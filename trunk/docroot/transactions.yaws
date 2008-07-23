@@ -1,0 +1,256 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  </head>
+  <body onload="load()" onunload="GUnload()">
+
+    <div class="menubar">
+       	  <div class="nothighlighted">
+	    <h2>Scalaris</h2>
+	  </div>
+       	  <div class="nothighlighted">
+	    <a class="menua" href="index.yaws">Home</a>
+	  </div>
+          <div class="nothighlighted">
+	<a class="menua" href="ring.yaws">Ring</a>
+	  </div>
+	  <div class="nothighlighted">
+       	    <a class="menua" href="rrd-status.yaws">RRD Status</a>
+	  </div>
+          <div class="nothighlighted">
+       	    <a class="menua" href="rrd-messages.yaws">RRD Messages</a>
+	  </div>
+	  <div class="nothighlighted">
+	    <a class="menua" href="documentation.yaws">Docu</a>
+	  </div>
+	  <div class="highlighted">
+	    <a class="menua" href="transactions.yaws">Transactions</a>
+	  </div>
+	  <div class="nothighlightedlast">
+	    <a class="menua" href="debug.yaws">Debug</a>
+	  </div>
+    </div><div class="middle">
+      <div class="middleleft">
+<h2>Transactions</h2>
+
+Number of nodes: 
+<erl> 
+ out(Arg) ->
+    erlang:put(instance_id, Arg#arg.opaque),
+    {html, integer_to_list(boot_server:number_of_nodes())}.
+</erl>
+
+<p>
+<h1> Transactional Storage </h1>
+
+<form method="post" action="/transactions.yaws">
+<input type=hidden name="type" value="transaction1">
+<p><input type="submit" value="Increment"/></p>
+</form>
+
+<form method="post" action="/transactions.yaws">
+<input type=hidden name="type" value="transaction3">
+<p><input type="submit" value="Test3"/></p>
+</form>
+
+<form method="post" action="/transactions.yaws">
+<input type=hidden name="type" value="transaction4">
+<p><input type="submit" value="Test4"/></p>
+</form>
+
+<form method="post" action="/transactions.yaws">
+<input type=hidden name="type" value="transaction5">
+<p><input type="submit" value="Test5"/></p>
+</form>
+
+<form method="post" action="/transactions.yaws">
+<input type=hidden name="type" value="transaction6">
+<p><input type="submit" value="Test6"/></p>
+</form>
+
+
+<p>
+<erl>
+out(A) ->
+    erlang:put(instance_id, A#arg.opaque),
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+		{ok, Type} = postvar(A,"type"),
+		if
+			Type == "transaction1" ->
+				{Time, Result} = timer:tc(transstore.cs_transaction_test, test1, []),
+		    		{ehtml, 
+     					{pre, [], 
+      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+      			true ->
+      				{ehtml, 
+       					{pre, [], 
+        				""}}
+		end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+		{ok, Type} = postvar(A,"type"),
+		if
+			Type == "transaction3" ->
+				{Time, Result} = timer:tc(transstore.cs_transaction_test, test3, []),
+		    		{ehtml, 
+     					{pre, [], 
+      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+      			true ->
+      				{ehtml, 
+       					{pre, [], 
+        				""}}
+		end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+<erl>
+out(A) ->
+    erlang:put(instance_id, A#arg.opaque),
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+		{ok, Type} = postvar(A,"type"),
+		if
+			Type == "transaction4" ->
+				{Time, Result} = timer:tc(transstore.cs_transaction_test, test4, []),
+		    		{ehtml, 
+     					{pre, [], 
+      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+      			true ->
+      				{ehtml, 
+       					{pre, [], 
+        				""}}
+		end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+<erl>
+out(A) ->
+    erlang:put(instance_id, A#arg.opaque),
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+		{ok, Type} = postvar(A,"type"),
+		if
+			Type == "transaction5" ->
+				{Time, Result} = timer:tc(transstore.cs_transaction_test, test5, []),
+		    		{ehtml, 
+     					{pre, [], 
+      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+      			true ->
+      				{ehtml, 
+       					{pre, [], 
+        				""}}
+		end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+<erl>
+out(A) ->
+    erlang:put(instance_id, A#arg.opaque),
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+		{ok, Type} = postvar(A,"type"),
+		if
+			Type == "transaction6" ->
+				{Time, Result} = timer:tc(transstore.cs_transaction_test, test6, []),
+		    		{ehtml, 
+     					{pre, [], 
+      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+      			true ->
+      				{ehtml, 
+       					{pre, [], 
+        				""}}
+		end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+</p>
+
+<h2>Quorum Read</h2>
+
+<form method="post" action="/transactions.yaws">
+
+<p>Key <input name="key" size="42" /></p>
+
+<input type=hidden name="type" value="quorumread">
+
+<p><input type="submit" value="Read"/></p>
+</form>
+
+<p>
+<erl>
+out(A) ->
+    erlang:put(instance_id, A#arg.opaque),
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+		{ok, Type} = postvar(A,"type"),
+		if
+			Type == "quorumread" ->
+				{ok, Key} = postvar(A, "key"),
+				{Time, Result} = timer:tc(transstore.cs_transaction_test, quorum_read, [Key]),
+		    		{ehtml, 
+     					{pre, [], 
+      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+      			true ->
+      				{ehtml, 
+       					{pre, [], 
+        				""}}
+		end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+</p>
+
+
+Last update:
+<erl>
+ 
+ out(Arg) ->
+        erlang:put(instance_id, Arg#arg.opaque),
+	{Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~w:~w:~w", [Hour, Minute, Second])}.
+</erl>
+</p>
+</div>
+<br class="br_class">&nbsp;
+</div>
+    <div class="bottom">
+    </div>
+</html>

@@ -1,0 +1,92 @@
+%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
+%%%-------------------------------------------------------------------
+%%% File    : admin.erl
+%%% Author  : Thorsten Schuett <schuett@zib.de>
+%%% Description : Supervisor for boot nodes
+%%%
+%%% Created : 03 Mar 2008 by Thorsten Schuett <schuett@zib.de>
+%%%-------------------------------------------------------------------
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @version $Id: admin.erl 463 2008-05-05 11:14:22Z schuett $
+-module(admin).
+
+-author('schuett@zib.de').
+-vsn('$Id: admin.erl 463 2008-05-05 11:14:22Z schuett $ ').
+
+-export([add_nodes/1, check_ring/0]).
+
+%%====================================================================
+%% API functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% Function: add_nodes(int()) -> ok
+%% Description: add new chordsharp nodes
+%%--------------------------------------------------------------------
+% @doc add new chordsharp nodes on the local node
+% @spec add_nodes(int()) -> ok
+add_nodes(Count) ->
+    randoms:init(),
+    add_nodes_loop(Count).
+
+add_nodes_loop(0) ->
+    ok;
+add_nodes_loop(Count) ->
+    io:format("~p~n", [supervisor:start_child(main_sup, {randoms:getRandomId(),
+							{cs_sup_or, start_link, []},
+							permanent,
+							brutal_kill,
+							worker,
+							[]})]),
+    add_nodes_loop(Count - 1).
+
+%%--------------------------------------------------------------------
+%% Function: check_ring() -> term()
+%% Description: contact boot server and check ring
+%%--------------------------------------------------------------------
+% @doc contact boot server and check ring
+% @spec check_ring() -> term
+check_ring() ->
+    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    Nodes = statistics:get_ring_details(),
+    lists:foldl(fun check_ring_foldl/2, first, Nodes).
+
+
+check_ring_foldl({ok, Node}, first) ->
+    get_id(hd(node_details:succlist(Node)));
+check_ring_foldl({failed}, Last) ->
+    Last;
+check_ring_foldl(_, {error, Message}) ->
+    {error, Message};
+check_ring_foldl({ok, Node}, PredsSucc) ->
+    MyId = get_id(node_details:me(Node)),
+    if
+	MyId == PredsSucc ->
+	    get_id(hd(node_details:succlist(Node)));
+	true ->
+	    {error, io_lib:format("~p didn't match ~p", [MyId, PredsSucc])}
+    end.
+
+
+    
+get_id(Node) ->
+    IsNull = node:is_null(Node),
+    if
+        IsNull ->
+            "null";
+        true ->
+            node:id(Node)
+    end.

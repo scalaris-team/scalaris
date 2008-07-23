@@ -1,0 +1,162 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  </head>
+  <body onload="load()" onunload="GUnload()">
+
+    <div class="menubar">
+       	  <div class="nothighlighted">
+	    <h2>Scalaris</h2>
+	  </div>
+       	  <div class="nothighlighted">
+	    <a class="menua" href="index.yaws">Home</a>
+	  </div>
+          <div class="nothighlighted">
+	<a class="menua" href="ring.yaws">Ring</a>
+	  </div>
+	  <div class="nothighlighted">
+       	    <a class="menua" href="rrd-status.yaws">RRD Status</a>
+	  </div>
+          <div class="highlighted">
+       	    <a class="menua" href="rrd-messages.yaws">RRD Messages</a>
+	  </div>
+	  <div class="nothighlighted">
+	    <a class="menua" href="documentation.yaws">Docu</a>
+	  </div>
+	  <div class="nothighlighted">
+	    <a class="menua" href="transactions.yaws">Transactions</a>
+	  </div>
+	  <div class="nothighlightedlast">
+	    <a class="menua" href="debug.yaws">Debug</a>
+	  </div>
+    </div><div class="middle">
+      <div class="middleleft">
+<h2>RRD: Messages</h2>
+
+Number of nodes: 
+<erl> 
+ out(Arg) ->
+    erlang:put(instance_id, Arg#arg.opaque),
+    {html, integer_to_list(boot_server:number_of_nodes())}.
+</erl>
+
+<br>
+<a href="#messages1h">1h</a></td>
+&nbsp;|&nbsp;<a href="#messages1d">1d</a></td>
+&nbsp;|&nbsp;<a href="#messages1w">1w</a></td>
+&nbsp;|&nbsp;<a href="#messages1m">1m</a></td>
+
+
+<p>
+<h3><a name="messages1h">Messages - 1h</a></h3>
+<img src="graphs/messages_get_pred_cnt_1h.png"></img>
+<img src="graphs/messages_get_pred_traffic_1h.png"></img>
+<img src="graphs/messages_get_succ_list_cnt_1h.png"></img>
+<img src="graphs/messages_get_succ_list_traffic_1h.png"></img>
+<img src="graphs/messages_get_succ_list_response_cnt_1h.png"></img>
+<img src="graphs/messages_get_succ_list_response_traffic_1h.png"></img>
+<img src="graphs/messages_ping_cnt_1h.png"></img>
+<img src="graphs/messages_ping_traffic_1h.png"></img>
+<img src="graphs/messages_notify_cnt_1h.png"></img>
+<img src="graphs/messages_notify_traffic_1h.png"></img>
+<img src="graphs/messages_get_load_cnt_1h.png"></img>
+<img src="graphs/messages_get_load_traffic_1h.png"></img>
+<img src="graphs/messages_get_load_response_cnt_1h.png"></img>
+<img src="graphs/messages_get_load_response_traffic_1h.png"></img>
+<img src="graphs/messages_drop_data_cnt_1h.png"></img>
+<img src="graphs/messages_drop_data_traffic_1h.png"></img>
+<img src="graphs/messages_get_middle_key_cnt_1h.png"></img>
+<img src="graphs/messages_get_middle_key_traffic_1h.png"></img>
+<img src="graphs/messages_get_middle_response_key_cnt_1h.png"></img>
+<img src="graphs/messages_get_middle_response_key_traffic_1h.png"></img>
+
+<h3><a name="messages1d">Messages - 1d</a></h3>
+<img src="graphs/messages_get_pred_cnt_1d.png"></img>
+<img src="graphs/messages_get_pred_traffic_1d.png"></img>
+<img src="graphs/messages_get_succ_list_cnt_1d.png"></img>
+<img src="graphs/messages_get_succ_list_traffic_1d.png"></img>
+<img src="graphs/messages_get_succ_list_response_cnt_1d.png"></img>
+<img src="graphs/messages_get_succ_list_response_traffic_1d.png"></img>
+<img src="graphs/messages_ping_cnt_1d.png"></img>
+<img src="graphs/messages_ping_traffic_1d.png"></img>
+<img src="graphs/messages_notify_cnt_1d.png"></img>
+<img src="graphs/messages_notify_traffic_1d.png"></img>
+<img src="graphs/messages_get_load_cnt_1d.png"></img>
+<img src="graphs/messages_get_load_traffic_1d.png"></img>
+<img src="graphs/messages_get_load_response_cnt_1d.png"></img>
+<img src="graphs/messages_get_load_response_traffic_1d.png"></img>
+<img src="graphs/messages_drop_data_cnt_1d.png"></img>
+<img src="graphs/messages_drop_data_traffic_1d.png"></img>
+<img src="graphs/messages_get_middle_key_cnt_1d.png"></img>
+<img src="graphs/messages_get_middle_key_traffic_1d.png"></img>
+<img src="graphs/messages_get_middle_response_key_cnt_1d.png"></img>
+<img src="graphs/messages_get_middle_response_key_traffic_1d.png"></img>
+
+<h3><a name="messages1w">Messages - 1w</a></h3>
+<img src="graphs/messages_get_pred_cnt_1w.png"></img>
+<img src="graphs/messages_get_pred_traffic_1w.png"></img>
+<img src="graphs/messages_get_succ_list_cnt_1w.png"></img>
+<img src="graphs/messages_get_succ_list_traffic_1w.png"></img>
+<img src="graphs/messages_get_succ_list_response_cnt_1w.png"></img>
+<img src="graphs/messages_get_succ_list_response_traffic_1w.png"></img>
+<img src="graphs/messages_ping_cnt_1w.png"></img>
+<img src="graphs/messages_ping_traffic_1w.png"></img>
+<img src="graphs/messages_notify_cnt_1w.png"></img>
+<img src="graphs/messages_notify_traffic_1w.png"></img>
+<img src="graphs/messages_get_load_cnt_1w.png"></img>
+<img src="graphs/messages_get_load_traffic_1w.png"></img>
+<img src="graphs/messages_get_load_response_cnt_1w.png"></img>
+<img src="graphs/messages_get_load_response_traffic_1w.png"></img>
+<img src="graphs/messages_drop_data_cnt_1w.png"></img>
+<img src="graphs/messages_drop_data_traffic_1w.png"></img>
+<img src="graphs/messages_get_middle_key_cnt_1w.png"></img>
+<img src="graphs/messages_get_middle_key_traffic_1w.png"></img>
+<img src="graphs/messages_get_middle_response_key_cnt_1w.png"></img>
+<img src="graphs/messages_get_middle_response_key_traffic_1w.png"></img>
+
+<h3><a name="messages1m">Messages - 1m</a></h3>
+<img src="graphs/messages_get_pred_cnt_1m.png"></img>
+<img src="graphs/messages_get_pred_traffic_1m.png"></img>
+<img src="graphs/messages_get_succ_list_cnt_1m.png"></img>
+<img src="graphs/messages_get_succ_list_traffic_1m.png"></img>
+<img src="graphs/messages_get_succ_list_response_cnt_1m.png"></img>
+<img src="graphs/messages_get_succ_list_response_traffic_1m.png"></img>
+<img src="graphs/messages_ping_cnt_1m.png"></img>
+<img src="graphs/messages_ping_traffic_1m.png"></img>
+<img src="graphs/messages_notify_cnt_1m.png"></img>
+<img src="graphs/messages_notify_traffic_1m.png"></img>
+<img src="graphs/messages_get_load_cnt_1m.png"></img>
+<img src="graphs/messages_get_load_traffic_1m.png"></img>
+<img src="graphs/messages_get_load_response_cnt_1m.png"></img>
+<img src="graphs/messages_get_load_response_traffic_1m.png"></img>
+<img src="graphs/messages_drop_data_cnt_1m.png"></img>
+<img src="graphs/messages_drop_data_traffic_1m.png"></img>
+<img src="graphs/messages_get_middle_key_cnt_1m.png"></img>
+<img src="graphs/messages_get_middle_key_traffic_1m.png"></img>
+<img src="graphs/messages_get_middle_response_key_cnt_1m.png"></img>
+<img src="graphs/messages_get_middle_response_key_traffic_1m.png"></img>
+</p>
+
+
+Last update:
+<erl>
+ 
+ out(Arg) ->
+        erlang:put(instance_id, Arg#arg.opaque),
+	{Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~w:~w:~w", [Hour, Minute, Second])}.
+</erl>
+</p>
+</div>
+<br class="br_class">&nbsp;
+</div>
+    <div class="bottom">
+    </div>
+</html>
