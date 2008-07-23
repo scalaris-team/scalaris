@@ -1,0 +1,2 @@
+{boot_host, {{127,0,0,1},14195,boot}}.
+{log_host, {{127,0,0,1},14195,boot_logger}}.

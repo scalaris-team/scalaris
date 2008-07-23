@@ -1,0 +1,1360 @@
+%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
+\documentclass[a4]{scrbook}
+\usepackage{typearea}
+\areaset[1cm]{165mm}{240mm}
+
+\usepackage[OT1]{fontenc}
+\usepackage[latin1]{inputenc}
+
+\usepackage{relsize}
+\usepackage{graphicx}
+%\usepackage{color}
+%\usepackage{colortbl}
+\usepackage{makeidx}
+\usepackage{fancyhdr}
+\usepackage{fancyvrb}
+\usepackage{lastpage}
+\usepackage{xxcolor}
+
+\usepackage[pdftex,
+        colorlinks=true,
+        urlcolor=rltblue,       % \href{...}{...} external (URL)
+        filecolor=rltblue,     % \href{...} local file
+        linkcolor=rltblue,      % \ref{...} and \pageref{...}
+%        pagebackref=true,
+        pdfborder={0 0 0}]{hyperref}
+\usepackage{listings}
+
+\renewcommand{\headrulewidth}{0pt}    % Width of head rule
+\renewcommand{\footrulewidth}{0.3pt}  % Width of head rule
+
+% normal pages
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+%\fancyhead[RE,LO]{}
+\fancyhead[RO]{}%
+\fancyfoot[LE,RO]{\bfseries\thepage\ / \pageref{LastPage}}%
+\chead{}%
+\cfoot{}%
+
+% beginning of a chapter
+\fancypagestyle{plain}{%
+\fancyhf{} % clear all header and footer fields
+%\fancyhead[RE,LO]{}
+\fancyhead[RO]{}%
+\fancyfoot[LE,RO]{\bfseries\thepage\ / \pageref{LastPage}}%
+\chead{}%
+\cfoot{}%
+}
+
+% Clear Header Style on the Last Empty Odd pages
+\makeatletter
+\def\cleardoublepage{\clearpage\if@twoside \ifodd\c@page\else%
+    \hbox{}%
+    \thispagestyle{empty}%              % Empty header styles
+    \newpage%
+    \if@twocolumn\hbox{}\newpage\fi\fi\fi}
+\makeatother
+
+%% Bold typewriter font
+\renewcommand{\ttdefault}{pcr}
+
+%%% colors %%%%%%%%%%%%%%%%%%%%%%%%
+
+\definecolor{lightyellow}{rgb}{1.0, 1.0, 0.5}
+\definecolor{rltred}{rgb}{0.75,0,0}
+\definecolor{rltgreen}{rgb}{0,0.5,0}
+\definecolor{rltblue}{rgb}{0,0,0.75}
+\definecolor{lightgray}{gray}{0.9}
+
+\setlength{\parindent}{0pt}
+
+\definecolor{lightyellow}{rgb}{1.0, 1.0, 0.5}
+\definecolor{codebackground}{rgb}{0.96,0.96,0.8}
+\definecolor{commandinput}{rgb}{0.8,0.8,1}
+
+%\thicklines
+\lstset{
+  basicstyle=\scriptsize\ttfamily,
+  backgroundcolor=\color{codebackground},
+  keywordstyle=\color{blue}\bfseries,
+  % underlined bold black keywords
+  identifierstyle=\bfseries, % nothing happens
+  commentstyle=\color{red}\bfseries, % white comments
+  stringstyle=\sffamily, % typewriter type for strings
+  showstringspaces=false,
+  xleftmargin=3pt,
+  xrightmargin=3pt,
+  fancyvrb=true,
+  frame=single,
+%  frameround=tttt,
+%  framexleftmargin=0pt,
+  framextopmargin=3pt,
+  framexbottommargin=3pt,
+%  framexrightmargin=5pt,
+  rulecolor=\color{codebackground},
+  language=Erlang,
+%  fillcolor=\color{red},
+%  rulesepcolor=\color{black}
+%  rulesep=1cm,
+}
+
+\makeindex
+
+
+\title{\textit{\it\sffamily Scalaris}\\\mbox{}\\Users and Developers Guide\\Version 0.1}
+\author{Florian Schintke, Thorsten Schütt}
+
+\newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
+\newcommand{\code}[1]{\lstinline[basicstyle=\small\ttfamily]!#1!}
+\newcommand{\filetitle}[1]{\hbox to \linewidth{~~File \code{#1:}\hfill}}
+\newcommand{\scalaris}{Scalaris}
+\newcommand{\todo}[1]{\texttt{\color{red}{#1}}}
+
+
+\makeindex
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\part{Users Guide}
+
+\chapter{Download and Installation}
+
+\section{Requirements}
+
+For building and running \scalaris{}, some third-party modules are
+required which are not included in the \scalaris{} sources:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item Erlang R12
+\item Erlang OTP (included in Erlang R12)
+\item Erlang yaws
+\item GNU Make
+\item rrdtool
+\end{itemize}
+
+Note, the Version 12 of Erlang is required. \scalaris{} will not
+work with older versions.
+
+To build the Java API the following modules are required additionally:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item Java Development Kit 1.6
+\item Apache Ant
+\end{itemize}
+
+Before building the Java API, make sure that \code{JAVA\_HOME} and
+\code{ANT\_HOME} are set. \code{JAVA\_HOME} has to point to a JDK
+1.6 installation, and \code{ANT\_HOME} has to point to an Ant
+installation.
+
+\section{Download}
+
+The sources can be obtained from \url{http://code.google.com/p/scalaris}.
+
+\subsection{Development Branch}
+
+You find the latest development version in the svn repoitory:
+\begin{lstlisting}[language=sh]
+# Non-members may check out a read-only working copy anonymously over HTTP.
+svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-read-only
+\end{lstlisting}
+
+\subsection{Releases}
+
+Releases can be found under the 'Download' tab on the web-page.
+
+
+\section{Configuration}
+
+\scalaris{} is configured by two configuration files
+(\code{bin/scalaris.cfg} and
+\code{bin/scalaris.local.cfg}). It will read the former for
+default values and then the latter which can override the
+defaults. After going through the build process there will be no
+\code{scalaris.local.cfg}. It can be created by the user to alter
+settings. It is required to be able to run a \scalaris{} on distributed
+nodes.
+
+\begin{lstlisting}[title=\filetitle{scalaris.local.cfg}]
+% Insert the apropriate IP-addresses for your setup as comma separated integers.
+% IP Address, Port, and label of the boot server
+{boot_host, {{209,85,135,99},14195,boot}}.
+
+% IP Address, Port, and label of the log server
+{log_host, {{209,85,135,99},14195,boot_logger}}.
+
+% possible values: 14195, [14195, 14196, 14197] (list of ports), 
+% or {14195, 15000} as range of ports
+{listen_port, 14195}.
+\end{lstlisting}
+
+\code{boot_host} defines the node where the boot server is
+running.
+
+\section{Build}
+
+%\subsection{Windows (Win32)}
+% \begin{enumerate}
+% \setlength{\itemsep}{0pt}
+% \setlength{\parskip}{0pt}
+% \item Copy \code{make.exe} from \code{contrib/win32} to \code{src} 
+% \item Copy \code{Makefile_to_src} from \code{contrib/win32} to \code{src} 
+% \item Copy \code{Makefile_to_src_comm_layer} from \code{contrib/win32} to \code{src/comm_layer} 
+% \item Copy \code{Makefile_to_src_transstore} from \code{contrib/win32} to \code{src/transstore} 
+% \item Rename Makefiles
+% \item Open MS-DOS Command Shell 
+% \item Go into \code{src} directory 
+% \item Call \code{make}
+% \item Go into bin directory 
+% \item Call \code{boot.bat}
+% \end{enumerate}
+% 
+% \subsubsection{Troubleshooting}
+% Check path to Erlang Installation in Makefiles.
+
+\subsection{Linux}
+
+Read the file \code{README} in the main \scalaris{} checkout directory.
+
+\subsection{Java-API}
+
+The following commands will build the Java API for \scalaris{}:
+\begin{lstlisting}[language=sh]
+%> cd java-api
+%> ant 
+\end{lstlisting}
+
+This will build chordsharp4j.jar, which is the library for accessing
+the overlay network. Optionally, the documentation can be build:
+\begin{lstlisting}[language=sh]
+%> ant doc
+\end{lstlisting}
+
+
+\section{Running \scalaris{}}
+
+In \scalaris{} there are two kinds of processes:
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item boot servers
+\item regular servers
+\end{itemize}
+
+In every \scalaris{}, at least one boot server is required. It will
+maintain a list of nodes taken part in the system and allows other
+nodes to join the ring. For redundancy, it is also possible to have
+several boot servers.
+
+\subsection{Running on a local machine}
+\label{sec.boot}
+
+Open at least two shells. In the first, go into the bin directory:
+\begin{lstlisting}[language=sh]
+%> cd bin
+%> ./boot.sh
+\end{lstlisting}
+
+This will start the boot server. On success \url{http://localhost:8000}
+should point to the management interface page of the boot server. The main
+page will show you the number of nodes currently in the system. After a
+couple of seconds a first \scalaris{} should have started in the boot server
+and the number should increase to one. The main page will also allow you to
+store and retrieve key-value pairs.
+
+The boot server should show output similar to the following, when
+starting the first \scalaris{} nodes. The first line is printed when
+the \scalaris{} is spawned. Afterwards it will try to connect the
+boot server. When the third line is printed, it managed to contact the
+boot server and joined the ring. In this case, it was the first node
+in the ring.
+\begin{lstlisting}
+[ I | Node   | <0.97.0> ] joining "23947834870"
+[ I | Node   | <0.97.0> ] join as first [50,51,57,52,55,56,51,52,56,55,48]
+[ I | Node   | <0.97.0> ] joined
+\end{lstlisting}
+
+In a second shell, you can now start a second \scalaris{} node. This
+will be a `regular server'. Go in the bin directory:
+\begin{lstlisting}[language=sh]
+%> cd bin
+%> ./cs_local.sh
+\end{lstlisting}
+
+The second node will read the configuration file and use this
+information to contact the boot server and will join the ring. The
+number of nodes on the web page should have increased to two by now.
+
+Optionally, a third and fourth node can be started on the same
+machine. In a third shell:
+\begin{lstlisting}[language=sh]
+%> cd bin
+%> ./cs_local2.sh
+\end{lstlisting}
+
+
+In a fourth shell:
+\begin{lstlisting}[language=sh]
+%> cd bin
+%> ./cs_local3.sh
+\end{lstlisting}
+
+
+This will add 3 nodes to the network. The web pages at
+\url{http://localhost:8000} should show the additional nodes.
+
+\subsection{Running distributed}
+
+\scalaris{} can be installed on other machines in the same way as described
+in Sect.~\ref{sec:install}. Please make sure, that the
+\code{scalaris.local.cfg} refers to available boot servers. Otherwise the
+other nodes will not find the boot server. On the remote nodes, you only
+need to call \code{./cs_local.sh} and they will automatically contact the
+configured boot server.
+
+\subsection{Running on PlanetLab}
+
+\subsection{Replication Degree}
+
+\subsection{Routing Scheme}
+
+\section{Installation}
+
+Note: there is no \code{make install} at the moment! The nodes have
+to be started from the bin directory.
+
+
+
+
+\chapter{Using the system}
+
+\section{Erlang}
+
+\section{Java command line interface}
+
+The jar file contains a small command line interface client.
+
+\begin{lstlisting}[language=sh]
+%> java -jar chordsharp4j.jar -help
+usage: chordsharp
+ -getsubscribers <topic>   get subscribers of a topic
+ -help                     print this message
+ -publish <params>         publish a new message for a topic: <topic>
+                           <message>
+ -read <key>               read an item
+ -subscribe <params>       subscribe to a topic: <topic> <url>
+ -write <params>           write an item: <key> <value>
+\end{lstlisting}
+
+Read and write can be used to read resp. write from/to the
+overlay. getsubscribers, publish, and subscribe are the PubSub
+functions.
+
+\begin{lstlisting}[language=sh]
+%> java -jar chordsharp4j.jar -write foo bar
+write(foo, bar)
+%> java -jar chordsharp4j.jar -read foo
+read(foo) == bar
+\end{lstlisting}
+
+The chordsharp4j library requires that you are running a `regular server' on
+the same node. Having a boot server running on the same node is not
+sufficient.
+
+\section{Java API}
+
+\chapter{Testing the system}
+
+
+\part{Developers Guide}
+
+\chapter{How a node joins the system}
+
+\hfill\emph{2008-07-22, SVN revision 1}
+
+\section{General Erlang server loop}
+
+Servers in Erlang often use the following structure to maintain a state
+while processing received messages:
+
+\lstset{language=Erlang}
+\begin{lstlisting}%[title=\filetitle{foo.erl}]
+loop(State) ->
+  receive
+    Message ->
+      State1 = f(State),
+      loop(State1)
+  end.
+\end{lstlisting}
+
+The server runs an endless loop, that waits for a message, processes it and
+calls itself using tail-recursion in each branch. The loop works on a
+\code{State}, which can be modified when a message is handeled.
+
+\section{Starting additional local nodes after boot}
+
+After booting a new \scalaris-System as described in
+Section~\sieheref{sec.boot}, ten additional local nodes can be started
+by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the boot
+process opened.
+
+
+\lstset{language=Erlang}
+\begin{lstlisting}
+scalaris/bin> ./boot.sh
+Erlang (BEAM) emulator version 5.6.1 [source] [smp:2] [async-threads:4] [hipe] [kernel-poll:false]
+
+Eshell V5.6.1  (abort with ^G)
+(boot@csr-pc9)1> ["scalaris.cfg","scalaris.local.cfg"]
+starting config
+listening on {0,0,0,0}:{14195,15000}
+[ I | Fail   | <0.75.0> ] start detector
+
+=INFO REPORT==== 18-Jul-2008::20:08:48 ===
+Yaws: Listening to 0.0.0.0:8000 for servers
+ - http://localhost:8000 under ../docroot
+[ I | Fail   | <0.102.0> ] start detector
+this() == {{127,0,0,1},14195}
+[ I | Node   | <0.105.0> ] joining "22500913918"
+[ I | Node   | <0.105.0> ] join as first [50,50,53,48,48,57,49,51,57,49,56]
+[ I | Node   | <0.105.0> ] joined
+
+(boot@csr-pc9)1> admin:add_nodes(10)
+\end{lstlisting}
+
+In the following we will trace, what this function does to join
+additional nodes to the system.
+
+The function \code{admin:add_nodes(int)} is defined as follows.
+\begin{lstlisting}[title=\filetitle{admin.erl}]
+[...]
+add_nodes(Count) ->
+    randoms:init(),
+    add_nodes_loop(Count).
+
+add_nodes_loop(0) ->
+    ok;
+add_nodes_loop(Count) ->
+    io:format("~p~n", [supervisor:start_child(main_sup, {randoms:getRandomId(),
+                                                        {cs_sup_or, start_link, []},
+                                                        permanent,
+                                                        brutal_kill,
+                                                        worker,
+                                                        []})]),
+    add_nodes_loop(Count - 1).
+[...]
+\end{lstlisting}
+
+
+It first initializes the random number generator and then calls
+\code{add_nodes_loop(Count)}.
+
+This function starts a new child for the main supervisor \code{main_sup}.
+As defined by the parameters, to actually perform the start, the function
+\code{cs_sup_or:start_link} is called by the Erlang supervisor mechanism.
+For more details on the OTP supervisor mechanism see Chapter 18 of the
+Erlang book~\cite{erlang-book} or the online documentation at 
+\url{http://www.erlang.org/doc/man/supervisor.html}.
+
+\subsection{Supervisor-tree of a \scalaris{} node}
+
+{\centering\includegraphics[width=0.9\linewidth]{supervision}}
+
+\subsection{Starting the or-supervisor and main processes of a node}
+
+The supervisor mechanism first calls the \code{init()} function of the
+defined module (\code{cs_sup_or:init()} in this case) before calling the
+defined function defined start function (\code{start_link} here.
+
+So, we have to take a look at \code{cs_sup_or:init}, the 'Scalaris
+\emph{or} supervisor'.
+ 
+\begin{lstlisting}[title=\filetitle{cs_sup_or.erl}]
+[...]
+init([]) ->
+    randoms:init(),
+    InstanceId = string:concat("cs_node_", randoms:getRandomId()),
+    FailureDetector =
+	{failure_detector,
+	 {failuredetector, start_link, [InstanceId]},
+	 permanent, brutal_kill, worker,
+	 [failure_detector]
+     },
+    Config =
+	{config,
+	 {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"], InstanceId]},
+	 permanent, brutal_kill, worker,
+	 []},
+    KeyHolder =
+	{cs_keyholder,
+	 {cs_keyholder, start_link, [InstanceId]},
+	 permanent, brutal_kill, worker,
+	 []},
+    MessageStatisticsCollector = 
+	{cs_message_collector,
+	 {cs_message, start_link, [InstanceId]},
+	 permanent, brutal_kill, worker,
+	 []},
+    Supervisor_AND = 
+	{cs_supervisor_and,
+	 {cs_sup_and, start_link, [InstanceId]},
+	 permanent, brutal_kill, supervisor,
+	 []},
+    {ok, {{one_for_one, 10, 1},
+	  [
+	   Config,
+	   KeyHolder,
+	   MessageStatisticsCollector,
+	   FailureDetector,
+	   Supervisor_AND
+	  ]}}.
+[...]
+\end{lstlisting}
+
+The \code{init()} function of a supervised process is requested to return
+process descriptions that the supervisor should start, and how the processes
+have to be handled. Here, we define a list of processes that should be
+observed by a \code{one_for_one} supervisor. The processes are:
+\code{Config}, \code{KeyHolder}, \code{MessageStatisticsCollector} and a
+\code{Supervisor_AND} process.
+
+The term \code{\{one_for_one, 10, 1\}} defines that the supervisor should
+  retry 10 times to restart each process before giving
+  up. \code{one_for_one} supervision means, that if a single process stops,
+  only that process is restarted. The other processes run independently.
+
+The \code{cs_sup_or:init()} is finished and the supervisor
+module, starts all the defined processes by calling their corresponding
+\code{init()} functions and afterwards, the functions that were defined in
+the list of the \code{cs_sup_or:init()}.
+
+For node join, we are only interested in the starting of the
+\code{Supervisor_AND} process, which was the last one in the list. All other
+defined processes are already running, when this will be started.
+
+\subsection{Starting the and-supervisor with a peer and its local database}
+
+Again, the OTP will first call the \code{init()} function of the
+corresponding module:
+
+\begin{lstlisting}[title=\filetitle{cs_sup_and.erl}]
+[...]
+init([InstanceId]) ->
+    Node =
+	{cs_node,
+	 {cs_node, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+    DB =
+	{cs_db_otp,
+	 {cs_db_otp, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+    {ok, {{one_for_all, 10, 1},
+	  [
+	   DB,
+	   Node
+	  ]}}.
+[...]
+\end{lstlisting}
+
+It defines two processes, that have to be observed using an
+\code{one_for_all}-supervisor, which means, that if one fails, all have to
+be restarted. Passed to the \code{init} function is the \code{InstanceId}, a
+random number to make the nodes unique. It was calculated a bit earlier in
+the code. Exercise: Try to find where.
+
+As you can see from the list, the \code{DB} ist started before the
+\code{Node}. This is important, because \code{cs_node} uses the database,
+but not vice versa. 
+
+After the \code{cs_sup_and:init()} finished, the DB is initialized and
+afterwards \code{cs_node:start_link} is called by the and-supervisor.
+
+\begin{lstlisting}[title=\filetitle{cs_node.erl}]
+[...]
+start_link(InstanceId) ->
+    {ok, spawn_link(?MODULE, start, [InstanceId])}.
+[...]
+\end{lstlisting}
+
+This spawns a new process, that executes \code{cs_node:start()} and
+maintains a link to that process. This function is called in the
+and-supervisor process, so the and-supervisor process will be informed, when
+the spawned process finishes. After the spawn is submitted,
+\code{cs_node:start_link} returns to the supervisor, which starts observing
+the processes in a loop.
+
+Note: \code{?MODULE} is a predefined Erlang macro, which expands to the
+module name, the code belongs to (here: \code{cs_node}).
+
+\subsection{Initializing a \code{cs_node}-process}
+
+\begin{lstlisting}[title=\filetitle{cs_node.erl}]
+[...]
+start(InstanceId) ->
+    %register(cs_node, self()),
+    process_dictionary:register_process(InstanceId, cs_node, self()),
+    randoms:init(),
+    timer:sleep(random:uniform(100) * 100),
+    Id = cs_keyholder:get_key(),
+    failuredetector:set_owner(self()),
+    boot_server:connect(),
+    {First, State} = cs_join:join(Id),
+    if
+	not First ->
+	    cs_replica_stabilization:recreate_replicas(
+              cs_state:get_my_range(State));
+	true ->
+	    ok
+    end,
+    timer:send_after(config:stabilizationInterval(), 
+      self(), {stabilize_ring}),
+    timer:send_after(config:pointerStabilizationInterval(),
+      self(), {stabilize_pointers}),
+    timer:send_after(config:failureDetectorUpdateInterval(),
+      self(), {stabilize_failuredetector}),
+    timer:send_after(config:loadBalanceStartupInterval(),
+      self(), {stabilize_loadbalance}),
+    io:format("[ I | Node   | ~w ] joined~n",[self()]),
+    loop(State, cs_debug:new()).
+[...]
+\end{lstlisting}
+
+A \code{cs_node} first registers itself in the process dictionary.  Then,
+the process sleeps for a random amount of time. Otherwise, if you would
+start 1000 processes with \code{admin:add_nodes(1000)}, the boot-server
+would receive many join requests at the same time, which is not intended.
+
+Then, the node retrieves its \code{Id} from the keyholder: 
+\code{Id = cs_keyholder:get_key()}. In the first call, a random identifier
+is returned. If the \code{cs_node}-process failed and is restarted by its
+supervisor, this call to the keyholder ensures, that the node still keeps
+its \code{Id}, assuming that the keyholder process is not failing.
+This is important for the load-balancing and for consistent responsibility
+of nodes to ensure consistent lookup.
+Note: the name \code{Key-holder} actually is an id-holder.
+
+If a node changes its position in the ring, the key-holder will be informed
+and the \code{cs_node} finishes itself. This triggers a restart of the
+corresponding database process via the and-supervisor. 
+When the supervisor restarts both processes, they will retrieve the new
+position in the ring from the key-holder and join the ring there.
+
+\todo{The supervisor was configured to restart a node at most 10 times. Does
+  that mean, that a node can only change its position in the ring 10 times
+  (caused by load-balancing)?}
+
+Next, the \code{cs_node} registers itself as the owner of the
+failuredetector \code{failuredetector:set_owner(self())} to become informed,
+when the failuredetector detects failing nodes.
+
+With \code{boot_server:connect()} a connection to the boot-server is
+established.
+
+\subsection{Actually joining the ring}
+
+\code{cs_join:join} is called next in \code{cs_node:start()}.
+
+\begin{lstlisting}[title=\filetitle{cs_join.erl}]
+[...]
+join(Id) -> 
+    io:format("[ I | Node   | ~w ] joining ~p ~n",[self(), Id]),
+    Ringsize = boot_server:number_of_nodes(),
+    if
+	Ringsize == 0 ->
+	    State = join_first(Id),
+	    cs_reregister:reregister(cs_state:uniqueId(State)),
+	    {true, State};
+	true ->
+	    case cs_lookup:reliable_get_node(erlang:get(instance_id), 
+					     Id, 60000) of
+		error ->
+		    join(Id);
+		{ok, Succ} ->
+		    State = join_ring(Id, Succ),
+		    cs_reregister:reregister(cs_state:uniqueId(State)),
+		    {false, State}
+	    end
+    end.
+[...]
+\end{lstlisting}
+
+The boot-server is contacted to retrieve the known number of nodes in the
+ring. If the ring is empty, \code{join_first} is called. Otherwise,
+\code{join_ring} is called.
+
+\code{join_first} just creates a new state for a \scalaris{} node conisting
+of an empty routing table, a successorlist containing itself, itself as its
+predecessor, itself, its responsibility area from \code{Id} to \code{Id} (the
+full ring), and a load balancing schema.
+
+\begin{lstlisting}[title=\filetitle{cs_join.erl}]
+[...]
+join_first(Id) -> 
+    io:format("[ I | Node   | ~w ] join as first ~w ~n",[self(), Id]),
+    Me = node:make(cs_send:this(), Id),
+    cs_state:new(?RT:empty(Me), [Me], Me, Me, {Id, Id}, cs_lb:new()).
+\end{lstlisting}
+
+The macro \code{?RT} maps to the configured routing algorithm.
+
+The state is defined in 
+
+\begin{lstlisting}[title=\filetitle{cs_state.erl}]
+[...]
+new(RT, SuccessorList, Predecessor, Me, MyRange, LB) ->
+    #state{
+     routingtable = RT,
+     successorlist = SuccessorList,
+     predecessor = Predecessor,
+     me = Me,
+     my_range = MyRange,
+     lb=LB,
+     join_time=now(),
+     deadnodes = gb_sets:new(),
+     trans_log = #translog{
+       tid_tm_mapping = dict:new(),
+       decided = gb_trees:empty(),
+       undecided = gb_trees:empty()
+      }
+    }.
+[...]
+\end{lstlisting}
+
+If a node joins an existing ring, \code{reliable_get_node} for the own
+\code{Id} is called in \code{cs_join:join()}. This lookup delivers the
+successor for the joining node. The node, that is currently responsible for
+\code{Id}, but which has a larger \code{Id} itself.  If this lookup fails
+for some reason, it is tried again, by recursivly calling the \code{join()}.
+
+\todo{What, if the \code{Id} is exactly the same as that of the existing
+  node? This could lead to lookup and responsibility inconsistency? Can this
+  be triggered by the load-balancing? This is a bug, that should be
+  fixed!!!}
+
+Then, \code{cs_join:join_ring} is called:
+
+\begin{lstlisting}[title=\filetitle{cs_join.erl}]
+[...]
+join_ring(Id, Succ) ->
+    io:format("[ I | Node   | ~w ] join_ring ~w ~n",[self(), Id]),
+    Me = node:make(cs_send:this(), Id),
+    UniqueId = node:uniqueId(Me),
+    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Id, UniqueId}),
+    receive
+	{join_response, Pred, Data, SuccList} -> 
+	    io:format("[ I | Node   | ~w ] got pred ~w~n",[self(), Pred]),
+	    IsNull = node:is_null(Pred),
+	    if
+		IsNull ->
+		    failuredetector:add_node(node:uniqueId(Succ), 
+                      node:id(Succ), node:pidX(Succ));
+		true ->
+		    failuredetector:add_nodes([{node:uniqueId(Pred), 
+                      node:id(Pred), node:pidX(Pred)}, 
+	              {node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)}]),
+		    cs_send:send(node:pidX(Pred), {update_succ, Me})
+	    end,
+	    cs_db_otp:add_data(Data),
+	    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, 
+              {node:id(Pred), Id}, cs_lb:new())
+    end.
+[...]
+\end{lstlisting}
+
+First the node is initialized. Then it sends a \code{join} message to the
+successor including a reference to itself and the chosen \code{Id}.
+
+The message is received by the old node in \code{cs_node.erl}. There exists
+a \code{\{join, X\}} handler. 
+
+\begin{lstlisting}[title=\filetitle{cs_node.erl}]
+[...]
+  {join, Source_PID, Id, UniqueId} = _Message -> 
+    ?LOG("[ ~w | I | Node   | ~w ] join~n",
+	      [calendar:universal_time(), self()]),
+    NewState = cs_join:join_request(State, Source_PID, Id, UniqueId),
+    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
+[...]
+\end{lstlisting}
+
+This triggers to call \code{join_request} on the old node. 
+
+\begin{lstlisting}[title=\filetitle{cs_join.erl}]
+[...]
+join_request(State, Source_PID, Id, UniqueId) ->
+    Pred = node:new(Source_PID, Id, UniqueId),
+    HisData = cs_db_otp:split_data(State, Id),
+    SuccList = cs_state:succ_list(State),
+    cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData, SuccList}),
+    failuredetector:add_node(UniqueId, Id, Source_PID),
+    cs_state:update_pred(State, Pred).
+[...]
+\end{lstlisting}
+
+This resets the local predecessor to the new node and splits the data.
+Then it sends a \code{join_respone} to the new node with its former
+predecessor, the data, it has to host, and its successorlist.
+Additionally, the new node will be observed with the failuredetector.
+
+\todo{Here, the observation of the former predecessor could be deleted from
+  the failure detector. But periodically, all known hosts are reregistered
+  with the failure detector, and then all other nodes are thrown away from
+  the list of nodes to observe in the failure detector.}
+
+Finally, the new predecessor is set and the \code{join_request()} is finished.
+ 
+Back on the new node, it waits for the \code{join_response} message in
+\code{cs_join:join_ring()}. The next steps after the message was received
+from the old node are to register the predecessor, to register all new nodes
+in the failure detector, to send a message to the predecessor, that its
+successor has changed.
+
+Finally, all data are added to the database and the succlist is build by
+putting the successor to the head of the successor list of the successor:
+\code{[Succ | SuccList]}.
+
+The next step in \code{cs_join:join()} is to call
+\code{cs_reregister:reregister} which reregisters the node periodically with
+the boot server. Then \code{\{false, State\}} is returned, which means 'this
+was not the first node in the ring'. Now, the \code{cs_join:join()} is
+completed.
+
+\subsection{Beginning to server requests}
+
+\code{cs_join:join()} was called from \code{cs_node:start()}, which
+continues
+
+\begin{lstlisting}[title=\filetitle{cs_node.erl}]
+[...]
+start(InstanceId) ->
+    %register(cs_node, self()),
+    process_dictionary:register_process(InstanceId, cs_node, self()),
+    randoms:init(),
+    timer:sleep(random:uniform(100) * 100),
+    Id = cs_keyholder:get_key(),
+    failuredetector:set_owner(self()),
+    boot_server:connect(),
+    {First, State} = cs_join:join(Id),
+    if
+	not First ->
+	    cs_replica_stabilization:recreate_replicas(
+              cs_state:get_my_range(State));
+	true ->
+	    ok
+    end,
+    timer:send_after(config:stabilizationInterval(), 
+      self(), {stabilize_ring}),
+    timer:send_after(config:pointerStabilizationInterval(), 
+      self(), {stabilize_pointers}),
+    timer:send_after(config:failureDetectorUpdateInterval(), 
+      self(), {stabilize_failuredetector}),
+    timer:send_after(config:loadBalanceStartupInterval(), 
+      self(), {stabilize_loadbalance}),
+    io:format("[ I | Node   | ~w ] joined~n",[self()]),
+    loop(State, cs_debug:new()).
+[...]
+\end{lstlisting}
+
+The \code{cs_replica_stabilization:recreate_replicas()} function is called,
+which is not yet implemented. It would recreated necessary replicas that
+were lost due to load-balancing and node failures.
+
+Finally all the self-management services are started with
+\code{timer:after} and the loop for request handling is started. 
+
+\subsection{FAQ}
+
+\paragraph{Question:} How are the routing-table, load-balancing and paxos 
+  processes started?
+
+\paragraph{Answer:} They are not implemented as separate Erlang
+  processes. All the requests are handled by the loop startet by
+  \code{cs_node:start()}. They could be implemented as separate processes.
+
+\chapter{Directory Structure of the Source Code}
+
+The directory tree of \scalaris{} is structured as follows: \\
+
+\begin{tabular}{|r|p{11.5cm}|}
+ \hline
+ \code{bin} & contains shell scripts needed to work with \scalaris{} (e.g.\ start the boot services, start a node, \dots)\\
+ \code{contrib} & necessary third party packages \\
+ \code{data} & rrd databases and a test dataset \\
+ \code{doc} & generated erlang documentation \\
+ \code{docroot} & root directory of the integrated webserver \\
+ \code{java-api} & a java api to \scalaris{} \\
+ \code{log} & log files \\
+ \code{src} & contains the \scalaris{} source code\\
+ \code{tests} & unit tests for Scalaris \\
+ \code{user-dev-guide} & contains the sources for this document\\
+ \hline
+\end{tabular}
+
+\chapter{System Components}
+
+
+
+\chapter{Processes}
+
+\chapter{Troubleshooting}
+
+\section{ApplicationMonitor appmon:start()}
+
+
+
+\appendix
+
+\chapter{Java API}
+
+\section{de.zib.chordsharp.ChordSharp}
+
+\begin{lstlisting}[language=Java, morekeywords={bool}]
+public class ChordSharp
+\end{lstlisting}
+
+Public ChordSharp Interface. 
+\\
+
+\begin{description}
+\item[\textbf{Version:}]1.1
+\item[\textbf{Author:}]Nico Kruber, kruber@zib.de
+\end{description}
+
+\begin{tabular}{|l|l|}
+\hline 
+ \textbf{Method Summary}
+ & \\
+ \hline 
+ static Vector$<$String$>$ &\textbf{getSubscribers}(String topic)\\ 
+& Gets a list of subscribers of a topic. \\
+ \hline 
+ static void &\textbf{publish}(String topic, String content)\\ 
+ & Publishes an event under a given topic. \\
+ \hline 
+ static String &\textbf{read}(String key)\\ 
+ & Gets the value stored with the given key. \\
+ \hline 
+ static void &\textbf{subscribe}(String topic, String url)\\ 
+ & Subscribes a url for a topic. \\
+ \hline 
+ static void &\textbf{write}(String key, String value)\\ 
+ & Stores the given key/value pair. \\
+ \hline 
+
+\end{tabular}
+
+\subsection*{ read}
+\begin{lstlisting}[language=Java, morekeywords={bool}]
+public static String read(String key)
+                   throws ConnectionException,
+                          TimeoutException,
+                          UnknownException,
+                          NotFoundException
+\end{lstlisting}
+
+Gets the value stored with the given key. 
+
+ 
+
+\begin{description}
+\item[\textbf{Parameters:}]key - the key to look up 
+\item[\textbf{Returns:}]the value stored under the given key
+\item[\textbf{Throws:}]
+\end{description}
+\begin{tabular}{ll}
+ConnectionException & if the connection is not active or a \\
+& communication error occurs or an exit signal \\
+& was received or the remote node sends a \\
+& message containing an invalid cookie \\
+TimeoutException & if a timeout occurred while trying to fetch the \\
+& value \\
+NotFoundException & if the requested key does not exist \\
+UnknownException & if any other error occurs\\
+\end{tabular}
+
+
+\subsection*{ write}
+\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
+
+public static void write(String key,
+                         String value)
+                  throws ConnectionException,
+                         TimeoutException,
+                         UnknownException
+\end{lstlisting}
+Stores the given key/value pair. 
+
+ 
+
+\begin{description}
+\item[\textbf{Parameters:}]key - the key to store the value for
+value - the value to store 
+\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
+TimeoutException - if a timeout occurred while trying to write the value 
+UnknownException - if any other error occurs
+
+\end{description}
+
+
+\subsection*{ publish}
+\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
+
+public static void publish(String topic,
+                           String content)
+                    throws ConnectionException
+\end{lstlisting}
+Publishes an event under a given topic. 
+
+ 
+
+\begin{description}
+\item[\textbf{Parameters:}]topic - the topic to publish the content under
+content - the content to publish 
+\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
+\end{description}
+
+\subsection*{ subscribe}
+\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
+
+public static void subscribe(String topic,
+                             String url)
+                      throws ConnectionException
+\end{lstlisting}
+Subscribes a url for a topic. 
+
+ 
+
+\begin{description}
+\item[\textbf{Parameters:}]topic - the topic to subscribe the url for
+url - the url of the subscriber (this is where the events are send to) 
+\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
+
+\end{description}
+
+
+\subsection*{ getSubscribers}
+\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
+
+public static Vector<String> getSubscribers(String topic)
+                                     throws ConnectionException,
+                                            UnknownException
+\end{lstlisting}
+Gets a list of subscribers of a topic. 
+
+ 
+
+\begin{description}
+\item[\textbf{Parameters:}]topic - the topic to get the subscribers for 
+\item[\textbf{Returns:}]the subscriber URLs 
+\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
+UnknownException - is thrown if the return type of the erlang method does not match the expected one
+
+\end{description}
+
+\subsection*{ de.zib.chordsharp.Transaction}
+
+
+\begin{lstlisting}[language=Java, morekeywords={bool}]
+public class \textbf{Transaction}
+\end{lstlisting}
+
+
+
+  Provides means to realise a transaction with the chordsharp ring using Java. 
+
+
+  It reads the connection parameters from a file called ChordSharpConnection.properties or uses default properties defined in ChordSharpConnection.defaultProperties. 
+\begin{lstlisting}[language=Java, morekeywords={bool}]
+OtpErlangString otpKey; 
+OtpErlangString otpValue; 
+OtpErlangString otpResult; 
+String key; 
+String value; 
+String result; 
+
+Transaction transaction = new Transaction(); // Transaction() 
+transaction.start(); // start() 
+transaction.write(otpKey, otpValue); // write(OtpErlangString, OtpErlangString) 
+transaction.write(key, value); // write(String, String) 
+otpResult = transaction.read(otpKey); //read(OtpErlangString) 
+result = transaction.read(key); //read(String) 
+transaction.commit(); // commit() 
+\end{lstlisting}
+
+For more examples, have a look at TransactionReadExample,
+TransactionParallelReadsExample, TransactionWriteExample and
+TransactionReadWriteExample.
+
+\subsubsection*{Attention:}
+
+If a read or write operation fails within a transaction all subsequent
+operations on that key will fail as well. This behaviour may
+particularly be undesirable if a read operation just checks whether a
+value already exists or not. To overcome this situation call
+revertLastOp() immediately after the failed operation which restores
+the state as it was before that operation.
+
+The TransactionReadWriteExample example shows such a use case.
+
+
+ 
+
+
+\begin{description}
+\item[\textbf{Version:}]1.0
+\item[\textbf{Author:}]Nico Kruber, kruber@zib.de
+\end{description}
+
+\begin{tabular}{|l|}
+\hline 
+ \textbf{Constructor Summary}
+ \\
+ \hline 
+\textbf{Transaction}()\\ 
+ Creates the object's connection to the chordsharp node specified in the \\
+``ChordSharpConnection.properties'' file. \\
+ \hline 
+
+\end{tabular}
+
+    
+
+\begin{tabular}{|l|l|}
+\hline 
+ \textbf{Method Summary} & \\
+ \hline 
+  void &\textbf{abort}()\\ 
+ & Cancels the current transaction. \\
+ \hline 
+  void &\textbf{commit}()\\ 
+ & Commits the current transaction. \\
+ \hline 
+  OtpErlangString &\textbf{read}(OtpErlangString key)\\ 
+ & Gets the value stored under the given key. \\
+ \hline 
+  String &\textbf{read}(String key)\\ 
+ & Gets the value stored under the given key. \\
+ \hline 
+  void &\textbf{revertLastOp}()\\ 
+ & Reverts the last (read or write) operation by \\
+ & restoring the last state. \\
+ \hline 
+  void &\textbf{start}()\\ 
+ & Starts a new transaction by generating a new transaction log. \\
+ \hline 
+  void &\textbf{write}(OtpErlangString key, OtpErlangString value)\\ 
+ & Stores the given key/value pair. \\
+ \hline 
+  void &\textbf{write}(String key, String value)\\ 
+ & Stores the given key/value pair. \\
+ \hline 
+
+\end{tabular}
+
+
+\subsection*{Transaction}
+
+\begin{lstlisting}[language=Java]
+public Transaction()
+            throws ConnectionException
+\end{lstlisting}
+Creates the object's connection to the chordsharp node specified in the ``ChordSharpConnection.properties'' file. 
+
+\begin{description}
+\item[\textbf{Throws:}]ConnectionException - if the connection fails
+\end{description}
+
+\subsection*{start}
+
+\begin{lstlisting}[language=Java]
+public void start()
+           throws ConnectionException,
+                  TransactionNotFinishedException,
+                  UnknownException
+\end{lstlisting}
+Starts a new transaction by generating a new transaction log. 
+
+ 
+
+\begin{description}
+\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
+TransactionNotFinishedException - if an old transaction is not finished (via commit() or abort()) yet 
+UnknownException - if the returned value from erlang does not have the expected type/structure
+
+\end{description}
+
+
+\subsection*{commit}
+
+\begin{lstlisting}[language=Java]
+public void commit()
+            throws UnknownException,
+                   ConnectionException
+\end{lstlisting}
+Commits the current transaction. The transaction's log is reset if the commit was successful, otherwise it still retains in the transaction which must be successfully committed or aborted in order to be restarted. 
+
+ 
+
+\begin{description}
+\item[\textbf{Throws:}
+]UnknownException - If the commit fails or the returned value from erlang is of an unknown type/structure, this exception is thrown. Neither the transaction log nor the local operations buffer is emptied, so that the commit can be tried again. 
+ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
+\item[\textbf{See Also:}
+]abort()
+
+\end{description}
+
+\subsection*{ abort}
+
+\begin{lstlisting}[language=Java]
+public void abort()
+\end{lstlisting}
+Cancels the current transaction. 
+
+  For a transaction to be cancelled, only the transLog needs to be reset. Nothing else needs to be done since the data was not modified until the transaction was committed. 
+
+
+ 
+
+\subsection*{read}
+
+\begin{lstlisting}[language=Java] 
+public OtpErlangString read(OtpErlangString key)
+                     throws ConnectionException,
+                            TimeoutException,
+                            UnknownException,
+                            NotFoundException
+\end{lstlisting}
+Gets the value stored under the given key. 
+
+\begin{description}
+\item[\textbf{Parameters:}
+]key - the key to look up 
+\item[\textbf{Returns:}
+]the value stored under the given key
+\item[\textbf{Throws:}
+]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
+TimeoutException - if a timeout occurred while trying to fetch the value 
+NotFoundException - if the requested key does not exist 
+UnknownException - if any other error occurs
+
+\end{description}
+
+
+\subsection*{read}
+
+\begin{lstlisting}[language=Java]
+public String read(String key)
+            throws ConnectionException,
+                   TimeoutException,
+                   UnknownException,
+                   NotFoundException
+\end{lstlisting}
+Gets the value stored under the given key. 
+
+ 
+
+\begin{description}
+\item[\textbf{Parameters:}
+]key - the key to look up 
+\item[\textbf{Returns:}
+]the value stored under the given key
+\item[\textbf{Throws:}
+]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
+TimeoutException - if a timeout occurred while trying to fetch the value 
+NotFoundException - if the requested key does not exist 
+UnknownException - if any other error occurs
+
+\end{description}
+
+
+\subsection*{write}
+
+\begin{lstlisting}[language=Java] 
+public void write(OtpErlangString key,
+                  OtpErlangString value)
+           throws ConnectionException,
+                  TimeoutException,
+                  UnknownException
+\end{lstlisting}
+Stores the given key/value pair. 
+
+\begin{description}
+\item[\textbf{Parameters:}
+]key - the key to store the value for
+value - the value to store 
+\item[\textbf{Throws:}
+]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
+TimeoutException - if a timeout occurred while trying to write the value 
+UnknownException - if any other error occurs
+
+\end{description}
+
+\subsection*{write}
+
+\begin{lstlisting}[language=Java] 
+public void write(String key,
+                  String value)
+           throws ConnectionException,
+                  TimeoutException,
+                  UnknownException
+\end{lstlisting}
+Stores the given key/value pair. 
+
+ 
+
+\begin{description}
+\item[\textbf{Parameters:}]key - the key to store the value for
+value - the value to store 
+\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
+TimeoutException - if a timeout occurred while trying to write the value 
+UnknownException - if any other error occurs
+
+\end{description}
+
+
+\subsection*{revertLastOp}
+
+\begin{lstlisting}[language=Java] 
+public void revertLastOp()
+\end{lstlisting}
+
+Reverts the last (read, parallelRead or write) operation by restoring
+the last state. If no operation was initiated yet, this method does
+nothing.
+
+This method is especially useful if after an unsuccessful read a value
+with the same key should be written which is not possible if the
+failed read is still in the transaction's log.
+
+
+\end{document}
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 

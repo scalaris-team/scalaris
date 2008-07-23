@@ -1,0 +1,130 @@
+# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+# 
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+# 
+#        http://www.apache.org/licenses/LICENSE-2.0
+# 
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
+README for Scalaris
+
+Scalaris is a scalable and fault-tolerant structured storage with strong data
+consistency for online databases or Web 2.0 services.
+
+For a more detailed description see the documentation in
+user-dev-guide/main.pdf
+
+Requirements
+============
+
+You will need:
+- Erlang R12
+- GNU Make
+- rrdtool
+
+Optional:
+- java
+- ant
+- libxslt
+
+Building
+========
+
+Execute:
+./configure
+make
+make rrd-init
+make docs
+
+Note: There is no make install at the moment!
+
+Afterwards the system is built. 
+
+Configuration
+=============
+
+Configuration is currently done with bin/scalaris.cfg and
+bin/scalaris.local.erl (optionally). bin/scalaris.cfg contains default for
+various parameters and shouldn't be changed normally.
+
+bin/scalaris.local.cfg is necessary for distributed setups and contains
+parameters which have to be adapted to the local
+environment. bin/scalaris.local.cfg.example is an example file.
+
+change the ip-address in the tuple to your own. (boot_host)
+
+log_path: the path to the log directory.
+
+
+Running
+=======
+
+Open at least two shells. In the first go into the bin directory:
+./boot.sh
+
+This will start the boot server. On success http://localhost:8000
+should point to the statistics page of the boot server.
+
+In a second shell:
+./cs_local.sh
+
+In a third shell:
+./cs_local2.sh
+
+In a fourth shell:
+./cs_local3.sh
+
+This will add 3 nodes to the network. The web pages should show the
+additional nodes.
+
+Starting nodes in same VM:
+In the Erlang-shell of the boot node do:
+> admin:add_nodes(3).
+
+
+Troubleshooting
+===============
+
+The boot server will start a web server on port 8000. Please make sure
+that no other applications is using the port.
+To check call:
+netstat -ltp | grep irdmi
+netstat -ltp | grep 8000
+Both commands will check whether an application is already using the 
+port.
+
+If you are not able to load the yaws module during boot _and_ are running
+R11, unpack the yaws-R11.tgz in the contrib-directory. Thereafter, run
+make clean && make.
+
+Firewall
+========
+
+Scalaris nodes are listening on TCP port 14195 by default. This is
+defined in scalaris.cfg in the line containing 'listen_port'. For
+distributed deployments of Scalaris the firewall has to allow
+connections to this port from the outside. The port can be change in
+the aforementioned configuration file or by an environment variable.
+The cs_local.sh uses the environment variable CS_PORT to change the
+port to 14196. This allows us to run several Scalaris nodes on the same
+host.
+ 
+Overview of directories
+=======================
+
+bin		the executables (.sh and .beam)
+contrib		necessary third party packages
+data		rrd databases and a test dataset
+doc		generated erlang documentation
+docroot		root directory of the integrated webserver
+java-api	a java api to Scalaris
+log		log files
+src		the erlang source code
+tests		unit tests for Scalaris
+user-dev-guide  users and developers guide

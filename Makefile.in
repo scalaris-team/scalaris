@@ -1,0 +1,110 @@
+#   Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+ERLC = @ERLC@
+ERL = @ERL@
+DIALYZER = @ERLANG_ROOT_DIR@/bin/dialyzer
+SVN = svn
+CD = cd
+RRDTOOL = @RRDTOOL@
+MAKE = make
+
+
+
+
+YAWS_PATH= /usr/local/lib/yaws
+
+APP_NAME = chordsharp
+
+VSN = $Id$
+
+all: compile
+
+#cp priv/xbin/*beam bin/
+compile:
+	$(MAKE) -C src
+
+test: compile
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/bin `pwd`/contrib/yaws/ebin -dir .
+
+java:
+	$(CD) java-api && ant jar
+
+clean:
+	-rm -rf bin/*.beam
+	-rm -rf bin/wikipedia/*.beam
+	-rm -rf bin/comm_layer/*.beam
+	-rm -rf bin/pubsub/*.beam
+	-rm -rf bin/transstore/*.beam
+	-rm -rf bin/locksmith/*.beam
+	-rm -rf src/*.beam
+	-rm -rf src/wikipedia/*.beam
+	-rm -rf src/comm_layer/*.beam
+	-rm -rf src/pubsub/*.beam
+	-rm -rf src/transstore/*.beam
+	-rm -rf src/locksmith/*.beam
+	-rm -rf test/*.beam
+	-rm -rf tests/*.beam
+	-rm -rf doc/*.html
+	-rm -rf doc/*.css
+	-rm -rf doc/edoc-info
+	-rm -rf docroot/graphs/*.png
+	$(MAKE) -C src/wikipedia/wikirender_drv clean
+
+docs:
+	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
+	'"."' '[{def,{vsn,"$(VSN)"}}]'
+
+svn:
+	$(SVN) propset svn:keywords Id src/*.erl src/wikipedia/*.erl src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
+
+dialyzer:
+	$(CD) bin && $(DIALYZER) -pa $(YAWS_PATH)/ebin -c *.beam
+
+rrd-init:
+	$(RRDTOOL) create data/average_memory_usage.rrd --step 60 DS:av_mem:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/max_memory_usage.rrd --step 60 DS:max_mem:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/total_nodes.rrd --step 60 DS:total_nodes:GAUGE:300:0:100000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/total_load.rrd --step 60 DS:total_load:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/average_load.rrd --step 60 DS:average_load:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/average_load_std_deviation.rrd --step 60 DS:av_load_std_dev:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/average_rt_size.rrd --step 60 DS:average_rt_size:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/average_rt_size_std_deviation.rrd --step 60 DS:av_rt_std_dev:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/total_messages_count.rrd --step 60 DS:total_messages_cnt:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/total_messages_size.rrd --step 60 DS:total_messages_size:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_ping_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_pong_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_pred_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_load_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_drop_data_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_ping_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_pong_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_pred_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_load_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_drop_data_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_notify_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_notify_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_succ_list_response_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_succ_list_response_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_succ_list_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_succ_list_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_load_response_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_load_response_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_middle_key_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_middle_key_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_middle_key_response_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	$(RRDTOOL) create data/messages_get_middle_key_response_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+
+
+
