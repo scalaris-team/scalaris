@@ -78,12 +78,25 @@ out(A) ->
 		{ok, Type} = postvar(A,"type"),
 		if
 			Type == "addkey" ->
-				{ok, Key} = postvar(A, "key"),
-				{ok, Value} = postvar(A, "value"),
-				{Time, Result} = webhelpers:set_key(Key, Value),
-		    		{ehtml, 
-     					{pre, [], 
+                                case postvar(A, "key") of
+				  {ok, Key} ->
+                                    case postvar(A, "value") of
+				      {ok, Value} ->
+				        {Time, Result} = webhelpers:set_key(Key, Value),
+		    		          {ehtml, 
+     					    {pre, [], 
       						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+                                      _ ->
+				        {Time, Result} = webhelpers:set_key(Key, ""),
+		    		          {ehtml, 
+     					    {pre, [], 
+      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}}
+                                    end;
+                                  _ ->
+      				    {ehtml, 
+       					{pre, [], 
+        				"key is undefined"}}
+                                end;
       			true ->
       				{ehtml, 
        					{pre, [], 
