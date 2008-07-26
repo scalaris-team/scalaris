@@ -63,9 +63,7 @@ Number of nodes:
 </table>
 
 <input type=hidden name="type" value="addkey">
-
-<form method="post" action="/index.yaws">
-<p><input type="submit" value="Add"/> <input type="reset" /></p>
+<p><input type="submit" value="Add"/> | <a href="/index.yaws">Reset</a></p>
 </form>
 
 <p>
@@ -75,37 +73,21 @@ out(A) ->
     IsPost = webhelpers:isPost(A),
     if
       	IsPost ->
-		{ok, Type} = postvar(A,"type"),
-		if
-			Type == "addkey" ->
-                                case postvar(A, "key") of
-				  {ok, Key} ->
-                                    case postvar(A, "value") of
-				      {ok, Value} ->
-				        {Time, Result} = webhelpers:set_key(Key, Value),
-		    		          {ehtml, 
-     					    {pre, [], 
-      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
-                                      _ ->
-				        {Time, Result} = webhelpers:set_key(Key, ""),
-		    		          {ehtml, 
-     					    {pre, [], 
-      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}}
-                                    end;
-                                  _ ->
-      				    {ehtml, 
-       					{pre, [], 
-        				"key is undefined"}}
-                                end;
-      			true ->
-      				{ehtml, 
-       					{pre, [], 
-        				""}}
-		end;
-	true ->
-      		{ehtml, 
-       			{pre, [], 
-        		""}}
+               {ok, Type} = postvar(A,"type"),
+               if 
+                 Type == "addkey" -> 
+                    case {postvar(A, "key"),postvar(A, "value")} of
+		      {{ok, Key},{ok, Value}} ->
+                         {Time, Result} = webhelpers:set_key(Key, Value),
+		    	 {ehtml, {pre, [], io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+                      _ -> 
+                         {ehtml, {pre, [], "<div style='color: red;'>Missing required input: Need a Key and Value</div>"}}
+                    end;
+                 true ->
+                    {ehtml,{pre, [], ""}}
+               end;
+ 	true ->
+      		{ehtml,{pre, [], ""}}
     end.
 </erl>
 </p>
@@ -119,7 +101,7 @@ out(A) ->
 
 <input type=hidden name="type" value="querykey">
 
-<p><input type="submit" value="Lookup"/> <input type="reset" /></p>
+<p><input type="submit" value="Lookup"/> | <a href="/index.yaws">Reset</a></p>
 </form>
 
 
@@ -130,19 +112,19 @@ out(A) ->
     IsPost = webhelpers:isPost(A),
     if
       	IsPost ->
-		{ok, Type} = postvar(A,"type"),
-		if
-			Type == "querykey" ->
-				{ok, Key} = postvar(A, "key"),
-				{Time, Result} = webhelpers:lookup(Key),
-		    		{ehtml, 
-     					{pre, [], 
-      						io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
-      			true ->
-      				{ehtml, 
-       					{pre, [], 
-        				""}}
-		end;
+              {ok, Type} = postvar(A,"type"),
+              if 
+                Type == "querykey" ->
+                  case postvar(A, "key") of
+                   {ok, Key} ->
+                      {Time, Result} = webhelpers:lookup(Key),
+		      {ehtml, {pre, [], io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+                    _ ->
+                      {ehtml, {pre, [], ""}}
+		  end;
+                true -> 
+                      {ehtml, {pre, [], ""}}
+              end;
 	true ->
       		{ehtml, 
        			{pre, [], 
