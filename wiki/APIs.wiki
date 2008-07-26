@@ -1,0 +1,37 @@
+#summary APIs supported by scalaris.
+
+= Introduction =
+
+= Web interface =
+
+Using the web interface, you can read and write key-value pairs. The read/write will be executed within a transaction. But each transaction will execute exactly one operation.
+
+= Java API =
+
+The java-api directory contains library for accessing scalaris from Java. Besides executing atomic read and write operations like in the web interface. You can write more complex transactions.
+
+{{{
+// new Transaction object
+Transaction transaction = new Transaction();
+// start new transaction
+transaction.start();
+
+//read account A
+int accountA =
+    new Integer(transaction.read("accountA")).intValue();
+//read account B
+int accountB =
+    new Integer(transaction.read("accountB")).intValue();
+
+//remove 100$ from accountA
+transaction.write("accountA",
+    new Integer(accountA - 100).toString());
+//add 100$ to account B
+transaction.write("accountB",
+    new Integer(accountB + 100).toString());
+
+transaction.commit();
+
+}}}
+The library can also be used as a command-line interface.
+
