@@ -98,7 +98,7 @@ get_keys_for_replicas(Key) when is_integer(Key) ->
     [Key, 
      normalize(Key + 16#40000000000000000000000000000000),
      normalize(Key + 16#80000000000000000000000000000000),
-     normalize(Key + 16#C000000000000000000000000000000)
+     normalize(Key + 16#C0000000000000000000000000000000)
     ];
 get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
