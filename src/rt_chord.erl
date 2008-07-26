@@ -152,12 +152,6 @@ dump(_State) ->
 %%      and triggers the next update
 %% @spec stabilize(cs_state:state(), int(), node:node()) -> cs_state:state()
 stabilize(State, Index, Node) ->
-    if
-	Index == 1 ->
-	    io:format("~p ~p ~p ~p~n", [Index, cs_state:me(State), cs_state:succ(State), Node]);
-	true ->
-	    ok
-    end,
     RT = cs_state:rt(State),
     case node:is_null(Node) of
 	true ->
