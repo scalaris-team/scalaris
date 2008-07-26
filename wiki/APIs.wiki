@@ -35,3 +35,6 @@ transaction.commit();
 }}}
 The library can also be used as a command-line interface.
 
+= Erlang Interface =
+
+Of course, you can write transactions in Erlang. See e.g. src/transstore/transaction_test.erl
