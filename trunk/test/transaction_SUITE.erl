@@ -37,9 +37,11 @@ suite() ->
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
-    Pid = spawn(fun () -> process_dictionary:start_link(), 
-			  boot_sup:start_link(), 
-			  timer:sleep(20000) 
+    Pid = spawn(fun () ->
+			comm_layer.comm_layer:start_link(),
+			process_dictionary:start_link(), 
+			boot_sup:start_link(), 
+			timer:sleep(20000) 
 		end),
     timer:sleep(12000),
     [{wrapper_pid, Pid} | Config].

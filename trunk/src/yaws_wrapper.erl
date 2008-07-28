@@ -26,17 +26,51 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([start_link/3]).
-
 -include("yaws.hrl").
 
+-export([start_link/3, try_link/3]).
+
+% start yaws
 start_link(DocRoot, SL, GL) ->
-    ok = application:load(yaws),
     ok = application:set_env(yaws, embedded, true),
+    ok = application:set_env(yaws, id, "default"),
     Link = yaws_sup:start_link(),
-    GC = yaws:setup_gconf(GL, yaws_config:make_default_gconf(false, "")),
+    GC = yaws:setup_gconf(GL, yaws_config:make_default_gconf(false, "default")),
     SC = yaws:setup_sconf(DocRoot, #sconf{}, SL),
-    yaws_config:add_yaws_soap_srv(GC),
+    %yaws_config:add_yaws_soap_srv(GC),
     SCs = yaws_config:add_yaws_auth([SC]),
     yaws_api:setconf(GC, [SCs]),
     Link.
+
+% try to open yaws
+try_link(DocRoot, SL, GL) ->
+    ok = application:set_env(yaws, embedded, true),
+    ok = application:set_env(yaws, id, "default"),
+    Link = yaws_sup:start_link(),
+    GC = yaws:setup_gconf(GL, yaws_config:make_default_gconf(false, "default")),
+    SC = yaws:setup_sconf(DocRoot, #sconf{}, SL),
+    %yaws_config:add_yaws_soap_srv(GC),
+    SCs = yaws_config:add_yaws_auth([SC]),
+    case try_port(SC#sconf.port) of
+	true ->
+	    yaws_api:setconf(GC, [SCs]),
+	    Link;
+	false ->
+	    io:format("WARNING: could not start yaws, maybe port ~p is in use~n", [SC#sconf.port]),
+	    spawn_link(fun() -> do_nothing() end)
+    end.
+
+do_nothing() ->
+    timer:sleep(1000000),
+    do_nothing().
+
+try_port(Port) ->
+    case gen_tcp:connect("0.0.0.0", Port, []) of
+	{ok, Sock} ->
+	    gen_tcp:close(Sock),
+	    true;
+	_  ->
+	    false
+    end.
+    
+    
