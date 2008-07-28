@@ -43,31 +43,25 @@ java:
 
 clean:
 	-rm -rf bin/*.beam
-	-rm -rf bin/wikipedia/*.beam
 	-rm -rf bin/comm_layer/*.beam
 	-rm -rf bin/pubsub/*.beam
 	-rm -rf bin/transstore/*.beam
-	-rm -rf bin/locksmith/*.beam
 	-rm -rf src/*.beam
-	-rm -rf src/wikipedia/*.beam
 	-rm -rf src/comm_layer/*.beam
 	-rm -rf src/pubsub/*.beam
 	-rm -rf src/transstore/*.beam
-	-rm -rf src/locksmith/*.beam
 	-rm -rf test/*.beam
-	-rm -rf tests/*.beam
 	-rm -rf doc/*.html
 	-rm -rf doc/*.css
 	-rm -rf doc/edoc-info
 	-rm -rf docroot/graphs/*.png
-	$(MAKE) -C src/wikipedia/wikirender_drv clean
 
 docs:
 	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
 	'"."' '[{def,{vsn,"$(VSN)"}}]'
 
 svn:
-	$(SVN) propset svn:keywords Id src/*.erl src/wikipedia/*.erl src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
+	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
 
 dialyzer:
 	$(CD) bin && $(DIALYZER) -pa $(YAWS_PATH)/ebin -c *.beam

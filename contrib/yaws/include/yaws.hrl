@@ -19,6 +19,8 @@
 -define(GC_FAIL_ON_BIND_ERR,                64).
 -define(GC_PICK_FIRST_VIRTHOST_ON_NOMATCH, 128).
 -define(GC_USE_FDSRV,                      256).
+-define(GC_USE_OLD_SSL,                    512).
+
 
 -define(GC_DEF, (?GC_AUTH_LOG bor ?GC_FAIL_ON_BIND_ERR)).
 
@@ -40,6 +42,8 @@
         ((GC#gconf.flags band ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH) /= 0)).
 -define(gc_use_fdsrv(GC),
         ((GC#gconf.flags band ?GC_USE_FDSRV) /= 0)).
+-define(gc_use_old_ssl(GC),
+        ((GC#gconf.flags band ?GC_USE_OLD_SSL) /= 0)).
 
 -define(gc_set_tty_trace(GC, Bool), 
         GC#gconf{flags = yaws:flag(GC#gconf.flags,?GC_TTY_TRACE, Bool)}).
@@ -62,6 +66,9 @@
                                    ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH,Bool)}).
 -define(gc_set_use_fdsrv(GC, Bool), 
         GC#gconf{flags = yaws:flag(GC#gconf.flags,?GC_USE_FDSRV,Bool)}).
+-define(gc_set_use_old_ssl(GC, Bool), 
+        GC#gconf{flags = yaws:flag(GC#gconf.flags,?GC_USE_OLD_SSL,Bool)}).
+
 
 
 %% global conf
@@ -76,13 +83,13 @@
                max_num_cached_bytes = 1000000,  %% 1 MEG
                max_size_cached_file = 8000,
                large_file_chunk_size = 10240,
+	       mnesia_dir = [],
                log_wrap_size = 10000000,  % wrap logs after 10M
                cache_refresh_secs = 30,  % seconds  (auto zero when debug)
                include_dir = [],    %% list of inc dirs for .yaws files 
                phpexe = "/usr/bin/php-cgi",  %% cgi capable php executable
                yaws,                %% server string
                id = "default",      %% string identifying this instance of yaws
-               tmpdir,
                enable_soap = false  %% start yaws_soap_srv iff true
               }).  
 
@@ -167,7 +174,8 @@
          arg_rewrite_mod = yaws,
          opaque = [],                 %% useful in embedded mode
          start_mod,                   %% user provided module to be started
-         allowed_scripts = [yaws,php],
+         allowed_scripts = [yaws,php,cgi],
+         tilde_allowed_scripts = [],
          revproxy = []
         }).
 
