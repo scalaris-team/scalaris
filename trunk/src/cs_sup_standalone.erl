@@ -75,8 +75,19 @@ init([]) ->
 	 supervisor,
 	 [cs_sup_or]
      },
+    YAWS = 
+	{yaws,
+	 {yaws_wrapper, try_link, ["../docroot_node", 
+				     [{port, 8001}, {listen, {0,0,0,0}}], 
+				     [{max_open_conns, 800}, {access_log, false}]
+				    ]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok,{{one_for_all,10,1}, [
 			      CommunicationPort,
+			      YAWS,
 			      ChordSharp
 			     ]}}.
 
