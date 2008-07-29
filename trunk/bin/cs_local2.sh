@@ -14,4 +14,4 @@
 #    limitations under the License.
 
 export CS_PORT=14197
-erl -setcookie "chocolate chip cookie" -connect_all false -hidden -sname node2 -s chordsharp
+erl -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -yaws embedded true -connect_all false -hidden -sname node2 -s chordsharp
