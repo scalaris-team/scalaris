@@ -65,11 +65,12 @@ do_nothing() ->
     do_nothing().
 
 try_port(Port) ->
-    case gen_tcp:connect("0.0.0.0", Port, []) of
+    case gen_tcp:listen(Port, []) of
 	{ok, Sock} ->
 	    gen_tcp:close(Sock),
 	    true;
-	_  ->
+	X  ->
+	    io:format("~p~n", [X]),
 	    false
     end.
     

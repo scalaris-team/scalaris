@@ -26,71 +26,83 @@
 -author('schuett@zib.de').
 -vsn('$Id: cs_api.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([number_of_nodes/0, node_list/0,
-	 get_key/1, set_key/3]).
-    
+-export([read/1, write/2, test_and_set/3]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc returns the number of nodes known to the boot server
-%%      the current erlang instance has to run a boot server
-%% @spec number_of_nodes() -> integer()
-number_of_nodes()->
-    boot ! {get_list, self()},
-    receive
-	{get_list_response, Nodes} ->
-	    util:lengthX(Nodes)
+%% @type key() = term(). Key
+%% @type value() = term(). Value
+
+%% @doc reads the value of a key
+%% @spec read(key()) -> {failure, term()} | value()
+read(Key) ->
+    case transstore.transaction_api:quorum_read(Key) of
+	{fail, Reason} ->
+	    {fail, Reason};
+	{Value, _Version} ->
+	    Value
+    end.
+	    
+
+%% @doc writes the value of a key
+%% @spec write(key(), value()) -> ok | {fail, term()}
+write(Key, Value) ->
+    case transstore.transaction_api:single_write(Key, Value) of
+	commit ->
+	    ok;
+	{fail, Reason} ->
+	    {fail, Reason}
     end.
 
-%% @doc returns all nodes known to the boot server
-%%      the current erlang instance has to run a boot server
-%% @spec node_list() -> list(pid())
-node_list() ->
-    boot ! {get_list, self()},
-    receive
-	{get_list_response, Nodes} ->
-	    Nodes
-    end.
-
-    
-get_key(Key) ->
+%% @doc atomic compare and swap
+%% @spec test_and_set(key(), value(), value()) -> {fail, Reason} | ok
+test_and_set(Key, OldValue, NewValue) ->
     TFun = fun(TransLog) ->
-		   {Result, TransLog1} = transstore.transaction:read(Key, TransLog),
-		   if
-                       Result == fail ->
-                           {{fail, notfound}, TransLog1};
-                       true ->
-                           {value, Value} = Result,
-                           {{ok, Value}, TransLog1}
-                   end
-	   end,
-    case do_transaction_locally(TFun, fun (X) -> {success, X} end, fun(_X) -> {failure} end, 4000) of
-	{success, Value} ->
-	    Value;
-	{failure, _Reason} ->
-	    failure
+                   {Result, TransLog1} = transstore.transaction_api:read(Key, TransLog),
+                   case Result of
+                       {value, ReadValue} ->
+                           if
+                               ReadValue == OldValue ->
+                                   {Result2, TransLog2} = transstore.transaction_api:write(Key, NewValue, TransLog1),
+                                   if
+                                       Result2 == ok ->
+                                           {{ok, done}, TransLog2};
+                                       true ->
+                                           {{fail, notfound}, TransLog2}
+                                   end;
+                               true ->
+                                   {{fail, {key_changed, ReadValue}}, TransLog1}
+                           end;
+                       {fail, not_found} ->
+                           {Result2, TransLog2} = transstore.transaction_api:write(Key, NewValue, TransLog),
+                           if
+                               Result2 == ok ->
+                                   {{ok, done}, TransLog2};
+                               true ->
+                                   {{fail, write}, TransLog2}
+                           end
+                       end
+           end,
+    SuccessFun = fun(X) -> {success, X} end,
+    FailureFun = fun(X) -> {failure, X} end,
+    case do_transaction_locally(TFun, SuccessFun, FailureFun, 5000) of
+	{trans, {success, {commit, done}}} ->
+	    ok;
+	{trans, {failure, Reason}} ->
+	    {fail, Reason};
+	X ->
+	    io:format("X: ~p~n", [X]),
+	    X
     end.
-
-set_key(Key, Value, _VersionNr) ->
-    TFun = fun(TransLog) ->
-		   {Result, TransLog1} = transstore.transaction:write(Key, Value, TransLog),
-		   if
-                       Result == ok ->
-                           {{ok, done}, TransLog1};
-                       true ->
-                           {{fail, Result}, TransLog1}
-                   end
-	   end,
-    {success} = do_transaction_locally(TFun, fun (_) -> {success} end, fun(_X)->{failure} end, 4000),
-    ok.
 
 
 % I know there is a cs_node in this instance so I will use it directly
 %@private
 do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
     {ok, PID} = process_dictionary:find_cs_node(),
-    PID ! {do_transaction, TransFun, SuccessFun, Failure, self()},
+    PID ! {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()},
     receive
 	X ->
 	    X
