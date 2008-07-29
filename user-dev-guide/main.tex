@@ -111,11 +111,6 @@
 %  rulesep=1cm,
 }
 
-\makeindex
-
-
-\title{\textit{\it\sffamily Scalaris}\\\mbox{}\\Users and Developers Guide\\Version 0.1}
-\author{Florian Schintke, Thorsten Schütt}
 
 \newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
 \newcommand{\code}[1]{\lstinline[basicstyle=\small\ttfamily]!#1!}
@@ -127,7 +122,44 @@
 \makeindex
 
 \begin{document}
-\maketitle
+\vspace*{4cm}
+\begin{center}
+\setlength{\parskip}{0.8cm}
+{
+\Huge
+\bf \textit{\it\sffamily Scalaris}
+
+ \textsf{Users and Developers Guide}
+
+\textsf{Version 0.1}
+}
+
+{\LARGE Florian Schintke, Thorsten Schütt}
+
+{\LARGE \today}
+\vfill
+\end{center}
+\pagebreak
+\mbox{}
+\vfill
+
+Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+
+\medskip
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+\medskip
+\url{http://www.apache.org/licenses/LICENSE-2.0}
+
+\medskip
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
 \tableofcontents
 
 \part{Users Guide}
@@ -185,14 +217,12 @@ Releases can be found under the 'Download' tab on the web-page.
 
 \section{Configuration}
 
-\scalaris{} is configured by two configuration files
-(\code{bin/scalaris.cfg} and
-\code{bin/scalaris.local.cfg}). It will read the former for
-default values and then the latter which can override the
-defaults. After going through the build process there will be no
-\code{scalaris.local.cfg}. It can be created by the user to alter
-settings. It is required to be able to run a \scalaris{} on distributed
-nodes.
+\scalaris{} reads the two configuration files from the working directory:
+\code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
+(optional). The former defines default settings and is included in the
+release. The latter can be created by the user to alter settings.  A sample
+file is \code{bin/scalaris.local.cfg.example}. A local configuration file is
+necessary to run \scalaris{} on distributed nodes:
 
 \begin{lstlisting}[title=\filetitle{scalaris.local.cfg}]
 % Insert the apropriate IP-addresses for your setup as comma separated integers.
@@ -207,8 +237,8 @@ nodes.
 {listen_port, 14195}.
 \end{lstlisting}
 
-\code{boot_host} defines the node where the boot server is
-running.
+\code{boot_host} defines the node where the boot server is running, which is
+contacted to join the system.
 
 \section{Build}
 
@@ -389,7 +419,7 @@ sufficient.
 
 \chapter{How a node joins the system}
 
-\hfill\emph{2008-07-22, SVN revision 1}
+\hfill\emph{2008-07-22, SVN revision 2}
 
 \section{General Erlang server loop}
 
@@ -421,14 +451,7 @@ process opened.
 \lstset{language=Erlang}
 \begin{lstlisting}
 scalaris/bin> ./boot.sh
-Erlang (BEAM) emulator version 5.6.1 [source] [smp:2] [async-threads:4] [hipe] [kernel-poll:false]
-
-Eshell V5.6.1  (abort with ^G)
-(boot@csr-pc9)1> ["scalaris.cfg","scalaris.local.cfg"]
-starting config
-listening on {0,0,0,0}:{14195,15000}
-[ I | Fail   | <0.75.0> ] start detector
-
+[...]
 =INFO REPORT==== 18-Jul-2008::20:08:48 ===
 Yaws: Listening to 0.0.0.0:8000 for servers
  - http://localhost:8000 under ../docroot
@@ -464,7 +487,6 @@ add_nodes_loop(Count) ->
 [...]
 \end{lstlisting}
 
-
 It first initializes the random number generator and then calls
 \code{add_nodes_loop(Count)}.
 
@@ -477,15 +499,19 @@ Erlang book~\cite{erlang-book} or the online documentation at
 
 \subsection{Supervisor-tree of a \scalaris{} node}
 
+When starting a new node in the system, the following supervisor tree is
+created:
+
+\medskip
 {\centering\includegraphics[width=0.9\linewidth]{supervision}}
 
-\subsection{Starting the or-supervisor and main processes of a node}
+\subsection{Starting the or-supervisor and general processes of a node}
 
 The supervisor mechanism first calls the \code{init()} function of the
 defined module (\code{cs_sup_or:init()} in this case) before calling the
-defined function defined start function (\code{start_link} here.
+defined start function (\code{start_link} here.
 
-So, we have to take a look at \code{cs_sup_or:init}, the 'Scalaris
+So, lets have a look at \code{cs_sup_or:init}, the 'Scalaris
 \emph{or} supervisor'.
  
 \begin{lstlisting}[title=\filetitle{cs_sup_or.erl}]
@@ -530,12 +556,11 @@ init([]) ->
 [...]
 \end{lstlisting}
 
-The \code{init()} function of a supervised process is requested to return
-process descriptions that the supervisor should start, and how the processes
-have to be handled. Here, we define a list of processes that should be
-observed by a \code{one_for_one} supervisor. The processes are:
-\code{Config}, \code{KeyHolder}, \code{MessageStatisticsCollector} and a
-\code{Supervisor_AND} process.
+The \code{init()} function must return process descriptions that the
+supervisor should start, and how the processes have to be observed. Here, we
+define a list of processes to be observed by a \code{one_for_one}
+supervisor. The processes are: \code{Config}, \code{KeyHolder},
+\code{MessageStatisticsCollector} and a \code{Supervisor_AND} process.
 
 The term \code{\{one_for_one, 10, 1\}} defines that the supervisor should
   retry 10 times to restart each process before giving
@@ -547,9 +572,10 @@ module, starts all the defined processes by calling their corresponding
 \code{init()} functions and afterwards, the functions that were defined in
 the list of the \code{cs_sup_or:init()}.
 
-For node join, we are only interested in the starting of the
-\code{Supervisor_AND} process, which was the last one in the list. All other
-defined processes are already running, when this will be started.
+For a join of a new node, we are only interested in the starting of the
+\code{Supervisor_AND} process here, which was the last one in the list. At
+that point in time, all other defined processes are already started and
+running.
 
 \subsection{Starting the and-supervisor with a peer and its local database}
 
@@ -584,15 +610,16 @@ init([InstanceId]) ->
 It defines two processes, that have to be observed using an
 \code{one_for_all}-supervisor, which means, that if one fails, all have to
 be restarted. Passed to the \code{init} function is the \code{InstanceId}, a
-random number to make the nodes unique. It was calculated a bit earlier in
+random number to make nodes unique. It was calculated a bit earlier in
 the code. Exercise: Try to find where.
 
-As you can see from the list, the \code{DB} ist started before the
-\code{Node}. This is important, because \code{cs_node} uses the database,
-but not vice versa. 
+As you can see from the list, the \code{DB} is started before the
+\code{Node}. This is intended and important, because \code{cs_node} uses the
+database, but not vice versa.
 
 After the \code{cs_sup_and:init()} finished, the DB is initialized and
 afterwards \code{cs_node:start_link} is called by the and-supervisor.
+We only go into details here, for the latter.
 
 \begin{lstlisting}[title=\filetitle{cs_node.erl}]
 [...]
@@ -602,9 +629,9 @@ start_link(InstanceId) ->
 \end{lstlisting}
 
 This spawns a new process, that executes \code{cs_node:start()} and
-maintains a link to that process. This function is called in the
-and-supervisor process, so the and-supervisor process will be informed, when
-the spawned process finishes. After the spawn is submitted,
+maintains a link to that process. This function is called in the context of
+the and-supervisor process, so the and-supervisor process will be informed,
+when the spawned process finishes. After the spawn is submitted,
 \code{cs_node:start_link} returns to the supervisor, which starts observing
 the processes in a loop.
 
@@ -649,20 +676,22 @@ the process sleeps for a random amount of time. Otherwise, if you would
 start 1000 processes with \code{admin:add_nodes(1000)}, the boot-server
 would receive many join requests at the same time, which is not intended.
 
-Then, the node retrieves its \code{Id} from the keyholder: 
-\code{Id = cs_keyholder:get_key()}. In the first call, a random identifier
-is returned. If the \code{cs_node}-process failed and is restarted by its
-supervisor, this call to the keyholder ensures, that the node still keeps
-its \code{Id}, assuming that the keyholder process is not failing.
-This is important for the load-balancing and for consistent responsibility
-of nodes to ensure consistent lookup.
-Note: the name \code{Key-holder} actually is an id-holder.
+Then, the node retrieves its \code{Id} from the keyholder: \code{Id =
+  cs_keyholder:get_key()}. In the first call, a random identifier is
+returned, otherwise the latest set value. If the \code{cs_node}-process
+failed and is restarted by its supervisor, this call to the keyholder
+ensures, that the node still keeps its \code{Id}, assuming that the
+keyholder process is not failing.  This is important for the load-balancing
+and for consistent responsibility of nodes to ensure consistent lookup in
+the structured overlay. Note: the name \code{Key-holder} actually is an
+id-holder.
 
-If a node changes its position in the ring, the key-holder will be informed
-and the \code{cs_node} finishes itself. This triggers a restart of the
-corresponding database process via the and-supervisor. 
-When the supervisor restarts both processes, they will retrieve the new
-position in the ring from the key-holder and join the ring there.
+If a node changes its position in the ring for load-balancing, the
+key-holder will be informed and the \code{cs_node} finishes itself. This
+triggers a restart of the corresponding database process via the
+and-supervisor.  When the supervisor restarts both processes, they will
+retrieve the new position in the ring from the key-holder and join the ring
+there.
 
 \todo{The supervisor was configured to restart a node at most 10 times. Does
   that mean, that a node can only change its position in the ring 10 times
@@ -709,8 +738,8 @@ ring. If the ring is empty, \code{join_first} is called. Otherwise,
 
 \code{join_first} just creates a new state for a \scalaris{} node conisting
 of an empty routing table, a successorlist containing itself, itself as its
-predecessor, itself, its responsibility area from \code{Id} to \code{Id} (the
-full ring), and a load balancing schema.
+predecessor, a reference to itself, its responsibility area from \code{Id}
+to \code{Id} (the full ring), and a load balancing schema.
 
 \begin{lstlisting}[title=\filetitle{cs_join.erl}]
 [...]
@@ -720,7 +749,8 @@ join_first(Id) ->
     cs_state:new(?RT:empty(Me), [Me], Me, Me, {Id, Id}, cs_lb:new()).
 \end{lstlisting}
 
-The macro \code{?RT} maps to the configured routing algorithm.
+The macro \code{?RT} maps to the configured routing algorithm. It is defined
+in \code{chordsharp.erl}. For further details on the routing see Chapter~\sieheref{chapter.routing}.
 
 The state is defined in 
 
@@ -819,24 +849,24 @@ join_request(State, Source_PID, Id, UniqueId) ->
 This resets the local predecessor to the new node and splits the data.
 Then it sends a \code{join_respone} to the new node with its former
 predecessor, the data, it has to host, and its successorlist.
-Additionally, the new node will be observed with the failuredetector.
+Additionally, the new node will be observed by the failuredetector.
 
-\todo{Here, the observation of the former predecessor could be deleted from
-  the failure detector. But periodically, all known hosts are reregistered
-  with the failure detector, and then all other nodes are thrown away from
-  the list of nodes to observe in the failure detector.}
+Note: Here, the observation of the former predecessor could be deleted from
+the failure detector. But periodically, all known hosts are reregistered
+with the failure detector, and then all other nodes are thrown away from the
+list of nodes to observe in the failure detector. So, we do not care here.
 
 Finally, the new predecessor is set and the \code{join_request()} is finished.
  
-Back on the new node, it waits for the \code{join_response} message in
+Back on the new node: it waits for the \code{join_response} message in
 \code{cs_join:join_ring()}. The next steps after the message was received
 from the old node are to register the predecessor, to register all new nodes
 in the failure detector, to send a message to the predecessor, that its
 successor has changed.
 
 Finally, all data are added to the database and the succlist is build by
-putting the successor to the head of the successor list of the successor:
-\code{[Succ | SuccList]}.
+putting the successor to the head of the successor list of the successor
+(old node): \code{[Succ | SuccList]}.
 
 The next step in \code{cs_join:join()} is to call
 \code{cs_reregister:reregister} which reregisters the node periodically with
@@ -847,7 +877,7 @@ completed.
 \subsection{Beginning to server requests}
 
 \code{cs_join:join()} was called from \code{cs_node:start()}, which
-continues
+now continues
 
 \begin{lstlisting}[title=\filetitle{cs_node.erl}]
 [...]
@@ -890,11 +920,528 @@ Finally all the self-management services are started with
 \subsection{FAQ}
 
 \paragraph{Question:} How are the routing-table, load-balancing and paxos 
-  processes started?
+  processes started, that can be seen in the supervisor tree?
 
-\paragraph{Answer:} They are not implemented as separate Erlang
+  \paragraph{Answer:} They are currently not implemented as separate Erlang
   processes. All the requests are handled by the loop startet by
-  \code{cs_node:start()}. They could be implemented as separate processes.
+  \code{cs_node:start()}. Nevertheless, they could be implemented as
+  separate processes to make the software architecture cleaner.
+
+\chapter{Routing and routing tables in the Overlay}
+\label{chapter.routing}
+
+\hfill\emph{2008-07-25, SVN revision 12}
+
+Each node of the ring can perform searches in the overlay.
+
+A search is done by a lookup in the overlay, but there are several other
+demands for communication between peers, so \scalaris{} provides a general
+interface to route a message another peer, that is currently responsible for
+a given \code{key}.
+
+\begin{lstlisting}[title=\filetitle{cs_lookup.erl}]
+[...]
+unreliable_lookup(Key, Msg) ->
+    get_pid(cs_node) ! {lookup_aux, Key, Msg}.
+
+unreliable_get_key(Key) ->
+    unreliable_lookup(Key, {get_key, cs_send:this(), Key}).
+[...]
+\end{lstlisting}
+
+The message \code{Msg} could be a \code{get} which retrieves content from
+the responsible node or a \code{get_node} message, which returns a pointer
+to the node.
+
+All currently supported messages are listed in the file \code{cs_node.erl}.
+
+The message routing is implemented in lookup.erl
+
+\begin{lstlisting}[title=\filetitle{lookup.erl}]
+[...]
+lookup_fin(Msg) ->
+    self() ! Msg.
+
+lookup_aux(State, Key, Msg) ->
+    Terminate = util:is_between(cs_state:id(State), Key, cs_state:succ_id(State)),
+    P = ?RT:next_hop(State, Key),
+    ?LOG("[ ~w | I | Node   | ~w ] lookup_aux ~w ~w ~s~n",
+      [calendar:universal_time(), self(), Terminate, P, Key]),
+    if
+	Terminate ->
+	    cs_send:send(P, {lookup_fin, Msg});
+	true ->
+	    cs_send:send(P, {lookup_aux, Key, Msg})
+    end.
+[...]
+\end{lstlisting}
+
+Each node is responsible for a certain key interval. 
+With the function \code{util:is_between} it is decided, whether the key is
+between the current node and its successor. If that is the case, 
+final step is done using \code{lookup_fin()}, which delivers the message to
+the local node. Otherwise, the message is forwarded to the next nearest
+known peer (listed in the routing table) determined by \code{?RT:next_hop}.
+
+
+% \begin{lstlisting}[language=Java]
+% interface RT {
+%   foo();
+%   lookup();
+% }
+% \end{lstlisting}
+
+\code{routingtable.erl} is a generic interface for routing tables, like a
+Java interface. In Erlang interfaces can be defined using a `behaviour'.
+The files \code{rt_simple} and \code{rt_chord} implement the behaviour
+`routingtable'.
+
+The macro ?RT in other files replaces to the active module, which is defined
+in \code{chordsharp.hrl}.
+
+\begin{lstlisting}[title=\filetitle{chordsharp.hrl}]
+[...]
+%%This file determines which kind of routingtable is used. Uncomment the
+%%one that is desired.
+
+%%Standard Chord routingtable
+-define(RT, rt_chord).
+
+%%Simple routingtable
+%-define(RT, rt_simple).
+[...]
+\end{lstlisting}
+
+The functions, that have to be implemented for a routing mechanism are
+defined in the following file:
+
+\begin{lstlisting}[title=\filetitle{routingtable.erl}]
+[...]
+behaviour_info(callbacks) ->
+    [
+     % create a default routing table
+     {empty, 1}, 
+     % key space -> indentifier space
+     {hash_key, 1}, {getRandomNodeId, 0},
+     % routing
+     {next_hop, 2}, 
+     % trigger for new stabilization round
+     {stabilize, 1}, 
+     % dead nodes filtering
+     {filterDeadNodes, 2}, 
+     % statistics
+     {to_pid_list, 1}, {to_node_list, 1}, {get_size, 1},
+     % for symmetric replication
+     {get_keys_for_replicas, 1},
+     % for debugging
+     {dump, 1}
+    ];
+
+behaviour_info(_Other) ->
+    undefined.
+[...]
+\end{lstlisting}
+
+\begin{description}
+\setlength{\parskip}{0pt}
+\setlength{\itemsep}{0pt}
+\item \code{empty/1} gets a successor passed and generates an empty routing
+  table.  The data structure of the routing table is undefined. It can be a
+  list, a tree, a matrix \ldots
+
+\item \code{hash_key/1} gets a key and translates it to an id for the
+  overlay.
+
+\item \code{getrandomnodeid/0} returns a random node id.
+
+\item \code{next_hop/2} gets a routing table and a key and returns the node,
+  that should be contacted next (is nearest to the id).
+
+\item \code{stabilize/1} is called periodically to rebuild the routing table.
+
+\item \code{filterDeadNodes} is called by the failuredetector and tells the
+  routing table about dead nodes to be eliminated from the routing
+  table. This function cleans the routing table.
+
+\item \code{to_pid_list/1} get all PIDs of the routing table entries.
+\item \code{to_node_list/1} get all nodes in the routing table as complete
+  reference including IP, range, etc.
+\item \code{get_size/1} get the size of the routing table.
+
+\item \code{get_keys_for_replicas/1} Returns for a given \code{Key} the keys
+  of its replicas. Thereby one can implement successorlist replication or
+  symmetric replication or any other schema.
+
+\item \code{dump/1} dump the state. Not mandatory, may just return \code{ok}.
+\end{description}
+
+\section{Simple routing table}
+
+One implementation of a routing table is the \code{rt_simple}, which routes
+via the successor, which is inefficient, as it needs a linear number of hops
+to reach its goal. A more robust implementation, would use a successor
+list. This implementation is not very efficient on churn.
+
+\subsection{Data types}
+First, the data structure of the routing table is defined:
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @type rt() = {node:node(), gb_trees:gb_tree()}. Sample routing table
+%% @type key() = int(). Identifier
+[...]
+\end{lstlisting}
+A routing table is a pair of a node (the successor) and an (unused) gbtree.
+Keys in the overlay are identified by integers.
+
+\subsection{A simple routingtable behaviour}
+
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @doc creates an empty routing table.
+%%      per default the empty routing should already include 
+%%      the successor
+%% @spec empty(node:node()) -> rt()
+empty(Succ) ->
+    {Succ, gb_trees:empty()}.
+[...]
+\end{lstlisting}
+The empty routing table consists of the successor.
+
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @doc hashes the key to the identifier space.
+%% @spec hash_key(string()) -> key()
+hash_key(Key) ->
+    BitString = binary_to_list(crypto:md5(Key)),
+    % binary to integer
+    lists:foldl(fun(El, Total) -> (Total bsl 8) bor El end, 0, BitString).
+
+%% @doc generates a random node id
+%%      In this case it is a random 128-bit string.
+%% @spec getRandomNodeId() -> key()
+getRandomNodeId() ->
+    % generates 128 bits of randomness
+    hash_key(integer_to_list(random:uniform(65536 * 65536))).
+[...]
+\end{lstlisting}
+Keys are hashed using MD5 and have a length of 128 bits.
+
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @doc returns the next hop to contact for a lookup
+%% @spec next_hop(cs_state:state(), key()) -> pid()
+next_hop(State, _Key) ->
+    cs_state:succ_pid(State).
+[...]
+\end{lstlisting}
+Next hop is always the successor.
+
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @doc triggers a new stabilization round
+%% @spec stabilize(cs_state:state()) -> cs_state:state()
+stabilize(State) ->
+    % trigger the next stabilization round
+    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
+    % renew routing table
+    cs_state:set_rt(State, empty(cs_state:succ(State))).
+[...]
+\end{lstlisting}
+The \code{stabilize/1} first triggers to be called again after the pointer
+stabilization interval defined in the configuration. Then it resets its
+routing table with the current successor.
+
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @doc removes dead nodes from the routing table
+%% @spec filterDeadNodes(rt(), [node:node()]) -> rt()
+filterDeadNodes(RT, _DeadNodes) ->
+    RT.
+[...]
+\end{lstlisting}
+\code{FilterDeadNodes/2} does nothing, as only the successor is listed in
+the routing table and that is reset periodically in \code{stabilize/1}.
+
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @doc returns the pids of the routing table entries .
+%% @spec to_pid_list(rt()) -> [pid()]
+to_pid_list({Succ, _RoutingTable} = _RT) ->
+    [node:pidX(Succ)].
+[...]
+\end{lstlisting}
+\code{to_pid_list/1} return the pids of the routing tables, as defined in \code{node.erl}.
+
+\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
+[...]
+%% @doc returns the pids of the routing table entries .
+%% @spec to_node_list(rt()) -> [node:node()]
+to_node_list({Succ, _RoutingTable} = _RT) ->
+    [Succ].
+[...]
+\end{lstlisting}
+Return whole node definitions as defined in \code{node.erl}
+
+\begin{lstlisting}[title=\filetitle{node.erl}]
+[...]
+-record(node, {pid, id, uniqueId}).
+[...]
+\end{lstlisting}
+
+\begin{lstlisting}[title=\filetitle{node.erl}]
+[...]
+%% @doc returns the size of the routing table.
+%%      inefficient standard implementation
+%% @spec get_size(rt()) -> int()
+get_size(RT) ->
+    length(to_pid_list(RT)).
+    
+%% @doc returns the replicas of the given key
+%% @spec get_keys_for_replicas(key() | string()) -> [key()]
+get_keys_for_replicas(Key) when is_integer(Key) ->
+    [Key, 
+     normalize(Key + 16#40000000000000000000000000000000),
+     normalize(Key + 16#80000000000000000000000000000000),
+     normalize(Key + 16#C0000000000000000000000000000000)
+    ];
+get_keys_for_replicas(Key) when is_list(Key) ->
+    get_keys_for_replicas(hash_key(Key)).
+
+normalize(Key) ->
+    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
+[...]
+\end{lstlisting}
+
+The \code{get_keys_for_replicas/1} implements symmetric replication, here.
+The call to \code{normalize} implements the modulo by throwing high bits
+away.
+
+\begin{lstlisting}[title=\filetitle{node.erl}]
+[...]
+%% @doc 
+%% @spec dump(cs_state:state()) -> term()
+dump(_State) ->
+    ok.
+[...]
+\end{lstlisting}
+
+\code{dump/1} is not implemented.
+
+
+\section{Chord routing table}
+
+The file \code{rt_chord.erl} implements Chord's routing.
+
+\subsection{Data types}
+
+\begin{lstlisting}[title=\filetitle{node.erl}]
+[...]
+%% @type rt() = gb_trees:gb_tree(). Chord routing table
+%% @type key() = int(). Identifier
+[...]
+\end{lstlisting}
+The routing table is a \code{gb_tree}. Identifiers in the ring are integers.
+
+\subsection{The routingtable behaviour for Chord}
+
+\begin{lstlisting}[title=\filetitle{node.erl}]
+[...]
+%% @doc creates an empty routing table.
+%% @spec empty(node:node()) -> rt()
+empty(_Succ) ->
+    gb_trees:empty().
+[...]
+\end{lstlisting}
+
+\todo{This function should return \code{_Succ}?}
+
+\code{hash_key(Key)} and \code{getRandomNodeId} call their counterparts from
+\code{rt_simple.erl}
+
+\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
+[...]
+%% @doc returns the next hop to contact for a lookup
+%% @spec next_hop(cs_state:state(), key()) -> node()
+next_hop(State, Id) -> 
+    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
+	%succ is responsible for the key
+	true ->
+	    cs_state:succ_pid(State);
+	% check routing table
+	false ->
+	    RT = cs_state:rt(State),
+	    next_hop(cs_state:id(State), RT, Id, 127, cs_state:succ_pid(State))
+    end.
+[...]
+\end{lstlisting}
+
+\code{next_hop} traverses the routing table beginning with the longest
+finger ($2^{127}$) by calling the helper function \code{next_hop/5}.
+
+\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
+[...]
+% @private
+next_hop(N, RT, Id, Index, Candidate) ->
+    case gb_trees:is_defined(Index, RT) of
+	true ->
+	    case gb_trees:get(Index, RT) of
+		null ->
+		    Candidate;
+		Entry ->
+		    case util:is_between_closed(N, node:id(Entry), Id) of
+			true ->
+			    node:pidX(Entry);
+			false ->
+			    next_hop(N, RT, Id, Index - 1, Candidate)
+		    end
+		end;
+	false ->
+	    Candidate
+    end.
+[...]
+\end{lstlisting}
+
+If the entry exists, it is retrievd from the \code{gb_tree}.  If the id of
+the routing table entry is between ourselves and the searched id, the finger
+is chosen. If anything fails, \code{Candidate} (the successor) is chosen.
+
+Why could a routing table entry be \code{null}? \code{filterDeadNodes}
+changes entries to \code{null}.
+
+\todo{BUG: Instead of directly returning \code{Candidate} one should further
+  traverse the routing table for shorter appropriate fingers. If doing so, a
+  check whether \code{Index} is zero, would become neccessary.}
+
+If the finger is to long, recursivly try the next shorter finger.
+
+\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
+[...]
+%% @doc starts the stabilization routine
+%% @spec stabilize(cs_state:state()) -> cs_state:state()
+stabilize(State) ->
+    % trigger the next stabilization round
+    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
+    % calculate the longest finger
+    Key = calculateKey(State, 127),
+    % trigger a lookup for Key
+    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), 127}),
+    State.
+[...]
+calculateKey(State, Idx) ->
+    % n + 2^Idx
+    rt_simple:normalize(cs_state:id(State) + (1 bsl Idx)).
+\end{lstlisting}
+
+The routing table stabilization is triggered with the index 127 and then
+runs asynchronously, as we do not want to block the \code{cs_node} to
+perform other request while recalculating the routing table.
+
+We have to find the node responsible for the calculated finger and therefore
+perfom a lookup for the node with a \code{rt_get_node} message, including
+a reference to ourselves as the reply-to address and the index to be set.
+
+The lookup performs an overlay routing by passing the massage until the
+responsible node is found. There, the message is delivered to the
+\code{cs_node}.
+
+At the destination the message is handled in \code{cs_node.erl}:
+
+\begin{lstlisting}[title=\filetitle{cs_node.erl}]
+[...]
+	% for chord_rt
+	{rt_get_node, Source_PID, Idx} ->
+	    cs_send:send(Source_PID, {rt_get_node_response, Idx, cs_state:me(State)}),
+	    loop(State, ?DEBUG(Debug));
+
+	{rt_get_node_response, Index, Node} = _Message ->
+	    NewState = ?RT:stabilize(State, Index, Node),
+	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
+[...]
+\end{lstlisting}
+
+The remote node just sends the requested information back directly in a
+\code{rt_get_node_response} message inclusing a reference to itself.
+
+When receiving the routing table entry, we call \code{stabilize/3}!, which
+is different from the \code{stabilize/1} above.
+
+\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
+[...]
+stabilize(State, Index, Node) ->
+    RT = cs_state:rt(State),
+    case node:is_null(Node) of
+	true ->
+	    State;
+	false ->
+	    case cs_state:succ(State) == Node of
+		true ->
+		    State;
+		false ->
+		    NewRT = gb_trees:enter(Index, Node, RT),
+		    Key = calculateKey(State, Index - 1),
+		    self() ! {lookup_aux, Key, {rt_get_node, cs_send:this(), Index - 1}},
+		    cs_state:set_rt(State, NewRT)
+	    end
+    end.
+[...]
+\end{lstlisting}
+
+\code{stabilize/3} assigns the received routing table entry and triggers to
+fill the next shorter one using the same mechanisms as described.
+
+When the shortest finger is the successor, then filling the routing table is
+stopped, as no further new entries would occur. It is not necessary, that
+\code{Index} reaches 1 to make that happen. If less than $2^{128}$ nodes
+participate in the system, it may happen earlier.
+
+\code{filterDeadNodes} updates the \code{gb_tree} accordingly. 
+\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
+[...]
+%% @doc remove all entries with the given ids
+%% @spec filterDeadNodes(gb_trees:gb_tree(), term()) -> gb_trees:gb_tree()
+filterDeadNodes(RT, DeadNodes) ->
+    gb_sets:fold(fun (Id, RT2) -> filter_intern(gb_trees:iterator(RT2), RT2, Id) end, RT, DeadNodes).
+
+% @private
+filter_intern(nil, RT, _) ->
+    RT;
+filter_intern([], RT, _) ->
+    RT;
+filter_intern(Iterator, RT, Id) ->
+    {Index, Value, Next} = gb_trees:next(Iterator),
+    case node:uniqueId(Value) == Id of
+	true ->
+	    filter_intern(Next, gb_trees:delete(Index, RT), Id);
+	false ->
+	    filter_intern(Next, RT, Id)
+    end.
+
+
+%% @doc returns the pids of the routing table entries .
+%% @spec to_pid_list(rt()) -> [pid()]
+to_pid_list(RT) ->
+    lists:map(fun ({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
+
+%% @doc returns the pids of the routing table entries .
+%% @spec to_node_list(rt()) -> [node:node()]
+to_node_list(RT) ->
+    lists:map(fun ({_Idx, Node}) -> Node end, gb_trees:to_list(RT)).
+
+%% @doc returns the size of the routing table.
+%%      inefficient standard implementation
+%% @spec get_size(rt()) -> int()
+get_size(RT) ->
+    length(to_pid_list(RT)).
+    
+%% @doc returns the replicas of the given key
+%% @spec get_keys_for_replicas(key() | string()) -> [key()]
+get_keys_for_replicas(Key) ->
+    rt_simple:get_keys_for_replicas(Key).
+[...]
+\end{lstlisting}
+
+Also the remaining functions are implemented as one would expect.
+
 
 \chapter{Directory Structure of the Source Code}
 
@@ -1352,6 +1899,15 @@ This method is especially useful if after an unsuccessful read a value
 with the same key should be written which is not possible if the
 failed read is still in the transaction's log.
 
+\bibliographystyle{plainnat}
+
+\begin{thebibliography}{9}
+
+\bibitem{erlang-book}
+J. Armstrong.
+\newblock \emph{Programming Erlang: Software for a Concurrent World.}
+\newblock Pragmatic Programmers, ISBN: 978-1-9343560-0-5, July 2007
+\end{thebibliography}
 
 \end{document}
 %%% Local Variables: 
