@@ -28,7 +28,6 @@
 
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
--include("database.hrl").
 
 -export([start_link/1, start/1]).
 

@@ -27,7 +27,6 @@
 -vsn('$Id: cs_lb.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -include("chordsharp.hrl").
--include("database.hrl").
 
 -export([new/0, balance_load/1, check_balance/2, get_middle_key/1, move_load/3, 
 	 get_loadbalance_flag/1, reset_loadbalance_flag/1]).

@@ -31,7 +31,7 @@
 -vsn('$Id: tparticipant.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -include("trecords.hrl").
--include("../database.hrl").
+-include("../chordsharp.hrl").
 
 -export([tp_validate/3, tp_commit/2, tp_abort/2]).
 

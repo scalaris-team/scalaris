@@ -28,7 +28,6 @@
 
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
--include("database.hrl").
 
 -export([new/6, 
 	 id/1, me/1, uniqueId/1,
