@@ -38,17 +38,17 @@ suite() ->
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
     Pid = spawn(fun () ->
-			comm_layer.comm_layer:start_link(),
-			process_dictionary:start_link(), 
+			ct:pal(ct, "registered names ~p", [erlang:registered()]),
+			process_dictionary:start_link_for_unittest(), 
 			boot_sup:start_link(), 
-			timer:sleep(20000) 
+			timer:sleep(25000) 
 		end),
-    timer:sleep(12000),
+    timer:sleep(15000),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    exit(Pid, normal),
+    exit(Pid, kill),
     ok.
 
 read(_Config) ->
