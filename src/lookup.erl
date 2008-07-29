@@ -27,6 +27,7 @@
 -vsn('$Id: lookup.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -include("chordsharp.hrl").
+-include("database.hrl").
 
 -export([lookup_aux/3, lookup_fin/1, get_key/3, set_key/4]).
 
@@ -51,9 +52,9 @@ lookup_aux(State, Key, Msg) ->
 
 get_key(Source_PID, HashedKey, Key) ->
     ?LOG("[ ~w | I | Node   | ~w ] get_key ~s~n",[calendar:universal_time(), self(), Key]),
-    cs_send:send(Source_PID, {get_key_response, Key, cs_db_otp:read(HashedKey)}).
+    cs_send:send(Source_PID, {get_key_response, Key, ?DB:read(HashedKey)}).
 
 set_key(Source_PID, Key, Value, Versionnr) ->
     ?LOG("[ ~w | I | Node   | ~w ] set_key ~s ~s~n",[calendar:universal_time(), self(), Key, Value]),
     cs_send:send(Source_PID, {set_key_response, Key, Value, Versionnr}),
-    cs_db_otp:write(Key, Value, Versionnr).
+    ?DB:write(Key, Value, Versionnr).

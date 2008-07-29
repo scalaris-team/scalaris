@@ -31,10 +31,11 @@
 -vsn('$Id: tparticipant.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -include("trecords.hrl").
+-include("../database.hrl").
 
 -export([tp_validate/3, tp_commit/2, tp_abort/2]).
 
--import(cs_db_otp).
+-import(?DB).
 -import(gb_trees).
 -import(lists).
 -import(io).
@@ -48,7 +49,7 @@
 tp_validate(State, Tid, Item)->
     %?TLOGN("validating item ~p", [Item]),
     %% Check whether the version is still valid
-    LocalItemRes = cs_db_otp:read(Item#item.rkey),
+    LocalItemRes = ?DB:read(Item#item.rkey),
    
     if
 	LocalItemRes /= failed -> 
@@ -71,9 +72,9 @@ tp_validate(State, Tid, Item)->
 	VCheckRes == success->
 	    case Item#item.operation of
 		read ->
-		    LockRes = cs_db_otp:set_read_lock(Item#item.rkey);
+		    LockRes = ?DB:set_read_lock(Item#item.rkey);
 		write ->
-		    LockRes = cs_db_otp:set_write_lock(Item#item.rkey);
+		    LockRes = ?DB:set_write_lock(Item#item.rkey);
 		_X ->
 		    LockRes = failed
 	    end,
@@ -145,11 +146,11 @@ tp_commit_store_unlock([]) ->
 tp_commit_store_unlock([Entry | LogRest])->
     if 
 	Entry#logentry.operation == write ->
-	    cs_db_otp:write(Entry#logentry.rkey, Entry#logentry.value, Entry#logentry.version),
-	    _Stored = cs_db_otp:read(Entry#logentry.rkey),
-	    cs_db_otp:unset_write_lock(Entry#logentry.rkey);
+	    ?DB:write(Entry#logentry.rkey, Entry#logentry.value, Entry#logentry.version),
+	    _Stored = ?DB:read(Entry#logentry.rkey),
+	    ?DB:unset_write_lock(Entry#logentry.rkey);
 	true ->
-	    cs_db_otp:unset_read_lock(Entry#logentry.rkey)
+	    ?DB:unset_read_lock(Entry#logentry.rkey)
     end,
     
     tp_commit_store_unlock(LogRest).
@@ -175,9 +176,9 @@ tp_abort_unlock([]) ->
 tp_abort_unlock([Entry | LogRest])->
      if 
 	Entry#logentry.operation == write ->
-	    cs_db_otp:unset_write_lock(Entry#logentry.rkey);
+	    ?DB:unset_write_lock(Entry#logentry.rkey);
 	true ->
-	    cs_db_otp:unset_read_lock(Entry#logentry.rkey)
+	    ?DB:unset_read_lock(Entry#logentry.rkey)
     end,
     tp_abort_unlock(LogRest).    
     

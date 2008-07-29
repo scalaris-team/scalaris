@@ -29,6 +29,7 @@
 -export([join/1, join_request/4]).
 
 -include("chordsharp.hrl").
+-include("database.hrl").
 
 %% @doc handle the join request of a new node
 %% @spec join_request(state:state(), pid(), Id, UniqueId) -> state:state()
@@ -36,7 +37,7 @@
 %%   UniqueId = term()
 join_request(State, Source_PID, Id, UniqueId) ->
     Pred = node:new(Source_PID, Id, UniqueId),
-    HisData = cs_db_otp:split_data(State, Id),
+    HisData = ?DB:split_data(State, Id),
     SuccList = cs_state:succ_list(State),
     cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData, SuccList}),
     failuredetector:add_node(UniqueId, Id, Source_PID),
@@ -68,7 +69,7 @@ join_ring(Id, Succ) ->
 					       {node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)}]),
 		    cs_send:send(node:pidX(Pred), {update_succ, Me})
 	    end,
-	    cs_db_otp:add_data(Data),
+	    ?DB:add_data(Data),
 	    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {node:id(Pred), Id}, cs_lb:new())
     end.
 

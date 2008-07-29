@@ -28,6 +28,7 @@
 
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
+-include("database.hrl").
 
 -export([new/6, 
 	 id/1, me/1, uniqueId/1,
@@ -217,7 +218,7 @@ details(State) ->
     Pred = pred(State),
     Node = me(State),
     SuccList = succ_list(State),
-    Load = cs_db_otp:get_load(),
+    Load = ?DB:get_load(),
     FD_Size = failuredetector:node_count(),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),
