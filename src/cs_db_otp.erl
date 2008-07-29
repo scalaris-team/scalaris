@@ -27,6 +27,7 @@
 -vsn('$Id: cs_db_otp.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -behaviour(gen_server).
+-behaviour(database).
 
 -export([start_link/1, start/1, init/1, handle_call/3, handle_cast/2, 
 	 handle_info/2, code_change/3, terminate/2, stop/0,

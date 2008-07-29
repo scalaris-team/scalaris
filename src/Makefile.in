@@ -36,6 +36,8 @@ compile-beam: $(BEAMS)
 rt_chord.beam: routingtable.beam
 rt_simple.beam: routingtable.beam
 
+cs_db_otp.beam: database.beam
+
 cs_join.beam: chordsharp.hrl
 cs_lb.beam: chordsharp.hrl
 cs_lookup.beam: chordsharp.hrl
@@ -48,6 +50,11 @@ pt_lookup.beam: chordsharp.hrl
 randoms.beam: chordsharp.hrl
 
 routingtable.beam: routingtable.erl
+	$(QUIET)echo "compiling ..." $<
+	$(QUIET)$(ERLC) -I$(YAWS_PATH)/include -pa $(YAWS_PATH) -o ../bin -W $(ERLC_FLAGS) $<
+	$(QUIET)$(ERLC) -I$(YAWS_PATH)/include -pa $(YAWS_PATH) -W $(ERLC_FLAGS) $<
+
+database.beam: database.erl
 	$(QUIET)echo "compiling ..." $<
 	$(QUIET)$(ERLC) -I$(YAWS_PATH)/include -pa $(YAWS_PATH) -o ../bin -W $(ERLC_FLAGS) $<
 	$(QUIET)$(ERLC) -I$(YAWS_PATH)/include -pa $(YAWS_PATH) -W $(ERLC_FLAGS) $<

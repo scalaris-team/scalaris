@@ -28,7 +28,7 @@
 
 -behaviour(supervisor).
 
--include("database.hrl").
+-include("chordsharp.hrl").
 
 -export([start_link/1, init/1]).
 

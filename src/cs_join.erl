@@ -29,7 +29,6 @@
 -export([join/1, join_request/4]).
 
 -include("chordsharp.hrl").
--include("database.hrl").
 
 %% @doc handle the join request of a new node
 %% @spec join_request(state:state(), pid(), Id, UniqueId) -> state:state()

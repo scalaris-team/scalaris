@@ -12,25 +12,36 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : chordsharp.hrl
+%%% File    : database.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : misc
+%%% Description : database behaviour
 %%%
-%%% Created :  10 Apr 2008 by Thorsten Schuett <schuett@zib.de>
+%%% Created :  29 Jul 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
+-module(database).
 
-%%This file determines which kind of routingtable is used. Uncomment the
-%%one that is desired.
+-author('schuett@zib.de').
+-vsn('$Id$ ').
 
-%%Standard Chord routingtable
--define(RT, rt_chord).
+-export([behaviour_info/1]).
 
-%%Simple routingtable
-%-define(RT, rt_simple).
+behaviour_info(callbacks) ->
+    [
+     % write locks
+     {set_write_lock, 1}, {unset_write_lock, 1},
+     % read locks
+     {set_read_lock, 1}, {unset_read_lock, 1},
+     % standard calls
+     {read, 1}, {write, 3}, {get_version, 1},
+     %load balancing
+     {get_load, 0}, {get_middle_key, 0}, {split_data, 2}, 
+     %
+     {get_data, 0}, {add_data, 1}
+    ];
 
-%%Standard database backend
--define(DB, cs_db_otp).
+behaviour_info(_Other) ->
+    undefined.
 

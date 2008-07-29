@@ -27,7 +27,6 @@
 -vsn('$Id: lookup.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -include("chordsharp.hrl").
--include("database.hrl").
 
 -export([lookup_aux/3, lookup_fin/1, get_key/3, set_key/4]).
 
