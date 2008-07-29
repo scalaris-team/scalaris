@@ -27,6 +27,7 @@
 -vsn('$Id: cs_lb.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -include("chordsharp.hrl").
+-include("database.hrl").
 
 -export([new/0, balance_load/1, check_balance/2, get_middle_key/1, move_load/3, 
 	 get_loadbalance_flag/1, reset_loadbalance_flag/1]).
@@ -44,7 +45,7 @@ balance_load(State) ->
     timer:send_after(config:loadBalanceInterval(), self(), {stabilize_loadbalance}).
 
 check_balance(Source_PID, Load) ->
-    MyLoad = cs_db_otp:get_load(),
+    MyLoad = ?DB:get_load(),
     if
 	(MyLoad * 2 < Load) and (Load > 1) ->
 	    cs_send:send(Source_PID, {get_middle_key, cs_send:this()}),
@@ -57,7 +58,7 @@ get_middle_key(State) ->
     LB = cs_state:get_lb(State),
     AmLoadbalancing = get_loadbalance_flag(LB),
     LastKeys = last_keys(LB),
-    Load = cs_db_otp:get_load(),
+    Load = ?DB:get_load(),
     if
 	AmLoadbalancing or (Load < 20) ->
 	    {nil, State};
@@ -65,7 +66,7 @@ get_middle_key(State) ->
 	    %Keys = gb_trees:keys(cs_state:get_data(State)),
 	    %Middle = util:lengthX(Keys) div 2 + 1,
 	    %lists:nth(Middle, Keys),
-	    MiddleKey = cs_db_otp:get_middle_key(),
+	    MiddleKey = ?DB:get_middle_key(),
 	    IsReservedKey = gb_sets:is_element(MiddleKey, LastKeys),
 	    if
 		IsReservedKey ->
@@ -99,7 +100,7 @@ move_load(State, _, NewId) ->
     State.
 
 drop_data(State) ->
-    cs_send:send(cs_state:succ_pid(State), {drop_data, cs_db_otp:get_data(), cs_send:this()}),
+    cs_send:send(cs_state:succ_pid(State), {drop_data, ?DB:get_data(), cs_send:this()}),
     receive
 	{drop_data_ack} ->
 	    ok

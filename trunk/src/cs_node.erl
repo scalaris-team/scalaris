@@ -28,6 +28,7 @@
 
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
+-include("database.hrl").
 
 -export([start_link/1, start/1]).
 
@@ -286,7 +287,7 @@ loop(State, Debug) ->
 	    ?LOG("[ ~w | I | Node   | ~w ] drop_data ~w~n",
 		      [calendar:universal_time(), self(), Data]),
 	    cs_send:send(Sender, {drop_data_ack}),
-	    cs_db_otp:add_data(Data),
+	    ?DB:add_data(Data),
 	    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)));
 
 %% bulk
@@ -302,14 +303,14 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 	{bulk_read_with_version, Issuer, From, To} ->
 	    cs_send:send(Issuer, {bulk_read_with_version_response, cs_state:my_range(State), 
-				  cs_db_otp:get_range_with_version(From, To)}),
+				  ?DB:get_range_with_version(From, To)}),
 	    loop(State, ?DEBUG(Debug));
 
 % load balancing
 	{get_load, Source_PID} ->
 	    ?LOG("[ ~w | I | Node   | ~w ] get_load~n",
 		      [calendar:universal_time(), self()]),
-	    cs_send:send(Source_PID, {get_load_response, cs_send:this(), cs_db_otp:get_load()}),
+	    cs_send:send(Source_PID, {get_load_response, cs_send:this(), ?DB:get_load()}),
 	    loop(State, ?DEBUG(Debug));
 
 	{get_load_response, Source_PID, Load} ->
@@ -372,7 +373,7 @@ loop(State, Debug) ->
 		    
 	   %%testing purpose
 %% 	{print_locked_items} ->
-%% 	    cs_db_otp:print_locked_items(),
+%% 	    ?DB:print_locked_items(),
 %% 	    timer:send_after(15000, self(), {print_locked_items}),
 %% 	    loop(State, Debug);
 %% TODO buggy ...

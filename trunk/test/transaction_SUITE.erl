@@ -38,7 +38,6 @@ suite() ->
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
     Pid = spawn(fun () ->
-			ct:pal(ct, "registered names ~p", [erlang:registered()]),
 			process_dictionary:start_link_for_unittest(), 
 			boot_sup:start_link(), 
 			timer:sleep(25000) 

@@ -28,6 +28,8 @@
 
 -behaviour(supervisor).
 
+-include("database.hrl").
+
 -export([start_link/1, init/1]).
 
 %%====================================================================
@@ -61,8 +63,8 @@ init([InstanceId]) ->
 	 worker,
 	 []},
     DB =
-	{cs_db_otp,
-	 {cs_db_otp, start_link, [InstanceId]},
+	{?DB,
+	 {?DB, start_link, [InstanceId]},
 	 permanent,
 	 brutal_kill,
 	 worker,
