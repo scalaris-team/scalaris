@@ -37,13 +37,13 @@ suite() ->
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
-    Pid = spawn(fun () -> process_dictionary:start_link(), boot_sup:start_link(), timer:sleep(20000) end),
+    Pid = spawn(fun () -> process_dictionary:start_link_for_unittest(), boot_sup:start_link(), timer:sleep(20000) end),
     timer:sleep(12000),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    exit(Pid, normal),
+    exit(Pid, kill),
     ok.
 
 test_db(_Config) ->

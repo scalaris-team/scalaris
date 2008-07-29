@@ -63,6 +63,9 @@
 
 	get_all_pids/0]).
 
+%% for unit testing
+-export([start_link_for_unittest/0]).
+
 %%====================================================================
 %% public functions
 %%====================================================================
@@ -141,6 +144,16 @@ get_all_pids() ->
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+%@doc Starts the server for unit testing
+start_link_for_unittest() ->
+    case whereis(process_dictionary) of
+	undefined ->
+	    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []);
+	_ ->
+	    gen_server:call(?MODULE, {drop_state}, 20000),
+	    already_running
+    end.
+    
 %%--------------------------------------------------------------------
 %% Function: start() -> {ok,Pid} | ignore | {error,Error}
 %% Description: Starts the server; for use with the test framework
@@ -214,7 +227,11 @@ handle_call({get_groups}, _From, ProcessDictionary) ->
 handle_call({get_processes_in_group, Group}, _From, ProcessDictionary) ->
     AllProcesses = find_processes_in_group(gb_trees:iterator(ProcessDictionary), gb_sets:new(), Group),
     ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
-    {reply, ProcessesAsJson, ProcessDictionary}.
+    {reply, ProcessesAsJson, ProcessDictionary};
+
+handle_call({drop_state}, _From, _ProcessDictionary) ->
+    {reply, ok, gb_trees:empty()}.
+
 
 find_process([], _) ->
     failed;

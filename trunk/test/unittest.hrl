@@ -39,5 +39,5 @@ myequals(XS, YS, X, Y) ->
 myequals(true, _, _, _, _) ->
     ok;
 myequals(false, XS, YS, X ,Y) ->
-    ct:fail(io_lib:format("~p(~p) != ~p(~p)", [XS, X, YS, Y])).
+    ct:fail(lists:flatten(io_lib:format("~p(~p) != ~p(~p)", [XS, X, YS, Y]))).
 
