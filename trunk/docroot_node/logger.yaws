@@ -3,51 +3,13 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
-    <title>Scalaris Management Interface</title>
+    <title>Scalaris Management Interface(Logger)</title>
     <link rel="stylesheet" type="text/css" href="main.css">
   <!--[if lte IE 5.5999]>
     <style type="text/css">@import url(ie55-.css);</style>
   <![endif]-->
   </head>
-  <body onload="load()" onunload="GUnload()">
-
-    <div class="menubar">
-       	  <div class="nothighlighted">
-	    <h2>Scalaris</h2>
-	  </div>
-       	  <div class="nothighlighted">
-	    <a class="menua" href="index.yaws">Home</a>
-	  </div>
-          <div class="nothighlighted">
-	<a class="menua" href="ring.yaws">Ring</a>
-	  </div>
-	  <div class="nothighlighted">
-       	    <a class="menua" href="rrd-status.yaws">RRD Status</a>
-	  </div>
-          <div class="highlighted">
-       	    <a class="menua" href="rrd-messages.yaws">RRD Messages</a>
-	  </div>
-	  <div class="nothighlighted">
-	    <a class="menua" href="documentation.yaws">Docu</a>
-	  </div>
-	  <div class="nothighlighted">
-	    <a class="menua" href="transactions.yaws">Transactions</a>
-	  </div>
-	  <div class="nothighlightedlast">
-	    <a class="menua" href="debug.yaws">Debug</a>
-	  </div>
-    </div><div class="middle">
-      <div class="middleleft">
-<h2>RRD: Messages</h2>
-
-Number of nodes: 
-<erl> 
- out(Arg) ->
-    erlang:put(instance_id, Arg#arg.opaque),
-    {html, integer_to_list(boot_server:number_of_nodes())}.
-</erl>
-
-<br>
+  <body>
 
 <erl>
 make_table([], _Map, Start, TotalBytes, TotalCount) ->
@@ -103,19 +65,5 @@ out(Arg) ->
     {ehtml, {table, [], [TableHead | make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]}}.
 </erl>
 
-
-Last update:
-<erl>
- 
- out(Arg) ->
-        erlang:put(instance_id, Arg#arg.opaque),
-	{Date, {Hour, Minute, Second}} = calendar:local_time(),
-    {html, io_lib:format("~w:~w:~w", [Hour, Minute, Second])}.
-</erl>
-</p>
-</div>
-<br class="br_class">&nbsp;
-</div>
-    <div class="bottom">
-    </div>
+</body>
 </html>
