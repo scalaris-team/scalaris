@@ -1,0 +1,3 @@
+{level, overview}.
+
+{incl_dirs_r, ["bin"]}.
