@@ -31,6 +31,8 @@
 -import(io_lib).
 -import(log).
 
+-include("comm_layer.hrl").
+
 %% @doc new accepted connection. called by comm_acceptor
 %% @spec new(inet:ip_address(), int(), socket()) -> pid()
 new(Address, Port, Socket) ->
@@ -79,7 +81,8 @@ loop(Socket, Address, Port) ->
 		    loop(Socket, Address, Port)
 	    end;
 	{send, Pid, Message} ->
-	    case gen_tcp:send(Socket, term_to_binary({deliver, Pid, Message})) of
+	    BinaryMessage = term_to_binary({deliver, Pid, Message}),
+	    case gen_tcp:send(Socket, BinaryMessage) of
 		{error, closed} ->
   	    	    comm_port:unregister_connection(Address, Port),
 	    	    gen_tcp:close(Socket);
@@ -93,6 +96,7 @@ loop(Socket, Address, Port) ->
   	    	    comm_port:unregister_connection(Address, Port),
 	    	    gen_tcp:close(Socket);
 		ok ->
+		    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(BinaryMessage)),
 		    loop(Socket, Address, Port)
 	    end;
 

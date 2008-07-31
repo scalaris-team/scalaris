@@ -9,6 +9,7 @@ TOUCH = touch
 .SUFFIXES: .erl .beam
 
 # ERLC_FLAGS = #+'{parse_transform, smart_exceptions}'
+ERLC_FLAGS=+debug_info
 
 YAWS_PATH= ../contrib/yaws
 

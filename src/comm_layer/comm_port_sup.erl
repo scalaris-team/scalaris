@@ -81,11 +81,19 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    CommLogger =
+	{comm_logger,
+	 {comm_layer.comm_logger, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_all, 10, 1},
 	  [
 	   Config,
 	   CommPort,
-	   CommAcceptor
+	   CommLogger,
+	   CommAcceptor	   
 	  ]}}.
     
 
