@@ -1,4 +1,5 @@
 #summary APIs supported by scalaris.
+#labels Featured
 
 = Introduction =
 
