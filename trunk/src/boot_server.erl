@@ -115,7 +115,8 @@ loop(Nodes) ->
 	    % ugly work around for finding the local ip by setting up a socket first
 	    loop(Nodes);
 	_X ->
-	    ?LOG("[ I | Boot   | ~w ] unknown message: ~w~n",[self(), _X])
+	    io:format("[ I | Boot   | ~w ] unknown message: ~w~n",[self(), _X]),
+	    loop(Nodes)
     end.
 
 %% @doc starts a failure_detector, the embedded webserver and the mainloop
