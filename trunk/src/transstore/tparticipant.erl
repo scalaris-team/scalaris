@@ -147,7 +147,7 @@ tp_commit_store_unlock([Entry | LogRest])->
     if 
 	Entry#logentry.operation == write ->
 	    ?DB:write(Entry#logentry.rkey, Entry#logentry.value, Entry#logentry.version),
-	    _Stored = ?DB:read(Entry#logentry.rkey),
+	    %_Stored = ?DB:read(Entry#logentry.rkey),
 	    ?DB:unset_write_lock(Entry#logentry.rkey);
 	true ->
 	    ?DB:unset_read_lock(Entry#logentry.rkey)
@@ -174,11 +174,16 @@ tp_abort(State, TransactionID)->
 tp_abort_unlock([]) ->
     ok;	    
 tp_abort_unlock([Entry | LogRest])->
-     if 
-	Entry#logentry.operation == write ->
-	    ?DB:unset_write_lock(Entry#logentry.rkey);
+    if 
+	Entry#logentry.status == prepared ->
+	    case Entry#logentry.operation of
+		write ->
+		    ?DB:unset_write_lock(Entry#logentry.rkey);
+		read ->
+		    ?DB:unset_read_lock(Entry#logentry.rkey)
+	    end;
 	true ->
-	    ?DB:unset_read_lock(Entry#logentry.rkey)
+	    ok
     end,
     tp_abort_unlock(LogRest).    
     

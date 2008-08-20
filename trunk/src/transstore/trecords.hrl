@@ -54,8 +54,8 @@
 -define(TLOG(X), ok).
 -define(TLOG2(X, Y), ok).
 
--define(TLOGN(X,Y), io:format("~p~p: " ++ X ++ "~n", [?MODULE, ?LINE] ++ Y)).
-%-define(TLOGN(X,Y), ok).
+%-define(TLOGN(X,Y), io:format("~p~p: " ++ X ++ "~n", [?MODULE, ?LINE] ++ Y)).
+-define(TLOGN(X,Y), ok).
 
 %-define(TIMELOG(X,Y), io:format("Transaction time: phase ~p took ~p ms ~n", [X,Y])).
 -define(TIMELOG(X,Y), ok).

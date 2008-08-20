@@ -34,6 +34,8 @@ behaviour_info(callbacks) ->
      {set_write_lock, 1}, {unset_write_lock, 1},
      % read locks
      {set_read_lock, 1}, {unset_read_lock, 1},
+     % locks helper
+     {get_locks, 1},
      % standard calls
      {read, 1}, {write, 3}, {get_version, 1},
      %load balancing
