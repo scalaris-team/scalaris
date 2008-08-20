@@ -40,7 +40,8 @@ get_pid() ->
 %% @spec set_owner(pid()) -> ok
 set_owner(Owner) ->
     %io:format("[ I | Fail   | ~w ] set owner: ~w~n",[self(), self()]),
-    get_pid() ! {set_owner, Owner}.
+    get_pid() ! {set_owner, Owner},
+    ok.
 
 %% @doc adds a node which should be watched. Id has to be a unique identifier for this process. Tag can 
 %%      used as a human readable name.
@@ -49,7 +50,8 @@ set_owner(Owner) ->
 %%  Tag = term()
 add_node(Id, Tag, Node) ->
     %io:format("[ I | Fail   | ~w ] add node: ~w~n",[self(), Node]),
-    get_pid() ! {add_node, Id, Tag, Node}.
+    get_pid() ! {add_node, Id, Tag, Node},
+    ok.
 
 %% @doc adds a list of nodes which should be watched. 
 %% @see failuredetector:add_node/3
@@ -57,7 +59,8 @@ add_node(Id, Tag, Node) ->
 %%  T = {Id, Tag, pid()}
 add_nodes(Nodes) ->
     %io:format("[ I | Fail   | ~w ] add nodes: ~w~n",[self(), Nodes]),
-    get_pid() ! {add_nodes, Nodes}.
+    get_pid() ! {add_nodes, Nodes},
+    ok.
 
 %% @doc replaces the nodes to be watched with the new passed nodes. 
 %% @see failuredetector:add_node/3

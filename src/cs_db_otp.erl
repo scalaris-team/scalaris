@@ -33,7 +33,7 @@
 	 handle_info/2, code_change/3, terminate/2, stop/0,
 	 
 	 set_write_lock/1, unset_write_lock/1, set_read_lock/1, 
-	 unset_read_lock/1, 
+	 unset_read_lock/1, get_locks/1,
 
 	 read/1, write/3, get_version/1, 
 
@@ -82,6 +82,11 @@ set_read_lock(Key) ->
 %% @spec unset_read_lock(string()) -> ok | failed
 unset_read_lock(Key) ->
     gen_server:call(get_pid(), {unset_read_lock, Key}, 20000).
+
+%% @doc get the locks and version of a key
+%% @spec get_locks(string()) -> {bool(), int(), int()}| failed
+get_locks(Key) ->
+    gen_server:call(get_pid(), {get_locks, Key}, 20000).
 
 %% @doc reads the version and value of a key
 %% @spec read(string()) -> {ok, string(), integer()} | failed
@@ -239,6 +244,16 @@ handle_call({unset_read_lock, Key}, _From, DB) ->
 	    {reply, failed, DB}
     end;
 
+% get locks
+%@private
+handle_call({get_locks, Key}, _From, DB) ->
+    case gb_trees:lookup(Key, DB) of
+	{value, {_Value, WriteLock, ReadLock, Version}} ->
+	    {reply, {WriteLock, ReadLock, Version}, DB};
+	none ->
+	    {reply, failed, DB}
+    end;
+
 % read
 %@private
 handle_call({read, Key}, _From, DB) ->
@@ -252,9 +267,16 @@ handle_call({read, Key}, _From, DB) ->
 % write
 %@private
 handle_call({write, Key, Value, Version}, _From, DB) ->
-    NewDB = gb_trees:enter(Key, 
-			   {Value, false, 0, Version}, 
-			   DB),
+    NewDB = case gb_trees:lookup(Key, DB) of
+		{value, {_Value, WriteLock, ReadLock, _Version}} ->
+		    gb_trees:enter(Key, 
+				   {Value, WriteLock, ReadLock, Version}, 
+				   DB);
+		none ->
+		    gb_trees:enter(Key, 
+				   {Value, false, 0, Version}, 
+				   DB)
+	    end,
     {reply, ok, NewDB};
 
 % get_version
