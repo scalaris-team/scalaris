@@ -49,94 +49,70 @@
 tp_validate(State, Tid, Item)->
     %?TLOGN("validating item ~p", [Item]),
     %% Check whether the version is still valid
-    LocalItemRes = ?DB:read(Item#item.rkey),
-   
-    if
-	LocalItemRes /= failed -> 
-	    {ok, _, Version} = LocalItemRes,
-	    %?TLOGN("stored locally ~p", [Item#item.key]),
-	    VCheckRes = check_version(Item, Version);
-	true ->
-	    Operation = Item#item.operation,
-	    if 
-		Operation == write ->
-		    VCheckRes = success;
-		true ->
-		    VCheckRes = fail
-	    end    
-    end,
-    
-    %?TLOGN("version check: ~p", [VCheckRes]),
-
-    if
-	VCheckRes == success->
-	    case Item#item.operation of
-		read ->
-		    LockRes = ?DB:set_read_lock(Item#item.rkey);
-		write ->
-		    LockRes = ?DB:set_write_lock(Item#item.rkey);
-		_X ->
-		    LockRes = failed
-	    end,
-	    
-	    case LockRes of
-		ok ->
-		    %?TLOGN("lock successful for ~p", [Item#item.rkey]),
-		    NewLogEntry = tp_log:new_logentry(prepared, Tid, Item),
-		    NewState1 = tp_log:add_to_undecided(State, Tid, NewLogEntry),
-		    Decision = prepared;
-		failed ->
-		    %?TLOGN("lock failed for ~p", [Item#item.rkey]), 
-                    NewLogEntry = tp_log:new_logentry(local_abort, Tid, Item),
-		    NewState1 = tp_log:add_to_undecided(State, Tid, NewLogEntry),
-		    Decision = abort;
-		_ ->
-		    %% something unexpected resulted
-		    Decision = abort,
-		    NewState1 = State
-	    end;
-	    %% add to log with prepared else with abort TODO??
-	true ->
-	    NewLogEntry = tp_log:new_logentry(local_abort, Tid, Item),
-	    NewState1 = tp_log:add_to_undecided(State, Tid, NewLogEntry),
-	    Decision = abort
-    end,
-    NewVote = trecords:new_vote(Tid, Item#item.key, Item#item.rkey, Decision, 1),
-    
+    LockRes = case ?DB:read(Item#item.rkey) of
+		  {ok, _Value, Version} ->
+		      set_lock(check_version(Item, Version), Item);
+		  _Any ->
+		      case Item#item.operation of
+			  write ->
+			      set_lock(success, Item);
+			  _Any ->
+			      failed
+		      end    
+	      end,
+    Decision = decision(LockRes),
+    NewState = update_transaction_participant_log(State, Tid, Item, Decision),
+    NewVote = trecords:new_vote(Tid, Item#item.key, Item#item.rkey, Decision, 1),   
     tsend:send_vote_to_rtms(Item#item.tms, NewVote),
-    NewState1.
+    NewState.
     
-check_version(TransactionItem, Version)->
+
+set_lock(success, #item{operation=read} = Item) ->
+    ?DB:set_read_lock(Item#item.rkey);
+set_lock(success, #item{operation=write} = Item) ->
+    ?DB:set_write_lock(Item#item.rkey);
+set_lock(_LockFailed, _Item)->
+    failed.
+
+decision(ok)->
+    prepared;
+decision(_)->
+    abort.
+
+update_transaction_participant_log(State, Tid, Item, prepared) ->
+    update_state(State, Tid, tp_log:new_logentry(prepared, Tid, Item));
+update_transaction_participant_log(State, Tid, Item, abort) ->
+    update_state(State, Tid, tp_log:new_logentry(local_abort, Tid, Item)).
+
+update_state(OldState, Tid, LogEntry)->
+    tp_log:add_to_undecided(OldState, Tid, LogEntry).
     
-    case TransactionItem#item.operation of
-	read ->
-	    if
-		TransactionItem#item.version >= Version ->   
-		    success;
-		true ->
-		    fail
-	    end;
-	write ->
-	    if
-		TransactionItem#item.version == (Version + 1) ->
-		    success;
-		true ->
-		    fail
-	    end
+check_version(#item{operation=read} = TransactionItem, Version)-> 
+     if
+	 TransactionItem#item.version >= Version ->   
+	     success;
+	 true ->
+	     fail
+     end;
+check_version(#item{operation=write} = TransactionItem, Version)-> 
+    if
+	TransactionItem#item.version == (Version + 1) ->
+	    success;
+	true ->
+	    fail
     end.
 
 tp_commit(State, TransactionID)->
     %?TLOGN("committing transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
-    TransLogUndecided = TransLog#translog.undecided,
-    IsLogged = gb_trees:is_defined(TransactionID, TransLogUndecided), 
-    if
-	IsLogged == true ->
+    TransLogUndecided = TransLog#translog.undecided, 
+    case gb_trees:is_defined(TransactionID, TransLogUndecided) of
+	true ->
 	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
 	    tp_commit_store_unlock(LogEntries),
 	    NewTransLog = tp_log:get_log(State),
 	    tp_log:remove_from_undecided(State, TransactionID, NewTransLog, TransLogUndecided);
-	true ->
+	_Any ->
 	    %%get information about transaction --- might have missed something before
 	    State
     end.
@@ -144,12 +120,12 @@ tp_commit(State, TransactionID)->
 tp_commit_store_unlock([]) ->
     ok;
 tp_commit_store_unlock([Entry | LogRest])->
-    if 
-	Entry#logentry.operation == write ->
+    case Entry#logentry.operation of
+	write ->
 	    ?DB:write(Entry#logentry.rkey, Entry#logentry.value, Entry#logentry.version),
 	    %_Stored = ?DB:read(Entry#logentry.rkey),
 	    ?DB:unset_write_lock(Entry#logentry.rkey);
-	true ->
+	_Any ->
 	    ?DB:unset_read_lock(Entry#logentry.rkey)
     end,
     
@@ -159,14 +135,13 @@ tp_abort(State, TransactionID)->
     ?TLOGN("aborting transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
     TransLogUndecided = TransLog#translog.undecided,
-    IsLogged = gb_trees:is_defined(TransactionID, TransLogUndecided), 
-    if
-	IsLogged == true ->
+    case gb_trees:is_defined(TransactionID, TransLogUndecided) of
+	true ->
 	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
 	    tp_abort_unlock(LogEntries),
 	    NewTransLog = tp_log:get_log(State),
 	    tp_log:remove_from_undecided(State, TransactionID, NewTransLog, TransLogUndecided);
-	true ->
+	_Any ->
 	    %%get information about transaction --- might have missed something before
 	    State
     end.
@@ -174,15 +149,15 @@ tp_abort(State, TransactionID)->
 tp_abort_unlock([]) ->
     ok;	    
 tp_abort_unlock([Entry | LogRest])->
-    if 
-	Entry#logentry.status == prepared ->
+    case Entry#logentry.status of
+	prepared ->
 	    case Entry#logentry.operation of
 		write ->
 		    ?DB:unset_write_lock(Entry#logentry.rkey);
 		read ->
 		    ?DB:unset_read_lock(Entry#logentry.rkey)
 	    end;
-	true ->
+	_Any ->
 	    ok
     end,
     tp_abort_unlock(LogRest).    
