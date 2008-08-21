@@ -28,11 +28,11 @@
 -include("unittest.hrl").
 
 all() ->
-    [increment_test].
+    [increment_test_2, increment_test_4, increment_test_8].
 
 suite() ->
     [
-     {timetrap, {seconds, 60}}
+     {timetrap, {seconds, 120}}
     ].
 
 init_per_suite(Config) ->
@@ -40,7 +40,7 @@ init_per_suite(Config) ->
     Pid = spawn(fun () ->
 			process_dictionary:start_link_for_unittest(), 
 			boot_sup:start_link(), 
-			timer:sleep(25000) 
+			timer:sleep(120000) 
 		end),
     timer:sleep(15000),
     [{wrapper_pid, Pid} | Config].
@@ -56,7 +56,6 @@ make_tfun(Key) ->
 	    {Result2, TransLog2} =
 		if
 		    Result == fail ->
-			ct:pal("fail ~p~n", [Result]),
 			Value = 0,
 			transstore.transaction_api:write(Key, Value, TransLog);
 		    true ->
@@ -94,7 +93,49 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     end.
     
 
-increment_test(_Config) ->
+increment_test_8(_Config) ->
+    % init: i = 0
+    Key = "i",
+    ?equals(transstore.transaction_api:single_write("i", 0), commit),
+
+    Self = self(),
+    Count = 100,
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+
+    Aborts = wait_for_done(8),
+    ct:pal("aborts: ~p~n", [Aborts]),
+    Foo = transstore.transaction_api:quorum_read(Key),
+    {Total, _} = Foo,
+    ?equals(Total, 8 * Count),
+    ok.
+
+increment_test_4(_Config) ->
+    % init: i = 0
+    Key = "i",
+    ?equals(transstore.transaction_api:single_write("i", 0), commit),
+
+    Self = self(),
+    Count = 100,
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+
+    Aborts = wait_for_done(4),
+    ct:pal("aborts: ~p~n", [Aborts]),
+    Foo = transstore.transaction_api:quorum_read(Key),
+    {Total, _} = Foo,
+    ?equals(Total, 4 * Count),
+    ok.
+
+increment_test_2(_Config) ->
     % init: i = 0
     Key = "i",
     ?equals(transstore.transaction_api:single_write("i", 0), commit),
@@ -104,20 +145,20 @@ increment_test(_Config) ->
     spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
     spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
 
-    receive
-	{done, Count1} ->
-	    receive 
-		{done, Count2} ->
-		    ct:pal("aborts: ~p/~p~n", [Count1, Count2]),
-		    ok
-	    end
-    end,
+    Aborts = wait_for_done(2),
+    ct:pal("aborts: ~p~n", [Aborts]),
     Foo = transstore.transaction_api:quorum_read(Key),
     {Total, _} = Foo,
-    ct:pal("read: ~p~n", [Foo]),
     ?equals(Total, 2 * Count),
     ok.
 
+wait_for_done(0) ->
+    [];
+wait_for_done(Count) ->
+    receive
+	{done, Aborts} ->
+	    [Aborts |wait_for_done(Count - 1)]
+    end.
 
 tfuns(_Config) ->
     ok.
