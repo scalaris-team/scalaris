@@ -25,7 +25,7 @@
 
 -include("trecords.hrl").
 
--export([write/3, read/2, parallel_reads/2, abort/0, quorum_read/1, parallel_quorum_reads/2, single_write/2, do_transaction/3, do_transaction_wo_rp/3, commit/1, jWrite/3, jRead/2, jParallel_reads/2]).
+-export([write/3, read/2, write2/3, read2/2, parallel_reads/2, abort/0, quorum_read/1, parallel_quorum_reads/2, single_write/2, do_transaction/3, do_transaction_wo_rp/3, commit/1, jWrite/3, jRead/2, jParallel_reads/2]).
 
 -import(cs_send).
 -import(erlang).
@@ -217,6 +217,25 @@ parallel_reads(Keys, TransLog)->
     transaction:parallel_reads(Keys, TransLog).
 
 
+% @spec read2(translog(), term()) -> {term(), translog()}
+% @throws {abort, {fail, translog()}}
+read2(TransLog, Key) ->
+    case read(Key, TransLog) of
+	{{fail, _Details}, _TransLog1} = Result ->
+	    throw({abort, Result});
+	{{value, Value}, TransLog1} = Result ->
+	    {Value, TransLog1}
+    end.
+
+% @spec write2(translog(), term(), term()) -> translog()
+% @throws {abort, {fail, translog()}}
+write2(TransLog, Key, Value) ->
+    case write(Key, Value, TransLog) of
+	{{fail, _Reason}, _TransLog1} = Result ->
+	    throw ({abort, Result});
+	{ok, TransLog1} ->
+	    TransLog1
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: abort() -> {abort} 

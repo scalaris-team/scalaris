@@ -29,6 +29,7 @@
 -include("trecords.hrl").
 
 -import(cs_send).
+-import(ct).
 -import(lists).
 -import(erlang).
 -import(timer).
@@ -100,7 +101,12 @@ start_manager_commit(Items, SuccessFun, FailureFun, Owner, TID, InstanceId)->
 %% or when operations on items fail, not catched by the user in the TFun
 read_phase(TFun)->
     TLog = transstore.trecords:new_translog(),
-    {{TFunFlag, ReadVal}, TLog2} = TFun(TLog),
+    {{TFunFlag, ReadVal}, TLog2} = try 
+				       TFun(TLog)
+				       catch {abort, State} ->
+					   State
+				   end,
+					       
     %?TLOGN("TLOG in readphase ~p~n", [TLog2]),
     if
 	TFunFlag == ok ->
