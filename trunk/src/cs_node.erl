@@ -290,19 +290,19 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)));
 
 %% bulk
-	{bulk_owner, I, R, Next, Msg} ->
+	{bulk_owner, I, Msg} ->
 	    ?LOG("[ ~w | I | Node   | ~w ] bulk_owner~n",
 		      [calendar:universal_time(), self()]),
-	    bulkowner:bulk_owner(State, I, R, Next, Msg),
+	    bulkowner:bulk_owner(State, I, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{start_bulk_owner, I, Msg} ->
 	    ?LOG("[ ~w | I | Node   | ~w ] start_bulk_owner~n",
 		      [calendar:universal_time(), self()]),
-	    bulkowner:start_bulk_owner(State, I, Msg),
+	    bulkowner:start_bulk_owner(I, Msg),
 	    loop(State, ?DEBUG(Debug));
-	{bulk_read_with_version, Issuer, From, To} ->
-	    cs_send:send(Issuer, {bulk_read_with_version_response, cs_state:my_range(State), 
-				  ?DB:get_range_with_version(From, To)}),
+	{bulkowner_deliver, Range, {bulk_read_with_version, Issuer}} ->
+	    cs_send:send(Issuer, {bulk_read_with_version_response, cs_state:get_my_range(State), 
+				  ?DB:get_range_with_version(Range)}),
 	    loop(State, ?DEBUG(Debug));
 
 % load balancing
@@ -369,8 +369,15 @@ loop(State, Debug) ->
 	    %cs_send:send(config:bootPid(), {register, cs_send:this(), cs_state:uniqueId(State)}),
 	    %timer:send_after(config:reregisterInterval(), self(), {reregister}),
 	    loop(State, ?DEBUG(Debug));
-		    
-	   %%testing purpose
+
+%% unit_tests
+	{bulkowner_deliver, _Range, {unit_test_bulkowner, Owner}} ->
+	    Owner ! {unit_test_bulkowner_response, lists:map(fun ({Key, {Value, _, _, _}}) ->
+									    {Key, Value}
+								    end, ?DB:get_data())},
+	    loop(State, ?DEBUG(Debug));
+
+%%testing purpose
 %% 	{print_locked_items} ->
 %% 	    ?DB:print_locked_items(),
 %% 	    timer:send_after(15000, self(), {print_locked_items}),

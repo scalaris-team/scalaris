@@ -12,43 +12,47 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_replica_stabilization_SUITE.erl
+%%% File    : unittest_helper.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Unit tests for src/cs_replica_stabilization.erl
+%%% Description : Helper functions for Unit tests 
 %%%
-%%% Created :  22 Feb 2008 by Thorsten Schuett <schuett@zib.de>
+%%% Created :  27 Aug 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
--module(cs_replica_stabilization_SUITE).
+-module(unittest_helper).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--compile(export_all).
+-export([make_ring/1, stop_ring/1]).
 
--include("unittest.hrl").
+make_ring(Size) ->
+    Owner = self(),
+    Pid = spawn(fun () ->
+			process_dictionary:start_link_for_unittest(), 
+			boot_sup:start_link(), 
+			timer:sleep(1000),
+			erlang:put(instance_id, process_dictionary:find_group(config)),
+			boot_server:connect(),
+			admin:add_nodes(Size - 1),
+			Owner ! {continue},
+			timer:sleep(120000) 
+		end),
+    receive
+	{continue} -> 
+	    ok
+    end,
+    wait_for_stable_ring(),
+    Pid.
 
-all() ->
-    [createReplicatedIntervals, done, merge_data].
+stop_ring(Pid) ->
+    exit(Pid, kill).
 
-suite() ->
-    [
-     {timetrap, {seconds, 20}}
-    ].
-
-init_per_suite(Config) ->
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-%% @TODO
-done(_Config) ->
-    ok.
-
-%% @TODO
-merge_data(_Config) ->
-    ok.
-
-createReplicatedIntervals(_Config) ->
-    %?equals(cs_replica_stabilization:createReplicatedIntervals(0, 1), []),
-    ok.
+wait_for_stable_ring() ->
+    case admin:check_ring() of
+	{error, Text} ->
+	    ct:pal("~p~n", [Text]),
+	    wait_for_stable_ring();
+	_ ->
+	    ok
+    end.
+    

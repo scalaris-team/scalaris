@@ -35,16 +35,22 @@ escape_quotes(String) ->
 
 escape_quotes_($", Rest) -> [$",$\\|Rest];
 escape_quotes_(Ch, Rest) -> [Ch|Rest].
-	
+
+
+is_between(X, _, X) ->
+    true;
+is_between(minus_infinity, _, plus_infinity) ->
+    true;
+is_between(minus_infinity, plus_infinity, _) ->
+    false;
+is_between(plus_infinity, plus_infinity, _) ->
+    false;
+is_between(plus_infinity, minus_infinity, _) ->
+    true;
+is_between(Begin, Id, End) when Begin < End ->
+    (Begin < Id) and (Id =< End);
 is_between(Begin, Id, End) ->
-    if
-	Begin < End -> 
-	    (Begin < Id) and (Id =< End);
-	Begin == End ->
-	    true;
-	true -> 
-	    (Begin < Id) or (Id =< End)
-    end.
+    (Begin < Id) or (Id =< End).
 
 
 is_between_stab(Begin, Id, End) ->

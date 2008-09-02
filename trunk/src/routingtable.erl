@@ -45,7 +45,9 @@ behaviour_info(callbacks) ->
      % for symmetric replication
      {get_keys_for_replicas, 1},
      % for debugging
-     {dump, 1}
+     {dump, 1},
+     % for bulkowner
+     {to_dict, 1}
     ];
 
 behaviour_info(_Other) ->

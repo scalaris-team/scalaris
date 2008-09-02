@@ -223,7 +223,7 @@ read2(TransLog, Key) ->
     case read(Key, TransLog) of
 	{{fail, _Details}, _TransLog1} = Result ->
 	    throw({abort, Result});
-	{{value, Value}, TransLog1} = Result ->
+	{{value, Value}, TransLog1} = _Result ->
 	    {Value, TransLog1}
     end.
 

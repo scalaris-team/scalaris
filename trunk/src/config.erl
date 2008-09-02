@@ -54,8 +54,7 @@ get_pid() ->
     InstanceId = erlang:get(instance_id),
     if
 	InstanceId == undefined ->
-	    io:format("~p~n", [util:get_stacktrace()]);
-	    %init:stop();
+	    io:format("missing instance_id: ~p~n", [util:get_stacktrace()]);
 	true ->
 	    ok
     end,

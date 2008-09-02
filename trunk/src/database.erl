@@ -41,7 +41,7 @@ behaviour_info(callbacks) ->
      %load balancing
      {get_load, 0}, {get_middle_key, 0}, {split_data, 2}, 
      %
-     {get_data, 0}, {add_data, 1}
+     {get_data, 0}, {add_data, 1}, {get_range_with_version, 1}
     ];
 
 behaviour_info(_Other) ->
