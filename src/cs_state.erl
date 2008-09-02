@@ -44,6 +44,7 @@
 	 filterDeadNodes/2,
 	 assert/1,
 	 get_my_range/1, set_my_range/2,
+	 next_interval/1,
 	 %%transactions
 	 get_trans_log/1,
 	 set_trans_log/2]).
@@ -67,6 +68,10 @@ new(RT, SuccessorList, Predecessor, Me, MyRange, LB) ->
        undecided = gb_trees:empty()
       }
     }.
+
+% @spec next_interval(state()) -> intervals:interval()
+next_interval(State) ->
+    intervals:new(id(State), succ_id(State)).
 
 get_my_range(#state{my_range=MyRange}) ->
     MyRange.

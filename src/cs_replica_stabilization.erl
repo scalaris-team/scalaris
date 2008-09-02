@@ -26,119 +26,102 @@
 -author('schuett@zib.de').
 -vsn('$Id: cs_replica_stabilization.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([recreate_replicas/1]).
+-include("chordsharp.hrl").
+
+-export([recreate_replicas/1, createReplicatedIntervals/2]).
 
 %% @doc recreates the replicas of the given key range
-%% @spec recreate_replicas({string(), string()}) -> ok
+%% @spec recreate_replicas({string(), string()}) -> pid()
 recreate_replicas({From, To}) ->
     InstanceId = erlang:get(instance_id),
+%    spawn(fun () -> 
+%		  erlang:put(instance_id, InstanceId),
+% 		  Intervals = createReplicatedIntervals(From, To),
+% 		  io:format("{~p, ~p}: ~p~n", [From, To, Intervals]),
+% 		  start_fetchers(1, Intervals),
+% 		  recreate_replicas_loop(length(Intervals), gb_sets:empty(), []) 
+% 	  end),
     ok.
 
-%%     spawn(fun () -> 
-%% 		  erlang:put(instance_id, InstanceId),
-%% 		  Intervals = createIntervals(From, To),
-%% 		  io:format("{~s, ~s}~n", [From, To]),
-%% 		  printIntervals(Intervals),
-%% 		  start_fetchers(1, Intervals),
-%% 		  recreate_replicas_loop(length(Intervals), gb_sets:empty(), []) 
-%% 	  end).
-
-%%====================================================================
-%% supervisor functions
-%%====================================================================  
 
 recreate_replicas_loop(Intervals, Done, Data) ->
     receive
 	{fetched_data, Index, FetchedData} ->
 	    case gb_sets:is_member(Index, Done) of
 		false ->
-		    recreate_replicas_loop(Intervals, gb_sets:add(Index, Done), [FetchedData | Data]);
+		    case gb_sets:size(Done) + 1 == Intervals of
+			true ->
+			    update_db(Data);
+			false ->
+			    recreate_replicas_loop(Intervals, gb_sets:add(Index, Done), [FetchedData | Data])
+		    end;
 		true ->
-		    recreate_replicas_loop(Intervals, Done, Data)
-	    end
-    after 1000 ->
-	    case gb_sets:size(Done) == Intervals of
-		true ->
-		    update_db(Data);
-		false ->
 		    recreate_replicas_loop(Intervals, Done, Data)
 	    end
     end.
 
-createIntervals([FromReplica | FromId], [ToReplica | ToId]) ->
-    Prefixes = config:replicaPrefixes(),
-    FromPrefix = util:find(FromReplica, Prefixes),
-    ToPrefix = util:find(ToReplica, Prefixes),
-    createIntervals(FromPrefix, FromId, ToPrefix, ToId, Prefixes,
-		    length(config:replicaPrefixes()), length(config:replicaPrefixes())).
-    
-createIntervals(_FromPrefix, _FromId, _ToPrefix, _ToId, _Prefixes, _Replicas, 1) ->
-    [];
-    
-createIntervals(FromPrefix, FromId, ToPrefix, ToId, Prefixes, Replicas, I) ->
-    [{[lists:nth(FromPrefix rem Replicas + 1, Prefixes) | FromId], 
-      [lists:nth(ToPrefix rem Replicas + 1, Prefixes) | ToId]} | 
-     createIntervals(FromPrefix + 1, FromId, ToPrefix + 1, ToId, Prefixes, Replicas, I - 1)].
-    
-printIntervals([{From, To} | Tail]) ->
-    io:format("{~s, ~s} ", [From, To]),
-    printIntervals(Tail);
-printIntervals([]) ->
-    io:format("~n", []).
-
-start_fetchers(_Index, []) ->
-    ok;
-start_fetchers(Index, [{From, To} | Tail]) ->
-    Me = self(),
-    spawn(fun () ->
-		  fetch_interval(Me, Index, From, To)
-	  end),
-    start_fetchers(Index + 1, Tail).
-    
 %%====================================================================
 %% fetch functions
 %%====================================================================  
 
-fetch_interval(Owner, Index, From, To) ->
-    bulkowner:issue_bulk_owner(intervals:new(From, To), 
-			       {bulk_read_with_version, cs_send:this(), From, To}),
+% @spec start_fetchers(int(), [intervals:interval()]) -> ok
+start_fetchers(_Index, []) ->
+    ok;
+start_fetchers(Index, [Interval | Tail]) ->
+    Me = self(),
+    spawn(fun () ->
+		  fetch_interval(Me, Index, Interval)
+	  end),
+    start_fetchers(Index + 1, Tail).
+    
+% @spec fetch_interval(pid(), int(), intervals:interval()) -> ok
+fetch_interval(Owner, Index, Interval) ->
+    bulkowner:issue_bulk_owner(Interval, 
+			       {bulk_read_with_version, cs_send:this()}),
     timer:send_after(5000, self(), {timeout}),
-    fetch_interval_loop(Owner, Index, From, To, [], []).
+    fetch_interval_loop(Owner, Index, Interval, [], []).
 
-fetch_interval_loop(Owner, Index, From, To, Done, FetchedData) ->
-    case done(From, To, Done) of
-	false ->
-	    receive
-		{timeout} ->
-		    timer:send_after(5000, self(), {timeout}),
-		    fetch_interval_loop(Owner, Index, From, To, Done, FetchedData);
-		{bulk_read_with_version_response, LocalFrom, LocalTo, NewData} ->
-		    fetch_interval_loop(Owner, Index, From, To, [{LocalFrom, LocalTo} | Done], 
-					merge_data(FetchedData, NewData));
-		X ->
-		    io:format("unknown message ~w~n", [X]),
-		    fetch_interval_loop(Owner, Index, From, To, Done, FetchedData)
+fetch_interval_loop(Owner, Index, Interval, Done, FetchedData) ->
+    receive
+	{timeout} ->
+	    timer:send_after(5000, self(), {timeout}),
+	    fetch_interval_loop(Owner, Index, Interval, Done, FetchedData);
+	{bulk_read_with_version_response, Interval, NewData} ->
+	    Done2 = [Interval | Done],
+	    case done(Interval, Done2) of
+		false ->
+		    fetch_interval_loop(Owner, Index, Interval, Done2, 
+					[FetchedData| NewData]);
+		true ->
+		    Owner ! {fetched_data, Index, FetchedData},
+		    ok
 	    end;
-	true ->
-	    Owner ! {fetched_data, Index, FetchedData}
+	X ->
+	    io:format("unknown message ~w~n", [X]),
+	    fetch_interval_loop(Owner, Index, Interval, Done, FetchedData)
     end.
 
-%%====================================================================
-%% TODO functions
-%%====================================================================  
-
-%% @TODO
-done(From, To, Done) ->
-    true.
-
-%% @TODO
-merge_data(FetchedData, NewData) ->
-    [].
+% @spec done(intervals:interval(), [intervals:interval()]) -> bool()
+done(Interval, Done) ->
+    intervals:is_covered(Interval, Done).
 
 %%====================================================================
 %% update database functions (TODO)
 %%====================================================================  
 
 %% @TODO
+% @spec update_db([{Key::term(), Value::term(), Version::int(), WriteLock::bool(), ReadLock::int()}]) -> ok
 update_db(Data) ->
     ok.
+
+%%====================================================================
+%% replica management
+%%====================================================================  
+
+% @spec createReplicatedIntervals(term(), term()) -> [intervals:interval()]
+createReplicatedIntervals(From, To) ->
+    FromReplicas = ?RT:get_keys_for_replicas(From),
+    ToReplicas   = ?RT:get_keys_for_replicas(To),
+    Zipped = lists:zip(FromReplicas, ToReplicas),
+    lists:map(fun intervals:make/1, Zipped).
+

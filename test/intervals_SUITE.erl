@@ -25,12 +25,14 @@
 
 -compile(export_all).
 
+-include_lib("quickcheck.hrl").
+
 -import(intervals).
 
 -include_lib("unittest.hrl").
 
 all() ->
-    [new, is_empty, cut].
+    [new, qc_is_empty, qc_is_covered, qc_cut, qc_sanitize].
 
 suite() ->
     [
@@ -47,19 +49,73 @@ new(_Config) ->
     intervals:new("a", "b"),
     ?assert(true).
 
-is_empty(_Config) ->
-    NotEmpty = intervals:new("a", "b"),
-    Empty = intervals:empty(),
-    ?assert(not intervals:is_empty(NotEmpty)),
-    ?assert(intervals:is_empty(Empty)).
-    
-cut(_Config) ->
-    NotEmpty = intervals:new("a", "b"),
-    Empty = intervals:empty(),
-    ?assert(intervals:is_empty(intervals:cut(NotEmpty, Empty))),
-    ?assert(intervals:is_empty(intervals:cut(Empty, NotEmpty))),
-    ?assert(intervals:is_empty(intervals:cut(NotEmpty, Empty))),
-    ?assert(not intervals:is_empty(intervals:cut(NotEmpty, NotEmpty))),
-    ?assert(intervals:cut(NotEmpty, NotEmpty) == NotEmpty),
-    ok.
-    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:is_empty/1
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_is_empty() ->
+    ?FORALL(X, int(),
+	    ?FORALL(I, interval(),
+		    ?IMPLIES(intervals:is_empty(I), not intervals:in(X, I)))).
+
+qc_is_empty(_Config) ->
+    qc:quickcheck(prop_is_empty()).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:cut/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_cut() ->    
+    ?FORALL(A, interval(),
+	    ?FORALL(B, interval(),
+		    ?FORALL(X, qc:int(),
+			    ?IMPLIES(intervals:in(X, A) 
+				     and intervals:in(X, B),
+				     intervals:in(X, intervals:cut(A, B)))))).
+
+qc_cut(_Config) ->
+    qc:quickcheck(prop_cut()).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:is_covered/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_is_covered() ->
+    ?FORALL(I, interval(),
+	    ?FORALL(Is, qc:list(interval()),
+		    ?FORALL(X, qc:int(),
+			    ?IMPLIES(intervals:is_covered(I, Is) and intervals:in(X, I),
+				    intervals:in(X, Is))))).
+
+qc_is_covered(_Config) ->
+    qc:quickcheck(prop_is_covered()).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:sanitize/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_sanitize() ->
+    ?FORALL(Is, list(interval()),
+	    ?FORALL(X, qc:int(),
+		    ?IMPLIES(intervals:in(X, Is),
+			     intervals:in(X, intervals:sanitize(Is))))).
+
+qc_sanitize(_Config) ->
+    qc:quickcheck(prop_sanitize()).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% quickcheck generators
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+interval() ->
+    qc:frequency([
+		  {6, ?LET(Begin, qc:int(), ?LET(End, qc:int(), return(intervals:new(Begin, End))))},
+		  {1, intervals:empty()}
+]).
+

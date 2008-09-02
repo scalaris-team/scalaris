@@ -35,7 +35,7 @@
 	 stabilize/1, 
 	 filterDeadNodes/2,
 	 to_pid_list/1, to_node_list/1, get_size/1, 
-	 get_keys_for_replicas/1, dump/1]).
+	 get_keys_for_replicas/1, dump/1, to_dict/1]).
 
 % stabilize for Chord
 -export([stabilize/3]).
@@ -172,3 +172,33 @@ stabilize(State, Index, Node) ->
 calculateKey(State, Idx) ->
     % n + 2^Idx
     rt_simple:normalize(cs_state:id(State) + (1 bsl Idx)).
+
+% 0 -> succ
+% 1 -> shortest finger
+% 2 -> next longer finger
+% 3 -> ...
+% n -> me
+% @spec to_dict(cs_state:state()) -> dict:dictionary()
+to_dict(State) ->
+    RT = cs_state:rt(State),
+    Succ = cs_state:succ(State),
+    Fingers = flatten(RT, 127),
+    {Dict, Next} = lists:foldl(fun(Finger, {Dict, Index}) ->
+				    {dict:store(Index, Finger, Dict), Index + 1}
+			    end, 
+			    {dict:store(0, Succ, dict:new()), 1}, lists:reverse(Fingers)),
+    dict:store(Next, cs_state:me(State), Dict).
+
+% @private
+flatten(RT, Index) ->
+    case gb_trees:is_defined(Index, RT) of
+	true ->
+	    case gb_trees:get(Index, RT) of
+		null ->
+		    [];
+		Entry ->
+		    [Entry | flatten(RT, Index - 1)]
+	    end;
+	false ->
+	    []
+    end.

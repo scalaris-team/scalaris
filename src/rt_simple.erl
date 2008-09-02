@@ -28,7 +28,7 @@
 
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, stabilize/1, filterDeadNodes/2,
-	to_pid_list/1, to_node_list/1, get_size/1, get_keys_for_replicas/1, dump/1]).
+	to_pid_list/1, to_node_list/1, get_size/1, get_keys_for_replicas/1, dump/1, to_dict/1]).
 
 -export([normalize/1]).
 
@@ -110,3 +110,14 @@ dump(_State) ->
 
 normalize(Key) ->
     Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
+
+
+% 0 -> succ
+% 1 -> shortest finger
+% 2 -> next longer finger
+% 3 -> ...
+% n -> me
+% @spec to_dict(cs_state:state()) -> dict:dictionary()
+to_dict(State) ->
+    Succ = cs_state:succ(State),
+    dict:store(0, Succ, dict:store(1, cs_state:me(State), dict:new())).

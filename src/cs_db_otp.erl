@@ -37,7 +37,7 @@
 
 	 read/1, write/3, get_version/1, 
 
-	 get_range/2, get_range_with_version/2,
+	 get_range/2, get_range_with_version/1,
 
 	 get_load/0, get_middle_key/0, split_data/2, get_data/0, 
 	 add_data/1]).
@@ -136,11 +136,11 @@ get_range(From, To) ->
     gen_server:call(get_pid(), {get_range, From, To}, 20000).
 
 %% @doc get keys and versions in a range
-%% @spec get_range_with_version(string(), string()) -> [{string(), string(), integer()}]
-get_range_with_version(From, To) ->    
-    gen_server:call(get_pid(), {get_range_with_version, From, To}, 20000).
+%% @spec get_range_with_version(intervals:interval()) -> [{Key::term(), 
+%%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
+get_range_with_version(Interval) ->    
+    gen_server:call(get_pid(), {get_range_with_version, Interval}, 20000).
     
-
 %%====================================================================
 %% for testing purpose 
 %%====================================================================
@@ -342,11 +342,12 @@ handle_call({get_range, From, To}, _From, DB) ->
 
 % get_range_with_version
 %@private
-handle_call({get_range_with_version, From, To}, _From, DB) ->
-    Items = lists:foldl(fun ({Key, {Value, _WriteLock, _ReadLock, Version}}, List) -> 
+handle_call({get_range_with_version, Interval}, _From, DB) ->
+    {From, To} = intervals:unpack(Interval),
+    Items = lists:foldl(fun ({Key, {Value, WriteLock, ReadLock, Version}}, List) -> 
 				case util:is_between(From, Key, To) of
 				    true ->
-					[{Key, Value, Version} | List];
+					[{Key, Value, Version, WriteLock, ReadLock} | List];
 				    false ->
 					List
 				end
