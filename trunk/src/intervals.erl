@@ -131,8 +131,6 @@ is_covered(Interval, Intervals) ->
     end.
 
 % @private
-is_covered_helper(#interval2{first=First, last=Last}, _) when First >= Last ->
-    true;
 is_covered_helper(Interval, Intervals) ->
     %io:format("helper: ~p ~p~n", [Interval, Intervals]),
     %io:format("find_start: ~p~n", [find_start(Interval#interval2.first, Intervals, [])]),
@@ -140,10 +138,10 @@ is_covered_helper(Interval, Intervals) ->
 	none ->
 	    false;
 	{CoversStart, RemainingIntervals} ->
-	    if
-		CoversStart#interval2.last >= Interval#interval2.last ->
-		    true;
+	    case greater_equals_than(CoversStart#interval2.last, Interval#interval2.last) of
 		true ->
+		    true;
+		false ->
 		    is_covered_helper(intervals:new(CoversStart#interval2.last, Interval#interval2.last), RemainingIntervals)
 	    end
     end.
@@ -220,6 +218,10 @@ is_between(X, _, X) ->
     true;
 is_between(_, plus_infinity, plus_infinity) ->
     true;
+is_between(minus_infinity, _, plus_infinity) ->
+    true;
+is_between(X, minus_infinity, plus_infinity) ->
+    false;
 is_between(X, Y, plus_infinity) ->
     X =< Y;
 is_between(minus_infinity, minus_infinity, _) ->
@@ -239,3 +241,14 @@ is_between(Begin, Id, End) ->
 	true -> 
 	    (Begin =< Id) or (Id =< End)
     end.
+
+greater_equals_than(minus_infinity, minus_infinity) ->
+    true;
+greater_equals_than(minus_infinity, X) ->
+    false;
+greater_equals_than(plus_infinity, plus_infinity) ->
+    true;
+greater_equals_than(X, plus_infinity) ->
+    false;
+greater_equals_than(X, Y) ->
+    X >= Y.
