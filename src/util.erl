@@ -83,6 +83,14 @@ trunc(L, K) ->
 	    Trunc
     end.
     
+max(minus_infinity, B) ->
+    B;
+max(B, minus_infinity) ->
+    B;
+max(plus_infinity, _) ->
+    plus_infinity;
+max(_, plus_infinity) ->
+    plus_infinity;
 max(A, B) ->
     if
 	A > B ->
@@ -91,6 +99,14 @@ max(A, B) ->
 	    B
     end.
 
+min(minus_infinity, _) ->
+    minus_infinity;
+min(_, minus_infinity) ->
+    minus_infinity;
+min(plus_infinity, A) ->
+    A;
+min(A, plus_infinity) ->
+    A;
 min(A, B) ->
     if
 	A < B ->
