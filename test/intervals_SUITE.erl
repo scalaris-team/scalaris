@@ -32,11 +32,20 @@
 -include_lib("unittest.hrl").
 
 all() ->
-    [new, qc_is_empty, qc_is_covered, qc_cut, qc_sanitize].
+    [new, 
+     qc_make, 
+     qc_unpack,
+     qc_unpack2,
+     qc_is_empty, 
+     qc_is_covered, 
+     qc_cut, 
+     my_cut,
+     qc_cut_iter, 
+     qc_sanitize].
 
 suite() ->
     [
-     {timetrap, {seconds, 10}}
+     {timetrap, {seconds, 100}}
     ].
 
 init_per_suite(Config) ->
@@ -51,11 +60,45 @@ new(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
+% intervals:make/1
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_make() ->
+    ?FORALL(X, interval_startpoint(),
+	    ?FORALL(Y, interval_endpoint(),
+		    intervals:make({X,Y}) == intervals:new(X, Y))).
+
+qc_make(_Config) ->
+    qc:quickcheck(prop_make()).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:unpack/1
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_unpack() ->
+    ?FORALL(X, interval_startpoint(), ?FORALL(Y, interval_endpoint(),
+       ?IMPLIES(not (X == Y), {X,Y} == intervals:unpack(intervals:new(X, Y))))).
+    
+qc_unpack(_Config) ->
+    qc:quickcheck(prop_unpack()).
+
+prop_unpack2() ->
+    ?FORALL(X, qc:int(),
+	    intervals:is_covered(
+	      all, [intervals:make(intervals:unpack(intervals:new(X,X)))])).
+
+qc_unpack2(_Config) ->
+    qc:quickcheck(prop_unpack2()).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 % intervals:is_empty/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 prop_is_empty() ->
-    ?FORALL(X, int(),
+    ?FORALL(X, interval_point(),
 	    ?FORALL(I, interval(),
 		    ?IMPLIES(intervals:is_empty(I), not intervals:in(X, I)))).
 
@@ -70,13 +113,47 @@ qc_is_empty(_Config) ->
 prop_cut() ->    
     ?FORALL(A, interval(),
 	    ?FORALL(B, interval(),
-		    ?FORALL(X, qc:int(),
+		    ?FORALL(X, interval_point(),
 			    ?IMPLIES(intervals:in(X, A) 
 				     and intervals:in(X, B),
 				     intervals:in(X, intervals:cut(A, B)))))).
 
 qc_cut(_Config) ->
     qc:quickcheck(prop_cut()).
+
+my_cut(_Config) ->
+    ?assert(intervals:in(0, intervals:cut(intervals:new(minus_infinity, 0), 
+			       intervals:new(0, plus_infinity)))),
+    ?assert(intervals:in(0, intervals:cut(intervals:new(minus_infinity, 1),
+			       intervals:new(-1, plus_infinity)))),
+    ?assert(not intervals:in(-1,
+		  intervals:cut(intervals:new(minus_infinity, -1),
+				intervals:new(1, plus_infinity)))),
+    ?assert(not intervals:in(0, 
+		  intervals:cut(intervals:new(minus_infinity, -1),
+				intervals:new(1, plus_infinity)))),
+    ?assert(not intervals:in(1, intervals:cut(intervals:new(minus_infinity, -1), 
+				   intervals:new(1, plus_infinity)))).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:cut_iter/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_cut_iter() ->    
+    ?FORALL(
+       A, qc:list(interval()),
+       ?FORALL(
+	  B, qc:list(interval()),
+	  ?FORALL(
+	     X, interval_point(),
+	     ?IMPLIES(
+	     intervals:in(X, A) and intervals:in(X, B),
+	     not intervals:is_empty(intervals:cut_iter(A, B)))))).
+%	     not intervals:is_covered(A, B)))).
+
+qc_cut_iter(_Config) ->
+    qc:quickcheck(prop_cut_iter()).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -101,7 +178,7 @@ qc_is_covered(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 prop_sanitize() ->
     ?FORALL(Is, list(interval()),
-	    ?FORALL(X, qc:int(),
+	    ?FORALL(X, interval_point(),
 		    ?IMPLIES(intervals:in(X, Is),
 			     intervals:in(X, intervals:sanitize(Is))))).
 
@@ -115,7 +192,27 @@ qc_sanitize(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 interval() ->
     qc:frequency([
-		  {6, ?LET(Begin, qc:int(), ?LET(End, qc:int(), return(intervals:new(Begin, End))))},
-		  {1, intervals:empty()}
+		  {6, ?LET(Begin, interval_startpoint(), ?LET(End, interval_endpoint(), return(intervals:new(Begin, End))))},
+		  {1, qc:int()},
+		  {1, intervals:empty()},
+		  {1, all}
 ]).
 
+interval_point() ->
+    qc:frequency([
+		  {6, qc:int()},
+		  {1, plus_infinity},
+		  {1, minus_infinity}
+		  ]).
+
+interval_endpoint() ->
+    qc:frequency([
+		  {6, qc:int()},
+		  {1, plus_infinity}
+		  ]).
+
+interval_startpoint() ->
+    qc:frequency([
+		  {6, qc:int()},
+		  {1, minus_infinity}
+		  ]).
