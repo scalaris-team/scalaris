@@ -241,7 +241,7 @@ listenIP()->
 %%====================================================================
 
 start_link(Files, InstanceId) ->
-    io:format("~p~n", [Files]),
+    io:format("Config files: ~p~n", [Files]),
     %{local, ?MODULE}, ; Files, InstanceId
     gen_server:start_link(?MODULE, [Files, InstanceId], []).
 
@@ -250,13 +250,13 @@ start_link(Files, InstanceId) ->
 %    {ok, ok};
 
 init([[File], InstanceId]) ->
-    io:format("starting config~n", []),
+%    io:format("starting config~n", []),
     process_dictionary:register_process(InstanceId, config, self()),
     {ok, populate_db(gb_trees:empty(), File)};
 
 %@private
 init([[Global, Local], InstanceId]) ->
-    io:format("starting config~n", []),
+%    io:format("starting config~n", []),
     process_dictionary:register_process(InstanceId, config, self()),
     {ok, populate_db(populate_db(gb_trees:empty(), Global), 
 		     Local)}.
