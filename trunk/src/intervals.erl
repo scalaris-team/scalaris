@@ -29,7 +29,7 @@
 -vsn('$Id: intervals.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
 -export([first/0,last/0,
-	 new/2, make/1,
+	 new/1, new/2, make/1,
 	 is_empty/1, empty/0,
 	 cut/2,
 	 is_covered/2,
@@ -46,7 +46,7 @@
 
 % @type interval() = [] | term() | {interval,term(),term()} | all | list(interval())]
 % [] -> empty interval
-% term() -> one element interval
+% {element, term()} -> one element interval
 % {interval,term(),term()} -> closed interval
 % all -> minus_infinity to plus_infinity
 % list(interval()) -> [i1, i2, i3,...]
@@ -64,6 +64,8 @@ new(X, X) ->
     all;
 new(Begin, End) ->
     {interval, Begin, End}.
+new(X) ->
+    {element,X}.
 
 make({Begin, End}) ->
     new(Begin, End).
@@ -92,12 +94,12 @@ cut([], _) ->
     empty();
 cut(_, []) ->
     empty();
-cut(A, B) when is_number(A) ->
-    case in(A,B) of
+cut({element,X}=A, B) ->
+    case in(X,B) of
 	true -> A;
 	false -> empty()
     end;
-cut(A, B) when is_number(B) -> 
+cut(A, {element,_}=B) -> 
     cut(B, A);
 cut(A, B) ->
     A_ = normalize(A),
@@ -116,12 +118,12 @@ cut_iter(_, []) ->
     [];
 cut_iter(A, all) ->
     A;
-cut_iter(A, B) when is_number(A) ->
+cut_iter({element,_}=A, B) ->
     case in(A, B) of
 	true -> A;
 	false -> empty()
     end;
-cut_iter(A, B) when is_number(B) ->
+cut_iter(A, {element,_}=B) ->
     cut_iter(B, A);
 cut_iter({interval, A0, A1}, {interval, B0, B1}) ->
     B0_in_A = is_between(A0, B0, A1),
@@ -130,9 +132,9 @@ cut_iter({interval, A0, A1}, {interval, B0, B1}) ->
     A1_in_B = is_between(B0, A1, B1),
     if
 	A1 == B0 and not A0_in_B ->
-	    A1;
+	    {element,A1};
 	B1 == A0 and not B0_in_A ->
-	    B1;
+	    {element,B1};
 	B0_in_A or B1_in_A or A0_in_B or A1_in_B ->
 	    new(util:max(A0, B0), util:min(A1, B1));
 
@@ -148,9 +150,9 @@ is_covered([], _) ->
 is_covered(all, Intervals) ->
     %io:format("is_covered: ~p ~p~n", [all, Intervals]),
     is_covered(new(minus_infinity, plus_infinity), Intervals);
-is_covered(X, Intervals) when is_number(X) ->
+is_covered({element,_}=X, Intervals) ->
     in(X, Intervals);
-is_covered({interval, A, B}, X) when is_number(X) ->
+is_covered({interval, A, B}, {element,_}=X) ->
     false;
 is_covered(Interval, Intervals) ->
     %io:format("is_covered: ~p ~p~n", [Interval, Intervals]),
@@ -188,9 +190,9 @@ in(_, []) ->
     false;
 in(_, all) ->
     true;
-in(X, X) when is_number(X) ->
+in(X, {element,X}) ->
     true;
-in(_, Y) when is_number(Y) ->
+in(_, {element,_}) ->
     false.
 
 sanitize(X) when is_list(X) ->
@@ -248,7 +250,7 @@ normalize(A) ->
 % @spec find_start(term(), [interval()], [interval()]) -> {interval(), [interval()]} | none
 find_start(_Start, [], _) ->
     none;
-find_start(Start, [Interval | Rest], Remainder) when is_number(Interval) ->
+find_start(Start, [{element,_}=Interval | Rest], Remainder) ->
     find_start(Start, Rest, Remainder);
 find_start(Start, [Interval | Rest], Remainder) ->
     case is_between(element(first(),Interval), Start, element(last(),Interval)) of
@@ -274,6 +276,8 @@ is_between(X, Y, plus_infinity) ->
     X =< Y;
 is_between(minus_infinity, minus_infinity, _) ->
     true;
+is_between(minus_infinity, plus_infinity, _) ->
+    false;
 is_between(minus_infinity, X, Y) ->
     X =< Y;
 is_between(_, plus_infinity, _) ->
