@@ -204,7 +204,7 @@ The sources can be obtained from \url{http://code.google.com/p/scalaris}.
 
 \subsection{Development Branch}
 
-You find the latest development version in the svn repoitory:
+You find the latest development version in the svn repository:
 \begin{lstlisting}[language=sh]
 # Non-members may check out a read-only working copy anonymously over HTTP.
 svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-read-only
@@ -225,7 +225,7 @@ file is \code{bin/scalaris.local.cfg.example}. A local configuration file is
 necessary to run \scalaris{} on distributed nodes:
 
 \begin{lstlisting}[title=\filetitle{scalaris.local.cfg}]
-% Insert the apropriate IP-addresses for your setup as comma separated integers.
+% Insert the appropriate IP-addresses for your setup as comma separated integers.
 % IP Address, Port, and label of the boot server
 {boot_host, {{209,85,135,99},14195,boot}}.
 
@@ -443,7 +443,7 @@ loop(State) ->
 
 The server runs an endless loop, that waits for a message, processes it and
 calls itself using tail-recursion in each branch. The loop works on a
-\code{State}, which can be modified when a message is handeled.
+\code{State}, which can be modified when a message is handled.
 
 \section{Starting additional local nodes after boot}
 
@@ -741,7 +741,7 @@ The boot-server is contacted to retrieve the known number of nodes in the
 ring. If the ring is empty, \code{join_first} is called. Otherwise,
 \code{join_ring} is called.
 
-\code{join_first} just creates a new state for a \scalaris{} node conisting
+\code{join_first} just creates a new state for a \scalaris{} node consisting
 of an empty routing table, a successorlist containing itself, itself as its
 predecessor, a reference to itself, its responsibility area from \code{Id}
 to \code{Id} (the full ring), and a load balancing schema.
@@ -852,7 +852,7 @@ join_request(State, Source_PID, Id, UniqueId) ->
 \end{lstlisting}
 
 This resets the local predecessor to the new node and splits the data.
-Then it sends a \code{join_respone} to the new node with its former
+Then it sends a \code{join_response} to the new node with its former
 predecessor, the data, it has to host, and its successorlist.
 Additionally, the new node will be observed by the failuredetector.
 
@@ -928,7 +928,7 @@ Finally all the self-management services are started with
   processes started, that can be seen in the supervisor tree?
 
   \paragraph{Answer:} They are currently not implemented as separate Erlang
-  processes. All the requests are handled by the loop startet by
+  processes. All the requests are handled by the loop started by
   \code{cs_node:start()}. Nevertheless, they could be implemented as
   separate processes to make the software architecture cleaner.
 
@@ -1026,7 +1026,7 @@ behaviour_info(callbacks) ->
     [
      % create a default routing table
      {empty, 1}, 
-     % key space -> indentifier space
+     % key space -> identifier space
      {hash_key, 1}, {getRandomNodeId, 0},
      % routing
      {next_hop, 2}, 
@@ -1306,7 +1306,7 @@ next_hop(N, RT, Id, Index, Candidate) ->
 [...]
 \end{lstlisting}
 
-If the entry exists, it is retrievd from the \code{gb_tree}.  If the id of
+If the entry exists, it is retrieved from the \code{gb_tree}.  If the id of
 the routing table entry is between ourselves and the searched id, the finger
 is chosen. If anything fails, \code{Candidate} (the successor) is chosen.
 
@@ -1315,7 +1315,7 @@ changes entries to \code{null}.
 
 \todo{BUG: Instead of directly returning \code{Candidate} one should further
   traverse the routing table for shorter appropriate fingers. If doing so, a
-  check whether \code{Index} is zero, would become neccessary.}
+  check whether \code{Index} is zero, would become necessary.}
 
 If the finger is to long, recursivly try the next shorter finger.
 
@@ -1342,7 +1342,7 @@ runs asynchronously, as we do not want to block the \code{cs_node} to
 perform other request while recalculating the routing table.
 
 We have to find the node responsible for the calculated finger and therefore
-perfom a lookup for the node with a \code{rt_get_node} message, including
+perform a lookup for the node with a \code{rt_get_node} message, including
 a reference to ourselves as the reply-to address and the index to be set.
 
 The lookup performs an overlay routing by passing the massage until the
@@ -1365,7 +1365,7 @@ At the destination the message is handled in \code{cs_node.erl}:
 \end{lstlisting}
 
 The remote node just sends the requested information back directly in a
-\code{rt_get_node_response} message inclusing a reference to itself.
+\code{rt_get_node_response} message including a reference to itself.
 
 When receiving the routing table entry, we call \code{stabilize/3}!, which
 is different from the \code{stabilize/1} above.
