@@ -84,7 +84,7 @@ qc_unpack(_Config) ->
     qc:quickcheck(prop_unpack()).
 
 prop_unpack2() ->
-    ?FORALL(X, qc:int(),
+    ?FORALL(X, external_datatype(),
 	    intervals:is_covered(
 	      all, [intervals:make(intervals:unpack(intervals:new(X,X)))])).
 
@@ -164,7 +164,7 @@ qc_cut_iter(_Config) ->
 prop_is_covered() ->
     ?FORALL(I, interval(),
 	    ?FORALL(Is, qc:list(interval()),
-		    ?FORALL(X, qc:int(),
+		    ?FORALL(X, external_datatype(),
 			    ?IMPLIES(intervals:is_covered(I, Is) and intervals:in(X, I),
 				    intervals:in(X, Is))))).
 
@@ -190,29 +190,33 @@ qc_sanitize(_Config) ->
 % quickcheck generators
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+external_datatype() ->
+%    qc:list(qc:int()).
+    qc:int().
+
 interval() ->
     qc:frequency([
 		  {6, ?LET(Begin, interval_startpoint(), ?LET(End, interval_endpoint(), return(intervals:new(Begin, End))))},
-		  {1, qc:int()},
+		  {1, intervals:new(external_datatype())},
 		  {1, intervals:empty()},
 		  {1, all}
 ]).
 
 interval_point() ->
     qc:frequency([
-		  {6, qc:int()},
+		  {6, external_datatype()},
 		  {1, plus_infinity},
 		  {1, minus_infinity}
 		  ]).
 
 interval_endpoint() ->
     qc:frequency([
-		  {6, qc:int()},
+		  {6, external_datatype()},
 		  {1, plus_infinity}
 		  ]).
 
 interval_startpoint() ->
     qc:frequency([
-		  {6, qc:int()},
+		  {6, external_datatype()},
 		  {1, minus_infinity}
 		  ]).
