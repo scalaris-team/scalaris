@@ -57,7 +57,7 @@ try_link(DocRoot, SL, GL) ->
 	    Link;
 	false ->
 	    io:format("WARNING: could not start yaws, maybe port ~p is in use~n", [SC#sconf.port]),
-	    spawn_link(fun() -> do_nothing() end)
+	    {ok, spawn_link(fun() -> do_nothing() end)}
     end.
 
 do_nothing() ->

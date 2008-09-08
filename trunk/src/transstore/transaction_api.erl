@@ -68,28 +68,37 @@
 %% * for {fail, fail} the reason is currently unknown, should 
 %%   not occur 
 quorum_read(Key)->
-    {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
-    RTO = 2000,
-    if 
-	Flag /= ok->
-	    {fail, "cs_node not found"};
-	true ->
-	    LocalCSNode ! {read, cs_send:this(), Key},
-	    receive
-		{single_read_return, {fail, Reason}}->
-		    ?TLOG("single read return fail"),
-		    {fail, Reason};
-		{single_read_return,{value, Page, Version}}->
-		    ?TLOG2("read_page returned", [Page]),
-		    {Page, Version};
-		_X ->
-		    ?TLOG2("read_page got the message ~p~n", [_X]),
-		    {fail, fail}
-	    after
-		RTO ->
-		    ?TLOG("single read return fail - timeout"),
-		    {fail, timeout}
-	    end
+    Owner = self(),
+    spawn(fun () ->
+		  {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
+		  RTO = 2000,
+		  if 
+		      Flag /= ok->
+			  {fail, "cs_node not found"};
+		      true ->
+			  LocalCSNode ! {read, cs_send:this(), Key},
+			  receive
+			      {single_read_return, {fail, Reason}}->
+				  io:format("single read return fail  with reason: ~p~n", [Reason]),
+				  ?TLOG("single read return fail"),
+				  Owner ! {fail, Reason};
+			      {single_read_return,{value, Page, Version}}->
+				  ?TLOG2("read_page returned", [Page]),
+				  Owner ! {Page, Version};
+			      _X ->
+				  ?TLOG2("read_page got the message ~p~n", [_X]),
+				  Owner ! {fail, fail}
+			  after
+			      RTO ->
+				  io:format("single read return fail - timeout~n", []),
+				  ?TLOG("single read return fail - timeout"),
+				  Owner ! {fail, timeout}
+			  end
+		  end
+	  end),
+    receive
+	Result ->
+	    Result
     end.
 
 %% Use this function to do parallel quorum reads on a list of keys with a commit phase
