@@ -20,13 +20,14 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 onScale solutions
 %% @version $Id: webhelpers.erl 463 2008-05-05 11:14:22Z schuett $
 -module(webhelpers).
 
 -author('schuett@zib.de').
 -vsn('$Id: webhelpers.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([getLoadRendered/0, getRingRendered/0, lookup/1, set_key/2, isPost/1]).
+-export([getLoadRendered/0, getRingChart/0, getRingRendered/0, lookup/1, set_key/2, isPost/1]).
 
 -include("yaws_api.hrl").
 
@@ -95,6 +96,50 @@ renderLoad([]) ->
 
 %%%-----------------------------Ring----------------------------------
 
+getRingChart() ->
+    RealRing = statistics:get_ring_details(),
+    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
+    RingSize = util:lengthX(Ring),
+    if
+	RingSize == 0 ->
+	    {p, [], "empty ring"};
+	RingSize == 1 ->	    
+	    {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
+	RingSize > 62 ->
+	    % Too many nodes for a google pie chart
+	    {p, [], "Pie Chart: Sorry, too many for a pie chart."};
+	true ->
+	    {p, [], [{img, [{src, renderRingChart(Ring)}], ""}]}
+    end.
+
+renderRingChart(Ring) ->
+    URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
+
+    CHD = "chd=t:" ++ tl(
+	lists:foldl(fun(X,S) -> S ++ "," ++ X end, "", 
+		    lists:map(fun ({ok,Node}) -> 
+		      Tmp = (get_id(node_details:me(Node))
+			  - get_id(node_details:pred(Node)))*100
+                          /16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+                      if Tmp < 0.0 
+			 -> Diff = 
+				(get_id(node_details:me(Node)) 
+				+ 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF 
+				- get_id(node_details:pred(Node)))*100
+		                / 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+			 true -> Diff = Tmp
+                      end,
+ io_lib:format("~f", 
+   [abs(Diff)])
+			      end, Ring))),
+    CHS = "chs=600x350",
+    CHL = "chl=" 
+	++ tl(lists:foldl(fun(X,S) -> S ++ "|" ++ X end, "",
+			  lists:map(fun ({ok,Node}) -> 
+					    node_details:hostname(Node) ++ " (" ++ integer_to_list(node_details:load(Node)) ++ ")" end,
+				    Ring))),
+    URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL
+.
 
 getRingRendered() ->
     RealRing = statistics:get_ring_details(),

@@ -51,6 +51,14 @@ Number of nodes:
 <erl>
 out(A) ->
     erlang:put(instance_id, A#arg.opaque),
+    {ehtml, webhelpers:getRingChart()}.
+</erl>
+</p>
+
+<p>
+<erl>
+out(A) ->
+    erlang:put(instance_id, A#arg.opaque),
     {ehtml, webhelpers:getRingRendered()}.
 </erl>
 </p>
