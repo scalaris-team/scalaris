@@ -114,30 +114,35 @@ getRingChart() ->
 
 renderRingChart(Ring) ->
     URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
-
-    CHD = "chd=t:" ++ tl(
-	lists:foldl(fun(X,S) -> S ++ "," ++ X end, "", 
-		    lists:map(fun ({ok,Node}) -> 
+    Sizes = lists:map(
+	      fun ({ok,Node}) -> 
 		      Tmp = (get_id(node_details:me(Node))
-			  - get_id(node_details:pred(Node)))*100
+			     - get_id(node_details:pred(Node)))*100
                           /16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
                       if Tmp < 0.0 
 			 -> Diff = 
 				(get_id(node_details:me(Node)) 
-				+ 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF 
-				- get_id(node_details:pred(Node)))*100
+				 + 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF 
+				 - get_id(node_details:pred(Node)))*100
 		                / 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 			 true -> Diff = Tmp
                       end,
- io_lib:format("~f", 
-   [abs(Diff)])
-			      end, Ring))),
+		      io_lib:format("~f", 
+				    [Diff])
+	      end, Ring),
+    Hostinfos = lists:map(
+		  fun ({ok,Node}) -> 
+			  node_details:hostname(Node) 
+			  ++ " (" ++ 
+			  integer_to_list(node_details:load(Node)) 
+			  ++ ")" 
+		  end,
+		  Ring),
+    CHD = "chd=t:" ++ tl(
+      lists:foldl(fun(X,S) -> S ++ "," ++ X end, "", Sizes)),
     CHS = "chs=600x350",
-    CHL = "chl=" 
-	++ tl(lists:foldl(fun(X,S) -> S ++ "|" ++ X end, "",
-			  lists:map(fun ({ok,Node}) -> 
-					    node_details:hostname(Node) ++ " (" ++ integer_to_list(node_details:load(Node)) ++ ")" end,
-				    Ring))),
+    CHL = "chl=" ++ tl(
+      lists:foldl(fun(X,S) -> S ++ "|" ++ X end, "", Hostinfos)),
     URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL
 .
 
