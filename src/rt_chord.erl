@@ -157,7 +157,7 @@ stabilize(State, Index, Node) ->
 	true ->
 	    State;
 	false ->
-	    case cs_state:succ(State) == Node of
+	    case (cs_state:succ(State) == Node) or (cs_state:me(State) == Node) of
 		true ->
 		    State;
 		false ->

@@ -28,6 +28,7 @@
 
 -behaviour(gen_server).
 
+-import(ets).
 -import(gb_trees).
 -import(gen_server).
 -import(io).
@@ -42,8 +43,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
-%% @type state() = {state, conn2pid, address, port}. CommLayer State
--record(state, {conn2pid, address, port}).
+%% @type state() = {state, conn2pid}. CommLayer State
+-record(state, {conn2pid}).
 
 %%====================================================================
 %% API
@@ -72,12 +73,22 @@ set_local_address(Address, Port) ->
 %% @doc 
 %% @spec get_local_address() -> inet:ip_address()
 get_local_address() ->
-    gen_server:call(?MODULE, {get_local_address}, 20000).
+    case ets:lookup(?MODULE, local_address) of
+     	[{local_address, Value}] ->
+ 	    Value;
+ 	[] ->
+ 	    undefined
+    end.
 
 %% @doc 
 %% @spec get_local_port() -> int()
 get_local_port() ->
-    gen_server:call(?MODULE, {get_local_port}, 20000).
+    case ets:lookup(?MODULE, local_port) of
+  	[{local_port, Value}] ->
+  	    Value;
+  	[] ->
+  	    -1
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
@@ -98,7 +109,8 @@ start_link() ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init([]) ->
-    {ok, #state{conn2pid = gb_trees:empty(), address = undefined, port = -1}}.
+    ets:new(?MODULE, [set, protected, named_table]),
+    {ok, #state{conn2pid = gb_trees:empty()}}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -115,14 +127,14 @@ handle_call({send, Address, Port, Pid, Message}, _From, State) ->
 	    LocalPid ! {send, Pid, Message},
 	    {reply, ok, State};
 	none ->
-	    case comm_connection:open_new(Address, Port, State#state.address, State#state.port) of
+	    case comm_connection:open_new(Address, Port, get_local_address(), get_local_port()) of
 		{local_ip, MyIP, _MyPort, LocalPid} ->
 		    LocalPid ! {send, Pid, Message},
-		    io:format("this() == ~w~n", [{MyIP, State#state.port}]),
+		    io:format("this() == ~w~n", [{MyIP, get_local_port()}]),
+		    ets:insert(?MODULE, {local_address, MyIP}),
 		    {reply, 
 		     ok, 
 		     State#state{
-		       address=MyIP,
 		       conn2pid=gb_trees:insert({Address, Port}, 
 						LocalPid, 
 						State#state.conn2pid)}
@@ -151,13 +163,9 @@ handle_call({register_conn, Address, Port, Pid}, _From, State) ->
     end;
 
 handle_call({set_local_address, Address, Port}, _From, State) ->
-    {reply, ok, State#state{address = Address, port = Port}};
-
-handle_call({get_local_address}, _From, State) ->
-    {reply, State#state.address, State};
-
-handle_call({get_local_port}, _From, State) ->
-    {reply, State#state.port, State}.
+    ets:insert(?MODULE, {local_address, Address}),
+    ets:insert(?MODULE, {local_port, Port}),
+    {reply, ok, State}.
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
@@ -197,4 +205,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-

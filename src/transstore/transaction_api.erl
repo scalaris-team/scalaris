@@ -79,7 +79,6 @@ quorum_read(Key)->
 			  LocalCSNode ! {read, cs_send:this(), Key},
 			  receive
 			      {single_read_return, {fail, Reason}}->
-				  io:format("single read return fail  with reason: ~p~n", [Reason]),
 				  ?TLOG("single read return fail"),
 				  Owner ! {fail, Reason};
 			      {single_read_return,{value, Page, Version}}->
@@ -90,7 +89,6 @@ quorum_read(Key)->
 				  Owner ! {fail, fail}
 			  after
 			      RTO ->
-				  io:format("single read return fail - timeout~n", []),
 				  ?TLOG("single read return fail - timeout"),
 				  Owner ! {fail, timeout}
 			  end

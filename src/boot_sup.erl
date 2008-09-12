@@ -75,7 +75,7 @@ init(_Args) ->
 	 []},
     Config =
 	{config,
-	 {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"], InstanceId]},
+	 {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"]]},
 	 permanent,
 	 brutal_kill,
 	 worker,

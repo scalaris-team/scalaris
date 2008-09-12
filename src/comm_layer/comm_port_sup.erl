@@ -60,13 +60,6 @@ start_link() ->
 init([]) ->
     randoms:init(),
     InstanceId = string:concat("comm_port_", randoms:getRandomId()),
-    Config =
-        {config2,
-         {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"], InstanceId]},
-         permanent,
-         brutal_kill,
-         worker,
-         []},
     CommPort =
 	{comm_port,
 	 {comm_layer.comm_port, start_link, []},
@@ -90,7 +83,6 @@ init([]) ->
 	 []},
     {ok, {{one_for_all, 10, 1},
 	  [
-	   Config,
 	   CommPort,
 	   CommLogger,
 	   CommAcceptor	   

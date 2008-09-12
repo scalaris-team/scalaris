@@ -37,17 +37,13 @@ suite() ->
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
-    Pid = spawn(fun () ->
-			process_dictionary:start_link_for_unittest(), 
-			boot_sup:start_link(), 
-			timer:sleep(120000) 
-		end),
-    timer:sleep(15000),
+    Pid = unittest_helper:make_ring(4),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
+    %error_logger:tty(false),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    exit(Pid, kill),
+    unittest_helper:stop_ring(Pid),
     ok.
 
 make_tfun(Key) ->
@@ -89,7 +85,7 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
 	{failure, abort} ->
 	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
 	X ->
-	    ct:pal("~p~n", [X])
+	    ct:pal("error in process_iter: ~p~n", [X])
     end.
     
 

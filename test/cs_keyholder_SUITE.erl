@@ -39,9 +39,8 @@ init_per_suite(Config) ->
     file:set_cwd("../bin"),
     Pid = spawn(fun () -> 
 			crypto:start(),
-			process_dictionary:start_link(), 
+			process_dictionary:start_link_for_unittest(), 
 			cs_keyholder:start_link(foo), 
-			config:start_link(["scalaris.cfg", "scalaris.local.cfg"], foo), 
 			timer:sleep(5000) 
 		end),
     timer:sleep(1000),

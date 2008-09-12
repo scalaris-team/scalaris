@@ -67,10 +67,9 @@ bulk_owner_iter(State, U, Index, I, Msg) ->
 	{ok, U_of_Index} ->
 	    U_of_IndexM1 = dict:fetch(Index - 1, U),
 	    Range = intervals:cut(I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index))),
-	    %ct:pal("bulk_owner_iter ~p (~p) ~p", [Range, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)), Index]),
 	    case intervals:is_empty(Range) of
 		false ->
-		    cs_send:send(node:pidX(U_of_IndexM1), {bulk_owner, Range, Msg});
+		    cs_send:send(node:pidX(U_of_IndexM1), {bulk_owner, intervals:sanitize(Range), Msg});
 		true ->
 		    ok
 	    end,

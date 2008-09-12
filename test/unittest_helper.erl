@@ -31,16 +31,16 @@ make_ring(Size) ->
 			process_dictionary:start_link_for_unittest(), 
 			boot_sup:start_link(), 
 			timer:sleep(1000),
-			erlang:put(instance_id, process_dictionary:find_group(config)),
 			boot_server:connect(),
-			admin:add_nodes(Size - 1),
+			admin:add_nodes(Size - 1, 1000),
 			Owner ! {continue},
-			timer:sleep(120000) 
+			timer:sleep(180000) 
 		end),
     receive
 	{continue} -> 
 	    ok
     end,
+    check_ring_size(Size),
     wait_for_stable_ring(),
     Pid.
 
@@ -50,9 +50,16 @@ stop_ring(Pid) ->
 wait_for_stable_ring() ->
     case admin:check_ring() of
 	{error, Text} ->
-	    ct:pal("~p~n", [Text]),
 	    wait_for_stable_ring();
 	_ ->
 	    ok
     end.
-    
+
+check_ring_size(Size) ->
+    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    case length(statistics:get_ring_details()) == Size of
+	true ->
+	    ok;
+	_ ->
+	    check_ring_size(Size)
+    end.

@@ -56,12 +56,18 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3,
 
-	register_process/3, lookup_process/2,
-	find_cs_node/0, find_group/1, find_instance_id/0,
+	 register_process/3, 
+	 lookup_process/2,
+	 find_cs_node/0, 
+	 find_group/1, 
+	 %find_instance_id/0,
 
-        get_groups/0, get_processes_in_group/1, get_info/2,
+	 %get_groups/0,
+	 %get_processes_in_group/1, 
+	 get_info/2,
 
-	get_all_pids/0]).
+	 %for fprof
+	 get_all_pids/0]).
 
 %% for unit testing
 -export([start_link_for_unittest/0]).
@@ -79,7 +85,13 @@ register_process(InstanceId, Name, Pid) ->
 %% @doc looks up a process with InstanceId and Name in the dictionary
 %% @spec lookup_process(term(), term()) -> term()
 lookup_process(InstanceId, Name) ->
-    gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
+    case ets:lookup(?MODULE, {InstanceId, Name}) of
+        [{{InstanceId, Name}, Value}] ->
+            Value;
+        [] ->
+            failed
+    end.
+    %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
 
 %% @doc tries to find a cs_node process
 %% @spec find_cs_node() -> pid()
@@ -148,7 +160,7 @@ start_link() ->
 start_link_for_unittest() ->
     case whereis(process_dictionary) of
 	undefined ->
-	    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []);
+	    gen_server:start({local, ?MODULE}, ?MODULE, [], []);
 	_ ->
 	    gen_server:call(?MODULE, {drop_state}, 20000),
 	    already_running
@@ -183,7 +195,8 @@ stop() ->
 %%--------------------------------------------------------------------
 %@private
 init([]) ->
-    {ok, gb_trees:empty()}.
+    ets:new(?MODULE, [set, protected, named_table]),
+    {ok, ok}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -196,41 +209,52 @@ init([]) ->
 %%--------------------------------------------------------------------
 
 %@private
-handle_call({get_all_pids}, _From, ProcessDictionary) ->
-    {reply, gb_trees:values(ProcessDictionary), ProcessDictionary};
-handle_call({register_process, InstanceId, Name, Pid}, _From, ProcessDictionary) ->
-    {reply, ok, gb_trees:enter({InstanceId, Name}, Pid, ProcessDictionary)};
+handle_call({get_all_pids}, _From, State) ->
+    {reply, [X || [X]<- ets:match(?MODULE, {'_','$1'})], State};
+handle_call({register_process, InstanceId, Name, Pid}, _From, State) ->
+    ets:insert(?MODULE, {{InstanceId, Name}, Pid}),
+    {reply, ok, State};
 
-handle_call({lookup_process, InstanceId, Name}, _From, ProcessDictionary) ->
-    {reply, gb_trees:get({InstanceId, Name}, ProcessDictionary), ProcessDictionary};
+handle_call({lookup_process2, InstanceId, Name}, _From, State) ->
+    Result = case ets:lookup(?MODULE, {InstanceId, Name}) of
+        [{{InstanceId, Name}, Value}] ->
+            Value;
+        [] ->
+            failed
+    end,
+    {reply, Result, State};
 
-handle_call({lookup_process2, InstanceId, Name}, _From, ProcessDictionary) ->
-    {reply, gb_trees:lookup({InstanceId, Name}, ProcessDictionary), ProcessDictionary};
+handle_call({find_process, Name}, _From, State) ->
+    Result = case ets:match(?MODULE, {{'_', Name}, '$1'}) of
+		 [[Value] | _] ->
+		     {ok, Value};
+		 [] ->
+		     failed
+	     end,
+    {reply, Result, State};
 
-handle_call({find_process, Name}, _From, ProcessDictionary) ->
-    Iter = gb_trees:iterator(ProcessDictionary),
-    {reply, find_process(Iter, Name), ProcessDictionary};
+handle_call({find_group, Name}, _From, State) ->
+    Result = case ets:match(?MODULE, {{'$1', Name}, '_'}) of
+	[[Value] | _] ->
+	    Value;
+	[] ->
+	    failed
+    end,
+    {reply, Result, State};
 
-handle_call({find_group, Name}, _From, ProcessDictionary) ->
-    Iter = gb_trees:iterator(ProcessDictionary),
-    {reply, find_group(Iter, Name), ProcessDictionary};
-
-handle_call({find_instance_id}, _From, ProcessDictionary) ->
-    {{InstanceId, _Name}, _Value} = gb_trees:smallest(ProcessDictionary),
-    {reply, InstanceId, ProcessDictionary};
-
-handle_call({get_groups}, _From, ProcessDictionary) ->
-    AllGroups = find_all_groups(gb_trees:iterator(ProcessDictionary), gb_sets:new()),
+handle_call({get_groups}, _From, State) ->
+    AllGroups = find_all_groups(ets:tab2list(?MODULE), gb_sets:new()),
     GroupsAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, El}, {text, El}, {leaf, false}]} | Rest] end, [], gb_sets:to_list(AllGroups))},
-    {reply, GroupsAsJson, ProcessDictionary};
+    {reply, GroupsAsJson, State};
 
-handle_call({get_processes_in_group, Group}, _From, ProcessDictionary) ->
-    AllProcesses = find_processes_in_group(gb_trees:iterator(ProcessDictionary), gb_sets:new(), Group),
+handle_call({get_processes_in_group, Group}, _From, State) ->
+    AllProcesses = find_processes_in_group(ets:tab2list(?MODULE), gb_sets:new(), Group),
     ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
-    {reply, ProcessesAsJson, ProcessDictionary};
+    {reply, ProcessesAsJson, State};
 
-handle_call({drop_state}, _From, _ProcessDictionary) ->
-    {reply, ok, gb_trees:empty()}.
+handle_call({drop_state}, _From, State) ->
+    ets:delete_all_objects(?MODULE),
+    {reply, ok, State}.
 
 
 find_process([], _) ->
@@ -257,19 +281,17 @@ find_group(Iter, Name) ->
 
 find_all_groups([], Set) ->
     Set;
-find_all_groups(Iter, Set) ->
-    {{InstanceId, _TheName}, _, Next} = gb_trees:next(Iter),
-    find_all_groups(Next, gb_sets:add_element(InstanceId, Set)).
+find_all_groups([{{InstanceId, _}, _} | Rest], Set) ->
+    find_all_groups(Rest, gb_sets:add_element(InstanceId, Set)).
 
 find_processes_in_group([], Set, _Group) ->
     Set;
-find_processes_in_group(Iter, Set, Group) ->
-    {{InstanceId, TheName}, _, Next} = gb_trees:next(Iter),
+find_processes_in_group([{{InstanceId, TheName}, _} | Rest], Set, Group) ->
     if
 	InstanceId == Group ->
-	    find_processes_in_group(Next, gb_sets:add_element(TheName, Set), Group);
+	    find_processes_in_group(Rest, gb_sets:add_element(TheName, Set), Group);
 	true ->
-	    find_processes_in_group(Next, Set, Group)
+	    find_processes_in_group(Rest, Set, Group)
     end.
 
 toString(X) when is_atom(X) ->
