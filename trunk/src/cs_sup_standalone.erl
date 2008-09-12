@@ -59,6 +59,13 @@ init([]) ->
     inets:start(),
     util:logger(),
     error_logger:logfile({open, "cs.log"}),
+    Config =
+	{config,
+	 {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"]]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     CommunicationPort = {
       comm_port,
       {comm_layer.comm_layer, start_link, []},
@@ -86,6 +93,7 @@ init([]) ->
 	 worker,
 	 []},
     {ok,{{one_for_all,10,1}, [
+			      Config,
 			      CommunicationPort,
 			      YAWS,
 			      ChordSharp

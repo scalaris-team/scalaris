@@ -63,13 +63,6 @@ init([]) ->
 	 worker,
 	 [failure_detector]
      },
-    Config =
-	{config,
-	 {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"], InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
     KeyHolder =
 	{cs_keyholder,
 	 {cs_keyholder, start_link, [InstanceId]},
@@ -101,7 +94,6 @@ init([]) ->
     {ok, {{one_for_one, 10, 1},
 	  [
 %	   XMLRPC,
-	   Config,
 	   KeyHolder,
 	   MessageStatisticsCollector,
 	   FailureDetector,

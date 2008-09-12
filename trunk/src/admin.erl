@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id: admin.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([add_nodes/1, check_ring/0]).
+-export([add_nodes/1, add_nodes/2, check_ring/0]).
 
 %%====================================================================
 %% API functions
@@ -38,20 +38,26 @@
 %%--------------------------------------------------------------------
 % @doc add new chordsharp nodes on the local node
 % @spec add_nodes(int()) -> ok
-add_nodes(Count) ->
-    randoms:init(),
-    add_nodes_loop(Count).
 
-add_nodes_loop(0) ->
+add_nodes(Count) ->
+    add_nodes(Count, 0).
+
+% @spec add_nodes(int(), int()) -> ok
+add_nodes(Count, Delay) ->
+    randoms:init(),
+    add_nodes_loop(Count, Delay).
+
+add_nodes_loop(0, _) ->
     ok;
-add_nodes_loop(Count) ->
-    io:format("~p~n", [supervisor:start_child(main_sup, {randoms:getRandomId(),
-							{cs_sup_or, start_link, []},
-							permanent,
-							brutal_kill,
-							worker,
-							[]})]),
-    add_nodes_loop(Count - 1).
+add_nodes_loop(Count, Delay) ->
+    supervisor:start_child(main_sup, {randoms:getRandomId(),
+				      {cs_sup_or, start_link, []},
+				      permanent,
+				      brutal_kill,
+				      worker,
+				      []}),
+    timer:sleep(Delay),
+    add_nodes_loop(Count - 1, Delay).
 
 %%--------------------------------------------------------------------
 %% Function: check_ring() -> term()

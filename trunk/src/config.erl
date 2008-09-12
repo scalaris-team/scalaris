@@ -26,10 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id: config.erl 494 2008-07-04 17:07:34Z schintke $ ').
 
--behaviour(gen_server).
-
--export([start_link/2, init/1, handle_call/3, handle_cast/2, 
-	 handle_info/2, code_change/3, terminate/2, stop/0,
+-export([
+	 start_link/1, start/2,
 
 	 read/1,
 
@@ -50,20 +48,15 @@
 %% public functions
 %%====================================================================
 
-get_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-	InstanceId == undefined ->
-	    io:format("missing instance_id: ~p~n", [util:get_stacktrace()]);
-	true ->
-	    ok
-    end,
-    process_dictionary:lookup_process(InstanceId, config).
-
 %% @doc read config parameter
 %% @spec read(term()) -> term() | failed
 read(Key) ->
-    gen_server:call(get_pid(), {read, Key}, 20000).
+    case ets:lookup(config_ets, Key) of
+	[{Key, Value}] ->
+	    Value;
+	[] ->
+	    failed
+    end.
 
 %%====================================================================
 %% public functions
@@ -72,53 +65,52 @@ read(Key) ->
 %% @doc the length of the successor list
 %% @spec succListLength() -> integer() | failed
 succListLength() ->
-    gen_server:call(get_pid(), {read, succ_list_length}, 20000).
-
+    read(succ_list_length).
 
 %% @doc the interval between two failure detection runs
 %% @spec failureDetectorInterval() -> integer() | failed
 failureDetectorInterval() ->
-    gen_server:call(get_pid(), {read, failure_detector_interval}, 20000).
+    read(failure_detector_interval).
 
 %% @doc the interval between two failure detection runs
 %% @spec failureDetectorPingInterval() -> integer() | failed
 failureDetectorPingInterval() ->
-    gen_server:call(get_pid(), {read, failure_detector_ping_interval}, 20000).
+    read(failure_detector_ping_interval).
 
 %% @doc the interval between two stabilization runs
 %% @spec stabilizationInterval() -> integer() | failed
 stabilizationInterval() ->
-    gen_server:call(get_pid(), {read, stabilization_interval}, 20000).
+    read(stabilization_interval).
 
 %% @doc the interval between two finger/pointer stabilization runs
 %% @spec pointerStabilizationInterval() -> integer() | failed
 pointerStabilizationInterval() ->
-    gen_server:call(get_pid(), {read, pointer_stabilization_interval}, 20000).
+    read(pointer_stabilization_interval).
 
 %% @doc interval between two updates of the nodes to be supervised 
 %% @spec failureDetectorUpdateInterval() -> integer() | failed
 failureDetectorUpdateInterval() ->
-    gen_server:call(get_pid(), {read, failure_detector_update_interval}, 20000).
+    read(failure_detector_update_interval).
 
 %% @doc interval between two load balance rounds
 %% @spec loadBalanceInterval() -> integer() | failed
 loadBalanceInterval() ->
-    gen_server:call(get_pid(), {read, load_balance_interval}, 20000).
+    read(load_balance_interval).
 
 %% @doc interval between two load balance rounds
 %% @spec loadBalanceStartupInterval() -> integer() | failed
 loadBalanceStartupInterval() ->
-    gen_server:call(get_pid(), {read, load_balance_startup_interval}, 20000).
+    read(load_balance_startup_interval).
 
 %% @doc interval between two flag reset events
 %% @spec loadBalanceFlagResetInterval() -> integer() | failed
 loadBalanceFlagResetInterval() ->
-    gen_server:call(get_pid(), {read, load_balance_flag_reset_interval}, 20000).
+    read(load_balance_flag_reset_interval).
 
 %% @doc hostname of the boot daemon
 %% @spec bootHost() -> string() | failed
 bootHost() ->
-    gen_server:call(get_pid(), {read, boot_host}, 20000).
+    read(boot_host).
 
 %% @doc pid of the boot daemon
 %% @spec bootPid() -> pid()
@@ -129,12 +121,12 @@ bootPid() ->
 %% @doc pid of the log daemon
 %% @spec logPid() -> pid()
 logPid() ->
-    gen_server:call(get_pid(), {read, log_host}, 20000).
+    read(log_host).
 
 %% @doc interval between two collections of the message statistics
 %% @spec collectorInterval() -> integer() | failed
 collectorInterval() ->
-    gen_server:call(get_pid(), {read, collector_interval}, 20000).
+    read(collector_interval).
 
 %% @doc path to the log directory
 %% @spec log_path() -> string()
@@ -165,174 +157,131 @@ transaction_log_file() ->
 %% @doc length of the debug queue
 %% @spec debugQueueLength() -> integer() | failed
 debugQueueLength() ->
-    gen_server:call(get_pid(), {read, debug_queue_length}, 20000).
+    read(debug_queue_length).
 
 %% @doc interval between two re-registrations with the boot daemon
 %% @spec reregisterInterval() -> integer() | failed
 reregisterInterval() ->
-    gen_server:call(get_pid(), {read, reregister_interval}, 20000).
+    read(reregister_interval).
 
 %% @doc the replication degree of the system
 %% @spec replicationFactor() -> integer() | failed
 replicationFactor() ->
-    gen_server:call(get_pid(), {read, replication_factor}, 20000).
+    read(replication_factor).
 
 %% @doc number of nodes needed for a quorum
 %% @spec quorumFactor() -> integer() | failed
 quorumFactor() ->
-    gen_server:call(get_pid(), {read, quorum_factor}, 20000).
+    read(quorum_factor).
 
 %% @doc prefixes used for the replicas
 %% @spec replicaPrefixes() -> [integer()] | failed
 replicaPrefixes() ->
-    gen_server:call(get_pid(), {read, replica_prefixes}, 20000).
+    read(replica_prefixes).
 
 %% @doc transaction node lookup timeout
 %% @spec transactionLookupTimeout() -> integer() | failed
 transactionLookupTimeout()->
-    gen_server:call(get_pid(), {read, transaction_lookup_timeout}, 20000).
+    read(transaction_lookup_timeout).
 
 %% @doc time out for read operations
 %% @spec readTimeout() -> integer() | failed
 readTimeout()->
-    gen_server:call(get_pid(), {read, read_timeout}, 20000).
+    read(read_timeout).
 
 tpFailureTimeout()->
-    gen_server:call(get_pid(), {read, tp_failure_timeout}, 20000).
+    read(tp_failure_timeout).
 
 %% @doc transaction leader detection interval
 %% @spec leaderDetectorInterval() -> integer() | failed
 leaderDetectorInterval()->
-    gen_server:call(get_pid(), {read, leader_detector_interval}, 20000).
+    read(leader_detector_interval).
     
 tmanagerTimeout()->
-    gen_server:call(get_pid(), {read, tmanager_timeout}, 20000).
+    read(tmanager_timeout).
 
 testDump()->
-	gen_server:call(get_pid(), {read, test_dump}, 20000).
+	read(test_dump).
 
 testKeepAlive()->
-	gen_server:call(get_pid(), {read, test_keep_alive}, 20000).
+	read(test_keep_alive).
 
 %% @doc with which nodes to register regularly, alternative to boot_host
 %% @spec register_hosts() -> list(pid()) | failed
 register_hosts()->
     %lists:map(fun (Host) -> {boot, Host} end, gen_server:call(get_pid(), {read, register_hosts}, 20000)).
-    case gen_server:call(get_pid(), {read, register_hosts}, 20000) of
+    case read(register_hosts) of
 	failed ->
 	    failed;
 	Nodes ->
 	    lists:map(fun (Host) -> {boot, Host} end, Nodes)
     end,
-    gen_server:call(get_pid(), {read, register_hosts}, 20000).
+    read(register_hosts).
 
 %% @doc port to listen on for TCP
 %% @spec listenPort() -> int()
 listenPort()->
-	gen_server:call(get_pid(), {read, listen_port}, 20000).
+	read(listen_port).
 
 %% @doc IP to listen on for TCP
 %% @spec listenIP() -> inet:ip_address() | undefined
 listenIP()->
-	gen_server:call(get_pid(), {read, listen_ip}, 20000).
+	read(listen_ip).
 
 %%====================================================================
 %% gen_server setup
 %%====================================================================
 
-start_link(Files, InstanceId) ->
+start_link(Files) ->
     io:format("Config files: ~p~n", [Files]),
-    %{local, ?MODULE}, ; Files, InstanceId
-    gen_server:start_link(?MODULE, [Files, InstanceId], []).
+    Owner = self(),
+    Link = spawn_link(?MODULE, start, [Files, Owner]),
+    receive
+	done ->
+	    ok;
+	X ->
+	    io:format("unknown config message  ~p", [X])
+    end,
+    {ok, Link}.
 
 %@private
-%init([X, InstanceId]) ->
-%    {ok, ok};
-
-init([[File], InstanceId]) ->
-%    io:format("starting config~n", []),
-    process_dictionary:register_process(InstanceId, config, self()),
-    {ok, populate_db(gb_trees:empty(), File)};
+start([File], Owner) ->
+    catch ets:new(config_ets, [set, protected, named_table]),
+    populate_db(File),
+    Owner ! done,
+    loop();
 
 %@private
-init([[Global, Local], InstanceId]) ->
-%    io:format("starting config~n", []),
-    process_dictionary:register_process(InstanceId, config, self()),
-    {ok, populate_db(populate_db(gb_trees:empty(), Global), 
-		     Local)}.
+start([Global, Local], Owner) ->
+    catch ets:new(config_ets, [set, protected, named_table]),
+    populate_db(Global),
+    populate_db(Local),
+    Owner ! done,
+    loop().
 
-%@private
-stop() ->
-    gen_server:cast(?MODULE, stop).
-
-populate_db(Dictionary, File) ->
-    case file:consult(File) of
-	{ok, Terms} ->
-	    eval_environment(lists:foldl(fun process_term/2, Dictionary, Terms), os:getenv("CS_PORT"));
-	    %lists:foldl(fun process_term/2, Dictionary, Terms);
-	{error, Reason} ->
-	    io:format("Can't load config file ~p: ~p. Ignoring.\n", [File, Reason]), Dictionary
-	    % exit(file:format_error(Reason))
+loop() ->
+    receive
+	_ ->
+	    loop()
     end.
 
-eval_environment(Dictionary, false) ->
-    Dictionary;
-eval_environment(Dictionary, Port) ->
+%@private
+populate_db(File) ->
+    case file:consult(File) of
+	{ok, Terms} ->
+	    lists:map(fun process_term/1, Terms),
+	    eval_environment(os:getenv("CS_PORT"));
+	{error, Reason} ->
+	    io:format("Can't load config file ~p: ~p. Ignoring.\n", [File, Reason]),
+	    fail
+    end.
+
+eval_environment(false) ->
+    ok;
+eval_environment(Port) ->
     {PortInt, []} = string:to_integer(Port),
-    gb_trees:enter(listen_port, PortInt, Dictionary).
+    ets:insert(config_ets, {listen_port, PortInt}).
     
-    
-process_term({Key, Value}, Dictionary) ->
-    gb_trees:enter(Key, Value, Dictionary).
-
-%%====================================================================
-%% gen_server callbacks
-%%====================================================================
-
-% read
-%@private
-handle_call({read, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, Value} ->
-	    {reply, Value, DB};
-	none ->
-	    {reply, failed, DB}
-    end;
-
-% write
-%@private
-handle_call({write, Key, Value}, _From, DB) ->
-    NewDB = gb_trees:enter(Key, Value, DB),
-    {reply, ok, NewDB}.
-
-
-
-%%--------------------------------------------------------------------
-%%% Internal functions
-%%--------------------------------------------------------------------
-
-%@private
-handle_cast(stop, DB) ->
-    {stop, normal, DB};
-
-%@private
-handle_cast({debug_info, Requestor}, DB) ->
-    Requestor ! {debug_info_response, [{"config_items", gb_trees:size(DB)}]},
-    {noreply, DB};
-
-handle_cast(_Msg, DB) ->
-    {noreply, DB}.
-
-%@private
-handle_info(_Info, DB) ->
-    {noreply, DB}.
-
-
-%@private
-code_change(_OldVsn, DB, _Extra) ->
-    {ok, DB}.
-
-%@private
-terminate(_Reason, _DB) ->
-    ok.
+process_term({_Key, _Value} = Pair) ->
+    ets:insert(config_ets, Pair).
 

@@ -56,7 +56,7 @@ tp_validate(State, Tid, Item)->
 		      case Item#item.operation of
 			  write ->
 			      set_lock(success, Item);
-			  _Any ->
+			  _Any2 ->
 			      failed
 		      end    
 	      end,

@@ -39,6 +39,8 @@ all() ->
      qc_is_empty, 
      qc_is_covered, 
      qc_cut, 
+     qc_not_cut, 
+     qc_not_cut2, 
      my_cut,
      qc_cut_iter, 
      qc_sanitize].
@@ -118,8 +120,30 @@ prop_cut() ->
 				     and intervals:in(X, B),
 				     intervals:in(X, intervals:cut(A, B)))))).
 
+prop_not_cut() ->    
+    ?FORALL(A, interval(),
+	    ?FORALL(B, interval(),
+		    ?FORALL(X, interval_point(),
+			    ?IMPLIES(intervals:in(X, A) 
+				     xor intervals:in(X, B),
+				     not intervals:in(X, intervals:cut(A, B)))))).
+
+prop_not_cut2() ->    
+    ?FORALL(A, interval(),
+	    ?FORALL(B, interval(),
+		    ?FORALL(X, interval_point(),
+			    ?IMPLIES(not intervals:in(X, A) 
+				     and not intervals:in(X, B),
+				     not intervals:in(X, intervals:cut(A, B)))))).
+
 qc_cut(_Config) ->
     qc:quickcheck(prop_cut()).
+
+qc_not_cut(_Config) ->
+    qc:quickcheck(prop_not_cut()).
+
+qc_not_cut2(_Config) ->
+    qc:quickcheck(prop_not_cut2()).
 
 my_cut(_Config) ->
     ?assert(intervals:in(0, intervals:cut(intervals:new(minus_infinity, 0), 

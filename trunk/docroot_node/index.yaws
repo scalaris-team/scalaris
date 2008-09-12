@@ -10,7 +10,6 @@
 
 <erl>
 out(Arg) ->
-  erlang:put(instance_id, process_dictionary:find_group(config)),
   {html, io_lib:format("~p", [config:listenIP()])}.
 </erl>
 

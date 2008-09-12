@@ -131,9 +131,9 @@ cut_iter({interval, A0, A1}, {interval, B0, B1}) ->
     A0_in_B = is_between(B0, A0, B1),
     A1_in_B = is_between(B0, A1, B1),
     if
-	A1 == B0 and not A0_in_B ->
+	(A1 == B0) and not A0_in_B ->
 	    {element,A1};
-	B1 == A0 and not B0_in_A ->
+	(B1 == A0) and not B0_in_A ->
 	    {element,B1};
 	B0_in_A or B1_in_A or A0_in_B or A1_in_B ->
 	    new(util:max(A0, B0), util:min(A1, B1));
@@ -152,7 +152,7 @@ is_covered(all, Intervals) ->
     is_covered(new(minus_infinity, plus_infinity), Intervals);
 is_covered({element,_}=X, Intervals) ->
     in(X, Intervals);
-is_covered({interval, A, B}, {element,_}=X) ->
+is_covered({interval, _, _}, {element,_}) ->
     false;
 is_covered(Interval, Intervals) ->
     %io:format("is_covered: ~p ~p~n", [Interval, Intervals]),
@@ -196,19 +196,24 @@ in(_, {element,_}) ->
     false.
 
 sanitize(X) when is_list(X) ->
-    sanitize_helper(lists:flatten(X));
+    sanitize_helper(X, []);
 sanitize(X) ->
-    sanitize_helper(X).
-
-sanitize_helper([]) ->
-    [];
-
-sanitize_helper([[] | Rest]) ->
-    sanitize_helper(Rest);
-sanitize_helper([X | Rest]) ->
-    [X | sanitize_helper(Rest)];
-sanitize_helper(X) ->
     X.
+
+sanitize_helper([[] | Rest], List) ->
+    sanitize_helper(Rest, List);
+sanitize_helper([all | _], _) ->
+    all;
+sanitize_helper([X | Rest], List) when is_list(X) ->
+    sanitize_helper(Rest, sanitize_helper(X, List));
+sanitize_helper([X | Rest], List) ->
+    sanitize_helper(Rest, [X | List]);
+sanitize_helper(all, List) ->
+    List;
+sanitize_helper({interval, _First, _Last} = X, List) ->
+    [X | List];
+sanitize_helper([], List) ->
+    List.
 %%====================================================================
 %% private functions
 %%====================================================================  
@@ -250,7 +255,7 @@ normalize(A) ->
 % @spec find_start(term(), [interval()], [interval()]) -> {interval(), [interval()]} | none
 find_start(_Start, [], _) ->
     none;
-find_start(Start, [{element,_}=Interval | Rest], Remainder) ->
+find_start(Start, [{element,_} | Rest], Remainder) ->
     find_start(Start, Rest, Remainder);
 find_start(Start, [Interval | Rest], Remainder) ->
     case is_between(element(first(),Interval), Start, element(last(),Interval)) of
@@ -280,8 +285,12 @@ is_between(minus_infinity, plus_infinity, _) ->
     false;
 is_between(minus_infinity, X, Y) ->
     X =< Y;
+is_between(X, plus_infinity, Y) when X > Y->
+    true;
 is_between(_, plus_infinity, _) ->
     false;
+is_between(X, minus_infinity, Y) when X > Y->
+    true;
 is_between(_, minus_infinity, _) ->
     false;
 is_between(Begin, Id, End) ->

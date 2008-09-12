@@ -40,7 +40,7 @@ init_per_suite(Config) ->
     Pid = spawn(fun () ->
 			process_dictionary:start_link_for_unittest(), 
 			boot_sup:start_link(), 
-			timer:sleep(45000) 
+			timer:sleep(120000) 
 		end),
     timer:sleep(15000),
     [{wrapper_pid, Pid} | Config].

@@ -37,13 +37,13 @@ suite() ->
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
-    Pid = spawn(fun () -> process_dictionary:start_link_for_unittest(), boot_sup:start_link(), timer:sleep(20000) end),
-    timer:sleep(12000),
+    Pid = unittest_helper:make_ring(4),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
+    %error_logger:tty(false),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    exit(Pid, kill),
+    unittest_helper:stop_ring(Pid),
     ok.
 
 test_db(_Config) ->
