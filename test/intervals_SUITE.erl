@@ -43,7 +43,9 @@ all() ->
      qc_not_cut2, 
      my_cut,
      qc_cut_iter, 
-     qc_sanitize].
+     qc_sanitize,
+     qc_sanitize2,
+     qc_in].
 
 suite() ->
     [
@@ -203,10 +205,31 @@ qc_is_covered(_Config) ->
 prop_sanitize() ->
     ?FORALL(Is, list(interval()),
 	    ?FORALL(X, interval_point(),
-		    ?IMPLIES(intervals:in(X, Is),
-			     intervals:in(X, intervals:sanitize(Is))))).
+		    intervals:in(X, Is) ==
+		    intervals:in(X, intervals:sanitize(Is)))).
+
+prop_sanitize2() ->
+    ?FORALL(I, interval(),
+	    intervals:sanitize(I) == I).
 
 qc_sanitize(_Config) ->
+    qc:quickcheck(prop_sanitize()).
+
+qc_sanitize2(_Config) ->
+    qc:quickcheck(prop_sanitize2()).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:in/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+prop_in() ->
+    ?FORALL(X, interval_point(),
+	    ?FORALL(Y, interval_point(),
+		    intervals:in(X, intervals:new(X, Y)) and
+		    intervals:in(Y, intervals:new(X, Y)))).
+
+qc_in(_Config) ->
     qc:quickcheck(prop_sanitize()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
