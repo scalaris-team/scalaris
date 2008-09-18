@@ -33,13 +33,13 @@ all: compile
 
 #cp priv/xbin/*beam bin/
 compile:
-	$(MAKE) -C src
+	@$(ERL) -pa contrib/yaws -make
 
 test: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/bin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec
 
 test-vts: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/bin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
 
 java:
 	$(CD) java-api && ant jar
@@ -49,6 +49,10 @@ clean:
 	-rm -rf bin/comm_layer/*.beam
 	-rm -rf bin/pubsub/*.beam
 	-rm -rf bin/transstore/*.beam
+	-rm -rf ebin/*.beam
+	-rm -rf ebin/comm_layer/*.beam
+	-rm -rf ebin/pubsub/*.beam
+	-rm -rf ebin/transstore/*.beam
 	-rm -rf src/*.beam
 	-rm -rf src/comm_layer/*.beam
 	-rm -rf src/pubsub/*.beam
