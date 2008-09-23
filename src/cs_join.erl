@@ -59,17 +59,18 @@ join_ring(Id, Succ) ->
     receive
 	{join_response, Pred, Data, SuccList} -> 
 	    io:format("[ I | Node   | ~w ] got pred ~w~n",[self(), Pred]),
-	    IsNull = node:is_null(Pred),
-	    if
-		IsNull ->
-		    failuredetector:add_node(node:uniqueId(Succ), node:id(Succ), node:pidX(Succ));
+	    case node:is_null(Pred) of
 		true ->
+		    failuredetector:add_node(node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)),
+		    ?DB:add_data(Data),
+		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {Id, Id}, cs_lb:new());
+		false ->
 		    failuredetector:add_nodes([{node:uniqueId(Pred), node:id(Pred), node:pidX(Pred)}, 
 					       {node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)}]),
-		    cs_send:send(node:pidX(Pred), {update_succ, Me})
-	    end,
-	    ?DB:add_data(Data),
-	    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {node:id(Pred), Id}, cs_lb:new())
+		    cs_send:send(node:pidX(Pred), {update_succ, Me}),
+		    ?DB:add_data(Data),
+		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {node:id(Pred), Id}, cs_lb:new())
+	    end
     end.
 
 %join_ring(_, error) ->
