@@ -36,7 +36,7 @@
 %%   UniqueId = term()
 join_request(State, Source_PID, Id, UniqueId) ->
     Pred = node:new(Source_PID, Id, UniqueId),
-    HisData = ?DB:split_data(State, Id),
+    HisData = ?DB:split_data(cs_state:id(State), Id),
     SuccList = cs_state:succ_list(State),
     cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData, SuccList}),
     failuredetector:add_node(UniqueId, Id, Source_PID),
