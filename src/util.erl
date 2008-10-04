@@ -139,9 +139,7 @@ wait_for_unregister(PID) ->
     end.
 
 get_stacktrace() ->
-    {'EXIT',{badarg,Stacktrace}} = (catch abs(x)),
-    Stacktrace.
-
+    erlang:get_stacktrace().
 
 ksplit(List, K) ->
     N = length(List),
@@ -154,21 +152,24 @@ ksplit(List, K) ->
 
 dump() ->
     lists:reverse(
-      lists:keysort(2, dict:to_list(lists:foldl(fun (X, Accum) -> 
-							dict:merge(fun (_K, V1, V2) -> 
-									   V1 + V2 
-								   end, 
-								   Accum, 
-								   dict:store(
-								     lists:keysearch(current_function, 
-										     1, 
-										     erlang:process_info(X, current_function)
-										    ), 
-								     1, 
-								     dict:new()
-								    )
-								  ) 
-						end, dict:new(), processes())))
+      lists:keysort(
+	2, dict:to_list(
+	     lists:foldl(
+	       fun (X, Accum) -> 
+		       dict:merge(fun (_K, V1, V2) -> 
+					  V1 + V2 
+				  end, 
+				  Accum, 
+				  dict:store(
+				    lists:keysearch(current_function, 
+						    1, 
+						    [erlang:process_info(X, current_function)]
+						   ), 
+				    1, 
+				    dict:new()
+				   )
+				 ) 
+	       end, dict:new(), processes())))
      ).
 
 dump2() ->
@@ -202,7 +203,7 @@ logger() ->
     spawn(fun () -> log() end).
 
 log() ->
-    {ok, F} = file:open("mem.log", write),
+    {ok, F} = file:open("mem.log", [write]),
     log(F).
 
 log(F) ->
