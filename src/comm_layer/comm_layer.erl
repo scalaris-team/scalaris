@@ -26,11 +26,13 @@
 -author('schuett@zib.de').
 -vsn('$Id: comm_layer.erl 523 2008-07-14 13:38:34Z schintke $ ').
 
--export([start_link/0, send/2, this/0]).
+-export([start_link/0, send/2, this/0, here/1]).
 
 -import(io).
 -import(util).
 
+% @TODO: should be ip
+-type(process_id() :: {any(), integer(), pid()}).
 %%====================================================================
 %% public functions
 %%====================================================================
@@ -63,8 +65,11 @@ send(Target, Message) ->
     ok.
 
 %% @doc returns process descriptor for the calling process
-%% @spec this() -> process_id()
+-spec(this/0 :: () -> process_id()).
 this() ->
-    {comm_port:get_local_address(), comm_port:get_local_port(), self()}.
+    here(self()).
 
-
+-spec(here/1 :: (pid()) -> process_id()).
+here(Pid) ->
+    {comm_port:get_local_address(), comm_port:get_local_port(), Pid}.
+    

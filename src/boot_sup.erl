@@ -132,6 +132,13 @@ init(_Args) ->
 	 brutal_kill,
 	 worker,
 	 []},
+   BenchServer = 
+	{bench_server,
+	 {bench_server, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_one, 10, 1},
 	  [
 	   Config,
@@ -143,6 +150,7 @@ init(_Args) ->
 	   Collector,
 	   Node,
 	   YAWS,
+	   BenchServer,
 	   CSNode
 	   ]}}.
     

@@ -230,7 +230,7 @@ prop_in() ->
 		    intervals:in(Y, intervals:new(X, Y)))).
 
 qc_in(_Config) ->
-    qc:quickcheck(prop_sanitize()).
+    qc:quickcheck(prop_in()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

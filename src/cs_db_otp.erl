@@ -29,6 +29,10 @@
 -behaviour(gen_server).
 -behaviour(database).
 
+-include("chordsharp.hrl").
+
+-type(key()::integer() | string()).
+
 -export([start_link/1, start/1, init/1, handle_call/3, handle_cast/2, 
 	 handle_info/2, code_change/3, terminate/2, stop/0,
 	 
@@ -117,6 +121,7 @@ get_middle_key() ->
 %% @doc returns all keys (and removes them from the db) which belong 
 %%      to a new node with id HisKey
 %% @spec split_data(string(), string()) -> [{string(), {string(), bool(), integer(), integer()}}]
+-spec(split_data/2 :: (key(), key()) -> [{key(), {key(), bool(), integer(), integer()}}]).
 split_data(MyKey, HisKey) ->
     gen_server:call(get_pid(), {split_data, MyKey, HisKey}, 20000).
 
