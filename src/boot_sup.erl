@@ -38,7 +38,9 @@
 %% Description: Starts the supervisor
 %%--------------------------------------------------------------------
 start_link() ->
-    supervisor:start_link({local, main_sup}, ?MODULE, []).
+    Link = supervisor:start_link({local, main_sup}, ?MODULE, []),
+    cs_sup_standalone:scan_environment(),
+    Link.
 
 %%====================================================================
 %% Supervisor callbacks
