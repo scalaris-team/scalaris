@@ -80,7 +80,7 @@ process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
     Parent ! {done, AbortCount};
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     case transstore.transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
-	{success, {commit, Y}} ->
+	{success, {commit, _}} ->
 	    process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
 	{failure, abort} ->
 	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);

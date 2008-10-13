@@ -92,10 +92,18 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+   BenchServer = 
+	{bench_server,
+	 {bench_server, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok,{{one_for_all,10,1}, [
 			      Config,
 			      CommunicationPort,
 			      YAWS,
+			      BenchServer,
 			      ChordSharp
 			     ]}}.
 

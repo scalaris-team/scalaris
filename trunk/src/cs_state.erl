@@ -109,6 +109,7 @@ update_succ(#state{successorlist=[_ | Rest]}=State, NewSucc) ->
     State#state{successorlist=[NewSucc | Rest]}.
 
 %%% Successor List
+-spec(succ_list/1 :: (#state{}) -> [any()]).
 succ_list(#state{successorlist=SuccList}) -> SuccList.
 
 succ_list_pids(State) -> 

@@ -71,7 +71,7 @@ svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
 
 dialyzer:
-	$(CD) bin && $(DIALYZER) -pa $(YAWS_PATH)/ebin -c *.beam
+	$(DIALYZER) -c src/*.erl -I $(YAWS_PATH)/include/
 
 rrd-init:
 	$(RRDTOOL) create data/average_memory_usage.rrd --step 60 DS:av_mem:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600

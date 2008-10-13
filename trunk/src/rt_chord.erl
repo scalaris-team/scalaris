@@ -40,7 +40,8 @@
 % stabilize for Chord
 -export([stabilize/3]).
 
-
+-type(key()::integer()).
+%-type(rt()::gb_trees::gb_tree()).
 %% @type rt() = gb_trees:gb_tree(). Chord routing table
 %% @type key() = int(). Identifier
 
