@@ -68,7 +68,12 @@ add_nodes_loop(Count, Delay) ->
 check_ring() ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
     Nodes = statistics:get_ring_details(),
-    lists:foldl(fun check_ring_foldl/2, first, Nodes).
+    case lists:foldl(fun check_ring_foldl/2, first, Nodes) of
+	{error, Reason} ->
+		{error, Reason};
+	_X ->
+		ok
+    end.
 
 
 check_ring_foldl({ok, Node}, first) ->
@@ -83,7 +88,7 @@ check_ring_foldl({ok, Node}, PredsSucc) ->
 	MyId == PredsSucc ->
 	    get_id(hd(node_details:succlist(Node)));
 	true ->
-	    {error, io_lib:format("~p didn't match ~p", [MyId, PredsSucc])}
+	    {error, lists:flatten(io_lib:format("~.16B didn't match ~.16B", [MyId, PredsSucc]))}
     end.
 
 
