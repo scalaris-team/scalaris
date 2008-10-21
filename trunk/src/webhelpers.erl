@@ -20,7 +20,7 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @copyright 2008 onScale solutions
+%%            2008 onScale solutions GmbH
 %% @version $Id: webhelpers.erl 463 2008-05-05 11:14:22Z schuett $
 -module(webhelpers).
 
