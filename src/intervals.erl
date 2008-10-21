@@ -44,7 +44,7 @@
 	 find_start/3
 	 ]).
 
-% @type interval() = [] | term() | {interval,term(),term()} | all | list(interval())]
+% @type interval() = [] | term() | {interval,term(),term()} | all | list(interval()).
 % [] -> empty interval
 % {element, term()} -> one element interval
 % {interval,term(),term()} -> closed interval

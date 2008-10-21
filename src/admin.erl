@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id: admin.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([add_nodes/1, add_nodes/2, check_ring/0]).
+-export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0]).
 
 %%====================================================================
 %% API functions
@@ -101,3 +101,12 @@ get_id(Node) ->
         true ->
             node:id(Node)
     end.
+
+%%--------------------------------------------------------------------
+%% Function: nodes() -> list()
+%% Description: contact boot server and list the known ip addresses
+%%--------------------------------------------------------------------
+% @doc contact boot server and list the known ip addresses
+% @spec nodes() -> list()
+nodes() ->
+    util:uniq([IP || {IP, _, _} <- lists:sort(boot_server:node_list())]).
