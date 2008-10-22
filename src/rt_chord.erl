@@ -75,12 +75,13 @@ next_hop(State, Id) ->
     end.
 
 % @private
+next_hop(N, RT, Id, 0, Candidate) -> Candidate;
 next_hop(N, RT, Id, Index, Candidate) ->
     case gb_trees:is_defined(Index, RT) of
 	true ->
 	    case gb_trees:get(Index, RT) of
 		null ->
-		    Candidate;
+		    next_hop(N, RT, Id, Index - 1, Candidate);
 		Entry ->
 		    case util:is_between_closed(N, node:id(Entry), Id) of
 			true ->
@@ -90,7 +91,7 @@ next_hop(N, RT, Id, Index, Candidate) ->
 		    end
 		end;
 	false ->
-	    Candidate
+	    next_hop(N, RT, Id, Index - 1, Candidate)
     end.
 
 %% @doc starts the stabilization routine
