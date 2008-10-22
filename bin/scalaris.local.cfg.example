@@ -1,2 +1,7 @@
+% Settings for distributed Erlang (see cs_send.erl to switch)
+%{boot_host, {boot,'boot@foo.bar.com'}}.
+%{log_host, 'boot@foo.bar.com'}.
+
+% Settings for TCP mode.
 {boot_host, {{127,0,0,1},14195,boot}}.
 {log_host, {{127,0,0,1},14195,boot_logger}}.
