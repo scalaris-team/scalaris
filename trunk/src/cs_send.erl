@@ -59,8 +59,11 @@ this() ->
 send(Pid, Message) ->
     Pid ! Message.
 
+get(Name, {Pid,Host}) ->
+    {Name, Host};
 get(Name, Pid) ->
-    %@todo fix
-    exit().
+    {Name, node()}.
 
+% here(Pid) ->
+%     {Pid, self()}. 
 -endif.
