@@ -30,7 +30,9 @@
 -import(cs_send).
 -import(erlang).
 -import(io).
+-import(lists).
 -import(process_dictionary).
+-import(random).
 
 %%===================================================================
 %% HOWTO do a transaction:
@@ -146,17 +148,13 @@ single_write(Key, Value)->
 
 %% use this function to do a full transaction including a readphase
 do_transaction(TFun, SuccessFun, FailureFun)->
-    {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
-    if 
-	Flag /= ok->
-	    io:format("transaction_api:do_transaction: Did not find a cs node ~n", []),
-	    fail;
-	true ->
-	    LocalCSNode ! {do_transaction, TFun, SuccessFun, FailureFun, cs_send:this()},
-	    receive
-		{trans, Message}->
-		    Message
-	    end
+    LocalCSNodes = process_dictionary:find_all_cs_nodes(),
+    [LocalCSNode] = lists:nth(random:uniform(length(LocalCSNodes)), LocalCSNodes),
+    %{_, LocalCSNode} = process_dictionary:find_cs_node(),
+    LocalCSNode ! {do_transaction, TFun, SuccessFun, FailureFun, cs_send:this()},
+    receive
+	{trans, Message}->
+	    Message
     end.
 
 %% Use this function to do a transaction without a read phase

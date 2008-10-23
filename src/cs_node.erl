@@ -237,15 +237,15 @@ loop(State, Debug) ->
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 
 %% find
-	{lookup_aux, Key, Msg} -> 
+	{lookup_aux, Key, Hops, Msg} -> 
 	    ?LOG("[ ~w | I | Node   | ~w ] lookup_aux~n",
 		      [calendar:universal_time(), self()]),
-	    lookup:lookup_aux(State, Key, Msg),
+	    lookup:lookup_aux(State, Key, Hops, Msg),
 	    loop(State, ?DEBUG(Debug));
-	{lookup_fin, Msg} -> 
+	{lookup_fin, Hops, Msg} -> 
 	    ?LOG("[ ~w | I | Node   | ~w ] lookup_fin~n",
 		      [calendar:universal_time(), self()]),
-	    lookup:lookup_fin(Msg),
+	    lookup:lookup_fin(Hops, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{get_node, Source_PID, Key} -> 	    
 	    ?LOG("[ ~w | I | Node   | ~w ] get_node~n",

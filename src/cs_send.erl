@@ -29,6 +29,7 @@
 -include("transstore/trecords.hrl").
 
 -export([send/2, this/0, get/2, here/1]).
+%-export([send/2, this/0, get/2]).
 
 -define(TCP_LAYER, true).
 %-define(BUILTIN, true).
@@ -59,10 +60,10 @@ this() ->
 send(Pid, Message) ->
     Pid ! Message.
 
-get(Name, {Pid,Host}) ->
+get(Name, {_Pid,Host}) ->
     {Name, Host};
 get(Name, Pid) ->
-    {Name, node()}.
+    {Name, node(Pid)}.
 
 % here(Pid) ->
 %     {Pid, self()}. 

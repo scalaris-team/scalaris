@@ -57,7 +57,7 @@ start_link() ->
 init([]) ->
     crypto:start(),
     inets:start(),
-    util:logger(),
+    %util:logger(),
     error_logger:logfile({open, "cs.log"}),
     Config =
 	{config,
@@ -99,9 +99,17 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+   AdminServer = 
+	{admin_server,
+	 {admin, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok,{{one_for_all,10,1}, [
 			      Config,
 			      CommunicationPort,
+			      AdminServer,
 			      YAWS,
 			      BenchServer,
 			      ChordSharp

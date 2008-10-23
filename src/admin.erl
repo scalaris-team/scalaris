@@ -26,7 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id: admin.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0]).
+-export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
+	 get_dump/0, get_dump_bw/0, diff_dump/3]).
 
 %%====================================================================
 %% API functions
@@ -100,6 +101,73 @@ get_id(Node) ->
             "null";
         true ->
             node:id(Node)
+    end.
+
+%%===============================================================================
+%% comm_layer:comm_logger functions
+%%===============================================================================
+get_dump() ->
+    [cs_send:send(cs_send:get(admin_server, Server), {get_comm_layer_dump, cs_send:this()}) 
+     || Server <- util:get_nodes()],
+    % list({Map, StartTime})
+    Dumps = [receive 
+	 {get_comm_layer_dump_response, Dump} ->
+	     Dump
+     end || _ <- util:get_nodes()],
+    StartTime = lists:min([Start || {_, Start} <- Dumps]),
+    Keys = util:uniq(lists:sort(lists:flatten([gb_trees:keys(Map) || {Map, _} <- Dumps]))),
+    {lists:foldl(fun (Tag, Map) -> 
+			 gb_trees:enter(Tag, get_aggregate(Tag, Dumps), Map)
+		 end, gb_trees:empty(), Keys), StartTime}.
+
+get_dump_bw() ->
+    {Map, StartTime} = get_dump(),
+    RunTime = timer:now_diff(erlang:now(), StartTime),
+    [{Tag, Size / RunTime, Count / RunTime} || {Tag, {Size, Count}} <- gb_trees:to_list(Map)].
+
+get_aggregate(_Tag, []) ->
+    {0, 0};
+get_aggregate(Tag, [{Dump, _} | Rest]) ->
+    case gb_trees:lookup(Tag, Dump) of
+	none ->
+	    get_aggregate(Tag, Rest);
+	{value, {Size, Count}} ->
+	    {AggSize, AggCount} = get_aggregate(Tag, Rest),
+	    {AggSize + Size, AggCount + Count}
+    end.
+	    
+diff_dump(BeforeDump, AfterDump, RunTime) ->    
+    Tags = util:uniq(lists:sort(lists:flatten([gb_trees:keys(BeforeDump), 
+					       gb_trees:keys(AfterDump)]))),
+    diff(Tags, BeforeDump, AfterDump).
+    
+diff([], _Before, _After) ->
+    [];
+diff([Tag | Rest], Before, After) ->
+    {NewSize, NewCount} = gb_trees:get(Tag, After),
+    case gb_trees:lookup(Tag, Before) of
+	none ->
+	    [{Tag, NewSize, NewCount} | diff(Rest, Before, After)];
+	{value, {Size, Count}} ->
+	    [{Tag, NewSize - Size, NewCount - Count} | diff(Rest, Before, After)]
+    end.
+
+%%===============================================================================
+%% admin server functions
+%%===============================================================================
+start_link() ->
+    {ok, spawn_link(?MODULE, start, [])}.
+
+start() ->
+    register(admin_server, self()),
+    loop().
+
+loop() ->
+    receive
+	{get_comm_layer_dump, Sender} ->
+	    cs_send:send(Sender, {get_comm_layer_dump_response, 
+				  comm_layer.comm_logger:dump()}),
+	    loop()
     end.
 
 %%--------------------------------------------------------------------

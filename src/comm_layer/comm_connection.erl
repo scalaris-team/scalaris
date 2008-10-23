@@ -106,15 +106,26 @@ loop(Socket, Address, Port) ->
     end.
 
 new_connection(Address, Port, MyPort) ->
-    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {active, once}, {nodelay, true}, {send_timeout, 60000}], 60000) of
+    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, {send_timeout, 60000}], 60000) of
         {ok, Socket} ->
                                                 % send end point data
-	    {ok, {MyAddress, _MyPort}} = inet:sockname(Socket),
-            gen_tcp:send(Socket, term_to_binary({endpoint, MyAddress, MyPort})),
-	    {ok, {RemoteIP, RemotePort}} = inet:peername(Socket),
-            gen_tcp:send(Socket, term_to_binary({youare, RemoteIP, RemotePort})),
-	    
-            Socket;
+	    case inet:sockname(Socket) of
+		{ok, {MyAddress, _MyPort}} ->
+	            gen_tcp:send(Socket, term_to_binary({endpoint, MyAddress, MyPort})),
+		    case inet:peername(Socket) of
+			{ok, {RemoteIP, RemotePort}} ->
+		            gen_tcp:send(Socket, term_to_binary({youare, RemoteIP, RemotePort})),
+		            Socket;
+			{error, Reason} ->
+			    io:format("reconnect to ~p because socket is ~p~n", [Address, Reason]),
+			    gen_tcp:close(Socket),
+	    		    new_connection(Address, Port, MyPort)
+		    end;
+		{error, Reason} ->
+		    io:format("reconnect to ~p because socket is ~p~n", [Address, Reason]),
+		    gen_tcp:close(Socket),
+	            new_connection(Address, Port, MyPort)
+	    end;
         {error, Reason} ->
             log:log2file(comm_connection, io_lib:format("couldn't connect to ~p:~p (~p)~n", [Address, Port, Reason])),
 	    comm_port:unregister_connection(Address, Port),

@@ -165,7 +165,7 @@ stabilize(State, Index, Node) ->
 		false ->
 		    NewRT = gb_trees:enter(Index, Node, RT),
 		    Key = calculateKey(State, Index - 1),
-		    self() ! {lookup_aux, Key, {rt_get_node, cs_send:this(), Index - 1}},
+		    self() ! {lookup_aux, Key, 0, {rt_get_node, cs_send:this(), Index - 1}},
 		    cs_state:set_rt(State, NewRT)
 	    end
     end.

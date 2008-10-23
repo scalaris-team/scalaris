@@ -227,7 +227,7 @@ details(State) ->
     FD_Size = failuredetector:node_count(),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),
-    node_details:new(Pred, Node, SuccList, Load, FD_Size, Hostname, RTSize, cs_message:get_details(), erlang:memory(total)).
+    node_details:new(Pred, Node, SuccList, Load, FD_Size, Hostname, RTSize, ok, erlang:memory(total)).
 
 %%% Assert / Debugging
 

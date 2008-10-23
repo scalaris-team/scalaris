@@ -49,7 +49,7 @@ start_link() ->
 send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
     MyIP = comm_port:get_local_address(),
     MyPort = comm_port:get_local_port(),
-    %io:format("send: ~p:~p -> ~p:~p : ~p\n", [MyIP, MyPort, _IP, _Port, Message]),
+    %io:format("send: ~p:~p -> ~p:~p(~p) : ~p\n", [MyIP, MyPort, _IP, _Port, _Pid, Message]),
     IsLocal = (MyIP == _IP) and (MyPort == _Port),
     if
  	IsLocal ->

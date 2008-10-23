@@ -28,25 +28,26 @@
 
 -include("chordsharp.hrl").
 
--export([lookup_aux/3, lookup_fin/1, get_key/3, set_key/4]).
+-export([lookup_aux/4, lookup_fin/2, get_key/3, set_key/4]).
 
 %logging on
 %-define(LOG(S, L), io:format(S, L)).
 %logging off
 -define(LOG(S, L), ok).
 
-lookup_fin(Msg) ->
+lookup_fin(Hops, Msg) ->
+    %io:format("Hops: ~p~n", [Hops]),
     self() ! Msg.
     
-lookup_aux(State, Key, Msg) ->
+lookup_aux(State, Key, Hops, Msg) ->
     Terminate = util:is_between(cs_state:id(State), Key, cs_state:succ_id(State)),
     P = ?RT:next_hop(State, Key),
     ?LOG("[ ~w | I | Node   | ~w ] lookup_aux ~w ~w ~s~n",[calendar:universal_time(), self(), Terminate, P, Key]),
     if
 	Terminate ->
-	    cs_send:send(P, {lookup_fin, Msg});
+	    cs_send:send(P, {lookup_fin, Hops + 1, Msg});
 	true ->
-	    cs_send:send(P, {lookup_aux, Key, Msg})
+	    cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
     end.
 
 get_key(Source_PID, HashedKey, Key) ->

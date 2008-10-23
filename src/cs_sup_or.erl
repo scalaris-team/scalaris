@@ -95,7 +95,7 @@ init([]) ->
 	  [
 %	   XMLRPC,
 	   KeyHolder,
-	   MessageStatisticsCollector,
+	   %MessageStatisticsCollector,
 	   FailureDetector,
 	   Supervisor_AND
 	  ]}}.
