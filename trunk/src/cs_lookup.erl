@@ -51,7 +51,7 @@ reliable_get_node(InstanceId, Id, Timeout) ->
     end.
 
 unreliable_lookup(Key, Msg) ->
-    get_pid(cs_node) ! {lookup_aux, Key, Msg}.
+    get_pid(cs_node) ! {lookup_aux, Key, 0, Msg}.
 
 unreliable_get_key(Key) ->
     unreliable_lookup(Key, {get_key, cs_send:this(), Key}).
@@ -59,7 +59,7 @@ unreliable_get_key(Key) ->
 
 reliable_get_node_service(InstanceId, Id, Node) ->
     reliable_get_node_service_using_boot(InstanceId, Id, Node).
-%    cs_send:send(cs_node, {lookup_aux, Id, {get_node, self(), Id}}),
+%    cs_send:send(cs_node, {lookup_aux, Id, 0, {get_node, self(), Id}}),
 %    receive
 %	{get_node_response, Id, Response} ->
 %	    cs_send:send(Node, {get_node_response, Id, Response})
@@ -78,7 +78,7 @@ reliable_get_node_service_using_boot(Id, Node) ->
     reliable_get_node_service_using_boot_iter(NodeList, [], Id, Node).
 
 reliable_get_node_service_using_boot_iter([First | Rest], Suspected, Id, Node) ->
-    cs_send:send(First, {lookup_aux, Id, {get_node, cs_send:this(), Id}}),
+    cs_send:send(First, {lookup_aux, Id, 0, {get_node, cs_send:this(), Id}}),
     receive
 	{get_node_response, Id, Response} ->
 	    cs_send:send(Node, {get_node_response, Id, Response})

@@ -40,6 +40,9 @@ run_increment(ThreadsPerVM, Iterations) ->
     Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
     runner(ThreadsPerVM, Iterations, [], Msg).
 
+%% @doc run an increment benchmark (i++) on all nodes
+%% profile : enable profiling
+%% {copies, Copies}: run in the benchmark in Copies nodes
 run_increment(ThreadsPerVM, Iterations, Options) ->
     Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
     runner(ThreadsPerVM, Iterations, Options, Msg).
@@ -50,9 +53,15 @@ run_read(ThreadsPerVM, Iterations) ->
     runner(ThreadsPerVM, Iterations, [], Msg).
 
 runner(ThreadsPerVM, Iterations, Options, Message) ->
-    ServerList = get_nodes(),
+    ServerList = case lists:keysearch(copies, 1, Options) of
+      {value, {copies, Copies}} ->
+	lists:sublist(util:get_nodes(), Copies);
+      false ->
+	util:get_nodes()
+    end,
+    {BeforeDump, _} = admin:get_dump(),
     Before = erlang:now(),
-    _Times = case lists:member(profile, Options) of
+    Times = case lists:member(profile, Options) of
 	false ->
     		[cs_send:send(Server, Message) || Server <- ServerList],
     		[receive {done, Time} -> Time end || _Server <- ServerList];
@@ -68,12 +77,17 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
 		Result
 	end,
     After = erlang:now(),
+    {AfterDump, _} = admin:get_dump(),
     RunTime = timer:now_diff(After, Before),
+    DiffDump = admin:diff_dump(BeforeDump, AfterDump, RunTime),
     io:format("servers: ~p threads/vm: ~p iterations: ~p~n", 
 	[length(ServerList), ThreadsPerVM, Iterations]),
     io:format("total time: ~p~n", [RunTime / 1000000.0]),
     io:format("1/s: ~p~n", 
 	[length(ServerList) * ThreadsPerVM * Iterations / RunTime * 1000000.0]),
+	Throughput = [ThreadsPerVM * Iterations / Time * 1000000.0 || Time <- Times],
+    io:format("~p~n", [Throughput]),
+    io:format("Dump: ~p~n", [DiffDump]),
     ok.
     
 %%==============================================================================
@@ -161,11 +175,6 @@ start_link() ->
 %%==============================================================================
 %% helper functions
 %%==============================================================================
--spec(get_nodes/0 :: () -> list()).
-get_nodes() ->
-    Nodes = lists:sort(boot_server:node_list()),
-    util:uniq([cs_send:get(bench_server, CSNode) || CSNode <- Nodes]).
-    
 get_and_init_key() ->
     Key = ?RT:getRandomNodeId(),
     case transstore.transaction_api:single_write(Key, 0) of
