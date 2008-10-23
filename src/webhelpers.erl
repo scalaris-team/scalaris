@@ -20,14 +20,14 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%%            2008 onScale solutions GmbH
+%% @copyright 2008 onScale solutions
 %% @version $Id: webhelpers.erl 463 2008-05-05 11:14:22Z schuett $
 -module(webhelpers).
 
 -author('schuett@zib.de').
 -vsn('$Id: webhelpers.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([getLoadRendered/0, getRingChart/0, getRingRendered/0, lookup/1, set_key/2, isPost/1]).
+-export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1]).
 
 -include("yaws_api.hrl").
 
@@ -220,6 +220,92 @@ renderRing({failed}) ->
        {td, [], "-"}
       ]}.
 
+getIndexedRingRendered() ->
+    RealRing = statistics:get_ring_details(),
+    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
+    RingSize = util:lengthX(Ring),
+    if
+	RingSize == 0 ->
+	    {p, [], "empty ring"};
+	true ->
+	    {p, [],
+	      [
+	      {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+	       [
+		{tr, [{bgcolor, '#000099'}],
+		 [
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load (std. deviation)"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Real Ring Size"}}}
+		 ]
+		},
+		{tr, [],
+		 [
+		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
+		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
+		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
+		  {td, [], io_lib:format('~p', [boot_server:node_list()])}
+		 ]
+		}
+	       ]
+	      },
+	      {br, []},
+	      {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+	       [{tr, [{bgcolor, '#000099'}],
+		 [
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Host"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Pred Offset"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node Index"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succ Offsets"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
+		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
+		 ]},
+		lists:map(fun (Node) -> renderIndexedRing(Node, Ring) end, Ring)
+	       ]
+	      }
+	     ]
+	    }
+    end.
+
+renderIndexedRing({ok, Details}, Ring) ->
+    Hostname = node_details:hostname(Details),
+    Pred = node_details:pred(Details),
+    Node = node_details:me(Details),
+    SuccList = node_details:succlist(Details),
+    RTSize = node_details:rt_size(Details),
+    Load = node_details:load(Details),
+    MyIndex = get_indexed_id(Node, Ring),
+    NIndex = length(Ring),
+    PredIndex = get_indexed_pred_id(Pred, Ring, MyIndex, NIndex),
+    SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, Ring, MyIndex, NIndex) end, SuccList),
+    [FirstSuccIndex|_] = SuccIndices,
+    {tr, [], 
+      [
+       {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
+       case is_list(PredIndex) orelse PredIndex =/= -1 of
+           true -> {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])};
+           false -> {td, [], io_lib:format('~p', [PredIndex])}
+       end,
+       {td, [], io_lib:format('~p: ~p', [MyIndex, get_id(Node)])},
+       case is_list(FirstSuccIndex) orelse FirstSuccIndex =/= 1 of
+           true -> {td, [], io_lib:format('<span style="color:red">~p</span>', [SuccIndices])};
+           false -> {td, [], io_lib:format('~p', [SuccIndices])}
+       end,
+       {td, [], io_lib:format('~p', [RTSize])},
+       {td, [], io_lib:format('~p', [Load])}
+      ]};
+
+renderIndexedRing({failed}, _Ring) ->
+    {tr, [], 
+      [
+       {td, [], "-"},
+       {td, [], "-"},
+       {td, [], "-"},
+       {td, [], "-"},
+       {td, [], "-"}
+      ]}.
+
 %%%-----------------------------Misc----------------------------------
 
 get_id(Node) ->
@@ -230,6 +316,35 @@ get_id(Node) ->
 	true ->
 	    node:id(Node)
     end.
+
+get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
+    case get_indexed_id(Node, Ring) of
+        "null" -> "null";
+        "none" -> "none";
+        Index -> ((Index-MyIndex+NIndex) rem NIndex)-NIndex
+    end.
+
+get_indexed_succ_id(Node, Ring, MyIndex, NIndex) ->
+    case get_indexed_id(Node, Ring) of
+        "null" -> "null";
+        "none" -> "none";
+        Index -> (Index-MyIndex+NIndex) rem NIndex
+    end.
+
+get_indexed_id(Node, Ring) ->
+    case node:is_null(Node) of
+        true -> "null";
+        false -> get_indexed_id(Node, Ring, 0)
+    end.
+
+get_indexed_id(Node, [{ok, Details}|Ring], Index) ->
+    case node:id(Node) =:= node:id(node_details:me(Details)) of
+        true -> Index;
+        false -> get_indexed_id(Node, Ring, Index+1)
+    end;
+
+get_indexed_id(_Node, [], _Index) ->
+    "none".
 
 get_flag(Hostname) ->
     Country = string:substr(Hostname, 1 + string:rchr(Hostname, $.)),

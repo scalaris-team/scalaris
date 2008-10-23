@@ -21,6 +21,9 @@
           <div class="nothighlighted">
             <a class="menua" href="ring.yaws">Ring</a>
 	  </div>
+          <div class="nothighlighted">
+            <a class="menua" href="indexed-ring.yaws">Indexed Ring</a>
+	  </div>
 	  <div class="nothighlighted">
        	    <a class="menua" href="rrd-status.yaws">RRD Status</a>
 	  </div>
