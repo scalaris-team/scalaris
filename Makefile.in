@@ -33,7 +33,7 @@ all: compile
 
 #cp priv/xbin/*beam bin/
 compile:
-	@$(ERL) -pa contrib/yaws -make
+	@$(ERL) -pa contrib/yaws -pa ebin -make
 
 test: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec
