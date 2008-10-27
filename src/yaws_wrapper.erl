@@ -60,10 +60,6 @@ try_link(DocRoot, SL, GL) ->
 	    ignore
     end.
 
-do_nothing() ->
-    timer:sleep(1000000),
-    do_nothing().
-
 try_port(Port) ->
     case gen_tcp:listen(Port, []) of
 	{ok, Sock} ->

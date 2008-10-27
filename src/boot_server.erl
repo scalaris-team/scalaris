@@ -127,7 +127,6 @@ start(InstanceId) ->
     process_dictionary:register_process(InstanceId, boot_server, self()),
     %error_logger:add_report_handler(cs_error_logger),
     failuredetector:set_owner(self()),
-%    yaws:start_embedded("../docroot", [{listen, {0,0,0,0}}, {opaque, InstanceId}], [{max_open_conns, 800}, {access_log, false}]),
     loop(gb_trees:empty()).
 
 %% @doc starts the server; called by the boot supervisor

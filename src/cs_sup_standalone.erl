@@ -58,10 +58,10 @@ init([]) ->
     crypto:start(),
     inets:start(),
     %util:logger(),
-    error_logger:logfile({open, "cs.log"}),
+    error_logger:logfile({open, preconfig:cs_log_file()}),
     Config =
 	{config,
-	 {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"]]},
+	 {config, start_link, [[preconfig:config(), preconfig:local_config()]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
@@ -84,10 +84,9 @@ init([]) ->
      },
     YAWS = 
 	{yaws,
-	 {yaws_wrapper, try_link, ["../docroot_node", 
-				     [{port, 8001}, {listen, {0,0,0,0}}], 
-				     [{max_open_conns, 800}, {access_log, false}]
-				    ]},
+	 {yaws_wrapper, try_link, [preconfig:docroot(),
+                                   [{port, preconfig:yaws_port()}, {listen, {0,0,0,0}}],
+                                   [{max_open_conns, 800}, {access_log, false}, {logdir, preconfig:log_path()}]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
@@ -120,11 +119,10 @@ init([]) ->
 %%====================================================================
 
 scan_environment() ->
-    loadInstances(os:getenv("CS_INSTANCES")),
+    loadInstances(preconfig:cs_instances()),
     ok.
 
-loadInstances(false) ->
+loadInstances(undefined) ->
     ok;
 loadInstances(Instances) ->
-    {Int, []} = string:to_integer(Instances),
-    admin:add_nodes(Int - 1).
+    admin:add_nodes(Instances - 1).

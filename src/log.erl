@@ -29,12 +29,12 @@
 -export([log/2, log2file/2]).
 
 log2file(Channel, Message) ->
-    case file:open("log.txt", [append]) of
+    case file:open(config:log_log_file(), [append]) of
 	{ok, FD} ->
 	    io:format(FD, "[ ~w | ~w] ~s~n", [calendar:universal_time(), Channel, Message]),
 	    file:close(FD);
 	{error, Reason} ->
-	    io:format("couldn't open log.txt: ~w~n", [Reason]),
+	    io:format("couldn't open ~w: ~w~n", [config:log_log_file(), Reason]),
 	    {error, Reason}
     end.
 	    

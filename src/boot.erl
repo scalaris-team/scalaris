@@ -30,7 +30,7 @@
 -export([start/0, stop/0]).
 
 start() ->
-    application:start(boot).
+    application:start(boot_cs).
 
 stop() ->
-    application:stop(boot).
+    application:stop(boot_cs).

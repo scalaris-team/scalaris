@@ -58,7 +58,7 @@ init(_Args) ->
     randoms:init(),
     crypto:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
-    error_logger:logfile({open, "cs.log"}),
+    error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
     FailureDetector =
 	{failure_detector,
@@ -77,7 +77,7 @@ init(_Args) ->
 	 []},
     Config =
 	{config,
-	 {config, start_link, [["scalaris.cfg", "scalaris.local.cfg"]]},
+	 {config, start_link, [[preconfig:config(), preconfig:local_config()]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
@@ -119,9 +119,9 @@ init(_Args) ->
 	 []},
     YAWS = 
 	{yaws,
-	 {yaws_wrapper, start_link, ["../docroot", 
-				     [{listen, {0,0,0,0}}, {opaque, InstanceId}], 
-				     [{max_open_conns, 800}, {access_log, false}]
+	 {yaws_wrapper, start_link, [preconfig:docroot(), 
+				     [{port, preconfig:yaws_port()},{listen, {0,0,0,0}}, {opaque, InstanceId}], 
+				     [{max_open_conns, 800}, {access_log, false}, {logdir, preconfig:log_path()}]
 				    ]},
 	 permanent,
 	 brutal_kill,

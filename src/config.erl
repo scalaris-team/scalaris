@@ -42,7 +42,13 @@
 	 transactionLookupTimeout/0, tpFailureTimeout/0, 
 	 tmanagerTimeout/0,
 	 readTimeout/0, leaderDetectorInterval/0, 
-	 testDump/0, testKeepAlive/0, register_hosts/0, listenPort/0, listenIP/0]).
+	 testDump/0, testKeepAlive/0, register_hosts/0, listenPort/0, listenIP/0,
+	 knownHosts/0]).
+
+-export([log_path/0,cs_log_file/0,log_log_file/0,mem_log_file/0,docroot/0]).
+
+-export([storage_path/0,storage_size/0,storage_clean/0]).
+
 
 %%====================================================================
 %% public functions
@@ -53,7 +59,8 @@
 read(Key) ->
     case ets:lookup(config_ets, Key) of
 	[{Key, Value}] ->
-	    Value;
+	    %% allow values defined as application environments to override
+	    preconfig:get_env(Key, Value);
 	[] ->
 	    failed
     end.
@@ -131,28 +138,62 @@ collectorInterval() ->
 %% @doc path to the log directory
 %% @spec log_path() -> string()
 log_path() ->
-    {ok, CWD} = file:get_cwd(),
-    CWD ++ "/../log/".
+    preconfig:log_path().
+
+%% @doc document root for the boot server yaws server
+%% @spec docroot() -> string()
+docroot() ->
+    preconfig:docroot().
 
 %% @doc path to the error log file
 %% @spec error_log_file() -> string()
 error_log_file() ->
-    string:concat(log_path(), "error_log.txt").
+    filename:join(log_path(), "error_log.txt").
 
 %% @doc path to the rrdtools log file
 %% @spec rrd_log_file() -> string()
 rrd_log_file() ->
-    string:concat(log_path(), "rrd_log.txt").
+    filename:join(log_path(), "rrd_log.txt").
 
 %% @doc path to the debug log file
 %% @spec debug_log_file() -> string()
 debug_log_file() ->
-    string:concat(log_path(), "debug_log.txt").
+    filename:join(log_path(), "debug_log.txt").
 
 %% @doc path to the transaction log file
 %% @spec transaction_log_file() -> string()
 transaction_log_file() ->
-    string:concat(log_path(), "transaction_log.txt").
+    filename:join(log_path(), "transaction_log.txt").
+
+%% @doc path to the chordsharp log file
+%% @spec cs_log_file() -> string()
+cs_log_file() ->
+    filename:join(log_path(), "cs_log.txt").
+
+%% @doc path to the logger log file
+%% @spec log_log_file() -> string()
+log_log_file() ->
+    filename:join(log_path(), "log.txt").
+
+%% @doc path to the mem log file
+%% @spec mem_log_file() -> string()
+mem_log_file() ->
+    filename:join(log_path(), "mem.txt").
+
+%% @doc path of file storage directory
+%% @spec storage_path() -> string()
+storage_path() ->
+    read(storage_path).
+
+%% @doc size of file storage directory
+%% @spec storage_size() -> integer()
+storage_size() ->
+    read(storage_size).
+
+%% @doc whether to recreate file storage from scratch
+%% @spec storage_clean() -> boolean()
+storage_clean() ->
+    read(storage_clean).
 
 %% @doc length of the debug queue
 %% @spec debugQueueLength() -> integer() | failed
@@ -221,12 +262,18 @@ register_hosts()->
 %% @doc port to listen on for TCP
 %% @spec listenPort() -> int()
 listenPort()->
-	read(listen_port).
+    preconfig:cs_port().
 
 %% @doc IP to listen on for TCP
 %% @spec listenIP() -> inet:ip_address() | undefined
 listenIP()->
 	read(listen_ip).
+
+%% @doc known hosts
+%@TODO: any() should be ip_address()
+-spec(knownHosts/0 :: () -> [{any(), integer(), pid()}]).
+knownHosts()->
+	read(known_hosts).
 
 %%====================================================================
 %% gen_server setup

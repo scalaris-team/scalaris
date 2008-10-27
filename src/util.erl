@@ -203,7 +203,7 @@ logger() ->
     spawn(fun () -> log() end).
 
 log() ->
-    {ok, F} = file:open("mem.log", [write]),
+    {ok, F} = file:open(config:mem_log_file(), [write]),
     log(F).
 
 log(F) ->

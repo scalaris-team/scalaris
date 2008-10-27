@@ -269,6 +269,8 @@ find_start(Start, Interval, Remainder) ->
 
 % @private
 % @spec is_between(term(), term(), term()) -> bool()
+is_between(_, X, X) ->
+    true;
 is_between(X, _, X) ->
     true;
 is_between(_, plus_infinity, plus_infinity) ->

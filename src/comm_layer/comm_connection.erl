@@ -100,6 +100,9 @@ loop(Socket, Address, Port) ->
 		    loop(Socket, Address, Port)
 	    end;
 
+	{youare, _IP, _Port} ->
+	    loop(Socket, Address, Port);
+
         Unknown ->
 	    log:log2file(comm_connection, io_lib:format("unknown message2 ~p", [Unknown]) ),
 	    loop(Socket, Address, Port)
