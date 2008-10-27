@@ -33,8 +33,8 @@ update(File, Value) ->
     logged_exec(Command).
 
 graph(PNGFile, TimeSpan, DataSource, Key) ->
-    Command = io_lib:format("rrdtool graph ../docroot/graphs/~s --units-exponent 0 --start now-~ps DEF:pkt=../data/~s:AVERAGE LINE1:pkt#ff0000:'~s'", 
-			    [PNGFile, TimeSpan, DataSource, Key]),
+    Command = io_lib:format("rrdtool graph ~w/graphs/~s --units-exponent 0 --start now-~ps DEF:pkt=../data/~s:AVERAGE LINE1:pkt#ff0000:'~s'",
+			    [config:docroot(), PNGFile, TimeSpan, DataSource, Key]),
     logged_exec(Command).
 
 %    rrdtool:graph("messages_get_middle_key_response_traffic_1h.png",3600, "messages_get_middle_key_response_traffic.rrd:traffic",  "GetMiddleKeyResponse Bytes/Node/s"),

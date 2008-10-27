@@ -20,5 +20,12 @@
 	{mod, {chordsharp_app, []}},
 	{registered, [cs_node,
 		      cs_xmlrpc]},
-	{applications, [kernel, stdlib]}
+	{applications, [kernel, stdlib]},
+    {env, [
+            {config, "scalaris.cfg"},
+            {local_config, "scalaris.local.cfg"},
+            {log_path, "../log"},
+            {docroot, "../docroot_node"}
+          ]
+    }
 	]}.
