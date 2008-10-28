@@ -13,5 +13,8 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-export CS_PORT=14198
-erl -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -hidden -name n3 -s chordsharp
+erl -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin \
+    -yaws embedded true -connect_all false -hidden \
+    -chordsharp cs_port 14198 \
+    -chordsharp yaws_port 8003 \
+    -name node3 -s chordsharp
