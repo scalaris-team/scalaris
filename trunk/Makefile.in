@@ -17,9 +17,8 @@ ERL = @ERL@
 DIALYZER = @ERLANG_ROOT_DIR@/bin/dialyzer
 SVN = svn
 CD = cd
-RRDTOOL = @RRDTOOL@
 MAKE = make
-
+VERSION=0.0.1
 
 
 
@@ -106,6 +105,3 @@ rrd-init:
 	$(RRDTOOL) create data/messages_get_middle_key_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
 	$(RRDTOOL) create data/messages_get_middle_key_response_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
 	$(RRDTOOL) create data/messages_get_middle_key_response_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-
-
-
