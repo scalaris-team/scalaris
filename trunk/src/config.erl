@@ -36,7 +36,7 @@
 	 failureDetectorPingInterval/0, 
 	 failureDetectorUpdateInterval/0, bootPid/0, 
 	 logPid/0, loadBalanceInterval/0, loadBalanceStartupInterval/0, loadBalanceFlagResetInterval/0, 
-	 collectorInterval/0, error_log_file/0, rrd_log_file/0, 
+	 collectorInterval/0, error_log_file/0, 
 	 debugQueueLength/0, debug_log_file/0, transaction_log_file/0, reregisterInterval/0, 
 	 replicationFactor/0, quorumFactor/0, replicaPrefixes/0, 
 	 transactionLookupTimeout/0, tpFailureTimeout/0, 
@@ -149,11 +149,6 @@ docroot() ->
 %% @spec error_log_file() -> string()
 error_log_file() ->
     filename:join(log_path(), "error_log.txt").
-
-%% @doc path to the rrdtools log file
-%% @spec rrd_log_file() -> string()
-rrd_log_file() ->
-    filename:join(log_path(), "rrd_log.txt").
 
 %% @doc path to the debug log file
 %% @spec debug_log_file() -> string()

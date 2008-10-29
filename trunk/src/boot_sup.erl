@@ -96,20 +96,6 @@ init(_Args) ->
 	 brutal_kill,
 	 worker,
 	 []},
-    Collector = 
-	{boot_collector,
-	 {boot_collector, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   MessageStatisticsCollector = 
-	{cs_message_collector,
-	 {cs_message, start_link, [InstanceId]},
-	 temporary, %permanent,
-	 brutal_kill,
-	 worker,
-	 []},
    CSNode = 
 	{cs_node,
 	 {cs_sup_or, start_link, []},
@@ -152,12 +138,10 @@ init(_Args) ->
 	  [
 	   Config,
  	   CommPort,
-	   %MessageStatisticsCollector,
 	   FailureDetector,
 	   AdminServer,
 	   %XMLRPC,
 	   Logger,
-	   %Collector,
 	   Node,
 	   YAWS,
 	   BenchServer,
