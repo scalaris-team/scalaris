@@ -15,8 +15,6 @@
 AC_PREREQ(2.53)
 AC_INIT(chordsharp, 0.01, schuett@zib.de)
 
-AC_PATH_TOOL(RRDTOOL, rrdtool)
-
 ###########################################################
 #
 # check xml2 and xslt
