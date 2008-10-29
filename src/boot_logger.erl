@@ -66,7 +66,7 @@ loop(ErrorLog, DebugLog, TransactionLog) ->
     loop(ErrorLog, DebugLog, TransactionLog).
 
 start(InstanceId) ->
-    process_dictionary:register_process(InstanceId, boot_collector, self()),
+    process_dictionary:register_process(InstanceId, boot_logger, self()),
     register(boot_logger, self()),
     {ok, ErrorLog} = file:open(config:error_log_file(), [append]),
     {ok, DebugLog} = file:open(config:debug_log_file(), [append]),

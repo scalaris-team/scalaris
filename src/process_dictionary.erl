@@ -63,8 +63,8 @@
 	 find_group/1, 
 	 %find_instance_id/0,
 
-	 %get_groups/0,
-	 %get_processes_in_group/1, 
+	 get_groups/0,
+	 get_processes_in_group/1, 
 	 get_info/2,
 
 	 %for fprof
@@ -128,9 +128,9 @@ get_processes_in_group(InstanceId) ->
 %% @spec get_info(term(), term()) -> term()
 get_info(InstanceId, Name) ->   
     KVs = case gen_server:call(?MODULE, {lookup_process2, InstanceId, list_to_atom(Name)}, 20000) of
-	      none ->
+	      failed ->
 		  [{"process", "unknown"}];
-	      {value, Pid} ->
+	      {ok, Pid} ->
 		  Pid ! {'$gen_cast', {debug_info, self()}},
 		  {memory, Memory} = process_info(Pid, memory),
 		  {reductions, Reductions} = process_info(Pid, reductions),
@@ -224,7 +224,7 @@ handle_call({register_process, InstanceId, Name, Pid}, _From, State) ->
 handle_call({lookup_process2, InstanceId, Name}, _From, State) ->
     Result = case ets:lookup(?MODULE, {InstanceId, Name}) of
         [{{InstanceId, Name}, Value}] ->
-            Value;
+            {ok, Value};
         [] ->
             failed
     end,

@@ -70,13 +70,6 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-    MessageStatisticsCollector = 
-	{cs_message_collector,
-	 {cs_message, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
     Supervisor_AND = 
 	{cs_supervisor_and,
 	 {cs_sup_and, start_link, [InstanceId]},
@@ -95,7 +88,6 @@ init([]) ->
 	  [
 %	   XMLRPC,
 	   KeyHolder,
-	   %MessageStatisticsCollector,
 	   FailureDetector,
 	   Supervisor_AND
 	  ]}}.

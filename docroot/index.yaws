@@ -25,12 +25,6 @@
             <a class="menua" href="indexed-ring.yaws">Indexed Ring</a>
 	  </div>
 	  <div class="nothighlighted">
-       	    <a class="menua" href="rrd-status.yaws">RRD Status</a>
-	  </div>
-          <div class="nothighlighted">
-       	    <a class="menua" href="rrd-messages.yaws">RRD Messages</a>
-	  </div>
-	  <div class="nothighlighted">
 	    <a class="menua" href="documentation.yaws">Docu</a>
 	  </div>
 	  <div class="nothighlighted">

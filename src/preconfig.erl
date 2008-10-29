@@ -49,7 +49,7 @@ get_env(Env, Def) ->
     get_env(Env, Def, Def, Def).
 
 %% @doc get an application environment with defaults
-%% @spec get_env(env, boot, node) -> string()
+%% @spec get_env(env, boot, node, client) -> string()
 get_env(Env, Boot_Def, Chordsharp_Def, Client_Def) ->
     %% io:format("preconfig:get_env(~p,~p,~p) -> ~p~n", [Env, Boot_Def, Chordsharp_Def, application:get_env(Env)]),
     case application:get_env(Env) of
@@ -66,7 +66,7 @@ get_env(Env, Boot_Def, Chordsharp_Def, Client_Def) ->
     end.
 
 %% @doc get a port number from the environment with defaults
-%% @spec get_env(env, boot, node) -> string()
+%% @spec get_int_from_env(env, boot, node, client) -> string()
 get_int_from_env(Env, Boot_Def, Chordsharp_Def, Client_Def) ->
     %% io:format("preconfig:get_env(~p,~p,~p) -> ~p~n", [Env, Boot_Def, Chordsharp_Def, application:get_env(Env)]),
     Int = fun(Value) ->
