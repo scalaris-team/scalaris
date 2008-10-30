@@ -49,8 +49,14 @@ end_per_suite(Config) ->
 test_db(_Config) ->
     ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), []),
     ?equals(pubsub.pubsub_api:subscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
-    %ct:print(default, "~p~n", [pubsub.pubsub_api:get_subscribers("TestTopic")]),
     ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), ["http://localhost:8000/pubsub.yaws"]),
     ?equals(pubsub.pubsub_api:publish("TestTopic", "TestContent"), ok),
+    ?equals(pubsub.pubsub_api:subscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
+    ?equals(pubsub.pubsub_api:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
+    ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
+    ?equals(pubsub.pubsub_api:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
+    ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
+    ?equals(pubsub.pubsub_api:unsubscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
+    ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), []),
     ok.
 

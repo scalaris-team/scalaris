@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id: pubsub_api.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([publish/2, subscribe/2, get_subscribers/1]).
+-export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
 
 -import(transstore.transaction_api).
 -import(io).
@@ -71,6 +71,17 @@ subscribe(Topic, URL) ->
 	   end,
     transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).
 
+%% @doc unsubscribes a url for a topic.
+-spec(unsubscribe/2 :: (string(), string()) -> ok | {fail, any()}).
+unsubscribe(Topic, URL) ->
+    TFun = fun(TransLog) ->
+		   {Subscribers, TransLog1} = transaction_api:read2(TransLog, Topic),
+		   NewSubscribers = lists:delete(URL, Subscribers),
+		   TransLog2 = transaction_api:write2(TransLog1, Topic, NewSubscribers),
+		   {{ok, ok}, TransLog2}
+	   end,
+    transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).	   
+
 %% @doc queries the subscribers of a query
 %% @spec get_subscribers(string()) -> [string()]
 get_subscribers(Topic) ->
@@ -81,23 +92,3 @@ get_subscribers(Topic) ->
 	true ->
 	    Fl
     end.
-
-%%     TFun = fun(TransLog) ->
-%% 		   {Result, TransLog1} = cs_transaction_api:read(Topic, TransLog),
-%% 		   if
-%% 		       Result == fail ->
-%% 			   {{ok, []}, TransLog};
-%% 		       true ->
-%% 			   {value, Subscribers} = Result,
-%% 			   io:format("Result_get: used true ~p~n", [Subscribers]),
-%% 			   {{ok, Subscribers}, TransLog1}
-%% 		   end
-%% 	   end,
-%%     cs_transaction_api:do_transaction_outside(TFun, fun (X) -> {success, X} end, {failure}, self(), 4000),   
-%%     receive
-%% 	{success, Subscribers} ->
-%% 	    Subscribers;
-%% 	X ->
-%% 	    io:format("Message_get ~p~n", [X]),
-%% 	    X
-%%     end.
