@@ -29,7 +29,7 @@
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
 
--export([new/6, 
+-export([new/6, new/7,
 	 id/1, me/1, uniqueId/1,
 	 succ/1, succ_pid/1, succ_id/1, update_succ/2,
 	 succ_list/1, succ_list_pids/1, set_succlist/2,
@@ -37,6 +37,7 @@
 	 filterDeadNodes/1,
 	 dump/1,
 	 set_rt/2, rt/1,
+	 get_db/1, set_db/2,
 	 get_lb/1, set_lb/2,
 	 get_nodes/1,
 	 addDeadNode/2,
@@ -50,9 +51,12 @@
 	 set_trans_log/2]).
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {routingtable, successorlist, predecessor, me, my_range, lb, deadnodes, join_time, trans_log}).
+-record(state, {routingtable, successorlist, predecessor, me, my_range, lb, deadnodes, join_time, trans_log, db}).
 
 new(RT, SuccessorList, Predecessor, Me, MyRange, LB) ->
+    new(RT, SuccessorList, Predecessor, Me, MyRange, LB, ?DB:new()).
+
+new(RT, SuccessorList, Predecessor, Me, MyRange, LB, ok = DB) ->
     #state{
      routingtable = RT, 
      successorlist = SuccessorList,
@@ -66,8 +70,10 @@ new(RT, SuccessorList, Predecessor, Me, MyRange, LB) ->
        tid_tm_mapping = dict:new(),
        decided = gb_trees:empty(),
        undecided = gb_trees:empty()
-      }
+      },
+     db = DB
     }.
+
 
 % @spec next_interval(state()) -> intervals:interval()
 next_interval(State) ->
@@ -78,6 +84,12 @@ get_my_range(#state{my_range=MyRange}) ->
 
 set_my_range(State, MyRange) ->
     State#state{my_range=MyRange}.
+
+get_db(#state{db=DB}) ->
+    DB.
+
+set_db(State, ok = DB) ->
+    State#state{db=DB}.
 
 get_lb(#state{lb=LB}) ->
     LB.
@@ -223,7 +235,7 @@ details(State) ->
     Pred = pred(State),
     Node = me(State),
     SuccList = succ_list(State),
-    Load = ?DB:get_load(),
+    Load = ?DB:get_load(get_db(State)),
     FD_Size = failuredetector:node_count(),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),

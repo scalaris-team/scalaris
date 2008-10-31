@@ -212,6 +212,8 @@ sanitize_helper(all, List) ->
     List;
 sanitize_helper({interval, _First, _Last} = X, List) ->
     [X | List];
+sanitize_helper({element, _} = X, List) ->
+    [X | List];
 sanitize_helper([], List) ->
     List.
 %%====================================================================

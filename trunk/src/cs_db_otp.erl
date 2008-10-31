@@ -33,18 +33,21 @@
 
 -type(key()::integer() | string()).
 
+-type(db()::ok).
+
 -export([start_link/1, start/1, init/1, handle_call/3, handle_cast/2, 
 	 handle_info/2, code_change/3, terminate/2, stop/0,
 	 
-	 set_write_lock/1, unset_write_lock/1, set_read_lock/1, 
-	 unset_read_lock/1, get_locks/1,
+	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 
+	 unset_read_lock/2, get_locks/2,
 
-	 read/1, write/3, get_version/1, 
+	 read/2, write/4, get_version/2, 
 
-	 get_range/2, get_range_with_version/1,
+	 get_range/3, get_range_with_version/2,
 
-	 get_load/0, get_middle_key/0, split_data/2, get_data/0, 
-	 add_data/1]).
+	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
+	 add_data/2,
+	new/0]).
 
 %% for testing purpose
 -export([print_locked_items/0]).
@@ -63,87 +66,92 @@ get_pid() ->
     end,
     process_dictionary:lookup_process(InstanceId, cs_db_otp).
 
+%% @doc initializes a new database
+new() ->
+    ok.
+
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
-%% @spec set_write_lock(string()) -> ok | failed
-set_write_lock(Key) ->
-    gen_server:call(get_pid(), {set_write_lock, Key}, 20000).
+%% @spec set_write_lock(string()) -> {db(), ok | failed}
+set_write_lock(ok = DB, Key) ->
+    {DB, gen_server:call(get_pid(), {set_write_lock, Key}, 20000)}.
 
 %% @doc unsets the write lock of a key
 %%      the write lock is a boolean value per key
-%% @spec unset_write_lock(string()) -> ok | failed
-unset_write_lock(Key) ->
-    gen_server:call(get_pid(), {unset_write_lock, Key}, 20000).
+%% @spec unset_write_lock(string()) -> {db(), ok | failed}
+unset_write_lock(ok = DB, Key) ->
+    {DB, gen_server:call(get_pid(), {unset_write_lock, Key}, 20000)}.
 
 %% @doc sets a read lock on a key
 %%      the read lock is an integer value per key
 %% @spec set_read_lock(string()) -> ok | failed
-set_read_lock(Key) ->
-    gen_server:call(get_pid(), {set_read_lock, Key}, 20000).
+set_read_lock(ok = DB, Key) ->
+    {DB, gen_server:call(get_pid(), {set_read_lock, Key}, 20000)}.
 
 %% @doc unsets a read lock on a key
 %%      the read lock is an integer value per key
-%% @spec unset_read_lock(string()) -> ok | failed
-unset_read_lock(Key) ->
-    gen_server:call(get_pid(), {unset_read_lock, Key}, 20000).
+%% @spec unset_read_lock(string()) -> {any(), ok | failed}
+unset_read_lock(ok = DB, Key) ->
+    {DB, gen_server:call(get_pid(), {unset_read_lock, Key}, 20000)}.
 
 %% @doc get the locks and version of a key
 %% @spec get_locks(string()) -> {bool(), int(), int()}| failed
-get_locks(Key) ->
+get_locks(ok = _DB, Key) ->
     gen_server:call(get_pid(), {get_locks, Key}, 20000).
 
 %% @doc reads the version and value of a key
 %% @spec read(string()) -> {ok, string(), integer()} | failed
-read(Key) ->
+read(ok = _DB, Key) ->
     gen_server:call(get_pid(), {read, Key}, 20000).
 
 %% @doc updates the value of key
-%% @spec write(string(), string(), integer()) -> ok
-write(Key, Value, Version) ->
-    gen_server:call(get_pid(), {write, Key, Value, Version}, 20000).
+%% @spec write(string(), string(), integer()) -> any()
+write(ok = DB, Key, Value, Version) ->
+    gen_server:call(get_pid(), {write, Key, Value, Version}, 20000),
+    DB.
 
 %% @doc reads the version of a key
 %% @spec get_version(string()) -> {ok, integer()} | failed
-get_version(Key) ->
+get_version(ok = _DB, Key) ->
     gen_server:call(get_pid(), {get_version, Key}, 20000).
 
 %% @doc returns the number of stored keys
 %% @spec get_load() -> integer()
-get_load() ->
+get_load(ok = _DB) ->
     gen_server:call(get_pid(), {get_load}, 20000).
 
 %% @doc returns the key, which splits the data into two equally 
 %%      sized groups
 %% @spec get_middle_key() -> {ok, string()} | failed
-get_middle_key() ->
+get_middle_key(ok = _DB) ->
     gen_server:call(get_pid(), {get_middle_key}, 20000).
 
 %% @doc returns all keys (and removes them from the db) which belong 
 %%      to a new node with id HisKey
-%% @spec split_data(string(), string()) -> [{string(), {string(), bool(), integer(), integer()}}]
--spec(split_data/2 :: (key(), key()) -> [{key(), {key(), bool(), integer(), integer()}}]).
-split_data(MyKey, HisKey) ->
-    gen_server:call(get_pid(), {split_data, MyKey, HisKey}, 20000).
+-spec(split_data/3 :: (any(), key(), key()) -> [{key(), {key(), bool(), integer(), integer()}}]).
+split_data(ok = DB, MyKey, HisKey) ->
+    {DB, gen_server:call(get_pid(), {split_data, MyKey, HisKey}, 20000)}.
 
 %% @doc returns all keys
 %% @spec get_data() -> [{string(), {string(), bool(), integer(), integer()}}]
-get_data() ->
+get_data(ok = _DB) ->
     gen_server:call(get_pid(), {get_data}, 20000).
     
 %% @doc adds keys
-%% @spec add_data([{string(), {string(), bool(), integer(), integer()}}]) -> ok
-add_data(Data) ->
-    gen_server:call(get_pid(), {add_data, Data}, 20000).
+%% @spec add_data([{string(), {string(), bool(), integer(), integer()}}]) -> any()
+add_data(ok = DB, Data) ->
+    gen_server:call(get_pid(), {add_data, Data}, 20000),
+    DB.
     
 %% @doc get keys in a range
 %% @spec get_range(string(), string()) -> [{string(), string()}]
-get_range(From, To) ->
+get_range(ok = _DB, From, To) ->
     gen_server:call(get_pid(), {get_range, From, To}, 20000).
 
 %% @doc get keys and versions in a range
 %% @spec get_range_with_version(intervals:interval()) -> [{Key::term(), 
 %%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
-get_range_with_version(Interval) ->    
+get_range_with_version(ok = _DB, Interval) ->    
     gen_server:call(get_pid(), {get_range_with_version, Interval}, 20000).
     
 %%====================================================================
