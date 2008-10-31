@@ -49,7 +49,7 @@ stop_ring(Pid) ->
 
 wait_for_stable_ring() ->
     case admin:check_ring() of
-	{error, Text} ->
+	{error, _Text} ->
 	    wait_for_stable_ring();
 	_ ->
 	    ok

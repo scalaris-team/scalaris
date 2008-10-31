@@ -28,14 +28,14 @@
 
 -include("chordsharp.hrl").
 
--export([lookup_aux/4, lookup_fin/2, get_key/3, set_key/4]).
+-export([lookup_aux/4, lookup_fin/2, get_key/4, set_key/5]).
 
 %logging on
 %-define(LOG(S, L), io:format(S, L)).
 %logging off
 -define(LOG(S, L), ok).
 
-lookup_fin(Hops, Msg) ->
+lookup_fin(_Hops, Msg) ->
     %io:format("Hops: ~p~n", [Hops]),
     self() ! Msg.
     
@@ -50,11 +50,12 @@ lookup_aux(State, Key, Hops, Msg) ->
 	    cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
     end.
 
-get_key(Source_PID, HashedKey, Key) ->
+get_key(State, Source_PID, HashedKey, Key) ->
     ?LOG("[ ~w | I | Node   | ~w ] get_key ~s~n",[calendar:universal_time(), self(), Key]),
-    cs_send:send(Source_PID, {get_key_response, Key, ?DB:read(HashedKey)}).
+    cs_send:send(Source_PID, {get_key_response, Key, ?DB:read(cs_state:get_db(State), HashedKey)}).
 
-set_key(Source_PID, Key, Value, Versionnr) ->
+set_key(State, Source_PID, Key, Value, Versionnr) ->
     ?LOG("[ ~w | I | Node   | ~w ] set_key ~s ~s~n",[calendar:universal_time(), self(), Key, Value]),
     cs_send:send(Source_PID, {set_key_response, Key, Value, Versionnr}),
-    ?DB:write(Key, Value, Versionnr).
+    DB = ?DB:write(cs_state:get_db(State), Key, Value, Versionnr),
+    cs_state:set_db(State, DB).

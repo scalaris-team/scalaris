@@ -261,7 +261,7 @@ loop(State, Debug) ->
 	    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
 	    if
 		Responsible == true ->
-		    lookup:get_key(Source_PID, Key, Key),
+		    lookup:get_key(State, Source_PID, Key, Key),
 		    loop(State, ?DEBUG(Debug));
 		true ->
 		    io:format("Get_Key: Got Request for Key ~p, it is not between ~p and ~p ~n", [Key, RangeBeg, RangeEnd]),
@@ -275,8 +275,8 @@ loop(State, Debug) ->
 	    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
 	    if
 		Responsible == true ->
-		    lookup:set_key(Source_PID, Key, Value, Versionnr),
-		    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)));
+		    State2 = lookup:set_key(State, Source_PID, Key, Value, Versionnr),
+		    loop(State2, ?DEBUG(cs_debug:debug(Debug, State2, _Message)));
 		true ->
 		    io:format("Set_Key: Got Request for Key ~p, it is not between ~p and ~p ~n", [Key, RangeBeg, RangeEnd]),
 		    %cs_send:send(Source_PID, {get_key_response, Key, failed}),
@@ -286,8 +286,8 @@ loop(State, Debug) ->
 	    ?LOG("[ ~w | I | Node   | ~w ] drop_data ~w~n",
 		      [calendar:universal_time(), self(), Data]),
 	    cs_send:send(Sender, {drop_data_ack}),
-	    ?DB:add_data(Data),
-	    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)));
+	    DB = ?DB:add_data(cs_state:get_db(State), Data),
+	    loop(cs_state:set_db(State, DB), ?DEBUG(cs_debug:debug(Debug, State, _Message)));
 
 %% bulk
 	{bulk_owner, I, Msg} ->
@@ -302,20 +302,20 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 	{bulkowner_deliver, Range, {bulk_read_with_version, Issuer}} ->
 	    cs_send:send(Issuer, {bulk_read_with_version_response, cs_state:get_my_range(State), 
-				  ?DB:get_range_with_version(Range)}),
+				  ?DB:get_range_with_version(cs_state:get_db(State), Range)}),
 	    loop(State, ?DEBUG(Debug));
 
 % load balancing
 	{get_load, Source_PID} ->
 	    ?LOG("[ ~w | I | Node   | ~w ] get_load~n",
 		      [calendar:universal_time(), self()]),
-	    cs_send:send(Source_PID, {get_load_response, cs_send:this(), ?DB:get_load()}),
+	    cs_send:send(Source_PID, {get_load_response, cs_send:this(), ?DB:get_load(cs_state:get_db(State))}),
 	    loop(State, ?DEBUG(Debug));
 
 	{get_load_response, Source_PID, Load} ->
 	    ?LOG("[ ~w | I | Node   | ~w ] get_load_response~n",
 		      [calendar:universal_time(), self()]),
-	    cs_lb:check_balance(Source_PID, Load),
+	    cs_lb:check_balance(State, Source_PID, Load),
 	    loop(State, ?DEBUG(Debug));
 
 	{get_middle_key, Source_PID} = _Message ->
@@ -374,7 +374,7 @@ loop(State, Debug) ->
 	{bulkowner_deliver, _Range, {unit_test_bulkowner, Owner}} ->
 	    Owner ! {unit_test_bulkowner_response, lists:map(fun ({Key, {Value, _, _, _}}) ->
 									    {Key, Value}
-								    end, ?DB:get_data())},
+								    end, ?DB:get_data(cs_state:get_db(State)))},
 	    loop(State, ?DEBUG(Debug));
 
 %%testing purpose

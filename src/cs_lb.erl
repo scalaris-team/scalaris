@@ -28,7 +28,7 @@
 
 -include("chordsharp.hrl").
 
--export([new/0, balance_load/1, check_balance/2, get_middle_key/1, move_load/3, 
+-export([new/0, balance_load/1, check_balance/3, get_middle_key/1, move_load/3, 
 	 get_loadbalance_flag/1, reset_loadbalance_flag/1]).
 
 -record(lb, {loadbalance_flag, reset_ref, last_keys}).
@@ -43,8 +43,8 @@ balance_load(State) ->
     lists:foreach(fun(Node) -> cs_send:send(Node, {get_load, cs_send:this()}) end, Fingers),    
     timer:send_after(config:loadBalanceInterval(), self(), {stabilize_loadbalance}).
 
-check_balance(Source_PID, Load) ->
-    MyLoad = ?DB:get_load(),
+check_balance(State, Source_PID, Load) ->
+    MyLoad = ?DB:get_load(cs_state:get_db(State)),
     if
 	(MyLoad * 2 < Load) and (Load > 1) ->
 	    cs_send:send(Source_PID, {get_middle_key, cs_send:this()}),
@@ -57,7 +57,7 @@ get_middle_key(State) ->
     LB = cs_state:get_lb(State),
     AmLoadbalancing = get_loadbalance_flag(LB),
     LastKeys = last_keys(LB),
-    Load = ?DB:get_load(),
+    Load = ?DB:get_load(cs_state:get_db(State)),
     if
 	AmLoadbalancing or (Load < 20) ->
 	    {nil, State};
@@ -65,7 +65,7 @@ get_middle_key(State) ->
 	    %Keys = gb_trees:keys(cs_state:get_data(State)),
 	    %Middle = util:lengthX(Keys) div 2 + 1,
 	    %lists:nth(Middle, Keys),
-	    MiddleKey = ?DB:get_middle_key(),
+	    MiddleKey = ?DB:get_middle_key(cs_state:get_db(State)),
 	    IsReservedKey = gb_sets:is_element(MiddleKey, LastKeys),
 	    if
 		IsReservedKey ->
@@ -99,7 +99,7 @@ move_load(State, _, NewId) ->
     State.
 
 drop_data(State) ->
-    cs_send:send(cs_state:succ_pid(State), {drop_data, ?DB:get_data(), cs_send:this()}),
+    cs_send:send(cs_state:succ_pid(State), {drop_data, ?DB:get_data(cs_state:get_db(State)), cs_send:this()}),
     receive
 	{drop_data_ack} ->
 	    ok

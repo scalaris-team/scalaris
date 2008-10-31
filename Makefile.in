@@ -73,35 +73,4 @@ dialyzer:
 	$(DIALYZER) -c src/*.erl -I $(YAWS_PATH)/include/
 
 rrd-init:
-	$(RRDTOOL) create data/average_memory_usage.rrd --step 60 DS:av_mem:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/max_memory_usage.rrd --step 60 DS:max_mem:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/total_nodes.rrd --step 60 DS:total_nodes:GAUGE:300:0:100000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/total_load.rrd --step 60 DS:total_load:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/average_load.rrd --step 60 DS:average_load:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/average_load_std_deviation.rrd --step 60 DS:av_load_std_dev:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/average_rt_size.rrd --step 60 DS:average_rt_size:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/average_rt_size_std_deviation.rrd --step 60 DS:av_rt_std_dev:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/total_messages_count.rrd --step 60 DS:total_messages_cnt:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/total_messages_size.rrd --step 60 DS:total_messages_size:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_ping_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_pong_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_pred_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_load_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_drop_data_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_ping_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_pong_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_pred_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_load_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_drop_data_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_notify_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_notify_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_succ_list_response_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_succ_list_response_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_succ_list_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_succ_list_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_load_response_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_load_response_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_middle_key_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_middle_key_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_middle_key_response_traffic.rrd --step 60 DS:traffic:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
-	$(RRDTOOL) create data/messages_get_middle_key_response_cnt.rrd --step 60 DS:count:GAUGE:300:0:10000000 RRA:AVERAGE:0.5:1:525600
+	@echo This is target is deprecated

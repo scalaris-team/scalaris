@@ -36,11 +36,11 @@
 %%   UniqueId = term()
 join_request(State, Source_PID, Id, UniqueId) ->
     Pred = node:new(Source_PID, Id, UniqueId),
-    HisData = ?DB:split_data(cs_state:id(State), Id),
+    {DB, HisData} = ?DB:split_data(cs_state:get_db(State), cs_state:id(State), Id),
     SuccList = cs_state:succ_list(State),
     cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData, SuccList}),
     failuredetector:add_node(UniqueId, Id, Source_PID),
-    cs_state:update_pred(State, Pred).
+    cs_state:update_pred(cs_state:set_db(State, DB), Pred).
 
 %%%------------------------------Join---------------------------------
 
@@ -48,7 +48,7 @@ join_request(State, Source_PID, Id, UniqueId) ->
 join_first(Id) -> 
     io:format("[ I | Node   | ~w ] join as first ~w ~n",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
-    cs_state:new(?RT:empty(Me), [Me], Me, Me, {Id, Id}, cs_lb:new()).
+    cs_state:new(?RT:empty(Me), [Me], Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
 
 %% @doc join a ring
 join_ring(Id, Succ) ->
@@ -62,14 +62,15 @@ join_ring(Id, Succ) ->
 	    case node:is_null(Pred) of
 		true ->
 		    failuredetector:add_node(node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)),
-		    ?DB:add_data(Data),
-		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {Id, Id}, cs_lb:new());
+		    DB = ?DB:add_data(?DB:new(), Data),
+		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {Id, Id}, cs_lb:new(), DB);
 		false ->
 		    failuredetector:add_nodes([{node:uniqueId(Pred), node:id(Pred), node:pidX(Pred)}, 
 					       {node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)}]),
 		    cs_send:send(node:pidX(Pred), {update_succ, Me}),
-		    ?DB:add_data(Data),
-		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {node:id(Pred), Id}, cs_lb:new())
+		    DB = ?DB:add_data(?DB:new(), Data),
+		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {node:id(Pred), Id}, 
+				 cs_lb:new(), DB)
 	    end
     end.
 

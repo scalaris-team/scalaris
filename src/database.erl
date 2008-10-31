@@ -30,18 +30,20 @@
 
 behaviour_info(callbacks) ->
     [
+     % init
+     {new, 0},
      % write locks
-     {set_write_lock, 1}, {unset_write_lock, 1},
+     {set_write_lock, 2}, {unset_write_lock, 2},
      % read locks
-     {set_read_lock, 1}, {unset_read_lock, 1},
+     {set_read_lock, 2}, {unset_read_lock, 2},
      % locks helper
-     {get_locks, 1},
+     {get_locks, 2},
      % standard calls
-     {read, 1}, {write, 3}, {get_version, 1},
+     {read, 2}, {write, 4}, {get_version, 2},
      %load balancing
-     {get_load, 0}, {get_middle_key, 0}, {split_data, 2}, 
+     {get_load, 1}, {get_middle_key, 1}, {split_data, 3}, 
      %
-     {get_data, 0}, {add_data, 1}, {get_range_with_version, 1}
+     {get_data, 1}, {add_data, 2}, {get_range_with_version, 2}
     ];
 
 behaviour_info(_Other) ->
