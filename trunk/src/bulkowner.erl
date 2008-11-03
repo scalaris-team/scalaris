@@ -47,8 +47,8 @@ start_bulk_owner(I, Msg) ->
 %% @spec bulk_owner(State::cs_state:state(), I::intervals:interval(), 
 %%                 Msg::term()) -> ok
 bulk_owner(State, I, Msg) ->
-    %ct:pal("bulk_owner ~p (~p)", [I, cs_state:next_interval(State)]),
-    Range = intervals:cut(I, cs_state:next_interval(State)),
+    %ct:pal("bulk_owner ~p (~p)", [I, cs_state:id(State)]),%cs_state:next_interval(State)]),
+    Range = intervals:sanitize(intervals:cut(I, cs_state:next_interval(State))),
     case intervals:is_empty(Range) of
 	true ->
 	    ok;
@@ -66,10 +66,11 @@ bulk_owner_iter(State, U, Index, I, Msg) ->
     case dict:find(Index, U) of
 	{ok, U_of_Index} ->
 	    U_of_IndexM1 = dict:fetch(Index - 1, U),
-	    Range = intervals:cut(I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index))),
+	    Range = intervals:sanitize(intervals:cut(I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)))),
+	    %ct:pal("iter: ~p ~p ~p ~n", [I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)), Range]),
 	    case intervals:is_empty(Range) of
 		false ->
-		    cs_send:send(node:pidX(U_of_IndexM1), {bulk_owner, intervals:sanitize(Range), Msg});
+		    cs_send:send(node:pidX(U_of_IndexM1), {bulk_owner, Range, Msg});
 		true ->
 		    ok
 	    end,
