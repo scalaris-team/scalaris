@@ -371,10 +371,14 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 
 %% unit_tests
-	{bulkowner_deliver, _Range, {unit_test_bulkowner, Owner}} ->
+	{bulkowner_deliver, Range, {unit_test_bulkowner, Owner}} ->
 	    Owner ! {unit_test_bulkowner_response, lists:map(fun ({Key, {Value, _, _, _}}) ->
-									    {Key, Value}
-								    end, ?DB:get_data(cs_state:get_db(State)))},
+								     {Key, Value}
+							     end, 
+							     lists:filter(fun ({Key, _}) ->
+										  intervals:in(Key, Range)
+									  end, ?DB:get_data(cs_state:get_db(State)))),
+							    cs_state:id(State)},
 	    loop(State, ?DEBUG(Debug));
 
 %%testing purpose

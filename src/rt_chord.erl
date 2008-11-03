@@ -75,7 +75,7 @@ next_hop(State, Id) ->
     end.
 
 % @private
-next_hop(N, RT, Id, 0, Candidate) -> Candidate;
+next_hop(_N, _RT, _Id, 0, Candidate) -> Candidate;
 next_hop(N, RT, Id, Index, Candidate) ->
     case gb_trees:is_defined(Index, RT) of
 	true ->
@@ -184,7 +184,7 @@ calculateKey(State, Idx) ->
 to_dict(State) ->
     RT = cs_state:rt(State),
     Succ = cs_state:succ(State),
-    Fingers = flatten(RT, 127),
+    Fingers = util:uniq(flatten(RT, 127)),
     {Dict, Next} = lists:foldl(fun(Finger, {Dict, Index}) ->
 				    {dict:store(Index, Finger, Dict), Index + 1}
 			    end, 
@@ -193,14 +193,9 @@ to_dict(State) ->
 
 % @private
 flatten(RT, Index) ->
-    case gb_trees:is_defined(Index, RT) of
-	true ->
-	    case gb_trees:get(Index, RT) of
-		null ->
-		    [];
-		Entry ->
-		    [Entry | flatten(RT, Index - 1)]
-	    end;
-	false ->
+    case gb_trees:lookup(Index, RT) of
+	{value, Entry} ->
+	    [Entry | flatten(RT, Index - 1)];
+	none ->
 	    []
     end.
