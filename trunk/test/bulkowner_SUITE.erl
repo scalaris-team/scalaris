@@ -28,7 +28,8 @@
 -include("unittest.hrl").
 
 all() ->
-    [count].
+    %[count].
+    [].
 
 suite() ->
     [
@@ -58,13 +59,20 @@ count(_Config) ->
 
 collect(Sum) ->
     if
-	Sum /= 68 ->
+	Sum < 68 ->
 	    receive
-		{unit_test_bulkowner_response, Data} ->
-		    ct:pal("sum: ~p ~p~n", [Sum, reduce(Data)]),
+		{unit_test_bulkowner_response, Data, Owner} ->
 		    collect(Sum + reduce(Data))
 	    end;
-	true ->
+	Sum == 68 ->
+	    receive
+		{unit_test_bulkowner_response, Data, Owner} ->
+		    Sum + reduce(Data)
+	    after 1000 ->
+		    Sum
+	    end;
+	Sum > 68 ->
+	    ct:pal("sum: ~p ~p~n", [Sum, Sum]),
 	    Sum
     end.
 
