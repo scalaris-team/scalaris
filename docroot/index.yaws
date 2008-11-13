@@ -27,9 +27,6 @@
 	  <div class="nothighlighted">
 	    <a class="menua" href="documentation.yaws">Docu</a>
 	  </div>
-	  <div class="nothighlighted">
-	    <a class="menua" href="transactions.yaws">Transactions</a>
-	  </div>
 	  <div class="nothighlightedlast">
 	    <a class="menua" href="debug.yaws">Debug</a>
 	  </div>
