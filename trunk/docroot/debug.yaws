@@ -32,13 +32,13 @@
 	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
           <div class="nothighlighted">
-	<a class="menua" href="ring.yaws">Ring</a>
+	    <a class="menua" href="ring.yaws">Ring</a>
+	  </div>
+          <div class="nothighlighted">
+	    <a class="menua" href="indexed-ring.yaws">Indexed Ring</a>
 	  </div>
 	  <div class="nothighlighted">
 	    <a class="menua" href="documentation.yaws">Docu</a>
-	  </div>
-	  <div class="nothighlighted">
-	    <a class="menua" href="transactions.yaws">Transactions</a>
 	  </div>
 	  <div class="highlightedlast">
 	    <a class="menua" href="debug.yaws">Debug</a>
