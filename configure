@@ -623,6 +623,7 @@ ERLANG_LIB_DIR
 ERLANG_LIB_DIR_common_test
 ERLANG_LIB_VER_common_test
 DRIVER_OS
+SCALARIS_ROOT
 LIBOBJS
 LTLIBOBJS'
 ac_subst_files=''
@@ -2313,7 +2314,10 @@ echo "detected OS is: '$DRIVER_OS'"
 
 mkdir -p ~/.yaws 2> /dev/null
 
-ac_config_files="$ac_config_files Makefile bin/Makefile src/Makefile src/comm_layer/Makefile src/pubsub/Makefile src/transstore/Makefile"
+SCALARIS_ROOT=`pwd`
+
+
+ac_config_files="$ac_config_files Makefile bin/Makefile bin/scalarisctl src/Makefile src/comm_layer/Makefile src/pubsub/Makefile src/transstore/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -2885,6 +2889,7 @@ do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "bin/Makefile") CONFIG_FILES="$CONFIG_FILES bin/Makefile" ;;
+    "bin/scalarisctl") CONFIG_FILES="$CONFIG_FILES bin/scalarisctl" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
     "src/comm_layer/Makefile") CONFIG_FILES="$CONFIG_FILES src/comm_layer/Makefile" ;;
     "src/pubsub/Makefile") CONFIG_FILES="$CONFIG_FILES src/pubsub/Makefile" ;;
@@ -2994,11 +2999,12 @@ ERLANG_LIB_DIR!$ERLANG_LIB_DIR$ac_delim
 ERLANG_LIB_DIR_common_test!$ERLANG_LIB_DIR_common_test$ac_delim
 ERLANG_LIB_VER_common_test!$ERLANG_LIB_VER_common_test$ac_delim
 DRIVER_OS!$DRIVER_OS$ac_delim
+SCALARIS_ROOT!$SCALARIS_ROOT$ac_delim
 LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 47; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 48; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
@@ -3325,3 +3331,5 @@ if test "$no_create" != yes; then
   $ac_cs_success || { (exit 1); exit 1; }
 fi
 
+
+chmod u+x bin/scalarisctl

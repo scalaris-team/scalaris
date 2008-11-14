@@ -75,6 +75,11 @@ AC_SUBST(DRIVER_OS)
 
 mkdir -p ~/.yaws 2> /dev/null
 
-AC_CONFIG_FILES([Makefile bin/Makefile src/Makefile src/comm_layer/Makefile src/pubsub/Makefile src/transstore/Makefile])
+SCALARIS_ROOT=`pwd`
+AC_SUBST(SCALARIS_ROOT)
+
+AC_CONFIG_FILES([Makefile bin/Makefile bin/scalarisctl src/Makefile src/comm_layer/Makefile src/pubsub/Makefile src/transstore/Makefile])
 
 AC_OUTPUT
+
+chmod u+x bin/scalarisctl
