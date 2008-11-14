@@ -72,57 +72,57 @@ new() ->
 
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
-%% @spec set_write_lock(string()) -> {db(), ok | failed}
+%% @spec set_write_lock(db(), string()) -> {db(), ok | failed}
 set_write_lock(ok = DB, Key) ->
     {DB, gen_server:call(get_pid(), {set_write_lock, Key}, 20000)}.
 
 %% @doc unsets the write lock of a key
 %%      the write lock is a boolean value per key
-%% @spec unset_write_lock(string()) -> {db(), ok | failed}
+%% @spec unset_write_lock(db(), string()) -> {db(), ok | failed}
 unset_write_lock(ok = DB, Key) ->
     {DB, gen_server:call(get_pid(), {unset_write_lock, Key}, 20000)}.
 
 %% @doc sets a read lock on a key
 %%      the read lock is an integer value per key
-%% @spec set_read_lock(string()) -> ok | failed
+%% @spec set_read_lock(db(), string()) -> {db(), ok | failed}
 set_read_lock(ok = DB, Key) ->
     {DB, gen_server:call(get_pid(), {set_read_lock, Key}, 20000)}.
 
 %% @doc unsets a read lock on a key
 %%      the read lock is an integer value per key
-%% @spec unset_read_lock(string()) -> {any(), ok | failed}
+%% @spec unset_read_lock(db(), string()) -> {db(), ok | failed}
 unset_read_lock(ok = DB, Key) ->
     {DB, gen_server:call(get_pid(), {unset_read_lock, Key}, 20000)}.
 
 %% @doc get the locks and version of a key
-%% @spec get_locks(string()) -> {bool(), int(), int()}| failed
+%% @spec get_locks(db(), string()) -> {bool(), int(), int()}| failed
 get_locks(ok = _DB, Key) ->
     gen_server:call(get_pid(), {get_locks, Key}, 20000).
 
 %% @doc reads the version and value of a key
-%% @spec read(string()) -> {ok, string(), integer()} | failed
+%% @spec read(db(), string()) -> {ok, string(), integer()} | failed
 read(ok = _DB, Key) ->
     gen_server:call(get_pid(), {read, Key}, 20000).
 
 %% @doc updates the value of key
-%% @spec write(string(), string(), integer()) -> any()
+%% @spec write(db(), string(), string(), integer()) -> db()
 write(ok = DB, Key, Value, Version) ->
     gen_server:call(get_pid(), {write, Key, Value, Version}, 20000),
     DB.
 
 %% @doc reads the version of a key
-%% @spec get_version(string()) -> {ok, integer()} | failed
+%% @spec get_version(db(), string()) -> {ok, integer()} | failed
 get_version(ok = _DB, Key) ->
     gen_server:call(get_pid(), {get_version, Key}, 20000).
 
 %% @doc returns the number of stored keys
-%% @spec get_load() -> integer()
+%% @spec get_load(db()) -> integer()
 get_load(ok = _DB) ->
     gen_server:call(get_pid(), {get_load}, 20000).
 
 %% @doc returns the key, which splits the data into two equally 
 %%      sized groups
-%% @spec get_middle_key() -> {ok, string()} | failed
+%% @spec get_middle_key(db()) -> {ok, string()} | failed
 get_middle_key(ok = _DB) ->
     gen_server:call(get_pid(), {get_middle_key}, 20000).
 
@@ -133,23 +133,23 @@ split_data(ok = DB, MyKey, HisKey) ->
     {DB, gen_server:call(get_pid(), {split_data, MyKey, HisKey}, 20000)}.
 
 %% @doc returns all keys
-%% @spec get_data() -> [{string(), {string(), bool(), integer(), integer()}}]
+%% @spec get_data(db()) -> [{string(), {string(), bool(), integer(), integer()}}]
 get_data(ok = _DB) ->
     gen_server:call(get_pid(), {get_data}, 20000).
     
 %% @doc adds keys
-%% @spec add_data([{string(), {string(), bool(), integer(), integer()}}]) -> any()
+%% @spec add_data(db(), [{string(), {string(), bool(), integer(), integer()}}]) -> any()
 add_data(ok = DB, Data) ->
     gen_server:call(get_pid(), {add_data, Data}, 20000),
     DB.
     
 %% @doc get keys in a range
-%% @spec get_range(string(), string()) -> [{string(), string()}]
+%% @spec get_range(db(), string(), string()) -> [{string(), string()}]
 get_range(ok = _DB, From, To) ->
     gen_server:call(get_pid(), {get_range, From, To}, 20000).
 
 %% @doc get keys and versions in a range
-%% @spec get_range_with_version(intervals:interval()) -> [{Key::term(), 
+%% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(), 
 %%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
 get_range_with_version(ok = _DB, Interval) ->    
     gen_server:call(get_pid(), {get_range_with_version, Interval}, 20000).
