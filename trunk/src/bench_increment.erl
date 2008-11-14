@@ -122,6 +122,7 @@ increment_test() ->
     %error_logger:tty(false),
     ok.
 
+-spec(wait_for_done/1 :: (integer()) -> list(integer())).
 wait_for_done(0) ->
     [];
 wait_for_done(Count) ->
