@@ -26,7 +26,6 @@ Requirements
 You will need:
 - Erlang R12
 - GNU Make
-- rrdtool
 
 Optional:
 - java
@@ -39,7 +38,6 @@ Building
 Execute:
 ./configure
 make
-make rrd-init
 make docs
 
 Note: There is no make install at the moment!
@@ -120,7 +118,6 @@ Overview of directories
 
 bin		the executables (.sh and .beam)
 contrib		necessary third party packages
-data		rrd databases and a test dataset
 doc		generated erlang documentation
 docroot		root directory of the integrated webserver
 java-api	a java api to Scalaris
