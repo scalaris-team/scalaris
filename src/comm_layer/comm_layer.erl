@@ -47,8 +47,8 @@ start_link() ->
 %% @type process_id() = {inet:ip_address(), int(), pid()}.
 %% @spec send(process_id(), term()) -> ok
 send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
-    MyIP = comm_port:get_local_address(),
-    MyPort = comm_port:get_local_port(),
+%% Test for local is done in comm_port:send()
+    {MyIP,MyPort} = comm_port:get_local_address_port(),
     %io:format("send: ~p:~p -> ~p:~p(~p) : ~p\n", [MyIP, MyPort, _IP, _Port, _Pid, Message]),
     IsLocal = (MyIP == _IP) and (MyPort == _Port),
     if
@@ -71,5 +71,6 @@ this() ->
 
 -spec(here/1 :: (pid()) -> process_id()).
 here(Pid) ->
-    {comm_port:get_local_address(), comm_port:get_local_port(), Pid}.
+    {LocalIP, LocalPort} = comm_port:get_local_address_port(),
+    {LocalIP, LocalPort, Pid}.
     

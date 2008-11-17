@@ -87,8 +87,7 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
 	[length(ServerList) * ThreadsPerVM * Iterations / RunTime * 1000000.0]),
 	Throughput = [ThreadsPerVM * Iterations / Time * 1000000.0 || Time <- Times],
     io:format("~p~n", [Throughput]),
-    io:format("Dump: ~p~n", [DiffDump]),
-    ok.
+    io:format("Message statistics (message name, bytes, how often): ~p~n", [DiffDump]),    ok.
     
 %%==============================================================================
 %% benchmarks
