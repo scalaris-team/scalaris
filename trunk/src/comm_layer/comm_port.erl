@@ -37,7 +37,7 @@
 -export([start_link/0,
 	send/2,
 	unregister_connection/2, register_connection/3,
-	set_local_address/2, get_local_address/0, get_local_port/0]).
+	set_local_address/2, get_local_address_port/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -70,24 +70,15 @@ register_connection(Adress, Port, Pid) ->
 set_local_address(Address, Port) ->
     gen_server:call(?MODULE, {set_local_address, Address, Port}, 20000).
 
+
 %% @doc 
-%% @spec get_local_address() -> inet:ip_address()
-get_local_address() ->
-    case ets:lookup(?MODULE, local_address) of
-     	[{local_address, Value}] ->
+%% @spec get_local_address_port() -> {inet:ip_address(),int()}
+get_local_address_port() ->
+    case ets:lookup(?MODULE, local_address_port) of
+     	[{local_address_port, Value}] ->
  	    Value;
  	[] ->
  	    undefined
-    end.
-
-%% @doc 
-%% @spec get_local_port() -> int()
-get_local_port() ->
-    case ets:lookup(?MODULE, local_port) of
-  	[{local_port, Value}] ->
-  	    Value;
-  	[] ->
-  	    -1
     end.
 
 %%--------------------------------------------------------------------
@@ -127,11 +118,12 @@ handle_call({send, Address, Port, Pid, Message}, _From, State) ->
 	    LocalPid ! {send, Pid, Message},
 	    {reply, ok, State};
 	none ->
-	    case comm_connection:open_new(Address, Port, get_local_address(), get_local_port()) of
-		{local_ip, MyIP, _MyPort, LocalPid} ->
+	    {DepAddr,DepPort} = get_local_address_port(),
+	    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
+		{local_ip, MyIP, MyPort, LocalPid} ->
 		    LocalPid ! {send, Pid, Message},
-		    io:format("this() == ~w~n", [{MyIP, get_local_port()}]),
-		    ets:insert(?MODULE, {local_address, MyIP}),
+		    io:format("this() == ~w~n", [{MyIP, MyPort}]),
+		    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
 		    {reply, 
 		     ok, 
 		     State#state{
@@ -163,8 +155,7 @@ handle_call({register_conn, Address, Port, Pid}, _From, State) ->
     end;
 
 handle_call({set_local_address, Address, Port}, _From, State) ->
-    ets:insert(?MODULE, {local_address, Address}),
-    ets:insert(?MODULE, {local_port, Port}),
+    ets:insert(?MODULE, {local_address_port, {Address,Port}}),
     {reply, ok, State}.
 
 %%--------------------------------------------------------------------

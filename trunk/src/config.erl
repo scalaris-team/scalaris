@@ -60,9 +60,14 @@ read(Key) ->
     case ets:lookup(config_ets, Key) of
 	[{Key, Value}] ->
 	    %% allow values defined as application environments to override
-	    preconfig:get_env(Key, Value);
+	    Value;
 	[] ->
-	    failed
+	    case preconfig:get_env(Key, failed) of
+		failed -> failed;
+		X ->
+		    ets:insert(config_ets, {Key, X}),
+		    X
+	    end
     end.
 
 %%====================================================================
@@ -237,21 +242,14 @@ tmanagerTimeout()->
     read(tmanager_timeout).
 
 testDump()->
-	read(test_dump).
+    read(test_dump).
 
 testKeepAlive()->
-	read(test_keep_alive).
+    read(test_keep_alive).
 
 %% @doc with which nodes to register regularly, alternative to boot_host
 %% @spec register_hosts() -> list(pid()) | failed
 register_hosts()->
-    %lists:map(fun (Host) -> {boot, Host} end, gen_server:call(get_pid(), {read, register_hosts}, 20000)).
-    case read(register_hosts) of
-	failed ->
-	    failed;
-	Nodes ->
-	    lists:map(fun (Host) -> {boot, Host} end, Nodes)
-    end,
     read(register_hosts).
 
 %% @doc port to listen on for TCP
@@ -324,6 +322,5 @@ eval_environment(Port) ->
     {PortInt, []} = string:to_integer(Port),
     ets:insert(config_ets, {listen_port, PortInt}).
     
-process_term({_Key, _Value} = Pair) ->
-    ets:insert(config_ets, Pair).
-
+process_term({Key, Value}) ->
+    ets:insert(config_ets, {Key, preconfig:get_env(Key, Value)}).
