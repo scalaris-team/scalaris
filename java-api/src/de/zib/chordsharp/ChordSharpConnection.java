@@ -141,6 +141,27 @@ import de.zib.tools.PropertyLoader;
  * 
  * <p>For the full example, see {@link ChordSharpConnectionSubscribeExample}</p>
  * 
+ * <h3>Unsubscribing from topics</h3>
+ * 
+ * Unsubscribing from topics works exactly like subscribing to topics:
+ * 
+ * <code style="white-space:pre;">
+ *   OtpErlangString otpTopic;
+ *   OtpErlangString otpURL;
+ *   
+ *   String topic;
+ *   String URL;
+ *   
+ *   // static:
+ *   ChordSharpConnection.unsubscribe(otpTopic, otpURL); // {@link #unsubscribe(OtpErlangString, OtpErlangString)}
+ *   ChordSharpConnection.unsubscribe(topic, URL);       // {@link #unsubscribe(String, String)}
+ *   
+ *   // non-static:
+ *   ChordSharpConnection cs = new ChordSharpConnection();
+ *   cs.singleUnsubscribe(otpTopic, otpURL); // {@link #singleUnsubscribe(OtpErlangString, OtpErlangString)}
+ *   cs.singleUnsubscribe(topic, URL);       // {@link #singleUnsubscribe(String, String)}
+ * </code>
+ * 
  * <h3>Getting a list of subscribers to a topic</h3>
  * <code style="white-space:pre;">
  *   OtpErlangString otpTopic;
@@ -163,7 +184,7 @@ import de.zib.tools.PropertyLoader;
  * <p>For the full example, see {@link ChordSharpConnectionGetSubscribersExample}</p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.2
+ * @version 1.3
  */
 public class ChordSharpConnection {
 	/**
@@ -947,6 +968,132 @@ public class ChordSharpConnection {
 			// e.printStackTrace();
 			throw new UnknownException(e.getMessage());
 		}
+	}
+	
+	// /////////////////////////////
+	// unsubscribe methods
+	// /////////////////////////////
+	
+	/**
+	 * Unsubscribes a url from a {@code topic}. Uses the given {@code connection}.
+	 * 
+	 * TODO: evaluate return type?
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param topic
+	 *            the topic to unsubscribe the url from
+	 * @param url
+	 *            the url of the subscriber
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * 
+	 * @since 1.3
+	 */
+	private static void unsubscribe(OtpConnection connection,
+			OtpErlangString topic, OtpErlangString url)
+			throws ConnectionException {
+		try {
+			connection.sendRPC("pubsub.pubsub_api", "unsubscribe",
+					new OtpErlangList(new OtpErlangObject[] { topic, url }));
+			connection.receiveRPC();
+			// OtpErlangObject received = connection.receiveRPC();
+		} catch (OtpErlangExit e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e.getMessage());
+		} catch (OtpAuthException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e.getMessage());
+		} catch (IOException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e.getMessage());
+		}
+	}
+
+	/**
+	 * Unsubscribes a url from a {@code topic}. Uses the object's
+	 * {@link #connection}.
+	 * 
+	 * @param topic
+	 *            the topic to unsubscribe the url from
+	 * @param url
+	 *            the url of the subscriber
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @see #unsubscribe(OtpConnection, OtpErlangString, OtpErlangString)
+	 * 
+	 * @since 1.3
+	 */
+	public void singleUnsubscribe(OtpErlangString topic, OtpErlangString url)
+			throws ConnectionException {
+		unsubscribe(connection, topic, url);
+	}
+
+	/**
+	 * Unsubscribes a url from a {@code topic}. Uses the object's
+	 * {@link #connection}.
+	 * 
+	 * @param topic
+	 *            the topic to unsubscribe the url from
+	 * @param url
+	 *            the url of the subscriber
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @see #singleUnsubscribe(OtpErlangString, OtpErlangString)
+	 * 
+	 * @since 1.3
+	 */
+	public void singleUnsubscribe(String topic, String url)
+			throws ConnectionException {
+		singleUnsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
+	}
+
+	/**
+	 * Unsubscribes a url from a {@code topic}. Uses the static
+	 * {@link #staticConnection}.
+	 * 
+	 * @param topic
+	 *            the topic to unsubscribe the url from
+	 * @param url
+	 *            the url of the subscriber
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @see #unsubscribe(OtpConnection, OtpErlangString, OtpErlangString)
+	 * 
+	 * @since 1.3
+	 */
+	public static void unsubscribe(OtpErlangString topic, OtpErlangString url)
+			throws ConnectionException {
+		unsubscribe(staticConnection, topic, url);
+	}
+
+	/**
+	 * Unsubscribes a url from a {@code topic}. Uses the static
+	 * {@link #staticConnection}.
+	 * 
+	 * @param topic
+	 *            the topic to unsubscribe the url from
+	 * @param url
+	 *            the url of the subscriber
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @see #unsubscribe(OtpErlangString, OtpErlangString)
+	 * 
+	 * @since 1.3
+	 */
+	public static void unsubscribe(String topic, String url)
+			throws ConnectionException {
+		unsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
 	}
 	
 	// /////////////////////////////

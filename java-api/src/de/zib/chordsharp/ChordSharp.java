@@ -21,7 +21,7 @@ import java.util.Vector;
  * Public ChordSharp Interface.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.1
+ * @version 1.3
  */
 public class ChordSharp {
 
@@ -100,6 +100,25 @@ public class ChordSharp {
 	public static void subscribe(String topic, String url)
 			throws ConnectionException {
 		ChordSharpConnection.subscribe(topic, url);
+	}
+	
+	/**
+	 * Unsubscribes a url from a {@code topic}.
+	 * 
+	 * @param topic
+	 *            the topic to unsubscribe the url from
+	 * @param url
+	 *            the url of the subscriber
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * 
+	 * @since 1.3
+	 */
+	public static void unsubscribe(String topic, String url)
+			throws ConnectionException {
+		ChordSharpConnection.unsubscribe(topic, url);
 	}
 
 	/**
