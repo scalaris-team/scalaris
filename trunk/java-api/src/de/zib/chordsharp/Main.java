@@ -29,7 +29,7 @@ import org.apache.commons.cli.ParseException;
  * Class to test basic functionality of the package.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.1
+ * @version 1.3
  */
 public class Main {
 
@@ -45,6 +45,7 @@ public class Main {
 	 *  -publish <params>         publish a new message for a topic: <topic> <message>
 	 *  -read <key>               read an item
 	 *  -subscribe <params>       subscribe to a topic: <topic> <url>
+	 *  -unsubscribe <params>     unsubscribe from a topic: <topic> <url>
 	 *  -write <params>           write an item: <key> <value>
 	 * }
 	 * </pre>
@@ -138,6 +139,24 @@ public class Main {
 //						+ e.getMessage());
 			}
 		}
+		if (line.hasOption("unsubscribe")) {
+			try {
+				System.out.println("unsubscribe("
+						+ line.getOptionValues("unsubscribe")[0] + ", "
+						+ line.getOptionValues("unsubscribe")[1] + ")");
+				ChordSharp.unsubscribe(line.getOptionValues("unsubscribe")[0], line
+						.getOptionValues("unsubscribe")[1]);
+			} catch (ConnectionException e) {
+				System.err.println("unsubscribe failed with connection error: "
+						+ e.getMessage());
+//			} catch (TimeoutException e) {
+//				System.err.println("subscribe failed with timeout: "
+//						+ e.getMessage());
+//			} catch (UnknownException e) {
+//				System.err.println("subscribe failed with unknown: "
+//						+ e.getMessage());
+			}
+		}
 		if (line.hasOption("getsubscribers")) {
 			try {
 				System.out.println("getSubscribers("
@@ -205,6 +224,15 @@ public class Main {
 //				.withDescription("subscribe to a topic: <topic> <url>").create(
 //						"subscribe");
 		group.addOption(subscribe);
+		
+		Option unsubscribe = OptionBuilder.create("unsubscribe");
+		unsubscribe.setArgName("params");
+		unsubscribe.setArgs(2);
+		unsubscribe.setDescription("unsubscribe from a topic: <topic> <url>");
+//		Option subscribe = OptionBuilder.withArgName("params").hasArgs(2)
+//				.withDescription("unsubscribe from a topic: <topic> <url>").create(
+//						"unsubscribe");
+		group.addOption(unsubscribe);
 
 		Option getSubscribers = OptionBuilder.create("getsubscribers");
 		getSubscribers.setArgName("topic");
