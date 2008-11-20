@@ -96,7 +96,6 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
 -spec(bench_increment/3 :: (integer(), integer(), any()) -> ok).
 bench_increment(Threads, Iterations, Owner) ->
     Bench = fun (Parent) -> 
-	          randoms:init(),
 	          Key = get_and_init_key(),
 		  bench_increment:process(Parent, 
 			                  Key, 
@@ -110,7 +109,6 @@ bench_increment(Threads, Iterations, Owner) ->
 -spec(bench_read/3 :: (integer(), integer(), any()) -> ok).
 bench_read(Threads, Iterations, Owner) ->
     Bench = fun (Parent) -> 
-	          randoms:init(),
 	          Key = get_and_init_key(),
 		  run_bench_read(Parent, 
 			     Key, 

@@ -74,9 +74,6 @@ join_ring(Id, Succ) ->
 	    end
     end.
 
-%join_ring(_, error) ->
-%    cs_join:join(randoms:getRandomNodeId()).
-
 %% @doc join a ring and return initial state
 %%      the boolean indicates whether it was the first 
 %%      node in the ring or not

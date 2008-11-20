@@ -218,7 +218,12 @@ init([]) ->
 handle_call({get_all_pids}, _From, State) ->
     {reply, [X || [X]<- ets:match(?MODULE, {'_','$1'})], State};
 handle_call({register_process, InstanceId, Name, Pid}, _From, State) ->
-    ets:insert(?MODULE, {{InstanceId, Name}, Pid}),
+    case ets:insert_new(?MODULE, {{InstanceId, Name}, Pid}) of
+	true ->
+	    ok;
+	false ->
+	    log:log2file(?MODULE, io_lib:format("reregistered process ~p ~p ~p", [InstanceId, Name, Pid]) )
+    end,
     {reply, ok, State};
 
 handle_call({lookup_process2, InstanceId, Name}, _From, State) ->
@@ -265,29 +270,6 @@ handle_call({get_processes_in_group, Group}, _From, State) ->
 handle_call({drop_state}, _From, State) ->
     ets:delete_all_objects(?MODULE),
     {reply, ok, State}.
-
-
-find_process([], _) ->
-    failed;
-find_process(Iter, Name) ->
-    {{_, TheName}, V, Next} = gb_trees:next(Iter),
-    if
-	TheName == Name ->
-	    {ok, V};
-	true ->
-	    find_process(Next, Name)
-    end.
-
-find_group([], _) ->
-    failed;
-find_group(Iter, Name) ->
-    {{InstanceId, TheName}, _, Next} = gb_trees:next(Iter),
-    if
-	TheName == Name ->
-	    InstanceId;
-	true ->
-	    find_group(Next, Name)
-    end.
 
 find_all_groups([], Set) ->
     Set;

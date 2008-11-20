@@ -26,6 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id: cs_keyholder.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
+-include("chordsharp.hrl").
+
 -export([start_link/1, start/1, set_key/1, get_key/0]).
 
 get_pid() ->
@@ -52,9 +54,7 @@ loop(Key) ->
 
 start(InstanceId) ->
     process_dictionary:register_process(InstanceId, cs_keyholder, self()),
-    %register(cs_keyholder, self()),
-    randoms:init(),
-    Key = randoms:getRandomNodeId(),
+    Key = ?RT:getRandomNodeId(),
     %@TODO reimplement
     %error_logger:add_report_handler(cs_error_logger),
     loop(Key).

@@ -13,37 +13,27 @@
 %   limitations under the License.
 %%%----------------------------------------------------------------------
 %%% File    : randoms.erl
-%%% Author  : Alexey Shchepin <alexey@sevcom.net>
+%%% Author  : Thorsten Schuett
 %%% Purpose :
 %%% Created : 13 Dec 2002 by Alexey Shchepin <alexey@sevcom.net>
 %%% Id      : $Id: randoms.erl 429 2008-04-15 13:56:13Z schuett $
 %%%----------------------------------------------------------------------
 
-%% @author Alexey Shchepin <alexey@sevcom.net>
+%% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2002-2007 Alexey Shchepin
 %% @version $Id: randoms.erl 429 2008-04-15 13:56:13Z schuett $
 -module(randoms).
 
--author('alexey@sevcom.net').
+-author('schuett@zib.de').
 -vsn('$Id: randoms.erl 429 2008-04-15 13:56:13Z schuett $ ').
 
 -include("chordsharp.hrl").
 
--export([init/0, getRandomId/0, getRandomNodeId/0]).
-
-%% @doc seeds the random number generator with the current time
-%% @spec init() -> randoms:ran()
-init() ->
-    {A1, A2, A3} = now(),
-    random:seed(A1, A2, A3).
+-export([getRandomId/0]).
 
 %% @doc generates a random id
 %% @spec getRandomId() -> list()
 getRandomId() ->
-    integer_to_list(random:uniform(65536 * 65536)).
+    integer_to_list(crypto:rand_uniform(1, 65536 * 65536)).
 
-%% @doc generates a random node id
-%% @spec getRandomNodeId() -> list()
-getRandomNodeId() ->
-    ?RT:getRandomNodeId().
 

@@ -27,6 +27,7 @@
 
 -export([write/3, read/2, write2/3, read2/2, parallel_reads/2, abort/0, quorum_read/1, parallel_quorum_reads/2, single_write/2, do_transaction/3, do_transaction_wo_rp/3, commit/1, jWrite/3, jRead/2, jParallel_reads/2]).
 
+-import(crypto).
 -import(cs_send).
 -import(erlang).
 -import(io).
