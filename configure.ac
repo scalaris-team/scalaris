@@ -78,7 +78,7 @@ mkdir -p ~/.yaws 2> /dev/null
 SCALARIS_ROOT=`pwd`
 AC_SUBST(SCALARIS_ROOT)
 
-AC_CONFIG_FILES([Makefile bin/Makefile bin/scalarisctl src/Makefile src/comm_layer/Makefile src/pubsub/Makefile src/transstore/Makefile])
+AC_CONFIG_FILES([Makefile bin/scalarisctl])
 
 AC_OUTPUT
 
