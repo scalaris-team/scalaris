@@ -53,7 +53,6 @@ start_link() ->
 %% specifications.
 %%--------------------------------------------------------------------
 init([]) ->
-    randoms:init(),
     InstanceId = string:concat("cs_node_", randoms:getRandomId()),
     FailureDetector =
 	{failure_detector,

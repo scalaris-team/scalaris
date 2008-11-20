@@ -400,8 +400,7 @@ loop(State, Debug) ->
 start(InstanceId) ->
     %register(cs_node, self()),
     process_dictionary:register_process(InstanceId, cs_node, self()),
-    randoms:init(),
-    timer:sleep(random:uniform(100) * 100),
+    timer:sleep(crypto:rand_uniform(1, 100) * 100),
     Id = cs_keyholder:get_key(),
     failuredetector:set_owner(self()),
     boot_server:connect(),

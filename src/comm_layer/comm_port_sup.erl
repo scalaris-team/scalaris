@@ -58,7 +58,6 @@ start_link() ->
 %% specifications.
 %%--------------------------------------------------------------------
 init([]) ->
-    randoms:init(),
     InstanceId = string:concat("comm_port_", randoms:getRandomId()),
     CommPort =
 	{comm_port,

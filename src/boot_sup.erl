@@ -55,7 +55,6 @@ start_link() ->
 %% specifications.
 %%--------------------------------------------------------------------
 init(_Args) ->
-    randoms:init(),
     crypto:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
     error_logger:logfile({open, preconfig:cs_log_file()}),

@@ -45,7 +45,6 @@ add_nodes(Count) ->
 
 % @spec add_nodes(int(), int()) -> ok
 add_nodes(Count, Delay) ->
-    randoms:init(),
     add_nodes_loop(Count, Delay).
 
 add_nodes_loop(0, _) ->
@@ -136,7 +135,7 @@ get_aggregate(Tag, [{Dump, _} | Rest]) ->
 	    {AggSize + Size, AggCount + Count}
     end.
 	    
-diff_dump(BeforeDump, AfterDump, RunTime) ->    
+diff_dump(BeforeDump, AfterDump, _RunTime) ->    
     Tags = util:uniq(lists:sort(lists:flatten([gb_trees:keys(BeforeDump), 
 					       gb_trees:keys(AfterDump)]))),
     diff(Tags, BeforeDump, AfterDump).

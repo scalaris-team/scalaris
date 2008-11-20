@@ -113,10 +113,8 @@ lengthX([_ | Rest]) ->
     1 + lengthX(Rest).
 
 randomelem(List)->
-    {A1,A2,A3} = now(),
-    random:seed(A1, A2, A3),
     Length= length(List),
-    RandomNum = random:uniform(Length),
+    RandomNum = crypto:rand_uniform(1, Length),
     lists:nth(RandomNum, List).
 
 logged_exec(Cmd) ->
@@ -229,4 +227,3 @@ uniq(_, [], Uniq) ->
 get_nodes() ->
     Nodes = boot_server:node_list(),
     util:uniq(lists:sort([cs_send:get(bench_server, CSNode) || CSNode <- Nodes])).
-    
