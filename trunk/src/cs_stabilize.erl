@@ -62,7 +62,7 @@ stabilize2(State, SuccsPred, Succ) ->
 
 stabilize(State, Succ, Succ_SuccList) ->
     SuccList = util:trunc(cs_state:filterDeadNodes([Succ | Succ_SuccList], State), config:succListLength()),
-    SuccListLength = util:lengthX(SuccList),
+    SuccListLength = length(SuccList),
     Limit = config:succListLength() / 2,
     if
 	SuccListLength < Limit ->
