@@ -99,7 +99,7 @@ renderLoad([]) ->
 getRingChart() ->
     RealRing = statistics:get_ring_details(),
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
-    RingSize = util:lengthX(Ring),
+    RingSize = length(Ring),
     if
 	RingSize == 0 ->
 	    {p, [], "empty ring"};
@@ -149,7 +149,7 @@ renderRingChart(Ring) ->
 getRingRendered() ->
     RealRing = statistics:get_ring_details(),
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
-    RingSize = util:lengthX(Ring),
+    RingSize = length(Ring),
     if
 	RingSize == 0 ->
 	    {p, [], "empty ring"};
@@ -223,7 +223,7 @@ renderRing({failed}) ->
 getIndexedRingRendered() ->
     RealRing = statistics:get_ring_details(),
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
-    RingSize = util:lengthX(Ring),
+    RingSize = length(Ring),
     if
 	RingSize == 0 ->
 	    {p, [], "empty ring"};

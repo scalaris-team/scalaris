@@ -193,7 +193,7 @@ filterPred(Pred, DeadNodes) ->
 filterDeadNodes(#state{routingtable=RT,successorlist=SuccList, predecessor=Pred, deadnodes=DeadNodes}=State) ->
     NewRT = ?RT:filterDeadNodes(RT, DeadNodes),
     NewSuccList = filterListSet(SuccList, DeadNodes),
-    NewSuccListLength = util:lengthX(NewSuccList),
+    NewSuccListLength = length(NewSuccList),
     Limit = config:succListLength() / 2,
     checkSuccList(NewSuccList, State, DeadNodes),
     if

@@ -27,7 +27,7 @@
 -vsn('$Id: util.erl 479 2008-06-12 06:38:54Z schuett $ ').
 
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3, 
-	 trunc/2, min/2, max/2, lengthX/1, randomelem/1, logged_exec/1, 
+	 trunc/2, min/2, max/2, randomelem/1, logged_exec/1, 
 	 wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0, find/2, logger/0, dump3/0, uniq/1, get_nodes/0]).
                           
 escape_quotes(String) ->
@@ -107,11 +107,6 @@ min(A, B) ->
 	    B
     end.
 
-lengthX([]) ->
-    0;
-lengthX([_ | Rest]) ->
-    1 + lengthX(Rest).
-
 randomelem(List)->
     Length= length(List),
     RandomNum = crypto:rand_uniform(1, Length),
@@ -119,7 +114,7 @@ randomelem(List)->
 
 logged_exec(Cmd) ->
     Output = os:cmd(Cmd),
-    OutputLength = lengthX(Output),
+    OutputLength = length(Output),
     if
 	OutputLength > 10 ->
 	    log:log("exec", Cmd),

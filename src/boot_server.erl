@@ -47,7 +47,7 @@ number_of_nodes() ->
     cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
     receive
 	{get_list_response, Nodes} ->
-	    util:lengthX(Nodes)
+	    length(Nodes)
     end.
 
 connect() ->

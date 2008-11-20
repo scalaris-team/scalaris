@@ -34,11 +34,11 @@ get_total_load(Ring) ->
 
 get_average_load(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    get_total_load(FilteredRing) / util:lengthX(FilteredRing).
+    get_total_load(FilteredRing) / length(FilteredRing).
 
 get_memory_usage(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    lists:foldl(fun (X, Sum) -> X + Sum end, 0, lists:map(fun get_memory/1, FilteredRing)) / util:lengthX(FilteredRing).
+    lists:foldl(fun (X, Sum) -> X + Sum end, 0, lists:map(fun get_memory/1, FilteredRing)) / length(FilteredRing).
 
 get_max_memory_usage(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
@@ -51,7 +51,7 @@ get_load_std_deviation(Ring) ->
     math:sqrt(lists:foldl(fun (Load, Acc) -> 
 				  Acc + (Load - Average)*(Load - Average) 
 			  end,
-			  0, lists:map(fun get_load/1, FilteredRing)) / util:lengthX(FilteredRing)).
+			  0, lists:map(fun get_load/1, FilteredRing)) / length(FilteredRing)).
     
 get_load({ok, Details}) ->
     node_details:load(Details);
@@ -92,7 +92,7 @@ get_total_rt_size(Ring) ->
 
 get_average_rt_size(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    get_total_rt_size(FilteredRing) / util:lengthX(FilteredRing).
+    get_total_rt_size(FilteredRing) / length(FilteredRing).
 
 get_rt_size_std_deviation(Ring) ->			
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
@@ -100,7 +100,7 @@ get_rt_size_std_deviation(Ring) ->
     math:sqrt(lists:foldl(fun (RTSize, Acc) -> 
 				  Acc + (RTSize - Average)*(RTSize - Average) 
 			  end,
-			  0, lists:map(fun get_rt/1, FilteredRing)) / util:lengthX(FilteredRing)).
+			  0, lists:map(fun get_rt/1, FilteredRing)) / length(FilteredRing)).
     
 get_rt({ok, Details}) ->
     node_details:rt_size(Details);

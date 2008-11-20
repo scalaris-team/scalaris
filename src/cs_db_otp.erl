@@ -316,7 +316,7 @@ handle_call({get_middle_key}, _From, DB) ->
 	    {reply, failed, DB};
 	true ->
 	    Keys = gb_trees:keys(DB),
-	    Middle = util:lengthX(Keys) div 2 + 1,
+	    Middle = length(Keys) div 2 + 1,
 	    MiddleKey = lists:nth(Middle, Keys),
 	    {reply, MiddleKey, DB}
     end;

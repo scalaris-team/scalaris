@@ -63,7 +63,7 @@ get_middle_key(State) ->
 	    {nil, State};
 	true ->
 	    %Keys = gb_trees:keys(cs_state:get_data(State)),
-	    %Middle = util:lengthX(Keys) div 2 + 1,
+	    %Middle = length(Keys) div 2 + 1,
 	    %lists:nth(Middle, Keys),
 	    MiddleKey = ?DB:get_middle_key(cs_state:get_db(State)),
 	    IsReservedKey = gb_sets:is_element(MiddleKey, LastKeys),
