@@ -29,7 +29,7 @@ import org.apache.commons.cli.ParseException;
  * Class to test basic functionality of the package.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.3
+ * @version 1.4
  */
 public class Main {
 
@@ -78,11 +78,11 @@ public class Main {
 			} catch (TimeoutException e) {
 				System.err.println("read failed with timeout: "
 						+ e.getMessage());
-			} catch (UnknownException e) {
-				System.err.println("read failed with unknown: "
-						+ e.getMessage());
 			} catch (NotFoundException e) {
 				System.err.println("read failed with not found: "
+						+ e.getMessage());
+			} catch (UnknownException e) {
+				System.err.println("read failed with unknown: "
 						+ e.getMessage());
 			}
 		}
@@ -131,12 +131,12 @@ public class Main {
 			} catch (ConnectionException e) {
 				System.err.println("subscribe failed with connection error: "
 						+ e.getMessage());
-//			} catch (TimeoutException e) {
-//				System.err.println("subscribe failed with timeout: "
-//						+ e.getMessage());
-//			} catch (UnknownException e) {
-//				System.err.println("subscribe failed with unknown: "
-//						+ e.getMessage());
+			} catch (TimeoutException e) {
+				System.err.println("subscribe failed with timeout: "
+						+ e.getMessage());
+			} catch (UnknownException e) {
+				System.err.println("subscribe failed with unknown: "
+						+ e.getMessage());
 			}
 		}
 		if (line.hasOption("unsubscribe")) {
@@ -149,12 +149,15 @@ public class Main {
 			} catch (ConnectionException e) {
 				System.err.println("unsubscribe failed with connection error: "
 						+ e.getMessage());
-//			} catch (TimeoutException e) {
-//				System.err.println("subscribe failed with timeout: "
-//						+ e.getMessage());
-//			} catch (UnknownException e) {
-//				System.err.println("subscribe failed with unknown: "
-//						+ e.getMessage());
+			} catch (TimeoutException e) {
+				System.err.println("unsubscribe failed with timeout: "
+						+ e.getMessage());
+			} catch (NotFoundException e) {
+				System.err.println("unsubscribe failed with not found: "
+						+ e.getMessage());
+			} catch (UnknownException e) {
+				System.err.println("unsubscribe failed with unknown: "
+						+ e.getMessage());
 			}
 		}
 		if (line.hasOption("getsubscribers")) {

@@ -143,7 +143,9 @@ import de.zib.tools.PropertyLoader;
  * 
  * <h3>Unsubscribing from topics</h3>
  * 
- * Unsubscribing from topics works exactly like subscribing to topics:
+ * Unsubscribing from topics works like subscribing to topics with the exception
+ * of a {@link NotFoundException} being thrown if either the topic does not
+ * exist or the URL is not subscribed to the topic.
  * 
  * <code style="white-space:pre;">
  *   OtpErlangString otpTopic;
@@ -184,7 +186,7 @@ import de.zib.tools.PropertyLoader;
  * <p>For the full example, see {@link ChordSharpConnectionGetSubscribersExample}</p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.3
+ * @version 1.4
  */
 public class ChordSharpConnection {
 	/**
@@ -693,7 +695,9 @@ public class ChordSharpConnection {
 	 * Publishes an event under a given {@code topic}. Uses the given
 	 * {@code connection}.
 	 * 
-	 * TODO: evaluate return type?
+	 * Note: The specification of {@code pubsub.pubsub_api:publish/2} states
+	 * that the only returned value is {@code ok}, so no further evaluation is
+	 * necessary.
 	 * 
 	 * @param connection
 	 *            the connection to perform the operation on
@@ -813,7 +817,8 @@ public class ChordSharpConnection {
 	/**
 	 * Subscribes a url to a {@code topic}. Uses the given {@code connection}.
 	 * 
-	 * TODO: evaluate return type?
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
 	 * 
 	 * @param connection
 	 *            the connection to perform the operation on
@@ -826,15 +831,42 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 */
 	private static void subscribe(OtpConnection connection,
 			OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, UnknownException {
 		try {
 			connection.sendRPC("pubsub.pubsub_api", "subscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			connection.receiveRPC();
-			// OtpErlangObject received = connection.receiveRPC();
+			OtpErlangObject received = connection.receiveRPC();
+			
+			/*
+			 * possible return values:
+			 *  - ok
+			 *  - {fail, not_found}
+			 *  - {fail, timeout}
+			 *  - {fail, fail}
+			 *  - {fail, abort}
+			 */
+			if (received.equals(new OtpErlangAtom("ok"))) {
+				return;
+			} else {
+				// {fail, Reason}
+				OtpErlangTuple returnValue = (OtpErlangTuple) received;
+
+				if (returnValue.elementAt(1).equals(
+						new OtpErlangAtom("timeout"))) {
+					throw new TimeoutException();
+				} else {
+					throw new UnknownException(
+							"Unknow error - erlang error message: "
+									+ returnValue.toString());
+				}
+			}
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
 			throw new ConnectionException(e.getMessage());
@@ -844,6 +876,9 @@ public class ChordSharpConnection {
 		} catch (IOException e) {
 			// e.printStackTrace();
 			throw new ConnectionException(e.getMessage());
+		} catch (ClassCastException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e.getMessage());
 		}
 	}
 
@@ -851,6 +886,9 @@ public class ChordSharpConnection {
 	 * Subscribes a url to a {@code topic}. Uses the object's
 	 * {@link #connection}.
 	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
 	 * @param topic
 	 *            the topic to subscribe the url to
 	 * @param url
@@ -860,10 +898,14 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * @see #subscribe(OtpConnection, OtpErlangString, OtpErlangString)
 	 */
 	public void singleSubscribe(OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, UnknownException {
 		subscribe(connection, topic, url);
 	}
 
@@ -871,6 +913,9 @@ public class ChordSharpConnection {
 	 * Subscribes a url to a {@code topic}. Uses the object's
 	 * {@link #connection}.
 	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
 	 * @param topic
 	 *            the topic to subscribe the url to
 	 * @param url
@@ -880,10 +925,14 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * @see #singleSubscribe(OtpErlangString, OtpErlangString)
 	 */
 	public void singleSubscribe(String topic, String url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, UnknownException {
 		singleSubscribe(new OtpErlangString(topic), new OtpErlangString(url));
 	}
 
@@ -891,25 +940,8 @@ public class ChordSharpConnection {
 	 * Subscribes a url to a {@code topic}. Uses the static
 	 * {@link #staticConnection}.
 	 * 
-	 * @param topic
-	 *            the topic to subscribe the url to
-	 * @param url
-	 *            the url of the subscriber (this is where the events are send
-	 *            to)
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @see #subscribe(OtpConnection, OtpErlangString, OtpErlangString)
-	 */
-	public static void subscribe(OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException {
-		subscribe(staticConnection, topic, url);
-	}
-
-	/**
-	 * Subscribes a url to a {@code topic}. Uses the static
-	 * {@link #staticConnection}.
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
 	 * 
 	 * @param topic
 	 *            the topic to subscribe the url to
@@ -920,10 +952,41 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * @see #subscribe(OtpConnection, OtpErlangString, OtpErlangString)
+	 */
+	public static void subscribe(OtpErlangString topic, OtpErlangString url)
+			throws ConnectionException, TimeoutException, UnknownException {
+		subscribe(staticConnection, topic, url);
+	}
+
+	/**
+	 * Subscribes a url to a {@code topic}. Uses the static
+	 * {@link #staticConnection}.
+	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
+	 * @param topic
+	 *            the topic to subscribe the url to
+	 * @param url
+	 *            the url of the subscriber (this is where the events are send
+	 *            to)
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * @see #subscribe(OtpErlangString, OtpErlangString)
 	 */
 	public static void subscribe(String topic, String url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, UnknownException {
 		subscribe(new OtpErlangString(topic), new OtpErlangString(url));
 	}
 
@@ -973,11 +1036,13 @@ public class ChordSharpConnection {
 	// /////////////////////////////
 	// unsubscribe methods
 	// /////////////////////////////
-	
+
 	/**
-	 * Unsubscribes a url from a {@code topic}. Uses the given {@code connection}.
+	 * Unsubscribes a url from a {@code topic}. Uses the given {@code
+	 * connection}.
 	 * 
-	 * TODO: evaluate return type?
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
 	 * 
 	 * @param connection
 	 *            the connection to perform the operation on
@@ -989,17 +1054,51 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws NotFoundException
+	 *             if the topic does not exist or the given subscriber is not
+	 *             subscribed to the given topic
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * 
 	 * @since 1.3
 	 */
 	private static void unsubscribe(OtpConnection connection,
 			OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, NotFoundException,
+			UnknownException {
 		try {
 			connection.sendRPC("pubsub.pubsub_api", "unsubscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			connection.receiveRPC();
-			// OtpErlangObject received = connection.receiveRPC();
+			OtpErlangObject received = connection.receiveRPC();
+			
+			/*
+			 * possible return values:
+			 *  - ok
+			 *  - {fail, not_found}
+			 *  - {fail, timeout}
+			 *  - {fail, fail}
+			 *  - {fail, abort}
+			 */
+			if (received.equals(new OtpErlangAtom("ok"))) {
+				return;
+			} else {
+				// {fail, Reason}
+				OtpErlangTuple returnValue = (OtpErlangTuple) received;
+
+				if (returnValue.elementAt(1).equals(
+						new OtpErlangAtom("timeout"))) {
+					throw new TimeoutException();
+				} else if (returnValue.elementAt(1).equals(
+						new OtpErlangAtom("not_found"))) {
+					throw new NotFoundException();
+				} else {
+					throw new UnknownException(
+							"Unknow error - erlang error message: "
+									+ returnValue.toString());
+				}
+			}
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
 			throw new ConnectionException(e.getMessage());
@@ -1009,6 +1108,9 @@ public class ChordSharpConnection {
 		} catch (IOException e) {
 			// e.printStackTrace();
 			throw new ConnectionException(e.getMessage());
+		} catch (ClassCastException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e.getMessage());
 		}
 	}
 
@@ -1016,6 +1118,9 @@ public class ChordSharpConnection {
 	 * Unsubscribes a url from a {@code topic}. Uses the object's
 	 * {@link #connection}.
 	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
 	 * @param topic
 	 *            the topic to unsubscribe the url from
 	 * @param url
@@ -1024,12 +1129,20 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws NotFoundException
+	 *             if the topic does not exist or the given subscriber is not
+	 *             subscribed to the given topic
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * @see #unsubscribe(OtpConnection, OtpErlangString, OtpErlangString)
 	 * 
 	 * @since 1.3
 	 */
 	public void singleUnsubscribe(OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, NotFoundException,
+			UnknownException {
 		unsubscribe(connection, topic, url);
 	}
 
@@ -1037,6 +1150,9 @@ public class ChordSharpConnection {
 	 * Unsubscribes a url from a {@code topic}. Uses the object's
 	 * {@link #connection}.
 	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
 	 * @param topic
 	 *            the topic to unsubscribe the url from
 	 * @param url
@@ -1045,12 +1161,20 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws NotFoundException
+	 *             if the topic does not exist or the given subscriber is not
+	 *             subscribed to the given topic
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * @see #singleUnsubscribe(OtpErlangString, OtpErlangString)
 	 * 
 	 * @since 1.3
 	 */
 	public void singleUnsubscribe(String topic, String url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, NotFoundException,
+			UnknownException {
 		singleUnsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
 	}
 
@@ -1058,6 +1182,9 @@ public class ChordSharpConnection {
 	 * Unsubscribes a url from a {@code topic}. Uses the static
 	 * {@link #staticConnection}.
 	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
 	 * @param topic
 	 *            the topic to unsubscribe the url from
 	 * @param url
@@ -1066,12 +1193,20 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws NotFoundException
+	 *             if the topic does not exist or the given subscriber is not
+	 *             subscribed to the given topic
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * @see #unsubscribe(OtpConnection, OtpErlangString, OtpErlangString)
 	 * 
 	 * @since 1.3
 	 */
 	public static void unsubscribe(OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, NotFoundException,
+			UnknownException {
 		unsubscribe(staticConnection, topic, url);
 	}
 
@@ -1079,6 +1214,9 @@ public class ChordSharpConnection {
 	 * Unsubscribes a url from a {@code topic}. Uses the static
 	 * {@link #staticConnection}.
 	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
 	 * @param topic
 	 *            the topic to unsubscribe the url from
 	 * @param url
@@ -1087,12 +1225,20 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws NotFoundException
+	 *             if the topic does not exist or the given subscriber is not
+	 *             subscribed to the given topic
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * @see #unsubscribe(OtpErlangString, OtpErlangString)
 	 * 
 	 * @since 1.3
 	 */
 	public static void unsubscribe(String topic, String url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, NotFoundException,
+			UnknownException {
 		unsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
 	}
 	

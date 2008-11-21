@@ -50,7 +50,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * 
  * @author Nico Kruber, kruber@zib.de
  * 
- * @version 1.3
+ * @version 1.4
  */
 public class ChordSharpConnectionTest {
 	private static long testTime = System.currentTimeMillis();
@@ -58,21 +58,21 @@ public class ChordSharpConnectionTest {
 	private final static String[] testData = {
 		"ahz2ieSh", "wooPhu8u", "quai9ooK", "Oquae4ee", "Airier1a", "Boh3ohv5", "ahD3Saog", "EM5ooc4i", 
 		"Epahrai8", "laVahta7", "phoo6Ahj", "Igh9eepa", "aCh4Lah6", "ooT0ath5", "uuzau4Ie", "Iup6mae6", 
-//		"xie7iSie", "ail8yeeP", "ooZ4eesi", "Ahn7ohph", "Ohy5moo6", "xooSh9Oo", "ieb6eeS7", "Thooqu9h", 
-//		"eideeC9u", "phois3Ie", "EimaiJ2p", "sha6ahR1", "Pheih3za", "bai4eeXe", "rai0aB7j", "xahXoox6", 
-//		"Xah4Okeg", "cieG8Yae", "Pe9Ohwoo", "Eehig6ph", "Xe7rooy6", "waY2iifu", "kemi8AhY", "Che7ain8", 
-//		"ohw6seiY", "aegh1oBa", "thoh9IeG", "Kee0xuwu", "Gohng8ee", "thoh9Chi", "aa4ahQuu", "Iesh5uge", 
-//		"Ahzeil8n", "ieyep5Oh", "xah3IXee", "Eefa5qui", "kai8Muuf", "seeCe0mu", "cooqua5Y", "Ci3ahF6z", 
-//		"ot0xaiNu", "aewael8K", "aev3feeM", "Fei7ua5t", "aeCa6oph", "ag2Aelei", "Shah1Pho", "ePhieb0N", 
-//		"Uqu7Phup", "ahBi8voh", "oon3aeQu", "Koopa0nu", "xi0quohT", "Oog4aiph", "Aip2ag5D", "tirai7Ae", 
-//		"gi0yoePh", "uay7yeeX", "aeb6ahC1", "OoJeic2a", "ieViom1y", "di0eeLai", "Taec2phe", "ID2cheiD", 
-//		"oi6ahR5M", "quaiGi8W", "ne1ohLuJ", "DeD0eeng", "yah8Ahng", "ohCee2ie", "ecu1aDai", "oJeijah4", 
-//		"Goo9Una1", "Aiph3Phi", "Ieph0ce5", "ooL6cae7", "nai0io1H", "Oop2ahn8", "ifaxae7O", "NeHai1ae", 
-//		"Ao8ooj6a", "hi9EiPhi", "aeTh9eiP", "ao8cheiH", "Yieg3sha", "mah7cu2D", "Uo5wiegi", "Oowei0ya", 
-//		"efeiDee7", "Oliese6y", "eiSh1hoh", "Joh6hoh9", "zib6Ooqu", "eejiJie4", "lahZ3aeg", "keiRai1d", 
-//		"Fei0aewe", "aeS8aboh", "hae3ohKe", "Een9ohQu", "AiYeeh7o", "Yaihah4s", "ood4Giez", "Oumai7te", 
-//		"hae2kahY", "afieGh4v", "Ush0boo0", "Ekootee5", "Ya8iz6Ie", "Poh6dich", "Eirae4Ah", "pai8Eeme", 
-//		"uNah7dae", "yo3hahCh", "teiTh7yo", "zoMa5Cuv", "ThiQu5ax", "eChi5caa", "ii9ujoiV", "ge7Iekui", 
+		"xie7iSie", "ail8yeeP", "ooZ4eesi", "Ahn7ohph", "Ohy5moo6", "xooSh9Oo", "ieb6eeS7", "Thooqu9h", 
+		"eideeC9u", "phois3Ie", "EimaiJ2p", "sha6ahR1", "Pheih3za", "bai4eeXe", "rai0aB7j", "xahXoox6", 
+		"Xah4Okeg", "cieG8Yae", "Pe9Ohwoo", "Eehig6ph", "Xe7rooy6", "waY2iifu", "kemi8AhY", "Che7ain8", 
+		"ohw6seiY", "aegh1oBa", "thoh9IeG", "Kee0xuwu", "Gohng8ee", "thoh9Chi", "aa4ahQuu", "Iesh5uge", 
+		"Ahzeil8n", "ieyep5Oh", "xah3IXee", "Eefa5qui", "kai8Muuf", "seeCe0mu", "cooqua5Y", "Ci3ahF6z", 
+		"ot0xaiNu", "aewael8K", "aev3feeM", "Fei7ua5t", "aeCa6oph", "ag2Aelei", "Shah1Pho", "ePhieb0N", 
+		"Uqu7Phup", "ahBi8voh", "oon3aeQu", "Koopa0nu", "xi0quohT", "Oog4aiph", "Aip2ag5D", "tirai7Ae", 
+		"gi0yoePh", "uay7yeeX", "aeb6ahC1", "OoJeic2a", "ieViom1y", "di0eeLai", "Taec2phe", "ID2cheiD", 
+		"oi6ahR5M", "quaiGi8W", "ne1ohLuJ", "DeD0eeng", "yah8Ahng", "ohCee2ie", "ecu1aDai", "oJeijah4", 
+		"Goo9Una1", "Aiph3Phi", "Ieph0ce5", "ooL6cae7", "nai0io1H", "Oop2ahn8", "ifaxae7O", "NeHai1ae", 
+		"Ao8ooj6a", "hi9EiPhi", "aeTh9eiP", "ao8cheiH", "Yieg3sha", "mah7cu2D", "Uo5wiegi", "Oowei0ya", 
+		"efeiDee7", "Oliese6y", "eiSh1hoh", "Joh6hoh9", "zib6Ooqu", "eejiJie4", "lahZ3aeg", "keiRai1d", 
+		"Fei0aewe", "aeS8aboh", "hae3ohKe", "Een9ohQu", "AiYeeh7o", "Yaihah4s", "ood4Giez", "Oumai7te", 
+		"hae2kahY", "afieGh4v", "Ush0boo0", "Ekootee5", "Ya8iz6Ie", "Poh6dich", "Eirae4Ah", "pai8Eeme", 
+		"uNah7dae", "yo3hahCh", "teiTh7yo", "zoMa5Cuv", "ThiQu5ax", "eChi5caa", "ii9ujoiV", "ge7Iekui", 
 		"sai2aiTa", "ohKi9rie", "ei2ioChu", "aaNgah9y", "ooJai1Ie", "shoh0oH9", "Ool4Ahya", "poh0IeYa", 
 		"Uquoo0Il", "eiGh4Oop", "ooMa0ufe", "zee6Zooc", "ohhao4Ah", "Uweekek5", "aePoos9I", "eiJ9noor", 
 		"phoong1E", "ianieL2h", "An7ohs4T", "Eiwoeku3", "sheiS3ao", "nei5Thiw", "uL5iewai", "ohFoh9Ae"};
@@ -799,6 +799,83 @@ public class ChordSharpConnectionTest {
 		}
 	}
 	
+	// getSubscribers() test methods for not existing topics begin
+	
+	/**
+	 * Test method for
+	 * {@link ChordSharpConnection#singleGetSubscribers(OtpErlangString)}.
+	 * Tries to get a subscriber list from an empty topic.
+	 * 
+	 * @throws UnknownException
+	 * @throws TimeoutException
+	 * @throws ConnectionException
+	 * @throws NotFoundException 
+	 */
+	@Test
+	public void testSingleGetSubscribersOtpString_NotExistingTopic() throws ConnectionException,
+			TimeoutException, UnknownException, NotFoundException {
+		String topic = "_SingleGetSubscribersOtpString_NotExistingTopic";
+		ChordSharpConnection conn = new ChordSharpConnection();
+		
+		conn.singleGetSubscribers(new OtpErlangString(testTime + topic));
+	}
+	
+	/**
+	 * Test method for
+	 * {@link ChordSharpConnection#singleGetSubscribers(String)}.
+	 * Tries to get a subscriber list from an empty topic.
+	 * 
+	 * @throws UnknownException
+	 * @throws TimeoutException
+	 * @throws ConnectionException
+	 * @throws NotFoundException 
+	 */
+	@Test
+	public void testSingleGetSubscribersString_NotExistingTopic() throws ConnectionException,
+			TimeoutException, UnknownException, NotFoundException {
+		String topic = "_SingleGetSubscribersString_NotExistingTopic";
+		ChordSharpConnection conn = new ChordSharpConnection();
+		
+		conn.singleGetSubscribers(testTime + topic);
+	}
+	
+	/**
+	 * Test method for
+	 * {@link ChordSharpConnection#getSubscribers(OtpErlangString)}.
+	 * Tries to get a subscriber list from an empty topic.
+	 * 
+	 * @throws UnknownException
+	 * @throws TimeoutException
+	 * @throws ConnectionException
+	 * @throws NotFoundException 
+	 */
+	@Test
+	public void testGetSubscribersOtpString_NotExistingTopic() throws ConnectionException,
+			TimeoutException, UnknownException, NotFoundException {
+		String topic = "_GetSubscribersOtpString_NotExistingTopic";
+		ChordSharpConnection.getSubscribers(new OtpErlangString(testTime + topic));
+	}
+	
+	/**
+	 * Test method for
+	 * {@link ChordSharpConnection#getSubscribers(String)}.
+	 * Tries to get a subscriber list from an empty topic.
+	 * 
+	 * @throws UnknownException
+	 * @throws TimeoutException
+	 * @throws ConnectionException
+	 * @throws NotFoundException 
+	 */
+	@Test
+	public void testGetSubscribersString_NotExistingTopic() throws ConnectionException,
+			TimeoutException, UnknownException, NotFoundException {
+		String topic = "_GetSubscribersString_NotExistingTopic";
+		ChordSharpConnection.getSubscribers(testTime + topic);
+	}
+	
+	// getSubscribers() test methods for not existing topics begin
+	// subscribe() test methods begin
+	
 	/**
 	 * Test method for
 	 * {@link ChordSharpConnection#singleSubscribe(OtpErlangString, OtpErlangString)} and
@@ -1096,7 +1173,8 @@ public class ChordSharpConnectionTest {
 		}
 	}
 	
-	// unsubscribe test methods begin
+	// subscribe() test methods end
+	// unsubscribe() test methods begin
 	
 	/**
 	 * Test method for
@@ -1110,7 +1188,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testSingleUnsubscribeOtpString_NotExistingTopic() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String topic = "_SingleUnsubscribeOtpString_NotExistingTopic";
@@ -1145,7 +1223,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testSingleUnsubscribeOtpString_NotExistingUrl()
 			throws ConnectionException, TimeoutException, UnknownException,
 			NotFoundException {
@@ -1317,7 +1395,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testSingleUnsubscribeString_NotExistingTopic() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String topic = "_SingleUnsubscribeString_NotExistingTopic";
@@ -1354,7 +1432,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testSingleUnsubscribeString_NotExistingUrl()
 			throws ConnectionException, TimeoutException, UnknownException,
 			NotFoundException {
@@ -1390,7 +1468,6 @@ public class ChordSharpConnectionTest {
 				+ testData[0] + ", " + testData[1] + "\"], but is: "
 				+ subscribers.toString(), 2, subscribers.size());
 	}
-	
 	
 	/**
 	 * Test method for
@@ -1452,7 +1529,6 @@ public class ChordSharpConnectionTest {
 					+ subscribers.toString(), 0, subscribers.size());
 		}
 	}
-	
 
 	/**
 	 * Test method for
@@ -1510,7 +1586,6 @@ public class ChordSharpConnectionTest {
 					+ " should not be a subscriber of " + topic);
 		}
 	}
-	
 
 	/**
 	 * Test method for
@@ -1526,7 +1601,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testUnsubscribeOtpString_NotExistingTopic() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String topic = "_UnsubscribeOtpString_NotExistingTopic";
@@ -1562,7 +1637,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testUnsubscribeOtpString_NotExistingUrl()
 			throws ConnectionException, TimeoutException, UnknownException,
 			NotFoundException {
@@ -1660,7 +1735,6 @@ public class ChordSharpConnectionTest {
 					+ subscribers.toString(), 0, subscribers.arity());
 		}
 	}
-	
 
 	/**
 	 * Test method for
@@ -1718,7 +1792,6 @@ public class ChordSharpConnectionTest {
 		}
 	}
 
-
 	/**
 	 * Test method for
 	 * {@link ChordSharpConnection#unsubscribe(String, String)} and
@@ -1733,7 +1806,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testUnsubscribeString_NotExistingTopic() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String topic = "_UnsubscribeString_NotExistingTopic";
@@ -1769,7 +1842,7 @@ public class ChordSharpConnectionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException 
 	 */
-	@Test
+	@Test(expected=NotFoundException.class)
 	public void testUnsubscribeString_NotExistingUrl()
 			throws ConnectionException, TimeoutException, UnknownException,
 			NotFoundException {
@@ -1864,7 +1937,6 @@ public class ChordSharpConnectionTest {
 					+ subscribers.toString(), 0, subscribers.size());
 		}
 	}
-	
 
 	/**
 	 * Test method for
@@ -1922,7 +1994,7 @@ public class ChordSharpConnectionTest {
 		}
 	}
 	
-	// unsubscribe test methods end
+	// unsubscribe() test methods end
 	
 	/**
 	 * Test method for the publish/subscribe system.
@@ -2174,9 +2246,9 @@ public class ChordSharpConnectionTest {
 		notifications_server1 = new HashMap<String, Vector<String>>();
 		notifications_server2 = new HashMap<String, Vector<String>>();
 		notifications_server3 = new HashMap<String, Vector<String>>();
-		String topic1 = testTime + "_Subscription3_1";
-		String topic2 = testTime + "_Subscription3_2";
-		String topic3 = testTime + "_Subscription3_3";
+		String topic1 = testTime + "_Subscription4_1";
+		String topic2 = testTime + "_Subscription4_2";
+		String topic3 = testTime + "_Subscription4_3";
 		
 		Server server1 = new Server(8087);
 		server1.setHandler(new SubscriptionHandler(notifications_server1));

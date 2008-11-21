@@ -19,13 +19,15 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.chordsharp.ChordSharpConnection;
 import de.zib.chordsharp.ConnectionException;
+import de.zib.chordsharp.TimeoutException;
+import de.zib.chordsharp.UnknownException;
 
 /**
  * Provides an example for using the {@code subscribe} methods of the
  * {@link ChordSharpConnection} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.0
+ * @version 1.4
  */
 public class ChordSharpConnectionSubscribeExample {
 	/**
@@ -69,6 +71,14 @@ public class ChordSharpConnectionSubscribeExample {
 		} catch (ConnectionException e) {
 			System.out.println("    subscribe(" + otpTopic.stringValue() + ", "
 					+ otpURL.stringValue() + ") failed: " + e.getMessage());
+		} catch (TimeoutException e) {
+			System.out.println("    subscribe(" + otpTopic.stringValue() + ", "
+					+ otpURL.stringValue() + ") failed with timeout: "
+					+ e.getMessage());
+		} catch (UnknownException e) {
+			System.out.println("    subscribe(" + otpTopic.stringValue() + ", "
+					+ otpURL.stringValue() + ") failed with unknown: "
+					+ e.getMessage());
 		}
 
 		try {
@@ -79,6 +89,12 @@ public class ChordSharpConnectionSubscribeExample {
 		} catch (ConnectionException e) {
 			System.out.println("    subscribe(" + topic + ", " + URL
 					+ ") failed: " + e.getMessage());
+		} catch (TimeoutException e) {
+			System.out.println("    subscribe(" + topic + ", " + URL
+					+ ") failed with timeout: " + e.getMessage());
+		} catch (UnknownException e) {
+			System.out.println("    subscribe(" + topic + ", " + URL
+					+ ") failed with unknown: " + e.getMessage());
 		}
 
 		// non-static:
@@ -94,6 +110,14 @@ public class ChordSharpConnectionSubscribeExample {
 			System.out.println("      subscribe(" + otpTopic.stringValue()
 					+ ", " + otpURL.stringValue() + ") failed: "
 					+ e.getMessage());
+		} catch (TimeoutException e) {
+			System.out.println("      subscribe(" + otpTopic.stringValue()
+					+ ", " + otpURL.stringValue() + ") failed with timeout: "
+					+ e.getMessage());
+		} catch (UnknownException e) {
+			System.out.println("      subscribe(" + otpTopic.stringValue()
+					+ ", " + otpURL.stringValue() + ") failed with unknown: "
+					+ e.getMessage());
 		}
 
 		try {
@@ -106,6 +130,12 @@ public class ChordSharpConnectionSubscribeExample {
 		} catch (ConnectionException e) {
 			System.out.println("      subscribe(" + topic + ", " + URL
 					+ ") failed: " + e.getMessage());
+		} catch (TimeoutException e) {
+			System.out.println("      subscribe(" + topic + ", " + URL
+					+ ") failed with timeout: " + e.getMessage());
+		} catch (UnknownException e) {
+			System.out.println("      subscribe(" + topic + ", " + URL
+					+ ") failed with unknown: " + e.getMessage());
 		}
 	}
 }
