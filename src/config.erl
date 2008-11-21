@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: config.erl 494 2008-07-04 17:07:34Z schintke $
+%% @version $Id$
 -module(config).
 
 -author('schuett@zib.de').
--vsn('$Id: config.erl 494 2008-07-04 17:07:34Z schintke $ ').
+-vsn('$Id$ ').
 
 -export([
 	 start_link/1, start/2,

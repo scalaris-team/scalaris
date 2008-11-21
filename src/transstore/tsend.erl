@@ -25,7 +25,7 @@
 -module(transstore.tsend).
 
 -author('moser@zib.de').
--vsn('$Id: tsend.erl 429 2008-04-15 13:56:13Z schuett $').
+-vsn('$Id$').
 
 
 -include("trecords.hrl").

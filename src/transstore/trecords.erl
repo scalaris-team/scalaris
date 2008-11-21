@@ -21,7 +21,7 @@
 -module(transstore.trecords).
 
 -author('moser@zib.de').
--vsn('$Id: trecords.erl 374 2008-03-12 09:53:23Z kruber $ ').
+-vsn('$Id$ ').
 
 -include("trecords.hrl").
 

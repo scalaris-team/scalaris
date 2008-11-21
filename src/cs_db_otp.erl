@@ -24,7 +24,7 @@
 -module(cs_db_otp).
 
 -author('schuett@zib.de').
--vsn('$Id: cs_db_otp.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -behaviour(gen_server).
 -behaviour(database).

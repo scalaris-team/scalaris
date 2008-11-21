@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: cs_send.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(cs_send).
 
 -author('schuett@zib.de').
--vsn('$Id: cs_send.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
 

@@ -22,11 +22,11 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %%            2008 onScale solutions GmbH
-%% @version $Id: intervals.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(intervals).
 
 -author('schuett@zib.de').
--vsn('$Id: intervals.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([first/0,last/0,
 	 new/1, new/2, make/1,

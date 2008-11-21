@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: boot_xmlrpc.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(boot_xmlrpc).
 
 -author('schuett@zib.de').
--vsn('$Id: boot_xmlrpc.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([start_link/1]).
 -export([handler/2]).

@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: transaction_test.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(transstore.transaction_test).
 
 -author('schuett@zib.de').
--vsn('$Id: transaction_test.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([run_test_increment/2, quorum_read/1, test/1, test1/0, test3/0, test4/0,
  test5/0, test6/0, run_test_write/3, run_test_write_5/2,

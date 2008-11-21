@@ -19,12 +19,12 @@
 %%%-------------------------------------------------------------------
 %% @author Monika Moser <moser@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: tmanager.erl 465 2008-05-07 11:16:12Z schuett $
+%% @version $Id$
 %% @doc 
 -module(transstore.tmanager).
 
 -author('moser@zib.de').
--vsn('$Id: tmanager.erl 465 2008-05-07 11:16:12Z schuett $').
+-vsn('$Id$').
 
 -include("trecords.hrl").
 

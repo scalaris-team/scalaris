@@ -20,7 +20,7 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: process_dictionary.erl 466 2008-05-07 13:20:35Z schuett $
+%% @version $Id$
 
 %@doc This module provides a mechanism to implement process
 %     groups. Within a process group, the names of processes have to
@@ -45,7 +45,7 @@
 -module(process_dictionary).
 
 -author('schuett@zib.de').
--vsn('$Id: process_dictionary.erl 466 2008-05-07 13:20:35Z schuett $ ').
+-vsn('$Id$ ').
 
 -behaviour(gen_server).
 

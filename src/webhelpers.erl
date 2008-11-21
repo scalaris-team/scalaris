@@ -21,11 +21,11 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %%            2008 onScale solutions
-%% @version $Id: webhelpers.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(webhelpers).
 
 -author('schuett@zib.de').
--vsn('$Id: webhelpers.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1]).
 

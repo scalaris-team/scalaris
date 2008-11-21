@@ -24,7 +24,7 @@
 -module(pubsub.pubsub_publish).
 
 -author('schuett@zib.de').
--vsn('$Id: pubsub_publish.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([publish/3, publish_internal/3]).
 

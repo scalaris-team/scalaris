@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: util.erl 479 2008-06-12 06:38:54Z schuett $
+%% @version $Id$
 -module(util).
 
 -author('schuett@zib.de').
--vsn('$Id: util.erl 479 2008-06-12 06:38:54Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3, 
 	 trunc/2, min/2, max/2, randomelem/1, logged_exec/1, 

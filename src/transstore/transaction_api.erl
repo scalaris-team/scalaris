@@ -21,7 +21,7 @@
 -module(transstore.transaction_api).
 
 -author('moser@zib.de').
--vsn('$Id: transaction_api.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -include("trecords.hrl").
 
