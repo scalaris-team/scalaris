@@ -21,7 +21,7 @@ import java.util.Vector;
  * Public ChordSharp Interface.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.3
+ * @version 1.4
  */
 public class ChordSharp {
 
@@ -87,6 +87,9 @@ public class ChordSharp {
 	/**
 	 * Subscribes a url for a {@code topic}.
 	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
 	 * @param topic
 	 *            the topic to subscribe the url for
 	 * @param url
@@ -96,14 +99,21 @@ public class ChordSharp {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 */
 	public static void subscribe(String topic, String url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, UnknownException {
 		ChordSharpConnection.subscribe(topic, url);
 	}
 	
 	/**
 	 * Unsubscribes a url from a {@code topic}.
+	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
 	 * 
 	 * @param topic
 	 *            the topic to unsubscribe the url from
@@ -113,11 +123,18 @@ public class ChordSharp {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws NotFoundException
+	 *             if the topic does not exist or the given subscriber is not
+	 *             subscribed to the given topic
+	 * @throws UnknownException
+	 *             if any other error occurs
 	 * 
 	 * @since 1.3
 	 */
 	public static void unsubscribe(String topic, String url)
-			throws ConnectionException {
+			throws ConnectionException, TimeoutException, NotFoundException, UnknownException {
 		ChordSharpConnection.unsubscribe(topic, url);
 	}
 
