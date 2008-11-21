@@ -123,7 +123,7 @@ update_succ(State, Succ) ->
 
 update_failuredetector(State) ->
     timer:send_after(config:failureDetectorUpdateInterval(), self(), {stabilize_failuredetector}),
-    Nodes = cs_state:get_nodes(State),
+    Nodes = util:uniq(lists:sort(cs_state:get_nodes(State))),
     failuredetector:set_nodes(Nodes).
 
 update_range(State, _OldPred, NewPred) ->

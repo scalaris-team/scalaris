@@ -26,7 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id: failuredetector.erl 463 2008-05-05 11:14:22Z schuett $ ').
 
--export([start_link/1, start/1, set_owner/1, add_node/3, add_nodes/1, set_nodes/1, node_count/0]).
+-export([start_link/1, start/1, set_owner/1, add_node/3, add_nodes/1, set_nodes/1, 
+	 node_count/0, remove_node/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -79,6 +80,10 @@ node_count() ->
 	    Count
     end.
     
+%% @doc remove a node from the failure detector
+remove_node(Id) ->
+    get_pid() ! {remove_node, Id}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -125,7 +130,7 @@ set_nodes(NewNodes, OldNodes, Alive) ->
 			 end
 		 end, 
 		 Alive, NewNodes),
-     lists:foldl(fun ({Id, Tag,   _}, Sum) -> gb_trees:enter(Id, Tag, Sum) end, gb_trees:empty(),  NewNodes)}.
+    lists:foldl(fun ({Id, Tag,   _}, Sum) -> gb_trees:enter(Id, Tag, Sum) end, gb_trees:empty(),  NewNodes)}.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Main loop
@@ -137,6 +142,8 @@ set_nodes(NewNodes, OldNodes, Alive) ->
 %% @spec loop(gb_trees:gb_tree(), gb_sets:gb_set(), gb_trees:gb_tree(), pid()) -> ok
 loop(Nodes, Alive, Tags, Owner) ->
     receive
+	{remove_node, Id} ->
+	    loop(gb_trees:delete_any(Id, Nodes), gb_sets:delete_any(Id, Alive), gb_trees:delete_any(Id, Tags), Owner);
 	{get_node_count, PID} ->
 	    PID ! {get_node_count_response, gb_trees:size(Nodes)},
 	    loop(Nodes, Alive, Tags, Owner);

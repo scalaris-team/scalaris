@@ -58,6 +58,13 @@ init(InstanceId, Supervisor) ->
 server(LS) ->
     case gen_tcp:accept(LS) of
 	{ok, S} ->
+	    case comm_port:get_local_address_port() of
+		{undefined, LocalPort} ->
+		    {ok, {MyIP, _LocalPort}} = inet:sockname(S),
+		    comm_port:set_local_address(MyIP, LocalPort);
+		_ ->
+		    ok
+	    end,
 	    receive
 		{tcp, S, Msg} ->
 		    {endpoint, Address, Port} = binary_to_term(Msg),

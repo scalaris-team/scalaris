@@ -95,6 +95,7 @@ loop(Nodes) ->
 	    %?LOG("[ I | Boot   | ~w ] crashed <~w/~w>~n",
 	    %	      [self(), _PID, gb_trees:values(Nodes)]),
 	    NewNodes = gb_trees:delete_any(Id, Nodes),
+	    failuredetector:remove_node(Id),
 	    loop(NewNodes);
 	{ping, Ping_PID, Cookie} ->
 	    cs_send:send(Ping_PID, {pong, Cookie}),
