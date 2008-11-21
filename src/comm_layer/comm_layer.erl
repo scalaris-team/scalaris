@@ -14,7 +14,11 @@
 %%%-------------------------------------------------------------------
 %%% File    : comm_layer.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : 
+%%% Description : Public interface to Communication Layer. 
+%%%           Generic functions to send messages.
+%%%           Distinguishes on runtime whether the destination is in the 
+%%%           same Erlang virtual machine (use ! for sending) or on a remote
+%%%           site (use comm_port:send()).
 %%%
 %%% Created :  04 Feb 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
@@ -46,6 +50,7 @@ start_link() ->
 %%      + the process inside. {IP address, port, pid}
 %% @type process_id() = {inet:ip_address(), int(), pid()}.
 %% @spec send(process_id(), term()) -> ok
+
 send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
 %% Test for local is done in comm_port:send()
     {MyIP,MyPort} = comm_port:get_local_address_port(),

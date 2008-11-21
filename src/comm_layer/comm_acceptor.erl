@@ -15,6 +15,8 @@
 %%% File    : comm_acceptor.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
 %%% Description : Acceptor
+%%%           This module accepts new connections and starts corresponding 
+%%%           comm_connection processes.
 %%%
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
