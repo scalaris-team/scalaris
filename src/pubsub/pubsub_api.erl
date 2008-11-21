@@ -76,9 +76,14 @@ subscribe(Topic, URL) ->
 unsubscribe(Topic, URL) ->
     TFun = fun(TransLog) ->
 		   {Subscribers, TransLog1} = transaction_api:read2(TransLog, Topic),
-		   NewSubscribers = lists:delete(URL, Subscribers),
-		   TransLog2 = transaction_api:write2(TransLog1, Topic, NewSubscribers),
-		   {{ok, ok}, TransLog2}
+		   case lists:member(URL, Subscribers) of
+		       true ->
+			   NewSubscribers = lists:delete(URL, Subscribers),
+			   TransLog2 = transaction_api:write2(TransLog1, Topic, NewSubscribers),
+			   {{ok, ok}, TransLog2};
+		       false ->
+			   {{fail, not_found}, TransLog}
+		   end
 	   end,
     transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).	   
 
