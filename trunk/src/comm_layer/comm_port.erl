@@ -15,6 +15,7 @@
 %%% File    : comm_port.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
 %%% Description : Main CommLayer Interface
+%%%           Maps remote addresses to comm_connection PIDs.
 %%%
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
@@ -29,7 +30,6 @@
 -behaviour(gen_server).
 
 -import(ets).
--import(gb_trees).
 -import(gen_server).
 -import(io).
 
@@ -42,9 +42,6 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
-
-%% @type state() = {state, conn2pid}. CommLayer State
--record(state, {conn2pid}).
 
 %%====================================================================
 %% API
@@ -101,7 +98,7 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     ets:new(?MODULE, [set, protected, named_table]),
-    {ok, #state{conn2pid = gb_trees:empty()}}.
+    {ok, ok}. % empty state.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -113,45 +110,43 @@ init([]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 handle_call({send, Address, Port, Pid, Message}, _From, State) ->
-    case gb_trees:lookup({Address, Port}, State#state.conn2pid) of
-	{value, LocalPid} ->
+    case ets:lookup(?MODULE, {Address, Port}) of
+	[{{Address, Port}, LocalPid}] ->
 	    LocalPid ! {send, Pid, Message},
 	    {reply, ok, State};
-	none ->
+	[] ->
 	    {DepAddr,DepPort} = get_local_address_port(),
 	    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
 		{local_ip, MyIP, MyPort, LocalPid} ->
 		    LocalPid ! {send, Pid, Message},
 		    io:format("this() == ~w~n", [{MyIP, MyPort}]),
 		    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
+		    ets:insert(?MODULE, {{Address, Port}, LocalPid}),
 		    {reply, 
 		     ok, 
-		     State#state{
-		       conn2pid=gb_trees:insert({Address, Port}, 
-						LocalPid, 
-						State#state.conn2pid)}
+		     State
 		    };
 		LocalPid ->
 		    LocalPid ! {send, Pid, Message},
+		    ets:insert(?MODULE, {{Address, Port}, LocalPid}),
 		    {reply, 
 		     ok, 
-		     State#state{
-		       conn2pid=gb_trees:insert({Address, Port}, 
-						LocalPid, 
-						State#state.conn2pid)}
+		     State
 		    }
 	    end
     end;
 
 handle_call({unregister_conn, Address, Port}, _From, State) ->
-    {reply, ok, State#state{conn2pid = gb_trees:delete_any({Address, Port}, State#state.conn2pid)}};
+    ets:delete(?MODULE, {Address, Port}),
+    {reply, ok, State};
 
 handle_call({register_conn, Address, Port, Pid}, _From, State) ->
-    case gb_trees:is_defined({Address, Port}, State#state.conn2pid) of
-	true ->
+    case ets:lookup(?MODULE, {Address, Port}) of
+	[{{Address, Port}, _}] ->
 	    {reply, duplicate, State};
-	false ->
-	    {reply, ok, State#state{conn2pid = gb_trees:insert({Address, Port}, Pid, State#state.conn2pid)}}
+	[] ->
+	    ets:insert(?MODULE, {{Address, Port}, Pid}),
+	    {reply, ok, State}
     end;
 
 handle_call({set_local_address, Address, Port}, _From, State) ->
