@@ -88,7 +88,7 @@ server(LS) ->
 		    NewPid = comm_connection:new(NewAddress, Port, S),
 		    gen_tcp:controlling_process(S, NewPid),
 		    inet:setopts(S, [{active, once}]),
-		    comm_port:register_connection(NewAddress, Port, NewPid)
+		    comm_port:register_connection(NewAddress, Port, NewPid, S)
 	    end,
 	    server(LS);
 	Other ->

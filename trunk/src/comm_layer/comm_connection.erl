@@ -25,7 +25,7 @@
 %% @version $Id $
 -module(comm_layer.comm_connection).
 
--export([open_new/4, new/3]).
+-export([send/3, open_new/4, new/3]).
 
 -import(gen_tcp).
 -import(inet).
@@ -45,20 +45,36 @@ new(Address, Port, Socket) ->
 open_new(Address, Port, undefined, MyPort) ->
     Myself = self(),
     LocalPid = spawn(fun () ->
-			     S = new_connection(Address, Port, MyPort),
-			     {ok, {MyIP, _MyPort}} = inet:sockname(S),
-			     Myself ! {new_connection_started, MyIP, MyPort},
-			     loop(S, Address, Port)
-		     end),
+  			     S = new_connection(Address, Port, MyPort),
+  			     {ok, {MyIP, _MyPort}} = inet:sockname(S),
+  			     Myself ! {new_connection_started, MyIP, MyPort, S},
+  			     loop(S, Address, Port)
+  		     end),
     receive
-	{new_connection_started, MyIP, MyPort} ->
-	    {local_ip, MyIP, MyPort, LocalPid}
+  	{new_connection_started, MyIP, MyPort, S} ->
+  	    {local_ip, MyIP, MyPort, LocalPid, S}
     end;
 open_new(Address, Port, _MyAddress, MyPort) ->
-    spawn(fun () -> 
-		  S = new_connection(Address, Port, MyPort), 
+    S = new_connection(Address, Port, MyPort), 
+    Pid = spawn(fun () -> 
 		  loop(S, Address, Port) 
-	  end).
+	  end),
+    {Pid, S}.
+
+send({Address, Port, Socket}, Pid, Message) ->
+    BinaryMessage = term_to_binary({deliver, Pid, Message}),
+    case gen_tcp:send(Socket, BinaryMessage) of
+	ok ->
+	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(BinaryMessage)),
+	    ok;
+	{error, closed} ->
+	    comm_port:unregister_connection(Address, Port),
+	    gen_tcp:close(Socket);
+	{error, Reason} ->
+	    log:log2file(comm_connection, io_lib:format("couldn't send to ~p:~p (~p)~n", [Address, Port, Reason])),
+	    comm_port:unregister_connection(Address, Port),
+	    gen_tcp:close(Socket)
+    end.
 
 loop(fail, Address, Port) ->
     comm_port:unregister_connection(Address, Port),
@@ -66,25 +82,10 @@ loop(fail, Address, Port) ->
 loop(Socket, Address, Port) ->
     receive
 	{send, Pid, Message} ->
-	    BinaryMessage = term_to_binary({deliver, Pid, Message}),
-	    case gen_tcp:send(Socket, BinaryMessage) of
-		ok ->
-		    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(BinaryMessage)),
-		    loop(Socket, Address, Port);
-		{error, closed} ->
-  	    	    comm_port:unregister_connection(Address, Port),
-	    	    gen_tcp:close(Socket);
-		    %gen_tcp:close(Socket),
-		    %self() ! Request,
-		    %loop(new_connection(Address, Port, comm_port:get_local_address(), 
-			%		comm_port:get_local_port()), 
-			% Address, Port);
-		{error, Reason} ->
-		    log:log2file(comm_connection, io_lib:format("couldn't send to ~p:~p (~p)~n", [Address, Port, Reason])),
-  	    	    comm_port:unregister_connection(Address, Port),
-	    	    gen_tcp:close(Socket)
+	    case send({Address, Port, Socket}, Pid, Message) of
+		ok -> loop(Socket, Address, Port);
+		_ -> ok
 	    end;
-
 	{tcp_closed, Socket} ->
 	    	comm_port:unregister_connection(Address, Port),
 	    	gen_tcp:close(Socket);
