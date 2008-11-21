@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: cs_node.erl 518 2008-07-14 10:45:26Z schintke $
+%% @version $Id$
 -module(cs_node).
 
 -author('schuett@zib.de').
--vsn('$Id: cs_node.erl 518 2008-07-14 10:45:26Z schintke $ ').
+-vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").

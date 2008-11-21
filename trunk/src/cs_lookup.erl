@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: cs_lookup.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(cs_lookup).
 
 -author('schuett@zib.de').
--vsn('$Id: cs_lookup.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([reliable_get_node/3, reliable_get_node_service/3, unreliable_lookup/2,
 	unreliable_get_key/1]).

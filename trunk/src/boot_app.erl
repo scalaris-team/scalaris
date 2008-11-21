@@ -21,11 +21,11 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @doc The boot server application
-%% @version $Id: boot_app.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(boot_app).
 
 -author('schuett@zib.de').
--vsn('$Id: boot_app.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -behaviour(application).
 

@@ -16,16 +16,16 @@
 %%% Author  : Thorsten Schuett
 %%% Purpose :
 %%% Created : 13 Dec 2002 by Alexey Shchepin <alexey@sevcom.net>
-%%% Id      : $Id: randoms.erl 429 2008-04-15 13:56:13Z schuett $
+%%% Id      : $Id$
 %%%----------------------------------------------------------------------
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2002-2007 Alexey Shchepin
-%% @version $Id: randoms.erl 429 2008-04-15 13:56:13Z schuett $
+%% @version $Id$
 -module(randoms).
 
 -author('schuett@zib.de').
--vsn('$Id: randoms.erl 429 2008-04-15 13:56:13Z schuett $ ').
+-vsn('$Id$ ').
 
 -include("chordsharp.hrl").
 

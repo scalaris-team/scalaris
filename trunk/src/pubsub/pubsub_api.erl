@@ -24,7 +24,7 @@
 -module(pubsub.pubsub_api).
 
 -author('schuett@zib.de').
--vsn('$Id: pubsub_api.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
 

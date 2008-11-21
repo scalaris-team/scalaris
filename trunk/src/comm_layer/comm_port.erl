@@ -25,7 +25,7 @@
 -module(comm_layer.comm_port).
 
 -author('schuett@zib.de').
--vsn('$Id: comm_port.erl 522 2008-07-14 12:49:59Z schuett $ ').
+-vsn('$Id$ ').
 
 -behaviour(gen_server).
 

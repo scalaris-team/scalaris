@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: cs_stabilize.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(cs_stabilize).
 
 -author('schuett@zib.de').
--vsn('$Id: cs_stabilize.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([notify/2, stabilize/1, stabilize2/3, stabilize/3, update_succ/2, update_failuredetector/1, succ_left/2, pred_left/2, update_range/3]).
 

@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: routingtable.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(routingtable).
 
 -author('schuett@zib.de').
--vsn('$Id: routingtable.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([behaviour_info/1]).
 

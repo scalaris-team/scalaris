@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: cs_sup_or.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(cs_sup_or).
 
 -author('schuett@zib.de').
--vsn('$Id: cs_sup_or.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -behaviour(supervisor).
 

@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: boot_logger.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(boot_logger).
 
 -author('schuett@zib.de').
--vsn('$Id: boot_logger.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([start_link/1, start/1, log/1, log_to_file/1, log_assert/2, transaction_log/1]).
 

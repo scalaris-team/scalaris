@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: statistics.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(statistics).
 
 -author('schuett@zib.de').
--vsn('$Id: statistics.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([get_total_load/1, get_average_load/1, get_load_std_deviation/1, get_ring_details/0, get_average_rt_size/1, get_rt_size_std_deviation/1, get_memory_usage/1, get_max_memory_usage/1]).
 

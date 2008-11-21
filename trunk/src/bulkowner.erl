@@ -20,14 +20,14 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: bulkowner.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 
 %% @doc This implements the bulk owner algorithm.
 %% @reference Ali Ghodsi, <em> Distributed k-ary System: Algorithms for Distributed Hash Tables</em>, PhD Thesis, page 129.
 -module(bulkowner).
 
 -author('schuett@zib.de').
--vsn('$Id: bulkowner.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -include("chordsharp.hrl").
 

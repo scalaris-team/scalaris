@@ -24,7 +24,7 @@
 -module(comm_layer.conn_queue).
 
 -author('schuett@zib.de').
--vsn('$Id: conn_queue.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 %% API
 -export([new/0, size/1, pop/1, push/2, delete/2, is_member/2]).

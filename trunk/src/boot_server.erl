@@ -20,7 +20,7 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: boot_server.erl 522 2008-07-14 12:49:59Z schuett $
+%% @version $Id$
 %% @doc The boot server maintains a list of chord# nodes and checks the 
 %%  availability using a failure_detector. It also exports a webpage 
 %%  on port 8000 containing some statistics. Its main purpose is to 
@@ -29,7 +29,7 @@
 -module(boot_server).
 
 -author('schuett@zib.de').
--vsn('$Id: boot_server.erl 522 2008-07-14 12:49:59Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([start_link/1, start/1, number_of_nodes/0, node_list/0, ping/0, ping/1, connect/0]).
 

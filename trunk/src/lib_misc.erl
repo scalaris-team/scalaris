@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: lib_misc.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(lib_misc).
 
 -author('schuett@zib.de').
--vsn('$Id: lib_misc.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([pmap1/2, make_workers/2, submit_task/2, wait/1]).
 

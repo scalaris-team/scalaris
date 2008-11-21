@@ -19,7 +19,7 @@
 -module(terms_and_strings).
                
 -author('plantikow@zib.de').
--vsn('$Id: terms_and_strings.erl 324 2008-02-22 11:55:01Z schuett $').
+-vsn('$Id$').
                   
 -compile(export_all).
 

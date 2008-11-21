@@ -20,7 +20,7 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: comm_port_sup.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(comm_layer.comm_logger).
 
 -author('schuett@zib.de').

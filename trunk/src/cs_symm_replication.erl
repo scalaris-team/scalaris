@@ -20,11 +20,11 @@
 %%%-------------------------------------------------------------------
 %% @author Monika Moser <moser@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-%% @version $Id: cs_symm_replication.erl 463 2008-05-05 11:14:22Z schuett $
+%% @version $Id$
 -module(cs_symm_replication).
 
 -author('moser@zib.de').
--vsn('$Id: cs_symm_replication.erl 463 2008-05-05 11:14:22Z schuett $ ').
+-vsn('$Id$ ').
 
 -export([get_keys_for_replicas/1]).
 
