@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
 -module(comm_layer.comm_port).
 
@@ -53,24 +53,9 @@ send({Address, Port, Pid}, Message) ->
     case ets:lookup(?MODULE, {Address, Port}) of
 	[{{Address, Port}, {_LPid, Socket}}] ->
 	    comm_connection:send({Address, Port, Socket}, Pid, Message), 
-	    {ok};
+	    ok;
 	[] ->
-	    {DepAddr,DepPort} = get_local_address_port(),
-	    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
-		{local_ip, MyIP, MyPort, MyPid, MySocket} ->
-		    comm_connection:send({Address, Port, MySocket}, Pid, Message),
-		    io:format("this() == ~w~n", [{MyIP, MyPort}]),
-%		    set_local_address(t, {MyIP,MyPort}}),
-%		    register_connection(Address, Port, MyPid, MySocket),
-		    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
-		    ets:insert(?MODULE, {{Address, Port}, {MyPid, MySocket}}),
-		    {ok};
-		{LPid, NewSocket} ->
-		    comm_connection:send({Address, Port, NewSocket}, Pid, Message),
-		    ets:insert(?MODULE, {{Address, Port}, {LPid, NewSocket}}),
-%		    register_connection(Address, Port, LPid, NewSocket),
-		    {ok}
-	    end
+	    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, 20000)
     end.
 
 %% @doc 
@@ -130,6 +115,33 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
+handle_call({send, Address, Port, Pid, Message}, _From, State) ->
+    case ets:lookup(?MODULE, {Address, Port}) of
+	[{{Address, Port}, {_LPid, Socket}}] ->
+	    comm_connection:send({Address, Port, Socket}, Pid, Message), 
+	    {reply, ok, State};
+	[] ->
+	    {DepAddr,DepPort} = get_local_address_port(),
+	    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
+		{local_ip, MyIP, MyPort, MyPid, MySocket} ->
+		    comm_connection:send({Address, Port, MySocket}, Pid, Message),
+		    io:format("this() == ~w~n", [{MyIP, MyPort}]),
+%		    set_local_address(t, {MyIP,MyPort}}),
+%		    register_connection(Address, Port, MyPid, MySocket),
+		    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
+		    ets:insert(?MODULE, {{Address, Port}, {MyPid, MySocket}}),
+		    {reply, ok, State};
+		fail ->
+		    % drop message (remote node not reachable, failure detector will notice)
+		    {reply, ok, State};
+		{connection, LocalPid, NewSocket} ->
+		    comm_connection:send({Address, Port, NewSocket}, Pid, Message),
+		    ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),
+%		    register_connection(Address, Port, LPid, NewSocket),
+		    {reply, ok, State}
+	    end
+    end;
+
 handle_call({unregister_conn, Address, Port}, _From, State) ->
     ets:delete(?MODULE, {Address, Port}),
     {reply, ok, State};
