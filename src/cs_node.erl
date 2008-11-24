@@ -349,6 +349,7 @@ loop(State, Debug) ->
 	    ?LOG("[ ~w | I | Node   | ~w ] crash ~w~n",
 		      [calendar:universal_time(), self(), Id]),
 	    NewState = cs_state:filterDeadNodes(cs_state:addDeadNode(Id, State)), 
+	    failuredetector:remove_node(Id),
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 
 	{dump} -> 
