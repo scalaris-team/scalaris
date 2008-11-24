@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
 -module(comm_layer.comm_connection).
 
@@ -41,25 +41,45 @@ new(Address, Port, Socket) ->
     spawn(fun () -> loop(Socket, Address, Port) end).
 
 %% @doc open new connection
-%% @spec open_new(inet:ip_address(), int(), inet:ip_address(), int()) -> pid()
+%% @spec open_new(inet:ip_address(), int(), inet:ip_address(), int()) -> 
+%%       {local_ip, inet:ip_address(), int(), pid(), inet:socket()} 
+%%     | fail 
+%%     | {connection, pid(), inet:socket()}
 open_new(Address, Port, undefined, MyPort) ->
     Myself = self(),
     LocalPid = spawn(fun () ->
-  			     S = new_connection(Address, Port, MyPort),
-  			     {ok, {MyIP, _MyPort}} = inet:sockname(S),
-  			     Myself ! {new_connection_started, MyIP, MyPort, S},
-  			     loop(S, Address, Port)
+  			     case new_connection(Address, Port, MyPort) of
+				 fail -> 
+				     Myself ! {new_connection_failed};
+				 Socket ->
+				     {ok, {MyIP, _MyPort}} = inet:sockname(Socket),
+				     Myself ! {new_connection_started, MyIP, MyPort, Socket},
+				     loop(Socket, Address, Port)
+			     end
   		     end),
     receive
+  	{new_connection_failed} ->
+	    fail;
   	{new_connection_started, MyIP, MyPort, S} ->
   	    {local_ip, MyIP, MyPort, LocalPid, S}
     end;
 open_new(Address, Port, _MyAddress, MyPort) ->
-    S = new_connection(Address, Port, MyPort), 
-    Pid = spawn(fun () -> 
-		  loop(S, Address, Port) 
-	  end),
-    {Pid, S}.
+    Owner = self(),
+    LocalPid = spawn(fun () ->
+			     case new_connection(Address, Port, MyPort) of
+				 fail ->
+				     Owner ! {new_connection_failed};
+				 Socket ->
+				     Owner ! {new_connection_started, Socket},
+				     loop(Socket, Address, Port) 
+			     end
+		     end),
+    receive
+	{new_connection_failed} ->
+	    fail;
+	{new_connection_started, Socket} ->
+	    {connection, LocalPid, Socket}
+    end.
 
 send({Address, Port, Socket}, Pid, Message) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message}),
@@ -112,8 +132,9 @@ loop(Socket, Address, Port) ->
 	    loop(Socket, Address, Port)
     end.
 
+%% @spec new_connection(inet:ip_address(), int(), int()) -> inet:socket() | fail
 new_connection(Address, Port, MyPort) ->
-    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, {send_timeout, 60000}], 60000) of
+    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, {send_timeout, 60000}], 15000) of
         {ok, Socket} ->
                                                 % send end point data
 	    case inet:sockname(Socket) of
@@ -135,7 +156,6 @@ new_connection(Address, Port, MyPort) ->
 	    end;
         {error, Reason} ->
             log:log2file(comm_connection, io_lib:format("couldn't connect to ~p:~p (~p)~n", [Address, Port, Reason])),
-	    comm_port:unregister_connection(Address, Port),
 	    fail
     end.
     
