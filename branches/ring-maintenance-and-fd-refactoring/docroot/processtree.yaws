@@ -1,0 +1,18 @@
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+		{ok, Node} = postvar(A,"node"),
+		case Node of
+		  "processTreeRoot" ->
+		    {html, json:encode(process_dictionary:get_groups())};
+		  _ ->
+		    {html, json:encode(process_dictionary:get_processes_in_group(Node))}
+		end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>

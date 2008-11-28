@@ -1,0 +1,76 @@
+#   Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+ERLC = @ERLC@
+ERL = @ERL@
+DIALYZER = @ERLANG_ROOT_DIR@/bin/dialyzer
+SVN = svn
+CD = cd
+MAKE = make
+VERSION=0.0.1
+
+
+
+YAWS_PATH= /usr/local/lib/yaws
+
+APP_NAME = chordsharp
+
+VSN = $Id$
+
+all: compile
+
+#cp priv/xbin/*beam bin/
+compile:
+	@$(ERL) -pa contrib/yaws -pa ebin -make
+
+test: compile
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec
+
+test-vts: compile
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
+
+java:
+	$(CD) java-api && ant jar
+
+clean:
+	-rm -rf bin/*.beam
+	-rm -rf bin/comm_layer/*.beam
+	-rm -rf bin/pubsub/*.beam
+	-rm -rf bin/transstore/*.beam
+	-rm -rf ebin/*.beam
+	-rm -rf ebin/comm_layer/*.beam
+	-rm -rf ebin/pubsub/*.beam
+	-rm -rf ebin/transstore/*.beam
+	-rm -rf src/*.beam
+	-rm -rf src/comm_layer/*.beam
+	-rm -rf src/pubsub/*.beam
+	-rm -rf src/transstore/*.beam
+	-rm -rf test/*.beam
+	-rm -rf doc/*.html
+	-rm -rf doc/*.css
+	-rm -rf doc/edoc-info
+	-rm -rf docroot/graphs/*.png
+
+docs:
+	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
+	'"."' '[{def,{vsn,"$(VSN)"}}]'
+
+svn:
+	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
+
+dialyzer:
+	$(DIALYZER) -c src/*.erl -I $(YAWS_PATH)/include/
+
+rrd-init:
+	@echo This is target is deprecated

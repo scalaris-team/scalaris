@@ -1,0 +1,119 @@
+#!/bin/sh
+# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+# 
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+# 
+#        http://www.apache.org/licenses/LICENSE-2.0
+# 
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
+SCALARIS_ROOT=@SCALARIS_ROOT@
+SCALARIS_ETC=$SCALARIS_ROOT/bin
+SCALARIS_COOKIE="chocolate chip cookie"
+HOST=localhost
+
+
+usage(){
+    echo "scalarisctl: "
+    echo "  scalarisctl boot start"
+    echo "  scalarisctl boot stop"
+    echo "  scalarisctl boot restart"
+    echo "  scalarisctl node start"
+    echo "  scalarisctl node stop"
+    echo "  scalarisctl node restart"
+    echo "  scalarisctl debug"
+    exit
+}
+
+bootstart(){
+    pushd $SCALARIS_ROOT/bin > /dev/null
+	erl -setcookie $SCALARIS_COOKIE \
+	    -pa $SCALARIS_ROOT/contrib/yaws/ebin \
+	    -pa $SCALARIS_ROOT/ebin \
+	    -noinput \
+	    -detached \
+	    -yaws embedded true \
+	    -boot_cs log_path "'$SCALARIS_ROOT/log'" \
+	    -boot_cs docroot "\"$SCALARIS_ROOT/docroot\"" \
+	    -boot_cs config "'$SCALARIS_ETC/scalaris.cfg'" \
+	    -boot_cs local_config "'$SCALARIS_ETC/scalaris.local.cfg'" \
+	    -connect_all false -hidden -sname boot@$HOST \
+	    -s boot;
+	popd > /dev/null
+}
+
+debug(){
+    # look into epmd -list: boot@ or node@
+    erl -setcookie $SCALARIS_COOKIE -sname rem -remsh boot@$HOST
+}
+
+bootstop(){
+    pushd $SCALARIS_ROOT/bin > /dev/null
+    erl -setcookie $SCALARIS_COOKIE \
+	-sname ctl \
+	-pa $SCALARIS_ROOT/ebin \
+	-noinput \
+	-s scalaris_ctl -extra boot@$HOST stop
+    popd > /dev/null
+}
+
+nodestart(){
+    pushd $SCALARIS_ROOT/bin > /dev/null
+	erl -setcookie $SCALARIS_COOKIE \
+	    -pa $SCALARIS_ROOT/contrib/yaws/ebin \
+	    -pa $SCALARIS_ROOT/ebin \
+	    -yaws embedded true \
+	    -chordsharp log_path "'$SCALARIS_ROOT/log'" \
+	    -chordsharp docroot "\"$SCALARIS_ROOT/docroot_node\"" \
+	    -chordsharp config "'$SCALARIS_ETC/scalaris.cfg'" \
+	    -chordsharp local_config "'$SCALARIS_ETC/scalaris.local.cfg'" \
+	    -connect_all false -hidden -sname node@$HOST \
+	    -noinput \
+	    -detached \
+	    -s chordsharp;
+	popd > /dev/null
+}
+
+
+nodestop(){
+    pushd $SCALARIS_ROOT/bin > /dev/null
+    erl -setcookie $SCALARIS_COOKIE \
+	-sname ctl \
+	-pa $SCALARIS_ROOT/ebin \
+	-noinput \
+	-s scalaris_ctl -extra node@$HOST stop
+    popd > /dev/null
+}
+
+case $1 in
+    boot)
+	[ 2 -eq $# ] || usage;
+	if [ $2 == "start" ]; then
+	    bootstart;
+	  elif [ $2 == "stop" ]; then
+	    bootstop;
+	  elif [ $2 == "restart" ]; then
+	    bootstop;
+	    bootstart;
+	  fi;;
+    debug)
+	debug;;
+    node)
+	[ 2 -eq $# ] || usage;
+	if [ $2 == "start" ]; then
+	    nodestart;
+	  elif [ $2 == "stop" ]; then
+	    nodestop;
+	  elif [ $2 == "restart" ]; then
+	    nodestop;
+	    nodestart;
+	  fi;;
+    *) usage;;
+esac
+
