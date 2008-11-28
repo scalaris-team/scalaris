@@ -26,10 +26,10 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([reregister/1]).
+-export([reregister/0]).
 
-reregister(UniqueId) ->
-    RegisterMessage = {register, cs_send:this(), UniqueId},
+reregister() ->
+    RegisterMessage = {register, cs_send:this()},
     reregister(config:register_hosts(), RegisterMessage),
     timer:send_after(config:reregisterInterval(), self(), {reregister}).
 

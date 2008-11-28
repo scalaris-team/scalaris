@@ -31,8 +31,10 @@
 	 uniqueId/1,
 	 is_null/1, null/0]).
 
+-type(node() :: {node, cs_send:mypid(), any(), any()}).
 -record(node, {pid, id, uniqueId}).
 
+-spec(new/3 :: (cs_send:mypid(), any(), any()) -> node()).
 new(PID, Id, UniqueId) ->
     #node{
      pid = PID, 
@@ -49,6 +51,7 @@ null() ->
 uniqueId(#node{uniqueId=A}) ->
     A.
     
+-spec(pidX/1 :: (node()) -> cs_send:mypid()).
 pidX(#node{pid=PID}) ->
     PID.
 

@@ -88,30 +88,22 @@ ping(PID) ->
 %% @doc the main loop of the bootstrapping server
 %% @spec loop(gb_sets:gb_set(pid())) -> gb_sets:gb_set(pid())
 loop(Nodes) ->
-    %?LOG("[ I | Boot   | ~w ] nodes <~w>~n",
-    	%      [self(), length(gb_trees:values(Nodes))]),
     receive
-	{crash, Id, _, _PID} ->
-	    %?LOG("[ I | Boot   | ~w ] crashed <~w/~w>~n",
-	    %	      [self(), _PID, gb_trees:values(Nodes)]),
-	    NewNodes = gb_trees:delete_any(Id, Nodes),
-	    failuredetector:remove_node(Id),
+	{crash, PID} ->
+	    NewNodes = gb_sets:delete_any(PID, Nodes),
 	    loop(NewNodes);
 	{ping, Ping_PID, Cookie} ->
 	    cs_send:send(Ping_PID, {pong, Cookie}),
 	    loop(Nodes);
 	{ping, Ping_PID} ->
-	    %?LOG("[ I | Boot   | ~w ] ping ~w ~n",[self(), Ping_PID]),
 	    cs_send:send(Ping_PID, {pong, Ping_PID}),
 	    loop(Nodes);
 	{get_list, Ping_PID} ->
-	    ?LOG("[ I | Boot   | ~w ] get_list ~w ~n",[self(), Ping_PID]),
-	    cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(gb_sets:from_list(gb_trees:values(Nodes)))}),
+	    cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
 	    loop(Nodes);
-	{register, Ping_PID, Id} ->
-	    %?LOG("[ I | Boot   | ~w ] register ~w ~s~n",[self(), Ping_PID, Id]),
-	    failuredetector:add_node(Id, nil, Ping_PID),
-	    loop(gb_trees:enter(Id, Ping_PID, Nodes));
+	{register, Ping_PID} ->
+	    failuredetector2:subscribe(Ping_PID),
+	    loop(gb_sets:add(Ping_PID, Nodes));
 	{connect} ->
 	    % ugly work around for finding the local ip by setting up a socket first
 	    loop(Nodes);
@@ -120,14 +112,11 @@ loop(Nodes) ->
 	    loop(Nodes)
     end.
 
-%% @doc starts a failure_detector, the embedded webserver and the mainloop
-%% @see failure_detector
+%% @doc starts the mainloop of the boot server
 %% @spec start(term()) -> gb_sets:gb_set(pid())
 start(InstanceId) ->
     register(boot, self()),
     process_dictionary:register_process(InstanceId, boot_server, self()),
-    %error_logger:add_report_handler(cs_error_logger),
-    failuredetector:set_owner(self()),
     loop(gb_trees:empty()).
 
 %% @doc starts the server; called by the boot supervisor

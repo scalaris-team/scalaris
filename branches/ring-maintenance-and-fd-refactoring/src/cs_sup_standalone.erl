@@ -66,6 +66,14 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    FailureDetector = {
+      failure_detector2,
+      {failuredetector2, start_link, []},
+      permanent,
+      brutal_kill,
+      worker,
+      []      
+     },
     CommunicationPort = {
       comm_port,
       {comm_layer.comm_layer, start_link, []},
@@ -107,6 +115,7 @@ init([]) ->
 	 []},
     {ok,{{one_for_all,10,1}, [
 			      Config,
+			      FailureDetector,
 			      CommunicationPort,
 			      AdminServer,
 			      YAWS,

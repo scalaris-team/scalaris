@@ -54,14 +54,6 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     InstanceId = string:concat("cs_node_", randoms:getRandomId()),
-    FailureDetector =
-	{failure_detector,
-	 {failuredetector, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 [failure_detector]
-     },
     KeyHolder =
 	{cs_keyholder,
 	 {cs_keyholder, start_link, [InstanceId]},
@@ -87,7 +79,6 @@ init([]) ->
 	  [
 %	   XMLRPC,
 	   KeyHolder,
-	   FailureDetector,
 	   Supervisor_AND
 	  ]}}.
     

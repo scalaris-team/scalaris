@@ -69,9 +69,17 @@ init([InstanceId]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    RM =
+	{?RM,
+	 {?RM, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_all, 10, 1},
 	  [
 	   DB,
+	   RM,
 	   Node
 	  ]}}.
     

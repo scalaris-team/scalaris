@@ -34,3 +34,5 @@
 %%Standard database backend
 -define(DB, cs_db_otp).
 
+%%Standard chord ring maintenance
+-define(RM, rm_chord).
