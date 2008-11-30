@@ -1,0 +1,8 @@
+#summary Frequently asked questions.
+
+
+= How can I change the web server port/yaws port? =
+
+For changing the yaws port of the boot server add "-boot_cs yaws_port XXXX" to the erl call in bin/boot.sh, where XXXX is the port. 
+
+For changing the yaws port of a normal server change in bin/cs_local?.sh "-chordsharp yaws_port XXXX", where XXXX is the port.
