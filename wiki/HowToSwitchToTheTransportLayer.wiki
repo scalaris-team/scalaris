@@ -1,0 +1,36 @@
+#summary How to switch the transport layer from TCP to distributed Erlang
+
+= Introduction =
+
+Scalaris supports two mechanism for exchanging information/messages between the nodes:
+  # custom TCP protocol
+  # distributed Erlang
+In the default configuration the former is used and its implementation is in src/comm_layer. The latter uses the Erlang native mechanism for sending messages between nodes.
+
+We implemented our own TCP-based protocol, because we plan to support SSL in the future.
+
+= Steps =
+
+  * change the transport layer in the code. in src/cs_send.erl change
+  {{{
+  -define(TCP_LAYER, true).
+  %-define(BUILTIN, true).
+  }}}
+  to
+  {{{
+  %-define(TCP_LAYER, true).
+  -define(BUILTIN, true).
+  }}}
+  * change the location of the boot server in bin/scalaris.cfg or bin/scalaris.local.cfg. For the TCP-layer you have to configure the location of the boot server as follows:
+  {{{
+  {boot_host, {{127,0,0,1},14195,boot}}.
+  {log_host, {{127,0,0,1},14195,boot_logger}}.
+  }}}
+  For the distributed Erlang mode you have to configure the location using standard Erlang pids:
+  {{{
+  {boot_host, {boot,'boot@foo.bar.com'}}.
+  {log_host, {boot_logger, 'boot@foo.bar.com'}}.
+  }}}
+  where foo.bar.com is the hostname of the boot server.
+  * make the names of the Erlang VMs globally accessible. For security reasons, all nodes are currently started with -sname XXX. You have to change boot.sh, cs_local.sh, cs_local2.sh, ... from "-sname" to "-name".
+  
