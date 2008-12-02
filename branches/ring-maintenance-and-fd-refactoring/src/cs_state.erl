@@ -149,4 +149,9 @@ set_trans_log(State, NewLog) ->
     State#state{trans_log=NewLog}.
 
 update_pred_succ(State, Pred, Succ) ->
-    State#state{predecessor=Pred, successor=Succ, my_range={node:id(Pred), id(State)}}.
+    case node:is_null(Pred) of
+	true ->
+	    State#state{predecessor=Pred, successor=Succ};
+	false ->
+	    State#state{predecessor=Pred, successor=Succ, my_range={node:id(Pred), id(State)}}
+    end.

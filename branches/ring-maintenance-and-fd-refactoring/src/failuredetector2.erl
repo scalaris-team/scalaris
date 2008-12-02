@@ -53,7 +53,7 @@ unsubscribe(Pid) ->
 %% @private
 -spec(remove_subscriber/1 :: (pid()) -> ok).
 remove_subscriber(Pid) ->
-    gen_server:call(?MODULE, {remove_subscriber, Pid, self()}, 20000).
+    gen_server:call(?MODULE, {remove_subscriber, Pid}, 20000).
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ping Process

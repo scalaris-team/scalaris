@@ -32,7 +32,7 @@ behaviour_info(callbacks) ->
     [
      % create a default routing table
      {empty, 1}, 
-     % key space -> indentifier space
+     % mapping: key space -> identifier space
      {hash_key, 1}, {getRandomNodeId, 0},
      % routing
      {next_hop, 2}, 

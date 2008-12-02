@@ -301,9 +301,7 @@ loop(State, Debug) ->
 	    ok;
 
 	{reregister} ->
-	    cs_reregister:reregister(cs_state:uniqueId(State)),
-	    %cs_send:send(config:bootPid(), {register, cs_send:this(), cs_state:uniqueId(State)}),
-	    %timer:send_after(config:reregisterInterval(), self(), {reregister}),
+	    cs_reregister:reregister(),
 	    loop(State, ?DEBUG(Debug));
 
 %% transactions

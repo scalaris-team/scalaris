@@ -35,6 +35,9 @@
 	 notify/1, update_succ/1, update_pred/1, 
 	 get_as_list/0]).
 
+% unit testing
+-export([merge/3]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -49,6 +52,7 @@ start_link(InstanceId) ->
     end,
     {ok, Link}.
 
+%% @doc called once by the cs_node when joining the ring
 initialize(Id, Me, Pred, Succ) ->
     get_pid() ! {init, Id, Me, Pred, [Succ], self()},
     receive
@@ -97,6 +101,16 @@ get_as_list() ->
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+start() ->
+    receive
+	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
+	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
+	    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
+	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
+	    CSNode ! {init_done},
+	    loop(NewId, NewMe, NewPred, NewSuccList)
+    end.
+
 loop(Id, Me, Pred, Succs) ->
     receive
 	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
@@ -130,7 +144,7 @@ loop(Id, Me, Pred, Succs) ->
 	    end;
 	{get_succ_list_response, Succ, SuccsSuccList} ->
 	    NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), config:succListLength()),
-	    %% @TODO if(length(NewSuccs) < succListLength() / 2) do someting right now
+	    %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
 	    cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
 	    ring_maintenance:update_succ_and_pred(Pred, hd(NewSuccs)), 
 	    failuredetector2:subscribe([node:pidX(Node) || Node <- NewSuccs]),
@@ -152,7 +166,7 @@ loop(Id, Me, Pred, Succs) ->
 		    end
 	    end;
 	{crash, DeadPid} ->
-	    case DeadPid == node:pidX(Pred) of
+	    case node:is_null(Pred) orelse DeadPid == node:pidX(Pred) of
 		true ->
 		    loop(Id, Me, node:null(), filter(DeadPid, Succs));
 		false ->
@@ -193,11 +207,10 @@ filter(Pid, [Succ | Rest]) ->
 %% @doc starts ring maintenance
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-    Id = cs_keyholder:get_key(),
     io:format("[ I | RM     | ~p ] starting ring maintainer~n", [self()]),
     timer:send_interval(config:stabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
-    loop(Id, node:null(), node:null(), []).
+    start().
 
 % @private
 get_pid() ->
