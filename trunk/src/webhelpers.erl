@@ -107,7 +107,7 @@ getRingChart() ->
 	    {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
 	RingSize > 62 ->
 	    % Too many nodes for a google pie chart
-	    {p, [], "Pie Chart: Sorry, too many for a pie chart."};
+	    {p, [], "Pie Chart: Sorry, too many nodes for a pie chart."};
 	true ->
 	    {p, [], [{img, [{src, renderRingChart(Ring)}], ""}]}
     end.
@@ -116,19 +116,22 @@ renderRingChart(Ring) ->
     URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
     Sizes = lists:map(
 	      fun ({ok,Node}) -> 
-		      Tmp = (get_id(node_details:me(Node))
-			     - get_id(node_details:pred(Node)))*100
-                          /16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
-                      if Tmp < 0.0 
-			 -> Diff = 
-				(get_id(node_details:me(Node)) 
-				 + 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF 
-				 - get_id(node_details:pred(Node)))*100
-		                / 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-			 true -> Diff = Tmp
-                      end,
-		      io_lib:format("~f", 
-				    [Diff])
+		      Me_tmp = get_id(node_details:me(Node)),
+		      Pred_tmp = get_id(node_details:pred(Node)),
+		      if (null == Me_tmp) orelse (null == Pred_tmp)
+			 -> io_lib:format("1.0"); % guess the size
+			 true ->
+			      Tmp = (Me_tmp - Pred_tmp)*100
+				  /16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+			      if Tmp < 0.0 
+				 -> Diff = (Me_tmp 
+					    + 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+					    - Pred_tmp)
+					* 100 / 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+				 true -> Diff = Tmp
+			      end,
+			      io_lib:format("~f", [Diff])
+		      end
 	      end, Ring),
     Hostinfos = lists:map(
 		  fun ({ok,Node}) -> 

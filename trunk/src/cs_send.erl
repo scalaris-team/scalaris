@@ -14,7 +14,9 @@
 %%%-------------------------------------------------------------------
 %%% File    : cs_send.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Message Sending
+%%% Description : Message Sending. This module allows to configure 
+%%%           Scalaris for using Distributed Erlang or TCP for inter-node
+%%%           communication.
 %%%
 %%% Created :  15 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
@@ -30,8 +32,8 @@
 
 -export([send/2, this/0, get/2]).
 
--define(TCP_LAYER, true).
-%-define(BUILTIN, true).
+-define(TCP_LAYER, true). % TCP communication
+%-define(BUILTIN, true).   % distributed Erlang native communication
 
 -ifdef(TCP_LAYER).
 this() ->
