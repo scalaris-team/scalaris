@@ -128,7 +128,7 @@ get_middle_key(ok = _DB) ->
 
 %% @doc returns all keys (and removes them from the db) which belong 
 %%      to a new node with id HisKey
--spec(split_data/3 :: (any(), key(), key()) -> [{key(), {key(), bool(), integer(), integer()}}]).
+-spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {key(), bool(), integer(), integer()}}]}).
 split_data(ok = DB, MyKey, HisKey) ->
     {DB, gen_server:call(get_pid(), {split_data, MyKey, HisKey}, 20000)}.
 

@@ -28,7 +28,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/0, subscribe/1, unsubscribe/1]).
+-export([start_link/0, subscribe/1, unsubscribe/1, remove_subscriber/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -217,7 +217,7 @@ code_change(_OldVsn, State, _Extra) ->
 make_pinger(PingerTable, Pid) ->
     case ets:lookup(PingerTable, Pid) of
 	[] ->
-	    io:format("start pinger for ~p~n", [Pid]),
+	    io:format("[ I | FD     | ~p ] starting pinger for ~p~n", [self(), Pid]),
 	    Pinger = start_pinger(Pid),
 	    ets:insert(PingerTable, {Pid, Pinger}),
 	    ok;

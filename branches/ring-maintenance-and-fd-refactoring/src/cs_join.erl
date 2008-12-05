@@ -48,6 +48,7 @@ join_first(Id) ->
     io:format("[ I | Node   | ~w ] join as first ~w ~n",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
     ?RM:initialize(Id, Me, Me, Me),
+    routingtable:initialize(Id, Me, Me),
     cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
 
 %% @doc join a ring
@@ -63,11 +64,13 @@ join_ring(Id, Succ) ->
 		true ->
 		    DB = ?DB:add_data(?DB:new(), Data),
 		    ?RM:initialize(Id, Me, Pred, Succ),
+		    routingtable:initialize(Id, Pred, Succ),
 		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
 		false ->
 		    cs_send:send(node:pidX(Pred), {update_succ, Me}),
 		    DB = ?DB:add_data(?DB:new(), Data),
 		    ?RM:initialize(Id, Me, Pred, Succ),
+		    routingtable:initialize(Id, Pred, Succ),
 		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id}, 
 				 cs_lb:new(), DB)
 	    end

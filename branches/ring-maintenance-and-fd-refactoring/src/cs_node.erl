@@ -77,26 +77,32 @@ loop(State, Debug) ->
 	{update_succ, Succ} = _Message -> 
 	    ?RM:update_succ(Succ),
 	    loop(State, ?DEBUG(Debug));
+	{get_pred_succ, Pid} ->
+	    cs_send:send(Pid, {get_pred_succ_response, cs_state:pred(State), 
+			       cs_state:succ(State)}),
+	    loop(State, ?DEBUG(Debug));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Finger Maintenance 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	{rt_update, RoutingTable} ->
+	    loop(cs_state:set_rt(State, RoutingTable), ?DEBUG(Debug));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Transactions (see transstore/*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{read, SourcePID, Key}->
-	    ?LOG("[ ~w | I | Node   | ~w ] single_read ~w ~n", [calendar:universal_time(), self(), Key]),
 	    transstore.transaction:quorum_read(Key, SourcePID),
 	    loop(State, ?DEBUG(Debug));
 	{parallel_reads, SourcePID, Keys, TLog}->
-	    ?LOG("[ ~w | I | Node   | ~w ] parallel_reads ~w ~n", [calendar:universal_time(), self(), Keys]),
 	    transstore.transaction:parallel_quorum_reads(Keys, TLog, SourcePID),
 	    loop(State, ?DEBUG(Debug));
 	%%  initiate a read phase
 	{do_transaction, TransFun, SuccessFun, FailureFun, Owner} ->
-	    ?TLOG("received do_transaction"),
 	    transstore.transaction:do_transaction(State, TransFun, SuccessFun, FailureFun, Owner),
 	    loop(State, ?DEBUG(Debug));
 	%% do a transaction without a read phase
 	{do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner}->
-	    ?TLOG("received do_transaction_wo_rp"),
 	    transstore.transaction:do_transaction_wo_readphase(State, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner),
 	    loop(State, ?DEBUG(Debug));
 	%% answer - lookup for transaction participant
@@ -151,58 +157,33 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
+% Finger Maintenance 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	{stabilize_loadbalance} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] stabilize_load_balance~n",
-		      [calendar:universal_time(), self()]),
-	    cs_lb:balance_load(State),
-	    loop(State, ?DEBUG(Debug));
-
-%% stabilize pointers
-	{stabilize_pointers} = _Message ->
-	    NewState = ?RT:stabilize(State),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-
-	% for cs_rt
 	{lookup_pointer, Source_Pid, Index} ->
-	    cs_send:send(Source_Pid, {lookup_pointer_response, Index, ?RT:lookup(State, Index)}),
+	    cs_send:send(Source_Pid, {lookup_pointer_response, Index, ?RT:lookup(cs_state:rt(State), Index)}),
 	    loop(State, ?DEBUG(Debug));
 
-	{lookup_pointer_response, Index, Node} = _Message ->
-	    NewState = ?RT:stabilize(State, Index, Node),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-
-	% for chord_rt
-	{rt_get_node, Source_PID, Idx} ->
-	    cs_send:send(Source_PID, {rt_get_node_response, Idx, cs_state:me(State)}),
+	{rt_get_node, Source_PID, Cookie} ->
+	    cs_send:send(Source_PID, {rt_get_node_response, Cookie, cs_state:me(State)}),
 	    loop(State, ?DEBUG(Debug));
 
-	{rt_get_node_response, Index, Node} = _Message ->
-	    NewState = ?RT:stabilize(State, Index, Node),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-
-%% find
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Lookup (see lookup.erl) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{lookup_aux, Key, Hops, Msg} -> 
-	    ?LOG("[ ~w | I | Node   | ~w ] lookup_aux~n",
-		      [calendar:universal_time(), self()]),
 	    lookup:lookup_aux(State, Key, Hops, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{lookup_fin, Hops, Msg} -> 
-	    ?LOG("[ ~w | I | Node   | ~w ] lookup_fin~n",
-		      [calendar:universal_time(), self()]),
 	    lookup:lookup_fin(Hops, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{get_node, Source_PID, Key} -> 	    
-	    ?LOG("[ ~w | I | Node   | ~w ] get_node~n",
-		      [calendar:universal_time(), self()]),
 	    cs_send:send(Source_PID, {get_node_response, Key, cs_state:me(State)}),
 	    loop(State, ?DEBUG(Debug));
 
-% db
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% database 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{get_key, Source_PID, Key}-> 	    
-	    ?LOG("[ ~w | I | Node   | ~w ] get_key~n",
-		      [calendar:universal_time(), self()]),
 	    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
 	    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
 	    if
@@ -215,8 +196,6 @@ loop(State, Debug) ->
 		    loop(State, ?DEBUG(Debug))
 	    end;
 	{set_key, Source_PID, Key, Value, Versionnr} = _Message -> 	    
-	    ?LOG("[ ~w | I | Node   | ~w ] set_key~n",
-		 [calendar:universal_time(), self()]),
 	    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
 	    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
 	    if
@@ -229,8 +208,6 @@ loop(State, Debug) ->
 		    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)))
 	    end;
 	{drop_data, Data, Sender} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] drop_data ~w~n",
-		      [calendar:universal_time(), self(), Data]),
 	    cs_send:send(Sender, {drop_data_ack}),
 	    DB = ?DB:add_data(cs_state:get_db(State), Data),
 	    loop(cs_state:set_db(State, DB), ?DEBUG(cs_debug:debug(Debug, State, _Message)));
@@ -282,6 +259,16 @@ loop(State, Debug) ->
 	    NewState = cs_join:join_request(State, Source_PID, Id, UniqueId),
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	{stabilize_loadbalance} ->
+	    ?LOG("[ ~w | I | Node   | ~w ] stabilize_load_balance~n",
+		      [calendar:universal_time(), self()]),
+	    cs_lb:balance_load(State),
+	    loop(State, ?DEBUG(Debug));
+
+
 %% misc.
 	{get_node_details, Pid, Cookie} ->
 	    cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State)}),
@@ -294,7 +281,7 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 
 	{'$gen_cast', {debug_info, Requestor}} ->
-	    Requestor ! {debug_info_response, [{"rt_debug", ?RT:dump(State)}, {"rt_size", ?RT:get_size(cs_state:rt(State))}]},
+	    Requestor ! {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]},
 	    loop(State, ?DEBUG(Debug));
 	{die} ->
 	    ?LOG("die ~w~n", [self()]),
@@ -336,11 +323,6 @@ loop(State, Debug) ->
 							    cs_state:id(State)},
 	    loop(State, ?DEBUG(Debug));
 
-%%testing purpose
-%% 	{print_locked_items} ->
-%% 	    ?DB:print_locked_items(),
-%% 	    timer:send_after(15000, self(), {print_locked_items}),
-%% 	    loop(State, Debug);
 %% TODO buggy ...
 	{get_node_response, _, _} ->
 	    loop(State, ?DEBUG(Debug));
@@ -352,8 +334,8 @@ loop(State, Debug) ->
 
 %% @doc joins this node in the ring and calls the main loop
 %% @spec start(term()) -> cs_state:state()
+-spec(start/1 :: (any()) -> cs_state:state()).
 start(InstanceId) ->
-    %register(cs_node, self()),
     process_dictionary:register_process(InstanceId, cs_node, self()),
     timer:sleep(crypto:rand_uniform(1, 100) * 100),
     Id = cs_keyholder:get_key(),
@@ -365,7 +347,6 @@ start(InstanceId) ->
 	true ->
 	    ok
     end,
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
     io:format("[ I | Node   | ~w ] joined~n",[self()]),
     loop(State, cs_debug:new()).
     
