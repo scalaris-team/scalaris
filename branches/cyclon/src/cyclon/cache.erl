@@ -43,9 +43,10 @@ case cache:size(Cache) ==length(Cache) of % Replace this with a Test of nil !!!!
 	false ->
 		receive 
 			{cyclon_pid,Node,Cyclon} ->
-				io:format("+"),
-				receive_req(add_element({{Cyclon,Node},nil},Cache))				
-		after 300 -> 
+				io:format("+ ~p | ~p ~n",[Node,Cyclon]),
+				receive_req(add_element({{Cyclon,Node},0},Cache))				
+		after 300 ->
+			
 			Cache
 		end
 end.
@@ -77,9 +78,9 @@ get_cache(Foo) ->
 
 add_list([],Foo) ->
 	Foo;
-add_list([H|T],Foo) ->
-	Node = node:pidX(H),
-	add_list(T,add_element({{nil,Node},nil},Foo)).
+
+add_list([NodePid|T],Foo) ->
+	add_list(T,add_element({{nil,NodePid},nil},Foo)).
 
 
 get_element(_,[]) ->
@@ -105,7 +106,7 @@ case A < B of
 	false	-> false
 end.
 
-eq({{A,_},_},{{B,_},_}) ->
+eq({{_,A},_},{{_,B},_}) ->
 case A==B of 
 	 true    -> true;
         false   -> false

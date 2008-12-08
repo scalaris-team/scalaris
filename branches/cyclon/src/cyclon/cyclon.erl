@@ -20,7 +20,7 @@
 -import(lists).
 -import(process_dictionary).
 -import(erlang).
-
+-import(node).
 %% API
 -export([start_link/1, start/1]).
 
@@ -40,23 +40,21 @@ start(InstanceId) ->
     boot_server:connect(),
     process_dictionary:register_process(InstanceId, cyclon, cs_send:this()),
 
-	get_pid() ! {get_pred, cs_send:this()},
-    get_pid() ! {get_succ_list, cs_send:this()},
-    	erlang:send_after(config:read(cyclon_interval), {shuffle}),
+	get_pid() ! {get_pred_succ, cs_send:this()},
+   	erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+    io:format("after send after~n", []),
     loop(cache:new(),nil).
 
 loop(Cache,Node) ->
     receive
-	{get_pred_response, Pred, Me} ->
-		{_,NewNode,_,_} = Me,
-		NewCache =  cache:add_list([Pred], Cache),
-		loop(NewCache,NewNode);
-	{get_succ_list_response, Me, Succ_list} ->
-		{_,NewNode,_,_} = Me,
-		NewCache =  cache:add_list(Succ_list, Cache),
-		loop(cache:update(NewCache),NewNode);
+	{get_pred_succ_response, Pred, Succ} ->
+	    io:format("get_pred_succ_response~n", []),
+	    Me = cs_send:get(get_pid(), cs_send:this()),
+		NewCache =  cache:add_list([node:pidX(Pred),node:pidX(Succ)], Cache),
+		loop(cache:update(NewCache),Me);
 		
 	{'$gen_cast', {debug_info, Requestor}} when Node/=nil ->
+	    io:format("gen_cast~n", []),
 		% io:format("~p~n", [lists:flatten(io_lib:format("~p", [State]))]),
 	    Requestor ! {debug_info_response, [
 					       	{"cs_node", lists:flatten(io_lib:format("~p", [get_pid()]))},
@@ -64,17 +62,24 @@ loop(Cache,Node) ->
 							{"cache", lists:flatten(io_lib:format("~p", [Cache])) }
 					      ]},
 	    loop(Cache,Node);
-	{shuffle} when Node/=nil	->
-		case cache:size(Cache) of
-			0 -> 
-				NewCache=Cache;
-			_  ->
-				NewCache = shuffle(Cache,Node)
-		end,
-		timer:send_after(config:read(cyclon_interval), {shuffle}),
-		loop(NewCache,Node);
+	{shuffle} 	->
+	    io:format("shuffle~n", []),
+		case Node of	
+		nil ->
+			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+			loop(Cache,Node);
+		_	->
+			case cache:size(Cache) of
+				0 -> 
+					NewCache=Cache;
+				_  ->
+					NewCache = shuffle(Cache,Node)
+			end,
+			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+			loop(NewCache,Node)
+		end;
 	X ->
-		io:format("%% Unhandle Message: ~p~n",X),
+		io:format("%% Unhandle Message: ~p~n", [X]),
 	    loop(Cache,Node)
     end.
 
@@ -89,8 +94,8 @@ if
 		L=cache:size(Cache)
 end,
 Subset=cache:get_random_subset(L,Cache),
-Q=cache:get_random_element(Subset),
 io:format("Subset: ~p~n",[Subset]),
+Q=cache:get_random_element(Subset),
 NSubset=cache:delete(Q,Subset),
 io:format("NSubset: ~p~n",[NSubset]),
 ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
