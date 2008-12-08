@@ -37,10 +37,9 @@
 join_request(State, Source_PID, Id, UniqueId) ->
     Pred = node:new(Source_PID, Id, UniqueId),
     {DB, HisData} = ?DB:split_data(cs_state:get_db(State), cs_state:id(State), Id),
-    SuccList = cs_state:succ_list(State),
-    cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData, SuccList}),
-    failuredetector:add_node(UniqueId, Id, Source_PID),
-    cs_state:update_pred(cs_state:set_db(State, DB), Pred).
+    cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData}),
+    ?RM:update_pred(Pred),
+    cs_state:set_db(State, DB).
 
 %%%------------------------------Join---------------------------------
 
@@ -48,7 +47,9 @@ join_request(State, Source_PID, Id, UniqueId) ->
 join_first(Id) -> 
     io:format("[ I | Node   | ~w ] join as first ~w ~n",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
-    cs_state:new(?RT:empty(Me), [Me], Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
+    ?RM:initialize(Id, Me, Me, Me),
+    routingtable:initialize(Id, Me, Me),
+    cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
 
 %% @doc join a ring
 join_ring(Id, Succ) ->
@@ -57,19 +58,20 @@ join_ring(Id, Succ) ->
     UniqueId = node:uniqueId(Me),
     cs_send:send(node:pidX(Succ), {join, cs_send:this(), Id, UniqueId}),
     receive
-	{join_response, Pred, Data, SuccList} -> 
+	{join_response, Pred, Data} -> 
 	    io:format("[ I | Node   | ~w ] got pred ~w~n",[self(), Pred]),
 	    case node:is_null(Pred) of
 		true ->
-		    failuredetector:add_node(node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)),
 		    DB = ?DB:add_data(?DB:new(), Data),
-		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {Id, Id}, cs_lb:new(), DB);
+		    ?RM:initialize(Id, Me, Pred, Succ),
+		    routingtable:initialize(Id, Pred, Succ),
+		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
 		false ->
-		    failuredetector:add_nodes([{node:uniqueId(Pred), node:id(Pred), node:pidX(Pred)}, 
-					       {node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)}]),
 		    cs_send:send(node:pidX(Pred), {update_succ, Me}),
 		    DB = ?DB:add_data(?DB:new(), Data),
-		    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, {node:id(Pred), Id}, 
+		    ?RM:initialize(Id, Me, Pred, Succ),
+		    routingtable:initialize(Id, Pred, Succ),
+		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id}, 
 				 cs_lb:new(), DB)
 	    end
     end.
@@ -85,7 +87,7 @@ join(Id) ->
     if
 	Ringsize == 0 ->
 	    State = join_first(Id),
-	    cs_reregister:reregister(cs_state:uniqueId(State)),
+	    cs_reregister:reregister(),
 	    {true, State};
 	true ->
 	    case cs_lookup:reliable_get_node(erlang:get(instance_id), 
@@ -94,7 +96,7 @@ join(Id) ->
 		    join(Id);
 		{ok, Succ} ->
 		    State = join_ring(Id, Succ),
-		    cs_reregister:reregister(cs_state:uniqueId(State)),
+		    cs_reregister:reregister(),
 		    {false, State}
 	    end
     end.

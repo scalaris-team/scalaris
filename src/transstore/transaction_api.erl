@@ -150,7 +150,7 @@ single_write(Key, Value)->
 %% use this function to do a full transaction including a readphase
 do_transaction(TFun, SuccessFun, FailureFun)->
     LocalCSNodes = process_dictionary:find_all_cs_nodes(),
-    [LocalCSNode] = lists:nth(random:uniform(length(LocalCSNodes)), LocalCSNodes),
+    LocalCSNode = lists:nth(random:uniform(length(LocalCSNodes)), LocalCSNodes),
     %{_, LocalCSNode} = process_dictionary:find_cs_node(),
     LocalCSNode ! {do_transaction, TFun, SuccessFun, FailureFun, cs_send:this()},
     receive

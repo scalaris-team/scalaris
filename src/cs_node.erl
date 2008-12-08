@@ -47,69 +47,62 @@
 %% @spec loop(State, Debug) -> State
 loop(State, Debug) ->
     receive
-%% pred_changed gets high priority
-	{pred_changed, OldPred, NewPred} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] pred_changed~n",
-		      [calendar:universal_time(), self()]),
-	    State1 = cs_stabilize:update_range(State, OldPred, NewPred),
-	    loop(State1, ?DEBUG(Debug));
-
-%% ping gets high priority
 	{kill} ->
 	    ok;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Ping Messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{ping, Ping_PID, Cookie} ->
-	    UniqueId = cs_state:uniqueId(State),
-	    if
-		Cookie == UniqueId ->
-		    ?LOG("[ ~w | I | Node   | ~w ] ping~n",
-			      [calendar:universal_time(), Cookie]),
-		    cs_send:send(Ping_PID, {pong, Cookie}),
-		    loop(State, ?DEBUG(Debug));
-		true ->
-		    loop(State, ?DEBUG(Debug))
-	    end;
+	    cs_send:send(Ping_PID, {pong, Cookie}),
+	    loop(State, ?DEBUG(Debug));
 	{ping, Ping_PID} ->
 	    cs_send:send(Ping_PID, {pong, Ping_PID}),
 	    loop(State, ?DEBUG(Debug));
 	{ping_with_cookie, Ping_PID, Cookie} ->
 	    cs_send:send(Ping_PID, {pong_with_cookie, Cookie}),
 	    loop(State, ?DEBUG(Debug));
-%% transactions
-	{transtest, Source_PID, NumElems}->
-	    transstore.transaction_test:run_test_write(State, Source_PID, NumElems),
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Ring Maintenance
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	{rm_update, Pred, Succ} ->
+	    NewState = cs_state:update_pred_succ(State, Pred, Succ),
+	    loop(NewState, ?DEBUG(Debug));
+	{succ_left, SuccList} = _Message ->
+	    ?RM:succ_left(SuccList),
 	    loop(State, ?DEBUG(Debug));
-	{test1, Source_PID}->
-	    transstore.transaction_test:run_test_increment(State, Source_PID),
+	{pred_left, Pred} = _Message ->
+	    ?RM:pred_left(Pred),
 	    loop(State, ?DEBUG(Debug));
-	{test3, Source_PID} ->
-	    transstore.transaction_test:run_test_write_5(State, Source_PID),
+	{update_succ, Succ} = _Message -> 
+	    ?RM:update_succ(Succ),
 	    loop(State, ?DEBUG(Debug));
-	{test4, Source_PID} ->
-	    transstore.transaction_test:run_test_write_20(State, Source_PID),
+	{get_pred_succ, Pid} ->
+	    cs_send:send(Pid, {get_pred_succ_response, cs_state:pred(State), 
+			       cs_state:succ(State)}),
 	    loop(State, ?DEBUG(Debug));
-	{test5, Source_PID} ->
-	    transstore.transaction_test:run_test_read_5(State, Source_PID),
-	    loop(State, ?DEBUG(Debug));
-	{test6, Source_PID} ->
-	    transstore.transaction_test:run_test_read_20(State, Source_PID),
-	    loop(State, ?DEBUG(Debug));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Finger Maintenance 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	{rt_update, RoutingTable} ->
+	    loop(cs_state:set_rt(State, RoutingTable), ?DEBUG(Debug));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Transactions (see transstore/*.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{read, SourcePID, Key}->
-	    ?LOG("[ ~w | I | Node   | ~w ] single_read ~w ~n", [calendar:universal_time(), self(), Key]),
 	    transstore.transaction:quorum_read(Key, SourcePID),
 	    loop(State, ?DEBUG(Debug));
 	{parallel_reads, SourcePID, Keys, TLog}->
-	    ?LOG("[ ~w | I | Node   | ~w ] parallel_reads ~w ~n", [calendar:universal_time(), self(), Keys]),
 	    transstore.transaction:parallel_quorum_reads(Keys, TLog, SourcePID),
 	    loop(State, ?DEBUG(Debug));
-	
 	%%  initiate a read phase
 	{do_transaction, TransFun, SuccessFun, FailureFun, Owner} ->
-	    ?TLOG("received do_transaction"),
 	    transstore.transaction:do_transaction(State, TransFun, SuccessFun, FailureFun, Owner),
 	    loop(State, ?DEBUG(Debug));
 	%% do a transaction without a read phase
 	{do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner}->
-	    ?TLOG("received do_transaction_wo_rp"),
 	    transstore.transaction:do_transaction_wo_readphase(State, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner),
 	    loop(State, ?DEBUG(Debug));
 	%% answer - lookup for transaction participant
@@ -149,114 +142,48 @@ loop(State, Debug) ->
 	    loop(NewState, ?DEBUG(Debug));
 	 
 
-%% stabilize ring
-	{get_id, Source_Pid} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_id~n",
-		      [calendar:universal_time(), self()]),
-	    cs_send:send(Source_Pid, {get_id_response, cs_send:this(), cs_state:id(State)}),
-	    loop(State, ?DEBUG(Debug));
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Ring Maintenance (rm_chord)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{get_pred, Source_Pid} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_pred~n",
-		      [calendar:universal_time(), self()]),
-	    cs_send:send(Source_Pid, {get_pred_response, cs_state:pred(State), cs_state:me(State)}),
+	    cs_send:send(Source_Pid, {get_pred_response, cs_state:pred(State)}),
 	    loop(State, ?DEBUG(Debug));
 	{get_succ_list, Source_Pid} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_succ_list~n",
-		 [calendar:universal_time(), self()]),
-	    cs_send:send(Source_Pid, {get_succ_list_response, cs_state:me(State), cs_state:succ_list(State)}),
+	    cs_send:send(Source_Pid, {get_succ_list_response, cs_state:me(State), 
+				      rm_chord:get_successorlist()}),
 	    loop(State, ?DEBUG(Debug));
-	{get_pred_response, SuccsPred, Succ} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_pred_respone ~w ~w~n",
-		      [calendar:universal_time(), self(), SuccsPred, Succ]),
-	    NewState = cs_stabilize:stabilize2(State, SuccsPred, Succ),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-	{get_succ_list_response, Succ, SuccList} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_succ_list ~w ~w~n",
-		      [calendar:universal_time(), self(), Succ, SuccList]),
-	    NewState = cs_stabilize:stabilize(State, Succ, SuccList),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-	{succ_left, SuccList} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] succ_left ~w~n",
-		      [calendar:universal_time(), self(), SuccList]),
-	    NewState = cs_stabilize:succ_left(State, SuccList),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-	{pred_left, Pred} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] pred_left ~w~n",
-		      [calendar:universal_time(), self(), Pred]),
-	    NewState = cs_stabilize:pred_left(State, Pred),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 	{notify, Pred} = _Message -> 
-	    ?LOG("[ ~w | I | Node   | ~w ] notify~n",
-		 [calendar:universal_time(), self()]),
-	    NewState = cs_stabilize:notify(State, Pred),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-	{update_succ, Succ} = _Message -> 
-	    ?LOG("[ ~w | I | Node   | ~w ] update_succ~n",
-		      [calendar:universal_time(), self()]),
-	    NewState = cs_stabilize:update_succ(State, Succ),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-	{stabilize_ring} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] stabilize_ring~n",
-		      [calendar:universal_time(), self()]),
-	    cs_stabilize:stabilize(State),
+	    rm_chord:notify(Pred),
 	    loop(State, ?DEBUG(Debug));
 
-	{stabilize_failuredetector} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] stabilize_failuredetector~n",
-		      [calendar:universal_time(), self()]),
-	    cs_stabilize:update_failuredetector(State),
-	    loop(State, ?DEBUG(Debug));
-
-	{stabilize_loadbalance} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] stabilize_load_balance~n",
-		      [calendar:universal_time(), self()]),
-	    cs_lb:balance_load(State),
-	    loop(State, ?DEBUG(Debug));
-
-%% stabilize pointers
-	{stabilize_pointers} = _Message ->
-	    NewState = ?RT:stabilize(State),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-
-	% for cs_rt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Finger Maintenance 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{lookup_pointer, Source_Pid, Index} ->
-	    cs_send:send(Source_Pid, {lookup_pointer_response, Index, ?RT:lookup(State, Index)}),
+	    cs_send:send(Source_Pid, {lookup_pointer_response, Index, ?RT:lookup(cs_state:rt(State), Index)}),
 	    loop(State, ?DEBUG(Debug));
 
-	{lookup_pointer_response, Index, Node} = _Message ->
-	    NewState = ?RT:stabilize(State, Index, Node),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-
-	% for chord_rt
-	{rt_get_node, Source_PID, Idx} ->
-	    cs_send:send(Source_PID, {rt_get_node_response, Idx, cs_state:me(State)}),
+	{rt_get_node, Source_PID, Cookie} ->
+	    cs_send:send(Source_PID, {rt_get_node_response, Cookie, cs_state:me(State)}),
 	    loop(State, ?DEBUG(Debug));
 
-	{rt_get_node_response, Index, Node} = _Message ->
-	    NewState = ?RT:stabilize(State, Index, Node),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-
-%% find
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Lookup (see lookup.erl) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{lookup_aux, Key, Hops, Msg} -> 
-	    ?LOG("[ ~w | I | Node   | ~w ] lookup_aux~n",
-		      [calendar:universal_time(), self()]),
 	    lookup:lookup_aux(State, Key, Hops, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{lookup_fin, Hops, Msg} -> 
-	    ?LOG("[ ~w | I | Node   | ~w ] lookup_fin~n",
-		      [calendar:universal_time(), self()]),
 	    lookup:lookup_fin(Hops, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{get_node, Source_PID, Key} -> 	    
-	    ?LOG("[ ~w | I | Node   | ~w ] get_node~n",
-		      [calendar:universal_time(), self()]),
 	    cs_send:send(Source_PID, {get_node_response, Key, cs_state:me(State)}),
 	    loop(State, ?DEBUG(Debug));
 
-% db
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% database 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{get_key, Source_PID, Key}-> 	    
-	    ?LOG("[ ~w | I | Node   | ~w ] get_key~n",
-		      [calendar:universal_time(), self()]),
 	    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
 	    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
 	    if
@@ -269,8 +196,6 @@ loop(State, Debug) ->
 		    loop(State, ?DEBUG(Debug))
 	    end;
 	{set_key, Source_PID, Key, Value, Versionnr} = _Message -> 	    
-	    ?LOG("[ ~w | I | Node   | ~w ] set_key~n",
-		 [calendar:universal_time(), self()]),
 	    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
 	    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
 	    if
@@ -283,21 +208,17 @@ loop(State, Debug) ->
 		    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)))
 	    end;
 	{drop_data, Data, Sender} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] drop_data ~w~n",
-		      [calendar:universal_time(), self(), Data]),
 	    cs_send:send(Sender, {drop_data_ack}),
 	    DB = ?DB:add_data(cs_state:get_db(State), Data),
 	    loop(cs_state:set_db(State, DB), ?DEBUG(cs_debug:debug(Debug, State, _Message)));
 
-%% bulk
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% bulk owner messages (see bulkowner.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{bulk_owner, I, Msg} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] bulk_owner~n",
-		      [calendar:universal_time(), self()]),
 	    bulkowner:bulk_owner(State, I, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{start_bulk_owner, I, Msg} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] start_bulk_owner~n",
-		      [calendar:universal_time(), self()]),
 	    bulkowner:start_bulk_owner(I, Msg),
 	    loop(State, ?DEBUG(Debug));
 	{bulkowner_deliver, Range, {bulk_read_with_version, Issuer}} ->
@@ -305,52 +226,53 @@ loop(State, Debug) ->
 				  ?DB:get_range_with_version(cs_state:get_db(State), Range)}),
 	    loop(State, ?DEBUG(Debug));
 
-% load balancing
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% load balancing messages (see cs_lb.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{get_load, Source_PID} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_load~n",
-		      [calendar:universal_time(), self()]),
 	    cs_send:send(Source_PID, {get_load_response, cs_send:this(), ?DB:get_load(cs_state:get_db(State))}),
 	    loop(State, ?DEBUG(Debug));
 
 	{get_load_response, Source_PID, Load} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_load_response~n",
-		      [calendar:universal_time(), self()]),
 	    cs_lb:check_balance(State, Source_PID, Load),
 	    loop(State, ?DEBUG(Debug));
 
 	{get_middle_key, Source_PID} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_middle_key~n",
-		      [calendar:universal_time(), self()]),
 	    {MiddleKey, NewState} = cs_lb:get_middle_key(State),
 	    cs_send:send(Source_PID, {get_middle_key_response, cs_send:this(), MiddleKey}),
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 
 	{get_middle_key_response, Source_PID, MiddleKey} = _Message ->
-	    ?LOG("[ ~w | I | Node   | ~w ] get_middle_key_response~n",
-		      [calendar:universal_time(), self()]),
 	    NewState = cs_lb:move_load(State, Source_PID, MiddleKey),
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 
 	{reset_loadbalance_flag} = _Message ->
 	    NewState = cs_lb:reset_loadbalance_flag(State),
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-%% join
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% join messages (see cs_join.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{join, Source_PID, Id, UniqueId} = _Message -> 
 	    ?LOG("[ ~w | I | Node   | ~w ] join~n",
 		      [calendar:universal_time(), self()]),
 	    NewState = cs_join:join_request(State, Source_PID, Id, UniqueId),
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	{stabilize_loadbalance} ->
+	    ?LOG("[ ~w | I | Node   | ~w ] stabilize_load_balance~n",
+		      [calendar:universal_time(), self()]),
+	    cs_lb:balance_load(State),
+	    loop(State, ?DEBUG(Debug));
+
+
 %% misc.
 	{get_node_details, Pid, Cookie} ->
 	    cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State)}),
 	    loop(State, Debug);
-	{crash, Id, _, _} = _Message -> 
-	    ?LOG("[ ~w | I | Node   | ~w ] crash ~w~n",
-		      [calendar:universal_time(), self(), Id]),
-	    NewState = cs_state:filterDeadNodes(cs_state:addDeadNode(Id, State)), 
-	    failuredetector:remove_node(Id),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
 
 	{dump} -> 
 	    ?LOG("[ ~w | I | Node   | ~w ] dump~n",
@@ -359,17 +281,36 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 
 	{'$gen_cast', {debug_info, Requestor}} ->
-	    Requestor ! {debug_info_response, [{"rt_debug", ?RT:dump(State)}, {"rt_size", ?RT:get_size(cs_state:rt(State))}]},
+	    Requestor ! {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]},
 	    loop(State, ?DEBUG(Debug));
 	{die} ->
 	    ?LOG("die ~w~n", [self()]),
 	    ok;
 
 	{reregister} ->
-	    cs_reregister:reregister(cs_state:uniqueId(State)),
-	    %cs_send:send(config:bootPid(), {register, cs_send:this(), cs_state:uniqueId(State)}),
-	    %timer:send_after(config:reregisterInterval(), self(), {reregister}),
+	    cs_reregister:reregister(),
 	    loop(State, ?DEBUG(Debug));
+
+%% transactions
+	{transtest, Source_PID, NumElems}->
+	    transstore.transaction_test:run_test_write(State, Source_PID, NumElems),
+	    loop(State, ?DEBUG(Debug));
+	{test1, Source_PID}->
+	    transstore.transaction_test:run_test_increment(State, Source_PID),
+	    loop(State, ?DEBUG(Debug));
+	{test3, Source_PID} ->
+	    transstore.transaction_test:run_test_write_5(State, Source_PID),
+	    loop(State, ?DEBUG(Debug));
+	{test4, Source_PID} ->
+	    transstore.transaction_test:run_test_write_20(State, Source_PID),
+	    loop(State, ?DEBUG(Debug));
+	{test5, Source_PID} ->
+	    transstore.transaction_test:run_test_read_5(State, Source_PID),
+	    loop(State, ?DEBUG(Debug));
+	{test6, Source_PID} ->
+	    transstore.transaction_test:run_test_read_20(State, Source_PID),
+	    loop(State, ?DEBUG(Debug));
+	
 
 %% unit_tests
 	{bulkowner_deliver, Range, {unit_test_bulkowner, Owner}} ->
@@ -382,11 +323,6 @@ loop(State, Debug) ->
 							    cs_state:id(State)},
 	    loop(State, ?DEBUG(Debug));
 
-%%testing purpose
-%% 	{print_locked_items} ->
-%% 	    ?DB:print_locked_items(),
-%% 	    timer:send_after(15000, self(), {print_locked_items}),
-%% 	    loop(State, Debug);
 %% TODO buggy ...
 	{get_node_response, _, _} ->
 	    loop(State, ?DEBUG(Debug));
@@ -398,12 +334,11 @@ loop(State, Debug) ->
 
 %% @doc joins this node in the ring and calls the main loop
 %% @spec start(term()) -> cs_state:state()
+-spec(start/1 :: (any()) -> cs_state:state()).
 start(InstanceId) ->
-    %register(cs_node, self()),
     process_dictionary:register_process(InstanceId, cs_node, self()),
     timer:sleep(crypto:rand_uniform(1, 100) * 100),
     Id = cs_keyholder:get_key(),
-    failuredetector:set_owner(self()),
     boot_server:connect(),
     {First, State} = cs_join:join(Id),
     if
@@ -412,13 +347,6 @@ start(InstanceId) ->
 	true ->
 	    ok
     end,
-    timer:send_after(config:stabilizationInterval(), self(), {stabilize_ring}),
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
-    timer:send_after(config:failureDetectorUpdateInterval(), self(), {stabilize_failuredetector}),
-    %timer:send_after(config:loadBalanceStartupInterval(), self(), {stabilize_loadbalance}),
-    %% begin testing purpose
-%    timer:send_after(15000, self(), {print_locked_items}),
-    %% end testing purpose
     io:format("[ I | Node   | ~w ] joined~n",[self()]),
     loop(State, cs_debug:new()).
     

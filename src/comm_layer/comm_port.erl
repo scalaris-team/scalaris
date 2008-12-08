@@ -64,7 +64,7 @@ unregister_connection(Adress, Port) ->
     gen_server:call(?MODULE, {unregister_conn, Adress, Port}, 20000).
 
 %% @doc 
-%% @spec register_connection(inet:ip_address(), int(), pid) -> ok | duplicate
+%% @spec register_connection(inet:ip_address(), int(), pid(), gen_tcp:socket()) -> ok | duplicate
 register_connection(Adress, Port, Pid, Socket) ->
     gen_server:call(?MODULE, {register_conn, Adress, Port, Pid, Socket}, 20000).
 

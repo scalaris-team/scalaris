@@ -31,35 +31,30 @@
 
 -export([new/6, new/7,
 	 id/1, me/1, uniqueId/1,
-	 succ/1, succ_pid/1, succ_id/1, update_succ/2,
-	 succ_list/1, succ_list_pids/1, set_succlist/2,
-	 pred_pid/1, pred_id/1, pred/1, update_pred/2, 
-	 filterDeadNodes/1,
+	 succ/1, succ_pid/1, succ_id/1,
+	 pred_pid/1, pred_id/1, pred/1, 
+	 update_pred_succ/3,
 	 dump/1,
 	 set_rt/2, rt/1,
 	 get_db/1, set_db/2,
 	 get_lb/1, set_lb/2,
-	 get_nodes/1,
-	 addDeadNode/2,
 	 details/1,
-	 filterDeadNodes/2,
-	 assert/1,
-	 get_my_range/1, set_my_range/2,
+	 get_my_range/1, 
 	 next_interval/1,
 	 %%transactions
 	 get_trans_log/1,
 	 set_trans_log/2]).
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {routingtable, successorlist, predecessor, me, my_range, lb, deadnodes, join_time, trans_log, db}).
+-record(state, {routingtable, successor, predecessor, me, my_range, lb, deadnodes, join_time, trans_log, db}).
 
-new(RT, SuccessorList, Predecessor, Me, MyRange, LB) ->
-    new(RT, SuccessorList, Predecessor, Me, MyRange, LB, ?DB:new()).
+new(RT, Successor, Predecessor, Me, MyRange, LB) ->
+    new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new()).
 
-new(RT, SuccessorList, Predecessor, Me, MyRange, LB, ok = DB) ->
+new(RT, Successor, Predecessor, Me, MyRange, LB, ok = DB) ->
     #state{
      routingtable = RT, 
-     successorlist = SuccessorList,
+     successor = Successor,
      predecessor = Predecessor,
      me = Me,
      my_range = MyRange,
@@ -82,9 +77,6 @@ next_interval(State) ->
 get_my_range(#state{my_range=MyRange}) ->
     MyRange.
 
-set_my_range(State, MyRange) ->
-    State#state{my_range=MyRange}.
-
 get_db(#state{db=DB}) ->
     DB.
 
@@ -106,32 +98,12 @@ id(#state{me=Me}) ->
 uniqueId(#state{me=Me}) -> 
     node:uniqueId(Me).
 
-join_time(#state{join_time=JoinTime}) ->
-    JoinTime.
-    
 %%% Successor
-succ(#state{successorlist=[Succ | _]}) -> Succ.
+succ(#state{successor=Succ}) -> Succ.
 
-succ_pid(#state{successorlist=[Succ | _]}) -> node:pidX(Succ).
+succ_pid(State) -> node:pidX(succ(State)).
 
-succ_id(#state{successorlist=[Succ | _]}) -> node:id(Succ).
-%succ_id(State) -> io:format("unknown state ~w~n", [State]), "a".
-
-update_succ(#state{successorlist=[_ | Rest]}=State, NewSucc) -> 
-    State#state{successorlist=[NewSucc | Rest]}.
-
-%%% Successor List
--spec(succ_list/1 :: (#state{}) -> [any()]).
-succ_list(#state{successorlist=SuccList}) -> SuccList.
-
-succ_list_pids(State) -> 
-    SuccList = succ_list(State),
-    lists:map(fun (Node) ->
-		      node:pidX(Node) end,
-	      SuccList).
-
-set_succlist(State, SuccList) ->
-    State#state{successorlist=SuccList}.
+succ_id(State) -> node:id(succ(State)).
 
 %%% Predecessor
 
@@ -141,16 +113,6 @@ pred_id(#state{predecessor=Pred}) -> node:id(Pred).
 
 pred(#state{predecessor=Pred}) -> Pred.
 
-update_pred(#state{predecessor=OldPred} = State, Pred) ->
-    if
-	OldPred == Pred ->
-	    ok;
-	true ->
-	    self() ! {pred_changed, OldPred, Pred}
-    end,
-    State#state{predecessor=Pred}.
-
-
 %%% Routing Table
 
 rt(#state{routingtable=RT}) ->
@@ -159,61 +121,6 @@ rt(#state{routingtable=RT}) ->
 set_rt(State, RT) ->
     State#state{routingtable=RT}.
 
-%%% dead nodes 
-
-filterList(L, Id) ->
-    lists:filter(fun (X) -> node:uniqueId(X) /= Id end, L).
-
-filterListSet(L, IdSet) ->
-    gb_sets:fold(fun (Id, List) -> filterList(List, Id) end, L, IdSet).
-
-filterDeadNodes(List, #state{deadnodes=DeadNodes}) ->
-    filterListSet(List, DeadNodes).
-    
-addDeadNode(DeadNode, State) ->
-    State#state{deadnodes=gb_sets:add_element(DeadNode, gb_sets:new())}.
-%    State#state{deadnodes=gb_sets:add_element(DeadNode, DeadNodes)}.
-
-filterPred(Pred, DeadNodes) ->
-    IsNull = node:is_null(Pred),
-    if
-	IsNull -> 
-	    Pred;
-	true ->
-	    PredIsDead = gb_sets:is_element(node:uniqueId(Pred), DeadNodes),
-	    if
-		PredIsDead ->
-		    self() ! {pred_changed, Pred, node:null()},
-		    node:null();
-		true ->
-		    Pred
-	    end
-    end.
-    
-filterDeadNodes(#state{routingtable=RT,successorlist=SuccList, predecessor=Pred, deadnodes=DeadNodes}=State) ->
-    NewRT = ?RT:filterDeadNodes(RT, DeadNodes),
-    NewSuccList = filterListSet(SuccList, DeadNodes),
-    NewSuccListLength = length(NewSuccList),
-    Limit = config:succListLength() / 2,
-    checkSuccList(NewSuccList, State, DeadNodes),
-    if
-	NewSuccListLength < Limit ->
-	    cs_send:send(succ_pid(State), {get_succ_list, cs_send:this()});
-	true ->
-	    void
-    end,
-    NewPred = filterPred(Pred, DeadNodes),
-    State#state{routingtable=NewRT,
-		successorlist=NewSuccList, 
-		predecessor=NewPred
-	       }.
-
-
-checkSuccList([], State, DeadNodes) ->
-    boot_logger:log(io_lib:format("online: ~p; oldlist ~p; me ~p; pred ~p; deadnodes ~p", [timer:now_diff(now(), join_time(State)), succ_list(State), me(State), pred(State), DeadNodes]));
-checkSuccList(_, _, _) ->
-    void.
-
 %%% util
 
 dump(State) ->
@@ -221,40 +128,15 @@ dump(State) ->
 						 , pred_id(State), pred_pid(State), succ_id(State), succ_pid(State)]),
     ok.
 
-get_nodes(#state{routingtable=RT,successorlist=SuccList, predecessor=Pred}) ->
-    if
-	Pred == null ->
-	    lists:map(fun (Node) -> {node:uniqueId(Node), node:id(Node), node:pidX(Node)} end, 
-		      lists:append([?RT:to_node_list(RT), SuccList]));
-	true ->
-	    lists:map(fun (Node) -> {node:uniqueId(Node), node:id(Node), node:pidX(Node)} end, 
-		      lists:append([?RT:to_node_list(RT), SuccList, [Pred]]))
-    end.
-
 details(State) ->
     Pred = pred(State),
     Node = me(State),
-    SuccList = succ_list(State),
+    SuccList = ?RM:get_as_list(),
     Load = ?DB:get_load(get_db(State)),
-    FD_Size = failuredetector:node_count(),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),
     %node_details:new(Pred, Node, SuccList, Load, FD_Size, Hostname, RTSize, cs_message:get_details(), erlang:memory(total)).
-    node_details:new(Pred, Node, SuccList, Load, FD_Size, Hostname, RTSize, ok, erlang:memory(total)).
-
-%%% Assert / Debugging
-
-assert(State) ->
-    assert_succlist(State).
-
-assert_succlist(State) ->
-    SuccListLength = length(succ_list(State)),
-    if
-	SuccListLength == 0 ->
-	    {fail, "succ list empty"};
-	true ->
-	    ok
-    end.
+    node_details:new(Pred, Node, SuccList, Load, Hostname, RTSize, ok, erlang:memory(total)).
 
 %%% Transactions
 %%% Information on transactions that all possible TMs and TPs share
@@ -266,3 +148,10 @@ get_trans_log(#state{trans_log=Log}) ->
 set_trans_log(State, NewLog) ->
     State#state{trans_log=NewLog}.
 
+update_pred_succ(State, Pred, Succ) ->
+    case node:is_null(Pred) of
+	true ->
+	    State#state{predecessor=Pred, successor=Succ};
+	false ->
+	    State#state{predecessor=Pred, successor=Succ, my_range={node:id(Pred), id(State)}}
+    end.

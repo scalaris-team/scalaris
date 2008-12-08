@@ -26,20 +26,30 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+% for behaviour
 -export([behaviour_info/1]).
+
+% for routing table implementation
+-export([initialize/3]).
+
+-include("chordsharp.hrl").
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Behaviour definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 behaviour_info(callbacks) ->
     [
      % create a default routing table
      {empty, 1}, 
-     % key space -> indentifier space
+     % mapping: key space -> identifier space
      {hash_key, 1}, {getRandomNodeId, 0},
      % routing
      {next_hop, 2}, 
      % trigger for new stabilization round
-     {stabilize, 1}, 
+     {stabilize, 3}, 
      % dead nodes filtering
-     {filterDeadNodes, 2}, 
+     {filterDeadNode, 2}, 
      % statistics
      {to_pid_list, 1}, {to_node_list, 1}, {get_size, 1},
      % for symmetric replication
@@ -54,3 +64,7 @@ behaviour_info(_Other) ->
     undefined.
 
 %% see rt_simple.erl for simple standard implementation
+
+initialize(Id, Pred, Succ) ->
+    Pid = process_dictionary:lookup_process(erlang:get(instance_id), routing_table),
+    Pid ! {init, Id, Pred, Succ}.
