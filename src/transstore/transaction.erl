@@ -133,7 +133,7 @@ write(Key, Value, TransLog)->
 	    lists:map(fun(ReplicaKey) ->
 			      cs_lookup:unreliable_get_key(ReplicaKey)
 		      end, ReplicaKeys),
-	    timer:send_after(config:transactionLookupTimeout(), self(), {write_read_receive_timeout, lists:nth(1, ReplicaKeys)}),
+	    erlang:send_after(config:transactionLookupTimeout(), self(), {write_read_receive_timeout, lists:nth(1, ReplicaKeys)}),
 	    {Flag, Result} = write_read_receive([], ReplicaKeys, write),
 	    if
 		Flag == fail ->
@@ -189,7 +189,7 @@ read(Key, TransLog)->
 	    lists:map(fun(ReplicaKey) ->
 			      cs_lookup:unreliable_get_key(ReplicaKey)
 		      end, ReplicaKeys),
-	    timer:send_after(config:transactionLookupTimeout(), self(), {write_read_receive_timeout, lists:nth(1, ReplicaKeys)}),
+	    erlang:send_after(config:transactionLookupTimeout(), self(), {write_read_receive_timeout, lists:nth(1, ReplicaKeys)}),
 	    {Flag, Result} = write_read_receive([], ReplicaKeys, read),
 	    if
 		Flag == fail ->
@@ -219,7 +219,7 @@ do_quorum_read(Key, SourcePID, InstanceId)->
     lists:map(fun(ReplicaKey) ->
 			      cs_lookup:unreliable_get_key(ReplicaKey)
 	      end, ReplicaKeys),
-    timer:send_after(config:transactionLookupTimeout(), self(), {write_read_receive_timeout, lists:nth(1, ReplicaKeys)}),
+    erlang:send_after(config:transactionLookupTimeout(), self(), {write_read_receive_timeout, lists:nth(1, ReplicaKeys)}),
     {Flag, Result} = write_read_receive([], ReplicaKeys, read),
     if
 	Flag == fail ->
@@ -406,7 +406,7 @@ parallel_reads(Keys, TransLog)->
 				      ResultsInitAcc,
 				      ReplicaKeysAll),
 
-	    timer:send_after(config:transactionLookupTimeout(), 
+	    erlang:send_after(config:transactionLookupTimeout(), 
 			     self(), 
 			     {write_read_receive_timeout, lists:nth(1, lists:nth(1, ReplicaKeysAll))}),
 	    
