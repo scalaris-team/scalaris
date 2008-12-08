@@ -59,13 +59,13 @@ init(_Args) ->
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
-    FailureDetector =
-	{failure_detector,
-	 {failuredetector, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 [failure_detector]
+    FailureDetector = {
+      failure_detector2,
+      {failuredetector2, start_link, []},
+      permanent,
+      brutal_kill,
+      worker,
+      []      
      },
     Node =
 	{boot_server,

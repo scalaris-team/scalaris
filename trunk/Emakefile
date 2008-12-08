@@ -1,3 +1,4 @@
+{"src/ring_maintenance.erl", [debug_info, {outdir, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"}]}.
 {"src/routingtable.erl", [debug_info, {outdir, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"}]}.
 {"src/database.erl", [debug_info, {outdir, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"}]}.
 {"src/*", [debug_info, {outdir, "ebin"}, {i, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"}]}.

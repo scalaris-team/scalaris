@@ -207,7 +207,7 @@ log(F) ->
 %% @doc omit repeated entries in a sorted list
 -spec(uniq/1 :: (list()) -> list()).
 uniq([First | Rest]) ->
-    uniq(First, Rest, [First]);
+    lists:reverse(uniq(First, Rest, [First]));
 uniq([]) ->
     [].
 

@@ -28,6 +28,8 @@
 
 -behaviour(supervisor).
 
+-include("chordsharp.hrl").
+
 -export([start_link/0, init/1]).
 
 %%====================================================================
@@ -54,14 +56,6 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     InstanceId = string:concat("cs_node_", randoms:getRandomId()),
-    FailureDetector =
-	{failure_detector,
-	 {failuredetector, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 [failure_detector]
-     },
     KeyHolder =
 	{cs_keyholder,
 	 {cs_keyholder, start_link, [InstanceId]},
@@ -76,18 +70,25 @@ init([]) ->
 	 brutal_kill,
 	 supervisor,
 	 []},
-%    XMLRPC = 
-%	{cs_xmlrpc,
-%	 {cs_xmlrpc, start_link, []},
-%	 permanent,
-%	 brutal_kill,
-%	 worker,
-%	 []},
+    RingMaintenance =
+	{?RM,
+	 {?RM, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+    RoutingTable =
+	{routingtable,
+	 {rt_loop, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_one, 10, 1},
 	  [
-%	   XMLRPC,
 	   KeyHolder,
-	   FailureDetector,
+	   RingMaintenance,
+	   RoutingTable,
 	   Supervisor_AND
 	  ]}}.
     

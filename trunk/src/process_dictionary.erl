@@ -60,8 +60,8 @@
 	 lookup_process/2,
 	 find_cs_node/0, 
 	 find_all_cs_nodes/0, 
+	 find_all_processes/1, 
 	 find_group/1, 
-	 %find_instance_id/0,
 
 	 get_groups/0,
 	 get_processes_in_group/1, 
@@ -102,17 +102,16 @@ find_cs_node() ->
 %% @doc tries to find all cs_node processes
 -spec(find_all_cs_nodes/0 :: () -> list()).
 find_all_cs_nodes() ->
-    gen_server:call(?MODULE, {find_all_processes, cs_node}, 20000).
+    find_all_processes(cs_node).
+
+-spec(find_all_processes/1 :: (any()) -> list()).
+find_all_processes(Name) ->
+    gen_server:call(?MODULE, {find_all_processes, Name}, 20000).
 
 %% @doc tries to find a process group with a specific process inside
 %% @spec find_group(term()) -> term()
 find_group(Process) ->
     gen_server:call(?MODULE, {find_group, Process}, 20000).
-
-%% @doc find instance id
-%% @spec find_instance_id() -> term()
-find_instance_id() ->
-    gen_server:call(?MODULE, {find_instance_id}, 20000).
 
 %% @doc find groups for web interface
 %% @spec get_groups() -> term()
@@ -246,7 +245,7 @@ handle_call({find_process, Name}, _From, State) ->
 
 handle_call({find_all_processes, Name}, _From, State) ->
     Result = ets:match(?MODULE, {{'_', Name}, '$1'}),
-    {reply, Result, State};
+    {reply, lists:flatten(Result), State};
 
 handle_call({find_group, Name}, _From, State) ->
     Result = case ets:match(?MODULE, {{'$1', Name}, '_'}) of

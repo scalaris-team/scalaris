@@ -105,17 +105,9 @@ drop_data(State) ->
 	    ok
     after 
 	10000 ->
-	    receive
-		{crash, Id, _, _} ->
-		    failuredetector:remove_node(Id),
-		    drop_data(cs_state:filterDeadNodes(cs_state:addDeadNode(Id, State)))
-	    after 
-		0 ->
-		    drop_data(State)
-	    end
+	    drop_data(State)
     end.
     
-
 reset_loadbalance_flag(State) ->
     LB = cs_state:get_lb(State),
     NewLB = LB#lb{loadbalance_flag=false},

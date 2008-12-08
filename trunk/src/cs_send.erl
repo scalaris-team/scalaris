@@ -36,10 +36,14 @@
 %-define(BUILTIN, true).   % distributed Erlang native communication
 
 -ifdef(TCP_LAYER).
+-type(mypid() :: {inet:ip_address(), integer(), pid()}).
+
+-spec(this/0 :: () -> mypid()).
 this() ->
     %self().
     comm_layer.comm_layer:this().
 
+-spec(send/2 :: (mypid(), any()) -> ok).
 send(Pid, Message) ->
     %Pid ! Message.
     comm_layer.comm_layer:send(Pid, Message).
@@ -51,6 +55,7 @@ get(Name, {IP, Port, _Pid}=_Node) ->
 -endif.
 
 -ifdef(BUILTIN).
+-type(mypid() :: pid()).
 this() ->
     self().
 

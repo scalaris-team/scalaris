@@ -27,25 +27,27 @@
 -vsn('$Id$ ').
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, stabilize/1, filterDeadNodes/2,
+-export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, stabilize/3, filterDeadNode/2,
 	to_pid_list/1, to_node_list/1, get_size/1, get_keys_for_replicas/1, dump/1, to_dict/1]).
 
 -export([normalize/1]).
 
 -behaviour(routingtable).
 
-%% @type rt() = {node:node(), gb_trees:gb_tree()}. Sample routing table
-%% @type key() = int(). Identifier
+% @doc Identifier
+-type(key()::pos_integer()).
+% @doc Routing Table
+-type(rt()::{node:node(), gb_trees:gb_tree()}).
 
 %% @doc creates an empty routing table.
 %%      per default the empty routing should already include 
 %%      the successor
-%% @spec empty(node:node()) -> rt()
+-spec(empty/1 :: (node:node()) -> rt()).
 empty(Succ) ->
     {Succ, gb_trees:empty()}.
 
 %% @doc hashes the key to the identifier space.
-%% @spec hash_key(string()) -> key()
+-spec(hash_key/1 :: (any()) -> key()).
 hash_key(Key) ->
     BitString = binary_to_list(crypto:md5(Key)),
     % binary to integer
@@ -53,7 +55,7 @@ hash_key(Key) ->
 
 %% @doc generates a random node id
 %%      In this case it is a random 128-bit string.
-%% @spec getRandomNodeId() -> key()
+-spec(getRandomNodeId/0 :: () -> key()).
 getRandomNodeId() ->
     % generates 128 bits of randomness
     hash_key(integer_to_list(crypto:rand_uniform(1, 65536 * 65536))).
@@ -65,15 +67,15 @@ next_hop(State, _Key) ->
 
 %% @doc triggers a new stabilization round
 %% @spec stabilize(cs_state:state()) -> cs_state:state()
-stabilize(State) ->
-    % trigger the next stabilization round
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
+-spec(stabilize/3 :: (key(), node:node(), rt()) -> rt()).
+stabilize(_Id, Succ, _RT) ->
     % renew routing table
-    cs_state:set_rt(State, empty(cs_state:succ(State))).
+    empty(Succ).
 
 %% @doc removes dead nodes from the routing table
 %% @spec filterDeadNodes(rt(), [node:node()]) -> rt()
-filterDeadNodes(RT, _DeadNodes) ->
+-spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
+filterDeadNode(RT, _DeadPid) ->
     RT.
 
 %% @doc returns the pids of the routing table entries .
@@ -89,6 +91,7 @@ to_node_list({Succ, _RoutingTable} = _RT) ->
 %% @doc returns the size of the routing table.
 %%      inefficient standard implementation
 %% @spec get_size(rt()) -> int()
+-spec(get_size/1 :: (rt()) -> pos_integer()).
 get_size(RT) ->
     length(to_pid_list(RT)).
     
@@ -104,7 +107,7 @@ get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
 
 %% @doc 
-%% @spec dump(cs_state:state()) -> term()
+-spec(dump/1 :: (rt()) -> ok).
 dump(_State) ->
     ok.
 

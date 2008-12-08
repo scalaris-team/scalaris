@@ -32,32 +32,30 @@
 -export([empty/1, 
 	 hash_key/1, getRandomNodeId/0, 
 	 next_hop/2, 
-	 stabilize/1, 
-	 filterDeadNodes/2,
+	 stabilize/3, 
+	 filterDeadNode/2,
 	 to_pid_list/1, to_node_list/1, get_size/1, 
 	 get_keys_for_replicas/1, dump/1, to_dict/1]).
 
 % stabilize for Chord
--export([stabilize/3]).
+-export([stabilize/5]).
 
--type(key()::integer()).
-%-type(rt()::gb_trees::gb_tree()).
-%% @type rt() = gb_trees:gb_tree(). Chord routing table
-%% @type key() = int(). Identifier
+-type(key()::pos_integer()).
+-type(rt()::gb_trees:gb_tree()).
 
 %% @doc creates an empty routing table.
-%% @spec empty(node:node()) -> rt()
+-spec(empty/1 :: (node:node()) -> rt()).
 empty(_Succ) ->
     gb_trees:empty().
 
 %% @doc hashes the key to the identifier space.
-%% @spec hash_key(string()) -> key()
+-spec(hash_key/1 :: (any()) -> key()).
 hash_key(Key) ->
     rt_simple:hash_key(Key).
 
 %% @doc generates a random node id
 %%      In this case it is a random 128-bit string.
-%% @spec getRandomNodeId() -> key()
+-spec(getRandomNodeId/0 :: () -> key()).
 getRandomNodeId() ->
     rt_simple:getRandomNodeId().
 
@@ -95,85 +93,86 @@ next_hop(N, RT, Id, Index, Candidate) ->
     end.
 
 %% @doc starts the stabilization routine
-%% @spec stabilize(cs_state:state()) -> cs_state:state()
-stabilize(State) ->
-    % trigger the next stabilization round
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
+-spec(stabilize/3 :: (key(), node:node(), rt()) -> rt()).
+stabilize(Id, Succ, RT) ->
     % calculate the longest finger
-    Key = calculateKey(State, 127),
+    Key = calculateKey(Id, 127),
     % trigger a lookup for Key
     cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), 127}),
-    State.
+    cleanup(gb_trees:iterator(RT), RT, Succ).
 
 %% @doc remove all entries with the given ids
-%% @spec filterDeadNodes(gb_trees:gb_tree(), term()) -> gb_trees:gb_tree()
-filterDeadNodes(RT, DeadNodes) ->
-    gb_sets:fold(fun (Id, RT2) -> filter_intern(gb_trees:iterator(RT2), RT2, Id) end, RT, DeadNodes).
+-spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
+filterDeadNode(RT, DeadPid) ->
+    filter_intern(gb_trees:iterator(RT), RT, DeadPid).
 
 % @private
-filter_intern(nil, RT, _) ->
-    RT;
-filter_intern([], RT, _) ->
-    RT;
-filter_intern(Iterator, RT, Id) ->
-    {Index, Value, Next} = gb_trees:next(Iterator),
-    case node:uniqueId(Value) == Id of
-	true ->
-	    filter_intern(Next, gb_trees:delete(Index, RT), Id);
-	false ->
-	    filter_intern(Next, RT, Id)
+-spec(filter_intern/3 :: (any() , rt(), cs_send:mypid()) -> rt()).
+filter_intern(Iterator, RT, DeadPid) ->
+    case gb_trees:next(Iterator) of
+	{Index, Value, Next} ->
+	    case node:pidX(Value) == DeadPid of
+		true ->
+		    filter_intern(Next, gb_trees:delete(Index, RT), DeadPid);
+		false ->
+		    filter_intern(Next, RT, DeadPid)
+	    end;
+	none ->
+	    RT
     end.
 
 %% @doc returns the pids of the routing table entries .
-%% @spec to_pid_list(rt()) -> [pid()]
+-spec(to_pid_list/1 :: (rt()) -> list(cs_send:mypid())).
 to_pid_list(RT) ->
     lists:map(fun ({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
 
 %% @doc returns the pids of the routing table entries .
-%% @spec to_node_list(rt()) -> [node:node()]
+-spec(to_node_list/1 :: (rt()) -> list(node:node())).
 to_node_list(RT) ->
     lists:map(fun ({_Idx, Node}) -> Node end, gb_trees:to_list(RT)).
 
 %% @doc returns the size of the routing table.
 %%      inefficient standard implementation
-%% @spec get_size(rt()) -> int()
+-spec(get_size/1 :: (rt()) -> pos_integer()).
 get_size(RT) ->
     length(to_pid_list(RT)).
     
 %% @doc returns the replicas of the given key
-%% @spec get_keys_for_replicas(key() | string()) -> [key()]
+-spec(get_keys_for_replicas/1 :: (key()) -> list(key())).
 get_keys_for_replicas(Key) ->
     rt_simple:get_keys_for_replicas(Key).
 
 %% @doc 
-%% @spec dump(cs_state:state()) -> term()
-dump(_State) ->
-    ok.
+-spec(dump/1 :: (rt()) -> any()).
+dump(RT) ->
+    lists:flatten(io_lib:format("~p", [gb_trees:to_list(RT)])).
 
 %% @doc updates one entry in the routing table
 %%      and triggers the next update
 %% @spec stabilize(cs_state:state(), int(), node:node()) -> cs_state:state()
-stabilize(State, Index, Node) ->
-    RT = cs_state:rt(State),
+-spec(stabilize/5 :: (key(), node:node(), rt(), pos_integer(), node:node()) -> rt()).
+stabilize(Id, Succ, RT, Index, Node) ->
     case node:is_null(Node) of
 	true ->
-	    State;
+	    RT;
 	false ->
-	    case (cs_state:succ(State) == Node) or (cs_state:me(State) == Node) of
+	    case (node:id(Succ) == node:id(Node)) or (Id == node:id(Node)) or (Index == -1) of
 		true ->
-		    State;
+		    RT;
 		false ->
 		    NewRT = gb_trees:enter(Index, Node, RT),
-		    Key = calculateKey(State, Index - 1),
-		    self() ! {lookup_aux, Key, 0, {rt_get_node, cs_send:this(), Index - 1}},
-		    cs_state:set_rt(State, NewRT)
+		    failuredetector2:subscribe(node:pidX(Node)),
+		    Key = calculateKey(Id, Index - 1),
+		    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), Index - 1}),
+		    NewRT
 	    end
     end.
 
 % @private
-calculateKey(State, Idx) ->
+-spec(calculateKey/2 :: (key(), pos_integer()) -> key()).
+calculateKey(Id, Idx) ->
     % n + 2^Idx
-    rt_simple:normalize(cs_state:id(State) + (1 bsl Idx)).
+    rt_simple:normalize(Id + (1 bsl Idx)).
 
 % 0 -> succ
 % 1 -> shortest finger
@@ -198,4 +197,19 @@ flatten(RT, Index) ->
 	    [Entry | flatten(RT, Index - 1)];
 	none ->
 	    []
+    end.
+
+% @private
+% @doc check whether the successor is stored by accident in the RT
+cleanup(It, RT, Succ) ->
+    case gb_trees:next(It) of
+	{Index, Node, Iter2} ->
+	    case node:id(Node) == node:id(Succ) of
+		true ->
+		    cleanup(Iter2, gb_trees:delete(Index, RT), Succ);
+		false ->
+		    cleanup(Iter2, RT, Succ)
+	    end;
+	none ->
+	    RT
     end.
