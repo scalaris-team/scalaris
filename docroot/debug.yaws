@@ -11,7 +11,7 @@
     <!-- Include Ext and app-specific scripts: -->
     <link rel="stylesheet" type="text/css" href="ext-all.css">
     <script type="text/javascript" src="ext-base.js"></script>
-    <script type="text/javascript" src="ext-all-debug.js"></script>
+    <script type="text/javascript" src="ext-all.js"></script>
     <script type="text/javascript" src="debug.js"></script>
     
     <!-- Include Ext stylesheets here: -->
