@@ -141,7 +141,7 @@ commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID, _TimeRP
     %?TLOGN("init phase: initres ~p", [InitRes]),
     if
 	InitRes == ok->
-	    timer:send_after(config:tpFailureTimeout(), self(), {check_failed_tps}),
+	    erlang:send_after(config:tpFailureTimeout(), self(), {check_failed_tps}),
 	    {_TimeCP, TransRes} = timer:tc(transstore.tmanager, start_commit, [TMState2]),
 	    ?TIMELOG("commit phase", _TimeCP/1000),
 	    %?TLOGN("Result of transaction: ~p", [TransRes]),
@@ -172,7 +172,7 @@ init_phase(TMState)->
     
     TPMessage = {lookup_tp, #tp_message{item_key = unknown, message={cs_send:this()}}},
     tsend:send_to_participants_with_lookup(TMState, TPMessage),
-    timer:send_after(config:transactionLookupTimeout(), self(), {rtm_lookup_timeout}),
+    erlang:send_after(config:transactionLookupTimeout(), self(), {rtm_lookup_timeout}),
     
     receive_lookup_rtms_tps_repl(TMState).
 
@@ -302,7 +302,7 @@ loop(TMState)->
 	    %% simple leader election
 	    if
 		MyBallot > 2 -> %% not the leader
-		    timer:send_after(time_become_leader(MyBallot), self(), {become_leader}),
+		    erlang:send_after(time_become_leader(MyBallot), self(), {become_leader}),
 		    loop(TMState2);
 		true->
 		    loop(TMState2)
@@ -324,7 +324,7 @@ loop(TMState)->
 	    ?TLOGN("I'm becoming a leader", []),
 	    tmanager_pac:vote_for_suspected(TMState),
 	    NewBal = TMState#tm_state.myBallot + config:replicationFactor(), 
-	    timer:send_after(time_become_leader(NewBal), self(), {become_leader}),
+	    erlang:send_after(time_become_leader(NewBal), self(), {become_leader}),
 	    loop(TMState#tm_state{myBallot = NewBal});
 	_ ->
 	    %io:format("TManager got unknown message ~p~n", [X]),
