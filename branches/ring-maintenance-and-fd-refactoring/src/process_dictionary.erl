@@ -62,7 +62,6 @@
 	 find_all_cs_nodes/0, 
 	 find_all_processes/1, 
 	 find_group/1, 
-	 %find_instance_id/0,
 
 	 get_groups/0,
 	 get_processes_in_group/1, 
@@ -113,11 +112,6 @@ find_all_processes(Name) ->
 %% @spec find_group(term()) -> term()
 find_group(Process) ->
     gen_server:call(?MODULE, {find_group, Process}, 20000).
-
-%% @doc find instance id
-%% @spec find_instance_id() -> term()
-find_instance_id() ->
-    gen_server:call(?MODULE, {find_instance_id}, 20000).
 
 %% @doc find groups for web interface
 %% @spec get_groups() -> term()
