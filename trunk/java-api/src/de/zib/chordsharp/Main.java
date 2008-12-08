@@ -15,6 +15,9 @@
  */
 package de.zib.chordsharp;
 
+import com.ericsson.otp.erlang.OtpErlangBinary;
+import com.ericsson.otp.erlang.OtpErlangString;
+import java.util.Random;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -47,6 +50,7 @@ public class Main {
 	 *  -subscribe <params>       subscribe to a topic: <topic> <url>
 	 *  -unsubscribe <params>     unsubscribe from a topic: <topic> <url>
 	 *  -write <params>           write an item: <key> <value>
+	 *  -minibench                run mini benchmark
 	 * }
 	 * </pre>
 	 * 
@@ -65,6 +69,11 @@ public class Main {
 		if (line.hasOption("help")) {
 			HelpFormatter formatter = new HelpFormatter();
 			formatter.printHelp("chordsharp", getOptions());
+			System.exit(0);
+		}
+
+		if (line.hasOption("minibench")) {
+		        minibench();
 			System.exit(0);
 		}
 
@@ -246,9 +255,40 @@ public class Main {
 //						"getsubscribers");
 		group.addOption(getSubscribers);
 
+		options.addOption(new Option("minibench", "run mini benchmark"));
+
 		options.addOptionGroup(group);
 
 		return options;
 	}
+
+    static void minibench(){
+	try{
+	    int DATA_SIZE = 1000; 
+	    byte[] data = new byte[DATA_SIZE]; 
+	    Random r = new Random(); 
+	    r.nextBytes(data); 
+ 
+	    int size = 100; 
+ 
+	    long time = System.currentTimeMillis(); 
+ 
+	    for (int i = 0; i < size; i++) { 
+		Transaction transaction = new Transaction(); 
+		transaction.start(); 
+	    
+		//transaction.write("" + i, new String(data)); 
+		transaction.write(new OtpErlangString("" + i), new OtpErlangBinary(data)); 
+		transaction.commit(); 
+	    } 
+ 
+	    System.out.println("time: " + (System.currentTimeMillis() - 
+					   time)); 
+	    System.out.println("speed: " + ((size * 1000) / 
+					    (System.currentTimeMillis() - time))); 
+	}catch(Exception e){
+	    System.out.println(e);
+	}
+    }
 
 }
