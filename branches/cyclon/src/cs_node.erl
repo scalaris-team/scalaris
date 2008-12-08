@@ -181,6 +181,13 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Cyclon (see cyclon/*.erl) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{get_cyclon_pid, Pid,Me} ->
+	    cs_send:send(Pid,{cyclon_pid,Me,get_cyclon()}),
+	    loop(State, ?DEBUG(Debug));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % database 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	{get_key, Source_PID, Key}-> 	    
@@ -355,3 +362,12 @@ start(InstanceId) ->
 start_link(InstanceId) ->
     {ok, spawn_link(?MODULE, start, [InstanceId])}.
 
+get_cyclon() ->
+    InstanceId = erlang:get(instance_id),
+    if
+	InstanceId == undefined ->
+	    io:format("~p~n", [util:get_stacktrace()]);
+	true ->
+	    ok
+    end,
+    process_dictionary:lookup_process(InstanceId, cyclon).
