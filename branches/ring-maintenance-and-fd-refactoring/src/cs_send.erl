@@ -14,7 +14,9 @@
 %%%-------------------------------------------------------------------
 %%% File    : cs_send.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Message Sending
+%%% Description : Message Sending. This module allows to configure 
+%%%           Scalaris for using Distributed Erlang or TCP for inter-node
+%%%           communication.
 %%%
 %%% Created :  15 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
@@ -28,11 +30,10 @@
 
 -include("transstore/trecords.hrl").
 
--export([send/2, this/0, get/2, here/1]).
-%-export([send/2, this/0, get/2]).
+-export([send/2, this/0, get/2]).
 
--define(TCP_LAYER, true).
-%-define(BUILTIN, true).
+-define(TCP_LAYER, true). % TCP communication
+%-define(BUILTIN, true).   % distributed Erlang native communication
 
 -ifdef(TCP_LAYER).
 -type(mypid() :: {inet:ip_address(), integer(), pid()}).
@@ -51,10 +52,6 @@ send(Pid, Message) ->
 get(Name, {IP, Port, _Pid}=_Node) ->
     {IP, Port, Name}.
 
--spec(here/1 :: (pid()) -> {any(), integer(), pid() | atom()}).
-here(Pid) ->
-    comm_layer.comm_layer:here(Pid).
-    
 -endif.
 
 -ifdef(BUILTIN).
@@ -70,6 +67,4 @@ get(Name, {_Pid,Host}) ->
 get(Name, Pid) ->
     {Name, node(Pid)}.
 
-% here(Pid) ->
-%     {Pid, self()}. 
 -endif.

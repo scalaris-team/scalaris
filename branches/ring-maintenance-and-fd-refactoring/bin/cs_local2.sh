@@ -17,4 +17,4 @@ erl -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin \
     -yaws embedded true -connect_all false -hidden \
     -chordsharp cs_port 14197 \
     -chordsharp yaws_port 8002 \
-    -name node2 -s chordsharp
+    -sname node2 -s chordsharp
