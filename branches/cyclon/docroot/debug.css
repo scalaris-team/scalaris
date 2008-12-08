@@ -1,0 +1,20 @@
+.folder .x-tree-node-icon{
+		background:transparent url(folder.gif);
+	}
+	.x-tree-node-expanded .x-tree-node-icon{
+		background:transparent url(folder-open.gif);
+	}
+
+#tree {
+  float: left;
+  margin: 5px;
+  width: 300px;
+  height: 600px;
+}
+
+#table {
+  float: left;
+  margin: 5px;
+  width: 600px;
+  height: 600px;
+}
