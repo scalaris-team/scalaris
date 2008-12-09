@@ -44,7 +44,7 @@
 -type(rt()::gb_trees:gb_tree()).
 
 %% @doc creates an empty routing table.
--spec(empty/1 :: (node:node()) -> rt()).
+-spec(empty/1 :: (node:node_type()) -> rt()).
 empty(_Succ) ->
     gb_trees:empty().
 
@@ -93,7 +93,7 @@ next_hop(N, RT, Id, Index, Candidate) ->
     end.
 
 %% @doc starts the stabilization routine
--spec(stabilize/3 :: (key(), node:node(), rt()) -> rt()).
+-spec(stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
 stabilize(Id, Succ, RT) ->
     % calculate the longest finger
     Key = calculateKey(Id, 127),
@@ -127,7 +127,7 @@ to_pid_list(RT) ->
     lists:map(fun ({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
 
 %% @doc returns the pids of the routing table entries .
--spec(to_node_list/1 :: (rt()) -> list(node:node())).
+-spec(to_node_list/1 :: (rt()) -> list(node:node_type())).
 to_node_list(RT) ->
     lists:map(fun ({_Idx, Node}) -> Node end, gb_trees:to_list(RT)).
 
@@ -150,7 +150,7 @@ dump(RT) ->
 %% @doc updates one entry in the routing table
 %%      and triggers the next update
 %% @spec stabilize(cs_state:state(), int(), node:node()) -> cs_state:state()
--spec(stabilize/5 :: (key(), node:node(), rt(), pos_integer(), node:node()) -> rt()).
+-spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(), node:node_type()) -> rt()).
 stabilize(Id, Succ, RT, Index, Node) ->
     case node:is_null(Node) of
 	true ->

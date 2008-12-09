@@ -37,12 +37,12 @@
 % @doc Identifier
 -type(key()::pos_integer()).
 % @doc Routing Table
--type(rt()::{node:node(), gb_trees:gb_tree()}).
+-type(rt()::{node:node_type(), gb_trees:gb_tree()}).
 
 %% @doc creates an empty routing table.
 %%      per default the empty routing should already include 
 %%      the successor
--spec(empty/1 :: (node:node()) -> rt()).
+-spec(empty/1 :: (node:node_type()) -> rt()).
 empty(Succ) ->
     {Succ, gb_trees:empty()}.
 
@@ -67,7 +67,7 @@ next_hop(State, _Key) ->
 
 %% @doc triggers a new stabilization round
 %% @spec stabilize(cs_state:state()) -> cs_state:state()
--spec(stabilize/3 :: (key(), node:node(), rt()) -> rt()).
+-spec(stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
 stabilize(_Id, Succ, _RT) ->
     % renew routing table
     empty(Succ).
