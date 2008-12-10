@@ -51,7 +51,7 @@ null() ->
 uniqueId(#node{uniqueId=A}) ->
     A.
     
--spec(pidX/1 :: (node()) -> cs_send:mypid()).
+-spec(pidX/1 :: (node_type()) -> cs_send:mypid()).
 pidX(#node{pid=PID}) ->
     PID.
 
