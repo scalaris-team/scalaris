@@ -8,6 +8,10 @@
 %% @author Christian Hennig <hennig@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
+%% @reference S. Voulgaris, D. Gavidia, M. van Steen. CYCLON: 
+%% Inexpensive Membership Management for Unstructured P2P Overlays. 
+%% Journal of Network and Systems Management, Vol. 13, No. 2, June 2005.
+
 -module(cyclon.cyclon).
 -author('hennig@zib.de').
 -vsn('$Id $ ').
@@ -45,12 +49,17 @@ start(InstanceId) ->
     %io:format("after send after~n", []),
     loop(cache:new(),cs_send:get(get_pid(), cs_send:this())).
 
+pidX({_,A,_,_}) ->
+	A.
+
+
 loop(Cache,Node) ->
     receive
 	{get_pred_succ_response, Pred, Succ} ->
 	    %Me = cs_send:get(get_pid(), cs_send:this()),
-	   	% io:format("~p ~p ~p ~n", [Pred,Succ,Me]),
- 	 	NewCache =  cache:add_list([node:pidX(Pred),node:pidX(Succ)], Cache),
+	   	io:format("Pred ~p~n Succ~p~n ~n", [node:pidX(Pred),pidX(Succ)]),
+		
+ 	 	NewCache =  cache:add_list([pidX(Pred),pidX(Succ)], Cache),
 		loop(cache:update(NewCache),Node);
 		
 	{'$gen_cast', {debug_info, Requestor}}  ->
@@ -83,27 +92,35 @@ loop(Cache,Node) ->
 		cs_send:send(P,{subset_response,ForSend}),
 		N2=cache:minus(Subset,Cache),
 		NewCache = cache:merge(Cache,N2,ForSend),
-		loop(Cache,Me);
+		loop(NewCache,Node);
 	X ->
 		io:format("%% Unhandle Message: ~p~n", [X]),
 	    loop(Cache,Node)
     end.
 
 shuffle(Cache, Node) ->
-%io:format("<#>"),
-get_L(Cache),
-Subset=cache:get_random_subset(L,Cache),
+
+Subset=cache:get_random_subset(get_L(Cache),Cache),
 Q=cache:get_random_element(Subset),
-NSubset=cache:delete(Q,Subset),
-ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
 {{QCyclon,_},_} = Q,
-cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
-receive 
-{subset_response,Othersubset} ->
-	N1=cache:delete({{nil,Node},nil},Othersubset),
-	N2=cache:minus(N1,Cache),
-	cache:merge(Cache,N2,ForSend);	
-after 300 ->
+io:format("QCyclon: ~p~n",[QCyclon]),
+io:format("Q:       ~p~n",[Q]),
+io:format("this:    ~p~n",[cs_send:this()]),
+case (QCyclon /= cs_send:this()) of
+true ->
+	NSubset=cache:delete(Q,Subset),
+	ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
+	io:format(">#>"),
+	cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
+	receive 
+	{subset_response,Othersubset} ->
+		N1=cache:delete({{nil,Node},nil},Othersubset),
+		N2=cache:minus(N1,Cache),
+		cache:merge(Cache,N2,ForSend)	
+	after 300 ->
+		Cache
+	end;
+false ->
 	Cache
 end.
 
