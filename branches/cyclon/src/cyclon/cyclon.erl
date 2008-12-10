@@ -43,6 +43,7 @@ start_link(InstanceId) ->
 start(InstanceId) ->
     boot_server:connect(),
     process_dictionary:register_process(InstanceId, cyclon, self()),
+	process_dictionary:register_process(InstanceId, cyclonNode, cs_send:this()),
 
 	get_pid() ! {get_pred_succ, cs_send:this()},
    	erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
@@ -57,7 +58,7 @@ loop(Cache,Node) ->
     receive
 	{get_pred_succ_response, Pred, Succ} ->
 	    %Me = cs_send:get(get_pid(), cs_send:this()),
-	   	io:format("Pred ~p~n Succ~p~n ~n", [node:pidX(Pred),pidX(Succ)]),
+	   	%io:format("Pred ~p~n Succ~p~n ~n", [node:pidX(Pred),pidX(Succ)]),
 		
  	 	NewCache =  cache:add_list([pidX(Pred),pidX(Succ)], Cache),
 		loop(cache:update(NewCache),Node);
@@ -103,21 +104,21 @@ shuffle(Cache, Node) ->
 Subset=cache:get_random_subset(get_L(Cache),Cache),
 Q=cache:get_random_element(Subset),
 {{QCyclon,_},_} = Q,
-io:format("QCyclon: ~p~n",[QCyclon]),
-io:format("Q:       ~p~n",[Q]),
-io:format("this:    ~p~n",[cs_send:this()]),
+%io:format("QCyclon: ~p~n",[QCyclon]),
+%io:format("Q:       ~p~n",[Q]),
+%io:format("this:    ~p~n",[cs_send:this()]),
 case (QCyclon /= cs_send:this()) of
 true ->
 	NSubset=cache:delete(Q,Subset),
 	ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
-	io:format(">#>"),
+	io:format("<#>"),
 	cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
 	receive 
 	{subset_response,Othersubset} ->
 		N1=cache:delete({{nil,Node},nil},Othersubset),
 		N2=cache:minus(N1,Cache),
 		cache:merge(Cache,N2,ForSend)	
-	after 300 ->
+	after config:read(cyclon_interval) ->
 		Cache
 	end;
 false ->

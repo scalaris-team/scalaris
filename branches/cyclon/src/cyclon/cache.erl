@@ -24,7 +24,7 @@
 
 -type(cache() :: list({{node:node_type(), node:node_type()}, pos_integer()})).
 
-%% @doc 
+%% @doc Firstly try to insert QT in Cache on the empty slots, and secondly replacing entries among the ones original sent
 -spec(merge/3 :: (cache(), cache(), cache()) -> cache()).
 merge(Cache,[],Send) ->
 	Cache;
@@ -37,6 +37,7 @@ case (cache:size(Cache) =< config:read(cyclon_cache_size)) of
 		 add_element(QH,delete(SH,merge(Cache,QT,ST)))
 end.
 
+%% @doc minus(M,N) : { x | x in M and x notin N} 
 minus([],N) ->
 	[];
 minus([H|T],N) ->
@@ -75,6 +76,7 @@ case cache:size(Cache) ==length(Cache) of % Replace this with a Test of nil !!!!
 		end
 end.
 
+%% @doc make the cache valid, by ataching CyclonPids to they NodePids
 update(Cache) ->
 send_req(Cache),
 receive_req(Cache).
@@ -153,6 +155,7 @@ add_element(Foo,[H|T]) ->
 					[H]++add_element(Foo,T)
 			end
 	end.
+%% @doc Amount of valid Cache entries 
 size([]) ->
 0;
 size([H|T]) ->

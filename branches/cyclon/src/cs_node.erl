@@ -370,4 +370,4 @@ get_cyclon() ->
 	true ->
 	    ok
     end,
-    process_dictionary:lookup_process(InstanceId, cyclon).
+    process_dictionary:lookup_process(InstanceId, cyclonNode).
