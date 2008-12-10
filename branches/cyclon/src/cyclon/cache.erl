@@ -20,8 +20,28 @@
 -import(io).
 %% API
 
--export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_element/2, get_random_element/1, get_random_subset/2, is_element/2, delete/2 ,update/1]).
+-export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_element/2, get_random_element/1, get_random_subset/2, is_element/2, delete/2 ,update/1, minus/2, merge/3]).
 
+merge(Cache,[],Send) ->
+	Cache;
+%     Cache  QsSUB    SendSub 	
+merge(Cache,[QH|QT],[SH|ST]) ->
+case size(Cache)<= config:read(cyclon_cache_size) of
+	true ->
+		add_element(QH,merge(Cache,QT,[SH|ST])),
+	false ->
+		 add_element(QH,delete(SH,merge(Cache,QT,ST)))
+end.
+
+minus([],N)
+	[];
+minus([H|T],N) ->
+case is_element(H,N) of
+ 	true -> 
+		minus(T,N);
+	false ->
+		[H]++minus(T,N)
+end	.
 
 %CacheSize = config:read(cyclon_cache_size).
 send_req([]) ->
@@ -43,7 +63,7 @@ case cache:size(Cache) ==length(Cache) of % Replace this with a Test of nil !!!!
 	false ->
 		receive 
 			{cyclon_pid,Node,Cyclon} ->
-				io:format("+ ~p | ~p ~n",[Node,Cyclon]),
+				%io:format("+ ~p | ~p ~n",[Node,Cyclon]),
 				receive_req(add_element({{Cyclon,Node},0},Cache))				
 		after 300 ->
 			
@@ -100,7 +120,7 @@ get_random_subset(0,_Cache) ->
 get_random_subset(N,Cache) -> 
 		[get_random_element(Cache)]++get_random_subset(N-cache:size(Cache),Cache).
 
-lt({{A,_},_},{{B,_},_}) ->
+lt({{_,A},_},{{_,B},_}) ->
 case A < B of 
 	true 	-> true;
 	false	-> false
