@@ -103,7 +103,7 @@ start_link() ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init([]) ->
-    ets:new(?MODULE, [set, public, named_table]),
+    ets:new(?MODULE, [set, protected, named_table]),
     {ok, ok}. % empty state.
 
 %%--------------------------------------------------------------------
