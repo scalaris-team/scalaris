@@ -26,19 +26,24 @@
 
 %% @doc Firstly try to insert QT in Cache on the empty slots, and secondly replacing entries among the ones original sent
 -spec(merge/3 :: (cache(), cache(), cache()) -> cache()).
-merge(Cache,[],Send) ->
+merge(Cache,[],_Send) ->
 	Cache;
+merge([],QsSub,_SendSub) ->
+	QsSub;
+merge(Cache,[_QH|_QT],[]) ->
+	 Cache;
 %     Cache  QsSUB    SendSub 	
 merge(Cache,[QH|QT],[SH|ST]) ->
+io:format("~p ~p-~p-~p ~n",[self(),length(Cache),length([QH|QT]),length([SH|ST])]),
 case (cache:size(Cache) =< config:read(cyclon_cache_size)) of
 	true ->
-		add_element(QH,merge(Cache,QT,[SH|ST]));
+		merge(add_element(QH,Cache),QT,[SH|ST]);
 	false ->
-		 add_element(QH,delete(SH,merge(Cache,QT,ST)))
+		merge(add_element(QH,delete(SH,Cache)),QT,ST)
 end.
 
 %% @doc minus(M,N) : { x | x in M and x notin N} 
-minus([],N) ->
+minus([],_N) ->
 	[];
 minus([H|T],N) ->
 case is_element(H,N) of
@@ -114,7 +119,12 @@ get_element(_,[]) ->
 get_element(1,[H|_]) ->
 	H;
 get_element(N,[_|T]) ->
-	get_element(N-1,T).
+	case N<1 of
+		false ->
+			get_element(N-1,T);
+		true ->
+			nil
+	end.
 
 get_random_element(State) ->
 	L=cache:size(State),
@@ -124,18 +134,18 @@ get_random_element(State) ->
 get_random_subset(0,_Cache) -> 
 		new();
 get_random_subset(N,Cache) -> 
-		[get_random_element(Cache)]++get_random_subset(N-cache:size(Cache),Cache).
+		[get_random_element(Cache)]++get_random_subset(N-1,Cache).
 
 lt({{_,A},_},{{_,B},_}) ->
 case A < B of 
-	true 	-> true;
-	false	-> false
+	 true    -> true;  %%  Will be expand 
+     false   -> false  %%	   later
 end.
 
 eq({{_,A},_},{{_,B},_}) ->
 case A==B of 
-	 true    -> true;
-        false   -> false
+	 true    -> true;  %%  Will be expand 
+     false   -> false  %%	   later
 end.
 
 
