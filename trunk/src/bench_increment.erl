@@ -73,7 +73,7 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
 	{failure, abort} ->
 	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
 	X ->
-	    ct:pal("~p~n", [X])
+	    io:format("~p~n", [X])
     end.
 
 bench() ->

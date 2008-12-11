@@ -149,7 +149,6 @@ dump(RT) ->
 
 %% @doc updates one entry in the routing table
 %%      and triggers the next update
-%% @spec stabilize(cs_state:state(), int(), node:node()) -> cs_state:state()
 -spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(), node:node_type()) -> rt()).
 stabilize(Id, Succ, RT, Index, Node) ->
     case node:is_null(Node) of
