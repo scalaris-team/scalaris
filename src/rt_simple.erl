@@ -34,9 +34,9 @@
 
 -behaviour(routingtable).
 
-% @doc Identifier
+% @type key(). Identifier.
 -type(key()::pos_integer()).
-% @doc Routing Table
+% @type rt(). Routing Table.
 -type(rt()::{node:node_type(), gb_trees:gb_tree()}).
 
 %% @doc creates an empty routing table.
@@ -66,14 +66,12 @@ next_hop(State, _Key) ->
     cs_state:succ_pid(State).
 
 %% @doc triggers a new stabilization round
-%% @spec stabilize(cs_state:state()) -> cs_state:state()
 -spec(stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
 stabilize(_Id, Succ, _RT) ->
     % renew routing table
     empty(Succ).
 
 %% @doc removes dead nodes from the routing table
-%% @spec filterDeadNodes(rt(), [node:node()]) -> rt()
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, _DeadPid) ->
     RT.
