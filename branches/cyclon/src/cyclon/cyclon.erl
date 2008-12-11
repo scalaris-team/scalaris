@@ -81,14 +81,14 @@ loop(Cache,Node) ->
 			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
 			loop(Cache,Node);
 		_	->
-			case cache:size(Cache) of
+			NewCache = case cache:size(Cache) of
 				0 -> 
-					ok;	
+					Cache;	
 				_  ->
 					shuffle(Cache,Node)
 			end,
 			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-			loop(Cache,Node)
+			loop(NewCache,Node)
 		end;
 	{subset,P,Subset} ->
 		%io:format("subset~n", []),
@@ -120,9 +120,10 @@ shuffle(Cache, Node) ->
 		NSubset=cache:delete(Q,Subset),
 		ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
 		%io:format("<#>"),
-		cs_send:send(QCyclon,{subset,cs_send:this(),ForSend});
+		cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
+		cache:delete(Q,Cache);	
 	false -> 
-		ok
+		Cache
 	end.
 
 
