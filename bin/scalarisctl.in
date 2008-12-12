@@ -13,8 +13,22 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-SCALARIS_ROOT=@SCALARIS_ROOT@
-SCALARIS_ETC=$SCALARIS_ROOT/bin
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+# /etc/scalaris/
+ETCDIR=/@sysconfdir@/scalaris
+# /lib/scalaris/
+SCALARISDIR=@libdir@/scalaris
+# /lib/scalaris/ebin
+BEAMDIR=$SCALARISDIR/ebin
+# /lib/scalaris/docroot
+DOCROOTDIR=$SCALARISDIR/docroot
+# /lib/scalaris/docroot_node
+NODEDOCROOTDIR=$SCALARISDIR/docroot_node
+# /var/log/scalaris
+LOGDIR=@localstatedir@/log/scalaris
+
 SCALARIS_COOKIE="chocolate chip cookie"
 HOST=localhost
 
@@ -32,17 +46,17 @@ usage(){
 }
 
 bootstart(){
-    pushd $SCALARIS_ROOT/bin > /dev/null
+    pushd $BEAMDIR > /dev/null
 	erl -setcookie $SCALARIS_COOKIE \
-	    -pa $SCALARIS_ROOT/contrib/yaws/ebin \
-	    -pa $SCALARIS_ROOT/ebin \
+	    -pa $SCALARISDIR/contrib/yaws/ebin \
+	    -pa $BEAMDIR \
 	    -noinput \
 	    -detached \
 	    -yaws embedded true \
-	    -boot_cs log_path "'$SCALARIS_ROOT/log'" \
-	    -boot_cs docroot "\"$SCALARIS_ROOT/docroot\"" \
-	    -boot_cs config "'$SCALARIS_ETC/scalaris.cfg'" \
-	    -boot_cs local_config "'$SCALARIS_ETC/scalaris.local.cfg'" \
+	    -boot_cs log_path "'$LOGDIR'" \
+	    -boot_cs docroot "\"$DOCROOTDIR\"" \
+	    -boot_cs config "'$ETCDIR/scalaris.cfg'" \
+	    -boot_cs local_config "'$ETCDIR/scalaris.local.cfg'" \
 	    -connect_all false -hidden -sname boot@$HOST \
 	    -s boot;
 	popd > /dev/null
@@ -54,25 +68,25 @@ debug(){
 }
 
 bootstop(){
-    pushd $SCALARIS_ROOT/bin > /dev/null
+    pushd $BEAMDIR > /dev/null
     erl -setcookie $SCALARIS_COOKIE \
 	-sname ctl \
-	-pa $SCALARIS_ROOT/ebin \
+	-pa $BEAMDIR \
 	-noinput \
 	-s scalaris_ctl -extra boot@$HOST stop
     popd > /dev/null
 }
 
 nodestart(){
-    pushd $SCALARIS_ROOT/bin > /dev/null
+    pushd $BEAMDIR > /dev/null
 	erl -setcookie $SCALARIS_COOKIE \
-	    -pa $SCALARIS_ROOT/contrib/yaws/ebin \
-	    -pa $SCALARIS_ROOT/ebin \
+	    -pa $$SCALARISDIR/contrib/yaws/ebin \
+	    -pa $BEAMDIR \
 	    -yaws embedded true \
-	    -chordsharp log_path "'$SCALARIS_ROOT/log'" \
-	    -chordsharp docroot "\"$SCALARIS_ROOT/docroot_node\"" \
-	    -chordsharp config "'$SCALARIS_ETC/scalaris.cfg'" \
-	    -chordsharp local_config "'$SCALARIS_ETC/scalaris.local.cfg'" \
+	    -chordsharp log_path "'$LOGDIR'" \
+	    -chordsharp docroot "\"$NODEDOCROOTDIR\"" \
+	    -chordsharp config "'$ETCDIR/scalaris.cfg'" \
+	    -chordsharp local_config "'$ETCDIR/scalaris.local.cfg'" \
 	    -connect_all false -hidden -sname node@$HOST \
 	    -noinput \
 	    -detached \
@@ -82,10 +96,10 @@ nodestart(){
 
 
 nodestop(){
-    pushd $SCALARIS_ROOT/bin > /dev/null
+    pushd $BEAMDIR > /dev/null
     erl -setcookie $SCALARIS_COOKIE \
 	-sname ctl \
-	-pa $SCALARIS_ROOT/ebin \
+	-pa $BEAMDIR \
 	-noinput \
 	-s scalaris_ctl -extra node@$HOST stop
     popd > /dev/null
