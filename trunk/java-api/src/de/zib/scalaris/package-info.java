@@ -20,7 +20,8 @@
  * <p>
  * The {@link de.zib.scalaris.Scalaris} class provides methods for reading and writing values,
  * publishing topics, subscribing to urls and getting a list of subscribers with both erlang
- * objects ({@link com.ericsson.otp.erlang.OtpErlangObject} and Java {@link java.lang.String}s.
+ * objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and Java {@link java.lang.String}
+ * objects.
  * </p>
  * 
  * <h4>Example:</h4>
@@ -45,8 +46,8 @@
  * <p>
  * The {@link de.zib.scalaris.Transaction} class provides means to realise a scalaris transaction
  * from Java. After starting a transaction, there are methods to read and write values with both
- * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject} and Java {@link java.lang.String}s.
- * The transaction can then be committed, aborted or reset.
+ * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and Java {@link java.lang.String}
+ * objects. The transaction can then be committed, aborted or reset.
  * </p>
  * 
  * <h4>Example:</h4>

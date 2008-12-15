@@ -23,7 +23,7 @@ public class Benchmark {
 	/**
 	 * The number of test runs.
 	 */
-	protected static final int BENCH_TEST_RUNS = 100;
+	protected static final int BENCH_TEST_RUNS = 1000;
 	/**
 	 * The time when the (whole) benchmark suite was started.
 	 * 
