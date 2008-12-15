@@ -27,6 +27,7 @@ import de.zib.chordsharp.ConnectionException;
  * @author Nico Kruber, kruber@zib.de
  * @version 1.0
  */
+@Deprecated
 public class ChordSharpConnectionPublishExample {
 	/**
 	 * Publishes content under a given topic, both provided on the command line,

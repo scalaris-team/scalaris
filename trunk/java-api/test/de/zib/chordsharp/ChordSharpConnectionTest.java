@@ -2332,8 +2332,6 @@ public class ChordSharpConnectionTest {
 		server2.stop();
 		server3.stop();
 	}
-
-	// TODO: add another subscription test with unsubscribed topics
 	
 	private class SubscriptionHandler extends AbstractHandler {
 		public Map<String, Vector<String>> notifications;

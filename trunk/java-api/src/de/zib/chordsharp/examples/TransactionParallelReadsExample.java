@@ -32,6 +32,7 @@ import de.zib.chordsharp.UnknownException;
  * @author Nico Kruber, kruber@zib.de
  * @version 1.0
  */
+@Deprecated
 public class TransactionParallelReadsExample {
 	/**
 	 * Reads all keys given on the command line (given as "key1 key2 ...") with

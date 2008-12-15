@@ -22,7 +22,9 @@ import java.util.Vector;
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 1.4
+ * @deprecated use {@link de.zib.scalaris.Scalaris} instead
  */
+@Deprecated
 public class ChordSharp {
 
 	/**

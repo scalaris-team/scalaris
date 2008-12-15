@@ -27,8 +27,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
+ * Unit test for the {@link PropertyLoader} class.
+ * 
  * @author Nico Kruber, kruber@zib.de
- *
  */
 public class PropertyLoaderTest {
 

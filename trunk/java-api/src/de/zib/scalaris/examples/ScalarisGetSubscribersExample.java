@@ -13,31 +13,31 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp.examples;
+package de.zib.scalaris.examples;
 
 import java.util.Iterator;
-import java.util.Vector;
+import java.util.List;
 
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangString;
 
-import de.zib.chordsharp.ChordSharpConnection;
-import de.zib.chordsharp.ConnectionException;
-import de.zib.chordsharp.UnknownException;
+import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the {@code getSubscribers} methods of the
- * {@link ChordSharpConnection} class.
+ * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.1
+ * @version 2.0
+ * @since 2.0
  */
-@Deprecated
-public class ChordSharpConnectionGetSubscribersExample {
+public class ScalarisGetSubscribersExample {
 	/**
 	 * Prints a list of all subscribers to a given topic, provided on the
 	 * command line with the {@code getSubscribers} methods of
-	 * {@link ChordSharpConnection}.<br />
+	 * {@link Scalaris}.<br />
 	 * If no topic is given, the default topic {@code "topic"} is used.
 	 * 
 	 * @param args
@@ -56,46 +56,16 @@ public class ChordSharpConnectionGetSubscribersExample {
 		OtpErlangString otpTopic = new OtpErlangString(topic);
 
 		OtpErlangList otpSubscribers;
-		Vector<String> subscribers;
+		List<String> subscribers;
 
-		System.out
-				.println("Reading values with the class `ChordSharpConnection`:");
+		System.out.println("Reading values with the class `Scalaris`:");
 
-		// static:
-		try {
-			System.out
-					.println("  `static OtpErlangString getSubscribers(OtpErlangString)`...");
-			otpSubscribers = ChordSharpConnection.getSubscribers(otpTopic);
-			System.out.println("    getSubscribers(" + otpTopic.stringValue()
-					+ ") == " + getSubscribers(otpSubscribers));
-		} catch (ConnectionException e) {
-			System.out.println("    getSubscribers(" + otpTopic.stringValue()
-					+ ") failed: " + e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    getSubscribers(" + otpTopic.stringValue()
-					+ ") failed: " + e.getMessage());
-		}
-
-		try {
-			System.out.println("  `static String getSubscribers(String)`...");
-			subscribers = ChordSharpConnection.getSubscribers(topic);
-			System.out.println("    getSubscribers(" + topic + ") == "
-					+ getSubscribers(subscribers));
-		} catch (ConnectionException e) {
-			System.out.println("    getSubscribers(" + topic + ") failed: "
-					+ e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    getSubscribers(" + topic
-					+ ") failed: " + e.getMessage());
-		}
-
-		// non-static:
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
+			Scalaris sc = new Scalaris();
 			System.out
-					.println("    `OtpErlangList singleGetSubscribers(OtpErlangString)`...");
-			otpSubscribers = cs.singleGetSubscribers(otpTopic);
+					.println("    `OtpErlangList getSubscribers(OtpErlangString)`...");
+			otpSubscribers = sc.getSubscribers(otpTopic);
 			System.out.println("      getSubscribers(" + otpTopic.stringValue()
 					+ ") == " + getSubscribers(otpSubscribers));
 		} catch (ConnectionException e) {
@@ -108,17 +78,18 @@ public class ChordSharpConnectionGetSubscribersExample {
 
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
-			System.out.println("    `Vector<String> singleGetSubscribers(String)`...");
-			subscribers = cs.singleGetSubscribers(topic);
+			Scalaris sc = new Scalaris();
+			System.out
+					.println("    `Vector<String> getSubscribers(String)`...");
+			subscribers = sc.getSubscribers(topic);
 			System.out.println("      getSubscribers(" + topic + ") == "
 					+ getSubscribers(subscribers));
 		} catch (ConnectionException e) {
 			System.out.println("      getSubscribers(" + topic + ") failed: "
 					+ e.getMessage());
 		} catch (UnknownException e) {
-			System.out.println("    getSubscribers(" + topic
-					+ ") failed: " + e.getMessage());
+			System.out.println("    getSubscribers(" + topic + ") failed: "
+					+ e.getMessage());
 		}
 	}
 
@@ -129,7 +100,7 @@ public class ChordSharpConnectionGetSubscribersExample {
 	 *            the list of subscribers to convert
 	 * @return a comma-separated list of subscriber URLs
 	 */
-	private static String getSubscribers(Vector<String> subscribers) {
+	private static String getSubscribers(List<String> subscribers) {
 		StringBuffer result = new StringBuffer();
 		for (Iterator<String> iterator = subscribers.iterator(); iterator
 				.hasNext();) {

@@ -13,12 +13,8 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp;
+package de.zib.scalaris;
 
-import com.ericsson.otp.erlang.OtpErlangBinary;
-import com.ericsson.otp.erlang.OtpErlangString;
-
-import java.util.Random;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -30,21 +26,21 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 /**
- * Class to test basic functionality of the package.
+ * Class to test basic functionality of the package and to use scalaris 
+ * from command line.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
- * @deprecated use {@link de.zib.scalaris.Main} instead
+ * @since 2.0
  */
-@Deprecated
 public class Main {
 	/**
 	 * Queries the command line options for an action to perform.
 	 * 
 	 * <pre>
 	 * {@code
-	 * > java -jar chordsharp.jar -help
-	 * usage: chordsharp
+	 * > java -jar scalaris.jar -help
+	 * usage: scalaris
 	 *  -getsubscribers <topic>   get subscribers of a topic
 	 *  -help                     print this message
 	 *  -publish <params>         publish a new message for a topic: <topic> <message>
@@ -56,7 +52,8 @@ public class Main {
 	 * }
 	 * </pre>
 	 * 
-	 * @param args command line arguments
+	 * @param args
+	 *            command line arguments
 	 */
 	public static void main(String[] args) {
 		CommandLineParser parser = new GnuParser();
@@ -75,15 +72,16 @@ public class Main {
 		}
 
 		if (line.hasOption("minibench")) {
-		        minibench();
+	        Benchmark.minibench();
 			System.exit(0);
 		}
 
 		if (line.hasOption("read")) {
 			try {
+				Scalaris sc = new Scalaris();
 				System.out.println("read(" + line.getOptionValue("read")
 						+ ") == "
-						+ ChordSharp.read(line.getOptionValue("read")));
+						+ sc.read(line.getOptionValue("read")));
 			} catch (ConnectionException e) {
 				System.err.println("read failed: " + e.getMessage());
 			} catch (TimeoutException e) {
@@ -99,9 +97,10 @@ public class Main {
 		}
 		if (line.hasOption("write")) {
 			try {
+				Scalaris sc = new Scalaris();
 				System.out.println("write(" + line.getOptionValues("write")[0]
 						+ ", " + line.getOptionValues("write")[1] + ")");
-				ChordSharp.write(line.getOptionValues("write")[0], line
+				sc.write(line.getOptionValues("write")[0], line
 						.getOptionValues("write")[1]);
 			} catch (ConnectionException e) {
 				System.err.println("write failed with connection error: "
@@ -116,10 +115,11 @@ public class Main {
 		}
 		if (line.hasOption("publish")) {
 			try {
+				Scalaris sc = new Scalaris();
 				System.out.println("publish("
 						+ line.getOptionValues("publish")[0] + ", "
 						+ line.getOptionValues("publish")[1] + ")");
-				ChordSharp.publish(line.getOptionValues("publish")[0], line
+				sc.publish(line.getOptionValues("publish")[0], line
 						.getOptionValues("publish")[1]);
 			} catch (ConnectionException e) {
 				System.err.println("publish failed with connection error: "
@@ -134,10 +134,11 @@ public class Main {
 		}
 		if (line.hasOption("subscribe")) {
 			try {
+				Scalaris sc = new Scalaris();
 				System.out.println("subscribe("
 						+ line.getOptionValues("subscribe")[0] + ", "
 						+ line.getOptionValues("subscribe")[1] + ")");
-				ChordSharp.subscribe(line.getOptionValues("subscribe")[0], line
+				sc.subscribe(line.getOptionValues("subscribe")[0], line
 						.getOptionValues("subscribe")[1]);
 			} catch (ConnectionException e) {
 				System.err.println("subscribe failed with connection error: "
@@ -152,10 +153,11 @@ public class Main {
 		}
 		if (line.hasOption("unsubscribe")) {
 			try {
+				Scalaris sc = new Scalaris();
 				System.out.println("unsubscribe("
 						+ line.getOptionValues("unsubscribe")[0] + ", "
 						+ line.getOptionValues("unsubscribe")[1] + ")");
-				ChordSharp.unsubscribe(line.getOptionValues("unsubscribe")[0], line
+				sc.unsubscribe(line.getOptionValues("unsubscribe")[0], line
 						.getOptionValues("unsubscribe")[1]);
 			} catch (ConnectionException e) {
 				System.err.println("unsubscribe failed with connection error: "
@@ -173,10 +175,11 @@ public class Main {
 		}
 		if (line.hasOption("getsubscribers")) {
 			try {
+				Scalaris sc = new Scalaris();
 				System.out.println("getSubscribers("
 						+ line.getOptionValues("getsubscribers")[0]
 						+ ") == "
-						+ ChordSharp.getSubscribers(line
+						+ sc.getSubscribers(line
 								.getOptionValues("getsubscribers")[0]));
 			} catch (ConnectionException e) {
 				System.err
@@ -263,34 +266,4 @@ public class Main {
 
 		return options;
 	}
-
-    private static void minibench() {
-		try {
-			int DATA_SIZE = 1000;
-			byte[] data = new byte[DATA_SIZE];
-			Random r = new Random();
-			r.nextBytes(data);
-
-			int size = 100;
-
-			long time = System.currentTimeMillis();
-
-			for (int i = 0; i < size; i++) {
-				Transaction transaction = new Transaction();
-				transaction.start();
-
-				// transaction.write("" + i, new String(data));
-				transaction.write(new OtpErlangString("" + i),
-						new OtpErlangBinary(data));
-				transaction.commit();
-			}
-
-			System.out.println("time: " + (System.currentTimeMillis() - time));
-			System.out.println("speed: "
-					+ ((size * 1000) / (System.currentTimeMillis() - time)));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
 }
