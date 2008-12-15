@@ -13,19 +13,21 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp;
+package de.zib.scalaris;
+
+import com.ericsson.otp.erlang.OtpErlangException;
 
 /**
- * Exception that is thrown when a new transaction is not started but is used
- * nevertheless. Since this is a programmer's mistake, a RuntimeException is
- * chosen as the base class which eliminates the need to specify the exception
- * in a throws clause.
+ * Exception that is thrown when a read operation on a chordsharp ring fails
+ * because the connection is not active or a communication error occurred or an
+ * exit signal was received or the remote node sent a message containing an
+ * invalid cookie.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
+ * @since 2.0
  */
-@Deprecated
-public class TransactionNotStartedException extends RuntimeException {
+public class ConnectionException extends OtpErlangException {
 	/**
 	 * class version for serialisation
 	 */
@@ -34,7 +36,7 @@ public class TransactionNotStartedException extends RuntimeException {
 	/**
 	 * Creates the exception with no message.
 	 */
-	public TransactionNotStartedException() {
+	public ConnectionException() {
 	}
 
 	/**
@@ -43,7 +45,7 @@ public class TransactionNotStartedException extends RuntimeException {
 	 * @param msg
 	 *            message of the exception
 	 */
-	public TransactionNotStartedException(String msg) {
+	public ConnectionException(String msg) {
 		super(msg);
 	}
 	
@@ -52,7 +54,7 @@ public class TransactionNotStartedException extends RuntimeException {
 	 * 
 	 * @param e the exception to "re-throw"
 	 */
-	public TransactionNotStartedException(Throwable e) {
+	public ConnectionException(Throwable e) {
 		super(e.getMessage());
 	}
 }

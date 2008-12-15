@@ -13,27 +13,27 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp.examples;
+package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
-import de.zib.chordsharp.ChordSharpConnection;
-import de.zib.chordsharp.ConnectionException;
-import de.zib.chordsharp.TimeoutException;
-import de.zib.chordsharp.UnknownException;
+import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the {@code subscribe} methods of the
- * {@link ChordSharpConnection} class.
+ * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.4
+ * @version 2.0
+ * @since 2.0
  */
-@Deprecated
-public class ChordSharpConnectionSubscribeExample {
+public class ScalarisSubscribeExample {
 	/**
 	 * Subscribes a given URL to a given topic, both provided on the command
-	 * line, with the {@code subscribe} methods of {@link ChordSharpConnection}.<br />
+	 * line, with the {@code subscribe} methods of {@link Scalaris}.<br />
 	 * If no URL or topic is given, the default URL {@code "url"} and the
 	 * default topic {@code "topic"} is used.
 	 * 
@@ -60,51 +60,14 @@ public class ChordSharpConnectionSubscribeExample {
 		OtpErlangString otpURL = new OtpErlangString(URL);
 
 		System.out
-				.println("Subscribing a URL to a topic with the class `ChordSharpConnection`:");
-
-		// static:
-		try {
-			System.out
-					.println("  `static void subscribe(OtpErlangString, OtpErlangString)`...");
-			ChordSharpConnection.subscribe(otpTopic, otpURL);
-			System.out.println("    subscribe(" + otpTopic.stringValue() + ", "
-					+ otpURL.stringValue() + ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("    subscribe(" + otpTopic.stringValue() + ", "
-					+ otpURL.stringValue() + ") failed: " + e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("    subscribe(" + otpTopic.stringValue() + ", "
-					+ otpURL.stringValue() + ") failed with timeout: "
-					+ e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    subscribe(" + otpTopic.stringValue() + ", "
-					+ otpURL.stringValue() + ") failed with unknown: "
-					+ e.getMessage());
-		}
-
-		try {
-			System.out.println("  `static void subscribe(String, String)`...");
-			ChordSharpConnection.subscribe(topic, URL);
-			System.out.println("    subscribe(" + topic + ", " + URL
-					+ ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("    subscribe(" + topic + ", " + URL
-					+ ") failed: " + e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("    subscribe(" + topic + ", " + URL
-					+ ") failed with timeout: " + e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    subscribe(" + topic + ", " + URL
-					+ ") failed with unknown: " + e.getMessage());
-		}
-
-		// non-static:
+				.println("Subscribing a URL to a topic with the class `Scalaris`:");
+		
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
+			Scalaris sc = new Scalaris();
 			System.out
-					.println("    `void singleSubscribe(OtpErlangString, OtpErlangString)`...");
-			cs.singleSubscribe(otpTopic, otpURL);
+					.println("    `void subscribe(OtpErlangString, OtpErlangString)`...");
+			sc.subscribe(otpTopic, otpURL);
 			System.out.println("      subscribe(" + otpTopic.stringValue()
 					+ ", " + otpURL.stringValue() + ") succeeded");
 		} catch (ConnectionException e) {
@@ -123,9 +86,9 @@ public class ChordSharpConnectionSubscribeExample {
 
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
-			System.out.println("    `void singleSubscribe(String, String)`...");
-			cs.singleSubscribe(topic, URL);
+			Scalaris sc = new Scalaris();
+			System.out.println("    `void subscribe(String, String)`...");
+			sc.subscribe(topic, URL);
 			System.out.println("      subscribe(" + topic + ", " + URL
 					+ ") succeeded");
 		} catch (ConnectionException e) {

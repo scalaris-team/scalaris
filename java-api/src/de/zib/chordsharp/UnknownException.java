@@ -23,7 +23,9 @@ import com.ericsson.otp.erlang.OtpErlangException;
  * are handled in {@link TimeoutException} and {@link NotFoundException}.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * @version 2.0
  */
+@Deprecated
 public class UnknownException extends OtpErlangException {
 	/**
 	 * class version for serialisation
@@ -44,5 +46,14 @@ public class UnknownException extends OtpErlangException {
 	 */
 	public UnknownException(String msg) {
 		super(msg);
+	}
+	
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e the exception to "re-throw"
+	 */
+	public UnknownException(Throwable e) {
+		super(e.getMessage());
 	}
 }

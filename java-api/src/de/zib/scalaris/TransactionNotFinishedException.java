@@ -13,19 +13,17 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp;
+package de.zib.scalaris;
 
 /**
- * Exception that is thrown when a new transaction is not started but is used
- * nevertheless. Since this is a programmer's mistake, a RuntimeException is
- * chosen as the base class which eliminates the need to specify the exception
- * in a throws clause.
+ * Exception that is thrown when a new transaction is started although the old
+ * one has not been committed or aborted.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
+ * @since 2.0
  */
-@Deprecated
-public class TransactionNotStartedException extends RuntimeException {
+public class TransactionNotFinishedException extends Exception {
 	/**
 	 * class version for serialisation
 	 */
@@ -34,7 +32,7 @@ public class TransactionNotStartedException extends RuntimeException {
 	/**
 	 * Creates the exception with no message.
 	 */
-	public TransactionNotStartedException() {
+	public TransactionNotFinishedException() {
 	}
 
 	/**
@@ -43,7 +41,7 @@ public class TransactionNotStartedException extends RuntimeException {
 	 * @param msg
 	 *            message of the exception
 	 */
-	public TransactionNotStartedException(String msg) {
+	public TransactionNotFinishedException(String msg) {
 		super(msg);
 	}
 	
@@ -52,7 +50,7 @@ public class TransactionNotStartedException extends RuntimeException {
 	 * 
 	 * @param e the exception to "re-throw"
 	 */
-	public TransactionNotStartedException(Throwable e) {
+	public TransactionNotFinishedException(Throwable e) {
 		super(e.getMessage());
 	}
 }

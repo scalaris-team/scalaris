@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp;
+package de.zib.scalaris;
 
 /**
  * Exception that is thrown when a new transaction is not started but is used
@@ -23,8 +23,8 @@ package de.zib.chordsharp;
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
+ * @since 2.0
  */
-@Deprecated
 public class TransactionNotStartedException extends RuntimeException {
 	/**
 	 * class version for serialisation

@@ -13,25 +13,25 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp.examples;
+package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
-import de.zib.chordsharp.ConnectionException;
-import de.zib.chordsharp.NotFoundException;
-import de.zib.chordsharp.TimeoutException;
-import de.zib.chordsharp.Transaction;
-import de.zib.chordsharp.TransactionNotFinishedException;
-import de.zib.chordsharp.UnknownException;
+import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.Transaction;
+import de.zib.scalaris.TransactionNotFinishedException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the {@code read} and {@code write} methods of
  * the {@link Transaction} class together in one transaction.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.1
+ * @version 2.0
+ * @since 2.0
  */
-@Deprecated
 public class TransactionReadWriteExample {
 	/**
 	 * Implements the following transactions each with the Java type methods and
@@ -373,7 +373,7 @@ public class TransactionReadWriteExample {
 
 	/**
 	 * Writes the given {@code key} and {@code value} with the
-	 * {@link Transaction#write(OtpErlangString, OtpErlangObject)} method on the
+	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} method on the
 	 * given {@code transaction} object and generates output according to the
 	 * result.
 	 * 
@@ -399,7 +399,7 @@ public class TransactionReadWriteExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue = new OtpErlangString(value);
 		try {
-			transaction.write(otpKey, otpValue);
+			transaction.writeObject(otpKey, otpValue);
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") succeeded");
 		} catch (ConnectionException e) {
@@ -463,7 +463,7 @@ public class TransactionReadWriteExample {
 
 	/**
 	 * Reads the given {@code key} with the
-	 * {@link Transaction#read(OtpErlangString)} method on the given
+	 * {@link Transaction#readObject(OtpErlangString)} method on the given
 	 * {@code transaction} object and generates output according to the result.
 	 * 
 	 * @param transaction
@@ -489,7 +489,7 @@ public class TransactionReadWriteExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue;
 		try {
-			otpValue = transaction.readString(otpKey);
+			otpValue = (OtpErlangString) transaction.readObject(otpKey);
 			System.out.println("      read(" + otpKey.stringValue() + ") == "
 					+ otpValue.stringValue());
 			return otpValue.stringValue();
@@ -509,6 +509,10 @@ public class TransactionReadWriteExample {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with not found: " + e.getMessage());
 			throw new NotFoundException(e.getMessage());
+		} catch (ClassCastException e) {
+			System.out.println("      read(" + otpKey.stringValue()
+					+ ") failed with unknown return type: " + e.getMessage());
+			throw new UnknownException(e.getMessage());
 		}
 	}
 
@@ -539,7 +543,7 @@ public class TransactionReadWriteExample {
 		System.out.println("    `String read(String)`...");
 		String value;
 		try {
-			value = transaction.readString(key);
+			value = transaction.read(key);
 			System.out.println("      read(" + key + ") == " + value);
 			return value;
 		} catch (ConnectionException e) {

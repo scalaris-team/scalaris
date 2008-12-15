@@ -20,7 +20,9 @@ package de.zib.chordsharp;
  * one has not been committed or aborted.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * @version 2.0
  */
+@Deprecated
 public class TransactionNotFinishedException extends Exception {
 	/**
 	 * class version for serialisation
@@ -41,5 +43,14 @@ public class TransactionNotFinishedException extends Exception {
 	 */
 	public TransactionNotFinishedException(String msg) {
 		super(msg);
+	}
+	
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e the exception to "re-throw"
+	 */
+	public TransactionNotFinishedException(Throwable e) {
+		super(e.getMessage());
 	}
 }

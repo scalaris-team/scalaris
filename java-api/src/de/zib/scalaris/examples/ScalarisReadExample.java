@@ -13,28 +13,28 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp.examples;
+package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
-import de.zib.chordsharp.ChordSharpConnection;
-import de.zib.chordsharp.ConnectionException;
-import de.zib.chordsharp.NotFoundException;
-import de.zib.chordsharp.TimeoutException;
-import de.zib.chordsharp.UnknownException;
+import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the {@code read} methods of the
- * {@link ChordSharpConnection} class.
+ * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.0
+ * @version 2.0
+ * @since 2.0
  */
-@Deprecated
-public class ChordSharpConnectionReadExample {
+public class ScalarisReadExample {
 	/**
 	 * Reads a key given on the command line with the {@code read} methods of
-	 * {@link ChordSharpConnection}.<br />
+	 * {@link Scalaris}.<br />
 	 * If no key is given, the default key {@code "key"} is used.
 	 * 
 	 * @param args
@@ -54,55 +54,14 @@ public class ChordSharpConnectionReadExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue;
 
-		System.out
-				.println("Reading values with the class `ChordSharpConnection`:");
+		System.out.println("Reading values with the class `Scalaris`:");
 
-		// static:
-		try {
-			System.out
-					.println("  `static OtpErlangString read(OtpErlangString)`...");
-			otpValue = ChordSharpConnection.readString(otpKey);
-			System.out.println("    read(" + otpKey.stringValue() + ") == "
-					+ otpValue.stringValue());
-		} catch (ConnectionException e) {
-			System.out.println("    read(" + otpKey.stringValue()
-					+ ") failed: " + e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("    read(" + otpKey.stringValue()
-					+ ") failed with timeout: " + e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    read(" + otpKey.stringValue()
-					+ ") failed with unknown: " + e.getMessage());
-		} catch (NotFoundException e) {
-			System.out.println("    read(" + otpKey.stringValue()
-					+ ") failed with not found: " + e.getMessage());
-		}
-
-		try {
-			System.out.println("  `static String read(String)`...");
-			value = ChordSharpConnection.readString(key);
-			System.out.println("    read(" + key + ") == " + value);
-		} catch (ConnectionException e) {
-			System.out.println("    read(" + key + ") failed: "
-					+ e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("    read(" + key + ") failed with timeout: "
-					+ e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    read(" + key + ") failed with unknown: "
-					+ e.getMessage());
-		} catch (NotFoundException e) {
-			System.out.println("    read(" + key + ") failed with not found: "
-					+ e.getMessage());
-		}
-
-		// non-static:
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
+			Scalaris sc = new Scalaris();
 			System.out
-					.println("    `OtpErlangString singleRead(OtpErlangString)`...");
-			otpValue = cs.singleReadString(otpKey);
+					.println("    `OtpErlangObject readObject(OtpErlangString)`...");
+			otpValue = (OtpErlangString) sc.readObject(otpKey);
 			System.out.println("      read(" + otpKey.stringValue() + ") == "
 					+ otpValue.stringValue());
 		} catch (ConnectionException e) {
@@ -117,13 +76,16 @@ public class ChordSharpConnectionReadExample {
 		} catch (NotFoundException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with not found: " + e.getMessage());
+		} catch (ClassCastException e) {
+			System.out.println("      read(" + otpKey.stringValue()
+					+ ") failed with unknown return type: " + e.getMessage());
 		}
 
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
-			System.out.println("    `String singleRead(String)`...");
-			value = cs.singleReadString(key);
+			Scalaris sc = new Scalaris();
+			System.out.println("    `String read(String)`...");
+			value = sc.read(key);
 			System.out.println("      read(" + key + ") == " + value);
 		} catch (ConnectionException e) {
 			System.out.println("      read(" + key + ") failed: "

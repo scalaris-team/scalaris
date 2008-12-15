@@ -15,27 +15,16 @@
  */
 package de.zib.chordsharp;
 
-import java.io.IOException;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.Vector;
 
-import com.ericsson.otp.erlang.OtpAuthException;
 import com.ericsson.otp.erlang.OtpConnection;
-import com.ericsson.otp.erlang.OtpErlangAtom;
-import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
-import com.ericsson.otp.erlang.OtpErlangTuple;
-import com.ericsson.otp.erlang.OtpPeer;
-import com.ericsson.otp.erlang.OtpSelf;
 
-import de.zib.chordsharp.examples.ChordSharpConnectionGetSubscribersExample;
-import de.zib.chordsharp.examples.ChordSharpConnectionPublishExample;
-import de.zib.chordsharp.examples.ChordSharpConnectionReadExample;
-import de.zib.chordsharp.examples.ChordSharpConnectionSubscribeExample;
-import de.zib.chordsharp.examples.ChordSharpConnectionWriteExample;
+import de.zib.scalaris.ConnectionFactory;
+import de.zib.scalaris.Scalaris;
 import de.zib.tools.PropertyLoader;
 
 /**
@@ -79,7 +68,7 @@ import de.zib.tools.PropertyLoader;
  *   value    = cs.singleReadString(key);    // {@link #singleReadString(String)}
  * </code>
  * 
- * <p>For the full example, see {@link ChordSharpConnectionReadExample}</p>
+ * <p>For the full example, see {@link de.zib.chordsharp.examples.ChordSharpConnectionReadExample}</p>
  * 
  * <h3>Writing values</h3>
  * <code style="white-space:pre;">
@@ -99,7 +88,7 @@ import de.zib.tools.PropertyLoader;
  *   cs.singleWrite(key, value);       // {@link #singleWrite(String, String)}
  * </code>
  * 
- * <p>For the full example, see {@link ChordSharpConnectionWriteExample}</p>
+ * <p>For the full example, see {@link de.zib.chordsharp.examples.ChordSharpConnectionWriteExample}</p>
  * 
  * <h3>Publishing topics</h3>
  * <code style="white-space:pre;">
@@ -119,7 +108,7 @@ import de.zib.tools.PropertyLoader;
  *   cs.singlePublish(topic, content);       // {@link #singlePublish(String, String)}
  * </code>
  * 
- * <p>For the full example, see {@link ChordSharpConnectionPublishExample}</p>
+ * <p>For the full example, see {@link de.zib.chordsharp.examples.ChordSharpConnectionPublishExample}</p>
  * 
  * <h3>Subscribing to topics</h3>
  * <code style="white-space:pre;">
@@ -139,7 +128,7 @@ import de.zib.tools.PropertyLoader;
  *   cs.singleSubscribe(topic, URL);       // {@link #singleSubscribe(String, String)}
  * </code>
  * 
- * <p>For the full example, see {@link ChordSharpConnectionSubscribeExample}</p>
+ * <p>For the full example, see {@link de.zib.chordsharp.examples.ChordSharpConnectionSubscribeExample}</p>
  * 
  * <h3>Unsubscribing from topics</h3>
  * 
@@ -167,11 +156,10 @@ import de.zib.tools.PropertyLoader;
  * <h3>Getting a list of subscribers to a topic</h3>
  * <code style="white-space:pre;">
  *   OtpErlangString otpTopic;
- *   
  *   String topic;
  *   
  *   OtpErlangList otpSubscribers;
- *   Vector&lt;String&gt; subscribers;
+ *   List&lt;String&gt; subscribers;
  *   
  *   // static:
  *   otpSubscribers = ChordSharpConnection.getSubscribers(otpTopic); // {@link #getSubscribers(OtpErlangString)}
@@ -183,19 +171,30 @@ import de.zib.tools.PropertyLoader;
  *   subscribers    = cs.singleGetSubscribers(topic);    // {@link #singleGetSubscribers(String)}
  * </code>
  * 
- * <p>For the full example, see {@link ChordSharpConnectionGetSubscribersExample}</p>
+ * <p>For the full example, see {@link de.zib.chordsharp.examples.ChordSharpConnectionGetSubscribersExample}</p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.4
+ * @version 2.0
+ * 
+ * @deprecated use {@link Scalaris} class instead
  */
+@Deprecated
 public class ChordSharpConnection {
 	/**
 	 * the connection to a chorsharp node
 	 */
-	private OtpConnection connection = null;
+	private Scalaris connection = null;
 	
 	/**
-	 * The default settings to use (set in static initialiser).
+	 * the static connection to a chordsharp node to be used by the static
+	 * methods
+	 */
+	static private Scalaris staticConnection = null;
+
+	/**
+	 * The default settings to use (set in static initialiser). The settings
+	 * will get overridden by the contents of the {@code
+	 * ChordSharpConnection.properties} file.
 	 * 
 	 * <ul>
 	 * <li>{@code cs.node = "boot@localhost"}</li>
@@ -203,12 +202,6 @@ public class ChordSharpConnection {
 	 * </ul>
 	 */
 	static Properties defaultProperties = new Properties();
-	
-	/**
-	 * the static connection to a chordsharp node to be used by the static
-	 * methods
-	 */
-	static private OtpConnection staticConnection = null;
 
 	/**
 	 * static initialiser: sets default values for the chordsharp connection and
@@ -219,12 +212,14 @@ public class ChordSharpConnection {
 		ChordSharpConnection.defaultProperties.setProperty("cs.cookie",
 				"chocolate chip cookie");
 		
-		Properties properties = new Properties(defaultProperties);
-		PropertyLoader.loadProperties(properties, "ChordSharpConnection.properties");
+		// load properties from file:
+		PropertyLoader.loadProperties(defaultProperties, "ChordSharpConnection.properties");
 		try {
-			staticConnection = ChordSharpConnection.createConnection(properties);
+			staticConnection = new Scalaris(ChordSharpConnection.createConnection(defaultProperties));
+		} catch (de.zib.scalaris.ConnectionException e) {
+			 e.printStackTrace();
 		} catch (ConnectionException e) {
-			// e.printStackTrace();
+			 e.printStackTrace();
 		}
 	}
 
@@ -238,7 +233,11 @@ public class ChordSharpConnection {
 	public ChordSharpConnection() throws ConnectionException {
 		Properties properties = new Properties(defaultProperties);
 		PropertyLoader.loadProperties(properties, "ChordSharpConnection.properties");
-		connection = ChordSharpConnection.createConnection(properties);
+		try {
+			connection = new Scalaris(ChordSharpConnection.createConnection(properties));
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		}
 	}
 
 	/**
@@ -255,21 +254,17 @@ public class ChordSharpConnection {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	static OtpConnection createConnection(String node,
-			String cookie) throws ConnectionException {
+	static OtpConnection createConnection(String node, String cookie)
+			throws ConnectionException {
 		try {
 			/*
 			 * only one connection per client name is allowed, so the name is
 			 * made unique with UUIDs.
 			 */
-			UUID clientId = UUID.randomUUID();
-			OtpSelf self = new OtpSelf("java_client_" + clientId,
-					cookie);
-			OtpPeer other = new OtpPeer(node);
-			return self.connect(other);
+			return ConnectionFactory.getInstance().createConnection("java_client", true);
 		} catch (Exception e) {
 //			e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		}
 	}
 
@@ -314,52 +309,71 @@ public class ChordSharpConnection {
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 */
-	private static OtpErlangObject read(OtpConnection connection,
+	private static OtpErlangObject read(Scalaris connection,
 			OtpErlangString key) throws ConnectionException, TimeoutException,
 			UnknownException, NotFoundException {
 		if (connection == null) {
 			throw new ConnectionException("No connection.");
 		}
 		try {
-			connection.sendRPC("transstore.transaction_api", "quorum_read",
-					new OtpErlangList(key));
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
-
-			/*
-			 * possible return values:
-			 *  - {Value, Version}
-			 *  - {fail, fail}
-			 *  - {fail, not_found}
-			 *  - {fail, timeout}
-			 */
-			if (received.elementAt(0).equals(new OtpErlangAtom("fail"))) {
-				OtpErlangObject reason = received.elementAt(1);
-				if (reason.equals(new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
-				} else if (reason.equals(new OtpErlangAtom("not_found"))) {
-					throw new NotFoundException();
-				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ reason.toString());
-				}
-			} else {
-				// return the value only, not the version:
-				OtpErlangObject value = received.elementAt(0);
-				return value;
-			}
-		} catch (OtpErlangExit e) {
+			return connection.readObject(key);
+		} catch (de.zib.scalaris.ConnectionException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.NotFoundException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new NotFoundException(e);
+		}
+	}
+	
+	/**
+	 * Gets the value stored under the given {@code key}. Uses the given
+	 * {@code connection}.
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param key
+	 *            the key to look up
+	 * @return the value stored under the given {@code key}
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to fetch the value
+	 * @throws NotFoundException
+	 *             if the requested key does not exist
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @since 2.0
+	 */
+	private static String read(Scalaris connection, String key)
+			throws ConnectionException, TimeoutException, UnknownException,
+			NotFoundException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
+		try {
+			return connection.read(key);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			// e.printStackTrace();
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.NotFoundException e) {
+			// e.printStackTrace();
+			throw new NotFoundException(e);
 		}
 	}
 
@@ -380,7 +394,7 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #read(OtpConnection, OtpErlangString)
+	 * @see #read(Scalaris, OtpErlangString)
 	 */
 	public OtpErlangString singleReadString(OtpErlangString key)
 			throws ConnectionException, TimeoutException, UnknownException,
@@ -410,11 +424,11 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #singleReadString(OtpErlangString)
+	 * @see #read(Scalaris, String)
 	 */
 	public String singleReadString(String key) throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
-		return singleReadString(new OtpErlangString(key)).stringValue();
+		return read(connection, key);
 	}
 	
 	/**
@@ -434,7 +448,7 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #read(OtpConnection, OtpErlangString)
+	 * @see #read(Scalaris, OtpErlangString)
 	 */
 	public OtpErlangObject singleReadObject(OtpErlangString key)
 			throws ConnectionException, TimeoutException, UnknownException,
@@ -459,7 +473,7 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #read(OtpConnection, OtpErlangString)
+	 * @see #read(Scalaris, OtpErlangString)
 	 */
 	public static OtpErlangString readString(OtpErlangString key)
 			throws ConnectionException, TimeoutException, UnknownException,
@@ -489,11 +503,11 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #readString(OtpErlangString)
+	 * @see #read(Scalaris, String)
 	 */
 	public static String readString(String key) throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
-		return readString(new OtpErlangString(key)).stringValue();
+		return read(staticConnection, key);
 	}
 	
 	/**
@@ -513,7 +527,7 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #read(OtpConnection, OtpErlangString)
+	 * @see #read(Scalaris, OtpErlangString)
 	 */
 	public static OtpErlangObject readObject(OtpErlangString key)
 			throws ConnectionException, TimeoutException, UnknownException,
@@ -544,54 +558,63 @@ public class ChordSharpConnection {
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 */
-	private static void write(OtpConnection connection, OtpErlangString key,
-			OtpErlangObject value) throws ConnectionException, TimeoutException, UnknownException {
+	private static void write(Scalaris connection, OtpErlangString key,
+			OtpErlangObject value) throws ConnectionException,
+			TimeoutException, UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
 		try {
-			if (connection == null) {
-				throw new ConnectionException("No connection.");
-			}
-			connection.sendRPC("transstore.transaction_api", "single_write",
-					new OtpErlangList(new OtpErlangObject[] { key, value }));
-			OtpErlangObject received = connection.receiveRPC();
-			
-			/*
-			 * possible return values:
-			 *  - commit
-			 *  - userabort
-			 *  - {fail, not_found}
-			 *  - {fail, timeout}
-			 *  - {fail, fail}
-			 *  - {fail, abort}
-			 */
-			if (received.equals(new OtpErlangAtom("commit"))) {
-				return;
-			} else if (received.equals(new OtpErlangAtom("userabort"))) {
-				throw new UnknownException("userabort");
-			} else {
-				// {fail, Reason}
-				OtpErlangTuple returnValue = (OtpErlangTuple) received;
-
-				if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
-				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ returnValue.toString());
-				}
-			}
-		} catch (OtpErlangExit e) {
-//			e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
-//			e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
-//			e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
+			connection.writeObject(key, value);
+		} catch (de.zib.scalaris.ConnectionException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			// e.printStackTrace();
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
+		}
+	}
+	
+	/**
+	 * Stores the given {@code key}/{@code value} pair. Uses the given
+	 * {@code connection}.
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param key
+	 *            the key to store the value for
+	 * @param value
+	 *            the value to store
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @since 2.0
+	 */
+	private static void write(Scalaris connection, String key, String value)
+			throws ConnectionException, TimeoutException, UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
+		try {
+			connection.write(key, value);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			// e.printStackTrace();
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
 		}
 	}
 
@@ -611,7 +634,7 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #write(OtpConnection, OtpErlangString, OtpErlangObject)
+	 * @see #write(Scalaris, OtpErlangString, OtpErlangObject)
 	 */
 	public void singleWrite(OtpErlangString key, OtpErlangObject value)
 			throws ConnectionException, TimeoutException, UnknownException {
@@ -634,11 +657,11 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #singleWrite(OtpErlangString, OtpErlangObject)
+	 * @see #write(Scalaris, String, String)
 	 */
 	public void singleWrite(String key, String value)
 			throws ConnectionException, TimeoutException, UnknownException {
-		singleWrite(new OtpErlangString(key), new OtpErlangString(value));
+		write(connection, key, value);
 	}
 
 	/**
@@ -657,7 +680,7 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #write(OtpConnection, OtpErlangString, OtpErlangObject)
+	 * @see #write(Scalaris, OtpErlangString, OtpErlangObject)
 	 */
 	public static void write(OtpErlangString key, OtpErlangObject value)
 			throws ConnectionException, TimeoutException, UnknownException {
@@ -680,11 +703,11 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #write(OtpErlangString, OtpErlangObject)
+	 * @see #write(Scalaris, String, String)
 	 */
 	public static void write(String key, String value)
 			throws ConnectionException, TimeoutException, UnknownException {
-		write(new OtpErlangString(key), new OtpErlangString(value));
+		write(staticConnection, key, value);
 	}
 
 	// /////////////////////////////
@@ -710,27 +733,50 @@ public class ChordSharpConnection {
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
 	 */
-	private static void publish(OtpConnection connection,
-			OtpErlangString topic, OtpErlangString content)
-			throws ConnectionException {
+	private static void publish(Scalaris connection, OtpErlangString topic,
+			OtpErlangString content) throws ConnectionException {
 		if (connection == null) {
 			throw new ConnectionException("No connection.");
 		}
 		try {
-			connection
-					.sendRPC("pubsub.pubsub_api", "publish", new OtpErlangList(
-							new OtpErlangObject[] { topic, content }));
-			connection.receiveRPC();
-			// OtpErlangObject received = connection.receiveRPC();
-		} catch (OtpErlangExit e) {
+			connection.publish(topic, content);
+		} catch (de.zib.scalaris.ConnectionException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
+			throw new ConnectionException(e);
+		}
+	}
+	
+	/**
+	 * Publishes an event under a given {@code topic}. Uses the given
+	 * {@code connection}.
+	 * 
+	 * Note: The specification of {@code pubsub.pubsub_api:publish/2} states
+	 * that the only returned value is {@code ok}, so no further evaluation is
+	 * necessary.
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param topic
+	 *            the topic to publish the content under
+	 * @param content
+	 *            the content to publish
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * 
+	 * @since 2.0
+	 */
+	private static void publish(Scalaris connection, String topic,
+			String content) throws ConnectionException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
+		try {
+			connection.publish(topic, content);
+		} catch (de.zib.scalaris.ConnectionException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		}
 	}
 
@@ -746,7 +792,7 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
-	 * @see #publish(OtpConnection, OtpErlangString, OtpErlangString)
+	 * @see #publish(Scalaris, OtpErlangString, OtpErlangString)
 	 */
 	public void singlePublish(OtpErlangString topic, OtpErlangString content)
 			throws ConnectionException {
@@ -765,11 +811,11 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
-	 * @see #singlePublish(OtpErlangString, OtpErlangString)
+	 * @see #publish(Scalaris, String, String)
 	 */
 	public void singlePublish(String topic, String content)
 			throws ConnectionException {
-		singlePublish(new OtpErlangString(topic), new OtpErlangString(content));
+		publish(connection, topic, content);
 	}
 
 	/**
@@ -784,7 +830,7 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
-	 * @see #publish(OtpConnection, OtpErlangString, OtpErlangString)
+	 * @see #publish(Scalaris, OtpErlangString, OtpErlangString)
 	 */
 	public static void publish(OtpErlangString topic, OtpErlangString content)
 			throws ConnectionException {
@@ -803,11 +849,11 @@ public class ChordSharpConnection {
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
 	 *             sends a message containing an invalid cookie
-	 * @see #publish(OtpErlangString, OtpErlangString)
+	 * @see #publish(Scalaris, String, String)
 	 */
 	public static void publish(String topic, String content)
 			throws ConnectionException {
-		publish(new OtpErlangString(topic), new OtpErlangString(content));
+		publish(staticConnection, topic, content);
 	}
 	
 	// /////////////////////////////
@@ -836,49 +882,66 @@ public class ChordSharpConnection {
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 */
-	private static void subscribe(OtpConnection connection,
-			OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException, TimeoutException, UnknownException {
+	private static void subscribe(Scalaris connection, OtpErlangString topic,
+			OtpErlangString url) throws ConnectionException, TimeoutException,
+			UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
 		try {
-			connection.sendRPC("pubsub.pubsub_api", "subscribe",
-					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			OtpErlangObject received = connection.receiveRPC();
-			
-			/*
-			 * possible return values:
-			 *  - ok
-			 *  - {fail, not_found}
-			 *  - {fail, timeout}
-			 *  - {fail, fail}
-			 *  - {fail, abort}
-			 */
-			if (received.equals(new OtpErlangAtom("ok"))) {
-				return;
-			} else {
-				// {fail, Reason}
-				OtpErlangTuple returnValue = (OtpErlangTuple) received;
-
-				if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
-				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ returnValue.toString());
-				}
-			}
-		} catch (OtpErlangExit e) {
+			connection.subscribe(topic, url);
+		} catch (de.zib.scalaris.ConnectionException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
+			throw new UnknownException(e);
+		}
+	}
+	
+	/**
+	 * Subscribes a url to a {@code topic}. Uses the given {@code connection}.
+	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param topic
+	 *            the topic to subscribe the url to
+	 * @param url
+	 *            the url of the subscriber (this is where the events are send
+	 *            to)
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @since 2.0
+	 */
+	private static void subscribe(Scalaris connection, String topic, String url)
+			throws ConnectionException, TimeoutException, UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
+		try {
+			connection.subscribe(topic, url);
+		} catch (de.zib.scalaris.ConnectionException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			// e.printStackTrace();
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
 		}
 	}
 
@@ -902,7 +965,7 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #subscribe(OtpConnection, OtpErlangString, OtpErlangString)
+	 * @see #subscribe(Scalaris, OtpErlangString, OtpErlangString)
 	 */
 	public void singleSubscribe(OtpErlangString topic, OtpErlangString url)
 			throws ConnectionException, TimeoutException, UnknownException {
@@ -929,11 +992,11 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #singleSubscribe(OtpErlangString, OtpErlangString)
+	 * @see #subscribe(Scalaris, String, String)
 	 */
 	public void singleSubscribe(String topic, String url)
 			throws ConnectionException, TimeoutException, UnknownException {
-		singleSubscribe(new OtpErlangString(topic), new OtpErlangString(url));
+		subscribe(connection, topic, url);
 	}
 
 	/**
@@ -956,7 +1019,7 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #subscribe(OtpConnection, OtpErlangString, OtpErlangString)
+	 * @see #subscribe(Scalaris, OtpErlangString, OtpErlangString)
 	 */
 	public static void subscribe(OtpErlangString topic, OtpErlangString url)
 			throws ConnectionException, TimeoutException, UnknownException {
@@ -983,54 +1046,11 @@ public class ChordSharpConnection {
 	 *             if a timeout occurred while trying to write the value
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #subscribe(OtpErlangString, OtpErlangString)
+	 * @see #subscribe(Scalaris, String, String)
 	 */
 	public static void subscribe(String topic, String url)
 			throws ConnectionException, TimeoutException, UnknownException {
-		subscribe(new OtpErlangString(topic), new OtpErlangString(url));
-	}
-
-	/**
-	 * Gets a list of subscribers to a {@code topic}. Uses the given
-	 * {@code connection}.
-	 * 
-	 * @param connection
-	 *            the connection to perform the operation on
-	 * @param topic
-	 *            the topic to get the subscribers for
-	 * @return the subscriber URLs
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws UnknownException
-	 *             is thrown if the return type of the erlang method does not
-	 *             match the expected one
-	 */
-	private static OtpErlangList getSubscribers(OtpConnection connection,
-			OtpErlangString topic) throws ConnectionException, UnknownException {
-		if (connection == null) {
-			throw new ConnectionException("No connection.");
-		}
-		try {
-			connection.sendRPC("pubsub.pubsub_api", "get_subscribers",
-					new OtpErlangList(topic));
-			// return value: [string,...]
-			OtpErlangObject received =  connection.receiveRPC();
-			return (OtpErlangList) received;
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
-		}
+		subscribe(staticConnection, topic, url);
 	}
 	
 	// /////////////////////////////
@@ -1064,53 +1084,76 @@ public class ChordSharpConnection {
 	 * 
 	 * @since 1.3
 	 */
-	private static void unsubscribe(OtpConnection connection,
-			OtpErlangString topic, OtpErlangString url)
-			throws ConnectionException, TimeoutException, NotFoundException,
-			UnknownException {
+	private static void unsubscribe(Scalaris connection, OtpErlangString topic,
+			OtpErlangString url) throws ConnectionException, TimeoutException,
+			NotFoundException, UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
 		try {
-			connection.sendRPC("pubsub.pubsub_api", "unsubscribe",
-					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			OtpErlangObject received = connection.receiveRPC();
-			
-			/*
-			 * possible return values:
-			 *  - ok
-			 *  - {fail, not_found}
-			 *  - {fail, timeout}
-			 *  - {fail, fail}
-			 *  - {fail, abort}
-			 */
-			if (received.equals(new OtpErlangAtom("ok"))) {
-				return;
-			} else {
-				// {fail, Reason}
-				OtpErlangTuple returnValue = (OtpErlangTuple) received;
+			connection.unsubscribe(topic, url);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			// e.printStackTrace();
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.NotFoundException e) {
+			// e.printStackTrace();
+			throw new NotFoundException(e);
+		}
+	}
 
-				if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
-				} else if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("not_found"))) {
-					throw new NotFoundException();
-				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ returnValue.toString());
-				}
-			}
-		} catch (OtpErlangExit e) {
+	/**
+	 * Unsubscribes a url from a {@code topic}. Uses the given {@code
+	 * connection}.
+	 * 
+	 * Note: Since version 1.4 erlang's return type is evaluated and additional
+	 * exceptions were added to comply with that change.
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param topic
+	 *            the topic to unsubscribe the url from
+	 * @param url
+	 *            the url of the subscriber
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws NotFoundException
+	 *             if the topic does not exist or the given subscriber is not
+	 *             subscribed to the given topic
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @since 2.0
+	 */
+	private static void unsubscribe(Scalaris connection, String topic,
+			String url) throws ConnectionException, TimeoutException,
+			NotFoundException, UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
+		try {
+			connection.unsubscribe(topic, url);
+		} catch (de.zib.scalaris.ConnectionException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.NotFoundException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new NotFoundException(e);
 		}
 	}
 
@@ -1136,7 +1179,7 @@ public class ChordSharpConnection {
 	 *             subscribed to the given topic
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #unsubscribe(OtpConnection, OtpErlangString, OtpErlangString)
+	 * @see #unsubscribe(Scalaris, OtpErlangString, OtpErlangString)
 	 * 
 	 * @since 1.3
 	 */
@@ -1168,14 +1211,14 @@ public class ChordSharpConnection {
 	 *             subscribed to the given topic
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #singleUnsubscribe(OtpErlangString, OtpErlangString)
+	 * @see #unsubscribe(Scalaris, String, String)
 	 * 
 	 * @since 1.3
 	 */
 	public void singleUnsubscribe(String topic, String url)
 			throws ConnectionException, TimeoutException, NotFoundException,
 			UnknownException {
-		singleUnsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
+		unsubscribe(connection, topic, url);
 	}
 
 	/**
@@ -1200,7 +1243,7 @@ public class ChordSharpConnection {
 	 *             subscribed to the given topic
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #unsubscribe(OtpConnection, OtpErlangString, OtpErlangString)
+	 * @see #unsubscribe(Scalaris, OtpErlangString, OtpErlangString)
 	 * 
 	 * @since 1.3
 	 */
@@ -1232,22 +1275,22 @@ public class ChordSharpConnection {
 	 *             subscribed to the given topic
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #unsubscribe(OtpErlangString, OtpErlangString)
+	 * @see #unsubscribe(Scalaris, String, String)
 	 * 
 	 * @since 1.3
 	 */
 	public static void unsubscribe(String topic, String url)
 			throws ConnectionException, TimeoutException, NotFoundException,
 			UnknownException {
-		unsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
+		unsubscribe(staticConnection, topic, url);
 	}
-	
+
 	// /////////////////////////////
-	// utility methods
+	// get subscribers methods
 	// /////////////////////////////
 	
 	/**
-	 * Converts the given erlang {@code list} with erlang strings to a Vector
+	 * Converts the given erlang {@code list} of erlang strings to a Vector
 	 * with java strings.
 	 * 
 	 * @param list
@@ -1262,10 +1305,75 @@ public class ChordSharpConnection {
 		}
 		return result;
 	}
-
-	// /////////////////////////////
-	// get subscribers methods
-	// /////////////////////////////
+	
+	/**
+	 * Gets a list of subscribers to a {@code topic}. Uses the given
+	 * {@code connection}.
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param topic
+	 *            the topic to get the subscribers for
+	 * @return the subscriber URLs
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws UnknownException
+	 *             is thrown if the return type of the erlang method does not
+	 *             match the expected one
+	 */
+	private static OtpErlangList getSubscribers(Scalaris connection,
+			OtpErlangString topic) throws ConnectionException, UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
+		try {
+			return connection.getSubscribers(topic);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
+		}
+	}
+	
+	/**
+	 * Gets a list of subscribers to a {@code topic}. Uses the given
+	 * {@code connection}.
+	 * 
+	 * @param connection
+	 *            the connection to perform the operation on
+	 * @param topic
+	 *            the topic to get the subscribers for
+	 * @return the subscriber URLs
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws UnknownException
+	 *             is thrown if the return type of the erlang method does not
+	 *             match the expected one
+	 * 
+	 * @since 2.0
+	 */
+	private static Vector<String> getSubscribers(Scalaris connection,
+			String topic) throws ConnectionException, UnknownException {
+		if (connection == null) {
+			throw new ConnectionException("No connection.");
+		}
+		try {
+			return erlStrListToStrVector(connection
+					.getSubscribers(new OtpErlangString(topic)));
+		} catch (de.zib.scalaris.ConnectionException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
+		}
+	}
 	
 	/**
 	 * Gets a list of subscribers to a {@code topic}. Uses the object's
@@ -1281,7 +1389,7 @@ public class ChordSharpConnection {
 	 * @throws UnknownException
 	 *             is thrown if the return type of the erlang method does not
 	 *             match the expected one
-	 * @see #getSubscribers(OtpConnection, OtpErlangString)
+	 * @see #getSubscribers(Scalaris, OtpErlangString)
 	 */
 	public OtpErlangList singleGetSubscribers(OtpErlangString topic)
 			throws ConnectionException, UnknownException {
@@ -1302,11 +1410,11 @@ public class ChordSharpConnection {
 	 * @throws UnknownException
 	 *             is thrown if the return type of the erlang method does not
 	 *             match the expected one
-	 * @see #singleGetSubscribers(OtpErlangString)
+	 * @see #getSubscribers(Scalaris, String)
 	 */
 	public Vector<String> singleGetSubscribers(String topic)
 			throws ConnectionException, UnknownException {
-		return erlStrListToStrVector(singleGetSubscribers(new OtpErlangString(topic)));
+		return getSubscribers(connection, topic);
 	}
 
 	/**
@@ -1323,7 +1431,7 @@ public class ChordSharpConnection {
 	 * @throws UnknownException
 	 *             is thrown if the return type of the erlang method does not
 	 *             match the expected one
-	 * @see #getSubscribers(OtpConnection, OtpErlangString)
+	 * @see #getSubscribers(Scalaris, OtpErlangString)
 	 */
 	public static OtpErlangList getSubscribers(OtpErlangString topic)
 			throws ConnectionException, UnknownException {
@@ -1344,11 +1452,23 @@ public class ChordSharpConnection {
 	 * @throws UnknownException
 	 *             is thrown if the return type of the erlang method does not
 	 *             match the expected one
-	 * @see #getSubscribers(OtpErlangString)
+	 * @see #getSubscribers(Scalaris, String)
 	 */
 	public static Vector<String> getSubscribers(String topic)
 			throws ConnectionException, UnknownException {
-		return erlStrListToStrVector(getSubscribers(new OtpErlangString(topic)));
+		return getSubscribers(staticConnection, topic);
+	}
+	
+	/**
+	 * Closes the transaction's connection to a Scalaris node.
+	 * 
+	 * Note: Subsequent calls to the other methods will throw
+	 * {@link ConnectionException}s!
+	 * 
+	 * @since 2.0
+	 */
+	public void closeConnection() {
+		connection.closeConnection();
 	}
 	
 	// deprecated methods:
@@ -1370,7 +1490,7 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #read(OtpConnection, OtpErlangString)
+	 * @see #read(Scalaris, OtpErlangString)
 	 * @deprecated use {@link #singleReadString(OtpErlangString)} instead
 	 */
 	@Deprecated
@@ -1423,7 +1543,7 @@ public class ChordSharpConnection {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
-	 * @see #read(OtpConnection, OtpErlangString)
+	 * @see #read(Scalaris, OtpErlangString)
 	 * @deprecated use {@link #readString(OtpErlangString)} instead
 	 */
 	@Deprecated

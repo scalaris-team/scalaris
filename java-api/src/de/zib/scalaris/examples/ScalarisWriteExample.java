@@ -13,27 +13,27 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.chordsharp.examples;
+package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
-import de.zib.chordsharp.ChordSharpConnection;
-import de.zib.chordsharp.ConnectionException;
-import de.zib.chordsharp.TimeoutException;
-import de.zib.chordsharp.UnknownException;
+import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the {@code write} methods of the
- * {@link ChordSharpConnection} class.
+ * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.0
+ * @version 2.0
+ * @since 2.0
  */
-@Deprecated
-public class ChordSharpConnectionWriteExample {
+public class ScalarisWriteExample {
 	/**
 	 * Writes a key/value pair given on the command line with the {@code write}
-	 * methods of {@link ChordSharpConnection}.<br />
+	 * methods of {@link Scalaris}.<br />
 	 * If no value or key is given, the default key {@code "key"} and the
 	 * default value {@code "value"} is used.
 	 * 
@@ -59,51 +59,14 @@ public class ChordSharpConnectionWriteExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue = new OtpErlangString(value);
 
-		System.out
-				.println("Writing values with the class `ChordSharpConnection`:");
+		System.out.println("Writing values with the class `Scalaris`:");
 
-		// static:
-		try {
-			System.out.println("  `static void write(OtpErlangString, OtpErlangString)`...");
-			ChordSharpConnection.write(otpKey, otpValue);
-			System.out.println("    write(" + otpKey.stringValue() + ", "
-					+ otpValue.stringValue() + ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("    write(" + otpKey.stringValue() + ", "
-					+ otpValue.stringValue() + ") failed: " + e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("    write(" + otpKey.stringValue() + ", "
-					+ otpValue.stringValue() + ") failed with timeout: "
-					+ e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    write(" + otpKey.stringValue() + ", "
-					+ otpValue.stringValue() + ") failed with unknown: "
-					+ e.getMessage());
-		}
-
-		try {
-			System.out.println("  `static void write(String, String)`...");
-			ChordSharpConnection.write(key, value);
-			System.out.println("    write(" + key + ", " + value
-					+ ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("    write(" + key + ", " + value + ") failed: "
-					+ e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("    write(" + key + ", " + value
-					+ ") failed with timeout: " + e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("    write(" + key + ", " + value
-					+ ") failed with unknown: " + e.getMessage());
-		}
-
-		// non-static:
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
+			Scalaris sc = new Scalaris();
 			System.out
-					.println("    `void singleWrite(OtpErlangString, OtpErlangString)`...");
-			cs.singleWrite(otpKey, otpValue);
+					.println("    `void writeObject(OtpErlangString, OtpErlangObject)`...");
+			sc.writeObject(otpKey, otpValue);
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") succeeded");
 		} catch (ConnectionException e) {
@@ -121,9 +84,9 @@ public class ChordSharpConnectionWriteExample {
 
 		try {
 			System.out.println("  creating object...");
-			ChordSharpConnection cs = new ChordSharpConnection();
-			System.out.println("    `void singleWrite(String, String)`...");
-			cs.singleWrite(key, value);
+			Scalaris sc = new Scalaris();
+			System.out.println("    `void write(String, String)`...");
+			sc.write(key, value);
 			System.out.println("      write(" + key + ", " + value
 					+ ") succeeded");
 		} catch (ConnectionException e) {

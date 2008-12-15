@@ -22,7 +22,9 @@ import com.ericsson.otp.erlang.OtpErlangException;
  * because the key did not exist before.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * @version 2.0
  */
+@Deprecated
 public class NotFoundException extends OtpErlangException {
 	/**
 	 * class version for serialisation
@@ -43,5 +45,14 @@ public class NotFoundException extends OtpErlangException {
 	 */
 	public NotFoundException(String msg) {
 		super(msg);
+	}
+	
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e the exception to "re-throw"
+	 */
+	public NotFoundException(Throwable e) {
+		super(e.getMessage());
 	}
 }
