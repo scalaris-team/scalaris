@@ -16,4 +16,7 @@
 datarootdir=@datarootdir@
 prefix=@prefix@
 JAVADIR=@datadir@/java
+
+/usr/lib/erlang/lib/jinterface-1.4.1/priv/OtpErlang.jar
+
 java -jar $JAVADIR/chordsharp4j.jar

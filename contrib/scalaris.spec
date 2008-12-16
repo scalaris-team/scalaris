@@ -2,11 +2,10 @@ Summary: Scalable Distributed key-value store
 Name: scalaris
 Version: 0.0.1
 Release: 1
-License: Apache
-Provides: scalaris
+License: ASL 2.0 
 Group: Applications/Databases
 URL: http://code.google.com/p/scalaris
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-build
 
 BuildRequires: erlang
@@ -28,6 +27,24 @@ Group: Documentation
 %description doc
 Documentation for scalaris.
 
+%package java
+Summary: Java API for scalaris
+Group: Applications/Databases
+Requires: jre
+Requires: erlang
+
+%description java
+Java Bindings
+
+%package client
+Summary: Cli client for scalaris
+Group: Applications/Databases
+Requires: %{name}-java=%{version}
+Requires: jakarta-commons-cli
+
+%description client
+command line client for scalaris
+
 %prep
 %setup -q
 
@@ -46,7 +63,9 @@ Documentation for scalaris.
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
     --docdir=%{_docdir}/%{name}
-make all java docs
+make all
+make java
+make docs
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -56,27 +75,32 @@ make install DESTDIR=$RPM_BUILD_ROOT
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%defattr(-,root,root,-)
-%doc %{_docdir}/*
+%defattr(-,root,root)
 %{_bindir}/scalarisctl
-%{_bindir}/scalarisclient
-%{_libdir}/%{name}/ebin/*.beam
-%{_libdir}/%{name}/ebin/comm_layer/*.beam
-%{_libdir}/%{name}/ebin/pubsub/*.beam
-%{_libdir}/%{name}/ebin/transstore/*.beam
-%{_libdir}/%{name}/contrib/yaws/ebin/*.beam
-%{_libdir}/%{name}/docroot/*.yaws
-%{_libdir}/%{name}/docroot_node/*.yaws
-%config %{_sysconfdir}/scalaris/scalaris.cfg
-%config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
-%{_datadir}/java/chordsharp4j.jar
+%{_libdir}/%{name}/ebin
+%{_libdir}/%{name}/contrib/yaws/ebin
+%{_libdir}/%{name}/contrib/yaws/include
+%{_libdir}/%{name}/docroot
+%{_libdir}/%{name}/docroot_node
+%{_localstatedir}/log/%{name}
+%config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
+%config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg.example
 
 %files doc
-%defattr(-,root,root,-)
-%doc AUTHORS README LICENSE doc/* user-dev-guide/main.pdf
+%defattr(-,root,root)
+%doc %{_docdir}/%{name}
+%doc AUTHORS README LICENSE user-dev-guide/main.pdf
 
+%files java
+%defattr(-,root,root)
+%{_datadir}/java/chordsharp4j-lib.jar
+
+%files client
+%defattr(-,root,root)
+%{_datadir}/java/chordsharp4j.jar
+%{_bindir}/scalarisclient
 
 %changelog
-* Thu Dec 11 2008 Thorsten Schuett <schuett@zib.de> - 
+* Thu Dec 11 2008 Thorsten Schuett <schuett@zib.de> - 0.0.1-1
 - Initial build.
 
