@@ -105,32 +105,60 @@ install: all java
 	mkdir -p $(BEAMDIR)/comm_layer
 	mkdir -p $(BEAMDIR)/pubsub
 	mkdir -p $(BEAMDIR)/transstore
-	install ebin/*.beam $(BEAMDIR)
-	install ebin/comm_layer/*.beam $(BEAMDIR)/comm_layer
-	install ebin/pubsub/*.beam     $(BEAMDIR)/pubsub
-	install ebin/transstore/*.beam $(BEAMDIR)/transstore
+	install -m 644 bin/*.app $(BEAMDIR)
+	install -m 644 ebin/*.beam $(BEAMDIR)
+	install -m 644 ebin/comm_layer/*.beam $(BEAMDIR)/comm_layer
+	install -m 644 ebin/pubsub/*.beam     $(BEAMDIR)/pubsub
+	install -m 644 ebin/transstore/*.beam $(BEAMDIR)/transstore
 	mkdir -p $(ETCDIR)
 	install bin/scalaris.cfg bin/scalaris.local.cfg.example $(ETCDIR)
-	mkdir $(DOCROOTDIR)
-	install docroot/*.yaws $(DOCROOTDIR)
+	mkdir -p $(DOCROOTDIR)
+	install -m 644 docroot/*.yaws $(DOCROOTDIR)
+	install -m 644 docroot/*.css $(DOCROOTDIR)
+	install -m 644 docroot/*.js $(DOCROOTDIR)
+	install -m 644 docroot/*.gif $(DOCROOTDIR)
+	mkdir -p $(DOCROOTDIR)/icons
+	install -m 644 docroot/icons/*.gif $(DOCROOTDIR)/icons
+	mkdir -p $(DOCROOTDIR)/images/default
+	mkdir -p $(DOCROOTDIR)/images/default/dd
+	mkdir -p $(DOCROOTDIR)/images/default/panel
+	mkdir -p $(DOCROOTDIR)/images/default/tree
+	mkdir -p $(DOCROOTDIR)/images/default/grid
+	install -m 644 docroot/images/default/dd/*.gif $(DOCROOTDIR)/images/default/dd
+	install -m 644 docroot/images/default/panel/*.gif $(DOCROOTDIR)/images/default/panel
+	install -m 644 docroot/images/default/panel/*.png $(DOCROOTDIR)/images/default/panel
+	install -m 644 docroot/images/default/tree/*.gif $(DOCROOTDIR)/images/default/tree
+	install -m 644 docroot/images/default/grid/*.gif $(DOCROOTDIR)/images/default/grid
+	install -m 644 docroot/images/default/grid/*.png $(DOCROOTDIR)/images/default/grid
 	mkdir $(NODEDOCROOTDIR)
 	install docroot_node/*.yaws $(NODEDOCROOTDIR)
 	mkdir -p $(SCALARISDIR)/contrib/yaws/ebin
 	install contrib/yaws/ebin/*.beam $(SCALARISDIR)/contrib/yaws/ebin
+	mkdir -p $(SCALARISDIR)/contrib/yaws/include
+	install contrib/yaws/include/yaws_api.hrl $(SCALARISDIR)/contrib/yaws/include
 	mkdir -p $(LOGDIR)
-	mkdir -p $(DOCDIR)
-	install AUTHORS README LICENSE $(DOCDIR)
 	mkdir -p $(DOCDIR)/erlang
-	install doc/*.html $(DOCDIR)/erlang
-	install doc/*.png $(DOCDIR)/erlang
+	install -m 644 doc/*.html $(DOCDIR)/erlang
+	install -m 644 doc/*.png $(DOCDIR)/erlang
 	mkdir -p $(DOCDIR)/erlang/comm_layer
-	install doc/comm_layer/*.html $(DOCDIR)/erlang/comm_layer
+	install -m 644 doc/comm_layer/*.html $(DOCDIR)/erlang/comm_layer
 	mkdir -p $(DOCDIR)/erlang/pubsub
-	install doc/pubsub/*.html $(DOCDIR)/erlang/pubsub
+	install -m 644 doc/pubsub/*.html $(DOCDIR)/erlang/pubsub
 	mkdir -p $(DOCDIR)/erlang/transstore
-	install doc/transstore/*.html $(DOCDIR)/erlang/transstore
+	install -m 644 doc/transstore/*.html $(DOCDIR)/erlang/transstore
+	mkdir -p $(DOCDIR)/java-api
+	mkdir -p $(DOCDIR)/java-api/resources
+	mkdir -p $(DOCDIR)/java-api/de/zib/chordsharp/class-use
+	mkdir -p $(DOCDIR)/java-api/de/zib/chordsharp/examples/class-use
+	install -m 644 java-api/doc/*.html $(DOCDIR)/java-api
+	install -m 644 java-api/doc/resources/*.gif $(DOCDIR)/java-api/resources
+	install -m 644 java-api/doc/de/zib/chordsharp/*.html $(DOCDIR)/java-api/de/zib/chordsharp
+	install -m 644 java-api/doc/de/zib/chordsharp/class-use/*.html $(DOCDIR)/java-api/de/zib/chordsharp/class-use
+	install -m 644 java-api/doc/de/zib/chordsharp/examples/*.html $(DOCDIR)/java-api/de/zib/chordsharp/examples
+	install -m 644 java-api/doc/de/zib/chordsharp/class-use/*.html $(DOCDIR)/java-api/de/zib/chordsharp/class-use
 	mkdir -p $(JAVADIR)
 	install java-api/chordsharp4j.jar $(JAVADIR)
+	install java-api/chordsharp4j-lib.jar $(JAVADIR)
 	mkdir -p $(BINDIR)
-	install bin/scalarisctl $(BINDIR)
-	install bin/scalarisclient $(BINDIR)
+	install -m 755 bin/scalarisctl $(BINDIR)
+	install -m 755 bin/scalarisclient $(BINDIR)

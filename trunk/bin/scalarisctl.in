@@ -17,7 +17,7 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 
 # /etc/scalaris/
-ETCDIR=/@sysconfdir@/scalaris
+ETCDIR=@sysconfdir@/scalaris
 # /lib/scalaris/
 SCALARISDIR=@libdir@/scalaris
 # /lib/scalaris/ebin
@@ -80,7 +80,7 @@ bootstop(){
 nodestart(){
     pushd $BEAMDIR > /dev/null
 	erl -setcookie $SCALARIS_COOKIE \
-	    -pa $$SCALARISDIR/contrib/yaws/ebin \
+	    -pa $SCALARISDIR/contrib/yaws/ebin \
 	    -pa $BEAMDIR \
 	    -yaws embedded true \
 	    -chordsharp log_path "'$LOGDIR'" \
