@@ -48,7 +48,8 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *       <p>Here the user can specify custom behaviour and increase performance.
  *       Handling the stored types correctly is at the user's hand.</p>
  *       <p>An example using erlang objects to improve performance for inserting strings is
- *       provided in {@link de.zib.scalaris.examples.FastStringTransaction}</p>
+ *       provided by {@link de.zib.scalaris.examples.CustomOtpFastStringObject} and can be
+ *       tested by {@link de.zib.scalaris.examples.FastStringBenchmark}.</p>
  * </ul> 
  * </p>
  * 
@@ -93,7 +94,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * </p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
+ * @version 2.1
  * @since 2.0
  */
 public class Transaction {
@@ -176,16 +177,16 @@ public class Transaction {
 			transLog = received;
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (OtpAuthException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (IOException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -235,16 +236,16 @@ public class Transaction {
 			}
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (OtpAuthException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (IOException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -317,16 +318,16 @@ public class Transaction {
 			}
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (OtpAuthException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (IOException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -354,11 +355,47 @@ public class Transaction {
 	public String read(String key) throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		try {
-			return ((OtpErlangString) readObject(new OtpErlangString(key)))
-					.stringValue();
+			CustomOtpStringObject result = new CustomOtpStringObject();
+			readCustom(key, result);
+			return result.getValue();
+//			return ((OtpErlangString) readObject(new OtpErlangString(key)))
+//					.stringValue();
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
+		}
+	}
+
+	/**
+	 * Gets the value stored under the given {@code key}.
+	 * 
+	 * @param key
+	 *            the key to look up
+	 * @param value 
+	 *            container that stores the value returned by scalaris
+	 * 
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to fetch the value
+	 * @throws NotFoundException
+	 *             if the requested key does not exist
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @see #readObject(OtpErlangString)
+	 * @since 2.1
+	 */
+	public void readCustom(String key, CustomOtpObject<?> value)
+			throws ConnectionException, TimeoutException, UnknownException,
+			NotFoundException {
+		try {
+			value.setOtpValue(readObject(new OtpErlangString(key)));
+		} catch (ClassCastException e) {
+			// e.printStackTrace();
+			throw new UnknownException(e);
 		}
 	}
 
@@ -409,16 +446,16 @@ public class Transaction {
 			}
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (OtpAuthException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (IOException e) {
 			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -443,7 +480,33 @@ public class Transaction {
 	 */
 	public void write(String key, String value) throws ConnectionException,
 			TimeoutException, UnknownException {
-		writeObject(new OtpErlangString(key), new OtpErlangString(value));
+		writeCustom(key, new CustomOtpStringObject(value));
+//		writeObject(new OtpErlangString(key), new OtpErlangString(value));
+	}
+	
+	/**
+	 * Stores the given {@code key}/{@code value} pair.
+	 * 
+	 * @param key
+	 *            the key to store the value for
+	 * @param value
+	 *            the value to store
+	 * 
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to write the value
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @see #writeObject(OtpErlangString, OtpErlangObject)
+	 * @since 2.1
+	 */
+	public void writeCustom(String key, CustomOtpObject<?> value)
+			throws ConnectionException, TimeoutException, UnknownException {
+		writeObject(new OtpErlangString(key), value.getOtpValue());
 	}
 
 	/**
