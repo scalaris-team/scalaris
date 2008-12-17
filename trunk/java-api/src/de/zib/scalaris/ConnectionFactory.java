@@ -47,10 +47,12 @@ public class ConnectionFactory {
 	 * Pseudo UUID - the number of this counter is added to client names when
 	 * creating a connection if clientNameAppendUUID is set.
 	 * 
-	 * @todo In some cases, an atomic value is not necessary, e.g. when the
-	 *       factory is used by only one thread, then a normal long value will
-	 *       suffice. Possible optimisation: use {@link AtomicLong} for
-	 *       singleton instance and {@link Long} for the other instances!
+	 * <p>
+	 * TODO: In some cases, an atomic value is not necessary, e.g. when the
+	 * factory is used by only one thread, then a normal long value will
+	 * suffice. Possible optimisation: use {@link AtomicLong} for singleton
+	 * instance and {@link Long} for the other instances!
+	 * </p>
 	 */
 	private AtomicLong clientNameUUID = new AtomicLong(0);
 
