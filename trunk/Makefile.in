@@ -156,9 +156,13 @@ install: all java
 	install -m 644 java-api/doc/de/zib/chordsharp/class-use/*.html $(DOCDIR)/java-api/de/zib/chordsharp/class-use
 	install -m 644 java-api/doc/de/zib/chordsharp/examples/*.html $(DOCDIR)/java-api/de/zib/chordsharp/examples
 	install -m 644 java-api/doc/de/zib/chordsharp/class-use/*.html $(DOCDIR)/java-api/de/zib/chordsharp/class-use
-	mkdir -p $(JAVADIR)
-	install java-api/chordsharp4j.jar $(JAVADIR)
-	install java-api/chordsharp4j-lib.jar $(JAVADIR)
+	mkdir -p $(JAVADIR)/scalaris
+	install java-api/scalaris.jar $(JAVADIR)/scalaris/
+	mkdir -p $(JAVADIR)/scalaris/lib
+	install java-api/lib/OtpErlang-1.4.jar $(JAVADIR)/scalaris/lib/
+	install java-api/scalaris-java.conf.sample $(ETCDIR)/scalaris-java.conf
+	install java-api/scalaris-java.conf.sample $(ETCDIR)/
+	install java-api/scalaris.properties $(ETCDIR)/
 	mkdir -p $(BINDIR)
 	install -m 755 bin/scalarisctl $(BINDIR)
-	install -m 755 bin/scalarisclient $(BINDIR)
+	install -m 755 java-api/scalaris $(BINDIR)

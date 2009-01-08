@@ -65,18 +65,9 @@ public class Main {
 			System.exit(0);
 		}
 
-		if (line.hasOption("help")) {
-			HelpFormatter formatter = new HelpFormatter();
-			formatter.printHelp("chordsharp", getOptions());
-			System.exit(0);
-		}
-
 		if (line.hasOption("minibench")) {
 	        Benchmark.minibench();
-			System.exit(0);
-		}
-
-		if (line.hasOption("read")) {
+		} else if (line.hasOption("read")) {
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("read(" + line.getOptionValue("read")
@@ -94,8 +85,7 @@ public class Main {
 				System.err.println("read failed with unknown: "
 						+ e.getMessage());
 			}
-		}
-		if (line.hasOption("write")) {
+		} else if (line.hasOption("write")) {
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("write(" + line.getOptionValues("write")[0]
@@ -112,8 +102,7 @@ public class Main {
 				System.err.println("write failed with unknown: "
 						+ e.getMessage());
 			}
-		}
-		if (line.hasOption("publish")) {
+		} else if (line.hasOption("publish")) {
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("publish("
@@ -131,8 +120,7 @@ public class Main {
 //				System.err.println("publish failed with unknown: "
 //						+ e.getMessage());
 			}
-		}
-		if (line.hasOption("subscribe")) {
+		} else if (line.hasOption("subscribe")) {
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("subscribe("
@@ -150,8 +138,7 @@ public class Main {
 				System.err.println("subscribe failed with unknown: "
 						+ e.getMessage());
 			}
-		}
-		if (line.hasOption("unsubscribe")) {
+		} else if (line.hasOption("unsubscribe")) {
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("unsubscribe("
@@ -172,8 +159,7 @@ public class Main {
 				System.err.println("unsubscribe failed with unknown: "
 						+ e.getMessage());
 			}
-		}
-		if (line.hasOption("getsubscribers")) {
+		} else if (line.hasOption("getsubscribers")) {
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("getSubscribers("
@@ -192,6 +178,11 @@ public class Main {
 				System.err.println("getSubscribers failed with unknown error: "
 						+ e.getMessage());
 			}
+		} else {
+			// print help if no other option was given
+//		if (line.hasOption("help")) {
+			HelpFormatter formatter = new HelpFormatter();
+			formatter.printHelp("scalaris", getOptions());
 		}
 	}
 
@@ -206,55 +197,73 @@ public class Main {
 
 		options.addOption(new Option("help", "print this message"));
 
-		Option read = OptionBuilder.create("read");
+		Option read = new Option("r", "read", true, "read an item");
 		read.setArgName("key");
 		read.setArgs(1);
-		read.setDescription("read an item");
+//		Option read = OptionBuilder.create("read");
+//		read.setArgName("key");
+//		read.setArgs(1);
+//		read.setDescription("read an item");
 //		Option read = OptionBuilder.withArgName("key").hasArg()
 //				.withDescription("read an item").create("read");
 		group.addOption(read);
 
-		Option write = OptionBuilder.create("write");
+		Option write = new Option("w", "write", true, "write an item: <key> <value>");
 		write.setArgName("params");
 		write.setArgs(2);
-		write.setDescription("write an item: <key> <value>");
+//		Option write = OptionBuilder.create("write");
+//		write.setArgName("params");
+//		write.setArgs(2);
+//		write.setDescription("write an item: <key> <value>");
 //		Option write = OptionBuilder.withArgName("params").hasArgs(2)
 //				.withDescription("write an item: <key> <value>")
 //				.create("write");
 		group.addOption(write);
 
-		Option publish = OptionBuilder.create("publish");
+		Option publish = new Option("p", "publish", true, "publish a new message for a topic: <topic> <message>");
 		publish.setArgName("params");
 		publish.setArgs(2);
-		publish.setDescription("publish a new message for a topic: <topic> <message>");
+//		Option publish = OptionBuilder.create("publish");
+//		publish.setArgName("params");
+//		publish.setArgs(2);
+//		publish.setDescription("publish a new message for a topic: <topic> <message>");
 //		Option publish = OptionBuilder.withArgName("params").hasArgs(2)
 //				.withDescription(
 //						"publish a new message for a topic: <topic> <message>")
 //				.create("publish");
 		group.addOption(publish);
 
-		Option subscribe = OptionBuilder.create("subscribe");
+		Option subscribe = new Option("s", "subscribe", true, "subscribe to a topic: <topic> <url>");
 		subscribe.setArgName("params");
 		subscribe.setArgs(2);
-		subscribe.setDescription("subscribe to a topic: <topic> <url>");
+//		Option subscribe = OptionBuilder.create("subscribe");
+//		subscribe.setArgName("params");
+//		subscribe.setArgs(2);
+//		subscribe.setDescription("subscribe to a topic: <topic> <url>");
 //		Option subscribe = OptionBuilder.withArgName("params").hasArgs(2)
 //				.withDescription("subscribe to a topic: <topic> <url>").create(
 //						"subscribe");
 		group.addOption(subscribe);
 		
-		Option unsubscribe = OptionBuilder.create("unsubscribe");
+		Option unsubscribe = new Option("u", "unsubscribe", true, "unsubscribe from a topic: <topic> <url>");
 		unsubscribe.setArgName("params");
 		unsubscribe.setArgs(2);
-		unsubscribe.setDescription("unsubscribe from a topic: <topic> <url>");
+//		Option unsubscribe = OptionBuilder.create("unsubscribe");
+//		unsubscribe.setArgName("params");
+//		unsubscribe.setArgs(2);
+//		unsubscribe.setDescription("unsubscribe from a topic: <topic> <url>");
 //		Option subscribe = OptionBuilder.withArgName("params").hasArgs(2)
 //				.withDescription("unsubscribe from a topic: <topic> <url>").create(
 //						"unsubscribe");
 		group.addOption(unsubscribe);
 
-		Option getSubscribers = OptionBuilder.create("getsubscribers");
+		Option getSubscribers = new Option("g", "getsubscribers", true, "get subscribers of a topic");
 		getSubscribers.setArgName("topic");
 		getSubscribers.setArgs(1);
-		getSubscribers.setDescription("get subscribers of a topic");
+//		Option getSubscribers = OptionBuilder.create("getsubscribers");
+//		getSubscribers.setArgName("topic");
+//		getSubscribers.setArgs(1);
+//		getSubscribers.setDescription("get subscribers of a topic");
 //		Option getSubscribers = OptionBuilder.withArgName("topic").hasArgs(1)
 //				.withDescription("get subscribers of a topic").create(
 //						"getsubscribers");
