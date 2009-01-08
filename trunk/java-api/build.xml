@@ -8,7 +8,7 @@
 	<!-- ########## Build configuration (end) ########## -->
 
 	<path id="scalaris.classpath">
-		<pathelement path='lib/OtpErlang-1.4.jar' />
+		<pathelement path='lib/OtpErlang-1.4.2.jar' />
 		<pathelement path='lib/jakarta-commons-cli-1.1.jar' />
 	</path>
 	<path id="scalaris.test.classpath">
@@ -26,7 +26,7 @@
 	        description="Compiles all source files for the library and the default Main class." />
 
 	<target name="jar"
-		    depends="scalaris.jar, chordsharp.jar"
+		    depends="scalaris.jar"
             description="Creates jar files for use on command line or in other projects." />
 	
 	<target name='clean'
@@ -200,7 +200,7 @@
 				<attribute name="Bundle-Version" value="2.0.0" />
 				<attribute name="Export-Package" value="de.zib.scalaris.*" />
 				<attribute name="Main-Class" value="de.zib.scalaris.Main" />
-				<!--<attribute name="Class-Path" value=". lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.jar" />-->
+				<!--<attribute name="Class-Path" value=". lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />-->
 			</manifest>
 		</jar>
 	</target>
@@ -215,7 +215,7 @@
 				<attribute name="Bundle-Name" value="Scalaris Java Interface" />
 				<attribute name="Bundle-Version" value="2.0.0" />
 				<attribute name="Export-Package" value="de.zib.scalaris.*" />
-				<attribute name="Class-Path" value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.jar" />
+				<attribute name="Class-Path" value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
 			</manifest>
 		</jar>
 	</target>
@@ -336,7 +336,7 @@
 				<attribute name="Bundle-Name" value="Chord# Java Interface" />
 				<attribute name="Bundle-Version" value="1.0.1" />
 				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
-				<!-- <attribute name="Class-Path" value=". lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.jar" /> -->
+				<!-- <attribute name="Class-Path" value=". lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" /> -->
 			</manifest>
 		</jar>
 		<!-- copy the connection settings file to the folder where the jar files resist
@@ -352,7 +352,7 @@
 				<attribute name="Bundle-Version" value="1.0.1" />
 				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
 				<attribute name="Main-Class" value="de.zib.chordsharp.Main" />
-				<attribute name="Class-Path" value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.jar" />
+				<attribute name="Class-Path" value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
 			</manifest>
 		</jar>
 	</target>
@@ -369,7 +369,7 @@
 				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
 				<!-- <attribute name="Main-Class" value="de.zib.chordsharp.Main" /> -->
 				<attribute name="Class-Path"
-				           value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.jar" />
+				           value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
 			</manifest>
 		</jar>
 	</target>

@@ -3,6 +3,8 @@
  */
 package de.zib.scalaris;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -94,18 +96,20 @@ public class ConnectionFactory {
 		if (configFile == null || configFile.isEmpty()) {
 			configFile = defaultConfigFile;
 		}
-		System.out.println("loading config file: " + configFile);
+//		System.out.println("loading config file: " + configFile);
 		PropertyLoader.loadProperties(properties, configFile);
 
 		node = properties.getProperty("scalaris.node", "boot@localhost");
 		cookie = properties.getProperty("scalaris.cookie", "chocolate chip cookie");
 		clientName = properties.getProperty("scalaris.client.name", "java_client");
-		if (properties.getProperty("scalaris.client.appendUUID", "true")
-				.equals("true")) {
+		if (properties.getProperty("scalaris.client.appendUUID", "true").equals("true")) {
 			clientNameAppendUUID = true;
 		} else {
 			clientNameAppendUUID = false;
 		}
+		
+		fixLocalhostName();
+//		System.out.println("node: " + node);
 	}
 
 	/**
@@ -176,6 +180,26 @@ public class ConnectionFactory {
 		return createConnection(clientName);
 	}
 
+	/**
+	 * Replaces {@code localhost} in the node's name to the machine's real
+	 * host name.
+	 * 
+	 * Due to a "feature" of OtpErlang >= 1.4.1 erlang nodes are now only
+	 * reachable by their official host name - so {@code ...@localhost} does
+	 * not work anymore if there is a real host name.
+	 */
+	private void fixLocalhostName() {
+		if (node.endsWith("@localhost")) {
+			String hostname = "localhost";
+			try {
+				InetAddress addr = InetAddress.getLocalHost();
+				hostname = addr.getHostName();
+			} catch (UnknownHostException e) {
+			}
+			node = node.replaceAll("@localhost$", "@" + hostname);
+		}
+	}
+	
 	/**
 	 * Returns the name of the node to connect to.
 	 * 
