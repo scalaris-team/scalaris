@@ -200,7 +200,7 @@
 				<attribute name="Bundle-Version" value="2.0.0" />
 				<attribute name="Export-Package" value="de.zib.scalaris.*" />
 				<attribute name="Main-Class" value="de.zib.scalaris.Main" />
-				<attribute name="Class-Path" value=". lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.jar" />
+				<!--<attribute name="Class-Path" value=". lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.jar" />-->
 			</manifest>
 		</jar>
 	</target>

@@ -27,6 +27,11 @@ import de.zib.tools.PropertyLoader;
  */
 public class ConnectionFactory {
 	/**
+	 * Default name of the configuration file.
+	 */
+	private static final String defaultConfigFile = "scalaris.properties";
+	
+	/**
 	 * The name of the node to connect to.
 	 */
 	private String node;
@@ -85,7 +90,12 @@ public class ConnectionFactory {
 	 */
 	public ConnectionFactory() {
 		Properties properties = new Properties();
-		PropertyLoader.loadProperties(properties, "scalaris.properties");
+		String configFile = System.getProperty("scalaris.java.config");
+		if (configFile == null || configFile.isEmpty()) {
+			configFile = defaultConfigFile;
+		}
+		System.out.println("loading config file: " + configFile);
+		PropertyLoader.loadProperties(properties, configFile);
 
 		node = properties.getProperty("scalaris.node", "boot@localhost");
 		cookie = properties.getProperty("scalaris.cookie", "chocolate chip cookie");
