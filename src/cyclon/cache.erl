@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : cyclon.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : Cache implementation, intern it is a gb_set, extern a list
+%%% Description : Cache implementation using a list
 %%%
 %%% Created :  1 Dec 2008 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
@@ -156,12 +156,6 @@ inc_age(Cache) ->
 	      end,
 	      Cache).
 
-older({_,A},{_,B}) ->
-	A > B.
-
-lt({{_,A},_},{{_,B},_}) ->
-	A < B . 
-
 eq({{_,A},_},{{_,B},_}) ->
 	A==B . 
 
@@ -203,34 +197,3 @@ add_element(Element, Cache) ->
 	    [Element | Cache]
     end.
 
-
-%% @doc delete an element in the Cache    
-delete2(_Foo,[]) ->
-	[];
-delete2(Foo,[H|T] = L) ->
-    case lt(Foo,H) of
-	true ->
-	    L;
-	false ->
-	    case eq(Foo,H) of
-		true ->
-		    T;
-		false ->
-		    [H]++delete2(Foo,T)
-	    end
-    end.
-
-add_element2(Foo,[]) ->
-	[Foo];
-add_element2(Foo,[H|T]) ->
-	case lt(Foo,H) of 
-		true -> 
-			[Foo]++[H|T];
-		false -> 
-			case eq(Foo,H) of
-				true ->
-					[Foo|T];
-				false ->
-					[H]++add_element2(Foo,T)
-			end
-	end.

@@ -64,7 +64,7 @@ add_nodes_loop(Count, Delay) ->
 %% Description: contact boot server and check ring
 %%--------------------------------------------------------------------
 % @doc contact boot server and check ring
-% @spec check_ring() -> term
+-spec(check_ring/0 :: () -> {error, string()} | ok).
 check_ring() ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
     Nodes = statistics:get_ring_details(),

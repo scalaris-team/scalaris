@@ -341,7 +341,6 @@ loop(State, Debug) ->
     end.
 
 %% @doc joins this node in the ring and calls the main loop
-%% @spec start(term()) -> cs_state:state()
 -spec(start/2 :: (any(), any()) -> cs_state:state()).
 start(InstanceId, Parent) ->
     process_dictionary:register_process(InstanceId, cs_node, self()),

@@ -26,8 +26,10 @@
 -export([make_ring/1, stop_ring/1]).
 
 make_ring(Size) ->
+    error_logger:tty(true),
     Owner = self(),
     Pid = spawn(fun () ->
+			timer:sleep(1000),
 			process_dictionary:start_link_for_unittest(), 
 			boot_sup:start_link(), 
 			timer:sleep(1000),
@@ -36,12 +38,16 @@ make_ring(Size) ->
 			Owner ! {continue},
 			timer:sleep(180000) 
 		end),
+    erlang:monitor(process, Pid),
     receive
+	{'DOWN', _Ref, process, _Pid2, Reason} ->
+	    ct:pal("process died: ~p ~n", [Reason]);
 	{continue} -> 
 	    ok
     end,
     check_ring_size(Size),
     wait_for_stable_ring(),
+    timer:sleep(5000),
     Pid.
 
 stop_ring(Pid) ->
@@ -49,10 +55,11 @@ stop_ring(Pid) ->
 
 wait_for_stable_ring() ->
     case admin:check_ring() of
-	{error, _Text} ->
-	    wait_for_stable_ring();
+	ok ->
+	    ok;
 	_ ->
-	    ok
+	    timer:sleep(100),
+	    wait_for_stable_ring()
     end.
 
 check_ring_size(Size) ->
@@ -61,5 +68,6 @@ check_ring_size(Size) ->
 	true ->
 	    ok;
 	_ ->
+	    timer:sleep(100),
 	    check_ring_size(Size)
     end.
