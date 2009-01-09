@@ -79,6 +79,5 @@ multi_write(_Config) ->
     ?equals(Result, success),
     ok.
 
-
 tfuns(_Config) ->
     ok.

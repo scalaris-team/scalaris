@@ -54,7 +54,7 @@ test_db(_Config) ->
     ?equals(pubsub.pubsub_api:subscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
     ?equals(pubsub.pubsub_api:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
     ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
-    ?equals(pubsub.pubsub_api:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
+    ?equals(pubsub.pubsub_api:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), {fail, not_found}),
     ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
     ?equals(pubsub.pubsub_api:unsubscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
     ?equals(pubsub.pubsub_api:get_subscribers("TestTopic"), []),

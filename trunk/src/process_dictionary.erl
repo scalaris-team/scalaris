@@ -81,6 +81,7 @@
 %% @spec register_process(term(), term(), pid()) -> ok
 register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
+    erlang:put(instance_name, Name),
     gen_server:call(?MODULE, {register_process, InstanceId, Name, Pid}, 20000).
 
 %% @doc looks up a process with InstanceId and Name in the dictionary

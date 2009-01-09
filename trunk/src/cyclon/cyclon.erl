@@ -28,7 +28,7 @@
 %% API
 -export([start_link/1, start/1]).
 
--export([]).
+-export([simple_shuffle/2, enhanced_shuffle/2]).
 
 %%====================================================================
 %% API
@@ -103,7 +103,7 @@ loop(Cache,Node,Cycles) ->
 				       0 -> 
 					   Cache;	
 				       _  ->
-					   eshuffle(Cache,Node)
+					   enhanced_shuffle(Cache,Node)
 				   end,
 			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
 			loop(NewCache,Node,Cycles+1)
@@ -111,7 +111,7 @@ loop(Cache,Node,Cycles) ->
 	{subset,P,Subset} ->
 		%io:format("subset~n", []),
 		ForSend=cache:get_random_subset(get_L(Cache),Cache),
-		io:format("<",[]),
+		%io:format("<",[]),
 		cs_send:send(P,{subset_response,ForSend,Subset}),
 		N2=cache:minus(Subset,Cache),
 		NewCache = cache:merge(Cache,N2,ForSend),
@@ -130,7 +130,8 @@ loop(Cache,Node,Cycles) ->
 	    loop(Cache,Node,Cycles)
     end.
 
-eshuffle(Cache, Node) ->
+%% @doc enhanced shuffle with age
+enhanced_shuffle(Cache, Node) ->
     Cache_1= cache:inc_age(Cache),
     Q=cache:get_oldest(Cache_1),
     Subset=cache:get_random_subset(get_L(Cache_1),Cache_1),
@@ -145,27 +146,28 @@ eshuffle(Cache, Node) ->
 			      NSubset_pre
 		      end,
 	    ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
-	    io:format(">",[]),
+	    %io:format(">",[]),
 	    cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
 	    cache:delete(Q,Cache);	
 	false -> 
 	    error
     end.
 
+%% @doc simple shuffle without age
 simple_shuffle(Cache, Node) ->
-	Subset=cache:get_random_subset(get_L(Cache),Cache),
-	Q=cache:get_random_element(Subset),
-	{{QCyclon,_},_} = Q,
-	case (QCyclon /= cs_send:this()) of
+    Subset=cache:get_random_subset(get_L(Cache),Cache),
+    Q=cache:get_random_element(Subset),
+    {{QCyclon,_},_} = Q,
+    case (QCyclon /= cs_send:this()) of
 	true ->
-		NSubset=cache:delete(Q,Subset),
-		ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
-		io:format("~p",[length(ForSend)]),
-		cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
-		cache:delete(Q,Cache);	
+	    NSubset=cache:delete(Q,Subset),
+	    ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
+	    %io:format("~p",[length(ForSend)]),
+	    cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
+	    cache:delete(Q,Cache);	
 	false -> 
-		Cache
-	end.
+	    Cache
+    end.
 
 
 get_L(Cache) ->
