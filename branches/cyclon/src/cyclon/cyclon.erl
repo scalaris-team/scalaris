@@ -38,8 +38,13 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 start_link(InstanceId) ->
-    {ok, spawn_link(?MODULE, start, [InstanceId])}.
-
+	case config:read(cyclon_enable) of
+		true -> 
+			 {ok, spawn_link(?MODULE, start, [InstanceId])};
+		_ ->
+			ignore
+	end.
+   
 start(InstanceId) ->
     boot_server:connect(),
     process_dictionary:register_process(InstanceId, cyclon, self()),
