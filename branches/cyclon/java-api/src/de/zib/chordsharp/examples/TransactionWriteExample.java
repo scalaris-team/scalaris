@@ -32,6 +32,7 @@ import de.zib.chordsharp.UnknownException;
  * @author Nico Kruber, kruber@zib.de
  * @version 1.0
  */
+@Deprecated
 public class TransactionWriteExample {
 	/**
 	 * Writes all key/value pairs given on the command line (given as "key1

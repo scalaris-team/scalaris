@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 AC_PREREQ(2.53)
-AC_INIT(chordsharp, 0.01, schuett@zib.de)
+AC_INIT(chordsharp, 0.0.1, schuett@zib.de)
 
 ###########################################################
 #
@@ -75,11 +75,12 @@ AC_SUBST(DRIVER_OS)
 
 mkdir -p ~/.yaws 2> /dev/null
 
-SCALARIS_ROOT=`pwd`
-AC_SUBST(SCALARIS_ROOT)
+#SCALARIS_ROOT=`pwd`
+#AC_SUBST(SCALARIS_ROOT)
 
-AC_CONFIG_FILES([Makefile bin/scalarisctl])
+AC_CONFIG_FILES([Makefile bin/scalarisctl bin/scalarisclient])
 
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl
+chmod u+x bin/scalarisclient

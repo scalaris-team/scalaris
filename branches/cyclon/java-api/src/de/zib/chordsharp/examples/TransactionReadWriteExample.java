@@ -31,6 +31,7 @@ import de.zib.chordsharp.UnknownException;
  * @author Nico Kruber, kruber@zib.de
  * @version 1.1
  */
+@Deprecated
 public class TransactionReadWriteExample {
 	/**
 	 * Implements the following transactions each with the Java type methods and

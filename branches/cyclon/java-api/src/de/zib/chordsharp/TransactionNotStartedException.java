@@ -22,7 +22,9 @@ package de.zib.chordsharp;
  * in a throws clause.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * @version 2.0
  */
+@Deprecated
 public class TransactionNotStartedException extends RuntimeException {
 	/**
 	 * class version for serialisation
@@ -43,5 +45,14 @@ public class TransactionNotStartedException extends RuntimeException {
 	 */
 	public TransactionNotStartedException(String msg) {
 		super(msg);
+	}
+	
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e the exception to "re-throw"
+	 */
+	public TransactionNotStartedException(Throwable e) {
+		super(e.getMessage());
 	}
 }

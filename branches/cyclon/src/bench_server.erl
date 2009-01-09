@@ -178,6 +178,10 @@ get_and_init_key() ->
       commit ->
         Key;
       {fail, abort} ->
+	    io:format("geT_and_init_key 1~n", []),
+        get_and_init_key();
+      {fail, timeout} ->
+	    io:format("geT_and_init_key 2~n", []),
         get_and_init_key()
     end.
 

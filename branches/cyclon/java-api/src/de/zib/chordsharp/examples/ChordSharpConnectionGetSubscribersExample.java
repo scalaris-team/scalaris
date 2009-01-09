@@ -32,6 +32,7 @@ import de.zib.chordsharp.UnknownException;
  * @author Nico Kruber, kruber@zib.de
  * @version 1.1
  */
+@Deprecated
 public class ChordSharpConnectionGetSubscribersExample {
 	/**
 	 * Prints a list of all subscribers to a given topic, provided on the
@@ -93,7 +94,7 @@ public class ChordSharpConnectionGetSubscribersExample {
 			System.out.println("  creating object...");
 			ChordSharpConnection cs = new ChordSharpConnection();
 			System.out
-					.println("    `OtpErlangString singleGetSubscribers(OtpErlangString)`...");
+					.println("    `OtpErlangList singleGetSubscribers(OtpErlangString)`...");
 			otpSubscribers = cs.singleGetSubscribers(otpTopic);
 			System.out.println("      getSubscribers(" + otpTopic.stringValue()
 					+ ") == " + getSubscribers(otpSubscribers));
@@ -108,7 +109,7 @@ public class ChordSharpConnectionGetSubscribersExample {
 		try {
 			System.out.println("  creating object...");
 			ChordSharpConnection cs = new ChordSharpConnection();
-			System.out.println("    `String singleGetSubscribers(String)`...");
+			System.out.println("    `Vector<String> singleGetSubscribers(String)`...");
 			subscribers = cs.singleGetSubscribers(topic);
 			System.out.println("      getSubscribers(" + topic + ") == "
 					+ getSubscribers(subscribers));

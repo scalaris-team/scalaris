@@ -24,7 +24,9 @@ import com.ericsson.otp.erlang.OtpErlangException;
  * invalid cookie.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * @version 2.0
  */
+@Deprecated
 public class ConnectionException extends OtpErlangException {
 	/**
 	 * class version for serialisation
@@ -46,5 +48,13 @@ public class ConnectionException extends OtpErlangException {
 	public ConnectionException(String msg) {
 		super(msg);
 	}
-
+	
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e the exception to "re-throw"
+	 */
+	public ConnectionException(Throwable e) {
+		super(e.getMessage());
+	}
 }

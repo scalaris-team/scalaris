@@ -29,6 +29,7 @@ import de.zib.chordsharp.UnknownException;
  * @author Nico Kruber, kruber@zib.de
  * @version 1.4
  */
+@Deprecated
 public class ChordSharpConnectionSubscribeExample {
 	/**
 	 * Subscribes a given URL to a given topic, both provided on the command

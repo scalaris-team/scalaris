@@ -15,26 +15,14 @@
  */
 package de.zib.chordsharp;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.Properties;
 import java.util.Vector;
 
-import com.ericsson.otp.erlang.OtpAuthException;
-import com.ericsson.otp.erlang.OtpConnection;
-import com.ericsson.otp.erlang.OtpErlangAtom;
-import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
-
-import de.zib.chordsharp.examples.TransactionParallelReadsExample;
-import de.zib.chordsharp.examples.TransactionReadExample;
-import de.zib.chordsharp.examples.TransactionReadWriteExample;
-import de.zib.chordsharp.examples.TransactionWriteExample;
-import de.zib.tools.PropertyLoader;
 
 /**
  * Provides means to realise a transaction with the chordsharp ring using Java.
@@ -68,9 +56,10 @@ import de.zib.tools.PropertyLoader;
  * </code>
  * 
  * <p>
- * For more examples, have a look at {@link TransactionReadExample},
- * {@link TransactionParallelReadsExample}, {@link TransactionWriteExample} and
- * {@link TransactionReadWriteExample}.
+ * For more examples, have a look at {@link de.zib.chordsharp.examples.TransactionReadExample},
+ * {@link de.zib.chordsharp.examples.TransactionParallelReadsExample},
+ * {@link de.zib.chordsharp.examples.TransactionWriteExample} and
+ * {@link de.zib.chordsharp.examples.TransactionReadWriteExample}.
  * </p>
  * 
  * <h3>Attention:</h3>
@@ -81,27 +70,20 @@ import de.zib.tools.PropertyLoader;
  * not. To overcome this situation call {@link #revertLastOp()} immediately
  * after the failed operation which restores the state as it was before that
  * operation.<br />
- * The {@link TransactionReadWriteExample} example shows such a use case.
+ * The {@link de.zib.chordsharp.examples.TransactionReadWriteExample} example shows such a use case.
  * </p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.0
+ * @version 2.0
+ * @deprecated use {@link de.zib.scalaris.Transaction} instead
  */
+@Deprecated
 public class Transaction {
 	/**
-	 * the erlang transaction log
+	 * The new {@link de.zib.scalaris.Transaction} object to redirect the tasks
+	 * to.
 	 */
-	private OtpErlangList transLog = null;
-	
-	/**
-	 * the erlang transaction log before the last operation
-	 */
-	private OtpErlangList transLog_old = null;
-
-	/**
-	 * the connection to a chorsharp node
-	 */
-	private OtpConnection connection;
+	de.zib.scalaris.Transaction transaction;
 	
 	/**
 	 * Creates the object's connection to the chordsharp node specified in the
@@ -111,9 +93,12 @@ public class Transaction {
 	 *             if the connection fails
 	 */
 	public Transaction() throws ConnectionException {
-		Properties properties = new Properties(ChordSharpConnection.defaultProperties);
-		PropertyLoader.loadProperties(properties, "ChordSharpConnection.properties");
-		connection = ChordSharpConnection.createConnection(properties);
+		try {
+			transaction = new de.zib.scalaris.Transaction(ChordSharpConnection
+					.createConnection(ChordSharpConnection.defaultProperties));
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		}
 	}
 
 	/**
@@ -131,28 +116,14 @@ public class Transaction {
 	 *             type/structure
 	 */
 	public void start() throws ConnectionException, TransactionNotFinishedException, UnknownException {
-		if (transLog != null) {
-			throw new TransactionNotFinishedException(
-					"Cannot start a new transaction until the old one is not committed or aborted.");
-		}
 		try {
-			connection.sendRPC("transstore.transaction", "translog_new",
-					new OtpErlangList());
-			// return value: []
-			OtpErlangList received = (OtpErlangList) connection.receiveRPC();
-			transLog = received;
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			transaction.start();
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.TransactionNotFinishedException e) {
+			throw new TransactionNotFinishedException(e);
 		}
 	}
 
@@ -173,56 +144,20 @@ public class Transaction {
 	 * @see #abort()
 	 */
 	public void commit() throws UnknownException, ConnectionException {
-		if (transLog == null) {
-			throw new TransactionNotStartedException("The transaction needs to be started before it is used.");
-		}
 		try {
-			connection.sendRPC("transstore.transaction_api", "commit",
-					new OtpErlangList(transLog));
-			/*
-			 * possible return values:
-			 *  - {ok}
-			 *  - {fail, Reason}
-			 */
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
-			if(received.elementAt(0).equals(new OtpErlangAtom("ok"))) {
-				// transaction was successful: reset transaction log
-				transLog = null;
-				transLog_old = null;
-				return;
-			} else {
-				// transaction failed
-				// TODO: is there a more specific type?
-				OtpErlangObject reason = received.elementAt(1);
-				throw new UnknownException("Erlang: " + reason.toString());
-			}
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			transaction.commit();
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			throw new UnknownException(e);
 		}
 	}
 
 	/**
 	 * Cancels the current transaction.
-	 * 
-	 * <p>
-	 * For a transaction to be cancelled, only the {@link #transLog} needs to be
-	 * reset. Nothing else needs to be done since the data was not modified
-	 * until the transaction was committed.
-	 * </p>
 	 */
 	public void abort() {
-		transLog = null;
-		transLog_old = null;
+		transaction.abort();
 	}
 
 	/**
@@ -245,47 +180,16 @@ public class Transaction {
 	public OtpErlangObject readObject(OtpErlangString key)
 			throws ConnectionException, TimeoutException, UnknownException,
 			NotFoundException {
-		if (transLog == null) {
-			throw new TransactionNotStartedException("The transaction needs to be started before it is used.");
-		}
 		try {
-			connection.sendRPC("transstore.transaction_api", "jRead",
-					new OtpErlangList(new OtpErlangObject[] {key, transLog}));
-			/*
-			 * possible return values:
-			 *  - {{fail, not_found}, TransLog}
-			 *  - {{fail, timeout}, TransLog}
-			 *  - {{fail, fail}, TransLog}
-			 *  - {{value, Value}, NewTransLog}
-			 */
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
-			transLog_old = transLog;
-			transLog = (OtpErlangList) received.elementAt(1);
-			OtpErlangTuple status = (OtpErlangTuple) received.elementAt(0);
-			if (status.elementAt(0).equals(new OtpErlangAtom("value"))) {
-				return status.elementAt(1);
-			} else {
-				if (status.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
-				} else if (status.elementAt(1).equals(
-						new OtpErlangAtom("not_found"))) {
-					throw new NotFoundException();
-				} else {
-					throw new UnknownException();
-				}
-			}
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			return transaction.readObject(key);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.NotFoundException e) {
+			throw new NotFoundException(e);
 		}
 	}
 	
@@ -335,7 +239,17 @@ public class Transaction {
 	 */
 	public String readString(String key) throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
-		return readString(new OtpErlangString(key)).stringValue();
+		try {
+			return transaction.read(key);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.NotFoundException e) {
+			throw new NotFoundException(e);
+		}
 	}
 
 	/**
@@ -356,44 +270,14 @@ public class Transaction {
 	 */
 	public void write(OtpErlangString key, OtpErlangObject value)
 			throws ConnectionException, TimeoutException, UnknownException {
-		if (transLog == null) {
-			throw new TransactionNotStartedException("The transaction needs to be started before it is used.");
-		}
 		try {
-			connection.sendRPC("transstore.transaction_api", "jWrite",
-					new OtpErlangList(new OtpErlangObject[] {key, value, transLog}));
-			/*
-			 * possible return values:
-			 *  - {{fail, not_found}, TransLog}
-			 *  - {{fail, timeout}, TransLog}
-			 *  - {{fail, fail}, TransLog}
-			 *  - {ok, NewTransLog}
-			 */
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
-			transLog_old = transLog;
-			transLog = (OtpErlangList) received.elementAt(1);
-			if (received.elementAt(0).equals(new OtpErlangAtom("ok"))) {
-				return;
-			} else {
-				OtpErlangTuple status = (OtpErlangTuple) received.elementAt(0);
-				if (status.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
-				} else {
-					throw new UnknownException(status.elementAt(1).toString());
-				}
-			}
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			transaction.writeObject(key, value);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			throw new TimeoutException(e);
 		}
 	}
 
@@ -416,7 +300,15 @@ public class Transaction {
 	
 	public void write(String key, String value) throws ConnectionException,
 			TimeoutException, UnknownException {
-		write(new OtpErlangString(key), new OtpErlangString(value));
+		try {
+			transaction.write(key, value);
+		} catch (de.zib.scalaris.ConnectionException e) {
+			throw new ConnectionException(e);
+		} catch (de.zib.scalaris.UnknownException e) {
+			throw new UnknownException(e);
+		} catch (de.zib.scalaris.TimeoutException e) {
+			throw new TimeoutException(e);
+		}
 	}
 
 	/**
@@ -434,10 +326,19 @@ public class Transaction {
 	 * </p>
 	 */
 	public void revertLastOp() {
-		if (transLog_old != null) {
-			transLog = transLog_old;
-			transLog_old = null;
-		}
+		transaction.revertLastOp();
+	}
+	
+	/**
+	 * Closes the transaction's connection to a chordsharp node.
+	 * 
+	 * Note: Subsequent calls to the other methods will throw
+	 * {@link ConnectionException}s!
+	 * 
+	 * @since 2.0
+	 */
+	public void closeConnection() {
+		transaction.closeConnection();
 	}
 	
 	

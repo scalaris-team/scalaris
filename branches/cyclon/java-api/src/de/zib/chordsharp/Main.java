@@ -17,6 +17,7 @@ package de.zib.chordsharp;
 
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangString;
+
 import java.util.Random;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -32,10 +33,11 @@ import org.apache.commons.cli.ParseException;
  * Class to test basic functionality of the package.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 1.4
+ * @version 2.0
+ * @deprecated use {@link de.zib.scalaris.Main} instead
  */
+@Deprecated
 public class Main {
-
 	/**
 	 * Queries the command line options for an action to perform.
 	 * 
@@ -195,7 +197,7 @@ public class Main {
 	 * 
 	 * @return the options the program understands
 	 */
-	static Options getOptions() {
+	private static Options getOptions() {
 		Options options = new Options();
 		OptionGroup group = new OptionGroup();
 
@@ -262,33 +264,33 @@ public class Main {
 		return options;
 	}
 
-    static void minibench(){
-	try{
-	    int DATA_SIZE = 1000; 
-	    byte[] data = new byte[DATA_SIZE]; 
-	    Random r = new Random(); 
-	    r.nextBytes(data); 
- 
-	    int size = 100; 
- 
-	    long time = System.currentTimeMillis(); 
- 
-	    for (int i = 0; i < size; i++) { 
-		Transaction transaction = new Transaction(); 
-		transaction.start(); 
-	    
-		//transaction.write("" + i, new String(data)); 
-		transaction.write(new OtpErlangString("" + i), new OtpErlangBinary(data)); 
-		transaction.commit(); 
-	    } 
- 
-	    System.out.println("time: " + (System.currentTimeMillis() - 
-					   time)); 
-	    System.out.println("speed: " + ((size * 1000) / 
-					    (System.currentTimeMillis() - time))); 
-	}catch(Exception e){
-	    System.out.println(e);
+    private static void minibench() {
+		try {
+			int DATA_SIZE = 1000;
+			byte[] data = new byte[DATA_SIZE];
+			Random r = new Random();
+			r.nextBytes(data);
+
+			int size = 100;
+
+			long time = System.currentTimeMillis();
+
+			for (int i = 0; i < size; i++) {
+				Transaction transaction = new Transaction();
+				transaction.start();
+
+				// transaction.write("" + i, new String(data));
+				transaction.write(new OtpErlangString("" + i),
+						new OtpErlangBinary(data));
+				transaction.commit();
+			}
+
+			System.out.println("time: " + (System.currentTimeMillis() - time));
+			System.out.println("speed: "
+					+ ((size * 1000) / (System.currentTimeMillis() - time)));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
-    }
 
 }

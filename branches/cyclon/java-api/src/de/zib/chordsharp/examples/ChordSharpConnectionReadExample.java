@@ -30,6 +30,7 @@ import de.zib.chordsharp.UnknownException;
  * @author Nico Kruber, kruber@zib.de
  * @version 1.0
  */
+@Deprecated
 public class ChordSharpConnectionReadExample {
 	/**
 	 * Reads a key given on the command line with the {@code read} methods of

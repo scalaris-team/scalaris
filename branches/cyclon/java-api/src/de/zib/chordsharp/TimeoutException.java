@@ -22,7 +22,9 @@ import com.ericsson.otp.erlang.OtpErlangException;
  * fails due to a timeout.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * @version 2.0
  */
+@Deprecated
 public class TimeoutException extends OtpErlangException {
 	/**
 	 * class version for serialisation
@@ -43,5 +45,14 @@ public class TimeoutException extends OtpErlangException {
 	 */
 	public TimeoutException(String msg) {
 		super(msg);
+	}
+	
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e the exception to "re-throw"
+	 */
+	public TimeoutException(Throwable e) {
+		super(e.getMessage());
 	}
 }

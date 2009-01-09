@@ -51,7 +51,7 @@
 new(RT, Successor, Predecessor, Me, MyRange, LB) ->
     new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new()).
 
-new(RT, Successor, Predecessor, Me, MyRange, LB, ok = DB) ->
+new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
     #state{
      routingtable = RT, 
      successor = Successor,
@@ -80,7 +80,7 @@ get_my_range(#state{my_range=MyRange}) ->
 get_db(#state{db=DB}) ->
     DB.
 
-set_db(State, ok = DB) ->
+set_db(State, DB) ->
     State#state{db=DB}.
 
 get_lb(#state{lb=LB}) ->

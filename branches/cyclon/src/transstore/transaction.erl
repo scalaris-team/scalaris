@@ -28,8 +28,20 @@
 
 -include("trecords.hrl").
 
--export([do_transaction/5, do_transaction_wo_readphase/6, generateTID/1, getRTMKeys/1, initRTM/2, write/3, read/2, parallel_reads/2, do_parallel_reads/4, parallel_quorum_reads/3, quorum_read/2, do_quorum_read/3, write_read_receive/3,
-translog_new/0]).
+-export([do_transaction/5, 
+	 do_transaction_wo_readphase/6, 
+	 generateTID/1, 
+	 getRTMKeys/1, 
+	 initRTM/2, 
+	 write/3, 
+	 read/2, 
+	 parallel_reads/2,
+	 do_parallel_reads/4, 
+	 parallel_quorum_reads/3, 
+	 quorum_read/2, 
+	 do_quorum_read/3, 
+	 write_read_receive/3,
+	 translog_new/0]).
 
 -import(lists).
 -import(dict).
