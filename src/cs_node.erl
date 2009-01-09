@@ -29,7 +29,7 @@
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
 
--export([start_link/1, start/1]).
+-export([start_link/1, start/2]).
 
 
 %logging on
@@ -178,6 +178,14 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 	{get_node, Source_PID, Key} -> 	    
 	    cs_send:send(Source_PID, {get_node_response, Key, cs_state:me(State)}),
+	    loop(State, ?DEBUG(Debug));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Cyclon (see cyclon/*.erl) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{get_cyclon_pid, Pid,Me} ->
+	    CyclonPid = cs_send:get(get_local_cyclon_pid(), cs_send:this()),
+	    cs_send:send(Pid,{cyclon_pid,Me,CyclonPid}),
 	    loop(State, ?DEBUG(Debug));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -334,9 +342,10 @@ loop(State, Debug) ->
 
 %% @doc joins this node in the ring and calls the main loop
 %% @spec start(term()) -> cs_state:state()
--spec(start/1 :: (any()) -> cs_state:state()).
-start(InstanceId) ->
+-spec(start/2 :: (any(), any()) -> cs_state:state()).
+start(InstanceId, Parent) ->
     process_dictionary:register_process(InstanceId, cs_node, self()),
+    Parent ! done,
     timer:sleep(crypto:rand_uniform(1, 100) * 100),
     Id = cs_keyholder:get_key(),
     boot_server:connect(),
@@ -353,5 +362,19 @@ start(InstanceId) ->
 %% @doc spawns a chord# node, called by the chord# supervisor process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-    {ok, spawn_link(?MODULE, start, [InstanceId])}.
+    Link = spawn_link(?MODULE, start, [InstanceId, self()]),
+    receive
+	done ->
+	    ok
+    end,
+    {ok, Link}.
 
+get_local_cyclon_pid() ->
+    InstanceId = erlang:get(instance_id),
+    if
+	InstanceId == undefined ->
+	    io:format("~p~n", [util:get_stacktrace()]);
+	true ->
+	    ok
+    end,
+    process_dictionary:lookup_process(InstanceId, cyclon).
