@@ -64,7 +64,7 @@ start(InstanceId) ->
 loop(Cache,Node,Cycles) ->
     receive
 	{getcache,Pid} ->
-		Pid ! {cache,cs_send:this(),Cycles,cache:get_list_of_cyclons(Cache)},
+		Pid ! {cache,Node,Cycles,cache:get_list_of_cyclons(Cache)},
 		loop(Cache,Node,Cycles);
 	{flush_cache} ->
 		get_pid() ! {get_pred_succ, cs_send:this()},
@@ -79,7 +79,7 @@ loop(Cache,Node,Cycles) ->
 		case node:pidX(Pred) /= Node of
  	 		true ->
 				NewCache =  cache:add_list([node:pidX(Pred),node:pidX(Succ)], Cache),
-				loop(cache:update(NewCache),Node,Cycles);
+				loop(NewCache,Node,Cycles);
 			false ->
 				loop(Cache,Node,Cycles)
 		end;
@@ -112,13 +112,13 @@ loop(Cache,Node,Cycles) ->
 		%io:format("subset~n", []),
 		ForSend=cache:get_random_subset(get_L(Cache),Cache),
 		%io:format("<",[]),
-		cs_send:send(P,{subset_response,ForSend,Subset}),
+		cs_send:send_to_group_member(P,cyclon,{subset_response,ForSend,Subset}),
 		N2=cache:minus(Subset,Cache),
 		NewCache = cache:merge(Cache,N2,ForSend),
 		loop(NewCache,Node,Cycles);
 	{subset_response,Subset,OldSubset} ->
 		%io:format("subset_response~n", []),
-		N1=cache:delete({{nil,Node},nil},Subset),
+		N1=cache:delete({Node,nil},Subset),
 		N2=cache:minus(N1,Cache),
 		NewCache=cache:merge(Cache,N2,OldSubset),
 		loop(NewCache,Node,Cycles);
@@ -135,8 +135,8 @@ enhanced_shuffle(Cache, Node) ->
     Cache_1= cache:inc_age(Cache),
     Q=cache:get_oldest(Cache_1),
     Subset=cache:get_random_subset(get_L(Cache_1),Cache_1),
-    {{QCyclon,_},_} = Q,
-    case (QCyclon /= cs_send:this()) of
+    {QCyclon,_} = Q,
+    case (QCyclon /= Node) of
 	true ->
 	    NSubset_pre=cache:delete(Q,Subset),
 	    NSubset = case cache:size(NSubset_pre) == config:read(cyclon_shuffle_length) of
@@ -145,9 +145,9 @@ enhanced_shuffle(Cache, Node) ->
 			  false ->
 			      NSubset_pre
 		      end,
-	    ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
+	    ForSend=cache:add_element({Node,0},NSubset),
 	    %io:format(">",[]),
-	    cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
+	    cs_send:send_to_group_member(QCyclon,cyclon,{subset,Node,ForSend}),
 	    cache:delete(Q,Cache);	
 	false -> 
 	    error
@@ -157,13 +157,13 @@ enhanced_shuffle(Cache, Node) ->
 simple_shuffle(Cache, Node) ->
     Subset=cache:get_random_subset(get_L(Cache),Cache),
     Q=cache:get_random_element(Subset),
-    {{QCyclon,_},_} = Q,
-    case (QCyclon /= cs_send:this()) of
+    {{QCyclon},_} = Q,
+    case (QCyclon /= Node) of
 	true ->
 	    NSubset=cache:delete(Q,Subset),
-	    ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
+	    ForSend=cache:add_element({Node,0},NSubset),
 	    %io:format("~p",[length(ForSend)]),
-	    cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
+	    cs_send:send_to_group_member(QCyclon,cyclon,{subset,Node,ForSend}),
 	    cache:delete(Q,Cache);	
 	false -> 
 	    Cache

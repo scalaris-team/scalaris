@@ -334,6 +334,13 @@ loop(State, Debug) ->
 %% TODO buggy ...
 	{get_node_response, _, _} ->
 	    loop(State, ?DEBUG(Debug));
+%% 
+	{send_to_group_member,Processname,Mesg} ->
+    	InstanceId = erlang:get(instance_id),
+       	Pid = process_dictionary:lookup_process(InstanceId,Processname),
+        Pid ! Mesg,
+        loop(State, ?DEBUG(Debug));
+
 	X ->
 	    io:format("cs_node: unknown message ~w~n", [X]),
 	    %ok
