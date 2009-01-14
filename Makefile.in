@@ -103,11 +103,13 @@ install: all java
 	@echo @prefix@
 	mkdir -p $(BEAMDIR)
 	mkdir -p $(BEAMDIR)/comm_layer
+	mkdir -p $(BEAMDIR)/cyclon
 	mkdir -p $(BEAMDIR)/pubsub
 	mkdir -p $(BEAMDIR)/transstore
 	install -m 644 bin/*.app $(BEAMDIR)
 	install -m 644 ebin/*.beam $(BEAMDIR)
 	install -m 644 ebin/comm_layer/*.beam $(BEAMDIR)/comm_layer
+	install -m 644 ebin/cyclon/*.beam $(BEAMDIR)/cyclon
 	install -m 644 ebin/pubsub/*.beam     $(BEAMDIR)/pubsub
 	install -m 644 ebin/transstore/*.beam $(BEAMDIR)/transstore
 	mkdir -p $(ETCDIR)
@@ -159,7 +161,7 @@ install: all java
 	mkdir -p $(JAVADIR)/scalaris
 	install java-api/scalaris.jar $(JAVADIR)/scalaris/
 	mkdir -p $(JAVADIR)/scalaris/lib
-	install java-api/lib/OtpErlang-1.4.jar $(JAVADIR)/scalaris/lib/
+	install java-api/lib/OtpErlang-1.4.2.jar $(JAVADIR)/scalaris/lib/
 	install java-api/scalaris-java.conf.sample $(ETCDIR)/scalaris-java.conf
 	install java-api/scalaris-java.conf.sample $(ETCDIR)/
 	install java-api/scalaris.properties $(ETCDIR)/
