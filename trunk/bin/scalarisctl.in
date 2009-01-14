@@ -47,16 +47,16 @@ usage(){
 
 bootstart(){
     pushd $BEAMDIR > /dev/null
-	erl -setcookie $SCALARIS_COOKIE \
+	erl -setcookie "\"$SCALARIS_COOKIE\"" \
 	    -pa $SCALARISDIR/contrib/yaws/ebin \
 	    -pa $BEAMDIR \
 	    -noinput \
 	    -detached \
 	    -yaws embedded true \
-	    -boot_cs log_path "'$LOGDIR'" \
+	    -boot_cs log_path "\"$LOGDIR\"" \
 	    -boot_cs docroot "\"$DOCROOTDIR\"" \
-	    -boot_cs config "'$ETCDIR/scalaris.cfg'" \
-	    -boot_cs local_config "'$ETCDIR/scalaris.local.cfg'" \
+	    -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
+	    -boot_cs local_config "\"$ETCDIR/scalaris.local.cfg\"" \
 	    -connect_all false -hidden -sname boot@$HOST \
 	    -s boot;
 	popd > /dev/null
@@ -64,12 +64,12 @@ bootstart(){
 
 debug(){
     # look into epmd -list: boot@ or node@
-    erl -setcookie $SCALARIS_COOKIE -sname rem -remsh boot@$HOST
+    erl -setcookie "\"$SCALARIS_COOKIE\"" -sname rem -remsh boot@$HOST
 }
 
 bootstop(){
     pushd $BEAMDIR > /dev/null
-    erl -setcookie $SCALARIS_COOKIE \
+    erl -setcookie "\"$SCALARIS_COOKIE\"" \
 	-sname ctl \
 	-pa $BEAMDIR \
 	-noinput \
@@ -79,14 +79,14 @@ bootstop(){
 
 nodestart(){
     pushd $BEAMDIR > /dev/null
-	erl -setcookie $SCALARIS_COOKIE \
+	erl -setcookie "\"$SCALARIS_COOKIE\"" \
 	    -pa $SCALARISDIR/contrib/yaws/ebin \
 	    -pa $BEAMDIR \
 	    -yaws embedded true \
-	    -chordsharp log_path "'$LOGDIR'" \
+	    -chordsharp log_path "\"$LOGDIR\"" \
 	    -chordsharp docroot "\"$NODEDOCROOTDIR\"" \
-	    -chordsharp config "'$ETCDIR/scalaris.cfg'" \
-	    -chordsharp local_config "'$ETCDIR/scalaris.local.cfg'" \
+	    -chordsharp config "\"$ETCDIR/scalaris.cfg\"" \
+	    -chordsharp local_config "\"$ETCDIR/scalaris.local.cfg\"" \
 	    -connect_all false -hidden -sname node@$HOST \
 	    -noinput \
 	    -detached \
@@ -97,7 +97,7 @@ nodestart(){
 
 nodestop(){
     pushd $BEAMDIR > /dev/null
-    erl -setcookie $SCALARIS_COOKIE \
+    erl -setcookie "\"$SCALARIS_COOKIE\"" \
 	-sname ctl \
 	-pa $BEAMDIR \
 	-noinput \
