@@ -15,6 +15,8 @@
  */
 package de.zib.scalaris;
 
+import java.util.Arrays;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -66,7 +68,7 @@ public class Main {
 
 		if (line.hasOption("minibench")) {
 	        Benchmark.minibench();
-		} else if (line.hasOption("read")) {
+		} else if (line.hasOption("r")) { // read
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("read(" + line.getOptionValue("read")
@@ -84,7 +86,7 @@ public class Main {
 				System.err.println("read failed with unknown: "
 						+ e.getMessage());
 			}
-		} else if (line.hasOption("write")) {
+		} else if (line.hasOption("w")) { // write
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("write(" + line.getOptionValues("write")[0]
@@ -101,7 +103,7 @@ public class Main {
 				System.err.println("write failed with unknown: "
 						+ e.getMessage());
 			}
-		} else if (line.hasOption("publish")) {
+		} else if (line.hasOption("p")) { // publish
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("publish("
@@ -119,7 +121,7 @@ public class Main {
 //				System.err.println("publish failed with unknown: "
 //						+ e.getMessage());
 			}
-		} else if (line.hasOption("subscribe")) {
+		} else if (line.hasOption("s")) { // subscribe
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("subscribe("
@@ -137,7 +139,7 @@ public class Main {
 				System.err.println("subscribe failed with unknown: "
 						+ e.getMessage());
 			}
-		} else if (line.hasOption("unsubscribe")) {
+		} else if (line.hasOption("u")) { // unsubscribe
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("unsubscribe("
@@ -158,7 +160,7 @@ public class Main {
 				System.err.println("unsubscribe failed with unknown: "
 						+ e.getMessage());
 			}
-		} else if (line.hasOption("getsubscribers")) {
+		} else if (line.hasOption("g")) { // getsubscribers
 			try {
 				Scalaris sc = new Scalaris();
 				System.out.println("getSubscribers("
