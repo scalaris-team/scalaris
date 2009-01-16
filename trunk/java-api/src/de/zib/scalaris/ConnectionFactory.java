@@ -108,7 +108,7 @@ public class ConnectionFactory {
 			clientNameAppendUUID = false;
 		}
 		
-		fixLocalhostName();
+		//fixLocalhostName();
 //		System.out.println("node: " + node);
 	}
 
@@ -141,7 +141,7 @@ public class ConnectionFactory {
 			OtpPeer other = new OtpPeer(node);
 			return self.connect(other);
 		} catch (Exception e) {
-			// e.printStackTrace();
+		        // e.printStackTrace();
 			throw new ConnectionException(e.getMessage());
 		}
 	}

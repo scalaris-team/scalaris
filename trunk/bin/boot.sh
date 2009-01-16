@@ -20,4 +20,4 @@ if [ -f "$GLOBAL_CFG" ] ; then source "$GLOBAL_CFG" ; fi
 if [ -f "$LOCAL_CFG" ] ; then source "$LOCAL_CFG" ; fi
 
 export ERL_MAX_PORTS=16384
-erl $ERL_OPTS +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -hidden -sname boot -s boot 
+erl $ERL_OPTS +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -hidden -sname boot@localhost -s boot 
