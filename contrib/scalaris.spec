@@ -7,11 +7,43 @@ Group: Applications/Databases
 URL: http://code.google.com/p/scalaris
 Source0: %{name}-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-build
+BuildRequires: ant
+Requires: jre >= 1.6.0
 
-BuildRequires: erlang
-BuildRequires: java
-Requires: erlang
-Requires: jre
+# #########################################################################################  
+# # Fedora, RHEL or CentOS  
+# ######################################################################################### 
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}  
+BuildRequires: java-devel >= 1.6.0
+BuildRequires: erlang >= R12B-4
+Requires: erlang >= R12B-4
+%endif 
+
+# #########################################################################################  
+# # Mandrake, Mandriva  
+# #########################################################################################  
+%if 0%{?mandriva_version} || 0%{?mdkversion}
+%if 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
+BuildRequires: java-devel >= 1.6.0
+BuildRequires: erlang-stack >= R12B-4
+Requires: erlang-stack >= R12B-4
+%else
+#BuildRequires:  java-1.5.0-gcj-devel
+BuildRequires: java-devel >= 1.6.0
+BuildRequires: classpathx-jaf
+BuildRequires: erlang >= R12B-4
+Requires: erlang >= R12B-4
+%endif
+%endif
+
+###########################################################################################
+# SuSE, openSUSE
+###########################################################################################
+%if 0%{?suse_version}
+BuildRequires: java-devel >= 1.6.0
+BuildRequires: erlang >= R12B-4
+Requires: erlang >= R12B-4
+%endif
 
 %description 
 Scalaris is a scalable, transactional, distributed key-value store. It
@@ -32,6 +64,7 @@ Summary: Java API for scalaris
 Group: Applications/Databases
 Requires: jre
 Requires: erlang
+Requires: jakarta-commons-cli
 
 %description java
 Java Bindings
@@ -39,8 +72,7 @@ Java Bindings
 %package client
 Summary: Cli client for scalaris
 Group: Applications/Databases
-Requires: %{name}-java=%{version}
-Requires: jakarta-commons-cli
+Requires: %{name}-java = %{version}
 
 %description client
 command line client for scalaris
@@ -68,6 +100,8 @@ make java
 make docs
 
 %install
+# see http://en.opensuse.org/Java/Packaging/Cookbook#bytecode_version_error
+export NO_BRP_CHECK_BYTECODE_VERSION=true
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
 
@@ -77,30 +111,35 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 %{_bindir}/scalarisctl
-%{_libdir}/%{name}/ebin
-%{_libdir}/%{name}/contrib/yaws/ebin
-%{_libdir}/%{name}/contrib/yaws/include
-%{_libdir}/%{name}/docroot
-%{_libdir}/%{name}/docroot_node
+#%{_libdir}/%{name}/ebin
+%{_libdir}/%{name}
+#%{_libdir}/%{name}/*
+#%{_libdir}/%{name}/contrib/yaws/ebin
+#%{_libdir}/%{name}/contrib/yaws/include
+#%{_libdir}/%{name}/docroot
+#%{_libdir}/%{name}/docroot_node
 %{_localstatedir}/log/%{name}
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg.example
+%{_sysconfdir}/%{name}
+%config(noreplace) %{_sysconfdir}/%{name}/scalaris.cfg
+%config %{_sysconfdir}/%{name}/scalaris.local.cfg.example
+%doc AUTHORS README LICENSE
 
 %files doc
 %defattr(-,root,root)
 %doc %{_docdir}/%{name}
-%doc AUTHORS README LICENSE user-dev-guide/main.pdf
+%doc user-dev-guide/main.pdf
 
 %files java
 %defattr(-,root,root)
-%{_datadir}/java/chordsharp4j-lib.jar
+%{_javadir}/%{name}
+%config(noreplace) %{_sysconfdir}/%{name}/scalaris-java.conf
+%config %{_sysconfdir}/%{name}/scalaris-java.conf.sample
+%config(noreplace) %{_sysconfdir}/%{name}/scalaris.properties
 
 %files client
 %defattr(-,root,root)
-%{_datadir}/java/chordsharp4j.jar
-%{_bindir}/scalarisclient
+%{_bindir}/scalaris
 
 %changelog
 * Thu Dec 11 2008 Thorsten Schuett <schuett@zib.de> - 0.0.1-1
 - Initial build.
-
