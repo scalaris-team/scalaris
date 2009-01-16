@@ -47,7 +47,7 @@ usage(){
 
 bootstart(){
     pushd $BEAMDIR > /dev/null
-	erl -setcookie "\"$SCALARIS_COOKIE\"" \
+	erl -setcookie "$SCALARIS_COOKIE" \
 	    -pa $SCALARISDIR/contrib/yaws/ebin \
 	    -pa $BEAMDIR \
 	    -noinput \
@@ -64,12 +64,12 @@ bootstart(){
 
 debug(){
     # look into epmd -list: boot@ or node@
-    erl -setcookie "\"$SCALARIS_COOKIE\"" -sname rem -remsh boot@$HOST
+    erl -setcookie "$SCALARIS_COOKIE" -sname rem -remsh boot@$HOST
 }
 
 bootstop(){
     pushd $BEAMDIR > /dev/null
-    erl -setcookie "\"$SCALARIS_COOKIE\"" \
+    erl -setcookie "$SCALARIS_COOKIE" \
 	-sname ctl \
 	-pa $BEAMDIR \
 	-noinput \
@@ -79,7 +79,7 @@ bootstop(){
 
 nodestart(){
     pushd $BEAMDIR > /dev/null
-	erl -setcookie "\"$SCALARIS_COOKIE\"" \
+	erl -setcookie "$SCALARIS_COOKIE" \
 	    -pa $SCALARISDIR/contrib/yaws/ebin \
 	    -pa $BEAMDIR \
 	    -yaws embedded true \
@@ -97,7 +97,7 @@ nodestart(){
 
 nodestop(){
     pushd $BEAMDIR > /dev/null
-    erl -setcookie "\"$SCALARIS_COOKIE\"" \
+    erl -setcookie "$SCALARIS_COOKIE" \
 	-sname ctl \
 	-pa $BEAMDIR \
 	-noinput \
