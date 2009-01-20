@@ -22,7 +22,7 @@
 -import(util).
 %% API
 
--export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_cyclons/1 ,inc_age/1, get_oldest/1]).
+-export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_nodes/1 ,inc_age/1, get_youngest/1, get_oldest/1, ages/1]).
 
 % list of {pid of cs_node process, age}
 -type(cache() :: list({node:node_type(), pos_integer()})).
@@ -58,10 +58,10 @@ minus([H|T],N) ->
 
 
 %% @doc 
-get_list_of_cyclons([]) ->
+get_list_of_nodes([]) ->
 	[];
-get_list_of_cyclons([{A,_}|T]) ->
-	[A]++get_list_of_cyclons(T).
+get_list_of_nodes([{A,_}|T]) ->
+	[A]++get_list_of_nodes(T).
 	
 
 %% @doc ensure that one place is empty in the stack, by delete a random entrie if no space left
@@ -111,17 +111,39 @@ get_oldest(Cache) ->
 			    end,
 			    0,
 			    Cache),
+    %io:format("Oldest: ~p~n",[HighestAge]),
     OldElements = lists:filter(fun ({_, Age}) ->
 				       Age == HighestAge
 			       end,
 			       Cache),
     get_random_element(OldElements).
-				    
+
+%% @doc find youngest element (randomize if multiple youngest elements)
+get_youngest([]) ->
+    [];
+get_youngest(Cache) ->
+    LowestAge = lists:foldl(fun ({_, Age}, MinAge) ->
+				    util:min(Age, MinAge)
+			    end,
+			   	99,
+			    Cache),
+
+    YoungElements = lists:filter(fun ({_, Age}) ->
+				       Age == LowestAge
+			       end,
+			       Cache),
+	
+    Out= get_node(get_random_element(YoungElements)),
+	%io:format("Youngest: ~p~n",[Out]),
+	[Out].
+
+get_node({X,_}) ->
+    X.
 
 inc_age(Cache) ->
     lists:map(fun({A,C}) ->
 		      {A, C + 1}
-	      end,
+              end,
 	      Cache).
 
 eq({A,_},{B,_}) ->
@@ -132,13 +154,13 @@ new() ->
 	[].
 %% @doc Amount of valid Cache entries 
 size([]) ->
-0;
+	0;
 size([H|T]) ->
-{Node,_}=H,
-case Node of
-nil	-> cache:size(T);
-_	-> 1+cache:size(T)
-end.
+	{Node,_}=H,
+	case Node of
+		nil	-> cache:size(T);
+		_	-> 1+cache:size(T)
+    end.
 
 
 
@@ -165,3 +187,7 @@ add_element(Element, Cache) ->
 	    [Element | Cache]
     end.
 
+ages([]) ->
+	[];
+ages([{_,Age}|T]) ->
+    [Age]++ages(T).

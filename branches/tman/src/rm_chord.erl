@@ -113,12 +113,6 @@ start() ->
 
 loop(Id, Me, Pred, Succs) ->
     receive
-	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
-	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-	    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
-	    CSNode ! {init_done},
-	    loop(NewId, NewMe, NewPred, NewSuccList);
 	{get_successorlist, Pid} ->
 	    Pid ! {get_successorlist_response, Succs},
 	    loop(Id, Me, Pred, Succs);

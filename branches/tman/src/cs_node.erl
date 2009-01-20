@@ -65,9 +65,18 @@ loop(State, Debug) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	{rm_update, Pred, Succ} ->
+	{rm_update_pred_succ, Pred, Succ} ->
 	    NewState = cs_state:update_pred_succ(State, Pred, Succ),
 	    loop(NewState, ?DEBUG(Debug));
+    
+    {rm_update_pred, Pred} ->
+	    NewState = cs_state:update_pred(State, Pred),
+	    loop(NewState, ?DEBUG(Debug));
+    {rm_update_succ, Succ} ->
+	    NewState = cs_state:update_succ(State,Succ),
+	    loop(NewState, ?DEBUG(Debug));
+    
+     
 	{succ_left, SuccList} = _Message ->
 	    ?RM:succ_left(SuccList),
 	    loop(State, ?DEBUG(Debug));
@@ -336,9 +345,11 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug));
 %% 
 	{send_to_group_member,Processname,Mesg} ->
+        %% @TODO: cleanup
     	InstanceId = erlang:get(instance_id),
        	Pid = process_dictionary:lookup_process(InstanceId,Processname),
-        Pid ! Mesg,
+        PidNode = cs_send:get(Pid, cs_send:this()),
+        cs_send:send(PidNode,Mesg),
         loop(State, ?DEBUG(Debug));
 
 	X ->
@@ -347,7 +358,7 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug))
     end.
 
-%% @doc joins this node in the ring and calls the main loop
+%% @doc joins this node in the  and calls the main loop
 -spec(start/2 :: (any(), any()) -> cs_state:state()).
 start(InstanceId, Parent) ->
     process_dictionary:register_process(InstanceId, cs_node, self()),

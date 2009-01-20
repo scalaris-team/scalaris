@@ -50,10 +50,32 @@ start(InstanceId) ->
     process_dictionary:register_process(InstanceId, cyclon, self()),
     %process_dictionary:register_process(InstanceId, cyclonNode, cs_send:this()),
     %{observer,'me@csr-pc38.zib.de' } ! {cyclon, self()},
+    
+    
+    
+    get_pid() !	{get_node, cs_send:this(),2.71828183},
     get_pid() ! {get_pred_succ, cs_send:this()},
+    
+    receive
+    	{get_node_response, 2.71828183, Me} ->
+          	Node = Me
+	end,
+    
+    receive
+    {get_pred_succ_response, Pred, Succ} ->
+	    %Me = cs_send:get(get_pid(), cs_send:this()),
+	   	%io:format("Pred ~p~n Succ~p~n ~n", [node:pidX(Pred),pidX(Succ)]),
+		case Pred /= Node of
+ 	 		true ->
+				Cache =  cache:add_list([Pred,Succ], cache:new());
+			false ->
+				Cache =  cache:new()
+		end
+    end,
+    
     erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
     io:format("Cyclon spawn: ~p~n", [cs_send:this()]),
-    loop(cache:new(),cs_send:get(get_pid(), cs_send:this()),0).
+    loop(Cache,Node,0).
 
 
 %% Cache
@@ -63,8 +85,14 @@ start(InstanceId) ->
 
 loop(Cache,Node,Cycles) ->
     receive
+    {get_ages,Pid} ->
+        Pid ! {ages,cache:ages(Cache)},
+        loop(Cache,Node,Cycles);
+	{get_youngest_element,Pid} ->
+		Pid ! {cache,Node,Cycles,cache:get_youngest(Cache)},
+		loop(Cache,Node,Cycles);
 	{getcache,Pid} ->
-		Pid ! {cache,Node,Cycles,cache:get_list_of_cyclons(Cache)},
+		Pid ! {cache,Node,Cycles,cache:get_list_of_nodes(Cache)},
 		loop(Cache,Node,Cycles);
 	{flush_cache} ->
 		get_pid() ! {get_pred_succ, cs_send:this()},
@@ -73,16 +101,7 @@ loop(Cache,Node,Cycles) ->
 		erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
 		loop(Cache,Node,Cycles);
 			
-	{get_pred_succ_response, Pred, Succ} ->
-	    %Me = cs_send:get(get_pid(), cs_send:this()),
-	   	%io:format("Pred ~p~n Succ~p~n ~n", [node:pidX(Pred),pidX(Succ)]),
-		case node:pidX(Pred) /= Node of
- 	 		true ->
-				NewCache =  cache:add_list([node:pidX(Pred),node:pidX(Succ)], Cache),
-				loop(NewCache,Node,Cycles);
-			false ->
-				loop(Cache,Node,Cycles)
-		end;
+	
 		
 	{'$gen_cast', {debug_info, Requestor}}  ->
 	    %io:format("gen_cast~n", []),
@@ -99,24 +118,25 @@ loop(Cache,Node,Cycles) ->
 		    nil ->
 			loop(Cache,Node,Cycles);
 		    _	->
-			NewCache = case cache:size(Cache) of
-				       0 -> 
+			NewCache = 
+                case cache:size(Cache) of
+					0 -> 
 					   Cache;	
-				       _  ->
+				    _  ->
 					   enhanced_shuffle(Cache,Node)
-				   end,
+				end,
 			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
 			loop(NewCache,Node,Cycles+1)
 		end;
-	{subset,P,Subset} ->
+	{cy_subset,P,Subset} ->
 		%io:format("subset~n", []),
 		ForSend=cache:get_random_subset(get_L(Cache),Cache),
 		%io:format("<",[]),
-		cs_send:send_to_group_member(P,cyclon,{subset_response,ForSend,Subset}),
+		cs_send:send_to_group_member(node:pidX(P),cyclon,{cy_subset_response,ForSend,Subset}),
 		N2=cache:minus(Subset,Cache),
 		NewCache = cache:merge(Cache,N2,ForSend),
 		loop(NewCache,Node,Cycles);
-	{subset_response,Subset,OldSubset} ->
+	{cy_subset_response,Subset,OldSubset} ->
 		%io:format("subset_response~n", []),
 		N1=cache:delete({Node,nil},Subset),
 		N2=cache:minus(N1,Cache),
@@ -147,8 +167,8 @@ enhanced_shuffle(Cache, Node) ->
 		      end,
 	    ForSend=cache:add_element({Node,0},NSubset),
 	    %io:format(">",[]),
-	    cs_send:send_to_group_member(QCyclon,cyclon,{subset,Node,ForSend}),
-	    cache:delete(Q,Cache);	
+	    cs_send:send_to_group_member(node:pidX(QCyclon),cyclon,{cy_subset,Node,ForSend}),
+	    cache:delete(Q,Cache_1);	
 	false -> 
 	    error
     end.
@@ -163,11 +183,12 @@ simple_shuffle(Cache, Node) ->
 	    NSubset=cache:delete(Q,Subset),
 	    ForSend=cache:add_element({Node,0},NSubset),
 	    %io:format("~p",[length(ForSend)]),
-	    cs_send:send_to_group_member(QCyclon,cyclon,{subset,Node,ForSend}),
+	    cs_send:send_to_group_member(node:pidX(QCyclon),cyclon,{cy_subset,Node,ForSend}),
 	    cache:delete(Q,Cache);	
 	false -> 
 	    Cache
     end.
+	
 
 
 get_L(Cache) ->

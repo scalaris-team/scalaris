@@ -13,7 +13,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-erl -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin \
+erl +S 4 +A 4  -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin \
     -yaws embedded true -connect_all false -hidden \
     -chordsharp cs_port 14196 \
     -chordsharp yaws_port 8001 \

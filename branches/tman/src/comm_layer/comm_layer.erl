@@ -35,6 +35,9 @@
 -import(io).
 -import(util).
 
+-include("comm_layer.hrl").
+
+
 % @TODO: should be ip
 -type(process_id() :: {any(), integer(), pid()}).
 %%====================================================================
@@ -57,6 +60,8 @@ send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
     IsLocal = (MyIP == _IP) and (MyPort == _Port),
     if
  	IsLocal ->
+        
+        ?LOG_MESSAGE(erlang:element(1, Message), byte_size(term_to_binary(Message))),
  	    _Pid ! Message;
  	true ->
 	    comm_port:send(Target, Message)
