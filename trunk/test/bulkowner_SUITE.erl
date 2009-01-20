@@ -61,12 +61,12 @@ collect(Sum) ->
     if
 	Sum < 68 ->
 	    receive
-		{unit_test_bulkowner_response, Data, Owner} ->
+		{unit_test_bulkowner_response, Data, _Owner} ->
 		    collect(Sum + reduce(Data))
 	    end;
 	Sum == 68 ->
 	    receive
-		{unit_test_bulkowner_response, Data, Owner} ->
+		{unit_test_bulkowner_response, Data, _Owner} ->
 		    Sum + reduce(Data)
 	    after 1000 ->
 		    Sum
