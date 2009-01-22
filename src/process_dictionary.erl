@@ -218,12 +218,7 @@ init([]) ->
 handle_call({get_all_pids}, _From, State) ->
     {reply, [X || [X]<- ets:match(?MODULE, {'_','$1'})], State};
 handle_call({register_process, InstanceId, Name, Pid}, _From, State) ->
-    case ets:insert_new(?MODULE, {{InstanceId, Name}, Pid}) of
-	true ->
-	    ok;
-	false ->
-	    log:log2file(?MODULE, io_lib:format("reregistered process ~p ~p ~p", [InstanceId, Name, Pid]) )
-    end,
+    ets:insert(?MODULE, {{InstanceId, Name}, Pid}),
     {reply, ok, State};
 
 handle_call({lookup_process2, InstanceId, Name}, _From, State) ->

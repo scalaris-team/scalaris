@@ -106,7 +106,8 @@ start() ->
 	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
 	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
 	    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
+	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList], 
+							   not node:is_null(Node)]),
 	    CSNode ! {init_done},
 	    loop(NewId, NewMe, NewPred, NewSuccList)
     end.
@@ -116,7 +117,8 @@ loop(Id, Me, Pred, Succs) ->
 	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
 	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
 	    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
+	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList],
+							  not node:is_null(Node)]),
 	    CSNode ! {init_done},
 	    loop(NewId, NewMe, NewPred, NewSuccList);
 	{get_successorlist, Pid} ->
@@ -168,7 +170,9 @@ loop(Id, Me, Pred, Succs) ->
 	{crash, DeadPid} ->
 	    case node:is_null(Pred) orelse DeadPid == node:pidX(Pred) of
 		true ->
-		    loop(Id, Me, node:null(), filter(DeadPid, Succs));
+		    NewSuccs = filter(DeadPid, Succs),
+		    update_succ_and_pred(node:null(), hd(NewSuccs), Pred, hd(Succs)),
+		    loop(Id, Me, node:null(), NewSuccs);
 		false ->
 		    loop(Id, Me, Pred, filter(DeadPid, Succs))
 	    end;
@@ -204,6 +208,14 @@ filter(Pid, [Succ | Rest]) ->
 	    filter(Pid, Rest);
 	false ->
 	    [Succ | filter(Pid, Rest)]
+    end.
+
+update_succ_and_pred(NewPred, NewSucc, OldPred, OldSucc) ->
+    case NewPred /= OldPred orelse NewSucc /= OldSucc of
+	true ->
+	    ring_maintenance:update_succ_and_pred(NewPred, NewSucc);
+	false ->
+	    ok
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

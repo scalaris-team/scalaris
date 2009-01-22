@@ -46,7 +46,7 @@ reliable_get_node(InstanceId, Id, Timeout) ->
 	    {ok, Node}
     after
 	Timeout ->
-	    io:format("[ ~w | I | Node   | ~w ] reliable_get_node failed ~p~n",[calendar:universal_time(), self(), boot_server:node_list()]),
+	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node failed ~p~n",[calendar:universal_time(), self(), boot_server:node_list()]),
 	    error
     end.
 

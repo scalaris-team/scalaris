@@ -144,7 +144,7 @@ handle_call({subscribe_list, PidList, Owner}, _From,
     % link subscriber
     Linker ! {link, Owner},
     % make ping processes for subscription
-    [make_pinger(PingerTable, Pid) || Pid <- PidList],
+    [make_pinger(PingerTable, Pid, Owner) || Pid <- PidList],
     % store subscription
     [subscribe(MyPid2Subscribers, Pid2WatchedPids, Pid, Owner) || Pid <- PidList],
     {reply, ok, State};
@@ -214,10 +214,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-make_pinger(PingerTable, Pid) ->
+make_pinger(PingerTable, Pid, Owner) ->
     case ets:lookup(PingerTable, Pid) of
 	[] ->
-	    io:format("[ I | FD     | ~p ] starting pinger for ~p~n", [self(), Pid]),
+	    io:format("[ I | FD     | ~p ] starting pinger for ~p~n", [Owner, Pid]),
 	    Pinger = start_pinger(Pid),
 	    ets:insert(PingerTable, {Pid, Pinger}),
 	    ok;
