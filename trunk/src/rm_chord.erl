@@ -195,9 +195,9 @@ merge(L1, L2, Id) ->
     Order = fun(A, B) ->
 		    node:id(A) =< node:id(B)
 	    end,
-    Larger  = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) >  Id])),
-    Equal   = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) == Id])),
-    Smaller = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) <  Id])),
+    Larger  = lists:usort(Order, [X || X <- MergedList, node:id(X) >  Id]),
+    Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) == Id]),
+    Smaller = lists:usort(Order, [X || X <- MergedList, node:id(X) <  Id]),
     lists:append([Larger, Smaller, Equal]).
 
 filter(_Pid, []) ->

@@ -114,7 +114,7 @@ get_dump() ->
 	     Dump
      end || _ <- util:get_nodes()],
     StartTime = lists:min([Start || {_, Start} <- Dumps]),
-    Keys = util:uniq(lists:sort(lists:flatten([gb_trees:keys(Map) || {Map, _} <- Dumps]))),
+    Keys = lists:usort(lists:flatten([gb_trees:keys(Map) || {Map, _} <- Dumps])),
     {lists:foldl(fun (Tag, Map) -> 
 			 gb_trees:enter(Tag, get_aggregate(Tag, Dumps), Map)
 		 end, gb_trees:empty(), Keys), StartTime}.
@@ -136,8 +136,8 @@ get_aggregate(Tag, [{Dump, _} | Rest]) ->
     end.
 	    
 diff_dump(BeforeDump, AfterDump, _RunTime) ->    
-    Tags = util:uniq(lists:sort(lists:flatten([gb_trees:keys(BeforeDump), 
-					       gb_trees:keys(AfterDump)]))),
+    Tags = lists:usort(lists:flatten([gb_trees:keys(BeforeDump), 
+					       gb_trees:keys(AfterDump)])),
     diff(Tags, BeforeDump, AfterDump).
     
 diff([], _Before, _After) ->
