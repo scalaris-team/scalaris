@@ -54,6 +54,7 @@ start_link() ->
 %% to find out about restart strategy, maximum restart frequency and child 
 %% specifications.
 %%--------------------------------------------------------------------
+%% userdevguide-begin cs_sup_or:init
 init([]) ->
     InstanceId = string:concat("cs_node_", randoms:getRandomId()),
     KeyHolder =
@@ -91,4 +92,4 @@ init([]) ->
 	   RoutingTable,
 	   Supervisor_AND
 	  ]}}.
-    
+%% userdevguide-end cs_sup_or:init

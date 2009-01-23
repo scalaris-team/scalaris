@@ -54,6 +54,7 @@ start_link(InstanceId) ->
 %% to find out about restart strategy, maximum restart frequency and child 
 %% specifications.
 %%--------------------------------------------------------------------
+%% userdevguide-begin cs_sup_and:init
 init([InstanceId]) ->
     Node =
 	{cs_node,
@@ -82,4 +83,5 @@ init([InstanceId]) ->
 	   Node,
 	   Cyclon
 	  ]}}.
-    
+%% userdevguide-end cs_sup_and:init
+
