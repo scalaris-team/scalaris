@@ -34,6 +34,7 @@
 %% @spec join_request(state:state(), pid(), Id, UniqueId) -> state:state()
 %%   Id = term()
 %%   UniqueId = term()
+
 %% userdevguide-begin cs_join:join_request
 join_request(State, Source_PID, Id, UniqueId) ->
     Pred = node:new(Source_PID, Id, UniqueId),
