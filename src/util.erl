@@ -221,4 +221,4 @@ uniq(_, [], Uniq) ->
 -spec(get_nodes/0 :: () -> list()).
 get_nodes() ->
     Nodes = boot_server:node_list(),
-    util:uniq(lists:sort([cs_send:get(bench_server, CSNode) || CSNode <- Nodes])).
+    lists:usort([cs_send:get(bench_server, CSNode) || CSNode <- Nodes]).
