@@ -33,11 +33,12 @@
 %% API functions
 %%====================================================================
 
+%% userdevguide-begin admin:add_nodes
 %%--------------------------------------------------------------------
 %% Function: add_nodes(int()) -> ok
-%% Description: add new chordsharp nodes
+%% Description: add new Scalaris nodes
 %%--------------------------------------------------------------------
-% @doc add new chordsharp nodes on the local node
+% @doc add new Scalaris nodes on the local node
 % @spec add_nodes(int()) -> ok
 
 add_nodes(Count) ->
@@ -58,6 +59,7 @@ add_nodes_loop(Count, Delay) ->
 				      []}),
     timer:sleep(Delay),
     add_nodes_loop(Count - 1, Delay).
+%% userdevguide-end admin:add_nodes
 
 %%--------------------------------------------------------------------
 %% Function: check_ring() -> term()

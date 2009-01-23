@@ -262,11 +262,13 @@ loop(State, Debug) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % join messages (see cs_join.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	{join, Source_PID, Id, UniqueId} = _Message -> 
+%% userdevguide-begin cs_node:join_message
+	{join, Source_PID, Id, UniqueId} = _Message ->
 	    ?LOG("[ ~w | I | Node   | ~w ] join~n",
 		      [calendar:universal_time(), self()]),
 	    NewState = cs_join:join_request(State, Source_PID, Id, UniqueId),
 	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
+%% userdevguide-end cs_node:join_message
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 
@@ -341,6 +343,7 @@ loop(State, Debug) ->
 	    loop(State, ?DEBUG(Debug))
     end.
 
+%% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
 -spec(start/2 :: (any(), any()) -> cs_state:state()).
 start(InstanceId, Parent) ->
@@ -358,7 +361,9 @@ start(InstanceId, Parent) ->
     end,
     io:format("[ I | Node   | ~w ] joined~n",[self()]),
     loop(State, cs_debug:new()).
-    
+%% userdevguide-end cs_node:start
+
+%% userdevguide-begin cs_node:start_link
 %% @doc spawns a chord# node, called by the chord# supervisor process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
@@ -368,6 +373,7 @@ start_link(InstanceId) ->
 	    ok
     end,
     {ok, Link}.
+%% userdevguide-end cs_node:start_link
 
 get_local_cyclon_pid() ->
     InstanceId = erlang:get(instance_id),

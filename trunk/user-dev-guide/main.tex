@@ -110,7 +110,34 @@
 %  rulesepcolor=\color{black}
 %  rulesep=1cm,
 }
+\lstset{rangebeginprefix=\%\%\ userdevguide-begin\ }
+\lstset{rangeendprefix=\%\%\ userdevguide-end\ }
+\lstset{includerangemarker=false}
 
+% \codesnippet[lstsettings]{filename-label}{range-label}{src-file with path}
+% \codesnippet[language=Erlang]{admin.erl}{admin:add_nodes}{../src/admin.erl}
+\newcommand{\codesnippet}[4][language=Erlang]{
+{
+\lstset{numbers=left}
+\lstinputlisting[
+  title=\filetitle{#2},
+  linerange=#3-#3,
+  #1
+]
+{#4}
+}
+}
+
+% \codesfile[lstsettings]{filename-label}{src-file with path}
+% \codesfile[language=Erlang]{admin.erl}{../src/admin.erl}
+\newcommand{\codefile}[3][language=Erlang]{
+{
+\lstinputlisting[
+  title=\filetitle{#2},
+  #1]
+{#3}
+}
+}
 
 \newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
 \newcommand{\code}[1]{\lstinline[basicstyle=\small\ttfamily]!#1!}
@@ -223,18 +250,7 @@ release. The latter can be created by the user to alter settings.  A sample
 file is \code{bin/scalaris.local.cfg.example}. A local configuration file is
 necessary to run \scalaris{} on distributed nodes:
 
-\begin{lstlisting}[title=\filetitle{scalaris.local.cfg}]
-% Insert the appropriate IP-addresses for your setup as comma separated integers.
-% IP Address, Port, and label of the boot server
-{boot_host, {{209,85,135,99},14195,boot}}.
-
-% IP Address, Port, and label of the log server
-{log_host, {{209,85,135,99},14195,boot_logger}}.
-
-% possible values: 14195, [14195, 14196, 14197] (list of ports), 
-% or {14195, 15000} as range of ports
-{listen_port, 14195}.
-\end{lstlisting}
+\codefile{scalaris.local.cfg}{../bin/scalaris.local.cfg.example}
 
 \code{boot_host} defines the node where the boot server is running, which is
 contacted to join the system.
@@ -269,7 +285,7 @@ Read the file \code{README} in the main \scalaris{} checkout directory.
 The following commands will build the Java API for \scalaris{}:
 \begin{lstlisting}[language=sh]
 %> cd java-api
-%> ant 
+%> ant
 \end{lstlisting}
 
 This will build chordsharp4j.jar, which is the library for accessing
@@ -417,13 +433,11 @@ sufficient.
 There are some unit tests in the \code{test} directory. You can call them
 by running \code{make test} in the main directory. The results are stored
 in a local \code{index.html} file. The tests use the \code{common-test}
-package from the Erlang system. 
+package from the Erlang system.
 
 \part{Developers Guide}
 
 \chapter{How a node joins the system}
-
-\hfill\emph{2008-07-22, SVN revision 2}
 
 \section{General Erlang server loop}
 
@@ -472,24 +486,8 @@ In the following we will trace, what this function does to join
 additional nodes to the system.
 
 The function \code{admin:add_nodes(int)} is defined as follows.
-\begin{lstlisting}[title=\filetitle{admin.erl}]
-[...]
-add_nodes(Count) ->
-    randoms:init(),
-    add_nodes_loop(Count).
 
-add_nodes_loop(0) ->
-    ok;
-add_nodes_loop(Count) ->
-    io:format("~p~n", [supervisor:start_child(main_sup, {randoms:getRandomId(),
-                                                        {cs_sup_or, start_link, []},
-                                                        permanent,
-                                                        brutal_kill,
-                                                        worker,
-                                                        []})]),
-    add_nodes_loop(Count - 1).
-[...]
-\end{lstlisting}
+\codesnippet{admin.erl}{admin:add_nodes}{../src/admin.erl}
 
 It first initializes the random number generator and then calls
 \code{add_nodes_loop(Count)}.
@@ -498,7 +496,7 @@ This function starts a new child for the main supervisor \code{main_sup}.
 As defined by the parameters, to actually perform the start, the function
 \code{cs_sup_or:start_link} is called by the Erlang supervisor mechanism.
 For more details on the OTP supervisor mechanism see Chapter 18 of the
-Erlang book~\cite{erlang-book} or the online documentation at 
+Erlang book~\cite{erlang-book} or the online documentation at
 \url{http://www.erlang.org/doc/man/supervisor.html}.
 
 \subsection{Supervisor-tree of a \scalaris{} node}
@@ -517,42 +515,8 @@ defined start function (\code{start_link} here.
 
 So, lets have a look at \code{cs_sup_or:init}, the 'Scalaris
 \emph{or} supervisor'.
- 
-\begin{lstlisting}[title=\filetitle{cs_sup_or.erl}]
-[...]
-init([]) ->
-    randoms:init(),
-    InstanceId = string:concat("cs_node_", randoms:getRandomId()),
-    FailureDetector =
-	{failure_detector,
-	 {failuredetector, start_link, [InstanceId]},
-	 permanent, brutal_kill, worker,
-	 [failure_detector]
-     },
-    KeyHolder =
-	{cs_keyholder,
-	 {cs_keyholder, start_link, [InstanceId]},
-	 permanent, brutal_kill, worker,
-	 []},
-    MessageStatisticsCollector = 
-	{cs_message_collector,
-	 {cs_message, start_link, [InstanceId]},
-	 permanent, brutal_kill, worker,
-	 []},
-    Supervisor_AND = 
-	{cs_supervisor_and,
-	 {cs_sup_and, start_link, [InstanceId]},
-	 permanent, brutal_kill, supervisor,
-	 []},
-    {ok, {{one_for_one, 10, 1},
-	  [
-	   KeyHolder,
-	   MessageStatisticsCollector,
-	   FailureDetector,
-	   Supervisor_AND
-	  ]}}.
-[...]
-\end{lstlisting}
+
+\codesnippet{cs_sup_or.erl}{cs_sup_or:init}{../src/cs_sup_or.erl}
 
 The \code{init()} function must return process descriptions that the
 supervisor should start, and how the processes have to be observed. Here, we
@@ -580,30 +544,7 @@ running.
 Again, the OTP will first call the \code{init()} function of the
 corresponding module:
 
-\begin{lstlisting}[title=\filetitle{cs_sup_and.erl}]
-[...]
-init([InstanceId]) ->
-    Node =
-	{cs_node,
-	 {cs_node, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    DB =
-	{cs_db_otp,
-	 {cs_db_otp, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    {ok, {{one_for_all, 10, 1},
-	  [
-	   DB,
-	   Node
-	  ]}}.
-[...]
-\end{lstlisting}
+\codesnippet{cs_sup_and.erl}{cs_sup_and:init}{../src/cs_sup_and.erl}
 
 It defines two processes, that have to be observed using an
 \code{one_for_all}-supervisor, which means, that if one fails, all have to
@@ -619,12 +560,7 @@ After the \code{cs_sup_and:init()} finished, the DB is initialized and
 afterwards \code{cs_node:start_link} is called by the and-supervisor.
 We only go into details here, for the latter.
 
-\begin{lstlisting}[title=\filetitle{cs_node.erl}]
-[...]
-start_link(InstanceId) ->
-    {ok, spawn_link(?MODULE, start, [InstanceId])}.
-[...]
-\end{lstlisting}
+\codesnippet{cs_node.erl}{cs_node:start_link}{../src/cs_node.erl}
 
 This spawns a new process, that executes \code{cs_node:start()} and
 maintains a link to that process. This function is called in the context of
@@ -638,36 +574,7 @@ module name, the code belongs to (here: \code{cs_node}).
 
 \subsection{Initializing a \code{cs_node}-process}
 
-\begin{lstlisting}[title=\filetitle{cs_node.erl}]
-[...]
-start(InstanceId) ->
-    %register(cs_node, self()),
-    process_dictionary:register_process(InstanceId, cs_node, self()),
-    randoms:init(),
-    timer:sleep(random:uniform(100) * 100),
-    Id = cs_keyholder:get_key(),
-    failuredetector:set_owner(self()),
-    boot_server:connect(),
-    {First, State} = cs_join:join(Id),
-    if
-	not First ->
-	    cs_replica_stabilization:recreate_replicas(
-              cs_state:get_my_range(State));
-	true ->
-	    ok
-    end,
-    timer:send_after(config:stabilizationInterval(), 
-      self(), {stabilize_ring}),
-    timer:send_after(config:pointerStabilizationInterval(),
-      self(), {stabilize_pointers}),
-    timer:send_after(config:failureDetectorUpdateInterval(),
-      self(), {stabilize_failuredetector}),
-    timer:send_after(config:loadBalanceStartupInterval(),
-      self(), {stabilize_loadbalance}),
-    io:format("[ I | Node   | ~w ] joined~n",[self()]),
-    loop(State, cs_debug:new()).
-[...]
-\end{lstlisting}
+\codesnippet{cs_node.erl}{cs_node:start}{../src/cs_node.erl}
 
 A \code{cs_node} first registers itself in the process dictionary.  Then,
 the process sleeps for a random amount of time. Otherwise, if you would
@@ -706,29 +613,7 @@ established.
 
 \code{cs_join:join} is called next in \code{cs_node:start()}.
 
-\begin{lstlisting}[title=\filetitle{cs_join.erl}]
-[...]
-join(Id) -> 
-    io:format("[ I | Node   | ~w ] joining ~p ~n",[self(), Id]),
-    Ringsize = boot_server:number_of_nodes(),
-    if
-	Ringsize == 0 ->
-	    State = join_first(Id),
-	    cs_reregister:reregister(cs_state:uniqueId(State)),
-	    {true, State};
-	true ->
-	    case cs_lookup:reliable_get_node(erlang:get(instance_id), 
-					     Id, 60000) of
-		error ->
-		    join(Id);
-		{ok, Succ} ->
-		    State = join_ring(Id, Succ),
-		    cs_reregister:reregister(cs_state:uniqueId(State)),
-		    {false, State}
-	    end
-    end.
-[...]
-\end{lstlisting}
+\codesnippet{cs_join.erl}{cs_join:join}{../src/cs_join.erl}
 
 The boot-server is contacted to retrieve the known number of nodes in the
 ring. If the ring is empty, \code{join_first} is called. Otherwise,
@@ -739,39 +624,14 @@ of an empty routing table, a successorlist containing itself, itself as its
 predecessor, a reference to itself, its responsibility area from \code{Id}
 to \code{Id} (the full ring), and a load balancing schema.
 
-\begin{lstlisting}[title=\filetitle{cs_join.erl}]
-[...]
-join_first(Id) -> 
-    io:format("[ I | Node   | ~w ] join as first ~w ~n",[self(), Id]),
-    Me = node:make(cs_send:this(), Id),
-    cs_state:new(?RT:empty(Me), [Me], Me, Me, {Id, Id}, cs_lb:new()).
-\end{lstlisting}
+\codesnippet{cs_join.erl}{cs_join:join_first}{../src/cs_join.erl}
 
 The macro \code{?RT} maps to the configured routing algorithm. It is defined
 in \code{chordsharp.erl}. For further details on the routing see Chapter~\sieheref{chapter.routing}.
 
-The state is defined in 
+The state is defined in
 
-\begin{lstlisting}[title=\filetitle{cs_state.erl}]
-[...]
-new(RT, SuccessorList, Predecessor, Me, MyRange, LB) ->
-    #state{
-     routingtable = RT,
-     successorlist = SuccessorList,
-     predecessor = Predecessor,
-     me = Me,
-     my_range = MyRange,
-     lb=LB,
-     join_time=now(),
-     deadnodes = gb_sets:new(),
-     trans_log = #translog{
-       tid_tm_mapping = dict:new(),
-       decided = gb_trees:empty(),
-       undecided = gb_trees:empty()
-      }
-    }.
-[...]
-\end{lstlisting}
+\codesnippet{cs_state.erl}{cs_state:state}{../src/cs_state.erl}
 
 If a node joins an existing ring, \code{reliable_get_node} for the own
 \code{Id} is called in \code{cs_join:join()}. This lookup delivers the
@@ -786,63 +646,19 @@ for some reason, it is tried again, by recursivly calling the \code{join()}.
 
 Then, \code{cs_join:join_ring} is called:
 
-\begin{lstlisting}[title=\filetitle{cs_join.erl}]
-[...]
-join_ring(Id, Succ) ->
-    io:format("[ I | Node   | ~w ] join_ring ~w ~n",[self(), Id]),
-    Me = node:make(cs_send:this(), Id),
-    UniqueId = node:uniqueId(Me),
-    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Id, UniqueId}),
-    receive
-	{join_response, Pred, Data, SuccList} -> 
-	    io:format("[ I | Node   | ~w ] got pred ~w~n",[self(), Pred]),
-	    IsNull = node:is_null(Pred),
-	    if
-		IsNull ->
-		    failuredetector:add_node(node:uniqueId(Succ), 
-                      node:id(Succ), node:pidX(Succ));
-		true ->
-		    failuredetector:add_nodes([{node:uniqueId(Pred), 
-                      node:id(Pred), node:pidX(Pred)}, 
-	              {node:uniqueId(Succ), node:id(Succ), node:pidX(Succ)}]),
-		    cs_send:send(node:pidX(Pred), {update_succ, Me})
-	    end,
-	    cs_db_otp:add_data(Data),
-	    cs_state:new(?RT:empty(Succ), [Succ | SuccList], Pred, Me, 
-              {node:id(Pred), Id}, cs_lb:new())
-    end.
-[...]
-\end{lstlisting}
+\codesnippet{cs_join.erl}{cs_join:join_ring}{../src/cs_join.erl}
 
 First the node is initialized. Then it sends a \code{join} message to the
 successor including a reference to itself and the chosen \code{Id}.
 
 The message is received by the old node in \code{cs_node.erl}. There exists
-a \code{\{join, X\}} handler. 
+a \code{\{join, X\}} handler.
 
-\begin{lstlisting}[title=\filetitle{cs_node.erl}]
-[...]
-  {join, Source_PID, Id, UniqueId} = _Message -> 
-    ?LOG("[ ~w | I | Node   | ~w ] join~n",
-	      [calendar:universal_time(), self()]),
-    NewState = cs_join:join_request(State, Source_PID, Id, UniqueId),
-    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-[...]
-\end{lstlisting}
+\codesnippet{cs_node.erl}{cs_node:join_message}{../src/cs_node.erl}
 
 This triggers to call \code{join_request} on the old node. 
 
-\begin{lstlisting}[title=\filetitle{cs_join.erl}]
-[...]
-join_request(State, Source_PID, Id, UniqueId) ->
-    Pred = node:new(Source_PID, Id, UniqueId),
-    HisData = cs_db_otp:split_data(State, Id),
-    SuccList = cs_state:succ_list(State),
-    cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData, SuccList}),
-    failuredetector:add_node(UniqueId, Id, Source_PID),
-    cs_state:update_pred(State, Pred).
-[...]
-\end{lstlisting}
+\codesnippet{cs_join.erl}{cs_join:join_request}{../src/cs_join.erl}
 
 This resets the local predecessor to the new node and splits the data.
 Then it sends a \code{join_response} to the new node with its former
@@ -872,41 +688,12 @@ the boot server. Then \code{\{false, State\}} is returned, which means 'this
 was not the first node in the ring'. Now, the \code{cs_join:join()} is
 completed.
 
-\subsection{Beginning to server requests}
+\subsection{Beginning to serve requests}
 
 \code{cs_join:join()} was called from \code{cs_node:start()}, which
 now continues
 
-\begin{lstlisting}[title=\filetitle{cs_node.erl}]
-[...]
-start(InstanceId) ->
-    %register(cs_node, self()),
-    process_dictionary:register_process(InstanceId, cs_node, self()),
-    randoms:init(),
-    timer:sleep(random:uniform(100) * 100),
-    Id = cs_keyholder:get_key(),
-    failuredetector:set_owner(self()),
-    boot_server:connect(),
-    {First, State} = cs_join:join(Id),
-    if
-	not First ->
-	    cs_replica_stabilization:recreate_replicas(
-              cs_state:get_my_range(State));
-	true ->
-	    ok
-    end,
-    timer:send_after(config:stabilizationInterval(), 
-      self(), {stabilize_ring}),
-    timer:send_after(config:pointerStabilizationInterval(), 
-      self(), {stabilize_pointers}),
-    timer:send_after(config:failureDetectorUpdateInterval(), 
-      self(), {stabilize_failuredetector}),
-    timer:send_after(config:loadBalanceStartupInterval(), 
-      self(), {stabilize_loadbalance}),
-    io:format("[ I | Node   | ~w ] joined~n",[self()]),
-    loop(State, cs_debug:new()).
-[...]
-\end{lstlisting}
+\codesnippet{cs_node.erl}{cs_node:start}{../src/cs_node.erl}
 
 The \code{cs_replica_stabilization:recreate_replicas()} function is called,
 which is not yet implemented. It would recreated necessary replicas that
