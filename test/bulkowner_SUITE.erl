@@ -28,8 +28,7 @@
 -include("unittest.hrl").
 
 all() ->
-    %[count].
-    [].
+    [count].
 
 suite() ->
     [
@@ -43,7 +42,7 @@ init_per_suite(Config) ->
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
-    error_logger:tty(false),
+    %error_logger:tty(false),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
     unittest_helper:stop_ring(Pid),
     ok.

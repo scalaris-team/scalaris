@@ -53,12 +53,25 @@ bulk_owner(State, I, Msg) ->
 	true ->
 	    ok;
 	false ->
+	    %io:format("deliver 1 ~p~n", [I]),
+	    %io:format("deliver 2 ~p~n", [cs_state:next_interval(State)]),
+	    %io:format("deliver 3 ~p~n", [Range]),
 	    %ct:pal("deliver: ~p ~p ~n", [Range, Msg]),
 	    cs_send:send(cs_state:succ_pid(State), {bulkowner_deliver, Range, Msg})
     end,
     U = ?RT:to_dict(State),
-    %ct:pal("~p~nU: ~p ~n", [cs_state:id(State), dict:to_list(U)]),
-    bulk_owner_iter(State, U, 1, I, Msg).
+    % empty ring ?
+    %case length([Node || {_, Node} <- dict:to_list(U), Node /= cs_state:me(State)]) of
+    case intervals:is_covered(I, Range) of
+	true ->
+	    ok;
+	false ->
+	    %io:format("Me ~p~n", [[Node || {_, Node} <- dict:to_list(U), Node /= cs_state:me(State)]]),
+	    %io:format("Me ~p~n", [cs_state:me(State)]),
+	    %io:format("U ~p~n", [dict:to_list(U)]),
+	    %ct:pal("~p~nU: ~p ~n", [cs_state:id(State), dict:to_list(U)]),
+	    bulk_owner_iter(State, U, 1, I, Msg)
+    end.
 
 % @spec bulk_owner_iter(State::cs_state:state(), U::dict:dictionary(), 
 %       Index::int(), I::intervals:interval(), Msg::term()) -> ok

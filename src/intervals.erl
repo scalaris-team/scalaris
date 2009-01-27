@@ -28,6 +28,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+-include("chordsharp.hrl").
+
 -export([first/0,last/0,
 	 new/1, new/2, make/1,
 	 is_empty/1, empty/0,
@@ -44,6 +46,8 @@
 	 find_start/3
 	 ]).
 
+-type(key() :: ?RT:key() | minus_infinity | plus_infinity).
+-type(interval() :: [] | {element, key()} | {interval, key(), key()} | all | list(interval())).
 % @type interval() = [] | term() | {interval,term(),term()} | all | list(interval()).
 % [] -> empty interval
 % {element, term()} -> one element interval
@@ -145,15 +149,22 @@ cut_iter({interval, A0, A1}, {interval, B0, B1}) ->
 
 % @doc returns true if the intervals cover the complete interval
 % @spec is_covered(interval(), [interval()]) -> bool()
+-spec(is_covered/2 :: (interval(), [interval()] | interval()) -> bool()).
 is_covered([], _) ->
+    true;
+is_covered(_, all) ->
     true;
 is_covered(all, Intervals) ->
     %io:format("is_covered: ~p ~p~n", [all, Intervals]),
     is_covered(new(minus_infinity, plus_infinity), Intervals);
-is_covered({element,_}=X, Intervals) ->
+is_covered({element,X}, Intervals) ->
     in(X, Intervals);
 is_covered({interval, _, _}, {element,_}) ->
     false;
+is_covered([Interval | Rest], Intervals) ->
+    is_covered(Interval, Intervals) andalso is_covered(Rest, Intervals);
+is_covered(Interval, {interval, _, _}=I) ->
+    is_covered(Interval, [I]);
 is_covered(Interval, Intervals) ->
     %io:format("is_covered: ~p ~p~n", [Interval, Intervals]),
     NormalIntervals = normalize(Intervals),
@@ -168,12 +179,12 @@ is_covered(Interval, Intervals) ->
 
 % @private
 is_covered_helper(Interval, Intervals) ->
-%    io:format("helper: ~p ~p~n", [Interval, Intervals]),
-%    io:format("find_start: ~p~n", [find_start(element(first(),Interval), Intervals, [])]),
+    %io:format("helper: ~p ~p~n", [Interval, Intervals]),
+    %io:format("find_start: ~p~n", [find_start(element(first(),Interval), Intervals, [])]),
     case find_start(element(first(),Interval), Intervals, []) of
 	none ->
 	    false;
-	{CoversStart, RemainingIntervals} ->	    
+	{CoversStart, RemainingIntervals} ->
 	    case greater_equals_than(element(last(),CoversStart), element(last(),Interval)) of
 		true ->
 		    true;
@@ -182,7 +193,7 @@ is_covered_helper(Interval, Intervals) ->
 	    end
     end.
 
-in(X, {interval, First, Last}) ->    
+in(X, {interval, First, Last}) ->
     is_between(First, X, Last);
 in(X, [I | Rest]) ->
     in(X, I) or in(X, Rest);
@@ -237,7 +248,7 @@ normalize([all | Rest]) ->
 normalize([[] | Rest]) ->
     normalize(Rest);
 normalize([Interval]) -> 
-    Interval;
+    normalize(Interval);
 normalize([Interval|Rest]) ->
     case wraps_around(Interval) of
 	true ->
@@ -246,10 +257,10 @@ normalize([Interval|Rest]) ->
 	    [Interval | normalize(Rest)]
     end;
 normalize({interval,First,Last}=I) ->
-  case greater_equals_than(First,Last) of
+    case greater_equals_than(First,Last) of
 	true ->  [new(minus_infinity, Last), new(First, plus_infinity)];
-      false -> I
-  end;
+	false -> I
+    end;
 normalize(A) ->
     A.
 
