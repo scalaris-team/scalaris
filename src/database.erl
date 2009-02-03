@@ -43,7 +43,12 @@ behaviour_info(callbacks) ->
      %load balancing
      {get_load, 1}, {get_middle_key, 1}, {split_data, 3}, 
      %
-     {get_data, 1}, {add_data, 2}, {get_range_with_version, 2}
+     {get_data, 1}, {add_data, 2}, {get_range_with_version, 2},
+     {get_range_only_with_version, 2},
+     % merkle tree
+     {build_merkle_tree, 2},
+     % bulk op for replica repair
+     {update_if_newer, 2}
     ];
 
 behaviour_info(_Other) ->
