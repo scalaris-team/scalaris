@@ -107,7 +107,7 @@ stabilize(Id, Succ, RT) ->
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, DeadPid) ->
     DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT), 
-			   node:pidX(Node) /= DeadPid],
+			   node:pidX(Node) == DeadPid],
     lists:foldl(fun (Index, Tree) -> gb_trees:delete(Index, Tree) end,
 		RT, DeadIndices).
 
