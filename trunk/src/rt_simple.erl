@@ -28,7 +28,8 @@
 
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, stabilize/3, filterDeadNode/2,
-	to_pid_list/1, to_node_list/1, get_size/1, get_keys_for_replicas/1, dump/1, to_dict/1]).
+	 to_pid_list/1, to_node_list/1, get_size/1, get_keys_for_replicas/1, is_equal_key/2, 
+	 get_standard_key/1, get_other_replicas_for_key/1, dump/1, to_dict/1]).
 
 -export([normalize/1]).
 
@@ -104,6 +105,37 @@ get_keys_for_replicas(Key) when is_integer(Key) ->
 get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
 
+%% @doc returns true if both keys describe the same item under replication
+-spec(is_equal_key/2 :: (key(), key()) -> bool()).
+is_equal_key(Key1, Key2) ->
+    Key1 == Key2 
+	orelse Key1 == normalize(Key2 + 16#40000000000000000000000000000000)
+	orelse Key1 == normalize(Key2 + 16#80000000000000000000000000000000)
+	orelse Key1 == normalize(Key2 + 16#C0000000000000000000000000000000).
+
+%% @doc perform "undo" on replication
+-spec(get_standard_key/1 :: (key()) -> key()).
+get_standard_key(Key) ->    
+    if
+	Key >= 16#C0000000000000000000000000000000 ->
+	    Key - 16#C0000000000000000000000000000000;
+	Key >= 16#80000000000000000000000000000000 ->
+	    Key - 16#80000000000000000000000000000000;
+	Key >= 16#40000000000000000000000000000000 ->
+	    Key - 16#40000000000000000000000000000000;
+	true ->
+	    Key
+    end.
+
+%% @doc get other replicas of the given replicated tree
+-spec(get_other_replicas_for_key/1 :: (key()) -> list(key())).
+get_other_replicas_for_key(Key) ->
+    [
+     normalize(Key + 16#40000000000000000000000000000000),
+     normalize(Key + 16#80000000000000000000000000000000),
+     normalize(Key + 16#C0000000000000000000000000000000)
+    ].
+    
 %% @doc 
 -spec(dump/1 :: (rt()) -> ok).
 dump(_State) ->

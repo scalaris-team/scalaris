@@ -43,11 +43,14 @@
 
 	 read/2, write/4, get_version/2, 
 
-	 get_range/3, get_range_with_version/2,
+	 get_range/3, get_range_with_version/2, get_range_only_with_version/2,
 
 	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
 	 add_data/2,
-	new/0]).
+	new/0,
+
+	build_merkle_tree/2,
+	update_if_newer/2]).
 
 %% for testing purpose
 -export([print_locked_items/0]).
@@ -148,15 +151,31 @@ add_data(ok = DB, Data) ->
 get_range(ok = _DB, From, To) ->
     gen_server:call(get_pid(), {get_range, From, To}, 20000).
 
-%% @doc get keys and versions in a range
+%% @doc get keys, locks, and versions in a range
 %% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(), 
 %%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
 get_range_with_version(ok = _DB, Interval) ->    
     gen_server:call(get_pid(), {get_range_with_version, Interval}, 20000).
+
+%% @doc get keys and versions in a range
+%% @spec get_range_only_with_version(db(), intervals:interval()) -> [{Key::term(), 
+%%       Value::term(), Version::integer()}]
+get_range_only_with_version(ok = _DB, Interval) ->    
+    gen_server:call(get_pid(), {get_range_only_with_version, Interval}, 20000).
+
+%% @doc build merkle tree for data, key as is and value will be the version number
+-spec(build_merkle_tree/2 :: (db(), intervals:interval()) -> merkerl:tree()).
+build_merkle_tree(ok = _DB, Range) ->
+    gen_server:call(get_pid(), {build_merkle_tree, Range}, 20000).
+
+%% @doc update key-value pairs if newer than the ones in the db
+-spec(update_if_newer/2 :: (db(), list({any(), any(), integer()})) -> ok).
+update_if_newer(ok = _DB, KVs) ->
+    gen_server:call(get_pid(), {update_if_newer, KVs}, 20000).
     
-%%====================================================================
+%%===============================================================================
 %% for testing purpose 
-%%====================================================================
+%%===============================================================================
 print_locked_items()->
     LI = gen_server:call(get_pid(), {get_locked_items}, 2000),
     LIlength = length(LI),
@@ -167,9 +186,9 @@ print_locked_items()->
 	    nothing_locked
     end.
 
-%%====================================================================
+%%===============================================================================
 %% gen_server setup
-%%====================================================================
+%%===============================================================================
 
 %% @doc Starts the server
 start_link(InstanceId) ->
@@ -189,9 +208,9 @@ init([InstanceId]) ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
-%%====================================================================
+%%===============================================================================
 %% gen_server callbacks
-%%====================================================================
+%%===============================================================================
 
 % set write lock
 %@private
@@ -355,6 +374,18 @@ handle_call({get_range, From, To}, _From, DB) ->
 
 % get_range_with_version
 %@private
+handle_call({get_range_only_with_version, Interval}, _From, DB) ->
+    {From, To} = intervals:unpack(Interval),
+    Items = lists:foldl(fun ({Key, {Value, WriteLock, _ReadLock, Version}}, List) -> 
+				case WriteLock == false andalso util:is_between(From, Key, To) of
+				    true ->
+					[{Key, Value, Version} | List];
+				    false ->
+					List
+				end
+			end, 
+		[], gb_trees:to_list(DB)),
+    {reply, Items, DB};
 handle_call({get_range_with_version, Interval}, _From, DB) ->
     {From, To} = intervals:unpack(Interval),
     Items = lists:foldl(fun ({Key, {Value, WriteLock, ReadLock, Version}}, List) -> 
@@ -368,10 +399,42 @@ handle_call({get_range_with_version, Interval}, _From, DB) ->
 		[], gb_trees:to_list(DB)),
     {reply, Items, DB};
 
+handle_call({build_merkle_tree, Range}, _From, DB) ->
+    {From, To} = intervals:unpack(Range),
+    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) -> 
+				     case util:is_between(From, Key, To) of
+					 true ->
+					     merkerl:insert({Key, 0}, Tree);
+					 false ->
+					     Tree
+				     end
+			     end, 
+		undefined, gb_trees:to_list(DB)),
+    {reply, MerkleTree, DB};
 
-%%====================================================================
+% update only if no locks are taken and version number is higher
+handle_call({update_if_newer, KVs}, _From, OldDB) ->
+    F = fun ({Key, Value, Version}, DB) ->
+		case gb_trees:lookup(Key, DB) of
+		    none ->
+			gb_trees:insert(Key, {Value, false, 0, Version}, DB);
+		    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
+			case not WriteLock andalso ReadLock == 0 andalso OldVersion < Version of
+			    true ->
+				gb_trees:update(Key, 
+						{Value, WriteLock, ReadLock, Version}, 
+						DB);
+			    false ->
+				DB
+			end
+		end
+	end, 
+    DB2 = lists:foldl(F, OldDB, KVs),
+    {reply, ok, DB2};
+
+%%===============================================================================
 %% for testing purpose 
-%%====================================================================
+%%===============================================================================
 handle_call({get_locked_items}, _From, DB)->
     Items = lists:filter(fun({_Key, {_Value, WriteLock, ReadLock, _Version}})->
 				 if
