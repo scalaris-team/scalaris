@@ -6,3 +6,52 @@
 For changing the yaws port of the boot server add "-boot_cs yaws_port XXXX" to the erl call in bin/boot.sh, where XXXX is the port. 
 
 For changing the yaws port of a normal server change in bin/cs_local?.sh "-chordsharp yaws_port XXXX", where XXXX is the port.
+
+
+= How do I delete a key? =
+
+Currently deleting is not supported. You can set the value to something empty instead.
+
+= Is the store persisted on disk? =
+
+No its not persistent on disk. Persistent storage is an often demanded feature, but it is not as easy to do as
+one might think. Lets explain why:
+
+== Why persistent storage? ==
+
+=== Persistent storage to overcome node failures and node resets: ===
+
+Scalaris uses quorum algorithms, that assume a crash-stop failure model for
+processes. A precondition of such systems is, that a majority of the replicas
+of an item is always available.
+
+If this precondition is violated, a majority of the nodes with replicas of an
+item x is not available, the item cannot be changed. It is lost. Persistent
+storage cannot help directly.
+
+If a minority of the replicas fail, they will be repaired (new replicas are
+created on other nodes).
+
+If a single failed node does crash and recover, which is not foreseen in the
+crash-stop model, but might happen if we have local persistent storage, we
+have
+three choices:
+  # drop the persistent storage and start as new node (crash-stop model)
+  # get some inconsistencies as another node already took over. For a short timeframe there might be more replicas in the system than allowed, which destroys the proper functioning of our majority based algorithms.
+  # friendly join the system and update the stored peristent state with the current state in the system (one way to implement that would be (1)).
+
+So, persistent storage does not help in improving the availability or
+robustness of the system.
+
+=== Persistent storage to allow pausing the system (controlled shutdown and restart): ===
+
+This would be possible to implement by a snapshot mechanism for
+the system. To pause the system, one would cut user access, wait some time for
+all ongoing transactions to finish, and then trigger a snapshot to local
+disks. On startup, the nodes would continue from the last state after reading
+the snapshot. Then user access can be restarted.
+
+=== Persistent storage to have an always up-to-date snapshot of the system: === 
+Persistency as in traditional replicated databases is not intended by our
+system model and thereby not possible. The best alternative would be periodic
+snapshots, that can be done also without interrupting the service.
