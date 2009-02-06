@@ -115,6 +115,7 @@ loop(Nodes) ->
 %% @doc starts the mainloop of the boot server
 %% @spec start(term()) -> gb_sets:gb_set(pid())
 start(InstanceId) ->
+    io:format("Starting Bootserver~n"),
     register(boot, self()),
     process_dictionary:register_process(InstanceId, boot_server, self()),
     loop(gb_trees:empty()).

@@ -88,8 +88,8 @@ loop(Cache,Node,Cycles) ->
     {get_ages,Pid} ->
         Pid ! {ages,cache:ages(Cache)},
         loop(Cache,Node,Cycles);
-	{get_youngest_element,Pid} ->
-		Pid ! {cache,Node,Cycles,cache:get_youngest(Cache)},
+	{get_youngest_element,N,Pid} ->
+		Pid ! {cache,Node,Cycles,cache:get_youngest(N,Cache)},
 		loop(Cache,Node,Cycles);
 	{getcache,Pid} ->
 		Pid ! {cache,Node,Cycles,cache:get_list_of_nodes(Cache)},

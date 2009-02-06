@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0]).
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1]).
 
 %%====================================================================
 %% API functions
@@ -195,3 +195,7 @@ worker_loop() ->
     after 400 ->
             ok
 	end.
+
+check_routing_tables(Port) ->
+	Nodes = boot_server:node_list(),
+	[ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- Nodes ].

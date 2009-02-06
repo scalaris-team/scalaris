@@ -56,6 +56,7 @@ start_link() ->
 %%--------------------------------------------------------------------
 init(_Args) ->
     crypto:start(),
+    tracer:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),

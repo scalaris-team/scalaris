@@ -131,14 +131,16 @@ dump(State) ->
     ok.
 
 details(State) ->
-    Pred = pred(State),
+    Predlist = ?RM:get_predlist(),
+    %Predlist = [pred(State)],
     Node = me(State),
     SuccList = ?RM:get_as_list(),
+    %SuccList = [succ(State)],
     Load = ?DB:get_load(get_db(State)),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),
     %node_details:new(Pred, Node, SuccList, Load, FD_Size, Hostname, RTSize, cs_message:get_details(), erlang:memory(total)).
-    node_details:new(Pred, Node, SuccList, Load, Hostname, RTSize, ok, erlang:memory(total)).
+    node_details:new(Predlist, Node, SuccList, Load, Hostname, RTSize, ok, erlang:memory(total)).
 
 %%% Transactions
 %%% Information on transactions that all possible TMs and TPs share
@@ -166,7 +168,4 @@ update_pred(State, Pred) ->
 	    State#state{predecessor=Pred, my_range={node:id(Pred), id(State)}}
     end.
 update_succ(State, Succ) ->
-    
-	    State#state{successor=Succ}
-	
-  .
+	    State#state{successor=Succ}.

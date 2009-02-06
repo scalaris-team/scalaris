@@ -104,22 +104,11 @@ stabilize(Id, Succ, RT) ->
 %% @doc remove all entries with the given ids
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, DeadPid) ->
-    filter_intern(gb_trees:iterator(RT), RT, DeadPid).
+    DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
+                           node:pidX(Node) == DeadPid],
+    lists:foldl(fun (Index, Tree) -> gb_trees:delete(Index, Tree) end,
+                RT, DeadIndices).
 
-% @private
--spec(filter_intern/3 :: (any() , rt(), cs_send:mypid()) -> rt()).
-filter_intern(Iterator, RT, DeadPid) ->
-    case gb_trees:next(Iterator) of
-	{Index, Value, Next} ->
-	    case node:pidX(Value) == DeadPid of
-		true ->
-		    filter_intern(Next, gb_trees:delete(Index, RT), DeadPid);
-		false ->
-		    filter_intern(Next, RT, DeadPid)
-	    end;
-	none ->
-	    RT
-    end.
 
 %% @doc returns the pids of the routing table entries .
 -spec(to_pid_list/1 :: (rt()) -> list(cs_send:mypid())).

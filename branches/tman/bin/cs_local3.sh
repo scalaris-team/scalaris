@@ -14,7 +14,7 @@
 #    limitations under the License.
 
 erl +S 4 +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa ../ebin \
-    -yaws embedded true -connect_all false -hidden \
+    -yaws embedded true -connect_all false \
     -chordsharp cs_port 14198 \
     -chordsharp yaws_port 8003 \
     -sname node3 -s chordsharp

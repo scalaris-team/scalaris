@@ -348,8 +348,9 @@ loop(State, Debug) ->
         %% @TODO: cleanup
     	InstanceId = erlang:get(instance_id),
        	Pid = process_dictionary:lookup_process(InstanceId,Processname),
-        PidNode = cs_send:get(Pid, cs_send:this()),
-        cs_send:send(PidNode,Mesg),
+        %PidNode = cs_send:get(Pid, cs_send:this()),
+        %cs_send:send(PidNode,Mesg),
+        Pid ! Mesg,
         loop(State, ?DEBUG(Debug));
 
 	X ->

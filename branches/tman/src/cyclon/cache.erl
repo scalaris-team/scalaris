@@ -22,7 +22,7 @@
 -import(util).
 %% API
 
--export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_nodes/1 ,inc_age/1, get_youngest/1, get_oldest/1, ages/1]).
+-export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_nodes/1 ,inc_age/1, get_youngest/2, get_oldest/1, ages/1]).
 
 % list of {pid of cs_node process, age}
 -type(cache() :: list({node:node_type(), pos_integer()})).
@@ -119,20 +119,15 @@ get_oldest(Cache) ->
     get_random_element(OldElements).
 
 %% @doc find youngest element (randomize if multiple youngest elements)
-get_youngest([]) ->
+get_youngest(_,[]) ->
     [];
-get_youngest(Cache) ->
-    LowestAge = lists:foldl(fun ({_, Age}, MinAge) ->
-				    util:min(Age, MinAge)
-			    end,
-			   	99,
-			    Cache),
+get_youngest(N,Cache) ->
+    Order = fun(A, B) ->
+		    get_age(A) =< get_age(B)
+	    end,
+    SortAge = lists:sort(Order,Cache),
 
-    YoungElements = lists:filter(fun ({_, Age}) ->
-				       Age == LowestAge
-			       end,
-			       Cache),
-	
+    YoungElements = lists:sublist(SortAge,1, N),	
     Out= get_node(get_random_element(YoungElements)),
 	%io:format("Youngest: ~p~n",[Out]),
 	[Out].
@@ -140,6 +135,8 @@ get_youngest(Cache) ->
 get_node({X,_}) ->
     X.
 
+get_age({_,X}) ->
+    X.
 inc_age(Cache) ->
     lists:map(fun({A,C}) ->
 		      {A, C + 1}
