@@ -23,8 +23,24 @@ import de.zib.tools.PropertyLoader;
  * object construction which might be useful when using multiple threads each
  * creating its own connections.
  * 
+ * The location of the default configuration file used by
+ * {@link #ConnectionFactory()} can be overridden by specifying the {@code
+ * scalaris.java.config} system property - otherwise the class tries to load
+ * {@code scalaris.properties}.
+ * 
+ * A user-defined {@link Properties} object can also be used by creating objects
+ * with {@link #ConnectionFactory(Properties)} or setting the new values with
+ * {@link #setProperties(Properties)} but must provide the following values
+ * (default values as shown)
+ * <ul>
+ * <li>{@code scalaris.node = "boot@localhost"}</li>
+ * <li>{@code scalaris.cookie = "chocolate chip cookie"}</li>
+ * <li>{@code scalaris.client.name = "java_client"}</li>
+ * <li>{@code scalaris.client.appendUUID = "true"}</li>
+ * </ul>
+ * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
+ * @version 2.1
  * @since 2.0
  */
 public class ConnectionFactory {
@@ -82,6 +98,10 @@ public class ConnectionFactory {
 	 * values given in a {@code scalaris.properties} file and falls back to
 	 * default values if values don't exist.
 	 * 
+	 * By default the config file is assumed to be in the same directory as
+	 * the classes. Specify the {@code scalaris.java.config} system property
+	 * to set a different location.
+	 * 
 	 * Default values are:
 	 * <ul>
 	 * <li>{@code scalaris.node = "boot@localhost"}</li>
@@ -98,7 +118,48 @@ public class ConnectionFactory {
 		}
 //		System.out.println("loading config file: " + configFile);
 		PropertyLoader.loadProperties(properties, configFile);
+		setProperties(properties);
+	}
 
+	/**
+	 * Constructor, sets the parameters to use for connections according to
+	 * values given in the given {@link Properties} object and falls back to
+	 * default values if values don't exist.
+	 * 
+	 * The {@link Properties} object should provide the following values
+	 * (default values as shown):
+	 * <ul>
+	 * <li>{@code scalaris.node = "boot@localhost"}</li>
+	 * <li>{@code scalaris.cookie = "chocolate chip cookie"}</li>
+	 * <li>{@code scalaris.client.name = "java_client"}</li>
+	 * <li>{@code scalaris.client.appendUUID = "true"}</li>
+	 * </ul>
+	 * 
+	 * @param properties
+	 */
+	public ConnectionFactory(Properties properties) {
+		setProperties(properties);
+	}
+
+	/**
+	 * Sets the object's members used for creating connections to erlang to
+	 * values provided by the given {@link Properties} object.
+	 * 
+	 * The {@link Properties} object should provide the following values
+	 * (default values as shown):
+	 * <ul>
+	 * <li>{@code scalaris.node = "boot@localhost"}</li>
+	 * <li>{@code scalaris.cookie = "chocolate chip cookie"}</li>
+	 * <li>{@code scalaris.client.name = "java_client"}</li>
+	 * <li>{@code scalaris.client.appendUUID = "true"}</li>
+	 * </ul>
+	 * 
+	 * NOTE: Existing connections are not changed!
+	 * 
+	 * @param properties
+	 *            the object to get the connection parameters from
+	 */
+	public void setProperties(Properties properties) {
 		node = properties.getProperty("scalaris.node", "boot@localhost");
 		cookie = properties.getProperty("scalaris.cookie", "chocolate chip cookie");
 		clientName = properties.getProperty("scalaris.client.name", "java_client");
