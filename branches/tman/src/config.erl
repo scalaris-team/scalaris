@@ -90,12 +90,12 @@ failureDetectorPingInterval() ->
     read(failure_detector_ping_interval).
 
 %% @doc the interval between two stabilization runs Max
-%% @spec stabilizationInterval() -> integer() | failed
+%% @spec stabilizationInterval_max() -> integer() | failed
 stabilizationInterval_max() ->
     read(stabilization_interval_max).
 
 %% @doc the interval between two stabilization runs Min
-%% @spec stabilizationInterval() -> integer() | failed
+%% @spec stabilizationInterval_min() -> integer() | failed
 stabilizationInterval_min() ->
     read(stabilization_interval_min).
 
