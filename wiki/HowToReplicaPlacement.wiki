@@ -21,6 +21,7 @@ The standard key creator is called "random". It just picks a random 128-bit stri
 
 For controlling the placement of replicas, you can use the "random_with_bit_mask" key creator. It also picks a random 128-bit string but applies two bitmasks as follows `(randomnumber and mask2) or mask1`. By carefully selecting the bitmask, you can control which servers are responsible for what data.
 
+For the following scenario you have to start four servers and uncomment a different key_creator_bitmask-line on each server. This will confine the nodes of each server to a different quadrant and therefore replica set.
 {{{
 {key_creator, random_with_bit_mask}.
 % place the nodes in the first quadrant
