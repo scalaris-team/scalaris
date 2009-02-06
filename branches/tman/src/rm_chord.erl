@@ -33,7 +33,7 @@
 -export([start_link/1, initialize/4, 
 	 get_successorlist/0, succ_left/1, pred_left/1, 
 	 notify/1, update_succ/1, update_pred/1, 
-	 get_as_list/0]).
+	 get_as_list/0,get_predlist/0]).
 
 % unit testing
 -export([merge/3]).
@@ -96,6 +96,13 @@ notify(Pred) ->
 
 get_as_list() ->
     get_successorlist().
+
+get_predlist() ->
+    get_pid() ! {get_predlist, self()},
+    receive
+	{get_predlist_response, PredList} ->
+	    PredList
+    end.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
@@ -116,8 +123,17 @@ loop(Id, Me, Pred, Succs) ->
 	{get_successorlist, Pid} ->
 	    Pid ! {get_successorlist_response, Succs},
 	    loop(Id, Me, Pred, Succs);
+    {get_predlist, Pid} ->
+        Pid ! {get_predlist_response, [Pred]},
+       	loop(Id, Me, Pred, Succs);
+
 	{stabilize} -> % new stabilization interval
-	    cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()}),
+        case Succs of
+            [] -> 
+                ok;
+            _  -> 
+                cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
+        end,
 	    loop(Id, Me, Pred, Succs);
 	{get_pred_response, SuccsPred} ->
 	    case node:is_null(SuccsPred) of
