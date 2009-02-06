@@ -118,6 +118,10 @@ loop(Socket, Address, Port) ->
 		{user_close} ->
 		    comm_port:unregister_connection(Address, Port),
 		    gen_tcp:close(Socket);
+		{youare, _Address, _Port} ->
+		    %% @TODO what do we get from this information?
+		    inet:setopts(Socket, [{active, once}]),
+		    loop(Socket, Address, Port);
 		Unknown ->
 		    log:log2file(comm_connection, io_lib:format("unknown message ~p", [Unknown]) ),
 		    inet:setopts(Socket, [{active, once}]),

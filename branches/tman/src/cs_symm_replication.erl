@@ -26,9 +26,12 @@
 -author('moser@zib.de').
 -vsn('$Id$ ').
 
--export([get_keys_for_replicas/1]).
+-export([get_keys_for_replicas/1, get_standard_key/1]).
 
 -include("chordsharp.hrl").
 
 get_keys_for_replicas(Key) ->
     ?RT:get_keys_for_replicas(Key).
+
+get_standard_key(Key) ->
+    ?RT:get_standard_key(Key).

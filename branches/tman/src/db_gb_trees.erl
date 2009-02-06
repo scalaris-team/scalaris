@@ -44,7 +44,10 @@
 
 	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
 	 add_data/2,
-	new/0]).
+	 get_range_only_with_version/2,
+	 build_merkle_tree/2,
+	 update_if_newer/2,
+	 new/0]).
 
 %%====================================================================
 %% public functions
@@ -238,3 +241,58 @@ get_range_with_version(DB, Interval) ->
 			end, 
 		[], gb_trees:to_list(DB)),
     Items.
+
+
+
+
+
+
+
+
+% get_range_with_version
+%@private
+
+get_range_only_with_version(DB, Interval) ->
+    {From, To} = intervals:unpack(Interval),
+    Items = lists:foldl(fun ({Key, {Value, WriteLock, _ReadLock, Version}}, List) -> 
+				case WriteLock == false andalso util:is_between(From, Key, To) of
+				    true ->
+					[{Key, Value, Version} | List];
+				    false ->
+					List
+				end
+			end, 
+		[], gb_trees:to_list(DB)),
+    Items.
+
+build_merkle_tree(DB, Range) ->
+    {From, To} = intervals:unpack(Range),
+    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) -> 
+				     case util:is_between(From, Key, To) of
+					 true ->
+					     merkerl:insert({Key, 0}, Tree);
+					 false ->
+					     Tree
+				     end
+			     end, 
+		undefined, gb_trees:to_list(DB)),
+    MerkleTree.
+
+% update only if no locks are taken and version number is higher
+update_if_newer(OldDB,  KVs) ->
+    F = fun ({Key, Value, Version}, DB) ->
+		case gb_trees:lookup(Key, DB) of
+		    none ->
+			gb_trees:insert(Key, {Value, false, 0, Version}, DB);
+		    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
+			case not WriteLock andalso ReadLock == 0 andalso OldVersion < Version of
+			    true ->
+				gb_trees:update(Key, 
+						{Value, WriteLock, ReadLock, Version}, 
+						DB);
+			    false ->
+				DB
+			end
+		end
+	end, 
+    lists:foldl(F, OldDB, KVs).

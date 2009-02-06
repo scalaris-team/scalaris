@@ -18,6 +18,9 @@
 %%%
 %%% Created : 24 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
+%% @doc this process stores the identifier of the cs_node. If the cs_node is 
+%%      restarted his identifier will survive in this process. We could use 
+%%      this e.g. when doing load-blancing
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
@@ -30,12 +33,16 @@
 
 -export([start_link/1, start/1, set_key/1, get_key/0]).
 
-get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), cs_keyholder).
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Public API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc sets the key of the cs_node
+-spec(set_key/1 :: (?RT:key()) -> any()).
 set_key(Key) ->
     get_pid() ! {set_key_keyholder, Key}.
 
+%% @doc reads the key of the cs_node
+-spec(get_key/0 :: () -> ?RT:key()).
 get_key() ->
     get_pid() ! {get_key_keyholder, self()},
     receive
@@ -43,6 +50,19 @@ get_key() ->
 	    Key
     end.
 
+start(InstanceId) ->
+    process_dictionary:register_process(InstanceId, cs_keyholder, self()),
+    Key = get_initial_key(config:read(key_creator)),
+    %@TODO reimplement
+    %error_logger:add_report_handler(cs_error_logger),
+    loop(Key).
+
+start_link(InstanceId) ->
+    {ok, spawn_link(?MODULE, start, [InstanceId])}.
+    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Server process
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 loop(Key) ->
     receive
 	{set_key_keyholder, NewKey} -> 
@@ -52,13 +72,14 @@ loop(Key) ->
 	    loop(Key)
 	end.
 
-start(InstanceId) ->
-    process_dictionary:register_process(InstanceId, cs_keyholder, self()),
-    Key = ?RT:getRandomNodeId(),
-    %@TODO reimplement
-    %error_logger:add_report_handler(cs_error_logger),
-    loop(Key).
+get_pid() ->
+    process_dictionary:lookup_process(erlang:get(instance_id), cs_keyholder).
 
-start_link(InstanceId) ->
-    {ok, spawn_link(?MODULE, start, [InstanceId])}.
-    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Key creation algorithms
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_initial_key(random) ->
+    ?RT:getRandomNodeId();
+get_initial_key(random_with_bit_mask) ->
+    {Mask1, Mask2} = config:read(key_creator_bitmask),
+    (get_initial_key(random) band Mask2) bor Mask1.

@@ -64,7 +64,7 @@ write_lock(_Config) ->
     {DB2, ok}     = cs_db_otp:set_write_lock(DB, "WriteLockKey1"),
     {DB3, ok}     = cs_db_otp:set_write_lock(DB2, "WriteLockKey2"),
     {DB4, failed} = cs_db_otp:set_write_lock(DB3, "WriteLockKey2"),
-    {DB5, ok}     = cs_db_otp:unset_write_lock(DB4, "WriteLockKey2"),
+    {_DB5, ok}     = cs_db_otp:unset_write_lock(DB4, "WriteLockKey2"),
     ok.
 
 read_lock(_Config) ->
@@ -74,7 +74,7 @@ read_lock(_Config) ->
     DB3           = cs_db_otp:write(DB2, "ReadLockKey2", "Value1", 1),
     {DB4, ok}     = cs_db_otp:set_read_lock(DB3, "ReadLockKey2"),
     {DB5, ok}     = cs_db_otp:set_read_lock(DB4, "ReadLockKey2"),
-    {DB6, ok}     = cs_db_otp:unset_read_lock(DB5, "ReadLockKey2"),
+    {_DB6, ok}     = cs_db_otp:unset_read_lock(DB5, "ReadLockKey2"),
     ok.
 
 read_write_lock(_Config) ->
@@ -82,7 +82,7 @@ read_write_lock(_Config) ->
     DB = cs_db_otp:new(),
     DB2           = cs_db_otp:write(DB, "ReadWriteLockKey1", "Value1", 1),
     {DB3, ok}     = cs_db_otp:set_read_lock(DB2, "ReadWriteLockKey1"),
-    {DB4, failed} = cs_db_otp:set_write_lock(DB3, "ReadWriteLockKey1"),
+    {_DB4, failed} = cs_db_otp:set_write_lock(DB3, "ReadWriteLockKey1"),
     ok.
 
 write_read_lock(_Config) ->
@@ -90,6 +90,6 @@ write_read_lock(_Config) ->
     DB = cs_db_otp:new(),
     DB2           = cs_db_otp:write(DB, "WriteReadLockKey1", "Value1", 1),
     {DB3, ok}     = cs_db_otp:set_write_lock(DB2, "WriteReadLockKey1"),
-    {DB4, failed} = cs_db_otp:set_read_lock(DB3, "WriteReadLockKey1"),
+    {_DB4, failed} = cs_db_otp:set_read_lock(DB3, "WriteReadLockKey1"),
     ok.
 

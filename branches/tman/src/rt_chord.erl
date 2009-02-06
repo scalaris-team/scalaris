@@ -35,7 +35,9 @@
 	 stabilize/3, 
 	 filterDeadNode/2,
 	 to_pid_list/1, to_node_list/1, get_size/1, 
-	 get_keys_for_replicas/1, dump/1, to_dict/1]).
+	 get_keys_for_replicas/1, is_equal_key/2, get_standard_key/1, 
+	 get_other_replicas_for_key/1, 
+	 dump/1, to_dict/1]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -104,11 +106,10 @@ stabilize(Id, Succ, RT) ->
 %% @doc remove all entries with the given ids
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, DeadPid) ->
-    DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
-                           node:pidX(Node) == DeadPid],
+    DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT), 
+			   node:pidX(Node) == DeadPid],
     lists:foldl(fun (Index, Tree) -> gb_trees:delete(Index, Tree) end,
-                RT, DeadIndices).
-
+		RT, DeadIndices).
 
 %% @doc returns the pids of the routing table entries .
 -spec(to_pid_list/1 :: (rt()) -> list(cs_send:mypid())).
@@ -130,6 +131,21 @@ get_size(RT) ->
 -spec(get_keys_for_replicas/1 :: (key()) -> list(key())).
 get_keys_for_replicas(Key) ->
     rt_simple:get_keys_for_replicas(Key).
+
+%% @doc returns true if both keys describe the same item under replication
+-spec(is_equal_key/2 :: (key(), key()) -> bool()).
+is_equal_key(Key1, Key2) ->
+    rt_simple:is_equal_key(Key1, Key2).
+
+%% @doc perform "undo" on replication
+-spec(get_standard_key/1 :: (key()) -> key()).
+get_standard_key(Key) ->    
+    rt_simple:get_standard_key(Key).
+
+%% @doc get other replicas of the given replicated tree
+-spec(get_other_replicas_for_key/1 :: (key()) -> list(key())).
+get_other_replicas_for_key(Key) ->
+    rt_simple:get_other_replicas_for_key(Key).
 
 %% @doc 
 -spec(dump/1 :: (rt()) -> any()).

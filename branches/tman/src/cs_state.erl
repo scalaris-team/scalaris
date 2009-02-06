@@ -53,6 +53,7 @@
 new(RT, Successor, Predecessor, Me, MyRange, LB) ->
     new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new()).
 
+%% userdevguide-begin cs_state:state
 new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
     #state{
      routingtable = RT, 
@@ -70,7 +71,7 @@ new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
       },
      db = DB
     }.
-
+%% userdevguide-end cs_state:state
 
 % @spec next_interval(state()) -> intervals:interval()
 next_interval(State) ->

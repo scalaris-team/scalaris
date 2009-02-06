@@ -1,4 +1,4 @@
-# Copyright 2007-2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 # 
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -11,7 +11,6 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-
 README for Scalaris
 
 Scalaris is a scalable and fault-tolerant structured storage with strong data
@@ -19,6 +18,32 @@ consistency for online databases or Web 2.0 services.
 
 For a more detailed description see the documentation in
 user-dev-guide/main.pdf
+
+RPM
+====
+
+If you installed scalaris using rpms, the following will walk you
+through some basic tests:
+
+The following command will start scalaris on a single node:
+[root@csr-pc11 ~]# scalarisctl boot start
+
+With the scalaris command line tool you can issue simple
+read/write/publish/subscribe commands. The following writes the
+key-value-pair (foo, bar) into the database.
+
+[root@csr-pc11 ~]# scalaris -w foo bar
+write(foo, bar)
+
+Using the -r parameter you can read back the value.
+
+[root@csr-pc11 ~]# scalaris -r foo
+read(foo) == bar
+
+And finally, for stopping the scalaris daemon:
+[root@csr-pc11 ~]# scalarisctl boot stop
+
+The remainder applies to the tarball.
 
 Requirements
 ============

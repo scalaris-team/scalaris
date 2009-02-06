@@ -34,15 +34,19 @@
 %% @spec join_request(state:state(), pid(), Id, UniqueId) -> state:state()
 %%   Id = term()
 %%   UniqueId = term()
+
+%% userdevguide-begin cs_join:join_request
 join_request(State, Source_PID, Id, UniqueId) ->
     Pred = node:new(Source_PID, Id, UniqueId),
     {DB, HisData} = ?DB:split_data(cs_state:get_db(State), cs_state:id(State), Id),
     cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData}),
     ?RM:update_pred(Pred),
     cs_state:set_db(State, DB).
+%% userdevguide-end cs_join:join_request
 
 %%%------------------------------Join---------------------------------
 
+%% userdevguide-begin cs_join:join_first
 %% @doc join an empty ring
 join_first(Id) -> 
     io:format("[ I | Node   | ~w ] join as first ~w ~n",[self(), Id]),
@@ -50,8 +54,10 @@ join_first(Id) ->
     ?RM:initialize(Id, Me, Me, Me),
     routingtable:initialize(Id, Me, Me),
     cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
+%% userdevguide-end cs_join:join_first
 
 %% @doc join a ring
+%% userdevguide-begin cs_join:join_ring
 join_ring(Id, Succ) ->
     io:format("[ I | Node   | ~w ] join_ring ~w ~n",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
@@ -75,7 +81,9 @@ join_ring(Id, Succ) ->
 				 cs_lb:new(), DB)
 	    end
     end.
+%% userdevguide-end cs_join:join_ring
 
+%% userdevguide-begin cs_join:join
 %% @doc join a ring and return initial state
 %%      the boolean indicates whether it was the first 
 %%      node in the ring or not
@@ -100,4 +108,5 @@ join(Id) ->
 		    {false, State}
 	    end
     end.
+%% userdevguide-end cs_join:join
 

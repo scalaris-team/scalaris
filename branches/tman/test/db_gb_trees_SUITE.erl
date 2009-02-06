@@ -57,7 +57,7 @@ write_lock(_Config) ->
     {DB2, ok}     = db_gb_trees:set_write_lock(DB, "WriteLockKey1"),
     {DB3, ok}     = db_gb_trees:set_write_lock(DB2, "WriteLockKey2"),
     {DB4, failed} = db_gb_trees:set_write_lock(DB3, "WriteLockKey2"),
-    {DB5, ok}     = db_gb_trees:unset_write_lock(DB4, "WriteLockKey2"),
+    {_DB5, ok}     = db_gb_trees:unset_write_lock(DB4, "WriteLockKey2"),
     ok.
 
 read_lock(_Config) ->
@@ -66,19 +66,19 @@ read_lock(_Config) ->
     DB3           = db_gb_trees:write(DB2, "ReadLockKey2", "Value1", 1),
     {DB4, ok}     = db_gb_trees:set_read_lock(DB3, "ReadLockKey2"),
     {DB5, ok}     = db_gb_trees:set_read_lock(DB4, "ReadLockKey2"),
-    {DB6, ok}     = db_gb_trees:unset_read_lock(DB5, "ReadLockKey2"),
+    {_DB6, ok}     = db_gb_trees:unset_read_lock(DB5, "ReadLockKey2"),
     ok.
 
 read_write_lock(_Config) ->
     DB = db_gb_trees:new(),
     DB2           = db_gb_trees:write(DB, "ReadWriteLockKey1", "Value1", 1),
     {DB3, ok}     = db_gb_trees:set_read_lock(DB2, "ReadWriteLockKey1"),
-    {DB4, failed} = db_gb_trees:set_write_lock(DB3, "ReadWriteLockKey1"),
+    {_DB4, failed} = db_gb_trees:set_write_lock(DB3, "ReadWriteLockKey1"),
     ok.
 
 write_read_lock(_Config) ->
     DB = db_gb_trees:new(),
     DB2           = db_gb_trees:write(DB, "WriteReadLockKey1", "Value1", 1),
     {DB3, ok}     = db_gb_trees:set_write_lock(DB2, "WriteReadLockKey1"),
-    {DB4, failed} = db_gb_trees:set_read_lock(DB3, "WriteReadLockKey1"),
+    {_DB4, failed} = db_gb_trees:set_read_lock(DB3, "WriteReadLockKey1"),
     ok.

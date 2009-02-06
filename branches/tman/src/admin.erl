@@ -33,11 +33,12 @@
 %% API functions
 %%====================================================================
 
+%% userdevguide-begin admin:add_nodes
 %%--------------------------------------------------------------------
 %% Function: add_nodes(int()) -> ok
-%% Description: add new chordsharp nodes
+%% Description: add new Scalaris nodes
 %%--------------------------------------------------------------------
-% @doc add new chordsharp nodes on the local node
+% @doc add new Scalaris nodes on the local node
 % @spec add_nodes(int()) -> ok
 
 add_nodes(Count) ->
@@ -58,6 +59,7 @@ add_nodes_loop(Count, Delay) ->
 				      []}),
     timer:sleep(Delay),
     add_nodes_loop(Count - 1, Delay).
+%% userdevguide-end admin:add_nodes
 
 %%--------------------------------------------------------------------
 %% Function: check_ring() -> term()
@@ -114,7 +116,7 @@ get_dump() ->
 	     Dump
      end || _ <- util:get_nodes()],
     StartTime = lists:min([Start || {_, Start} <- Dumps]),
-    Keys = util:uniq(lists:sort(lists:flatten([gb_trees:keys(Map) || {Map, _} <- Dumps]))),
+    Keys = lists:usort(lists:flatten([gb_trees:keys(Map) || {Map, _} <- Dumps])),
     {lists:foldl(fun (Tag, Map) -> 
 			 gb_trees:enter(Tag, get_aggregate(Tag, Dumps), Map)
 		 end, gb_trees:empty(), Keys), StartTime}.
@@ -136,8 +138,8 @@ get_aggregate(Tag, [{Dump, _} | Rest]) ->
     end.
 	    
 diff_dump(BeforeDump, AfterDump, _RunTime) ->    
-    Tags = util:uniq(lists:sort(lists:flatten([gb_trees:keys(BeforeDump), 
-					       gb_trees:keys(AfterDump)]))),
+    Tags = lists:usort(lists:flatten([gb_trees:keys(BeforeDump), 
+					       gb_trees:keys(AfterDump)])),
     diff(Tags, BeforeDump, AfterDump).
     
 diff([], _Before, _After) ->

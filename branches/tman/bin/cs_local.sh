@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 # 
 #    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,4 +17,4 @@ erl +S 4 +A 4  -setcookie "chocolate chip cookie" -pa ../contrib/yaws/ebin -pa .
     -yaws embedded true -connect_all false \
     -chordsharp cs_port 14196 \
     -chordsharp yaws_port 8001 \
-    -sname node -s chordsharp
+    -sname node@localhost -s chordsharp

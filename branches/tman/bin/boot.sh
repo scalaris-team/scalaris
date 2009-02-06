@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 # 
 #    Licensed under the Apache License, Version 2.0 (the "License");
