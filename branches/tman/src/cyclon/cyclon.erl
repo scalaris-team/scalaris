@@ -25,6 +25,7 @@
 -import(process_dictionary).
 -import(erlang).
 -import(node).
+-import(log).
 %% API
 -export([start_link/1, start/1]).
 
@@ -74,7 +75,7 @@ start(InstanceId) ->
     end,
     
     erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-    io:format("Cyclon spawn: ~p~n", [cs_send:this()]),
+    log:log(info,"Cyclon spawn: ~p~n", [cs_send:this()]),
     loop(Cache,Node,0).
 
 

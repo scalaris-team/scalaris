@@ -31,7 +31,7 @@
 
 -include("chordsharp.hrl").
 
--export([start_link/1, start/1, set_key/1, get_key/0]).
+-export([start_link/1, start/1, set_key/1, get_key/0, reinit/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
@@ -50,6 +50,9 @@ get_key() ->
 	    Key
     end.
 
+reinit() ->
+    get_pid() ! {reinit}.
+
 start(InstanceId) ->
     process_dictionary:register_process(InstanceId, cs_keyholder, self()),
     Key = get_initial_key(config:read(key_creator)),
@@ -65,6 +68,8 @@ start_link(InstanceId) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 loop(Key) ->
     receive
+    {reinit} ->
+        loop(get_initial_key(config:read(key_creator)));
 	{set_key_keyholder, NewKey} -> 
 	    loop(NewKey);
 	{get_key_keyholder, PID} -> 

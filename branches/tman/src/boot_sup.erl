@@ -82,6 +82,7 @@ init(_Args) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    
 %%     XMLRPC = 
 %% 	{boot_xmlrpc,
 %% 	 {boot_xmlrpc, start_link, [InstanceId]},
@@ -90,8 +91,8 @@ init(_Args) ->
 %% 	 worker,
 %% 	 []},
     Logger = 
-	{boot_logger,
-	 {boot_logger, start_link, [InstanceId]},
+	{logger,
+	 {log, start_link, []},
 	 permanent,
 	 brutal_kill,
 	 worker,

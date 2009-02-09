@@ -26,13 +26,15 @@
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
+
+
 -export([start/2]).
 
 -behavior(ring_maintenance).
 
 -export([start_link/1, initialize/4, 
 	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1, 
-         update_succ/1, update_pred/1, minus/2 ,
+         update_succ/1, update_pred/1, 
 	 get_as_list/0]).
 
 % unit testing
@@ -275,8 +277,8 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
                 %io:format("#~n"),
                 %NewNodes = lists:usort(minus(PredsNew,Preds)++minus(SuccsNew,Succs)),
                 %OldNodes = lists:usort(minus(Preds,PredsNew)++minus(Succs,SuccsNew)),
-                NewNodes = minus(NewView,OldView),
-                OldNodes = minus(OldView,NewView),
+                NewNodes = util:minus(NewView,OldView),
+                OldNodes = util:minus(OldView,NewView),
                 %io:format("~p : in: ~p | out: ~p~n",[self(),length(NewNodes),length(OldNodes)]),
                 %io:format("~p : in: ~p | out: ~p~n",[self(),NewNodes,OldNodes]),
                 failuredetector2:unsubscribe([node:pidX(Node) || Node <- OldNodes]),
@@ -285,8 +287,8 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
                 
         		
 		false ->
-            	NewNodes = minus(NewView,OldView),
-                OldNodes = minus(OldView,NewView),
+            	NewNodes = util:minus(NewView,OldView),
+                OldNodes = util:minus(OldView,NewView),
               	ok
 	end,
     NewAktFD=length(failuredetector2:getmytargets()),
@@ -357,18 +359,8 @@ new_interval(Preds,Succs,PNew,SNew,Interval) ->
     		end.
 
 
-minus([],_N) ->
-    [];
-minus([H|T],N) ->
-    case is_element(H,N) of
- 	true -> 
-	    minus(T,N);
-	false ->
-	    [H]++minus(T,N)
-    end.
 
-is_element(Element, Cache) ->
-    lists:any(fun(SomeElement) -> (Element==SomeElement) end, Cache).
+
 
 
 %% @doc has_changed(CurrentView, ShuffleBuddy, LastReported)

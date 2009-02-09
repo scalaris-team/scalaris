@@ -126,8 +126,8 @@ check_fd(X, X) ->
 check_fd(NewRT, OldRT) ->
     NewView = ?RT:to_pid_list(NewRT),
     OldView = ?RT:to_pid_list(OldRT),
-    NewNodes = rm_tman:minus(NewView,OldView),
-    OldNodes = rm_tman:minus(OldView,NewView),
+    NewNodes = util:minus(NewView,OldView),
+    OldNodes = util:minus(OldView,NewView),
     failuredetector2:unsubscribe(OldNodes),             
     failuredetector2:subscribe(NewNodes).
 

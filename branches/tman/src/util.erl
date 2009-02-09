@@ -28,7 +28,7 @@
 
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3, 
 	 trunc/2, min/2, max/2, randomelem/1, logged_exec/1, 
-	 wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0, find/2, logger/0, dump3/0, uniq/1, get_nodes/0]).
+	 wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0, find/2, logger/0, dump3/0, uniq/1, get_nodes/0, minus/2]).
                           
 escape_quotes(String) ->
 	lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).
@@ -203,6 +203,17 @@ log(F) ->
     io:format(F, "~p: ~p~n", [dump3(), time()]),
     timer:sleep(300000),
     log(F).
+
+%% @doc minus(M,N) : { x | x in M and x notin N}
+minus([],_N) ->
+    [];
+minus([H|T],N) ->
+   	case lists:member(H,N) of
+ 	true -> 
+	    minus(T,N);
+	false ->
+	    [H]++minus(T,N)
+    end.
 
 %% @doc omit repeated entries in a sorted list
 -spec(uniq/1 :: (list()) -> list()).

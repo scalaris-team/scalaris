@@ -26,25 +26,24 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([log/2, log2file/2]).
+-include("log4erl.hrl").
 
-log2file(Channel, Message) ->
-    case file:open(config:log_log_file(), [append]) of
-	{ok, FD} ->
-	    io:format(FD, "[ ~w | ~w] ~s~n", [calendar:universal_time(), Channel, Message]),
-	    file:close(FD);
-	{error, Reason} ->
-	    io:format("couldn't open ~w: ~w~n", [config:log_log_file(), Reason]),
-	    {error, Reason}
-    end.
-	    
-    
-log({ok, FD}, Message) ->
-    io:format(FD, "~p~n", [Message]),
-    file:close(FD);
-log({error, Reason}, _) ->
-    io:format("~p~n", [Reason]);
-log(Channel, Message) ->
-    io:format("~s: ~s~n", [Channel, Message]).
-    %log(file:open(io_lib:format("../log/~s.log", [Channel]), append), Message).
+%-export([log/1, log2file/0]).
+-export([start_link/0]).
+-export([log/2,log/3,log/4]).
+
+
+start_link() ->
+    application:start(log4erl),
+    log4erl:add_console_appender(stdout,{info, "%j %t [%L] %l%n"}), 
+    log4erl:change_log_level(config:read(log_level)),
+   	log(info, "Log4erl started"),
+    ignore.
+
+log(Level,Log) ->
+    log4erl:log(Level,Log).
+log(Level,Log,Data) ->
+    log4erl:log(Level,Log,Data).
+log(Logger, Level, Log, Data) ->
+    log4erl:log(Logger, Level, Log, Data).
 

@@ -19,7 +19,7 @@
 %%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+%% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 -module(cs_node).
 
@@ -48,7 +48,10 @@
 loop(State, Debug) ->
     receive
 	{kill} ->
-	    ok;
+        ok;
+    {churn} ->
+        cs_keyholder:reinit(),
+        ok;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ping Messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
