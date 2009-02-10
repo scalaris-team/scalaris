@@ -187,7 +187,7 @@ loop(Id, Me, Pred, Succs) ->
 					       {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]},
 	    loop(Id, Me, Pred, Succs);
 	X ->
-	    io:format("@rm_chord unknown message ~p~n", [X]),
+	   log:log(warn,"[ RM ] unknown message ~p~n", [X]),
 	    loop(Id, Me, Pred, Succs)
     end.
 
@@ -222,7 +222,7 @@ filter(Pid, [Succ | Rest]) ->
 %% @doc starts ring maintenance
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-    io:format("[ I | RM     | ~p ] starting ring maintainer~n", [self()]),
+   log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
     timer:send_interval(config:stabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
     start().

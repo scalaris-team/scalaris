@@ -147,7 +147,7 @@ loop(Cache,Node,Cycles) ->
 		Pid ! {random_element_response,cache:get_random_element(Cache)},
 		loop(Cache,Node,Cycles);
 	X ->
-		io:format("%% Unhandle Message: ~p~n", [X]),
+		log:log(warn,"[ CY | ~p ] Unhandle Message: ~p", [self(),X]),
 	    loop(Cache,Node,Cycles)
     end.
 
@@ -207,7 +207,7 @@ get_pid() ->
     InstanceId = erlang:get(instance_id),
     if
 	InstanceId == undefined ->
-	    io:format("~p~n", [util:get_stacktrace()]);
+	   log:log(error,"[ CY | ~w ] ~p", [self(),util:get_stacktrace()]);
 	true ->
 	    ok
     end,

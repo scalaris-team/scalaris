@@ -128,7 +128,7 @@ loop(State, Debug) ->
 		    cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
 		    loop(State, ?DEBUG(Debug));
 		true ->
-		    io:format("LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),	    
+		   log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),	    
 		    loop(State, ?DEBUG(Debug))
 	    end;
 	%% answer - lookup for replicated transaction manager
@@ -211,7 +211,7 @@ loop(State, Debug) ->
 		    lookup:get_key(State, Source_PID, Key, Key),
 		    loop(State, ?DEBUG(Debug));
 		true ->
-		    io:format("Get_Key: Got Request for Key ~p, it is not between ~p and ~p ~n", [Key, RangeBeg, RangeEnd]),
+		    log:log(info,"[ Node ] Get_Key: Got Request for Key ~p, it is not between ~p and ~p", [Key, RangeBeg, RangeEnd]),
 		    %self() ! {lookup_aux, Key, Msg},
 		    loop(State, ?DEBUG(Debug))
 	    end;
@@ -223,7 +223,7 @@ loop(State, Debug) ->
 		    State2 = lookup:set_key(State, Source_PID, Key, Value, Versionnr),
 		    loop(State2, ?DEBUG(cs_debug:debug(Debug, State2, _Message)));
 		true ->
-		    io:format("Set_Key: Got Request for Key ~p, it is not between ~p and ~p ~n", [Key, RangeBeg, RangeEnd]),
+		    log:log(info,"[ Node ] Set_Key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
 		    %cs_send:send(Source_PID, {get_key_response, Key, failed}),
 		    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)))
 	    end;
@@ -359,7 +359,7 @@ loop(State, Debug) ->
         loop(State, ?DEBUG(Debug));
 
 	X ->
-	    io:format("cs_node: unknown message ~w~n", [X]),
+	    log:log(warn,"[ Node ] unknown message ~w", [X]),
 	    %ok
 	    loop(State, ?DEBUG(Debug))
     end.
@@ -380,7 +380,7 @@ start(InstanceId, Parent) ->
 	true ->
 	    ok
     end,
-    io:format("[ I | Node   | ~w ] joined~n",[self()]),
+    log:log(info,"[ Node ~w ] joined",[self()]),
     loop(State, cs_debug:new()).
 %% userdevguide-end cs_node:start
 
@@ -400,7 +400,7 @@ get_local_cyclon_pid() ->
     InstanceId = erlang:get(instance_id),
     if
 	InstanceId == undefined ->
-	    io:format("~p~n", [util:get_stacktrace()]);
+	   log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
 	true ->
 	    ok
     end,

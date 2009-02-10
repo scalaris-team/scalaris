@@ -34,6 +34,7 @@
 
 -import(io).
 -import(util).
+-import(log).
 
 -include("comm_layer.hrl").
 
@@ -68,8 +69,8 @@ send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
     end;
 
 send(Target, Message) ->
-    io:format("wrong call to cs_send:send: ~w ! ~w~n", [Target, Message]),
-    io:format("stacktrace: ~w~n", [util:get_stacktrace()]),
+    log:log(error,"[ CC ] wrong call to cs_send:send: ~w ! ~w", [Target, Message]),
+    log:log(error,"[ CC ] stacktrace: ~w", [util:get_stacktrace()]),
     ok.
 
 %% @doc returns process descriptor for the calling process

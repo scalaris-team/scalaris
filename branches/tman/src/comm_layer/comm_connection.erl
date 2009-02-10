@@ -91,7 +91,7 @@ send({Address, Port, Socket}, Pid, Message) ->
 	    comm_port:unregister_connection(Address, Port),
 	    gen_tcp:close(Socket);
 	{error, Reason} ->
-	    log:log2file(comm_connection, io_lib:format("couldn't send to ~p:~p (~p)~n", [Address, Port, Reason])),
+	    log:log(error,"[ CC ] couldn't send to ~p:~p (~p)", [Address, Port, Reason]),
 	    comm_port:unregister_connection(Address, Port),
 	    gen_tcp:close(Socket)
     end.
@@ -123,7 +123,7 @@ loop(Socket, Address, Port) ->
 		    inet:setopts(Socket, [{active, once}]),
 		    loop(Socket, Address, Port);
 		Unknown ->
-		    log:log2file(comm_connection, io_lib:format("unknown message ~p", [Unknown]) ),
+		    log:log(warn,"[ CC ] unknown message ~p", [Unknown]),
 		    inet:setopts(Socket, [{active, once}]),
 		    loop(Socket, Address, Port)
 	    end;
@@ -132,7 +132,7 @@ loop(Socket, Address, Port) ->
 	    loop(Socket, Address, Port);
 
         Unknown ->
-	    log:log2file(comm_connection, io_lib:format("unknown message2 ~p", [Unknown]) ),
+	    log:log(warn,"[ CC ] unknown message2 ~p", [Unknown]) ,
 	    loop(Socket, Address, Port)
     end.
 
@@ -149,17 +149,17 @@ new_connection(Address, Port, MyPort) ->
 		            gen_tcp:send(Socket, term_to_binary({youare, RemoteIP, RemotePort})),
 		            Socket;
 			{error, Reason} ->
-			    io:format("reconnect to ~p because socket is ~p~n", [Address, Reason]),
+			   log:log(error,"[ CC ] reconnect to ~p because socket is ~p", [Address, Reason]),
 			    gen_tcp:close(Socket),
 	    		    new_connection(Address, Port, MyPort)
 		    end;
 		{error, Reason} ->
-		    io:format("reconnect to ~p because socket is ~p~n", [Address, Reason]),
+		    log:log(error,"[ CC ] reconnect to ~p because socket is ~p", [Address, Reason]),
 		    gen_tcp:close(Socket),
 	            new_connection(Address, Port, MyPort)
 	    end;
         {error, Reason} ->
-            log:log2file(comm_connection, io_lib:format("couldn't connect to ~p:~p (~p)~n", [Address, Port, Reason])),
+            log:log(error,"[ CC ] couldn't connect to ~p:~p (~p)", [Address, Port, Reason]),
 	    fail
     end.
     

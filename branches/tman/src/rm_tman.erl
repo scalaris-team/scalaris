@@ -123,13 +123,13 @@ start() ->
 loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc) ->
  	case Succs == merge(Succs, [], Id) of
         false ->
-            io:format("should never ever happen (succs): ~p~n", [Succs]);
+            log:log(error,"[ RM ~p] should never ever happen (succs): ~p", [self(),Succs]);
         true ->
             ok
     end,
  	case Preds == lists:reverse(merge(Preds, [], Id)) of
         false ->
-            io:format("should never ever happen (preds): ~p~n", [Preds]);
+           log:log(error,"[RM | ~p]should never ever happen (preds): ~p", [self(),Preds]);
         true ->
             ok
     end,
@@ -221,7 +221,7 @@ loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc) ->
 	    loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc);
     
 	X ->
-	    io:format("@rm_tman unknown message ~p~n", [X]),
+	   log:log(warn,"@rm_tman unknown message ~p", [X]),
 	    loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc)
     end.
 
@@ -298,8 +298,8 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
             %io:format("RM ~p | New ~p ~p~n",[self(),NewAktFD,NewAktPS]),
             ok;
         false ->
-             io:format("~p : in: ~p | out: ~p~n",[self(),NewNodes,OldNodes]),
-             io:format("===================================== ERROR==============~n RM ~p | ERR ~p ~p~n~p~n",[self(),NewAktFD,NewAktPS,{Preds,Succs,PredsNew,SuccsNew}])
+             log:log(error,"~p : in: ~p | out: ~p",[self(),NewNodes,OldNodes]),
+             log:log(error,"RM ~p | ERR ~p ~p~n~p",[self(),NewAktFD,NewAktPS,{Preds,Succs,PredsNew,SuccsNew}])
 	end.
              
              
@@ -381,7 +381,7 @@ has_changed(_A, _B, _C) ->
 %% @doc starts ring maintenance
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-    io:format("[ I | RM     | ~p ] starting ring maintainer T-MAN~n", [self()]),
+   log:log(info,"[ RM ~p ] starting ring maintainer T-MAN", [self()]),
     Sup ! start_done,
     start().
 

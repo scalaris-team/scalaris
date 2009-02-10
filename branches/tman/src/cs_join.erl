@@ -59,13 +59,13 @@ join_first(Id) ->
 %% @doc join a ring
 %% userdevguide-begin cs_join:join_ring
 join_ring(Id, Succ) ->
-    io:format("[ I | Node   | ~w ] join_ring ~w ~n",[self(), Id]),
+    log:log(info,"[ Node ~w ] join_ring ~w",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
     UniqueId = node:uniqueId(Me),
     cs_send:send(node:pidX(Succ), {join, cs_send:this(), Id, UniqueId}),
     receive
 	{join_response, Pred, Data} -> 
-	    io:format("[ I | Node   | ~w ] got pred ~w~n",[self(), Pred]),
+	    log:log(info,"[ Node ~w ] got pred ~w",[self(), Pred]),
 	    case node:is_null(Pred) of
 		true ->
 		    DB = ?DB:add_data(?DB:new(), Data),
@@ -90,7 +90,7 @@ join_ring(Id, Succ) ->
 %% @spec join(Id) -> {true|false, state:state()}
 %%   Id = term()
 join(Id) -> 
-    io:format("[ I | Node   | ~w ] joining ~p ~n",[self(), Id]),
+    log:log(info,"[ Node ~w ] joining ~p",[self(), Id]),
     Ringsize = boot_server:number_of_nodes(),
     if
 	Ringsize == 0 ->

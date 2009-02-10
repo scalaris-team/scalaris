@@ -166,7 +166,7 @@ handle_call({crash, Pid}, _From,  {SubscriberTable, PingerTable, _Linker} = Stat
     ets:delete(PingerTable, Pid),
     case ets:match(SubscriberTable, {'$1', Pid}) of
 		[] ->
-	    	io:format("@fd: shouldn't happen1~n", []);
+	    	log:log(error,"[ FD ] shouldn't happen1");
 		Subscribers ->
 	    	% notify and unsubscribe
             
@@ -248,7 +248,7 @@ code_change(_OldVsn, State, _Extra) ->
 make_pinger(PingerTable, Target) ->
     case ets:lookup(PingerTable, Target) of
 	[] ->
-	    io:format("[ I | FD     | ~p ] starting pinger for ~p~n", [self(), Target]),
+	   log:log(info,"[ FD ~p ] starting pinger for ~p", [self(), Target]),
 	    Pinger = start_pinger(Target),
 	    ets:insert(PingerTable, {Target, Pinger}),
 	    ok;
@@ -298,7 +298,7 @@ crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, Owner) ->
 
 report_crash(Pid) ->
     
-    io:format("~p crashed ~n",[Pid]),
+   log:log(info,"[ FD ] ~p crashed",[Pid]),
    	Res =  (catch erlang:process_info(Pid, backtrace)),
 	case Res of
         {backtrace, Bin} ->

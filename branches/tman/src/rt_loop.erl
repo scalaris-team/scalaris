@@ -49,7 +49,7 @@ start_link(InstanceId) ->
 
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
-    io:format("[ I | RT     | ~p ] starting ringtable~n", [self()]),
+   	log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     timer:send_interval(config:pointerStabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
     loop().
@@ -92,7 +92,7 @@ loop(Id, Pred, Succ, RTState) ->
 	    loop(Id, Pred, Succ, RTState);
     {check,Port} ->
         Y = [ {Index,node:pidX(Node)} || {Index,Node} <-gb_trees:to_list(RTState) ],
- 		io:format("RT: Wrongitems: ~p~n",[[Index || {Index,{_IP,PORT,_PID}} <-Y, PORT/=Port]]),
+ 		log:log(info,"[ RT ]: Wrongitems: ~p",[[Index || {Index,{_IP,PORT,_PID}} <-Y, PORT/=Port]]),
         loop(Id, Pred, Succ, RTState);
 	{crash, DeadPid} ->
         NewRT = ?RT:filterDeadNode(RTState, DeadPid),
@@ -100,10 +100,10 @@ loop(Id, Pred, Succ, RTState) ->
         check(RTState, NewRT, false),
     	loop(Id, Pred, Succ, NewRT );
 	{dump} ->
-	    io:format("~p:~p~n", [Id, ?RT:dump(RTState)]),
+	   log:log(info,"[ RT ] ~p:~p", [Id, ?RT:dump(RTState)]),
 	    loop(Id, Pred, Succ, RTState);
 	X ->
-	    io:format("@rt_loop: unknown message ~p ~n", [X]),
+	    log:log(warn,"[ RT ]: unknown message ~p", [X]),
 	    loop(Id, Pred, Succ, RTState)
     end.
  

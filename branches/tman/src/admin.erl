@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1]).
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1, ring_health/0]).
 
 %%====================================================================
 %% API functions
@@ -92,6 +92,17 @@ check_ring_foldl({ok, Node}, PredsSucc) ->
 	true ->
 	    {error, lists:flatten(io_lib:format("~.16B didn't match ~.16B", [MyId, PredsSucc]))}
     end.
+
+ring_health() ->
+    RealRing = statistics:get_ring_details(),
+    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
+    RingSize = length(Ring),
+    RingSize.
+
+is_valid({ok, _}) ->
+    true;
+is_valid({failed}) ->
+    false.
 
 
     
