@@ -8,3 +8,4 @@
 {"src/transstore/*", [debug_info, {outdir, "ebin/transstore"}, {i, "include"}]}.
 {"test/*", [debug_info, {outdir, "test"}, {i, "include"}]}.
 {"contrib/log4erl/src/*",[debug_info, {outdir, "contrib/log4erl/ebin/"},{i, "contrib/log4erl/include"}]}.
+{"contrib/yaws/src/*",[debug_info, {outdir, "contrib/yaws/ebin/"},{i, "contrib/yaws/include"}]}.
