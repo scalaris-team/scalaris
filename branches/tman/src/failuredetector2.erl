@@ -297,20 +297,30 @@ crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, Owner) ->
 	%io:format("after unsubscribe~n").
 
 report_crash(Pid) ->
-    
    log:log(warn,"[ FD ] ~p crashed",[Pid]),
+	case dump_to_file(Pid) of
+		ok ->
+			{Group, Name} = process_dictionary:lookup_process(Pid),
+   			log:log(warn,"[ FD ] a ~p process died",[Name]),
+			TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
+			dump_to_file(TManPid);
+		failed ->
+			ok
+	end,
+    %io:format("~p b crashed ~n",[Pid]),
+    gen_server:call(?MODULE, {crash, Pid}, 20000).
+    
+dump_to_file(Pid) ->
    	Res =  (catch erlang:process_info(Pid, backtrace)),
+    (catch erlang:process_display(Pid, backtrace)),
 	case Res of
         {backtrace, Bin} ->
             Trace =  binary_to_list(Bin),
 			N = "/tmp/scalaris-crash.log",
 			{ok,S} = file:open(N,[append]),
 			io:format(S,"FD ~p | ~p crashed~n#~p~n",[self(),Pid,Trace]),
-			file:close(S);
-        _ -> ok
-	end,
-    
-    (catch erlang:process_display(Pid, backtrace)),
-    %io:format("~p b crashed ~n",[Pid]),
-    gen_server:call(?MODULE, {crash, Pid}, 20000).
-    
+			file:close(S),
+			ok;
+        _ -> 
+			failed
+	end.

@@ -37,6 +37,7 @@ run_1() ->
     Size = list_to_integer(os:getenv("RING_SIZE")),
     io:format("Do ~p~n",[Size]),
     admin:add_nodes(Size),
+    %kernel:
    	%Wait Seconds until Error in ring is 0
     
     M = lists:flatten(io_lib:format("/work/bzchenni/t_man_run_1_Extend_~p.log", [Size])),

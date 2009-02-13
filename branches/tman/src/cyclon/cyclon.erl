@@ -89,11 +89,15 @@ loop(Cache,Node,Cycles) ->
     {get_ages,Pid} ->
         Pid ! {ages,cache:ages(Cache)},
         loop(Cache,Node,Cycles);
-	{get_youngest_element,N,Pid} ->
-		Pid ! {cache,Node,Cycles,cache:get_youngest(N,Cache)},
+    
+    {get_subset,all,Pid} ->
+		Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
 		loop(Cache,Node,Cycles);
-	{getcache,Pid} ->
-		Pid ! {cache,Node,Cycles,cache:get_list_of_nodes(Cache)},
+	{get_subset,N,Pid} ->
+		Pid ! {cache,cache:get_youngest(N,Cache)},
+		loop(Cache,Node,Cycles);
+	{get_cache,Pid} ->
+		Pid ! {cache,cache:get_list_of_nodes(Cache)},
 		loop(Cache,Node,Cycles);
 	{flush_cache} ->
 		get_pid() ! {get_pred_succ, cs_send:this()},
@@ -143,9 +147,6 @@ loop(Cache,Node,Cycles) ->
 		N2=cache:minus(N1,Cache),
 		NewCache=cache:merge(Cache,N2,OldSubset),
 		loop(NewCache,Node,Cycles);
-	{random_element,Pid} ->
-		Pid ! {random_element_response,cache:get_random_element(Cache)},
-		loop(Cache,Node,Cycles);
 	X ->
 		log:log(warn,"[ CY | ~p ] Unhandle Message: ~p", [self(),X]),
 	    loop(Cache,Node,Cycles)
