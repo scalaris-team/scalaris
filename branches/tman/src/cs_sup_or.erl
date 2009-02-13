@@ -67,6 +67,13 @@ init([Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    RSE =
+	{rse_chord,
+	 {rse_chord, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     Supervisor_AND = 
 	{cs_supervisor_and,
 	 {cs_sup_and, start_link, [InstanceId, Options]},
@@ -93,6 +100,7 @@ init([Options]) ->
 	   KeyHolder,
 	   RingMaintenance,
 	   RoutingTable,
-	   Supervisor_AND
+	   Supervisor_AND,
+	   RSE
 	  ]}}.
 %% userdevguide-end cs_sup_or:init
