@@ -29,7 +29,7 @@
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
 
--export([start_link/1, start/2]).
+-export([start_link/1, start_link/2, start/3]).
 
 
 %logging on
@@ -368,11 +368,16 @@ loop(State, Debug) ->
 
 %% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec(start/2 :: (any(), any()) -> cs_state:state()).
-start(InstanceId, Parent) ->
+-spec(start/3 :: (any(), any(), list()) -> cs_state:state()).
+start(InstanceId, Parent, Options) ->
     process_dictionary:register_process(InstanceId, cs_node, self()),
     Parent ! done,
-    timer:sleep(crypto:rand_uniform(1, 100) * 100),
+    case lists:member(first, Options) of
+	true ->
+	    ok;
+	false ->
+	    timer:sleep(crypto:rand_uniform(1, 100) * 100)
+    end,
     Id = cs_keyholder:get_key(),
     boot_server:connect(),
     {First, State} = cs_join:join(Id),
@@ -390,7 +395,10 @@ start(InstanceId, Parent) ->
 %% @doc spawns a chord# node, called by the chord# supervisor process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-    Link = spawn_link(?MODULE, start, [InstanceId, self()]),
+    start_link(InstanceId, []).
+
+start_link(InstanceId, Options) ->
+    Link = spawn_link(?MODULE, start, [InstanceId, self(), Options]),
     receive
 	done ->
 	    ok

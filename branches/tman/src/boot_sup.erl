@@ -106,7 +106,7 @@ init(_Args) ->
 	 []},
    CSNode = 
 	{cs_node,
-	 {cs_sup_or, start_link, []},
+	 {cs_sup_or, start_link, [[first]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
