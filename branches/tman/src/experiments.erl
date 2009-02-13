@@ -33,35 +33,42 @@ start() ->
 	timer:sleep(2000),
 	erlang:spawn(?MODULE,run_1,[]).
 
+
+
 run_1() ->
     Size = list_to_integer(os:getenv("RING_SIZE")),
     io:format("Do ~p~n",[Size]),
+    Start = erlang:now(),
     admin:add_nodes(Size),
     %kernel:
    	%Wait Seconds until Error in ring is 0
     
     M = lists:flatten(io_lib:format("/work/bzchenni/t_man_run_1_Extend_~p.log", [Size])),
 	{ok,F} = file:open(M,[write]),
-    Time = wait(F,Size),
+    Time = wait(F,Size,Start),
+    Ende = erlang:now(),
     N = "/work/bzchenni/t_man_run_1.log",
 	{ok,S} = file:open(N,[append]),
-    io:format(S,"~p ~p~n",[Size,Time]),
-    io:format("~p ~p~n",[Size,Time]),
+    io:format(S,"~p ~p ~p~n",[Size,time_diff(Start,Ende),Time]),
+    io:format("~p ~p ~p~n",[Size,time_diff(Start,Ende),Time]),
 	halt(1).
 
 
 %%
 %% Local Functions
 %%
-wait(F,S) ->
+wait(F,S,Start) ->
     erlang:send_after(1000, self() ,{go}),
     {Error,Size} = metric:ring_health(),
-	io:format(F,"~p ~p~n",[Error,Size/S+1]),
+    Ende = erlang:now(),
+	io:format(F,"~p ~p ~p~n",[time_diff(Start,Ende),Error,Size/S+1]),
     receive 
         {go} ->
             ok
     end,
     case (Error == 0) of
         true -> 1;
-        false -> 1+wait(F,S)
+        false -> 1+wait(F,S,Start)
     end.
+time_diff({SMe,SSe,SMi},{EMe,ESe,EMi}) ->
+    (EMe*1000000+ESe+EMi/1000000)-(SMe*1000000+SSe+SMi/1000000).
