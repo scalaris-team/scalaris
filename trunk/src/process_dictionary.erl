@@ -58,6 +58,7 @@
 
 	 register_process/3, 
 	 lookup_process/2,
+	 lookup_process/1,
 	 find_cs_node/0, 
 	 find_all_cs_nodes/0, 
 	 find_all_processes/1, 
@@ -94,6 +95,16 @@ lookup_process(InstanceId, Name) ->
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
+
+%% @doc find the process group and name of a process by pid
+-spec(lookup_process/1 :: (pid()) -> {any(), any()}).
+lookup_process(Pid) ->
+    case ets:match(?MODULE, {'$1',Pid}) of
+	[[{Group, Name}]] ->
+	    {Group, Name};
+	[] ->
+	    failed
+    end.
 
 %% @doc tries to find a cs_node process
 %% @spec find_cs_node() -> pid()
