@@ -75,7 +75,7 @@ start(InstanceId) ->
     end,
     
     erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-    log:log(info,"Cyclon spawn: ~p~n", [cs_send:this()]),
+    log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
     loop(Cache,Node,0).
 
 

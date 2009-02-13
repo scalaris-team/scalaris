@@ -93,7 +93,7 @@ test_and_set(Key, OldValue, NewValue) ->
 	{trans, {failure, Reason}} ->
 	    {fail, Reason};
 	X ->
-	    io:format("X: ~p~n", [X]),
+	   log:log(warn,"[ Node ~w ] ~p", [self(),X]),
 	    X
     end.
 

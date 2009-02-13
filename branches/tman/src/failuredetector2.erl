@@ -298,7 +298,7 @@ crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, Owner) ->
 
 report_crash(Pid) ->
     
-   log:log(info,"[ FD ] ~p crashed",[Pid]),
+   log:log(warn,"[ FD ] ~p crashed",[Pid]),
    	Res =  (catch erlang:process_info(Pid, backtrace)),
 	case Res of
         {backtrace, Bin} ->
@@ -310,7 +310,7 @@ report_crash(Pid) ->
         _ -> ok
 	end,
     
-    %(catch erlang:process_display(Pid, backtrace)),
+    (catch erlang:process_display(Pid, backtrace)),
     %io:format("~p b crashed ~n",[Pid]),
     gen_server:call(?MODULE, {crash, Pid}, 20000).
     

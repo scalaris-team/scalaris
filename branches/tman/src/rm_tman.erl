@@ -256,8 +256,8 @@ filter(Pid, [Succ | Rest]) ->
     end.
 
 %% @doc get a peer form the cycloncache which is alive 
-get_RndView(_N,Node) ->
-     cs_send:send_to_group_member(node:pidX(Node),cyclon,{get_youngest_element,1,self()}),
+get_RndView(N,Node) ->
+     cs_send:send_to_group_member(node:pidX(Node),cyclon,{get_youngest_element,N,self()}),
      receive
          {cache,_,_,RndView} ->
              RndView

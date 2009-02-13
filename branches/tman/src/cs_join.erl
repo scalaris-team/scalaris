@@ -49,7 +49,7 @@ join_request(State, Source_PID, Id, UniqueId) ->
 %% userdevguide-begin cs_join:join_first
 %% @doc join an empty ring
 join_first(Id) -> 
-    io:format("[ I | Node   | ~w ] join as first ~w ~n",[self(), Id]),
+   	log:log(info,"[ Node ~w ] join as first ~w",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
     ?RM:initialize(Id, Me, Me, Me),
     routingtable:initialize(Id, Me, Me),

@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum fr Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1, ring_health/0]).
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1]).
 
 %%====================================================================
 %% API functions
@@ -93,27 +93,16 @@ check_ring_foldl({ok, Node}, PredsSucc) ->
 	    {error, lists:flatten(io_lib:format("~.16B didn't match ~.16B", [MyId, PredsSucc]))}
     end.
 
-ring_health() ->
-    RealRing = statistics:get_ring_details(),
-    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
-    RingSize = length(Ring),
-    RingSize.
-
-is_valid({ok, _}) ->
-    true;
-is_valid({failed}) ->
-    false.
 
 
-    
 get_id(Node) ->
-    IsNull = node:is_null(Node),
-    if
-        IsNull ->
-            "null";
-        true ->
-            node:id(Node)
-    end.
+    case node:is_null(Node) of
+		true ->
+			"null";
+		false ->
+	    	node:id(Node)
+    end.    
+
 
 %%===============================================================================
 %% comm_layer:comm_logger functions
