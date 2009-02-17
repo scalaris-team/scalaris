@@ -152,9 +152,7 @@ loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache) 
                 Pid ! {get_predlist_response, [AktPred]}
         end,
 	    loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache);
-    {cache,NewCache} ->
-        loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,NewCache);
-	{stabilize,AktToken} -> % new stabilization interval
+    {stabilize,AktToken} -> % new stabilization interval
        %io:format("."),
         % Triger an update of the Random view
 
@@ -189,6 +187,8 @@ loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache) 
         loop(Id, Me, Preds, Succs,RandViewSizenew,Interval,AktToken,NewAktPred,NewAktSucc,Cache);
 	{stabilize,_} ->
 		loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache);
+    {cache,NewCache} ->
+        loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,NewCache);
     {rm_buffer,Q,Buffer_q} ->
         RndView=get_RndView(RandViewSize,Cache),
         cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,Me,Succs++Preds++[Me]++RndView}),
@@ -211,16 +211,21 @@ loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache) 
        
         NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval),
         erlang:send_after(NewInterval , self(), {stabilize,AktToken+1}),
-        loop(Id, Me, PredsNew, SuccsNew,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,Cache);	
+        loop(Id, Me, PredsNew, SuccsNew,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,Cache);
+    {zombie,Node} ->
+        erlang:send(self(), {stabilize,AktToken+1}),
+        loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken+1,AktPred,AktSucc,[Node|Cache]);
 	{crash, DeadPid} ->
         %io:format("~p RM | ~p crashed~n",[self(),DeadPid]),
+        
+                
         PredsNew = filter(DeadPid, Preds),
         SuccsNew = filter(DeadPid, Succs),
         %io:format("~p~n", [{PredsNew,SuccsNew}]),
      	
         %update_failuredetector(Preds,Succs,PredsNew,SuccsNew ),
-        
-		erlang:send_after(config:stabilizationInterval_min(), self(), {stabilize,AktToken+1}),
+        erlang:send(self(), {stabilize,AktToken+1}),
+		%erlang:send_after(config:stabilizationInterval_min(), self(), {stabilize,AktToken+1}),
         loop(Id, Me, PredsNew ,SuccsNew,1,config:stabilizationInterval_min(),AktToken+1,AktPred,AktSucc ,Cache);
     	
 	{'$gen_cast', {debug_info, Requestor}} ->
@@ -258,6 +263,10 @@ filter(_Pid, []) ->
 filter(Pid, [Succ | Rest]) ->
     case Pid == node:pidX(Succ) of
 	true ->
+        
+        %Hook for DeadNodeCache
+        dn_cache:add_zombie_candidate(Succ),
+
 	    filter(Pid, Rest);
 	false ->
 	    [Succ | filter(Pid, Rest)]
@@ -389,7 +398,8 @@ get_cyclon_pid() ->
 %% @doc starts ring maintenance
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-   log:log(info,"[ RM ~p ] starting ring maintainer T-MAN", [self()]),
+    dn_cache:subscribe(),
+   	log:log(info,"[ RM ~p ] starting ring maintainer T-MAN", [self()]),
     Sup ! start_done,
     start().
 

@@ -43,11 +43,11 @@ run_1() ->
     %kernel:
    	%Wait Seconds until Error in ring is 0
     
-    M = lists:flatten(io_lib:format("/work/bzchenni/t_man_run_1_Extend_~p.log", [Size])),
+    M = lists:flatten(io_lib:format("/work/bzchenni/tman_run_1_Extend_~p.log", [Size])),
 	{ok,F} = file:open(M,[write]),
     Time = wait(F,Size,Start),
     Ende = erlang:now(),
-    N = "/work/bzchenni/t_man_run_1.log",
+    N = "/work/bzchenni/tman_run_1.log",
 	{ok,S} = file:open(N,[append]),
     io:format(S,"~p ~p ~p~n",[Size,time_diff(Start,Ende),Time]),
     io:format("~p ~p ~p~n",[Size,time_diff(Start,Ende),Time]),

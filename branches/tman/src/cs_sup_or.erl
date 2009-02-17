@@ -95,9 +95,17 @@ init([Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    DeadNodeCache = 
+	{deadnodecache,
+	 {dn_cache, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_one, 10, 1},
 	  [
 	   KeyHolder,
+       DeadNodeCache,
 	   RingMaintenance,
 	   RoutingTable,
 	   Supervisor_AND,

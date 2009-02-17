@@ -79,21 +79,20 @@ node_health(failed,_Ring) ->
 norm([],_) ->
     [];
 norm([H|T],X) ->
-    [(erlang:abs(H)-X)*(1/X)|norm(T,X+1)].
+    [(save_abs(H,X)-X)*(1/X)|norm(T,X+1)].
 
+save_abs(H,X) ->
+    try abs(H)
+    catch 
+        _ -> X
+	end.
 
 is_valid({ok, _}) ->
     true;
 is_valid({failed}) ->
     false.
 
-get_id(Node) ->
-    case node:is_null(Node) of
-		true ->
-			"null";
-		false ->
-	    	node:id(Node)
-    end.
+
 
 get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
     case get_indexed_id(Node, Ring) of
