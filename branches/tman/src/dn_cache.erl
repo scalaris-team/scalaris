@@ -80,7 +80,7 @@ loop(Queue,Subscriber) ->
         gb_sets:filter(fun (X) -> X ! {zombie,Zombie} end, Subscriber),
         loop(Queue,Subscriber);
 	{add_zombie_candidate, Node} ->
-		loop(ch_queue:add(Node,Queue),Subscriber);
+		loop(fix_queue:add(Node,Queue),Subscriber);
     {subscribe,Node} ->
 		loop(Queue,gb_sets:insert(Node,Subscriber));
 	{unsubscribe,Node} ->
