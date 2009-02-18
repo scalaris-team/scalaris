@@ -21,7 +21,9 @@ if [ -f "$LOCAL_CFG" ] ; then source "$LOCAL_CFG" ; fi
 
 export ERL_MAX_PORTS=16384
 
-for i in $(seq 3 800); do 
-export RING_SIZE="$i" ; 
-erl $ERL_OPTS +S 4 +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -sname boot -s experiments ;
+for i in $(seq 1 10); do
+	for i in $(seq 50 50 600); do 
+	export RING_SIZE="$i" ; 
+	erl $ERL_OPTS +S 4 +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -sname boot -s experiments ;
+	done
 done
