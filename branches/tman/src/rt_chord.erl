@@ -43,7 +43,11 @@
 -export([stabilize/5]).
 
 -type(key()::pos_integer()).
+-ifdef(types_are_builtin).
+-type(rt()::gb_tree()).
+-else.
 -type(rt()::gb_trees:gb_tree()).
+-endif.
 
 %% @doc creates an empty routing table.
 -spec(empty/1 :: (node:node_type()) -> rt()).

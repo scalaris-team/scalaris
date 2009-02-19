@@ -50,6 +50,13 @@ AC_CHECK_FILE($erlang_cv_lib_dir_common_test/priv/bin/run_test, , AC_MSG_NOTICE(
 #AC_PROG_YACC
 #AC_PROG_CC
 
+AC_COMPILE_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
+       [GBTREESISBUILTIN=", {d, types_are_builtin}"; AC_MSG_NOTICE([gb_tree() is a built-in type])],
+       [GBTREESISBUILTIN=""; AC_MSG_NOTICE([gb_tree() is not built-in])])
+
+AC_SUBST(GBTREESISBUILTIN)
+
 ###########################################################
 #
 # check MACOSX vs. Linux for flexbisonparse driver
@@ -78,7 +85,7 @@ mkdir -p ~/.yaws 2> /dev/null
 #SCALARIS_ROOT=`pwd`
 #AC_SUBST(SCALARIS_ROOT)
 
-AC_CONFIG_FILES([Makefile bin/scalarisctl bin/scalarisclient])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl bin/scalarisclient])
 
 AC_OUTPUT
 

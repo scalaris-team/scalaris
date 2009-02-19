@@ -32,7 +32,11 @@
 
 -type(key()::integer() | string()).
 
+-ifdef(types_are_builtin).
+-type(db()::gb_tree()).
+-else.
 -type(db()::gb_trees:gb_tree()).
+-endif.
 
 -export([start_link/1,
 	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 

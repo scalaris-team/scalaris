@@ -72,6 +72,8 @@ loop_ping(Pid, Count) ->
     cs_send:send(Pid, {ping, cs_send:this(), Count}),
     timer:send_after(config:failureDetectorInterval(), {timeout}), 
     receive
+	{stop} ->
+	    ok;
 	{pong, _Count} ->
 	    receive
 		{timeout} ->
