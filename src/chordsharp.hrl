@@ -37,3 +37,7 @@
 
 %%Standard chord ring maintenance
 -define(RM, rm_chord).
+
+%% ring maintenance by T-man
+%-define(RM, rm_tman).
+

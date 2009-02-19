@@ -31,7 +31,7 @@
 
 	 read/1,
 
-	 succListLength/0, stabilizationInterval/0, 
+	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
 	 pointerStabilizationInterval/0, failureDetectorInterval/0, 
 	 failureDetectorPingInterval/0, 
 	 failureDetectorUpdateInterval/0, bootPid/0, 
@@ -89,10 +89,20 @@ failureDetectorInterval() ->
 failureDetectorPingInterval() ->
     read(failure_detector_ping_interval).
 
-%% @doc the interval between two stabilization runs
+%% @doc the interval between two stabilization runs Max
 %% @spec stabilizationInterval() -> integer() | failed
 stabilizationInterval() ->
-    read(stabilization_interval).
+    read(stabilization_interval_max).
+
+%% @doc the interval between two stabilization runs Max
+%% @spec stabilizationInterval_max() -> integer() | failed
+stabilizationInterval_max() ->
+    read(stabilization_interval_max).
+
+%% @doc the interval between two stabilization runs Min
+%% @spec stabilizationInterval_min() -> integer() | failed
+stabilizationInterval_min() ->
+    read(stabilization_interval_min).
 
 %% @doc the interval between two finger/pointer stabilization runs
 %% @spec pointerStabilizationInterval() -> integer() | failed

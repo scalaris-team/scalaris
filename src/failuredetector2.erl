@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/0, subscribe/1, unsubscribe/1, remove_subscriber/1]).
+-export([start_link/0, subscribe/1, unsubscribe/1,remove_subscriber/1,getmytargets/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -47,14 +47,18 @@ subscribe(Pid) ->
 
 %% @doc deletes the failure detector for the given pid.
 -spec(unsubscribe/1 :: (cs_send:mypid()) -> ok).
-unsubscribe(Pid) ->
-    gen_server:call(?MODULE, {unsubscribe, Pid, self()}, 20000).
+unsubscribe(TargetList) when is_list(TargetList) ->
+    gen_server:call(?MODULE, {unsubscribe_list, TargetList, self()}, 20000);
+unsubscribe(Target) ->
+    gen_server:call(?MODULE, {unsubscribe_list, [Target], self()}, 20000).
 
-%% @private
+%% 
 -spec(remove_subscriber/1 :: (pid()) -> ok).
 remove_subscriber(Pid) ->
     gen_server:call(?MODULE, {remove_subscriber, Pid}, 20000).
     
+getmytargets()  ->
+    gen_server:call(?MODULE, {getmytargets, self()}, 20000).	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ping Process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -68,15 +72,13 @@ loop_ping(Pid, Count) ->
     cs_send:send(Pid, {ping, cs_send:this(), Count}),
     timer:send_after(config:failureDetectorInterval(), {timeout}), 
     receive
-	{stop} ->
-	    ok;
 	{pong, _Count} ->
 	    receive
 		{timeout} ->
 		    loop_ping(Pid, Count + 1)
 	    end;
 	{timeout} ->
-	    report_crash(Pid)
+     	    report_crash(Pid)
 	    %loop_ping(Pid, Count + 1)
     end.
 
@@ -125,11 +127,15 @@ start_link() ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init([]) ->
-    MyPid2Subscribers = ets:new(?MODULE, [set, protected]),
-    Pid2WatchedPids = ets:new(?MODULE, [set, protected]),
+    process_dictionary:register_process("fd", failure_detector, self()),
+    %% mapping: remote_process -> list(subscribers)
+    %%MyPid2Subscribers = ets:new(?MODULE, [set, protected]),
+    %% list of {subscriber (local process), watched process}
+    %% {pid(), cs_send:mypid()}
+    SubscriberTable = ets:new(?MODULE, [bag, protected]),
     Pinger = ets:new(?MODULE, [set, protected]),
     Linker = start_linker(),
-    {ok, {MyPid2Subscribers, Pid2WatchedPids, Pinger, Linker}}.
+    {ok, {SubscriberTable, Pinger, Linker}}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -141,36 +147,49 @@ init([]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 %% @private
-handle_call({subscribe_list, PidList, Owner}, _From, 
-	    {MyPid2Subscribers, Pid2WatchedPids, PingerTable, Linker} = State) ->
+handle_call({subscribe_list, PidList, Subscriber}, _From,{SubscriberTable, PingerTable, Linker} = State) ->
     % link subscriber
-    Linker ! {link, Owner},
+    Linker ! {link, Subscriber},
     % make ping processes for subscription
-    [make_pinger(PingerTable, Pid, Owner) || Pid <- PidList],
+    [make_pinger(PingerTable, Pid) || Pid <- PidList],
     % store subscription
-    [subscribe(MyPid2Subscribers, Pid2WatchedPids, Pid, Owner) || Pid <- PidList],
+    [subscribe(SubscriberTable, Pid, Subscriber) || Pid <- PidList],
     {reply, ok, State};
-handle_call({unsubscribe, Pid, Owner}, _From, 
-	    {MyPid2Subscribers, Pid2WatchedPids, PingerTable, _Linker} = State) ->
-    unsubscribe(MyPid2Subscribers, Pid2WatchedPids, PingerTable, Pid, Owner),
+handle_call({unsubscribe_list, TargetList, Unsubscriber}, _From,{SubscriberTable, PingerTable, _Linker} = State) ->
+	[ unsubscribe(SubscriberTable, PingerTable, Target, Unsubscriber) || Target <- TargetList ],
     {reply, ok, State};
-handle_call({crash, Pid}, _From, 
-	    {MyPid2Subscribers, Pid2WatchedPids, PingerTable, _Linker} = State) ->
+handle_call({crash, Pid}, _From,  {SubscriberTable, PingerTable, _Linker} = State) ->
+   	
+    %G = (catch  erlang:process_display(element(3,Pid),backtrace)),
+    %io:format("~p~n",[G]),
+    
     ets:delete(PingerTable, Pid),
-    case ets:lookup(MyPid2Subscribers, Pid) of
-	[{Pid, Subscribers}] ->
-	    % notify and unsubscribe
-	    [crash_and_unsubscribe(MyPid2Subscribers, Pid2WatchedPids, PingerTable, Pid, X) || X <- Subscribers];
-	[] ->
-	    io:format("@fd: shouldn't happen1~n", [])
+    case ets:match(SubscriberTable, {'$1', Pid}) of
+		[] ->
+	    	log:log(error,"[ FD ] shouldn't happen1");
+		Subscribers ->
+	    	% notify and unsubscribe
+            
+	    	[crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, X) || [X] <- Subscribers]
+    
     end,
     {reply, ok, State};
 handle_call({remove_subscriber, Subscriber}, _From, 
-	    {MyPid2Subscribers, Pid2WatchedPids, PingerTable, _Linker} = State) ->
-    WatchedPids = ets:lookup(Pid2WatchedPids, Subscriber),
-    [unsubscribe(MyPid2Subscribers, Pid2WatchedPids, PingerTable, WatchedPid, Subscriber) 
-     || WatchedPid <- WatchedPids],
-    {reply, ok, State}.
+	    {SubscriberTable, PingerTable, _Linker} = State) ->
+    WatchedPids = ets:lookup(SubscriberTable, Subscriber),
+    ets:delete(SubscriberTable, Subscriber),
+    lists:map(fun (Pid) ->
+                       case ets:match(SubscriberTable, {'$1', Pid}) of
+                           [] ->
+                               kill_pinger(PingerTable, Pid);
+                           _ ->
+                               ok
+                       end
+              	end, WatchedPids),
+    {reply, ok, State};
+handle_call({getmytargets, Pid}, _From,{SubscriberTable, _PingerTable, _Linker} = State) ->
+    Targets=ets:lookup(SubscriberTable, Pid),
+    {reply, Targets, State}.
 
 
 %%--------------------------------------------------------------------
@@ -179,7 +198,17 @@ handle_call({remove_subscriber, Subscriber}, _From,
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
-%% @private
+%@private
+handle_cast({debug_info, Requestor}, {SubscriberTable, PingerTable, _Linker} = State) ->
+    Subscribers = length(lists:usort(ets:match(SubscriberTable, {'$1', '_'}))), 
+    Targets     = length(lists:usort(ets:match(SubscriberTable, {'_', '$1'}))), 
+    Requestor ! {debug_info_response, [
+					       	{"SubscriberTable", lists:flatten(io_lib:format("~p", [length(ets:tab2list(SubscriberTable))]))},
+						   	{"Pinger", lists:flatten(io_lib:format("~p", [length(ets:tab2list(PingerTable))]))},
+					       	{"Subscribers", lists:flatten(io_lib:format("~p", [Subscribers]))},
+						   	{"Targets", lists:flatten(io_lib:format("~p", [Targets]))}
+                                      ]},
+    {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -216,64 +245,82 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-make_pinger(PingerTable, Pid, Owner) ->
-    case ets:lookup(PingerTable, Pid) of
+make_pinger(PingerTable, Target) ->
+    case ets:lookup(PingerTable, Target) of
 	[] ->
-	    io:format("[ I | FD     | ~p ] starting pinger for ~p~n", [Owner, Pid]),
-	    Pinger = start_pinger(Pid),
-	    ets:insert(PingerTable, {Pid, Pinger}),
+	   log:log(info,"[ FD ~p ] starting pinger for ~p", [self(), Target]),
+	    Pinger = start_pinger(Target),
+	    ets:insert(PingerTable, {Target, Pinger}),
 	    ok;
-	[{Pid, _Pinger}] ->
+	[{_Pid, _Pinger}] ->
 	    ok
     end.
 
-kill_pinger(PingerTable, Pid) ->
-    case ets:lookup(PingerTable, Pid) of
+kill_pinger(PingerTable, Target) ->
+    case ets:lookup(PingerTable, Target) of
 	[] ->
-	    ok;
-	[{Pid, Pinger}] ->
-	    ets:delete(PingerTable, {Pid, Pinger}),
+	    aua;
+	[{_Pid, Pinger}] ->
+	    ets:delete(PingerTable, {Target, Pinger}),
 	    Pinger ! {stop}
     end.   
 
 %% (mypid() -> list(pid()), pid() -> mypid())
-subscribe(MyPid2Subscribers, Pid2WatchedPids, Pid, Owner) ->
-    case ets:lookup(MyPid2Subscribers, Pid) of
-	[] ->
-	    ets:insert(MyPid2Subscribers, {Pid, [Owner]}),
-	    ets:insert(Pid2WatchedPids, {Owner, Pid}),
-	    ok;
-	[{Pid, Subscribers}] ->
-	    case lists:member(Owner, Subscribers) of
-		true ->
-		    ok;
-		false ->
-		    ets:insert(MyPid2Subscribers, {Pid, [Owner | Subscribers]}),
-		    ets:insert(Pid2WatchedPids, {Owner, Pid}),
-		    ok
-	    end
-    end.
+subscribe(SubscriberTable, Pid, Subscriber) ->
+	ets:insert(SubscriberTable, {Subscriber, Pid}).
 
 %% (mypid() -> list(pid()), pid() -> mypid())
-unsubscribe(MyPid2Subscribers, Pid2WatchedPids, PingerTable, Pid, Owner) ->
-    ets:delete(Pid2WatchedPids, {Pid, Owner}),
-    case ets:lookup(MyPid2Subscribers, Pid) of
-	[] ->
-	    ok;
-	[{Pid, Subscribers}] ->
-	    NewSubscribers = lists:delete(Owner, Subscribers),
-	    case length(NewSubscribers) of
-		0 ->
-		    kill_pinger(PingerTable, Pid);
-		_ ->
-		    ok
-	    end
-    end.
+unsubscribe(SubscriberTable, PingerTable, Target, Unsubscriber) ->
+    %io:format("unsub: ~p~n",[{Unsubscriber, Target}]),
+    ets:delete_object(SubscriberTable, {Unsubscriber, Target}),
+	case ets:match(SubscriberTable, {'$1', Target}) of
+    	[] ->
+        	RES= kill_pinger(PingerTable, Target),
+			case RES==aua of 
+				true ->
+					 %io:format("should not happend!~n"),
+					 %io:format("unsub: ~p~n",[{Unsubscriber, Target}]);
+                    mhh;
+				false ->
+					ok
+			end;
+        _X ->
+            %io:format("After del: ~p~n",[X])
+            ok
+     end.
 
-crash_and_unsubscribe(MyPid2Subscribers, Pid2WatchedPids, PingerTable, Pid, Owner) ->
+crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, Owner) ->
+    %io:format("+ ~p~n", [{SubscriberTable, PingerTable, Pid, Owner}]),
     Owner ! {crash, Pid},
-    unsubscribe(MyPid2Subscribers, Pid2WatchedPids, PingerTable, Pid, Owner).
+    %io:format("Send crash to ~p~n",[Pid]),
+    unsubscribe(SubscriberTable, PingerTable, Pid, Owner).
+	%io:format("after unsubscribe~n").
 
 report_crash(Pid) ->
+   log:log(warn,"[ FD ] ~p crashed",[Pid]),
+	case dump_to_file(Pid) of
+		ok ->
+			{Group, Name} = process_dictionary:lookup_process(Pid),
+   			log:log(warn,"[ FD ] a ~p process died",[Name]),
+			TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
+			dump_to_file(TManPid);
+		failed ->
+			ok
+	end,
+    %io:format("~p b crashed ~n",[Pid]),
     gen_server:call(?MODULE, {crash, Pid}, 20000).
     
+dump_to_file(Pid) ->
+   	Res =  (catch erlang:process_info(Pid, backtrace)),
+    (catch erlang:process_display(Pid, backtrace)),
+	case Res of
+        {backtrace, Bin} ->
+            Trace =  binary_to_list(Bin),
+			N = "/tmp/scalaris-crash.log",
+			{ok,S} = file:open(N,[append]),
+			io:format(S,"FD ~p | ~p crashed~n#~p~n",[self(),Pid,Trace]),
+			file:close(S),
+			ok;
+        _ -> 
+			failed
+	end.

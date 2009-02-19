@@ -82,6 +82,13 @@ init([]) ->
       worker,
       []
      },
+     Logger = 
+	{logger,
+	 {log, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     ChordSharp = 
 	{chordsharp,
 	 {cs_sup_or, start_link, []},
@@ -115,6 +122,7 @@ init([]) ->
 	 []},
     {ok,{{one_for_all,10,1}, [
 			      Config,
+                  Logger,
 			      FailureDetector,
 			      CommunicationPort,
 			      AdminServer,

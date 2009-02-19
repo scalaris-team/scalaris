@@ -117,7 +117,7 @@ renderRingChart(Ring) ->
     Sizes = lists:map(
 	      fun ({ok,Node}) -> 
 		      Me_tmp = get_id(node_details:me(Node)),
-		      Pred_tmp = get_id(node_details:pred(Node)),
+		      Pred_tmp = get_id(hd(node_details:predlist(Node))),
 		      if (null == Me_tmp) orelse (null == Pred_tmp)
 			 -> io_lib:format("1.0"); % guess the size
 			 true ->
@@ -199,7 +199,7 @@ getRingRendered() ->
 
 renderRing({ok, Details}) ->
     Hostname = node_details:hostname(Details),
-    Pred = node_details:pred(Details),
+    PredList = node_details:predlist(Details),
     Node = node_details:me(Details),
     SuccList = node_details:succlist(Details),
     RTSize = node_details:rt_size(Details),
@@ -207,7 +207,7 @@ renderRing({ok, Details}) ->
     {tr, [], 
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
-       {td, [], io_lib:format('~p', [get_id(Pred)])},
+       {td, [], io_lib:format('~p', [lists:map(fun get_id/1, PredList)])},
        {td, [], io_lib:format('~p', [get_id(Node)])},
        {td, [], io_lib:format('~p', [lists:map(fun get_id/1, SuccList)])},
        {td, [], io_lib:format('~p', [RTSize])},
@@ -273,21 +273,26 @@ getIndexedRingRendered() ->
 
 renderIndexedRing({ok, Details}, Ring) ->
     Hostname = node_details:hostname(Details),
-    Pred = node_details:pred(Details),
+    PredList = node_details:predlist(Details),
     Node = node_details:me(Details),
     SuccList = node_details:succlist(Details),
     RTSize = node_details:rt_size(Details),
     Load = node_details:load(Details),
     MyIndex = get_indexed_id(Node, Ring),
     NIndex = length(Ring),
-    PredIndex = get_indexed_pred_id(Pred, Ring, MyIndex, NIndex),
+    PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, Ring, MyIndex, NIndex) end, PredList),
     SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, Ring, MyIndex, NIndex) end, SuccList),
     [FirstSuccIndex|_] = SuccIndices,
     {tr, [], 
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
        case is_list(PredIndex) orelse PredIndex =/= -1 of
-           true -> {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])};
+           true -> case hd(PredIndex) == -1 of
+                       true->
+                           {td, [], io_lib:format('~p', [PredIndex])};                                                      
+                       false ->
+                 			{td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
+                   end;
            false -> {td, [], io_lib:format('~p', [PredIndex])}
        end,
        {td, [], io_lib:format('~p: ~p', [MyIndex, get_id(Node)])},

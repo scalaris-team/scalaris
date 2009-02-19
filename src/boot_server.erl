@@ -108,13 +108,14 @@ loop(Nodes) ->
 	    % ugly work around for finding the local ip by setting up a socket first
 	    loop(Nodes);
 	_X ->
-	    io:format("[ I | Boot   | ~w ] unknown message: ~w~n",[self(), _X]),
+	   log:log(warn,"[ Boot | ~w ] unknown message: ~w",[self(), _X]),
 	    loop(Nodes)
     end.
 
 %% @doc starts the mainloop of the boot server
 %% @spec start(term()) -> gb_sets:gb_set(pid())
 start(InstanceId) ->
+    log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
     register(boot, self()),
     process_dictionary:register_process(InstanceId, boot_server, self()),
     loop(gb_trees:empty()).

@@ -68,7 +68,7 @@ handler(InstanceId, {call, test5, [_Cookie]}) ->
 handler(InstanceId, Payload) ->
     erlang:put(instance_id, InstanceId),
     FaultString = lists:flatten(io_lib:format("Unknown call: ~p", [Payload])),
-    io:format("unknown xmlrpc request: ~w~n", [FaultString]),
+   log:log(warn,"[ XMLRPC ] unknown xmlrpc request: ~w~n", [FaultString]),
     {false, {response, {fault, -4, FaultString}}}.
 
 start_link(InstanceId) ->

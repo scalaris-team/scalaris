@@ -49,7 +49,7 @@ start_link(InstanceId) ->
 
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
-    io:format("[ I | RT     | ~p ] starting ringtable~n", [self()]),
+   	log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     timer:send_interval(config:pointerStabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
     loop().
@@ -74,8 +74,6 @@ loop(Id, Pred, Succ, RTState) ->
 	    Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
 	    Pid ! {get_pred_succ, cs_send:this()},
 	    NewRTState = ?RT:stabilize(Id, Succ, RTState),
-	    failuredetector2:remove_subscriber(self()),
-	    failuredetector2:subscribe(?RT:to_pid_list(RTState)),
 	    check(RTState, NewRTState),
 	    loop(Id, Pred, Succ, NewRTState);
 	% got new successor
@@ -92,22 +90,46 @@ loop(Id, Pred, Succ, RTState) ->
 	{'$gen_cast', {debug_info, Requestor}} ->
 	    Requestor ! {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, {"rt_size", ?RT:get_size(RTState)}]},
 	    loop(Id, Pred, Succ, RTState);
+    {check,Port} ->
+        Y = [ {Index,node:pidX(Node)} || {Index,Node} <-gb_trees:to_list(RTState) ],
+ 		log:log(info,"[ RT ]: Wrongitems: ~p",[[Index || {Index,{_IP,PORT,_PID}} <-Y, PORT/=Port]]),
+        loop(Id, Pred, Succ, RTState);
 	{crash, DeadPid} ->
-	    loop(Id, Pred, Succ, ?RT:filterDeadNode(RTState, DeadPid));
+        NewRT = ?RT:filterDeadNode(RTState, DeadPid),
+        %io:format("~p~n",[{DeadPid,gb_trees:to_list(RTState),gb_trees:to_list(NewRT)}]),
+        check(RTState, NewRT, false),
+    	loop(Id, Pred, Succ, NewRT );
 	{dump} ->
-	    io:format("~p:~p~n", [Id, ?RT:dump(RTState)]),
+	   log:log(info,"[ RT ] ~p:~p", [Id, ?RT:dump(RTState)]),
 	    loop(Id, Pred, Succ, RTState);
 	X ->
-	    io:format("@rt_loop: unknown message ~p ~n", [X]),
+	    log:log(warn,"[ RT ]: unknown message ~p", [X]),
 	    loop(Id, Pred, Succ, RTState)
     end.
  
+check(Old, New) ->
+    check(Old, New, true).
 
-check(X, X) ->
+% OldRT, NewRT, CheckFD
+check(X, X, _) ->
     ok;
-check(_OldRT, NewRT) ->
+check(OldRT, NewRT, true) ->
+    Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
+    Pid ! {rt_update, NewRT},
+    check_fd(NewRT, OldRT);
+check(_OldRT, NewRT, false) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
     Pid ! {rt_update, NewRT}.
+
+check_fd(X, X) ->
+    ok;
+check_fd(NewRT, OldRT) ->
+    NewView = ?RT:to_pid_list(NewRT),
+    OldView = ?RT:to_pid_list(OldRT),
+    NewNodes = util:minus(NewView,OldView),
+    OldNodes = util:minus(OldView,NewView),
+    failuredetector2:unsubscribe(OldNodes),             
+    failuredetector2:subscribe(NewNodes).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Debug

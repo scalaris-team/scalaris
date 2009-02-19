@@ -33,7 +33,7 @@
 -export([start_link/1, initialize/4, 
 	 get_successorlist/0, succ_left/1, pred_left/1, 
 	 notify/1, update_succ/1, update_pred/1, 
-	 get_as_list/0]).
+	 get_as_list/0,get_predlist/0]).
 
 % unit testing
 -export([merge/3]).
@@ -96,6 +96,13 @@ notify(Pred) ->
 
 get_as_list() ->
     get_successorlist().
+
+get_predlist() ->
+    get_pid() ! {get_predlist, self()},
+    receive
+	{get_predlist_response, PredList} ->
+	    PredList
+    end.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
@@ -106,26 +113,27 @@ start() ->
 	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
 	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
 	    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList], 
-							   not node:is_null(Node)]),
+	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
 	    CSNode ! {init_done},
 	    loop(NewId, NewMe, NewPred, NewSuccList)
     end.
 
 loop(Id, Me, Pred, Succs) ->
     receive
-	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
-	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-	    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList],
-							  not node:is_null(Node)]),
-	    CSNode ! {init_done},
-	    loop(NewId, NewMe, NewPred, NewSuccList);
 	{get_successorlist, Pid} ->
 	    Pid ! {get_successorlist_response, Succs},
 	    loop(Id, Me, Pred, Succs);
+    {get_predlist, Pid} ->
+        Pid ! {get_predlist_response, [Pred]},
+       	loop(Id, Me, Pred, Succs);
+
 	{stabilize} -> % new stabilization interval
-	    cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()}),
+        case Succs of
+            [] -> 
+                ok;
+            _  -> 
+                cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
+        end,
 	    loop(Id, Me, Pred, Succs);
 	{get_pred_response, SuccsPred} ->
 	    case node:is_null(SuccsPred) of
@@ -170,9 +178,7 @@ loop(Id, Me, Pred, Succs) ->
 	{crash, DeadPid} ->
 	    case node:is_null(Pred) orelse DeadPid == node:pidX(Pred) of
 		true ->
-		    NewSuccs = filter(DeadPid, Succs),
-		    update_succ_and_pred(node:null(), hd(NewSuccs), Pred, hd(Succs)),
-		    loop(Id, Me, node:null(), NewSuccs);
+		    loop(Id, Me, node:null(), filter(DeadPid, Succs));
 		false ->
 		    loop(Id, Me, Pred, filter(DeadPid, Succs))
 	    end;
@@ -181,7 +187,7 @@ loop(Id, Me, Pred, Succs) ->
 					       {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]},
 	    loop(Id, Me, Pred, Succs);
 	X ->
-	    io:format("@rm_chord unknown message ~p~n", [X]),
+	   log:log(warn,"[ RM ] unknown message ~p~n", [X]),
 	    loop(Id, Me, Pred, Succs)
     end.
 
@@ -195,9 +201,9 @@ merge(L1, L2, Id) ->
     Order = fun(A, B) ->
 		    node:id(A) =< node:id(B)
 	    end,
-    Larger  = lists:usort(Order, [X || X <- MergedList, node:id(X) >  Id]),
-    Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) == Id]),
-    Smaller = lists:usort(Order, [X || X <- MergedList, node:id(X) <  Id]),
+    Larger  = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) >  Id])),
+    Equal   = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) == Id])),
+    Smaller = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) <  Id])),
     lists:append([Larger, Smaller, Equal]).
 
 filter(_Pid, []) ->
@@ -210,21 +216,13 @@ filter(Pid, [Succ | Rest]) ->
 	    [Succ | filter(Pid, Rest)]
     end.
 
-update_succ_and_pred(NewPred, NewSucc, OldPred, OldSucc) ->
-    case NewPred /= OldPred orelse NewSucc /= OldSucc of
-	true ->
-	    ring_maintenance:update_succ_and_pred(NewPred, NewSucc);
-	false ->
-	    ok
-    end.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc starts ring maintenance
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-    io:format("[ I | RM     | ~p ] starting ring maintainer~n", [self()]),
+   log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
     timer:send_interval(config:stabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
     start().

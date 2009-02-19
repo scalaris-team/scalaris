@@ -78,6 +78,8 @@ clean:
 	-rm -rf src/comm_layer/*.beam
 	-rm -rf src/pubsub/*.beam
 	-rm -rf src/transstore/*.beam
+	-rm -rf contrib/yaws/ebin/*.beam
+	-rm -rf contrib/log4erl/ebin/*.beam
 	-rm -rf test/*.beam
 	-rm -rf doc/*.html
 	-rm -rf doc/*.css

@@ -45,8 +45,16 @@ lookup_aux(State, Key, Hops, Msg) ->
     ?LOG("[ ~w | I | Node   | ~w ] lookup_aux ~w ~w ~s~n",[calendar:universal_time(), self(), Terminate, P, Key]),
     if
 	Terminate ->
-	    cs_send:send(P, {lookup_fin, Hops + 1, Msg});
+	    cs_send:send(cs_state:succ_pid(State), {lookup_fin, Hops + 1, Msg});
 	true ->
+        case lists:member(node(P), [erlang:node() |erlang:nodes()]) of
+            true ->
+                ok;
+            false ->
+                %io:format("~p ~p~n", [node(P), [erlang:node()| erlang:nodes()]]),
+                io:format("error in lookup_aux: ~n")
+                %io:format("error in lookup_aux: ~p ~p~n ~p ~n", [cs_state:succ(State), cs_state:pred(State),gb_trees:to_list(cs_state:rt(State))])
+        end,
 	    cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
     end.
 
