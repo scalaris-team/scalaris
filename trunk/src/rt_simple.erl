@@ -38,7 +38,11 @@
 % @type key(). Identifier.
 -type(key()::pos_integer()).
 % @type rt(). Routing Table.
+-ifdef(types_are_builtin).
 -type(rt()::{node:node_type(), gb_tree()}).
+-else.
+-type(rt()::{node:node_type(), gb_trees:gb_tree()}).
+-endif.
 
 %% @doc creates an empty routing table.
 %%      per default the empty routing should already include 
