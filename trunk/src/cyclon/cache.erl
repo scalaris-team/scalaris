@@ -22,10 +22,10 @@
 -import(util).
 %% API
 
--export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2 ,update/1, minus/2, merge/3, trim/1, get_list_of_cyclons/1 ,inc_age/1, get_oldest/1]).
+-export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_nodes/1 ,inc_age/1, get_youngest/2, get_oldest/1, ages/1]).
 
-% list of {pid of cyclon process, pid of cs_node process, age}
--type(cache() :: list({{node:node_type(), node:node_type()}, pos_integer()})).
+% list of {pid of cs_node process, age}
+-type(cache() :: list({node:node_type(), pos_integer()})).
 
 %% @doc Firstly try to insert QT in Cache on the empty slots, and secondly replacing entries among the ones original sent
 -spec(merge/3 :: (cache(), cache(), cache()) -> cache()).
@@ -58,43 +58,11 @@ minus([H|T],N) ->
 
 
 %% @doc 
-get_list_of_cyclons([]) ->
+get_list_of_nodes([]) ->
 	[];
-get_list_of_cyclons([{{A,_},_}|T]) ->
-	[A]++get_list_of_cyclons(T).
+get_list_of_nodes([{A,_}|T]) ->
+	[A]++get_list_of_nodes(T).
 	
-%CacheSize = config:read(cyclon_cache_size).
-send_req([]) ->
-    nil;
-send_req([{{Cyclon,Node},_}|T]) ->
-    case Cyclon of
-	nil ->
-						%io:format("Send to: ~p~n",[Node]),
-	    cs_send:send(Node,{get_cyclon_pid, cs_send:this(), Node}),
-	    send_req(T);
-	_ ->
-	    send_req(T)
-    end.
-
-receive_req(Cache) ->
-    case cache:size(Cache) ==length(Cache) of % Replace this with a Test of nil !!!!!!!!!!!
-	true ->
-	    Cache;
-	false ->
-	    receive 
-		{cyclon_pid,Node,Cyclon} ->
-		    %io:format("+ ~p | ~p ~n",[Node,Cyclon]),
-		    receive_req(add_element({{Cyclon,Node},0},Cache))				
-	    after 300 ->
-		    
-		    Cache
-	    end
-    end.
-
-%% @doc make the cache valid, by ataching CyclonPids to they NodePids
-update(Cache) ->
-    send_req(Cache),
-    receive_req(Cache).
 
 %% @doc ensure that one place is empty in the stack, by delete a random entrie if no space left
 trim(Cache) ->
@@ -111,7 +79,7 @@ get_cache(Foo) ->
 add_list([],Foo) ->
 	Foo;
 add_list([NodePid|T],Foo) ->
-	add_list(T,add_element({{nil,NodePid},0},Foo)).
+	add_list(T,add_element({NodePid,0},Foo)).
 
 
 get_random_element(State) ->
@@ -143,20 +111,39 @@ get_oldest(Cache) ->
 			    end,
 			    0,
 			    Cache),
+    %io:format("Oldest: ~p~n",[HighestAge]),
     OldElements = lists:filter(fun ({_, Age}) ->
 				       Age == HighestAge
 			       end,
 			       Cache),
     get_random_element(OldElements).
-				    
 
+%% @doc find youngest element (randomize if multiple youngest elements)
+get_youngest(_,[]) ->
+    [];
+get_youngest(N,Cache) ->
+    Order = fun(A, B) ->
+		    get_age(A) =< get_age(B)
+	    end,
+    SortAge = lists:sort(Order,Cache),
+
+    YoungElements = lists:sublist(SortAge,1, N),	
+    Out= get_node(get_random_element(YoungElements)),
+	%io:format("Youngest: ~p~n",[Out]),
+	[Out].
+
+get_node({X,_}) ->
+    X.
+
+get_age({_,X}) ->
+    X.
 inc_age(Cache) ->
-    lists:map(fun({{A,B},C}) ->
-		      {{A,B}, C + 1}
-	      end,
+    lists:map(fun({A,C}) ->
+		      {A, C + 1}
+              end,
 	      Cache).
 
-eq({{_,A},_},{{_,B},_}) ->
+eq({A,_},{B,_}) ->
 	A==B . 
 
 
@@ -164,13 +151,13 @@ new() ->
 	[].
 %% @doc Amount of valid Cache entries 
 size([]) ->
-0;
+	0;
 size([H|T]) ->
-{{Cyclon,_},_}=H,
-case Cyclon of
-	nil	-> cache:size(T);
-	_	-> 1+cache:size(T)
-end.
+	{Node,_}=H,
+	case Node of
+		nil	-> cache:size(T);
+		_	-> 1+cache:size(T)
+    end.
 
 
 
@@ -197,3 +184,7 @@ add_element(Element, Cache) ->
 	    [Element | Cache]
     end.
 
+ages([]) ->
+	[];
+ages([{_,Age}|T]) ->
+    [Age]++ages(T).

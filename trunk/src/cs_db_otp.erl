@@ -63,7 +63,7 @@ get_pid() ->
     InstanceId = erlang:get(instance_id),
     if
 	InstanceId == undefined ->
-	    io:format("~p~n", [util:get_stacktrace()]);
+	   log:log(error,"~p", [util:get_stacktrace()]);
 	true ->
 	    ok
     end,

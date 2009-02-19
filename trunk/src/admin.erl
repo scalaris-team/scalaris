@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum fr Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3]).
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1]).
 
 %%====================================================================
 %% API functions
@@ -94,15 +94,15 @@ check_ring_foldl({ok, Node}, PredsSucc) ->
     end.
 
 
-    
+
 get_id(Node) ->
-    IsNull = node:is_null(Node),
-    if
-        IsNull ->
-            "null";
-        true ->
-            node:id(Node)
-    end.
+    case node:is_null(Node) of
+		true ->
+			"null";
+		false ->
+	    	node:id(Node)
+    end.    
+
 
 %%===============================================================================
 %% comm_layer:comm_logger functions
@@ -179,3 +179,25 @@ loop() ->
 % @spec nodes() -> list()
 nodes() ->
     util:uniq([IP || {IP, _, _} <- lists:sort(boot_server:node_list())]).
+
+%%===============================================================================
+%% Debug functions
+%%===============================================================================
+
+print_ages() ->
+	Nodes = boot_server:node_list(),
+	[ cs_send:send_to_group_member(Node,cyclon,{get_ages,self()}) || Node <- Nodes ],
+    worker_loop().
+		
+worker_loop() ->
+	receive 
+		{ages,Ages} ->
+			io:format("~p~n",[Ages]),
+			worker_loop()
+    after 400 ->
+            ok
+	end.
+
+check_routing_tables(Port) ->
+	Nodes = boot_server:node_list(),
+	[ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- Nodes ].

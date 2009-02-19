@@ -67,6 +67,7 @@ get_ring_details() ->
     lists:sort(fun compare_node_details/2, lists:map(fun (Pid) -> get_node_details(Pid) end, Nodes)).
     
 
+
 compare_node_details({ok, X}, {ok, Y}) ->
     node:id(node_details:me(X)) < node:id(node_details:me(Y));
 compare_node_details({failed}, _) ->

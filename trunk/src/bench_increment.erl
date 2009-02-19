@@ -36,7 +36,7 @@ init() ->
 			timer:sleep(6010000) 
 		end),
     timer:sleep(22000),
-    io:format("init done~n", []),
+   log:log(info,"[ Bench ] init done"),
     Pid.
 
 tini(Pid) ->

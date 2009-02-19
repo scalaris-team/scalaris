@@ -34,6 +34,8 @@
 	 succ/1, succ_pid/1, succ_id/1,
 	 pred_pid/1, pred_id/1, pred/1, 
 	 update_pred_succ/3,
+     update_succ/2,
+     update_pred/2,
 	 dump/1,
 	 set_rt/2, rt/1,
 	 get_db/1, set_db/2,
@@ -130,14 +132,16 @@ dump(State) ->
     ok.
 
 details(State) ->
-    Pred = pred(State),
+    Predlist = ?RM:get_predlist(),
+    %Predlist = [pred(State)],
     Node = me(State),
     SuccList = ?RM:get_as_list(),
+    %SuccList = [succ(State)],
     Load = ?DB:get_load(get_db(State)),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),
     %node_details:new(Pred, Node, SuccList, Load, FD_Size, Hostname, RTSize, cs_message:get_details(), erlang:memory(total)).
-    node_details:new(Pred, Node, SuccList, Load, Hostname, RTSize, ok, erlang:memory(total)).
+    node_details:new(Predlist, Node, SuccList, Load, Hostname, RTSize, ok, erlang:memory(total)).
 
 %%% Transactions
 %%% Information on transactions that all possible TMs and TPs share
@@ -156,3 +160,13 @@ update_pred_succ(State, Pred, Succ) ->
 	false ->
 	    State#state{predecessor=Pred, successor=Succ, my_range={node:id(Pred), id(State)}}
     end.
+
+update_pred(State, Pred) ->
+    case node:is_null(Pred) of
+	true ->
+	    State#state{predecessor=Pred};
+	false ->
+	    State#state{predecessor=Pred, my_range={node:id(Pred), id(State)}}
+    end.
+update_succ(State, Succ) ->
+	    State#state{successor=Succ}.

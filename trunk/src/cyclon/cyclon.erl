@@ -25,6 +25,7 @@
 -import(process_dictionary).
 -import(erlang).
 -import(node).
+-import(log).
 %% API
 -export([start_link/1, start/1]).
 
@@ -50,10 +51,32 @@ start(InstanceId) ->
     process_dictionary:register_process(InstanceId, cyclon, self()),
     %process_dictionary:register_process(InstanceId, cyclonNode, cs_send:this()),
     %{observer,'me@csr-pc38.zib.de' } ! {cyclon, self()},
+    
+    
+    
+    get_pid() !	{get_node, cs_send:this(),2.71828183},
     get_pid() ! {get_pred_succ, cs_send:this()},
+    
+    receive
+    	{get_node_response, 2.71828183, Me} ->
+          	Node = Me
+	end,
+    
+    receive
+    {get_pred_succ_response, Pred, Succ} ->
+	    %Me = cs_send:get(get_pid(), cs_send:this()),
+	   	%io:format("Pred ~p~n Succ~p~n ~n", [node:pidX(Pred),pidX(Succ)]),
+		case Pred /= Node of
+ 	 		true ->
+				Cache =  cache:add_list([Pred,Succ], cache:new());
+			false ->
+				Cache =  cache:new()
+		end
+    end,
+    
     erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-    io:format("Cyclon spawn: ~p~n", [cs_send:this()]),
-    loop(cache:new(),cs_send:get(get_pid(), cs_send:this()),0).
+    log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
+    loop(Cache,Node,0).
 
 
 %% Cache
@@ -63,8 +86,18 @@ start(InstanceId) ->
 
 loop(Cache,Node,Cycles) ->
     receive
-	{getcache,Pid} ->
-		Pid ! {cache,cs_send:this(),Cycles,cache:get_list_of_cyclons(Cache)},
+    {get_ages,Pid} ->
+        Pid ! {ages,cache:ages(Cache)},
+        loop(Cache,Node,Cycles);
+    
+    {get_subset,all,Pid} ->
+		Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
+		loop(Cache,Node,Cycles);
+	{get_subset,N,Pid} ->
+		Pid ! {cache,cache:get_youngest(N,Cache)},
+		loop(Cache,Node,Cycles);
+	{get_cache,Pid} ->
+		Pid ! {cache,cache:get_list_of_nodes(Cache)},
 		loop(Cache,Node,Cycles);
 	{flush_cache} ->
 		get_pid() ! {get_pred_succ, cs_send:this()},
@@ -73,16 +106,7 @@ loop(Cache,Node,Cycles) ->
 		erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
 		loop(Cache,Node,Cycles);
 			
-	{get_pred_succ_response, Pred, Succ} ->
-	    %Me = cs_send:get(get_pid(), cs_send:this()),
-	   	%io:format("Pred ~p~n Succ~p~n ~n", [node:pidX(Pred),pidX(Succ)]),
-		case node:pidX(Pred) /= Node of
- 	 		true ->
-				NewCache =  cache:add_list([node:pidX(Pred),node:pidX(Succ)], Cache),
-				loop(cache:update(NewCache),Node,Cycles);
-			false ->
-				loop(Cache,Node,Cycles)
-		end;
+	
 		
 	{'$gen_cast', {debug_info, Requestor}}  ->
 	    %io:format("gen_cast~n", []),
@@ -99,34 +123,32 @@ loop(Cache,Node,Cycles) ->
 		    nil ->
 			loop(Cache,Node,Cycles);
 		    _	->
-			NewCache = case cache:size(Cache) of
-				       0 -> 
+			NewCache = 
+                case cache:size(Cache) of
+					0 -> 
 					   Cache;	
-				       _  ->
+				    _  ->
 					   enhanced_shuffle(Cache,Node)
-				   end,
+				end,
 			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
 			loop(NewCache,Node,Cycles+1)
 		end;
-	{subset,P,Subset} ->
+	{cy_subset,P,Subset} ->
 		%io:format("subset~n", []),
 		ForSend=cache:get_random_subset(get_L(Cache),Cache),
 		%io:format("<",[]),
-		cs_send:send(P,{subset_response,ForSend,Subset}),
+		cs_send:send_to_group_member(node:pidX(P),cyclon,{cy_subset_response,ForSend,Subset}),
 		N2=cache:minus(Subset,Cache),
 		NewCache = cache:merge(Cache,N2,ForSend),
 		loop(NewCache,Node,Cycles);
-	{subset_response,Subset,OldSubset} ->
+	{cy_subset_response,Subset,OldSubset} ->
 		%io:format("subset_response~n", []),
-		N1=cache:delete({{nil,Node},nil},Subset),
+		N1=cache:delete({Node,nil},Subset),
 		N2=cache:minus(N1,Cache),
 		NewCache=cache:merge(Cache,N2,OldSubset),
 		loop(NewCache,Node,Cycles);
-	{random_element,Pid} ->
-		Pid ! {random_element_response,cache:get_random_element(Cache)},
-		loop(Cache,Node,Cycles);
 	X ->
-		io:format("%% Unhandle Message: ~p~n", [X]),
+		log:log(warn,"[ CY | ~p ] Unhandle Message: ~p", [self(),X]),
 	    loop(Cache,Node,Cycles)
     end.
 
@@ -135,8 +157,8 @@ enhanced_shuffle(Cache, Node) ->
     Cache_1= cache:inc_age(Cache),
     Q=cache:get_oldest(Cache_1),
     Subset=cache:get_random_subset(get_L(Cache_1),Cache_1),
-    {{QCyclon,_},_} = Q,
-    case (QCyclon /= cs_send:this()) of
+    {QCyclon,_} = Q,
+    case (QCyclon /= Node) of
 	true ->
 	    NSubset_pre=cache:delete(Q,Subset),
 	    NSubset = case cache:size(NSubset_pre) == config:read(cyclon_shuffle_length) of
@@ -145,10 +167,10 @@ enhanced_shuffle(Cache, Node) ->
 			  false ->
 			      NSubset_pre
 		      end,
-	    ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
+	    ForSend=cache:add_element({Node,0},NSubset),
 	    %io:format(">",[]),
-	    cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
-	    cache:delete(Q,Cache);	
+	    cs_send:send_to_group_member(node:pidX(QCyclon),cyclon,{cy_subset,Node,ForSend}),
+	    cache:delete(Q,Cache_1);	
 	false -> 
 	    error
     end.
@@ -157,17 +179,18 @@ enhanced_shuffle(Cache, Node) ->
 simple_shuffle(Cache, Node) ->
     Subset=cache:get_random_subset(get_L(Cache),Cache),
     Q=cache:get_random_element(Subset),
-    {{QCyclon,_},_} = Q,
-    case (QCyclon /= cs_send:this()) of
+    {{QCyclon},_} = Q,
+    case (QCyclon /= Node) of
 	true ->
 	    NSubset=cache:delete(Q,Subset),
-	    ForSend=cache:add_element({{cs_send:this(),Node},0},NSubset),
+	    ForSend=cache:add_element({Node,0},NSubset),
 	    %io:format("~p",[length(ForSend)]),
-	    cs_send:send(QCyclon,{subset,cs_send:this(),ForSend}),
+	    cs_send:send_to_group_member(node:pidX(QCyclon),cyclon,{cy_subset,Node,ForSend}),
 	    cache:delete(Q,Cache);	
 	false -> 
 	    Cache
     end.
+	
 
 
 get_L(Cache) ->
@@ -185,7 +208,7 @@ get_pid() ->
     InstanceId = erlang:get(instance_id),
     if
 	InstanceId == undefined ->
-	    io:format("~p~n", [util:get_stacktrace()]);
+	   log:log(error,"[ CY | ~w ] ~p", [self(),util:get_stacktrace()]);
 	true ->
 	    ok
     end,

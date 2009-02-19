@@ -30,7 +30,7 @@
 
 -include("chordsharp.hrl").
 
--export([start_link/1, init/1]).
+-export([start_link/2, init/1]).
 
 %%====================================================================
 %% API functions
@@ -39,8 +39,8 @@
 %% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
 %% Description: Starts the supervisor
 %%--------------------------------------------------------------------
-start_link(InstanceId) ->
-    supervisor:start_link(?MODULE, [InstanceId]).
+start_link(InstanceId, Options) ->
+    supervisor:start_link(?MODULE, [InstanceId, Options]).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -55,10 +55,10 @@ start_link(InstanceId) ->
 %% specifications.
 %%--------------------------------------------------------------------
 %% userdevguide-begin cs_sup_and:init
-init([InstanceId]) ->
+init([InstanceId, Options]) ->
     Node =
 	{cs_node,
-	 {cs_node, start_link, [InstanceId]},
+	 {cs_node, start_link, [InstanceId, Options]},
 	 permanent,
 	 brutal_kill,
 	 worker,

@@ -30,7 +30,7 @@
 
 -include("chordsharp.hrl").
 
--export([start_link/0, init/1]).
+-export([start_link/1, start_link/0, init/1]).
 
 %%====================================================================
 %% API functions
@@ -39,8 +39,11 @@
 %% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
 %% Description: Starts the supervisor
 %%--------------------------------------------------------------------
+start_link(Options) ->
+    supervisor:start_link(?MODULE, [Options]).
+
 start_link() ->
-    supervisor:start_link(?MODULE, []).
+    supervisor:start_link(?MODULE, [[]]).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -55,7 +58,7 @@ start_link() ->
 %% specifications.
 %%--------------------------------------------------------------------
 %% userdevguide-begin cs_sup_or:init
-init([]) ->
+init([Options]) ->
     InstanceId = string:concat("cs_node_", randoms:getRandomId()),
     KeyHolder =
 	{cs_keyholder,
@@ -64,9 +67,16 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    RSE =
+	{rse_chord,
+	 {rse_chord, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     Supervisor_AND = 
 	{cs_supervisor_and,
-	 {cs_sup_and, start_link, [InstanceId]},
+	 {cs_sup_and, start_link, [InstanceId, Options]},
 	 permanent,
 	 brutal_kill,
 	 supervisor,
@@ -85,11 +95,20 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    DeadNodeCache = 
+	{deadnodecache,
+	 {dn_cache, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_one, 10, 1},
 	  [
 	   KeyHolder,
+       DeadNodeCache,
 	   RingMaintenance,
 	   RoutingTable,
-	   Supervisor_AND
+	   Supervisor_AND,
+	   RSE
 	  ]}}.
 %% userdevguide-end cs_sup_or:init

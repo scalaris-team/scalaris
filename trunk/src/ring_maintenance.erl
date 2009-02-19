@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id').
 
--export([behaviour_info/1, update_succ_and_pred/2]).
+-export([behaviour_info/1, update_succ_and_pred/2, update_succ/1,  update_pred/1]).
 
 behaviour_info(callbacks) ->
     [
@@ -53,4 +53,18 @@ behaviour_info(_Other) ->
 %%      that his pred/succ changed
 update_succ_and_pred(Pred, Succ) ->    
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rm_update, Pred, Succ}.
+    Pid ! {rm_update_pred_succ, Pred, Succ}.
+
+
+%% @doc functions for rm_*.erl modules to notify the cs_node
+%%      that his pred/succ changed
+update_pred(Pred) ->    
+    Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
+    Pid ! {rm_update_pred, Pred}.
+
+
+%% @doc functions for rm_*.erl modules to notify the cs_node
+%%      that his pred/succ changed
+update_succ(Succ) ->    
+    Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
+    Pid ! {rm_update_succ, Succ}.

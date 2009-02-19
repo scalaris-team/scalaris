@@ -30,7 +30,7 @@
 -import(config).
 -import(gen_tcp).
 -import(inet).
--import(io).
+-import(log).
 -import(lists).
 -import(process_dictionary).
 
@@ -44,7 +44,7 @@ start_link(InstanceId) ->
 init(InstanceId, Supervisor) ->
     process_dictionary:register_process(InstanceId, acceptor, self()),
     erlang:register(comm_layer_acceptor, self()),
-    io:format("listening on ~p:~p~n", [config:listenIP(), config:listenPort()]),
+   log:log(info,"[ CC ] listening on ~p:~p", [config:listenIP(), config:listenPort()]),
     LS = case config:listenIP() of
 		       undefined ->
 			   open_listen_port(config:listenPort(), first_ip());
@@ -92,7 +92,7 @@ server(LS) ->
 	    end,
 	    server(LS);
 	Other ->
-            log:log2file(comm_connection, io_lib:format("unknown message ~p~n", [Other]))
+            log:log(warn,"[ CC ] unknown message ~p", [Other])
     end.
 
 open_listen_port({From, To}, IP) ->
@@ -103,7 +103,7 @@ open_listen_port([Port | Rest], IP) ->
 	{ok, Socket} ->
 	    Socket;
 	{error, Reason} ->
-	    io:format("can't listen on ~p: ~p~n", [Port, Reason]),
+	   log:log(error,"[ CC ] can't listen on ~p: ~p~n", [Port, Reason]),
 	    open_listen_port(Rest, IP)
     end;
 open_listen_port([], _) ->

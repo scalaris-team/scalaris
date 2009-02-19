@@ -19,7 +19,7 @@
 %%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
+%% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 -module(cs_node).
 
@@ -29,7 +29,7 @@
 -include("transstore/trecords.hrl").
 -include("chordsharp.hrl").
 
--export([start_link/1, start/2]).
+-export([start_link/1, start_link/2, start/3]).
 
 
 %logging on
@@ -48,8 +48,12 @@
 loop(State, Debug) ->
     receive
 	{kill} ->
-	    timer:sleep(10000),
-	    ok;
+        ok;
+    {churn} ->
+        cs_keyholder:reinit(),
+        ok;
+    {halt} ->
+        util:sleep_for_ever();
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ping Messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -66,9 +70,18 @@ loop(State, Debug) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	{rm_update, Pred, Succ} ->
+	{rm_update_pred_succ, Pred, Succ} ->
 	    NewState = cs_state:update_pred_succ(State, Pred, Succ),
 	    loop(NewState, ?DEBUG(Debug));
+    
+    {rm_update_pred, Pred} ->
+	    NewState = cs_state:update_pred(State, Pred),
+	    loop(NewState, ?DEBUG(Debug));
+    {rm_update_succ, Succ} ->
+	    NewState = cs_state:update_succ(State,Succ),
+	    loop(NewState, ?DEBUG(Debug));
+    
+     
 	{succ_left, SuccList} = _Message ->
 	    ?RM:succ_left(SuccList),
 	    loop(State, ?DEBUG(Debug));
@@ -117,7 +130,7 @@ loop(State, Debug) ->
 		    cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
 		    loop(State, ?DEBUG(Debug));
 		true ->
-		    io:format("LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),	    
+		   log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),	    
 		    loop(State, ?DEBUG(Debug))
 	    end;
 	%% answer - lookup for replicated transaction manager
@@ -200,7 +213,7 @@ loop(State, Debug) ->
 		    lookup:get_key(State, Source_PID, Key, Key),
 		    loop(State, ?DEBUG(Debug));
 		true ->
-		    io:format("Get_Key: Got Request for Key ~p, it is not between ~p and ~p ~n", [Key, RangeBeg, RangeEnd]),
+		    log:log(info,"[ Node ] Get_Key: Got Request for Key ~p, it is not between ~p and ~p", [Key, RangeBeg, RangeEnd]),
 		    %self() ! {lookup_aux, Key, Msg},
 		    loop(State, ?DEBUG(Debug))
 	    end;
@@ -212,7 +225,7 @@ loop(State, Debug) ->
 		    State2 = lookup:set_key(State, Source_PID, Key, Value, Versionnr),
 		    loop(State2, ?DEBUG(cs_debug:debug(Debug, State2, _Message)));
 		true ->
-		    io:format("Set_Key: Got Request for Key ~p, it is not between ~p and ~p ~n", [Key, RangeBeg, RangeEnd]),
+		    log:log(info,"[ Node ] Set_Key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
 		    %cs_send:send(Source_PID, {get_key_response, Key, failed}),
 		    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)))
 	    end;
@@ -337,19 +350,34 @@ loop(State, Debug) ->
 %% TODO buggy ...
 	{get_node_response, _, _} ->
 	    loop(State, ?DEBUG(Debug));
+%% 
+	{send_to_group_member,Processname,Mesg} ->
+        %% @TODO: cleanup
+    	InstanceId = erlang:get(instance_id),
+       	Pid = process_dictionary:lookup_process(InstanceId,Processname),
+        %PidNode = cs_send:get(Pid, cs_send:this()),
+        %cs_send:send(PidNode,Mesg),
+        Pid ! Mesg,
+        loop(State, ?DEBUG(Debug));
+
 	X ->
-	    io:format("cs_node: unknown message ~w~n", [X]),
+	    log:log(warn,"[ Node ] unknown message ~w", [X]),
 	    %ok
 	    loop(State, ?DEBUG(Debug))
     end.
 
 %% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec(start/2 :: (any(), any()) -> cs_state:state()).
-start(InstanceId, Parent) ->
+-spec(start/3 :: (any(), any(), list()) -> cs_state:state()).
+start(InstanceId, Parent, Options) ->
     process_dictionary:register_process(InstanceId, cs_node, self()),
     Parent ! done,
-    timer:sleep(crypto:rand_uniform(1, 100) * 100),
+    case lists:member(first, Options) of
+	true ->
+	    ok;
+	false ->
+	    timer:sleep(crypto:rand_uniform(1, 100) * 100)
+    end,
     Id = cs_keyholder:get_key(),
     boot_server:connect(),
     {First, State} = cs_join:join(Id),
@@ -359,7 +387,7 @@ start(InstanceId, Parent) ->
 	true ->
 	    ok
     end,
-    io:format("[ I | Node   | ~w ] joined~n",[self()]),
+    log:log(info,"[ Node ~w ] joined",[self()]),
     loop(State, cs_debug:new()).
 %% userdevguide-end cs_node:start
 
@@ -367,7 +395,10 @@ start(InstanceId, Parent) ->
 %% @doc spawns a chord# node, called by the chord# supervisor process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-    Link = spawn_link(?MODULE, start, [InstanceId, self()]),
+    start_link(InstanceId, []).
+
+start_link(InstanceId, Options) ->
+    Link = spawn_link(?MODULE, start, [InstanceId, self(), Options]),
     receive
 	done ->
 	    ok
@@ -379,7 +410,7 @@ get_local_cyclon_pid() ->
     InstanceId = erlang:get(instance_id),
     if
 	InstanceId == undefined ->
-	    io:format("~p~n", [util:get_stacktrace()]);
+	   log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
 	true ->
 	    ok
     end,

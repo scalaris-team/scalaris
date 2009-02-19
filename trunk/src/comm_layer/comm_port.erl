@@ -31,7 +31,7 @@
 
 -import(ets).
 -import(gen_server).
--import(io).
+-import(log).
 
 %% API
 -export([start_link/0,
@@ -125,7 +125,7 @@ handle_call({send, Address, Port, Pid, Message}, _From, State) ->
 	    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
 		{local_ip, MyIP, MyPort, MyPid, MySocket} ->
 		    comm_connection:send({Address, Port, MySocket}, Pid, Message),
-		    io:format("this() == ~w~n", [{MyIP, MyPort}]),
+		   log:log(info,"[ CC ] this() == ~w", [{MyIP, MyPort}]),
 %		    set_local_address(t, {MyIP,MyPort}}),
 %		    register_connection(Address, Port, MyPid, MySocket),
 		    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
