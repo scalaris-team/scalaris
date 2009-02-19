@@ -32,7 +32,7 @@
 
 -type(key()::integer() | string()).
 
--type(db()::gb_trees:gb_tree()).
+-type(db()::gb_tree()).
 
 -export([start_link/1,
 	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 

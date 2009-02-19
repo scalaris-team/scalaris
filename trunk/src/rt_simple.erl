@@ -38,7 +38,7 @@
 % @type key(). Identifier.
 -type(key()::pos_integer()).
 % @type rt(). Routing Table.
--type(rt()::{node:node_type(), gb_trees:gb_tree()}).
+-type(rt()::{node:node_type(), gb_tree()}).
 
 %% @doc creates an empty routing table.
 %%      per default the empty routing should already include 

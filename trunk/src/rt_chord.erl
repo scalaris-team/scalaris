@@ -43,7 +43,7 @@
 -export([stabilize/5]).
 
 -type(key()::pos_integer()).
--type(rt()::gb_trees:gb_tree()).
+-type(rt()::gb_tree()).
 
 %% @doc creates an empty routing table.
 -spec(empty/1 :: (node:node_type()) -> rt()).
