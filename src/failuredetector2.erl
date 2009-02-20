@@ -298,20 +298,23 @@ crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, Owner) ->
     unsubscribe(SubscriberTable, PingerTable, Pid, Owner).
 	%io:format("after unsubscribe~n").
 
+-spec(report_crash/1 :: (cs_send:mypid()) -> ok).
 report_crash(Pid) ->
-   log:log(warn,"[ FD ] ~p crashed",[Pid]),
-	case dump_to_file(Pid) of
-		ok ->
-			{Group, Name} = process_dictionary:lookup_process(Pid),
-   			log:log(warn,"[ FD ] a ~p process died",[Name]),
-			TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
-			dump_to_file(TManPid);
-		failed ->
-			ok
-	end,
+    log:log(warn,"[ FD ] ~p crashed",[Pid]),
+%%  debug code; only usable with distributed Erlang
+%%     case dump_to_file(Pid) of
+%% 	ok ->
+%% 	    {Group, Name} = process_dictionary:lookup_process(Pid),
+%% 	    log:log(warn,"[ FD ] a ~p process died",[Name]),
+%% 	    TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
+%% 	    dump_to_file(TManPid);
+%% 	failed ->
+%% 	    ok
+%%     end,
     %io:format("~p b crashed ~n",[Pid]),
     gen_server:call(?MODULE, {crash, Pid}, 20000).
     
+-spec(dump_to_file/1 :: (pid()) -> ok | failed).
 dump_to_file(Pid) ->
    	Res =  (catch erlang:process_info(Pid, backtrace)),
     (catch erlang:process_display(Pid, backtrace)),
