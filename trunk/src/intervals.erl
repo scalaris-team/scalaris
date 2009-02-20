@@ -47,7 +47,8 @@
 	 ]).
 
 -type(key() :: ?RT:key() | minus_infinity | plus_infinity).
--type(interval() :: [] | {element, key()} | {interval, key(), key()} | all | list(interval())).
+-type(simple_interval() :: {element, key()} | {interval, key(), key()} | all).
+-type(interval() :: simple_interval() | list(simple_interval())).
 % @type interval() = [] | term() | {interval,term(),term()} | all | list(interval()).
 % [] -> empty interval
 % {element, term()} -> one element interval

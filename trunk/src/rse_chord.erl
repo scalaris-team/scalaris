@@ -35,7 +35,7 @@ start_link(InstanceId) ->
     gen_component:start_link(?MODULE, [InstanceId], [profile]).
 
 %% @doc initializes component
--spec(init/1 :: (list(any())) -> state()).
+-spec(init/1 :: ([any()]) -> state()).
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, rse_chord, self()),
     erlang:send_after(shuffle_interval(), self(), {shuffle_trigger}),

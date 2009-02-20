@@ -97,7 +97,7 @@ lookup_process(InstanceId, Name) ->
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
 
 %% @doc find the process group and name of a process by pid
--spec(lookup_process/1 :: (pid()) -> {any(), any()}).
+-spec(lookup_process/1 :: (pid()) -> {any(), any()} | failed).
 lookup_process(Pid) ->
     case ets:match(?MODULE, {'$1',Pid}) of
 	[[{Group, Name}]] ->

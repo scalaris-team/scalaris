@@ -33,6 +33,12 @@
 
 -export([start_link/1, start/1, number_of_nodes/0, node_list/0, ping/0, ping/1, connect/0]).
 
+-ifdef(types_are_builtin).
+-type(boot_node_list()::gb_set()).
+-else.
+-type(boot_node_list()::gb_sets:gb_set()).
+-endif.
+
 %logging on
 %-define(LOG(S, L), io:format(S, L)).
 %logging off
@@ -43,6 +49,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc returns the number of nodes known to the boot server
 %% @spec number_of_nodes() -> integer()
+-spec(number_of_nodes/0 :: () -> pos_integer()).
 number_of_nodes() ->
     cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
     receive
@@ -55,6 +62,7 @@ connect() ->
 
 %% @doc returns all nodes known to the boot server
 %% @spec node_list() -> list(pid())
+-spec(node_list/0 :: () -> list()).
 node_list() ->
     cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
     receive
@@ -87,6 +95,7 @@ ping(PID) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc the main loop of the bootstrapping server
 %% @spec loop(gb_sets:gb_set(pid())) -> gb_sets:gb_set(pid())
+-spec(loop/1 :: (boot_node_list()) -> no_return()).
 loop(Nodes) ->
     receive
 	{crash, PID} ->
@@ -114,11 +123,12 @@ loop(Nodes) ->
 
 %% @doc starts the mainloop of the boot server
 %% @spec start(term()) -> gb_sets:gb_set(pid())
+-spec(start/1 :: (any()) -> no_return()).
 start(InstanceId) ->
     log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
     register(boot, self()),
     process_dictionary:register_process(InstanceId, boot_server, self()),
-    loop(gb_trees:empty()).
+    loop(gb_sets:empty()).
 
 %% @doc starts the server; called by the boot supervisor
 %% @see boot_sup
