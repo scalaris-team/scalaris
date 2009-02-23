@@ -47,11 +47,9 @@ start_link(InstanceId) ->
 	end.
    
 start(InstanceId) ->
-    boot_server:connect(),
     process_dictionary:register_process(InstanceId, cyclon, self()),
     %process_dictionary:register_process(InstanceId, cyclonNode, cs_send:this()),
     %{observer,'me@csr-pc38.zib.de' } ! {cyclon, self()},
-    
     
     
     get_pid() !	{get_node, cs_send:this(),2.71828183},
