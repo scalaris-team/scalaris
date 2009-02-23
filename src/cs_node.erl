@@ -392,7 +392,6 @@ start(InstanceId, Parent, Options) ->
 	    timer:sleep(crypto:rand_uniform(1, 100) * 100)
     end,
     Id = cs_keyholder:get_key(),
-    boot_server:connect(),
     {First, State} = cs_join:join(Id),
     if
 	not First ->
