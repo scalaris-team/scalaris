@@ -40,6 +40,8 @@ behaviour_info(callbacks) ->
      {get_locks, 2},
      % standard calls
      {read, 2}, {write, 4}, {get_version, 2},
+     % dangerous calls
+     {delete, 2},
      %load balancing
      {get_load, 1}, {get_middle_key, 1}, {split_data, 3}, 
      %

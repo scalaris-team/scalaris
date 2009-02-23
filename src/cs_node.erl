@@ -108,6 +108,9 @@ loop(State, Debug) ->
 	{read, SourcePID, Key}->
 	    transstore.transaction:quorum_read(Key, SourcePID),
 	    loop(State, ?DEBUG(Debug));
+	{delete, SourcePID, Key} ->
+	    transstore.transaction:delete(SourcePID, Key),
+	    loop(State, ?DEBUG(Debug));
 	{parallel_reads, SourcePID, Keys, TLog}->
 	    transstore.transaction:parallel_quorum_reads(Keys, TLog, SourcePID),
 	    loop(State, ?DEBUG(Debug));
@@ -229,6 +232,16 @@ loop(State, Debug) ->
 		    %cs_send:send(Source_PID, {get_key_response, Key, failed}),
 		    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)))
 	    end;
+	{delete_key, Source_PID, Key} ->
+	    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
+	    case util:is_between(RangeBeg, Key, RangeEnd) of
+		true ->
+		    State2 = lookup:delete_key(State, Source_PID, Key),
+		    loop(State2, ?DEBUG(Debug));
+		false ->
+		    log:log(info,"[ Node ] delete_key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
+		    loop(State, ?DEBUG(cs_debug:debug(Debug, State, _Message)))
+	    end;    
 	{drop_data, Data, Sender} = _Message ->
 	    cs_send:send(Sender, {drop_data_ack}),
 	    DB = ?DB:add_data(cs_state:get_db(State), Data),
