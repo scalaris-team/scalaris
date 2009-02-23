@@ -28,7 +28,7 @@
 
 -include("chordsharp.hrl").
 
--export([lookup_aux/4, lookup_fin/2, get_key/4, set_key/5]).
+-export([lookup_aux/4, lookup_fin/2, get_key/4, set_key/5, delete_key/3]).
 
 %logging on
 %-define(LOG(S, L), io:format(S, L)).
@@ -59,3 +59,8 @@ set_key(State, Source_PID, Key, Value, Versionnr) ->
     cs_send:send(Source_PID, {set_key_response, Key, Value, Versionnr}),
     DB = ?DB:write(cs_state:get_db(State), Key, Value, Versionnr),
     cs_state:set_db(State, DB).
+
+delete_key(State, Source_PID, Key) ->
+    {DB2, Result} = ?DB:delete(cs_state:get_db(State), Key),
+    cs_send:send(Source_PID, {delete_key_response, Key, Result}),
+    cs_state:set_db(State, DB2).

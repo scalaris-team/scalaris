@@ -27,6 +27,7 @@
 -vsn('$Id$ ').
 
 -include("trecords.hrl").
+-include("../chordsharp.hrl").
 
 -export([do_transaction/5, 
 	 do_transaction_wo_readphase/6, 
@@ -35,6 +36,8 @@
 	 initRTM/2, 
 	 write/3, 
 	 read/2, 
+	 delete/2,
+	 do_delete/3,
 	 parallel_reads/2,
 	 do_parallel_reads/4, 
 	 parallel_quorum_reads/3, 
@@ -670,14 +673,59 @@ initRTM(State, Message)->
     NewTransLog = TransLog#translog{tid_tm_mapping = New_TID_TM_Mapping},
     cs_state:set_trans_log(State, NewTransLog).
 
-%%====================================================================
-%% Functions to manipulate TransLog's
-%%====================================================================
+%% @doc deletes all replicas of an item, but respects locks
+%%      the return value is the number of successfully deleted items
+%%      WARNING: this function can lead to inconsistencies
+-spec(delete/2 :: (cs_send:mypid(), any()) -> pos_integer()).
+delete(SourcePID, Key) ->
+    InstanceId = erlang:get(instance_id),
+    spawn(transstore.transaction, do_delete, [Key, SourcePID, InstanceId]).
 
-%%-------------------------------------------------------------------
+do_delete(Key, SourcePID, InstanceId)->
+    erlang:put(instance_id, InstanceId),
+    ReplicaKeys = cs_symm_replication:get_keys_for_replicas(Key),
+    [ cs_lookup:unreliable_lookup(Replica, {delete_key, cs_send:this(), Replica}) || 
+	Replica <- ReplicaKeys],
+    erlang:send_after(config:transactionLookupTimeout(), self(), {timeout}),
+    delete_collect_results(ReplicaKeys, SourcePID, []).
+
+%% @doc collect the response for the delete requests
+-spec(delete_collect_results/3 :: (list(?RT:key()), cs_send:mypid(), 
+				   list()) -> any()).
+delete_collect_results([], SourcePID, Results) ->
+    cs_send:send(SourcePID, {delete_result, {ok, 
+					     length([ok || R <- Results, R == ok]), 
+					     Results}});
+delete_collect_results(ReplicaKeys, Source_PID, Results) ->
+    receive
+	{delete_key_response, Key, Result} ->
+	    case lists:member(Key, ReplicaKeys) of
+		true ->
+		    delete_collect_results(lists:delete(Key, ReplicaKeys), 
+					   Source_PID, 
+					   [Result | Results]);
+		false ->
+		    delete_collect_results(ReplicaKeys, 
+					   Source_PID, 
+					   Results)
+	    end;
+	{timeout} ->
+	    cs_send:send(Source_PID, {delete_result, 
+				      {fail, timeout, 
+				       length([ok || R <- Results, R == ok]), 
+				       Results}})
+    end.
+    
+    
+    
+%%===============================================================================
+%% Functions to manipulate TransLog's
+%%===============================================================================
+
+%%-------------------------------------------------------------------------------
 %% Function: new_translog/0
 %% Purpose:  create an empty list
 %% Returns:  empty list
-%%-------------------------------------------------------------------
+%%-------------------------------------------------------------------------------
 translog_new()->
     trecords:new_translog().
