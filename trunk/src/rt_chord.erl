@@ -166,7 +166,8 @@ stabilize(Id, Succ, RT, Index, Node) ->
 	false ->
 	    case (node:id(Succ) == node:id(Node)) or (Id == node:id(Node)) or (Index == -1) of
 		true ->
-		    RT;
+		    % delete lower entries
+		    prune_table(RT, Index);
 		false ->
 		    NewRT = gb_trees:enter(Index, Node, RT),
 		    failuredetector2:subscribe(node:pidX(Node)),
@@ -221,3 +222,14 @@ cleanup(It, RT, Succ) ->
 	none ->
 	    RT
     end.
+
+%% @private
+%% @doc delete all entries whose index is smaller-equal than index
+-spec(prune_table/2 :: (rt(), pos_integer()) -> rt()).
+prune_table(RT, Index) ->
+    Keys = [Key || Key <- gb_trees:keys(RT), Key =< Index],
+    lists:foldl(fun (Key, Table) ->
+			gb_trees:delete(Key, Table)
+		end, RT, Keys).
+	     
+    
