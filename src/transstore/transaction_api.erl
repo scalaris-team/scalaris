@@ -260,7 +260,7 @@ abort()->
 -spec(delete/2 :: (any(), pos_integer()) -> {ok, pos_integer(), list()} | 
 						{fail, timeout} | 
 						{fail, timeout, pos_integer(), list()} | 
-						{fail, string()}).
+						{fail, node_not_found}).
 delete(Key, Timeout) ->
     case process_dictionary:find_cs_node() of
 	{ok, LocalCSNode} ->
@@ -273,7 +273,7 @@ delete(Key, Timeout) ->
 		    {fail, timeout}
 	    end;
 	_ ->
-	    {fail, "cs_node not found"}
+	    {fail, node_not_found}
     end.
     
 %%====================================================================
