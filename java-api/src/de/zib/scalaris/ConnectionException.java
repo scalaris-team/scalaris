@@ -16,15 +16,16 @@
 package de.zib.scalaris;
 
 import com.ericsson.otp.erlang.OtpErlangException;
+import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown when a read operation on a chordsharp ring fails
+ * Exception that is thrown when a read operation on a scalaris ring fails
  * because the connection is not active or a communication error occurred or an
  * exit signal was received or the remote node sent a message containing an
  * invalid cookie.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
+ * @version 2.2
  * @since 2.0
  */
 public class ConnectionException extends OtpErlangException {
@@ -56,5 +57,32 @@ public class ConnectionException extends OtpErlangException {
 	 */
 	public ConnectionException(Throwable e) {
 		super(e.getMessage());
+	}
+
+	/**
+	 * Creates an exception including the message of the given erlang object.
+	 * 
+	 * @param erlValue
+	 *            the erlang message to include
+	 * 
+	 * @since 2.2
+	 */
+	public ConnectionException(OtpErlangObject erlValue) {
+		super("Erlang message: " + erlValue.toString());
+	}
+
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e
+	 *            the exception to "re-throw"
+	 * @param erlValue
+	 *            the string representation of this erlang value is included
+	 *            into the message
+	 * 
+	 * @since 2.2
+	 */
+	public ConnectionException(Throwable e, OtpErlangObject erlValue) {
+		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
 	}
 }

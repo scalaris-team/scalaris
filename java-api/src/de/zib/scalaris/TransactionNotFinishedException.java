@@ -33,6 +33,7 @@ public class TransactionNotFinishedException extends Exception {
 	 * Creates the exception with no message.
 	 */
 	public TransactionNotFinishedException() {
+		super("Cannot start a new transaction until the old one is not committed or aborted.");
 	}
 
 	/**
