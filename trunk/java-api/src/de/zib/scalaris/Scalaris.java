@@ -22,7 +22,9 @@ import com.ericsson.otp.erlang.OtpAuthException;
 import com.ericsson.otp.erlang.OtpConnection;
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangExit;
+import com.ericsson.otp.erlang.OtpErlangInt;
 import com.ericsson.otp.erlang.OtpErlangList;
+import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
@@ -84,6 +86,18 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * </code>
  * 
  * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisWriteExample}</p>
+ * 
+ * <h3>Deleting values</h3>
+ * <code style="white-space:pre;">
+ *   String key;
+ *   int timeout;
+ *   DeleteResult result;
+ *   
+ *   Scalaris sc = new Scalaris();
+ *   sc.delete(key);                    // {@link #delete(String)}
+ *   sc.delete(key, timeout);           // {@link #delete(String, int)}
+ *   result = sc.getLastDeleteResult(); // {@link #getLastDeleteResult()}
+ * </code>
  * 
  * <h3>Publishing topics</h3>
  * <code style="white-space:pre;">
@@ -147,7 +161,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisGetSubscribersExample}</p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
+ * @version 2.2
  * @since 2.0
  */
 public class Scalaris {
@@ -155,6 +169,13 @@ public class Scalaris {
 	 * the connection to a chorsharp node
 	 */
 	private OtpConnection connection;
+	
+	/**
+	 * Stores the result list returned by erlang during a delete operation.
+	 * 
+	 * @see #delete(String)
+	 */
+	private OtpErlangList lastDeleteResult = null;
 	
 	/**
 	 * Constructor, uses the default connection returned by
@@ -206,10 +227,12 @@ public class Scalaris {
 	public OtpErlangObject readObject(OtpErlangString key)
 			throws ConnectionException, TimeoutException, UnknownException,
 			NotFoundException {
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("transstore.transaction_api", "quorum_read",
 					new OtpErlangList(key));
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 
 			/*
 			 * possible return values:
@@ -221,13 +244,11 @@ public class Scalaris {
 			if (received.elementAt(0).equals(new OtpErlangAtom("fail"))) {
 				OtpErlangObject reason = received.elementAt(1);
 				if (reason.equals(new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
+					throw new TimeoutException(received_raw);
 				} else if (reason.equals(new OtpErlangAtom("not_found"))) {
-					throw new NotFoundException();
+					throw new NotFoundException(received_raw);
 				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ reason.toString());
+					throw new UnknownException(received_raw);
 				}
 			} else {
 				// return the value only, not the version:
@@ -245,7 +266,8 @@ public class Scalaris {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 
@@ -340,10 +362,12 @@ public class Scalaris {
 	 */
 	public void writeObject(OtpErlangString key, OtpErlangObject value)
 			throws ConnectionException, TimeoutException, UnknownException {
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("transstore.transaction_api", "single_write",
 					new OtpErlangList(new OtpErlangObject[] { key, value }));
-			OtpErlangObject received = connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangObject received = received_raw;
 			
 			/*
 			 * possible return values:
@@ -357,18 +381,16 @@ public class Scalaris {
 			if (received.equals(new OtpErlangAtom("commit"))) {
 				return;
 			} else if (received.equals(new OtpErlangAtom("userabort"))) {
-				throw new UnknownException("userabort");
+//				throw new UnknownException("userabort");
+				throw new UnknownException(received_raw);
 			} else {
 				// {fail, Reason}
 				OtpErlangTuple returnValue = (OtpErlangTuple) received;
 
-				if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
+				if (returnValue.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
+					throw new TimeoutException(received_raw);
 				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ returnValue.toString());
+					throw new UnknownException(received_raw);
 				}
 			}
 		} catch (OtpErlangExit e) {
@@ -382,7 +404,8 @@ public class Scalaris {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 
@@ -520,10 +543,12 @@ public class Scalaris {
 	 */
 	public void subscribe(OtpErlangString topic, OtpErlangString url) throws ConnectionException,
 			TimeoutException, UnknownException {
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("pubsub.pubsub_api", "subscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			OtpErlangObject received = connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangObject received = received_raw;
 
 			/*
 			 * possible return values: - ok - {fail, not_found} - {fail,
@@ -535,13 +560,10 @@ public class Scalaris {
 				// {fail, Reason}
 				OtpErlangTuple returnValue = (OtpErlangTuple) received;
 
-				if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
+				if (returnValue.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
+					throw new TimeoutException(received_raw);
 				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ returnValue.toString());
+					throw new UnknownException(received_raw);
 				}
 			}
 		} catch (OtpErlangExit e) {
@@ -555,7 +577,8 @@ public class Scalaris {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 	
@@ -609,10 +632,12 @@ public class Scalaris {
 	public void unsubscribe(OtpErlangString topic, OtpErlangString url)
 			throws ConnectionException, TimeoutException, NotFoundException,
 			UnknownException {
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("pubsub.pubsub_api", "unsubscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			OtpErlangObject received = connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangObject received = received_raw;
 
 			/*
 			 * possible return values: - ok - {fail, not_found} - {fail,
@@ -624,16 +649,12 @@ public class Scalaris {
 				// {fail, Reason}
 				OtpErlangTuple returnValue = (OtpErlangTuple) received;
 
-				if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
-				} else if (returnValue.elementAt(1).equals(
-						new OtpErlangAtom("not_found"))) {
-					throw new NotFoundException();
+				if (returnValue.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
+					throw new TimeoutException(received_raw);
+				} else if (returnValue.elementAt(1).equals(new OtpErlangAtom("not_found"))) {
+					throw new NotFoundException(received_raw);
 				} else {
-					throw new UnknownException(
-							"Unknow error - erlang error message: "
-									+ returnValue.toString());
+					throw new UnknownException(received_raw);
 				}
 			}
 		} catch (OtpErlangExit e) {
@@ -647,7 +668,8 @@ public class Scalaris {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 	
@@ -715,11 +737,13 @@ public class Scalaris {
 	 */
 	public OtpErlangList getSubscribers(
 			OtpErlangString topic) throws ConnectionException, UnknownException {
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("pubsub.pubsub_api", "get_subscribers",
 					new OtpErlangList(topic));
 			// return value: [string,...]
-			OtpErlangList received = (OtpErlangList) connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangList received = (OtpErlangList) received_raw;
 			return received;
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
@@ -732,7 +756,8 @@ public class Scalaris {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 	
@@ -755,6 +780,144 @@ public class Scalaris {
 	public ArrayList<String> getSubscribers(
 			String topic) throws ConnectionException, UnknownException {
 		return erlStrListToStrArrayList(getSubscribers(new OtpErlangString(topic)));
+	}
+	
+	// /////////////////////////////
+	// delete methods
+	// /////////////////////////////
+	
+	/**
+	 * Tries to delete all replicas of the given {@code key} in 2000ms.
+	 * 
+	 * @param key
+	 *            the key to delete
+	 * 
+	 * @return the number of successfully deleted replicas
+	 * 
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to delete the value
+	 * @throws NodeNotFoundException
+	 *             if no scalaris node was found
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @since 2.2
+	 * 
+	 * @see #delete(String, int)
+	 */
+	public long delete(String key) throws ConnectionException,
+	TimeoutException, UnknownException, NodeNotFoundException {
+		return delete(key, 2000);
+	}
+
+	/**
+	 * Tries to delete all replicas of the given {@code key}.
+	 * 
+	 * WARNING: This function can lead to inconsistent data (e.g. deleted items
+	 * can re-appear). Also when re-creating an item the version before the
+	 * delete can re-appear.
+	 * 
+	 * @param key
+	 *            the key to delete
+	 * @param timeout
+	 *            the time (in milliseconds) to wait for results
+	 * 
+	 * @return the number of successfully deleted replicas
+	 * 
+	 * @throws ConnectionException
+	 *             if the connection is not active or a communication error
+	 *             occurs or an exit signal was received or the remote node
+	 *             sends a message containing an invalid cookie
+	 * @throws TimeoutException
+	 *             if a timeout occurred while trying to delete the value
+	 * @throws NodeNotFoundException
+	 *             if no scalaris node was found
+	 * @throws UnknownException
+	 *             if any other error occurs
+	 * 
+	 * @since 2.2
+	 * 
+	 * @see #delete(String)
+	 */
+	public long delete(String key, int timeout) throws ConnectionException,
+	TimeoutException, UnknownException, NodeNotFoundException {
+		OtpErlangObject received_raw = null;
+		try {
+			connection.sendRPC("transstore.transaction_api", "delete",
+					new OtpErlangList( new OtpErlangObject[] {
+							new OtpErlangString(key),
+							new OtpErlangInt(timeout) }));
+			received_raw = connection.receiveRPC();
+			OtpErlangTuple received = (OtpErlangTuple) received_raw;
+
+			/*
+			 * possible return values:
+			 *  - {ok, pos_integer(), list()}
+			 *  - {fail, timeout}
+			 *  - {fail, timeout, pos_integer(), list()}
+			 *  - {fail, node_not_found}
+			 */
+			if (received.elementAt(0).equals(new OtpErlangAtom("fail"))) {
+				OtpErlangObject reason = received.elementAt(1);
+				if (reason.equals(new OtpErlangAtom("timeout"))) {
+					if (received.arity() > 2) {
+						lastDeleteResult = (OtpErlangList) received.elementAt(3);
+					} else {
+						lastDeleteResult = null;
+					}
+					throw new TimeoutException(received_raw);
+				} else if (reason.equals(new OtpErlangAtom("node_not_found"))) {
+					lastDeleteResult = null;
+					throw new NodeNotFoundException(received_raw);
+				} else {
+					lastDeleteResult = null;
+					throw new UnknownException(received_raw);
+				}
+			} else {
+				lastDeleteResult = (OtpErlangList) received.elementAt(2);
+				long succeeded = ((OtpErlangLong) received.elementAt(1)).longValue();
+				return succeeded;
+			}
+		} catch (OtpErlangExit e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (OtpAuthException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (IOException e) {
+			// e.printStackTrace();
+			throw new ConnectionException(e);
+		} catch (ClassCastException e) {
+			// e.printStackTrace();
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
+		}
+	}
+
+	/**
+	 * Returns the result of the last call to {@link #delete(String)}.
+	 * 
+	 * NOTE: This function traverses the result list returned by erlang and
+	 * therefore takes some time to process. It is advised to store the returned
+	 * result object once generated.
+	 * 
+	 * @return the delete result
+	 * 
+	 * @throws UnknownException
+	 *             is thrown if an unknown reason was encountered
+	 * 
+	 * @see #delete(String)
+	 */
+	public DeleteResult getLastDeleteResult() throws UnknownException {
+		try {
+			return new DeleteResult(lastDeleteResult);
+		} catch (UnknownException e) {
+			throw new UnknownException(e, lastDeleteResult);
+		}
 	}
 	
 	/**

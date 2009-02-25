@@ -169,14 +169,14 @@ write(DB, Key, Value, Version) ->
     end.
 
 %% @doc deletes the key
--spec(delete/2 :: (db(), key()) -> {db(), ok | {failed, locks_set} 
+-spec(delete/2 :: (db(), key()) -> {db(), ok | locks_set
 				    | undef}).
 delete(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, false, 0, _Version}} ->
 	    {gb_trees:delete(Key, DB), ok};
 	{value, _Value} ->
-	    {DB, {failed, locks_set}};
+	    {DB, locks_set};
 	none ->
 	    {DB, undef}
     end.

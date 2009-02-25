@@ -404,6 +404,138 @@ public class ScalarisTest {
 			conn.closeConnection();
 		}
 	}
+	
+	/**
+	 * Test method for {@link Scalaris#delete(String)} and
+	 * {@link Scalaris#write(String, String)}.
+	 * Tries to delete some not existing keys.
+	 * 
+	 * @throws UnknownException
+	 * @throws TimeoutException
+	 * @throws ConnectionException
+	 * @throws NodeNotFoundException
+	 */
+	@Test
+	public void testDelete_notExistingKey() throws ConnectionException,
+			TimeoutException, UnknownException, NodeNotFoundException {
+		String key = "_Delete_NotExistingKey";
+		Scalaris conn = new Scalaris();
+
+		try {
+			for (int i = 0; i < testData.length; ++i) {
+				long deleted = conn.delete(testTime + key + i);
+				DeleteResult result = conn.getLastDeleteResult();
+				assertEquals(0, deleted);
+				assertEquals(0, result.ok);
+				assertEquals(0, result.locks_set);
+				assertEquals(4, result.undef);
+			}
+		} finally {
+			conn.closeConnection();
+		}
+	}
+	
+	/**
+	 * Test method for {@link Scalaris#delete(String)} and
+	 * {@link Scalaris#write(String, String)}.
+	 * Inserts some values, tries to delete them afterwards and tries the
+	 * delete again.
+	 * 
+	 * @throws UnknownException
+	 * @throws TimeoutException
+	 * @throws ConnectionException
+	 * @throws NodeNotFoundException
+	 */
+	@Test
+	public void testDelete1() throws ConnectionException,
+			TimeoutException, UnknownException, NodeNotFoundException {
+		String key = "_Delete1";
+		Scalaris conn = new Scalaris();
+
+		try {
+			for (int i = 0; i < testData.length; ++i) {
+				conn.write(testTime + key + i, testData[i]);
+			}
+			
+			// now try to delete the data:
+			for (int i = 0; i < testData.length; ++i) {
+				long deleted = conn.delete(testTime + key + i);
+				DeleteResult result = conn.getLastDeleteResult();
+				assertEquals(4, deleted);
+				assertEquals(4, result.ok);
+				assertEquals(0, result.locks_set);
+				assertEquals(0, result.undef);
+				
+				// try again (should be successful with 0 deletes)
+				deleted = conn.delete(testTime + key + i);
+				result = conn.getLastDeleteResult();
+				assertEquals(0, deleted);
+				assertEquals(0, result.ok);
+				assertEquals(0, result.locks_set);
+				assertEquals(4, result.undef);
+			}
+		} finally {
+			conn.closeConnection();
+		}
+	}
+	
+	/**
+	 * Test method for {@link Scalaris#delete(String)} and
+	 * {@link Scalaris#write(String, String)}.
+	 * Inserts some values, tries to delete them afterwards, inserts them again
+	 * and tries to delete them again (twice).
+	 * 
+	 * @throws UnknownException
+	 * @throws TimeoutException
+	 * @throws ConnectionException
+	 * @throws NodeNotFoundException
+	 */
+	@Test
+	public void testDelete2() throws ConnectionException,
+			TimeoutException, UnknownException, NodeNotFoundException {
+		String key = "_Delete2";
+		Scalaris conn = new Scalaris();
+
+		try {
+			for (int i = 0; i < testData.length; ++i) {
+				conn.write(testTime + key + i, testData[i]);
+			}
+			
+			// now try to delete the data:
+			for (int i = 0; i < testData.length; ++i) {
+				long deleted = conn.delete(testTime + key + i);
+				DeleteResult result = conn.getLastDeleteResult();
+				assertEquals(4, deleted);
+				assertEquals(4, result.ok);
+				assertEquals(0, result.locks_set);
+				assertEquals(0, result.undef);
+			}
+			
+			for (int i = 0; i < testData.length; ++i) {
+				conn.write(testTime + key + i, testData[i]);
+			}
+			
+			// now try to delete the data:
+			for (int i = 0; i < testData.length; ++i) {
+				long deleted = conn.delete(testTime + key + i);
+				DeleteResult result = conn.getLastDeleteResult();
+				assertEquals(4, deleted);
+				assertEquals(4, result.ok);
+				assertEquals(0, result.locks_set);
+				assertEquals(0, result.undef);
+				
+				// try again (should be successful with 0 deletes)
+				deleted = conn.delete(testTime + key + i);
+				result = conn.getLastDeleteResult();
+				assertEquals(0, deleted);
+				assertEquals(0, result.ok);
+				assertEquals(0, result.locks_set);
+				assertEquals(4, result.undef);
+			}
+		} finally {
+			conn.closeConnection();
+		}
+	}
 
 	/**
 	 * Test method for
