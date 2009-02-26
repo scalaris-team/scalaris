@@ -123,7 +123,7 @@ start() ->
 loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache) ->
  	case Succs == merge(Succs, [], Id) of
         false ->
-            log:log(error,"[ RM ~p] should never ever happen (succs): ~p", [self(),Succs]);
+            log:log(error,"[ RM | ~p] should never ever happen (succs): ~p", [self(),Succs]);
         true ->
             ok
     end,
@@ -311,8 +311,8 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
             %io:format("RM ~p | New ~p ~p~n",[self(),NewAktFD,NewAktPS]),
             ok;
         false ->
-             log:log(error,"~p : in: ~p | out: ~p",[self(),NewNodes,OldNodes]),
-             log:log(error,"RM ~p | ERR ~p ~p~n~p",[self(),NewAktFD,NewAktPS,{Preds,Succs,PredsNew,SuccsNew}])
+             log:log(error,"[ RM | ~p]  : in: ~p | out: ~p",[self(),NewNodes,OldNodes]),
+             log:log(error,"[ RM | ~p] ~p ~p~n~p",[self(),NewAktFD,NewAktPS,{Preds,Succs,PredsNew,SuccsNew}])
 	end.
              
              

@@ -92,6 +92,7 @@ on({get_rse_chord, Pid}, {LocalEstimation} = State) ->
 
 %% unknown message
 on(_UnknownMessage, _State) ->
+    log:log(error, "[ RSE ] unknown message in rse_chord: ~p ~p~n", [_UnknownMessage, _State]),
     unknown_event.
     
 

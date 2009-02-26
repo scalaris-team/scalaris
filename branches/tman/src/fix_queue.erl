@@ -10,14 +10,14 @@
 %%
 %% Exported Functions
 %%
--export([new/1,add/2 ,filter/2]).
+-export([new/1,add/2 ,map/2]).
 
 %%
 %% API Functions
 %%
 
-filter(Fun,{_,_,Q}) ->
-    queue:filter(Fun,Q).
+map(Fun,{_,_,Q}) ->
+   lists:map(Fun,queue:to_list(Q)).
     
 new(MaxLength) ->
     {MaxLength,0,queue:new()}.

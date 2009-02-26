@@ -79,7 +79,7 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
     end.
 
 handle_unknown_event(UnknownMessage, State, ComponentState) ->
-    io:format("unknown message: ~p~n", [UnknownMessage]),
+    log:log(error, "[ GC ] unknown message: ~p ~p~n", [UnknownMessage]),
     {State, ComponentState}.
     
 

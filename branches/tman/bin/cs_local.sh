@@ -17,4 +17,4 @@ erl +S 4 +A 4  -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -p
     -yaws embedded true -connect_all false \
     -chordsharp cs_port 14196 \
     -chordsharp yaws_port 8001 \
-    -sname node@localhost -s chordsharp
+    -sname node@`hostname` -s chordsharp
