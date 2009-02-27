@@ -32,5 +32,5 @@ We implemented our own TCP-based protocol, because we plan to support SSL in the
   {log_host, {boot_logger, 'boot@foo.bar.com'}}.
   }}}
   where foo.bar.com is the hostname of the boot server.
-  * make the names of the Erlang VMs globally accessible. For security reasons, all nodes are currently started with -sname XXX. You have to change boot.sh, cs_local.sh, cs_local2.sh, ... from "-sname" to "-name".
+  * make the names of the Erlang VMs globally accessible. You have to use "-name" in boot.sh, cs_local.sh, cs_local2.sh.
   
