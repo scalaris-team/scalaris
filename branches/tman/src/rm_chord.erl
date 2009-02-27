@@ -128,12 +128,13 @@ loop(Id, Me, Pred, Succs) ->
        	loop(Id, Me, Pred, Succs);
 
 	{stabilize} -> % new stabilization interval
-        case Succs of
-            [] -> 
-                ok;
-            _  -> 
-                cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
-        end,
+	    erlang:send_after(config:stabilizationInterval(), self(), {stabilize}),
+	    case Succs of
+		[] -> 
+		    ok;
+		_  -> 
+		    cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
+	    end,
 	    loop(Id, Me, Pred, Succs);
 	{get_pred_response, SuccsPred} ->
 	    case node:is_null(SuccsPred) of
@@ -222,8 +223,8 @@ filter(Pid, [Succ | Rest]) ->
 %% @doc starts ring maintenance
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-   log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
-    timer:send_interval(config:stabilizationInterval(), self(), {stabilize}),
+    log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
+    erlang:send_after(config:stabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
     start().
 

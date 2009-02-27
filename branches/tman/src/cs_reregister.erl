@@ -31,7 +31,7 @@
 reregister() ->
     RegisterMessage = {register, cs_send:this()},
     reregister(config:register_hosts(), RegisterMessage),
-    timer:send_after(config:reregisterInterval(), self(), {reregister}).
+    erlang:send_after(config:reregisterInterval(), self(), {reregister}).
 
 reregister(failed, Message)->
     cs_send:send(config:bootPid(), Message);

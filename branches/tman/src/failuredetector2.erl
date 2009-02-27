@@ -70,7 +70,7 @@ start_pinger(Pid) ->
 
 loop_ping(Pid, Count) ->
     cs_send:send(Pid, {ping, cs_send:this(), Count}),
-    timer:send_after(config:failureDetectorInterval(), {timeout}), 
+    erlang:send_after(config:failureDetectorInterval(), self(), {timeout}), 
     receive
 	{stop} ->
 	    ok;
@@ -247,7 +247,12 @@ make_pinger(Target) ->
 
 kill_pinger(Target) ->
     fd_db:del_pinger(Target),
-	fd_db:get_pinger(Target) ! {stop}.
+    case fd_db:get_pinger(Target) of
+	{ok, Pid} -> 
+	    Pid ! {stop};
+	none ->
+	    ok
+    end.
     
 
 %% (mypid() -> list(pid()), pid() -> mypid())
@@ -260,7 +265,7 @@ unsubscribe(Target, Subscriber) ->
     case fd_db:get_subscribers(Target) of
     	[] ->
         	kill_pinger(Target);
-		_X ->
+	_X ->
             ok
      end.
 
