@@ -254,7 +254,7 @@ public class ConnectionFactory {
 			String hostname = "localhost";
 			try {
 				InetAddress addr = InetAddress.getLocalHost();
-				hostname = addr.getHostName();
+				hostname = addr.getCanonicalHostName();
 			} catch (UnknownHostException e) {
 			}
 			node = node.replaceAll("@localhost$", "@" + hostname);

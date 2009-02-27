@@ -25,6 +25,6 @@ export ERL_MAX_PORTS=16384
 for i in $(seq 20 21 10000); do
 	for j in $(seq 1 5); do 
 	export RING_SIZE="$i" ; 
-	erl $ERL_OPTS +S 8 +A 8 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -sname boot -s experiments ;
+	erl $ERL_OPTS +S 8 +A 8 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -name boot -s experiments ;
 	done
 done
