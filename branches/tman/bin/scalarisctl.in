@@ -30,7 +30,7 @@ NODEDOCROOTDIR=$SCALARISDIR/docroot_node
 LOGDIR=@localstatedir@/log/scalaris
 
 SCALARIS_COOKIE="chocolate chip cookie"
-HOST=localhost
+HOST=`uname -n`
 
 
 usage(){

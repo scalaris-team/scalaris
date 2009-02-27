@@ -169,8 +169,8 @@ public class ConnectionFactory {
 			clientNameAppendUUID = false;
 		}
 		
-		//fixLocalhostName();
-//		System.out.println("node: " + node);
+		fixLocalhostName();
+		//System.out.println("node: " + node);
 	}
 
 	/**

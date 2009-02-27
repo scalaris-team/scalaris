@@ -12,9 +12,9 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-
+HOSTNAME=`uname -n`
 erl +S 4 +A 4  -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin \
     -yaws embedded true -connect_all false \
     -chordsharp cs_port 14196 \
     -chordsharp yaws_port 8001 \
-    -sname node@`hostname` -s chordsharp
+    -sname node@$HOSTNAME -s chordsharp

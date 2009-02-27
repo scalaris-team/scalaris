@@ -246,13 +246,15 @@ make_pinger(Target) ->
     end.
 
 kill_pinger(Target) ->
-    fd_db:del_pinger(Target),
-    case fd_db:get_pinger(Target) of
-	{ok, Pid} -> 
-	    Pid ! {stop};
-	none ->
-	    ok
-    end.
+	case fd_db:get_pinger(Target) of
+      {ok,X} ->
+          X	! {stop},
+      		fd_db:del_pinger(Target);
+      none ->
+          failed
+	end.
+  
+          
     
 
 %% (mypid() -> list(pid()), pid() -> mypid())
@@ -261,13 +263,13 @@ subscribe(Target, Subscriber) ->
 
 -spec(unsubscribe/2 :: (cs_node:mypid(),pid()) -> ok).
 unsubscribe(Target, Subscriber) ->
-    fd_db:del_subscription(Subscriber, Target),
-    case fd_db:get_subscribers(Target) of
-    	[] ->
-        	kill_pinger(Target);
+	fd_db:del_subscription(Subscriber, Target),
+	case fd_db:get_subscribers(Target) of
+  	[] ->
+    	kill_pinger(Target);
 	_X ->
-            ok
-     end.
+		ok
+	end.
 
 crash_and_unsubscribe(Target, Subscriber) ->
   
@@ -278,15 +280,15 @@ crash_and_unsubscribe(Target, Subscriber) ->
 
 report_crash(Target) ->
    log:log(warn,"[ FD ] ~p crashed",[Target]),
-   case dump_to_file(Target) of
-		ok ->
-			{Group, Name} = process_dictionary:lookup_process(Target),
-   			log:log(warn,"[ FD ] a ~p process died",[Name]),
-			TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
-			dump_to_file(TManPid);
-		failed ->
-			ok
-	end,
+%%    case dump_to_file(Target) of
+%% 		ok ->
+%% 			{Group, Name} = process_dictionary:lookup_process(Target),
+%%    			log:log(warn,"[ FD ] a ~p process died",[Name]),
+%% 			TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
+%% 			dump_to_file(TManPid);
+%% 		failed ->
+%% 			ok
+%% 	end,
     %io:format("~p b crashed ~n",[Pid]),
     gen_server:call(?MODULE, {crash, Target}, 20000).
 
