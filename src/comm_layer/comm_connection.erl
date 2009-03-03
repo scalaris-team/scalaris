@@ -27,6 +27,7 @@
 
 -export([send/3, open_new/4, new/3]).
 
+-import(config).
 -import(gen_tcp).
 -import(inet).
 -import(io).
@@ -138,7 +139,9 @@ loop(Socket, Address, Port) ->
 
 %% @spec new_connection(inet:ip_address(), int(), int()) -> inet:socket() | fail
 new_connection(Address, Port, MyPort) ->
-    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, {send_timeout, 60000}], 15000) of
+    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, 
+					 {send_timeout, config:read(tcp_send_timeout)}], 
+			 config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
                                                 % send end point data
 	    case inet:sockname(Socket) of
