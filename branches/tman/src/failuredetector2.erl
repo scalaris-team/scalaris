@@ -279,33 +279,30 @@ crash_and_unsubscribe(Target, Subscriber) ->
 
 
 report_crash(Target) ->
-   log:log(warn,"[ FD ] ~p crashed",[Target]),
-%%    case dump_to_file(Target) of
-%% 		ok ->
-%% 			{Group, Name} = process_dictionary:lookup_process(Target),
-%%    			log:log(warn,"[ FD ] a ~p process died",[Name]),
-%% 			TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
-%% 			dump_to_file(TManPid);
-%% 		failed ->
-%% 			ok
-%% 	end,
-    %io:format("~p b crashed ~n",[Pid]),
-    gen_server:call(?MODULE, {crash, Target}, 20000).
+   log:log(warn,"[ FD ] ~p crashed at ~p",[Target, erlang:time()]),
+   
+	%{Group, Name} = process_dictionary:lookup_process(Target),
+  %log:log(warn,"[ FD ] a ~p process died",[Name]),
+  (catch erlang:process_display(erlang:element(3,Target), backtrace)),
+ 	%TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
+ 	%(catch erlang:process_display(TManPid, backtrace)),
+ 	 gen_server:call(?MODULE, {crash, Target}, 20000).
 
 
 dump_to_file(Pid) when not(is_pid(Pid)) ->
     failed;
 dump_to_file(Pid) ->
-   	Res =  (catch erlang:process_info(Pid, backtrace)),
-    (catch erlang:process_display(Pid, backtrace)),
-	case Res of
-        {backtrace, Bin} ->
-            Trace =  binary_to_list(Bin),
-			N = "/tmp/scalaris-crash.log",
-			{ok,S} = file:open(N,[append]),
-			io:format(S,"FD ~p | ~p crashed~n#~p~n",[self(),Pid,Trace]),
-			file:close(S),
-			ok;
-        _X -> 
-			log:log(error,"[ FD ] Trying to get Backtrace of ~p ~n   Res = ~p~n",[Pid,Res]) 
-	end.
+   %	Res =  (catch erlang:process_info(Pid, backtrace)),
+    
+	%	case Res of
+   % 	{backtrace, Bin} ->
+   %   	Trace =  binary_to_list(Bin),
+		%		N = "/tmp/scalaris-crash.log",
+			%	{ok,S} = file:open(N,[append]),
+			%	io:format(S,"FD ~p | ~p crashed~n#~p~n",[self(),Pid,Trace]),
+			%	file:close(S),
+			%	ok;
+			%_X -> 
+			%	log:log(error,"[ FD ] Trying to get Backtrace of ~p ~n   Res = ~p~n",[Pid,Res]),
+				ok. 
+	%end.

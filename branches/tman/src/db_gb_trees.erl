@@ -44,6 +44,8 @@
 
 	 read/2, write/4, get_version/2, 
 
+	 delete/2,
+
 	 get_range/3, get_range_with_version/2,
 
 	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
@@ -166,6 +168,19 @@ write(DB, Key, Value, Version) ->
 			   DB)
     end.
 
+%% @doc deletes the key
+-spec(delete/2 :: (db(), key()) -> {db(), ok | locks_set
+				    | undef}).
+delete(DB, Key) ->
+    case gb_trees:lookup(Key, DB) of
+	{value, {_Value, false, 0, _Version}} ->
+	    {gb_trees:delete(Key, DB), ok};
+	{value, _Value} ->
+	    {DB, locks_set};
+	none ->
+	    {DB, undef}
+    end.
+    
 %% @doc reads the version of a key
 %% @spec get_version(db(), string()) -> {ok, integer()} | failed
 get_version(DB, Key) ->

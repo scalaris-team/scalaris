@@ -60,6 +60,7 @@ start_link() ->
 %% userdevguide-begin cs_sup_or:init
 init([Options]) ->
     InstanceId = string:concat("cs_node_", randoms:getRandomId()),
+    boot_server:connect(),
     KeyHolder =
 	{cs_keyholder,
 	 {cs_keyholder, start_link, [InstanceId]},

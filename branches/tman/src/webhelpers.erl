@@ -119,7 +119,7 @@ renderRingChart(Ring) ->
 		      Me_tmp = get_id(node_details:me(Node)),
 		      Pred_tmp = get_id(hd(node_details:predlist(Node))),
 		      if (null == Me_tmp) orelse (null == Pred_tmp)
-			 -> io_lib:format("1.0"); % guess the size
+			 -> io_lib:format("1.0", []); % guess the size
 			 true ->
 			      Tmp = (Me_tmp - Pred_tmp)*100
 				  /16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,

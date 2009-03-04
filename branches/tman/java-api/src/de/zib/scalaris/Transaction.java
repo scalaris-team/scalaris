@@ -94,7 +94,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * </p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.1
+ * @version 2.2
  * @since 2.0
  */
 public class Transaction {
@@ -166,14 +166,15 @@ public class Transaction {
 	public void start() throws ConnectionException,
 			TransactionNotFinishedException, UnknownException {
 		if (transLog != null || transLog_old != null) {
-			throw new TransactionNotFinishedException(
-					"Cannot start a new transaction until the old one is not committed or aborted.");
+			throw new TransactionNotFinishedException();
 		}
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("transstore.transaction", "translog_new",
 					new OtpErlangList());
 			// return value: []
-			OtpErlangList received = (OtpErlangList) connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangList received = (OtpErlangList) received_raw;
 			transLog = received;
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
@@ -186,7 +187,8 @@ public class Transaction {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 
@@ -214,8 +216,9 @@ public class Transaction {
 	 */
 	public void commit() throws UnknownException, ConnectionException {
 		if (transLog == null) {
-			throw new TransactionNotStartedException("The transaction needs to be started before it is used.");
+			throw new TransactionNotStartedException();
 		}
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("transstore.transaction_api", "commit",
 					new OtpErlangList(transLog));
@@ -224,15 +227,17 @@ public class Transaction {
 			 *  - {ok}
 			 *  - {fail, Reason}
 			 */
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 			if(received.elementAt(0).equals(new OtpErlangAtom("ok"))) {
 				// transaction was successful: reset transaction log
 				reset();
 				return;
 			} else {
 				// transaction failed
-				OtpErlangObject reason = received.elementAt(1);
-				throw new UnknownException("Erlang: " + reason.toString());
+//				OtpErlangObject reason = received.elementAt(1);
+//				throw new UnknownException(reason.toString());
+				throw new UnknownException(received_raw);
 			}
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
@@ -245,7 +250,8 @@ public class Transaction {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 
@@ -288,8 +294,9 @@ public class Transaction {
 			throws ConnectionException, TimeoutException, UnknownException,
 			NotFoundException {
 		if (transLog == null) {
-			throw new TransactionNotStartedException("The transaction needs to be started before it is used.");
+			throw new TransactionNotStartedException();
 		}
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("transstore.transaction_api", "jRead",
 					new OtpErlangList(new OtpErlangObject[] {key, transLog}));
@@ -300,7 +307,8 @@ public class Transaction {
 			 *  - {{fail, fail}, TransLog}
 			 *  - {{value, Value}, NewTransLog}
 			 */
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 			transLog_old = transLog;
 			transLog = (OtpErlangList) received.elementAt(1);
 			OtpErlangTuple status = (OtpErlangTuple) received.elementAt(0);
@@ -308,12 +316,12 @@ public class Transaction {
 				return status.elementAt(1);
 			} else {
 				if (status.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
+					throw new TimeoutException(received_raw);
 				} else if (status.elementAt(1).equals(
 						new OtpErlangAtom("not_found"))) {
-					throw new NotFoundException();
+					throw new NotFoundException(received_raw);
 				} else {
-					throw new UnknownException();
+					throw new UnknownException(received_raw);
 				}
 			}
 		} catch (OtpErlangExit e) {
@@ -327,7 +335,8 @@ public class Transaction {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 
@@ -419,8 +428,9 @@ public class Transaction {
 	public void writeObject(OtpErlangString key, OtpErlangObject value)
 			throws ConnectionException, TimeoutException, UnknownException {
 		if (transLog == null) {
-			throw new TransactionNotStartedException("The transaction needs to be started before it is used.");
+			throw new TransactionNotStartedException();
 		}
+		OtpErlangObject received_raw = null;
 		try {
 			connection.sendRPC("transstore.transaction_api", "jWrite",
 					new OtpErlangList(new OtpErlangObject[] {key, value, transLog}));
@@ -431,7 +441,8 @@ public class Transaction {
 			 *  - {{fail, fail}, TransLog}
 			 *  - {ok, NewTransLog}
 			 */
-			OtpErlangTuple received = (OtpErlangTuple) connection.receiveRPC();
+			received_raw = connection.receiveRPC();
+			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 			transLog_old = transLog;
 			transLog = (OtpErlangList) received.elementAt(1);
 			if (received.elementAt(0).equals(new OtpErlangAtom("ok"))) {
@@ -439,9 +450,12 @@ public class Transaction {
 			} else {
 				OtpErlangTuple status = (OtpErlangTuple) received.elementAt(0);
 				if (status.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException();
+					throw new TimeoutException(received_raw);
+//				} else if (status.elementAt(1).equals(new OtpErlangAtom("fail"))) {
+////					throw new UnknownException(status.elementAt(1).toString());
+//					throw new UnknownException(received_raw);
 				} else {
-					throw new UnknownException(status.elementAt(1).toString());
+					throw new UnknownException(received_raw);
 				}
 			}
 		} catch (OtpErlangExit e) {
@@ -455,7 +469,8 @@ public class Transaction {
 			throw new ConnectionException(e);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e);
+			// received_raw is not null since the first class cast is after the RPC!
+			throw new UnknownException(e, received_raw);
 		}
 	}
 

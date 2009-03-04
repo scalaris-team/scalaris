@@ -27,8 +27,7 @@
 -vsn('$Id$ ').
 
 -export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1, 
-         get_partitions/0]).
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1]).
 
 %%====================================================================
 %% API functions
@@ -202,43 +201,3 @@ worker_loop() ->
 check_routing_tables(Port) ->
 	Nodes = boot_server:node_list(),
 	[ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- Nodes ].
-
-get_partitions() ->
-	Details = [X || {ok, X} <- statistics:get_ring_details()],
-	StrippedDetails = [{Node, Pred, Succ} || {node_details, [Pred], Node, [Succ], _, _, _, _, _} <- Details],
-    All = [Node || {Node, _, _} <- StrippedDetails],
-    Result = outer_iterate(All, StrippedDetails),
-    Result.
-
-outer_iterate([], _) ->
-    [0];
-outer_iterate(List, StrippedDetails) ->
-    Node = hd(List),
-    Result = iterate([Node], StrippedDetails),
-    Rest = util:minus(List, Result),
-    [length(Result) | outer_iterate(Rest, StrippedDetails)].
-    
-iterate(List, StrippedDetails) ->
-	First = lists:map(fun (X) -> 
-                      		{value, {_, Pred, Succ}} = lists:keysearch(X, 1, StrippedDetails), 
-                        	[Pred, Succ]
-                      	end, 
-                      	List),    
-	Second = lists:map(fun (X) -> 
-                      	{value, {Node, _, Succ}} = lists:keysearch(X, 2, StrippedDetails), 
-                        [Node, Succ] 
-                      end, 
-                      List),    
-	Third = lists:map(fun (X) -> 
-                      	{value, {Node, Pred, _}} = lists:keysearch(X, 3, StrippedDetails), 
-                        [Node, Pred] 
-                      end, 
-                      List),    
-	Result = lists:usort(List ++ lists:flatten(First ++ Second ++ Third)),
-	case List == Result of
-		true ->
-            List;
-		false ->
-			iterate(Result, StrippedDetails)
-	end.
-

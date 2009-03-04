@@ -22,7 +22,16 @@
 -export([start_link/1]).
 -export([init/1, on/2]).
 
+% state of a rse_chord process
 -type(state() :: {float()}).
+
+% accepted messages of rse_chord processes
+-type(message() :: {init_shuffle} 
+      | {get_pred_succ_response, Pred::node:node_type(), Succ::node:node_type()}
+      | {shuffle_trigger}
+      | {cache, Cache::[node:node_type()]}
+      | {get_rse_chord_response, RemoteEstimate::float()}
+      | {get_rse_chord, Pid::cs_send:mypid()}).
 
 shuffle_interval() ->
     25000.
@@ -31,11 +40,12 @@ shuffle_reset_interval() ->
     180000.
 
 %% @doc start_link for supervisor
+-spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
     gen_component:start_link(?MODULE, [InstanceId], [profile]).
 
 %% @doc initializes component
--spec(init/1 :: (list(any())) -> state()).
+-spec(init/1 :: ([any()]) -> state()).
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, rse_chord, self()),
     erlang:send_after(shuffle_interval(), self(), {shuffle_trigger}),
@@ -47,7 +57,7 @@ init([InstanceId]) ->
 % ring size estimator
 %================================================================================
 %% @doc message handler
--spec(on/2 :: (any(), state()) -> state()).
+-spec(on/2 :: (message(), state()) -> state()).
 
 %% trigger new estimation round
 on({init_shuffle}, State) ->
@@ -92,7 +102,6 @@ on({get_rse_chord, Pid}, {LocalEstimation} = State) ->
 
 %% unknown message
 on(_UnknownMessage, _State) ->
-    log:log(error, "[ RSE ] unknown message in rse_chord: ~p ~p~n", [_UnknownMessage, _State]),
     unknown_event.
     
 
@@ -109,6 +118,7 @@ get_cyclon_pid() ->
 
 %% @doc Calculate initial estimate for ring size based on distance to 
 %%      predecessor and successor
+-spec(get_initial_estimate/3 :: (rt_simple:key(), rt_simple:key(), rt_simple:key()) -> float()).
 get_initial_estimate(Pred, Id, Succ) ->
     if
 	Pred == Id andalso Id == Succ ->
@@ -120,6 +130,7 @@ get_initial_estimate(Pred, Id, Succ) ->
     end.
 
 %% @doc normalize Chord identifier
+-spec(normalize/1 :: (rt_simple:key()) -> rt_simple:key()).
 normalize(Key) ->
     if
 	Key < 0 ->
@@ -129,3 +140,5 @@ normalize(Key) ->
 	true ->
 	    Key
     end.
+
+% -*-  indent-tabs-mode:nil;  -*-

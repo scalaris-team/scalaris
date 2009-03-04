@@ -39,9 +39,11 @@ behaviour_info(_Other) ->
 %================================================================================
 % generic framework
 %================================================================================
+-spec(start_link/2 :: (any(), list()) -> {ok, pid()}).
 start_link(Module, Args) ->
     {ok, spawn_link(?MODULE, start, [Module, Args, []])}.
 
+-spec(start_link/3 :: (any(), list(), list()) -> {ok, pid()}).
 start_link(Module, Args, Options) ->
     {ok, spawn_link(?MODULE, start, [Module, Args, Options])}.
 
@@ -79,7 +81,7 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
     end.
 
 handle_unknown_event(UnknownMessage, State, ComponentState) ->
-    log:log(error, "[ GC ] unknown message: ~p ~p~n", [UnknownMessage]),
+    io:format("unknown message: ~p~n", [UnknownMessage]),
     {State, ComponentState}.
     
 

@@ -50,7 +50,7 @@ start_link(InstanceId) ->
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
    	log:log(info,"[ RT ~p ] starting routingtable", [self()]),
-    erlang:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    timer:send_interval(config:pointerStabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
     loop().
 
@@ -71,7 +71,6 @@ loop(Id, Pred, Succ, RTState) ->
 	    loop(Id, NewPred, NewSucc, ?RT:empty(NewSucc));
 	% regular stabilize operation
 	{stabilize} ->
-	    erlang:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
 	    Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
 	    Pid ! {get_pred_succ, cs_send:this()},
 	    NewRTState = ?RT:stabilize(Id, Succ, RTState),

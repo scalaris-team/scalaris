@@ -35,6 +35,7 @@ public class TransactionNotStartedException extends RuntimeException {
 	 * Creates the exception with no message.
 	 */
 	public TransactionNotStartedException() {
+		super("The transaction needs to be started before it is used.");
 	}
 
 	/**

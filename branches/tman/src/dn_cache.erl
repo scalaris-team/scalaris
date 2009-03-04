@@ -73,7 +73,7 @@ start() ->
 loop(Queue,Subscriber) ->
  	receive
 	{zombiehunter} ->
-        fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,self(),X}) end,Queue), 
+        fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this(),X}) end,Queue), 
         erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
         loop(Queue,Subscriber);
 	{pong,Zombie} ->

@@ -31,9 +31,11 @@
 -record(node_details, {predlist, node, succlist, load, hostname, rt_size, message_log, memory}).
 new(Pred, Node, SuccList, Load, Hostname, RTSize, Log, Memory) ->
     #node_details{
-     predlist = Pred,
+     %predlist = Pred,
+     predlist = rm_tman:get_predlist(),
      node = Node,
-     succlist = SuccList,
+     %succlist = SuccList,
+     succlist = rm_tman:get_successorlist(),
      load = Load,
      hostname = Hostname,
      rt_size = RTSize,

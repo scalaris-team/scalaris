@@ -19,14 +19,14 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown when a read operation on a scalaris ring fails
- * because the key did not exist before.
+ * Exception that is thrown when a delete operation on a scalaris ring fails
+ * because no scalaris node was found.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.2
- * @since 2.0
+ * @since 2.2
  */
-public class NotFoundException extends OtpErlangException {
+public class NodeNotFoundException extends OtpErlangException {
 	/**
 	 * class version for serialisation
 	 */
@@ -35,7 +35,7 @@ public class NotFoundException extends OtpErlangException {
 	/**
 	 * Creates the exception with no message.
 	 */
-	public NotFoundException() {
+	public NodeNotFoundException() {
 	}
 
 	/**
@@ -44,7 +44,7 @@ public class NotFoundException extends OtpErlangException {
 	 * @param msg
 	 *            message of the exception
 	 */
-	public NotFoundException(String msg) {
+	public NodeNotFoundException(String msg) {
 		super(msg);
 	}
 	
@@ -53,7 +53,7 @@ public class NotFoundException extends OtpErlangException {
 	 * 
 	 * @param e the exception to "re-throw"
 	 */
-	public NotFoundException(Throwable e) {
+	public NodeNotFoundException(Throwable e) {
 		super(e.getMessage());
 	}
 
@@ -65,7 +65,7 @@ public class NotFoundException extends OtpErlangException {
 	 * 
 	 * @since 2.2
 	 */
-	public NotFoundException(OtpErlangObject erlValue) {
+	public NodeNotFoundException(OtpErlangObject erlValue) {
 		super("Erlang message: " + erlValue.toString());
 	}
 
@@ -77,10 +77,8 @@ public class NotFoundException extends OtpErlangException {
 	 * @param erlValue
 	 *            the string representation of this erlang value is included
 	 *            into the message
-	 * 
-	 * @since 2.2
 	 */
-	public NotFoundException(Throwable e, OtpErlangObject erlValue) {
+	public NodeNotFoundException(Throwable e, OtpErlangObject erlValue) {
 		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
 	}
 }

@@ -28,7 +28,7 @@
 
 -include("chordsharp.hrl").
 
--export([lookup_aux/4, lookup_fin/2, get_key/4, set_key/5]).
+-export([lookup_aux/4, lookup_fin/2, get_key/4, set_key/5, delete_key/3]).
 
 %logging on
 %-define(LOG(S, L), io:format(S, L)).
@@ -44,18 +44,10 @@ lookup_aux(State, Key, Hops, Msg) ->
     P = ?RT:next_hop(State, Key),
     ?LOG("[ ~w | I | Node   | ~w ] lookup_aux ~w ~w ~s~n",[calendar:universal_time(), self(), Terminate, P, Key]),
     if
-	Terminate ->
-	    cs_send:send(cs_state:succ_pid(State), {lookup_fin, Hops + 1, Msg});
-	true ->
-        case lists:member(node(P), [erlang:node() |erlang:nodes()]) of
-            true ->
-                ok;
-            false ->
-                %io:format("~p ~p~n", [node(P), [erlang:node()| erlang:nodes()]]),
-                io:format("error in lookup_aux: ~n")
-                %io:format("error in lookup_aux: ~p ~p~n ~p ~n", [cs_state:succ(State), cs_state:pred(State),gb_trees:to_list(cs_state:rt(State))])
-        end,
-	    cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
+			Terminate ->
+	    	cs_send:send(cs_state:succ_pid(State), {lookup_fin, Hops + 1, Msg});
+			true ->
+	    	cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
     end.
 
 get_key(State, Source_PID, HashedKey, Key) ->
@@ -67,3 +59,8 @@ set_key(State, Source_PID, Key, Value, Versionnr) ->
     cs_send:send(Source_PID, {set_key_response, Key, Value, Versionnr}),
     DB = ?DB:write(cs_state:get_db(State), Key, Value, Versionnr),
     cs_state:set_db(State, DB).
+
+delete_key(State, Source_PID, Key) ->
+    {DB2, Result} = ?DB:delete(cs_state:get_db(State), Key),
+    cs_send:send(Source_PID, {delete_key_response, Key, Result}),
+    cs_state:set_db(State, DB2).

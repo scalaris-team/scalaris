@@ -25,7 +25,10 @@
 
 -include("trecords.hrl").
 
--export([write/3, read/2, write2/3, read2/2, parallel_reads/2, abort/0, quorum_read/1, parallel_quorum_reads/2, single_write/2, do_transaction/3, do_transaction_wo_rp/3, commit/1, jWrite/3, jRead/2, jParallel_reads/2]).
+-export([write/3, read/2, write2/3, read2/2, parallel_reads/2, abort/0, 
+	 quorum_read/1, parallel_quorum_reads/2, single_write/2, 
+	 do_transaction/3, do_transaction_wo_rp/3, commit/1, jWrite/3, 
+     jRead/2, jParallel_reads/2, delete/2]).
 
 -import(crypto).
 -import(cs_send).
@@ -251,6 +254,28 @@ write2(TransLog, Key, Value) ->
 abort()->
     abort.
 
+%% @doc tries to delete the given key and returns the number of 
+%%      replicas successfully deleted.
+%%      WARNING: this function can lead to inconsistencies
+-spec(delete/2 :: (any(), pos_integer()) -> {ok, pos_integer(), list()} | 
+						{fail, timeout} | 
+						{fail, timeout, pos_integer(), list()} | 
+						{fail, node_not_found}).
+delete(Key, Timeout) ->
+    case process_dictionary:find_cs_node() of
+	{ok, LocalCSNode} ->
+	    LocalCSNode ! {delete, cs_send:this(), Key},
+	    receive
+		{delete_result, Result} ->
+		    Result
+	    after
+		Timeout ->
+		    {fail, timeout}
+	    end;
+	_ ->
+	    {fail, node_not_found}
+    end.
+
 %%====================================================================
 %% transaction API - Wrapper functions to be used from the java transaction api
 %%====================================================================
@@ -293,4 +318,3 @@ jParallel_reads(Keys, TransLog)->
     A = parallel_reads(Keys, TransLog),
     io:format("~p~n", [A]),
     A.
-

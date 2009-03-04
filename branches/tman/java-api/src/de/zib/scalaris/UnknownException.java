@@ -16,14 +16,15 @@
 package de.zib.scalaris;
 
 import com.ericsson.otp.erlang.OtpErlangException;
+import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
  * Generic exception that is thrown during read or write operations on a
- * chordsharp ring. The reason is anything else but a timeout or not_found. They
+ * scalaris ring. The reason is anything else but a timeout or not_found. They
  * are handled in {@link TimeoutException} and {@link NotFoundException}.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
+ * @version 2.2
  * @since 2.0
  */
 public class UnknownException extends OtpErlangException {
@@ -47,13 +48,41 @@ public class UnknownException extends OtpErlangException {
 	public UnknownException(String msg) {
 		super(msg);
 	}
-	
+
 	/**
 	 * Creates an exception taking the message of the given throwable.
 	 * 
-	 * @param e the exception to "re-throw"
+	 * @param e
+	 *            the exception to "re-throw"
 	 */
 	public UnknownException(Throwable e) {
 		super(e.getMessage());
+	}
+
+	/**
+	 * Creates an exception including the message of the given erlang object.
+	 * 
+	 * @param erlValue
+	 *            the erlang message to include
+	 * 
+	 * @since 2.2
+	 */
+	public UnknownException(OtpErlangObject erlValue) {
+		super("Erlang message: " + erlValue.toString());
+	}
+
+	/**
+	 * Creates an exception taking the message of the given throwable.
+	 * 
+	 * @param e
+	 *            the exception to "re-throw"
+	 * @param erlValue
+	 *            the string representation of this erlang value is included
+	 *            into the message
+	 * 
+	 * @since 2.2
+	 */
+	public UnknownException(Throwable e, OtpErlangObject erlValue) {
+		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
 	}
 }

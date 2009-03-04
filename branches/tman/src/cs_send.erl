@@ -32,8 +32,8 @@
 
 -export([send/2, this/0, get/2, send_to_group_member/3]).
 
-%-define(TCP_LAYER, true). % TCP communication
--define(BUILTIN, true).   % distributed Erlang native communication
+-define(TCP_LAYER, true). % TCP communication
+%-define(BUILTIN, true).   % distributed Erlang native communication
 
 send_to_group_member(Csnodepid,Processname,Mesg) ->
     send(Csnodepid,{send_to_group_member,Processname,Mesg}).
