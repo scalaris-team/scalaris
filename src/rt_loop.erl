@@ -66,9 +66,9 @@ loop() ->
 loop(Id, Pred, Succ, RTState) ->
     receive
 	% can happen after load-balancing
-	{init, Id, NewPred, NewSucc} ->
+	{init, Id2, NewPred, NewSucc} ->
 	    check(RTState, ?RT:empty(NewSucc)),
-	    loop(Id, NewPred, NewSucc, ?RT:empty(NewSucc));
+	    loop(Id2, NewPred, NewSucc, ?RT:empty(NewSucc));
 	% regular stabilize operation
 	{stabilize} ->
 	    Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
