@@ -32,7 +32,8 @@
 -import(ets).
 -import(gen_server).
 -import(log).
-
+-import(io).
+-import(process_dictionary).
 %% API
 -export([start_link/0,
 	send/2,
@@ -115,7 +116,7 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({send, Address, Port, Pid, Message}, _From, State) ->
+handle_call({send, Address, Port, Pid, Message}, {_From,_}, State) ->
     case ets:lookup(?MODULE, {Address, Port}) of
 	[{{Address, Port}, {_LPid, Socket}}] ->
 	    comm_connection:send({Address, Port, Socket}, Pid, Message), 
@@ -133,6 +134,8 @@ handle_call({send, Address, Port, Pid, Message}, _From, State) ->
 		    {reply, ok, State};
 		fail ->
 		    % drop message (remote node not reachable, failure detector will notice)
+        io:format("~p tried to talk to a dead node: ~p~n", 
+					[process_dictionary:lookup_process(_From), Message]),
 		    {reply, ok, State};
 		{connection, LocalPid, NewSocket} ->
 		    comm_connection:send({Address, Port, NewSocket}, Pid, Message),

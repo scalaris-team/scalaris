@@ -242,15 +242,17 @@ filter(Pid, [Succ | Rest]) ->
 %% @doc get a peer form the cycloncache which is alive 
 get_RndView(N,Cache) ->
      lists:sublist(Cache, N).
+     
 
 % @doc Check if change of failuredetector is necessary
 update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
     OldView=lists:usort(Preds++Succs),
     NewView=lists:usort(PredsNew++SuccsNew),
+    %OldTargets=failuredetector2:getmytargets(),
     %AktFD=length(failuredetector2:getmytargets()),
 		%AktPS=length(lists:usort(Preds++Succs)),
 		%io:format("RM ~p | Old ~p ~p~n",[self(),AktFD,AktPS]),
-	case (NewView /= OldView) of
+		case (NewView /= OldView) of
         true ->
             	
                 %io:format("#~n"),
@@ -269,17 +271,19 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
             		NewNodes = util:minus(NewView,OldView),
                 OldNodes = util:minus(OldView,NewView),
               	ok
-	end,
-    NewAktFD=length(failuredetector2:getmytargets()),
-    NewAktPS=length(NewView),
-    case (NewAktFD == NewAktPS) of 
-        true ->
-            %io:format("RM ~p | New ~p ~p~n",[self(),NewAktFD,NewAktPS]),
-            ok;
-        false ->
-             log:log(error,"[ RM | ~p]  : in: ~p | out: ~p",[self(),NewNodes,OldNodes]),
-             log:log(error,"[ RM | ~p] ~p ~p~n~p",[self(),NewAktFD,NewAktPS,{Preds,Succs,PredsNew,SuccsNew}])
-	end.
+		end,
+    %NewAktPS=length(NewView),
+    %NewTargets=failuredetector2:getmytargets(),
+    %NewAktFD=length(NewTargets),
+    %case (NewAktFD == NewAktPS) of 
+    %    true ->
+    %        %io:format("RM ~p | New ~p ~p~n",[self(),NewAktFD,NewAktPS]),
+    %        ok;
+    %    false ->
+    %         log:log(error,"[ RM | ~p]  : in: ~p | out: ~p",[self(),NewNodes,OldNodes]),
+    %         log:log(error,"[ RM | ~p] FDNOdes: ~p NewView ~p~n~p~n~p",[self(),NewAktFD,NewAktPS,{Preds,Succs,PredsNew,SuccsNew}, {OldTargets, NewTargets}])
+		%end,
+		ok.
              
              
              

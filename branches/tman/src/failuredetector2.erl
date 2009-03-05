@@ -41,8 +41,10 @@
 %% @doc generates a failure detector for the calling process on the given pid.
 -spec(subscribe/1 :: (cs_send:mypid() | list(cs_send:mypid())) -> ok).
 subscribe(PidList) when is_list(PidList) ->
+		io:format("Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),PidList]),
     gen_server:call(?MODULE, {subscribe_list, PidList, self()}, 20000);
 subscribe(Pid) ->
+		io:format("Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),Pid]),
     gen_server:call(?MODULE, {subscribe_list, [Pid], self()}, 20000).
 
 %% @doc deletes the failure detector for the given pid.
@@ -272,7 +274,7 @@ unsubscribe(Target, Subscriber) ->
 	end.
 
 crash_and_unsubscribe(Target, Subscriber) ->
-  
+    io:format("~p got a crash message for ~p~n",[process_dictionary:lookup_process(Subscriber), Target]),
     Subscriber ! {crash, Target},
     unsubscribe(Target,Subscriber).
 
