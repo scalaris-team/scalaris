@@ -39,10 +39,10 @@
 %% @spec read(key()) -> {failure, term()} | value()
 read(Key) ->
     case transstore.transaction_api:quorum_read(Key) of
-	{fail, Reason} ->
-	    {fail, Reason};
-	{Value, _Version} ->
-	    Value
+        {fail, Reason} ->
+	       {fail, Reason};
+        {Value, _Version} ->
+	       Value
     end.
 	    
 
