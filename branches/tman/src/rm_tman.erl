@@ -262,13 +262,13 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
                 OldNodes = util:minus(OldView,NewView),
                 %io:format("~p : in: ~p | out: ~p~n",[self(),length(NewNodes),length(OldNodes)]),
                 %io:format("~p : in: ~p | out: ~p~n",[self(),NewNodes,OldNodes]),
-  
-                failuredetector2:unsubscribe([node:pidX(Node) || Node <- OldNodes]),
-           			failuredetector2:subscribe([node:pidX(Node) || Node <- NewNodes]);
+                
+                update_fd([node:pidX(Node) || Node <- OldNodes],fun failuredetector2:unsubscribe/1),
+           		update_fd([node:pidX(Node) || Node <- NewNodes],fun failuredetector2:subscribe/1);
                 
         		
 		false ->
-            		NewNodes = util:minus(NewView,OldView),
+            	NewNodes = util:minus(NewView,OldView),
                 OldNodes = util:minus(OldView,NewView),
               	ok
 		end,
@@ -286,7 +286,12 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
 		ok.
              
              
-             
+    
+
+update_fd([], _) ->
+    ok;
+update_fd(Nodes, F) ->
+    F(Nodes).             
            
 	
 % @doc informed the cs_node for new [succ|pred] if necessary
