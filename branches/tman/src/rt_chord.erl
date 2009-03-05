@@ -170,7 +170,6 @@ stabilize(Id, Succ, RT, Index, Node) ->
 		    prune_table(RT, Index);
 		false ->
 		    NewRT = gb_trees:enter(Index, Node, RT),
-		    failuredetector2:subscribe(node:pidX(Node)),
 		    Key = calculateKey(Id, Index - 1),
 		    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), Index - 1}),
 		    NewRT

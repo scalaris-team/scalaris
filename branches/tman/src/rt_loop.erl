@@ -49,7 +49,7 @@ start_link(InstanceId) ->
 
 start(InstanceId, Sup) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
-   	log:log(info,"[ RT ~p ] starting routingtable", [self()]),
+    log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     timer:send_interval(config:pointerStabilizationInterval(), self(), {stabilize}),
     Sup ! start_done,
     loop().
@@ -59,54 +59,54 @@ start(InstanceId, Sup) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 loop() ->
     receive
-	{init, Id, Pred, Succ} ->
-	    loop(Id, Pred, Succ, ?RT:empty(Succ))
+        {init, Id, Pred, Succ} ->
+            loop(Id, Pred, Succ, ?RT:empty(Succ))
     end.
 
 loop(Id, Pred, Succ, RTState) ->
     receive
 	% can happen after load-balancing
-	{init, Id, NewPred, NewSucc} ->
-	    check(RTState, ?RT:empty(NewSucc)),
-	    loop(Id, NewPred, NewSucc, ?RT:empty(NewSucc));
-	% regular stabilize operation
-	{stabilize} ->
-	    Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-	    Pid ! {get_pred_succ, cs_send:this()},
-	    NewRTState = ?RT:stabilize(Id, Succ, RTState),
-	    check(RTState, NewRTState),
-	    loop(Id, Pred, Succ, NewRTState);
-	% got new successor
-	{get_pred_succ_response, NewPred, NewSucc} ->
-	    loop(Id, NewPred, NewSucc, RTState);
-	{rt_get_node_response, Index, Node} ->
-	    NewRTState = ?RT:stabilize(Id, Succ, RTState, Index, Node),
-	    check(RTState, NewRTState),
-	    loop(Id, Pred, Succ, NewRTState);
-	{lookup_pointer_response, Index, Node} ->
-	    NewRTState = ?RT:stabilize_pointer(Id, RTState, Index, Node),
-	    check(RTState, NewRTState),
-	    loop(Id, Pred, Succ, NewRTState);
-	{'$gen_cast', {debug_info, Requestor}} ->
-	    Requestor ! {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, {"rt_size", ?RT:get_size(RTState)}]},
-	    loop(Id, Pred, Succ, RTState);
-    {check,Port} ->
-        Y = [ {Index,node:pidX(Node)} || {Index,Node} <-gb_trees:to_list(RTState) ],
- 		log:log(info,"[ RT ]: Wrongitems: ~p",[[Index || {Index,{_IP,PORT,_PID}} <-Y, PORT/=Port]]),
-        loop(Id, Pred, Succ, RTState);
-	{crash, DeadPid} ->
-        NewRT = ?RT:filterDeadNode(RTState, DeadPid),
-        %io:format("~p~n",[{DeadPid,gb_trees:to_list(RTState),gb_trees:to_list(NewRT)}]),
-        check(RTState, NewRT, false),
-    	loop(Id, Pred, Succ, NewRT );
-	{dump} ->
-	   log:log(info,"[ RT ] ~p:~p", [Id, ?RT:dump(RTState)]),
-	    loop(Id, Pred, Succ, RTState);
-	X ->
-	    log:log(warn,"[ RT ]: unknown message ~p", [X]),
-	    loop(Id, Pred, Succ, RTState)
+        {init, Id, NewPred, NewSucc} ->
+            check(RTState, ?RT:empty(NewSucc)),
+            loop(Id, NewPred, NewSucc, ?RT:empty(NewSucc));
+        % regular stabilize operation
+        {stabilize} ->
+            Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
+            Pid ! {get_pred_succ, cs_send:this()},
+            NewRTState = ?RT:stabilize(Id, Succ, RTState),
+            check(RTState, NewRTState),
+            loop(Id, Pred, Succ, NewRTState);
+        % got new successor
+        {get_pred_succ_response, NewPred, NewSucc} ->
+            loop(Id, NewPred, NewSucc, RTState);
+        {rt_get_node_response, Index, Node} ->
+            NewRTState = ?RT:stabilize(Id, Succ, RTState, Index, Node),
+            check(RTState, NewRTState),
+            loop(Id, Pred, Succ, NewRTState);
+        {lookup_pointer_response, Index, Node} ->
+            NewRTState = ?RT:stabilize_pointer(Id, RTState, Index, Node),
+            check(RTState, NewRTState),
+            loop(Id, Pred, Succ, NewRTState);
+        {'$gen_cast', {debug_info, Requestor}} ->
+            Requestor ! {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, {"rt_size", ?RT:get_size(RTState)}]},
+            loop(Id, Pred, Succ, RTState);
+        {check,Port} ->
+            Y = [ {Index,node:pidX(Node)} || {Index,Node} <-gb_trees:to_list(RTState) ],
+            log:log(info,"[ RT ]: Wrongitems: ~p",[[Index || {Index,{_IP,PORT,_PID}} <-Y, PORT/=Port]]),
+            loop(Id, Pred, Succ, RTState);
+        {crash, DeadPid} ->
+            NewRT = ?RT:filterDeadNode(RTState, DeadPid),
+	    %io:format("~p~n",[{DeadPid,gb_trees:to_list(RTState),gb_trees:to_list(NewRT)}]),
+            check(RTState, NewRT, false),
+            loop(Id, Pred, Succ, NewRT );
+        {dump} ->
+            log:log(info,"[ RT ] ~p:~p", [Id, ?RT:dump(RTState)]),
+            loop(Id, Pred, Succ, RTState);
+        X ->
+            log:log(warn,"[ RT ]: unknown message ~p", [X]),
+            loop(Id, Pred, Succ, RTState)
     end.
- 
+
 check(Old, New) ->
     check(Old, New, true).
 
@@ -121,11 +121,12 @@ check(_OldRT, NewRT, false) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
     Pid ! {rt_update, NewRT}.
 
+-spec(check_fd/2 :: (list(cs_send:mypid()), list(cs_send:mypid())) -> any()).
 check_fd(X, X) ->
     ok;
 check_fd(NewRT, OldRT) ->
-    NewView = ?RT:to_pid_list(NewRT),
-    OldView = ?RT:to_pid_list(OldRT),
+    NewView = lists:usort(?RT:to_pid_list(NewRT)),
+    OldView = lists:usort(?RT:to_pid_list(OldRT)),
     NewNodes = util:minus(NewView,OldView),
     OldNodes = util:minus(OldView,NewView),
     failuredetector2:unsubscribe(OldNodes),             
