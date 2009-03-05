@@ -129,8 +129,13 @@ check_fd(NewRT, OldRT) ->
     OldView = lists:usort(?RT:to_pid_list(OldRT)),
     NewNodes = util:minus(NewView,OldView),
     OldNodes = util:minus(OldView,NewView),
-    failuredetector2:unsubscribe(OldNodes),             
-    failuredetector2:subscribe(NewNodes).
+    update_fd(OldNodes, fun failuredetector2:unsubscribe/1),
+    update_fd(NewNodes, fun failuredetector2:subscribe/1).
+
+update_fd([], _) ->
+    ok;
+update_fd(Nodes, F) ->
+    F(Nodes).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Debug
