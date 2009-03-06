@@ -25,7 +25,7 @@
 %% @version $Id $
 -module(comm_layer.comm_connection).
 
--export([send/3, open_new/4, new/3]).
+-export([send/3, open_new/4, new/3, open_new_async/4]).
 
 -import(config).
 -import(gen_tcp).
@@ -82,6 +82,23 @@ open_new(Address, Port, _MyAddress, MyPort) ->
 	{new_connection_started, Socket} ->
 	    {connection, LocalPid, Socket}
     end.
+
+% ===============================================================================
+% @doc open a new connection asynchronously
+% ===============================================================================
+-spec(open_new_async/4 :: (any(), any(), any(), any()) -> pid()).
+open_new_async(Address, Port, _MyAddr, MyPort) ->
+    Pid = spawn(fun () ->
+			case new_connection(Address, Port, MyPort) of
+			    fail ->
+				comm_port:unregister_connection(Address, Port),
+				ok;
+			    Socket ->
+				loop(Socket, Address, Port)
+			end
+		end),
+    Pid.
+
 
 send({Address, Port, Socket}, Pid, Message) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message}),
