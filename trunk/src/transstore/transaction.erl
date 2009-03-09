@@ -316,15 +316,15 @@ check_results(Results, Operation)->
     Quorum = config:quorumFactor(),
     NumSuccessfulResponses = length(TMPResults),
     NumFailedResponses = length(TMPResultsFailed),
-    
+
     if
 	NumSuccessfulResponses >= Quorum ->
 	    get_max_element(TMPResults, {0,-1});
-	(NumFailedResponses >= (ReplFactor - Quorum)) and (Operation == write) ->
+	(NumFailedResponses >= Quorum) and (Operation == write) ->
 	    {0, -1};
 	true ->
 	    NumResponses = length(Results),
-	    if 
+	    if
 		NumResponses == ReplFactor ->
 		    fail;
 		true ->
