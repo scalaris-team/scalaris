@@ -75,6 +75,7 @@
 %%   not occur 
 quorum_read(Key)->
     Owner = self(),
+
     spawn(fun () ->
 		  {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
 		  RTO = 2000,
@@ -87,7 +88,7 @@ quorum_read(Key)->
 			      {single_read_return, {fail, Reason}}->
 				  ?TLOG("single read return fail"),
 				  Owner ! {fail, Reason};
-			      {single_read_return,{value, Page, Version}}->
+			      {single_read_return, {value, Page, Version}}->
 				  ?TLOG2("read_page returned", [Page]),
 				  Owner ! {Page, Version};
 			      _X ->

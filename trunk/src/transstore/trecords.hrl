@@ -23,15 +23,17 @@
 %% @version $Id$
 
 %% the remotly sent one
--record(item, {key, rkey, value, version, operation, tms}). 
+-record(item, {key, rkey, value, version, operation, tms}).
 
-%% @type translog() = {gb_trees:gb_tree(), gb_trees:gb_tree()}. the information about items involved in a transaction
+%% @type translog() = {gb_trees:gb_tree(), gb_trees:gb_tree()}.
+% the information about items involved in a transaction
 -record(translog, {tid_tm_mapping, undecided, decided}).
 
 %% the entry for a transaction per item stored in the log
 %% contains information about the item and the transaction
 %% status: prepared/local_abort/commit/abort
--record(logentry, {status, key, rkey, value, version, operation, transactionID, tms}).
+-record(logentry, {status, key, rkey, value, version, operation,
+		   transactionID, tms}).
 
 %% the vote of a participant
 -record(vote, {transactionID, key, rkey, decision, timestamp}).
@@ -43,7 +45,9 @@
 -record(tm_message, {transaction_id, tm_key, message}).
 
 %% the state of a transaction manager
--record(tm_state, {transID,  items, leader,  myBallot, rtms, votes, vote_acks, read_vote_acks, decisions, rtms_found, tps_found, status}).
+-record(tm_state, {transID,  items, leader,  myBallot, rtms,
+		   votes, vote_acks, read_vote_acks, decisions,
+		   rtms_found, tps_found, status}).
 
 %% information on an item hold by a transaction manager
 -record(tm_item, {key, value, version, operation, tps}).
