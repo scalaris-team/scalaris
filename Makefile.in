@@ -57,10 +57,10 @@ compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
 test: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
 
 test-vts: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
 
 java:
 	$(CD) java-api && ant jar
