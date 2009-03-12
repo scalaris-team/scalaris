@@ -133,7 +133,7 @@ loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache) 
     	{stabilize,AktToken} -> % new stabilization interval
        	
             % Triger an update of the Random view
-            get_cyclon_pid() ! {get_subset,all,self()},
+            get_cyclon_pid() ! {get_subset_max_age,RandViewSize,self()},
             RndView=get_RndView(RandViewSize,Cache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
 			{Pred,Succ} =get_safe_pred_succ(Preds,Succs,RndView,Me),

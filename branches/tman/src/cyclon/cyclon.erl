@@ -85,8 +85,12 @@ loop(Cache,Node,Cycles) ->
     {get_subset,all,Pid} ->
 			Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
 			loop(Cache,Node,Cycles);
+
+    {get_subset_max_age,Age,Pid} ->
+            Pid ! {cache,cache:get_subset_max_age(Age,Cache)},
+            loop(Cache,Node,Cycles);    
         
-		{get_subset,N,Pid} ->
+	{get_subset,N,Pid} ->
 			Pid ! {cache,cache:get_youngest(N,Cache)},
 			loop(Cache,Node,Cycles);
         

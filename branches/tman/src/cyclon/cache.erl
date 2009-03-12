@@ -22,7 +22,7 @@
 -import(util).
 %% API
 
--export([add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_nodes/1 ,inc_age/1, get_youngest/2, get_oldest/1, ages/1, get_youngest/1]).
+-export([get_subset_max_age/2, add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_nodes/1 ,inc_age/1, get_youngest/2, get_oldest/1, ages/1, get_youngest/1]).
 
 % list of {pid of cs_node process, age}
 -type(cache() :: list({node:node_type(), pos_integer()})).
@@ -175,7 +175,8 @@ size([H|T]) ->
 
 
 
-
+get_subset_max_age(MaxAge,Cache) ->
+    get_list_of_nodes(lists:filter(fun ({_,Age}) -> Age < MaxAge end ,Cache)).
 
 
 
