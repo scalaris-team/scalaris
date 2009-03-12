@@ -146,7 +146,7 @@ init(_Args) ->
 	  [
 	   Config,
        Logger,
-       Tracer,
+       %Tracer,
        CommPort,
 	   FailureDetector,
 	   AdminServer,

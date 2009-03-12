@@ -96,15 +96,15 @@ is_valid({failed}) ->
 
 get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
     case get_indexed_id(Node, Ring) of
-        "null" -> "null";
-        "none" -> "none";
+        "null" -> -1*(NIndex-1);
+        "none" -> -1*(NIndex-1);
         Index -> ((Index-MyIndex+NIndex) rem NIndex)-NIndex
     end.
 
 get_indexed_succ_id(Node, Ring, MyIndex, NIndex) ->
     case get_indexed_id(Node, Ring) of
-        "null" -> "null";
-        "none" -> "none";
+        "null" -> (NIndex-1);
+        "none" -> (NIndex-1);
         Index -> (Index-MyIndex+NIndex) rem NIndex
     end.
 

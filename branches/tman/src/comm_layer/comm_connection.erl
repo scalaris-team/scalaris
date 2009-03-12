@@ -119,7 +119,7 @@ send({Address, Port, Socket}, Pid, Message) ->
 	    comm_port:unregister_connection(Address, Port),
 	    close_connection(Socket);
 	{error, Reason} ->
-	    log:log(error,"[ CC ] couldn't send to ~p:~p (~p)", [Address, Port, Reason]),
+	    %log:log(error,"[ CC ] couldn't send to ~p:~p (~p)", [Address, Port, Reason]),
 	    comm_port:unregister_connection(Address, Port),
 	    close_connection(Socket)
     end.
@@ -200,20 +200,20 @@ new_connection(Address, Port, MyPort) ->
 		            gen_tcp:send(Socket, YouAre),
 		            Socket;
 			{error, Reason} ->
-			    log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
-				    [Address, Reason]),
+			    %log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
+				%    [Address, Reason]),
 			    close_connection(Socket),
 	    		    new_connection(Address, Port, MyPort)
 		    end;
 		{error, Reason} ->
-		    log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
-			    [Address, Reason]),
+		    %log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
+			%    [Address, Reason]),
 		    close_connection(Socket),
 	            new_connection(Address, Port, MyPort)
 	    end;
         {error, Reason} ->
-            log:log(error,"[ CC ] couldn't connect to ~p:~p (~p)", 
-		    [Address, Port, Reason]),
+            %log:log(error,"[ CC ] couldn't connect to ~p:~p (~p)", 
+		    %[Address, Port, Reason]),
 	    fail
     end.
     

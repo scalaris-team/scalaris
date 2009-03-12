@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1]).
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1, dd_check_ring/1,dd_check_ring/0 ]).
 
 %%====================================================================
 %% API functions
@@ -201,3 +201,11 @@ worker_loop() ->
 check_routing_tables(Port) ->
 	Nodes = boot_server:node_list(),
 	[ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- Nodes ].
+
+dd_check_ring() ->
+    dd_check_ring(0).    
+dd_check_ring(Token) ->
+    {ok,One} = process_dictionary:find_cs_node(),
+    One ! {send_to_group_member,ring_maintenance,{init_check_ring,Token}},
+    {token_on_the_way}.
+          

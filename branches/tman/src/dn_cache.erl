@@ -65,11 +65,9 @@ unsubscribe() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 start() ->
-				
-      	%erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
-        
-				log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
-	    loop(fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()).
+    erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
+    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
+	loop(fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()).
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
 loop(Queue,Subscriber) ->

@@ -72,7 +72,7 @@ run_1() ->
 %%
 
 wait2(Size) ->
-    erlang:send_after(5000, self() ,{go}),
+    erlang:send_after(1000, self() ,{go}),
     Ende = erlang:now(),
     Res = admin:check_ring(),
     receive
