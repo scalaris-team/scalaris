@@ -140,6 +140,9 @@ install: all java
 	install contrib/yaws/ebin/*.beam $(SCALARISDIR)/contrib/yaws/ebin
 	mkdir -p $(SCALARISDIR)/contrib/yaws/include
 	install contrib/yaws/include/yaws_api.hrl $(SCALARISDIR)/contrib/yaws/include
+	mkdir -p $(SCALARISDIR)/contrib/log4erl/ebin
+	install contrib/log4erl/ebin/*.beam $(SCALARISDIR)/contrib/log4erl/ebin
+	install contrib/log4erl/ebin/*.app $(SCALARISDIR)/contrib/log4erl/ebin
 	mkdir -p $(LOGDIR)
 	mkdir -p $(DOCDIR)/erlang
 	install -m 644 doc/*.html $(DOCDIR)/erlang
