@@ -81,3 +81,7 @@ cd scalaris-0.0.1/contrib
 rpmbuild -ba scalaris.spec
 }}}
 Your source and binary rpm will be generated in /usr/src/packages/SRPMS and RPMS.
+
+= Can I store more Data in Scalaris than ram+swapspace is available in the cluster? =
+
+Currently not, but in principle the used data store could use mnesia, Tokyo Cabinet or something similar. Note however, that this would not provide persistency.
