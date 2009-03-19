@@ -1,5 +1,8 @@
 #summary Frequently asked questions.
 
+== Questions ==
+
+<wiki:toc max_depth="1" />
 
 = How can I change the web server port/yaws port? =
 
@@ -67,3 +70,14 @@ the snapshot. Then user access can be restarted.
 Persistency as in traditional replicated databases is not intended by our
 system model and thereby not possible. The best alternative would be periodic
 snapshots, that can be done also without interrupting the service.
+
+= How to build an rpm? =
+
+{{{
+svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
+tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1
+cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
+cd scalaris-0.0.1/contrib
+rpmbuild -ba scalaris.spec
+}}}
+Your source and binary rpm will be generated in /usr/src/packages/SRPMS and RPMS.
