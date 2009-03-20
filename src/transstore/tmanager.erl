@@ -41,7 +41,7 @@
 -import(cs_symm_replication).
 -import(boot_logger).
 
--export([start_manager/6, start_manager_commit/6, start_replicated_manager/6]).
+-export([start_manager/6, start_manager_commit/6, start_replicated_manager/2]).
 
 %% for timer module
 -export([read_phase/1, init_phase/1, start_commit/1]).
@@ -261,18 +261,19 @@ start_commit(TMState)->
 	     TMState#tm_state.items),
     loop(TMState).
 
-start_replicated_manager(TransID, Items, Leader, RKey, InstanceId, Owner)->
-    Owner ! {the_pid, cs_send:this()},
+start_replicated_manager(Message, InstanceId)->
+    {Leader, Items} = Message#tm_message.message,
+    RKey = Message#tm_message.tm_key,
+    TransID = Message#tm_message.transaction_id,
     erlang:put(instance_id, InstanceId),
-    if
-	Leader == true ->
-	    NLeader = cs_send:this();
-	true ->
-	    NLeader = Leader
-    end,
+    cs_send:send(Leader, {rtm, cs_send:this(), RKey}),
+    NLeader = if Leader ->
+                      cs_send:this();
+                 true ->
+                      Leader
+              end,
     TMState = trecords:new_tm_state(TransID, Items, NLeader, {RKey, cs_send:this(), unknownballot}),
     loop(TMState).
-
 
 loop(TMState)->
     receive
