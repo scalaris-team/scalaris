@@ -42,7 +42,7 @@ shuffle_reset_interval() ->
 %% @doc start_link for supervisor
 -spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [InstanceId], [profile]).
+    gen_component:start_link(?MODULE, [InstanceId], [sync_start]).
 
 %% @doc initializes component
 -spec(init/1 :: ([any()]) -> state()).
