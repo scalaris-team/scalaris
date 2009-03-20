@@ -27,9 +27,9 @@
 -vsn('$Id$ ').
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, stabilize/3, filterDeadNode/2,
-	 to_pid_list/1, to_node_list/1, get_size/1, get_keys_for_replicas/1, is_equal_key/2, 
-	 get_standard_key/1, get_other_replicas_for_key/1, dump/1, to_dict/1]).
+-export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3, 
+	 filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1, 
+	 dump/1, to_dict/1]).
 
 -export([normalize/1]).
 
@@ -70,9 +70,9 @@ getRandomNodeId() ->
 next_hop(State, _Key) ->
     cs_state:succ_pid(State).
 
-%% @doc triggers a new stabilization round
--spec(stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
-stabilize(_Id, Succ, _RT) ->
+%% @doc triggered by a new stabilization round
+-spec(init_stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
+init_stabilize(_Id, Succ, _RT) ->
     % renew routing table
     empty(Succ).
 
@@ -82,24 +82,17 @@ filterDeadNode(RT, _DeadPid) ->
     RT.
 
 %% @doc returns the pids of the routing table entries .
-%% @spec to_pid_list(rt()) -> [pid()]
+-spec(to_pid_list/1 :: (rt()) -> [cs_send:mypid()]).
 to_pid_list({Succ, _RoutingTable} = _RT) ->
     [node:pidX(Succ)].
 
-%% @doc returns the pids of the routing table entries .
-%% @spec to_node_list(rt()) -> [node:node()]
-to_node_list({Succ, _RoutingTable} = _RT) ->
-    [Succ].
-
 %% @doc returns the size of the routing table.
-%%      inefficient standard implementation
-%% @spec get_size(rt()) -> int()
 -spec(get_size/1 :: (rt()) -> pos_integer()).
-get_size(RT) ->
-    length(to_pid_list(RT)).
+get_size(_RT) ->
+    1.
     
 %% @doc returns the replicas of the given key
-%% @spec get_keys_for_replicas(key() | string()) -> [key()]
+-spec(get_keys_for_replicas/1 :: (key() | string()) -> [key()]).
 get_keys_for_replicas(Key) when is_integer(Key) ->
     [Key, 
      normalize(Key + 16#40000000000000000000000000000000),
@@ -108,37 +101,6 @@ get_keys_for_replicas(Key) when is_integer(Key) ->
     ];
 get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
-
-%% @doc returns true if both keys describe the same item under replication
--spec(is_equal_key/2 :: (key(), key()) -> bool()).
-is_equal_key(Key1, Key2) ->
-    Key1 == Key2 
-	orelse Key1 == normalize(Key2 + 16#40000000000000000000000000000000)
-	orelse Key1 == normalize(Key2 + 16#80000000000000000000000000000000)
-	orelse Key1 == normalize(Key2 + 16#C0000000000000000000000000000000).
-
-%% @doc perform "undo" on replication
--spec(get_standard_key/1 :: (key()) -> key()).
-get_standard_key(Key) ->    
-    if
-	Key >= 16#C0000000000000000000000000000000 ->
-	    Key - 16#C0000000000000000000000000000000;
-	Key >= 16#80000000000000000000000000000000 ->
-	    Key - 16#80000000000000000000000000000000;
-	Key >= 16#40000000000000000000000000000000 ->
-	    Key - 16#40000000000000000000000000000000;
-	true ->
-	    Key
-    end.
-
-%% @doc get other replicas of the given replicated tree
--spec(get_other_replicas_for_key/1 :: (key()) -> list(key())).
-get_other_replicas_for_key(Key) ->
-    [
-     normalize(Key + 16#40000000000000000000000000000000),
-     normalize(Key + 16#80000000000000000000000000000000),
-     normalize(Key + 16#C0000000000000000000000000000000)
-    ].
     
 %% @doc 
 -spec(dump/1 :: (rt()) -> ok).
@@ -147,7 +109,6 @@ dump(_State) ->
 
 normalize(Key) ->
     Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
-
 
 % 0 -> succ
 % 1 -> shortest finger

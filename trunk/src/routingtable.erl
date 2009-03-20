@@ -47,14 +47,13 @@ behaviour_info(callbacks) ->
      % routing
      {next_hop, 2}, 
      % trigger for new stabilization round
-     {stabilize, 3}, 
+     {init_stabilize, 3}, 
      % dead nodes filtering
      {filterDeadNode, 2}, 
      % statistics
-     {to_pid_list, 1}, {to_node_list, 1}, {get_size, 1},
+     {to_pid_list, 1}, {get_size, 1},
      % for symmetric replication
-     {get_keys_for_replicas, 1}, {is_equal_key, 2}, {get_standard_key, 1},
-     {get_other_replicas_for_key, 1},
+     {get_keys_for_replicas, 1},
      % for debugging
      {dump, 1},
      % for bulkowner
