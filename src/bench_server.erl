@@ -85,8 +85,10 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
     io:format("total time: ~p~n", [RunTime / 1000000.0]),
     io:format("1/s: ~p~n", 
 	[length(ServerList) * ThreadsPerVM * Iterations / RunTime * 1000000.0]),
-	Throughput = [ThreadsPerVM * Iterations / Time * 1000000.0 || Time <- Times],
+    Throughput = [ThreadsPerVM * Iterations / Time * 1000000.0 || Time <- Times],
+    
     io:format("~p~n", [Throughput]),
+    io:format("High load avg. latency: ~p ms~n", [ RunTime / 1000.0 / Iterations ]),
     io:format("Message statistics (message name, bytes, how often): ~p~n", [DiffDump]),    ok.
     
 %%==============================================================================
