@@ -74,14 +74,13 @@ loop(State, Debug) ->
 	    NewState = cs_state:update_pred_succ(State, Pred, Succ),
 	    loop(NewState, ?DEBUG(Debug));
     
-    {rm_update_pred, Pred} ->
+	{rm_update_pred, Pred} ->
 	    NewState = cs_state:update_pred(State, Pred),
 	    loop(NewState, ?DEBUG(Debug));
-    {rm_update_succ, Succ} ->
+	{rm_update_succ, Succ} ->
 	    NewState = cs_state:update_succ(State,Succ),
 	    loop(NewState, ?DEBUG(Debug));
     
-     
 	{succ_left, SuccList} = _Message ->
 	    ?RM:succ_left(SuccList),
 	    loop(State, ?DEBUG(Debug));

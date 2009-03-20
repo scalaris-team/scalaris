@@ -22,7 +22,7 @@
 -export([start_link/1]).
 -export([init/1, on/2]).
 
-% state of a rse_chord process
+% state of an rse_chord process
 -type(state() :: {float()}).
 
 % accepted messages of rse_chord processes
