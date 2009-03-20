@@ -497,15 +497,9 @@ getRTMKeys(TID)->
 %%--------------------------------------------------------------------
 
 initRTM(State, Message)->
-    {Leader, Items} = Message#tm_message.message,
-    RKey = Message#tm_message.tm_key,
     TransID = Message#tm_message.transaction_id,
-    spawn(transstore.tmanager, start_replicated_manager, [TransID, Items, Leader, RKey, erlang:get(instance_id), self()]),
-    RTMPID = receive
-		 {the_pid, X} -> X
-	     end,
-    cs_send:send(Leader, {rtm, RTMPID, RKey}),
-
+    ERTMPID = spawn(transstore.tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
+    RTMPID = cs_send:get(ERTMPID, cs_send:this()),
     %% update transaction log: store mapping between transaction ID and local TM
     TransLog = cs_state:get_trans_log(State),
     New_TID_TM_Mapping = dict:store(TransID, RTMPID, TransLog#translog.tid_tm_mapping),
