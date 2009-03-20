@@ -75,10 +75,9 @@ snapshots, that can be done also without interrupting the service.
 
 {{{
 svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
-tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1
+tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1 --exclude-vcs
 cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
-cd scalaris-0.0.1/contrib
-rpmbuild -ba scalaris.spec
+rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
 }}}
 Your source and binary rpm will be generated in /usr/src/packages/SRPMS and RPMS.
 
