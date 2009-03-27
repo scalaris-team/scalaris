@@ -221,23 +221,21 @@ on({get_cyclon_pid, Pid,Me}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_key, Source_PID, Key}, State) ->
     {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
-    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
-    if
-	Responsible == true ->
+    case util:is_between(RangeBeg, Key, RangeEnd) of
+	true ->
 	    lookup:get_key(State, Source_PID, Key, Key),
 	    State;
-	true ->
+	false ->
 	    log:log(info,"[ Node ] Get_Key: Got Request for Key ~p, it is not between ~p and ~p", [Key, RangeBeg, RangeEnd]),
 	    State
     end;
 
 on({set_key, Source_PID, Key, Value, Versionnr}, State) ->
     {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
-    Responsible = util:is_between(RangeBeg, Key, RangeEnd),
-    if
-	Responsible == true ->
-	    lookup:set_key(State, Source_PID, Key, Value, Versionnr);
+    case util:is_between(RangeBeg, Key, RangeEnd) of
 	true ->
+	    lookup:set_key(State, Source_PID, Key, Value, Versionnr);
+	false ->
 	    log:log(info,"[ Node ] Set_Key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
 	    State
     end;
@@ -382,7 +380,7 @@ start_link(InstanceId) ->
     start_link(InstanceId, []).
 
 start_link(InstanceId, Options) ->
-    gen_component:start_link(?MODULE, [InstanceId, Options], [sync_start, profile]).
+    gen_component:start_link(?MODULE, [InstanceId, Options], [sync_start]).
 %% userdevguide-end cs_node:start_link
 
 get_local_cyclon_pid() ->

@@ -41,6 +41,7 @@
 -import(io).
 -import(cs_send).
 -import(cs_state).
+-import(timer).
 
 
 
@@ -109,14 +110,14 @@ tp_commit(State, TransactionID)->
     %?TLOGN("committing transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
     TransLogUndecided = TransLog#translog.undecided, 
-    case gb_trees:is_defined(TransactionID, TransLogUndecided) of
-	true ->
-	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
+    case gb_trees:lookup(TransactionID, TransLogUndecided) of
+	{value, LogEntries} ->
+	    %LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
 	    DB = tp_commit_store_unlock(cs_state:get_db(State), LogEntries),
 	    State2 = cs_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);
-	_Any ->
+	none ->
 	    %%get information about transaction --- might have missed something before
 	    State
     end.
@@ -139,14 +140,14 @@ tp_abort(State, TransactionID)->
     ?TLOGN("aborting transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
     TransLogUndecided = TransLog#translog.undecided,
-    case gb_trees:is_defined(TransactionID, TransLogUndecided) of
-	true ->
+    case gb_trees:lookup(TransactionID, TransLogUndecided) of
+	{value, LogEntries} ->
 	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
 	    DB = tp_abort_unlock(cs_state:get_db(State), LogEntries),
 	    State2 = cs_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);
-	_Any ->
+	none ->
 	    %%get information about transaction --- might have missed something before
 	    State
     end.
