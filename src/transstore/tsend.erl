@@ -29,18 +29,19 @@
 
 
 -include("trecords.hrl").
+-include("../chordsharp.hrl").
 
 -export([send/2, send_to_rtms_with_lookup/2, send_to_participants_with_lookup/2, send_to_participants/2, send_to_rtms/2, send_to_tp/2, tell_rtms/1, send_to_client/2, send_prepare_item/2, send_vote_to_rtms/2]).
 
--import(lists).
--import(dict).
--import(cs_symm_replication).
--import(process_dictionary).
--import(util).
--import(io).
--import(erlang).
 -import(cs_lookup).
 -import(cs_send).
+-import(dict).
+-import(erlang).
+-import(io).
+-import(lists).
+-import(process_dictionary).
+-import(?RT).
+-import(util).
 
 
 
@@ -61,7 +62,7 @@ send_to_participants_with_lookup(TMState, Message)->
 
 send_to_replica_with_lookup(Key, Message)->
     ?TLOG("send_to_replica_with_lookup"),
-    ReplKeys = cs_symm_replication:get_keys_for_replicas(Key),
+    ReplKeys = ?RT:get_keys_for_replicas(Key),
     {MessName, MessText} = Message,
     lists:map(fun(RKey) -> 
 		      NewMessText = MessText#tp_message{item_key = RKey, orig_key = Key},

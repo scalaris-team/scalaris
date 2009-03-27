@@ -27,19 +27,19 @@
 -vsn('$Id$').
 
 -include("trecords.hrl").
+-include("../chordsharp.hrl").
 
+-import(boot_logger).
+-import(config).
 -import(cs_send).
 -import(ct).
--import(lists).
--import(erlang).
--import(timer).
--import(lists).
 -import(dict).
+-import(erlang).
 -import(io_lib).
 -import(io).
--import(config).
--import(cs_symm_replication).
--import(boot_logger).
+-import(lists).
+-import(?RT).
+-import(timer).
 
 -export([start_manager/6, start_manager_commit/6, start_replicated_manager/2]).
 
@@ -233,7 +233,7 @@ receive_lookup_rtms_tps_repl(TMState)->
 
 %% ad a tp to the TMState
 add_tp(TMState, ItemKey, OriginalKey, Address) ->
-    %OriginalKey = cs_symm_replication:get_original_key(ItemKey),
+    %OriginalKey = ?RT:get_original_key(ItemKey),
     Item = dict:fetch(OriginalKey, TMState#tm_state.items),
     TPs = Item#tm_item.tps,
     NewTPs = [{ItemKey, Address} | TPs],

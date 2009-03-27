@@ -46,17 +46,17 @@
 %        write_read_receive/3,
          translog_new/0]).
 
--import(lists).
--import(dict).
--import(cs_symm_replication).
 -import(config).
--import(node).
 -import(cs_lookup).
 -import(cs_send).
 -import(cs_state).
+-import(dict).
 -import(erlang).
--import(process_dictionary).
 -import(io).
+-import(lists).
+-import(node).
+-import(process_dictionary).
+-import(?RT).
 
 
 
@@ -140,7 +140,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
        %% we do not have any information for the key in the log read the
        %% information from remote
        true ->
-            ReplicaKeys = cs_symm_replication:get_keys_for_replicas(Key),
+            ReplicaKeys = ?RT:get_keys_for_replicas(Key),
             [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
             erlang:send_after(config:transactionLookupTimeout(), self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
@@ -174,7 +174,7 @@ quorum_read(Key, SourcePID)->
 
 do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
-    ReplicaKeys = cs_symm_replication:get_keys_for_replicas(Key),
+    ReplicaKeys = ?RT:get_keys_for_replicas(Key),
     [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
     erlang:send_after(config:transactionLookupTimeout(), self(),
                       {write_read_receive_timeout, hd(ReplicaKeys)}),
@@ -218,15 +218,13 @@ write_read_receive(ReplicaKeys, Operation, State)->
                     case lists:member(Key, ReplicaKeys) of
                         true ->
                             {_OldVal, OldVersnr} = Result,
-                            if (Versionnr >= OldVersnr) ->
-                                    NewResult = {Value, Versionnr};
-                               true ->
-                                    NewResult = Result
-                            end,
-                            NewNumOk = 1 + NumOk,
+                            NewResult = case (Versionnr >= OldVersnr) of
+                                            true -> {Value, Versionnr};
+                                            false -> Result
+                                        end,
                             write_read_receive(ReplicaKeys, Operation,
                                                {ReplFactor, Quorum,
-                                                NewNumOk, NumFailed, NewResult});
+                                                NumOk + 1, NumFailed, NewResult});
                        false ->
                             write_read_receive(ReplicaKeys, Operation, State)
                     end;
@@ -284,7 +282,7 @@ parallel_reads(Keys, TransLog)->
             %% get a list with all replica keys
             %% [[Key, RKey1, RKey2, ..., RKey3], [Key2, ....], ...]
             ReplicaKeysAll =
-                [ cs_symm_replication:get_keys_for_replicas(Elem) ||
+                [ ?RT:get_keys_for_replicas(Elem) ||
                     Elem <- ToLookup ],
 
             lists:map(fun(ReplicaKeys)->
@@ -381,7 +379,7 @@ write_read_receive_parallel(Results, ReplicaKeys)->
 
 add_result([Head | Results], Key, Result, AllResults)->
     {CurrKey, ResultsForKey, EndResult} = Head,
-    OrigKey = cs_symm_replication:get_original_key(Key),
+    OrigKey = ?RT:get_original_key(Key),
     if
         CurrKey == OrigKey ->
             NewAllResults = lists:delete(Head, AllResults),
@@ -436,15 +434,10 @@ check_results_parallel([Head |Results], AllResults)->
 get_max_element([], {ValMaxElement, VersMaxElement})->
     {ValMaxElement, VersMaxElement};
 get_max_element([{Value, Versionnr}|Rest], {ValMaxElement, VersMaxElement})->
-    if
-	Versionnr > VersMaxElement ->
-	    get_max_element(Rest, {Value, Versionnr});
-	true ->
-	    get_max_element(Rest, {ValMaxElement, VersMaxElement})
-    end.
-
-
-
+    get_max_element(Rest, case (Versionnr > VersMaxElement) of
+                              true -> {Value, Versionnr};
+                              false -> {ValMaxElement, VersMaxElement}
+                          end).
 
 build_translog(Results)->
     EndResultAccum = [],
@@ -481,17 +474,8 @@ generateTID(State)->
 
 getRTMKeys(TID)->
     {Key, _} = TID,
-    RKeys = cs_symm_replication:get_keys_for_replicas(Key),
-    KeyInList = lists:member(Key, RKeys),
-    if
-	KeyInList == true ->
-	    lists:delete(Key, RKeys);
-	true ->
-	    %% this should only happen in the beginning
-	    %% when there are arbitrary keys for the nodes
-	    [_ | NewRKeys] = RKeys,
-	    NewRKeys
-    end.
+    RKeys = ?RT:get_keys_for_replicas(Key),
+    lists:delete(Key, RKeys).
 
 %%--------------------------------------------------------------------
 %% Function: initRTM(State, Message)-> State
@@ -518,7 +502,7 @@ delete(SourcePID, Key) ->
 
 do_delete(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
-    ReplicaKeys = cs_symm_replication:get_keys_for_replicas(Key),
+    ReplicaKeys = ?RT:get_keys_for_replicas(Key),
     [ cs_lookup:unreliable_lookup(Replica, {delete_key, cs_send:this(), Replica}) ||
 	Replica <- ReplicaKeys],
     erlang:send_after(config:transactionLookupTimeout(), self(), {timeout}),
