@@ -65,8 +65,6 @@ make_tfun(MyAccount, OtherAccount) ->
 		    {{ok, ok}, TransLog2}
 	    end
     end.
-	    
-	    
 
 process(Parent, MyAccount, OtherAccount, Count) ->
     SuccessFun = fun(X) ->
@@ -89,7 +87,7 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
 	    ct:pal("do_transaction failed: ~p~n", [X])
     end.
 
-banking_account(_Config) ->    
+banking_account(_Config) ->
     ?equals(transstore.transaction_api:single_write("a", 1000), commit),
     ?equals(transstore.transaction_api:single_write("b", 0), commit),
     ?equals(transstore.transaction_api:single_write("c", 0), commit),
