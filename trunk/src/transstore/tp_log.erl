@@ -70,15 +70,12 @@ get_log(State)->
 
 add_to_undecided(State, TransID, LogEntry)->
     TransLog = cs_state:get_trans_log(State),
-    TransInLog = gb_trees:is_defined(TransID, TransLog#translog.undecided),
-    if
-	TransInLog == true -> 
-	    TransInLogList = gb_trees:get(TransID, TransLog#translog.undecided),
-	    NewTransInLogList = lists:append([LogEntry], TransInLogList);
-	true ->
-	    NewTransInLogList = [LogEntry]
-    end,
-    
+    NewTransInLogList = case gb_trees:lookup(TransID, TransLog#translog.undecided) of
+			    {value, TransInLogList} ->
+				lists:append([LogEntry], TransInLogList);
+			    none ->
+				[LogEntry]
+			end,
     NewTransInLog = gb_trees:enter(TransID, NewTransInLogList, TransLog#translog.undecided),
     cs_state:set_trans_log(State, TransLog#translog{undecided=NewTransInLog}).   
     
