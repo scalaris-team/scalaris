@@ -74,36 +74,22 @@
 %% * for {fail, fail} the reason is currently unknown, should 
 %%   not occur 
 quorum_read(Key)->
-    Owner = self(),
-
-    spawn(fun () ->
-		  {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
-		  RTO = 2000,
-		  if 
-		      Flag /= ok->
-			  {fail, "cs_node not found"};
-		      true ->
-			  LocalCSNode ! {read, cs_send:this(), Key},
-			  receive
-			      {single_read_return, {fail, Reason}}->
-				  ?TLOG("single read return fail"),
-				  Owner ! {fail, Reason};
-			      {single_read_return, {value, Page, Version}}->
-				  ?TLOG2("read_page returned", [Page]),
-				  Owner ! {Page, Version};
-			      _X ->
-				  ?TLOG2("read_page got the message ~p~n", [_X]),
-				  Owner ! {fail, fail}
-			  after
-			      RTO ->
-				  ?TLOG("single read return fail - timeout"),
-				  Owner ! {fail, timeout}
-			  end
-		  end
-	  end),
+    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    RTO = 2000,
+    transstore.transaction:quorum_read(Key, cs_send:this()),
     receive
-	Result ->
-	    Result
+        {single_read_return, {value, Page, Version}}->
+            ?TLOG2("read_page returned", [Page]),
+            {Page, Version};
+        {single_read_return, {fail, Reason}}->
+            ?TLOG("single read return fail"),
+            {fail, Reason};
+        _X ->
+            ?TLOG2("read_page got the message ~p~n", [_X]),
+            {fail, fail}
+    after RTO ->
+            ?TLOG("single read return fail - timeout"),
+            {fail, timeout}
     end.
 
 %% Use this function to do parallel quorum reads on a list of keys with a commit phase
