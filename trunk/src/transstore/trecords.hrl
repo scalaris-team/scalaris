@@ -47,7 +47,7 @@
 %% the state of a transaction manager
 -record(tm_state, {transID,  items, leader,  myBallot, rtms,
 		   votes, vote_acks, read_vote_acks, decisions,
-		   rtms_found, tps_found, status}).
+		   rtms_found, tps_found, status, decision}).
 
 %% information on an item hold by a transaction manager
 -record(tm_item, {key, value, version, operation, tps}).

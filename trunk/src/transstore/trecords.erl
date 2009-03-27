@@ -123,7 +123,8 @@ new_tm_state(TransID, Items, Leader, Self)->
 	      decisions = NewDecisions,
 	      rtms_found = false,
 	      tps_found = false,
-	      status = collecting
+	      status = collecting,
+	      decision = undecided
 	     }.
 
 %%--------------------------------------------------------------------

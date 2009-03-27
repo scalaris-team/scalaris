@@ -148,7 +148,7 @@ commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID, _TimeRP
 	    if
 		TransRes == commit->
 		    %boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | commit | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
-		    % io:format("| ~p | ~f | ~f |~f | commit | ~p~n", [TID, _TimeRP/1000, _TimeIP/1000, _TimeCP/1000, _ItemsListLength]),
+		    %io:format("| ~p | ~f | ~f |~f | commit | ~p~n", [TID, _TimeRP/1000, _TimeIP/1000, _TimeCP/1000, _ItemsListLength]),
 		    tsend:send_to_client(Owner, SuccessFun({commit, ReadPhaseResult}));
 		true ->
 		    %boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | abort | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
@@ -217,10 +217,10 @@ receive_lookup_rtms_tps_repl(TMState)->
 	    Limit = config:replicationFactor(),
 	    AllTPs = check_tps(TMState2, Limit),
 	    if
-		AllTPs == true ->
+		AllTPs ->
 		    TMState3 = TMState2#tm_state{tps_found = true},
 		    if
-			TMState3#tm_state.rtms_found == true->
+			TMState3#tm_state.rtms_found ->
 			    %?TLOGN("Found RTMs ~p~n, TPs for items: ~p ~n", [TMState#tm_state.rtms, TMState#tm_state.items]),
 			    {ok, TMState3};
 			true ->
@@ -229,7 +229,6 @@ receive_lookup_rtms_tps_repl(TMState)->
 		true ->
 		    receive_lookup_rtms_tps_repl(TMState2)
 	    end
-    
     end.
 
 %% ad a tp to the TMState
@@ -243,16 +242,9 @@ add_tp(TMState, ItemKey, OriginalKey, Address) ->
 
 %% check whether we have enough TPs for all items
 check_tps(TMState, Limit) ->
-    Keys = dict:fetch_keys(TMState#tm_state.items),
-    lists:all(fun(Item)-> 
-		      ItemValues = dict:fetch(Item, TMState#tm_state.items), 
-		      TPs = ItemValues#tm_item.tps,
-		      if
-			  length(TPs) >= Limit ->
-			      true;
-					   true ->
-			      false
-		      end end, Keys).
+    dict:fold(fun(_Item, ItemValues, Accum) ->
+		      Accum andalso length(ItemValues#tm_item.tps) >= Limit
+	      end, true, TMState#tm_state.items).
 
 
 start_commit(TMState)->
