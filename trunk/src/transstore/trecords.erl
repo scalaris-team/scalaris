@@ -24,12 +24,13 @@
 -vsn('$Id$ ').
 
 -include("trecords.hrl").
+-include("../chordsharp.hrl").
 
 -export([new_tm_state/4, get_vote/3, store_vote/4, get_vote_acks/1, get_vote_acks/2, get_vote_acks/3, store_vote_acks/4, get_read_vote_acks/1, get_read_vote_acks/3, store_read_vote_acks/4, get_decision/3, store_decision/4, new_tm_item/4, new_translog/0, new_tm_message/2, new_vote/5, create_items/1]).
 
 -import(dict).
 -import(lists).
--import(cs_symm_replication).
+-import(?RT).
 
 %%--------------------------------------------------------------------
 %% Function: new_tm_state/4
@@ -80,7 +81,7 @@ new_tm_state(TransID, Items, Leader, Self)->
 				       RVAcksDict = dict:new(),
 				       DecRepDict = dict:new(),
 				       
-				       RKeys = cs_symm_replication:get_keys_for_replicas(Key),
+				       RKeys = ?RT:get_keys_for_replicas(Key),
 				       
 				       VotesReplica = lists:foldl(fun(Elem, Acc)->
 									  dict:store(Elem, {bottom, 0, 0}, Acc)

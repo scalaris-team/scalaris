@@ -27,17 +27,17 @@
 -vsn('$Id$').
 
 -include("trecords.hrl").
+-include("../chordsharp.hrl").
 
 -export([process_vote/2, process_vote_ack/5, process_read_vote/2, collect_rv_ack/5, vote_for_suspected/1]).
 
--import(cs_symm_replication).
--import(cs_send).
--import(io).
--import(dict).
--import(lists).
 -import(config).
+-import(cs_send).
+-import(dict).
 -iport(erlang).
-
+-import(io).
+-import(lists).
+-import(?RT).
 
 %%--------------------------------------------------------------------
 %% Function: check_vote/2
@@ -302,7 +302,7 @@ vote_for_suspected(TMState)->
     %%Filter all items that have no decision yet
     Undecided = filter_undecided_items(TMState),
     lists:foreach(fun({Key, _Val})->
-			  RKeys = cs_symm_replication:get_keys_for_replicas(Key),
+			  RKeys = ?RT:get_keys_for_replicas(Key),
 			  lists:foreach(fun(RKey)->
 						Vote = trecords:new_vote(TMState#tm_state.transID, Key, RKey, abort, TMState#tm_state.myBallot),
 						Message = {read_vote, Vote},
