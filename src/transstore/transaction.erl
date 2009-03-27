@@ -124,9 +124,9 @@ read_or_write(Key, Value, TransLog, Operation) ->
             [Element] = ElementsInTransLog,
             {LogOperation,LogKey,LogSuccess,LogValue,LogVersion} = Element,
             if (LogSuccess == ok) and (Operation == write) ->
-                    case LogOperation of
-                        write -> NewVersion = LogVersion;
-                        read -> NewVersion = LogVersion + 1
+                    NewVersion = case LogOperation of
+                                     write -> LogVersion;
+                                     read -> LogVersion + 1
                     end,
                     NewElement = {write, LogKey, LogSuccess, Value, NewVersion},
                     NewTransLog1 = lists:delete(Element, TransLog),
@@ -150,13 +150,9 @@ read_or_write(Key, Value, TransLog, Operation) ->
                     {{fail, Result}, NewTransLog};
                true -> %% Flag == value
                     {ReadVal, Version} = Result,
-                    case Operation of
-                        write ->
-                            NewVersion = Version + 1,
-                            NewVal = Value;
-                        read ->
-                            NewVersion = Version,
-                            NewVal = ReadVal
+                    {NewVersion, NewVal} = case Operation of
+                                               write -> {Version + 1, Value};
+                                               read -> {Version, ReadVal}
                     end,
                     NewTransLog = [{Operation, Key, ok, NewVal, NewVersion} | TransLog],
                     case Operation of
@@ -191,10 +187,6 @@ do_quorum_read(Key, SourcePID, InstanceId)->
             cs_send:send(SourcePID, {single_read_return,{value, Value, Version}})
     end.
 
-%%====================================================================
-%% Helper functions : *retrieve the results from read/write
-%%                    *filter the results
-%%====================================================================
 write_read_receive(ReplicaKeys, Operation)->
     write_read_receive(ReplicaKeys, Operation,
                        {config:replicationFactor(),
@@ -213,21 +205,31 @@ write_read_receive(ReplicaKeys, Operation, State)->
             {fail, not_found};
        true ->
             receive
-                {get_key_response, _Key, failed} ->
-                    write_read_receive(ReplicaKeys, Operation,
-                                       {ReplFactor, Quorum,
-                                        NumOk, 1 + NumFailed, Result});
-                {get_key_response, _Key, {ok, Value, Versionnr}} ->
-                    {_OldVal, OldVersnr} = Result,
-                    if (Versionnr >= OldVersnr) ->
-                            NewResult = {Value, Versionnr};
-                       true ->
-                            NewResult = Result
-                    end,
-                    NewNumOk = 1 + NumOk,
-                    write_read_receive(ReplicaKeys, Operation,
-                                       {ReplFactor, Quorum,
-                                        NewNumOk, NumFailed, NewResult});
+                {get_key_response, Key, failed} ->
+                    case lists:member(Key, ReplicaKeys) of
+                        true ->
+                            write_read_receive(ReplicaKeys, Operation,
+                                               {ReplFactor, Quorum,
+                                                NumOk, 1 + NumFailed, Result});
+                        false ->
+                            write_read_receive(ReplicaKeys, Operation, State)
+                    end;
+                {get_key_response, Key, {ok, Value, Versionnr}} ->
+                    case lists:member(Key, ReplicaKeys) of
+                        true ->
+                            {_OldVal, OldVersnr} = Result,
+                            if (Versionnr >= OldVersnr) ->
+                                    NewResult = {Value, Versionnr};
+                               true ->
+                                    NewResult = Result
+                            end,
+                            NewNumOk = 1 + NumOk,
+                            write_read_receive(ReplicaKeys, Operation,
+                                               {ReplFactor, Quorum,
+                                                NewNumOk, NumFailed, NewResult});
+                       false ->
+                            write_read_receive(ReplicaKeys, Operation, State)
+                    end;
                 {write_read_receive_timeout, _Key} ->
                     {fail, timeout};
                 Any ->

@@ -132,7 +132,7 @@ read_phase(TFun)->
 
 %% commit phase
 commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID, _TimeRP)->
-    %% BEGIN only for time measurements	    
+    %% BEGIN only for time measurements
     _ItemsListLength = length(dict:to_list(Items)),
     %boot_logger:transaction_log(io_lib:format("| ~p | | | | | | ~p ", [TID, _ItemsListLength])),
     %% END only for time measurements
@@ -148,6 +148,7 @@ commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID, _TimeRP
 	    if
 		TransRes == commit->
 		    %boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | commit | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
+		    % io:format("| ~p | ~f | ~f |~f | commit | ~p~n", [TID, _TimeRP/1000, _TimeIP/1000, _TimeCP/1000, _ItemsListLength]),
 		    tsend:send_to_client(Owner, SuccessFun({commit, ReadPhaseResult}));
 		true ->
 		    %boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | abort | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
