@@ -75,7 +75,7 @@ new_tm_state(TransID, Items, Leader, Self)->
      NewVoteAcks,
      NewRVAcks,
      NewDecisions} = dict:fold(fun(Key, _Entry, {MyVotes, MyAcks, MyRVAcks, MyDec})->
-				       ReplicaDict = dict:new(),
+				       %ReplicaDict = dict:new(),
 				       AcksRepDict = dict:new(),
 				       RVAcksDict = dict:new(),
 				       DecRepDict = dict:new(),
@@ -85,7 +85,8 @@ new_tm_state(TransID, Items, Leader, Self)->
 				       VotesReplica = lists:foldl(fun(Elem, Acc)->
 									  dict:store(Elem, {bottom, 0, 0}, Acc)
 								  end,
-								  ReplicaDict,
+								  %ReplicaDict,
+								  MyVotes,
 								  RKeys),
 				       AcksReplica = lists:foldl(fun(Elem, Acc) ->
 								      dict:store(Elem, [], Acc)
@@ -104,7 +105,7 @@ new_tm_state(TransID, Items, Leader, Self)->
 								DecRepDict,
 								RKeys),
 				       
-				    {dict:store(Key, VotesReplica, MyVotes), 
+				    {VotesReplica,%dict:store(Key, VotesReplica, MyVotes), 
 				     dict:store(Key, AcksReplica, MyAcks),
 				     dict:store(Key, RVAcksReplica, MyRVAcks),
 				     dict:store(Key, DecReplica, MyDec)}
@@ -135,7 +136,7 @@ new_tm_state(TransID, Items, Leader, Self)->
 
 get_vote(TMState, Key, RKey)->
     Votes = TMState#tm_state.votes,
-    dict:fetch(RKey, dict:fetch(Key, Votes)).
+    dict:fetch(RKey, Votes).
 
 %% @spec store_vote(TMState::tm_state, Key::string(), RKey::List, Vote::Vote) -> tm_state
 %%       List = [Prefix + string()]
@@ -148,9 +149,7 @@ get_vote(TMState, Key, RKey)->
 
 store_vote(TMState, Key, RKey, Vote)->
     Votes = TMState#tm_state.votes,
-    RKeyDict = dict:fetch(Key, Votes),
-    NewRKeyDict = dict:update(RKey, fun(_V)-> Vote end, RKeyDict),
-    NewVotes = dict:update(Key, fun(_)-> NewRKeyDict end, Votes),
+    NewVotes = dict:store(RKey, Vote, Votes),
     TMState#tm_state{votes = NewVotes}.
 
 get_vote_acks(TMState)->
@@ -189,8 +188,8 @@ store_vote_acks(TMState, Key, RKey, Ack)->
     
     NewRKeyAcks = [Ack | RKeyAcks],
     
-    NewRKeyDict = dict:update(RKey, fun(_) -> NewRKeyAcks end, RKeyDict),
-    NewVoteAcks = dict:update(Key, fun(_) -> NewRKeyDict end, VoteAcks),
+    NewRKeyDict = dict:store(RKey, NewRKeyAcks, RKeyDict),
+    NewVoteAcks = dict:store(Key, NewRKeyDict, VoteAcks),
     TMState#tm_state{vote_acks = NewVoteAcks}.
 
 get_read_vote_acks(TMState)->
@@ -215,8 +214,8 @@ store_read_vote_acks(TMState, Key, RKey, Ack)->
     
     NewRKeyAcks = [Ack | RKeyAcks],
     
-    NewRKeyDict = dict:update(RKey, fun(_) -> NewRKeyAcks end, RKeyDict),
-    NewVoteAcks = dict:update(Key, fun(_) -> NewRKeyDict end, RVAcks),
+    NewRKeyDict = dict:store(RKey, NewRKeyAcks, RKeyDict),
+    NewVoteAcks = dict:store(Key, NewRKeyDict, RVAcks),
     TMState#tm_state{read_vote_acks = NewVoteAcks}.
 
 get_decision(TMState, Key, RKey)->
@@ -227,8 +226,8 @@ store_decision(TMState, Key, RKey, Decision)->
     Decisions = TMState#tm_state.decisions,
     ItemDecs = dict:fetch(Key, Decisions),
     
-    NewItemDecs = dict:update(RKey, fun(_) -> Decision end, ItemDecs),
-    NewDecisions = dict:update(Key, fun(_) -> NewItemDecs end, Decisions), 
+    NewItemDecs = dict:store(RKey, Decision, ItemDecs),
+    NewDecisions = dict:store(Key, NewItemDecs, Decisions), 
     TMState#tm_state{decisions = NewDecisions}.
  
 
