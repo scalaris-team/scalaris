@@ -52,20 +52,25 @@ get_tags({Tag, {Size, _Count}, Iterator}) ->
 
 out(Arg) ->
     {Map, Start} = comm_layer.comm_logger:dump(),
-    SortedTagList = lists:reverse(lists:keysort(2, get_tags(gb_trees:next(gb_trees:iterator(Map))))),
-    {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),
-    TableHead = {tr, [{bgcolor, '#000099'}], 
-     [
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Message Tag"}}},
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Size"}}},
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Count"}}},
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Byte/s"}}},
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average 1/s"}}},
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Message Size"}}},
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Bytes"}}},
-       {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Count"}}}
-     ]},
-    {ehtml, {table, [], [TableHead | make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]}}.
+    case gb_trees:size(Map) of
+      0 ->
+        {ehtml, {p, [], "No messages logged. Enable logging in src/comm_layer/comm_layer.hrl (LOG_MESSAGE macro)."}};
+      _ ->
+        SortedTagList = lists:reverse(lists:keysort(2, get_tags(gb_trees:next(gb_trees:iterator(Map))))),
+        {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),
+        TableHead = {tr, [{bgcolor, '#000099'}], 
+          [
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Message Tag"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Size"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Count"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Byte/s"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average 1/s"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Message Size"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Bytes"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Count"}}}
+          ]},
+        {ehtml, {table, [], [TableHead | make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]}}
+    end.
 </erl>
 
 </body>
