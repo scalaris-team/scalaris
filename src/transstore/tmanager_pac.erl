@@ -169,7 +169,7 @@ check_acks_item([{_, AcksReplica}| Rest]) ->
 -type(timestamp_type() :: pos_integer()).
 -spec(check_acks_replica/1 :: (list({decision_type(),timestamp_type()})) -> decision_type() | undecided).
 check_acks_replica(AcksForReplicaList) ->
-    count_acks_replica(-1, bottom, 0, erlang:trunc(config:replicationFactor()/2) + 1, lists:sort(AcksForReplicaList)).
+    count_acks_replica(-1, bottom, 0, erlang:trunc(config:replicationFactor()/2) + 1, lists:keysort(2, AcksForReplicaList)).
     
 count_acks_replica(_LastTimeStamp, LastDecision, Count, Limit, _) when Count >= Limit ->
     LastDecision;
