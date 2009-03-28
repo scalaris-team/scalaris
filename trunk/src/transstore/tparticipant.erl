@@ -52,16 +52,17 @@
 tp_validate(State, Tid, Item)->
     %?TLOGN("validating item ~p", [Item]),
     %% Check whether the version is still valid
-    {DB, LockRes} = case ?DB:read(cs_state:get_db(State), Item#item.rkey) of
+    StateDB = cs_state:get_db(State),
+    {DB, LockRes} = case ?DB:read(StateDB, Item#item.rkey) of
 			 {ok, _Value, Version} ->
-			     set_lock(cs_state:get_db(State), check_version(Item, Version), Item);
+			     set_lock(StateDB, check_version(Item, Version), Item);
 			 _Any ->
 			     case Item#item.operation of
 				 write ->
-				     set_lock(cs_state:get_db(State), success, Item);
+				     set_lock(StateDB, success, Item);
 				 _Any2 ->
-				     {cs_state:get_db(State), failed}
-			     end    
+				     {StateDB, failed}
+			     end
 		     end,
     Decision = decision(LockRes),
     NewState = update_transaction_participant_log(cs_state:set_db(State, DB), Tid, Item, Decision),

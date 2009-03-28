@@ -30,6 +30,8 @@
 
 -include("chordsharp.hrl").
 
+-import(ct).
+
 -type(key()::integer() | string()).
 
 -ifdef(types_are_builtin).
@@ -203,12 +205,12 @@ get_load(DB) ->
 %%      sized groups
 %% @spec get_middle_key(db()) -> {ok, string()} | failed
 get_middle_key(DB) ->
-    case gb_trees:size(DB) < 3 of
+    case (Length = gb_trees:size(DB)) < 3 of
 	true ->
 	    failed;
 	false ->
 	    Keys = gb_trees:keys(DB),
-	    Middle = length(Keys) div 2 + 1,
+	    Middle = Length div 2,
 	    MiddleKey = lists:nth(Middle, Keys),
 	    {ok, MiddleKey}
     end.

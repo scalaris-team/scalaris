@@ -43,18 +43,16 @@
 -import(?RT).
 -import(util).
 
-
-
 send_to_rtms_with_lookup(TID, Message)->
     RTMKeys = transaction:getRTMKeys(TID),
     ?TLOG("sent_to_rtms_with_lookup"),
+    {MessName, TMMessage} = Message,
     lists:map(fun(RKey) -> 
-		      {MessName, TMMessage} = Message,
 		      NewTMMessage = TMMessage#tm_message{tm_key = RKey},
 		      cs_lookup:unreliable_lookup(RKey, {MessName, NewTMMessage})
 	      end,
 	      RTMKeys).
-		      
+
 send_to_participants_with_lookup(TMState, Message)->
     ?TLOG("sent_to_participants_with_lookup"),
     Keys = dict:fetch_keys(TMState#tm_state.items),
@@ -69,27 +67,22 @@ send_to_replica_with_lookup(Key, Message)->
 		      cs_lookup:unreliable_lookup(RKey, {MessName, NewMessText})
 	      end, 
 	      ReplKeys).
-	
+
 send_to_participants(TMState, Message)->
     dict:map(fun(_Key, Item) ->
 		     send_to_tp(Item, Message) end, TMState#tm_state.items).
 
-send_to_rtms(TMState, Message)->
-    lists:map(fun({_Key, Address, _})->
-		      cs_send:send(Address, Message)
-	      end,
-	      TMState#tm_state.rtms).
+send_to_rtms(TMState, Message) ->
+    [ cs_send:send(Address, Message) ||
+        {_Key, Address, _ } <- TMState#tm_state.rtms ].
 
 send(Address, Message)->
     cs_send:send(Address, Message).
 
 send_vote_to_rtms(RTMS, Vote)->
-    lists:map(fun(RTM)->
-		      {_, Address, _} = RTM,
-%		      ?TLOGN("message ~p", [{vote, self(), Vote}]),
-		      cs_send:send(Address, {vote, cs_send:this(), Vote})
-	      end,
-	      RTMS).
+    Me = cs_send:this(),
+    [ cs_send:send(Address, {vote, Me, Vote}) ||
+        {_, Address, _} <- RTMS ].
 
 send_to_tp(Item, Message)->
     {MessName, MessText} = Message,
