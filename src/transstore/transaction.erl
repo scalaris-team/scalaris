@@ -127,7 +127,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
                     NewVersion = case LogOperation of
                                      write -> LogVersion;
                                      read -> LogVersion + 1
-                    end,
+                                 end,
                     NewElement = {write, LogKey, LogSuccess, Value, NewVersion},
                     NewTransLog1 = lists:delete(Element, TransLog),
                     NewTransLog2 = [NewElement | NewTransLog1],
@@ -153,7 +153,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
                     {NewVersion, NewVal} = case Operation of
                                                write -> {Version + 1, Value};
                                                read -> {Version, ReadVal}
-                    end,
+                                           end,
                     NewTransLog = [{Operation, Key, ok, NewVal, NewVersion} | TransLog],
                     case Operation of
                         write -> {ok, NewTransLog};

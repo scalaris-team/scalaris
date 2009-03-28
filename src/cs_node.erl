@@ -144,7 +144,7 @@ on({lookup_tp, Message}, State) ->
 	    cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
 	    State;
 	true ->
-	    log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),	    
+	    log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),
 	    State
     end;
 
@@ -204,7 +204,7 @@ on({lookup_fin, Hops, Msg}, State) ->
     lookup:lookup_fin(Hops, Msg),
     State;
 
-on({get_node, Source_PID, Key}, State) -> 	    
+on({get_node, Source_PID, Key}, State) ->
     cs_send:send(Source_PID, {get_node_response, Key, cs_state:me(State)}),
     State;
 
