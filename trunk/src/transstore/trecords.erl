@@ -26,8 +26,9 @@
 -include("trecords.hrl").
 -include("../chordsharp.hrl").
 
--export([new_tm_state/4, get_vote/3, store_vote/4, get_vote_acks/1, get_vote_acks/2, get_vote_acks/3, store_vote_acks/4, get_read_vote_acks/1, get_read_vote_acks/3, store_read_vote_acks/4, get_decision/3, store_decision/4, new_tm_item/4, new_translog/0, new_tm_message/2, new_vote/5, create_items/1]).
-
+-export([new_tm_state/4, get_vote/3, store_vote/4, get_vote_acks/1, get_vote_acks/2, get_vote_acks/3, store_vote_acks/4, get_read_vote_acks/3, store_read_vote_acks/4, new_tm_item/4, new_translog/0, new_tm_message/2, new_vote/5, create_items/1]).
+%get_decision/3, store_decision/4, 
+%get_read_vote_acks/1, 
 -import(dict).
 -import(lists).
 -import(?RT).
@@ -98,18 +99,20 @@ new_tm_state(TransID, Items, Leader, Self)->
 				       RVAcksReplica = lists:foldl(fun(Elem, Acc) ->
 									   dict:store(Elem, [], Acc)
 								   end,
-								   RVAcksDict,
+								   %RVAcksDict,
+								   MyRVAcks,
 								   RKeys),
-				       DecReplica = lists:foldl(fun(Elem, Acc)->
-									dict:store(Elem, undecided, Acc)
-								end,
-								DecRepDict,
-								RKeys),
+%% 				       DecReplica = lists:foldl(fun(Elem, Acc)->
+%% 									dict:store(Elem, undecided, Acc)
+%% 								end,
+%% 								DecRepDict,
+%% 								RKeys),
 				       
 				    {VotesReplica,%dict:store(Key, VotesReplica, MyVotes), 
 				     dict:store(Key, AcksReplica, MyAcks),
-				     dict:store(Key, RVAcksReplica, MyRVAcks),
-				     dict:store(Key, DecReplica, MyDec)}
+				     MyRVAcks,%dict:store(Key, RVAcksReplica, MyRVAcks),
+				     MyDec %dict:store(Key, DecReplica, MyDec)
+				    }
 			    end,
 			    {Votes, Acks, RVAcks, Decisions},
 			    Items),
@@ -122,7 +125,7 @@ new_tm_state(TransID, Items, Leader, Self)->
 	      votes = NewVotes,
 	      vote_acks = NewVoteAcks,
 	      read_vote_acks = NewRVAcks,
-	      decisions = NewDecisions,
+	      %decisions = NewDecisions,
 	      rtms_found = false,
 	      tps_found = false,
 	      status = collecting,
@@ -193,12 +196,13 @@ store_vote_acks(TMState, Key, RKey, Ack)->
     NewVoteAcks = dict:store(Key, NewRKeyDict, VoteAcks),
     TMState#tm_state{vote_acks = NewVoteAcks}.
 
-get_read_vote_acks(TMState)->
-    TMState#tm_state.read_vote_acks.
+%% get_read_vote_acks(TMState)->
+%%     TMState#tm_state.read_vote_acks.
 
 get_read_vote_acks(TMState, Key, RKey)->
     VoteAcks = TMState#tm_state.read_vote_acks,
-    dict:fetch(RKey, dict:fetch(Key, VoteAcks)).
+    %dict:fetch(RKey, dict:fetch(Key, VoteAcks)).
+    dict:fetch(RKey, VoteAcks).
 
 %%--------------------------------------------------------------------
 %% @spec store_read_vote_acks(TMState::tm_state, Key::string(), RKey::List, Ack::RVAck)->tm_state
@@ -210,26 +214,24 @@ get_read_vote_acks(TMState, Key, RKey)->
 %% Ack := {{AcceptedVote, AcceptedVoteTimestamp}, Timestamp}
 store_read_vote_acks(TMState, Key, RKey, Ack)->
     RVAcks = TMState#tm_state.read_vote_acks,
-    RKeyDict = dict:fetch(Key, RVAcks),
-    RKeyAcks = dict:fetch(RKey, RKeyDict),
+    RKeyAcks = dict:fetch(RKey, RVAcks),
     
     NewRKeyAcks = [Ack | RKeyAcks],
     
-    NewRKeyDict = dict:store(RKey, NewRKeyAcks, RKeyDict),
-    NewVoteAcks = dict:store(Key, NewRKeyDict, RVAcks),
+    NewVoteAcks = dict:store(RKey, NewRKeyAcks, RVAcks),
     TMState#tm_state{read_vote_acks = NewVoteAcks}.
 
-get_decision(TMState, Key, RKey)->
-    Decisions = TMState#tm_state.decisions,
-    dict:fetch(RKey, dict:fetch(Key, Decisions)).
+%% get_decision(TMState, Key, RKey)->
+%%     Decisions = TMState#tm_state.decisions,
+%%     dict:fetch(RKey, dict:fetch(Key, Decisions)).
 
-store_decision(TMState, Key, RKey, Decision)->
-    Decisions = TMState#tm_state.decisions,
-    ItemDecs = dict:fetch(Key, Decisions),
+%% store_decision(TMState, Key, RKey, Decision)->
+%%     Decisions = TMState#tm_state.decisions,
+%%     ItemDecs = dict:fetch(Key, Decisions),
     
-    NewItemDecs = dict:store(RKey, Decision, ItemDecs),
-    NewDecisions = dict:store(Key, NewItemDecs, Decisions), 
-    TMState#tm_state{decisions = NewDecisions}.
+%%     NewItemDecs = dict:store(RKey, Decision, ItemDecs),
+%%     NewDecisions = dict:store(Key, NewItemDecs, Decisions), 
+%%     TMState#tm_state{decisions = NewDecisions}.
  
 
 %%--------------------------------------------------------------------
