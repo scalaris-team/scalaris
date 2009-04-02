@@ -83,7 +83,7 @@ Requires:   %{name}-java = %{version}
 Command line client for scalaris using the Java interface
 
 %prep
-%setup -q
+%setup -q -n %{name}
 
 %build
 ./configure --prefix=%{_prefix} \
