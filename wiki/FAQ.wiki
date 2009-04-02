@@ -74,12 +74,14 @@ snapshots, that can be done also without interrupting the service.
 = How to build an rpm? =
 
 {{{
-svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
-tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1 --exclude-vcs
+svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris
+tar -cvjf scalaris-0.0.1.tar.bz2 scalaris --exclude-vcs
 cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
 rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
 }}}
 Your source and binary rpm will be generated in /usr/src/packages/SRPMS and RPMS.
+
+Also we build rpms using checkouts from svn and provide them using the openSUSE !BuildService at http://download.opensuse.org/repositories/home:/tschuett/. We provide rpms for [http://download.opensuse.org/repositories/home:/tschuett/Fedora_10/ Fedora 10], [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009/ Mandriva 2009] and [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/ openSUSE 11.1]. Inside those repositories you will also find an erlang rpm - you don't need this if you already have a recent enough erlang version!
 
 = Can I store more Data in Scalaris than ram+swapspace is available in the cluster? =
 
