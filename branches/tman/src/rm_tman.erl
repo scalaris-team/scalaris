@@ -157,10 +157,9 @@ loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache) 
             loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache);
   		{cache,NewCache} ->
             loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,NewCache);
-  		{rm_buffer,Q,Buffer_q} ->
+        {rm_buffer,Q,Buffer_q} ->
             RndView=get_RndView(RandViewSize,Cache),
             cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,Succs++Preds++[Me]}),
-            
             Buffer=merge(Succs++Preds,Buffer_q++RndView,node:id(Me)),
    	        SuccsNew=lists:sublist(Buffer, config:read(succ_list_length)),
             PredsNew=lists:sublist(lists:reverse(Buffer), config:read(pred_list_length)),
