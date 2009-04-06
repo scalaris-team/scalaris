@@ -29,31 +29,30 @@
 
 
 -include("trecords.hrl").
+-include("../chordsharp.hrl").
 
 -export([send/2, send_to_rtms_with_lookup/2, send_to_participants_with_lookup/2, send_to_participants/2, send_to_rtms/2, send_to_tp/2, tell_rtms/1, send_to_client/2, send_prepare_item/2, send_vote_to_rtms/2]).
 
--import(lists).
--import(dict).
--import(cs_symm_replication).
--import(process_dictionary).
--import(util).
--import(io).
--import(erlang).
 -import(cs_lookup).
 -import(cs_send).
-
-
+-import(dict).
+-import(erlang).
+-import(io).
+-import(lists).
+-import(process_dictionary).
+-import(?RT).
+-import(util).
 
 send_to_rtms_with_lookup(TID, Message)->
     RTMKeys = transaction:getRTMKeys(TID),
     ?TLOG("sent_to_rtms_with_lookup"),
+    {MessName, TMMessage} = Message,
     lists:map(fun(RKey) -> 
-		      {MessName, TMMessage} = Message,
 		      NewTMMessage = TMMessage#tm_message{tm_key = RKey},
 		      cs_lookup:unreliable_lookup(RKey, {MessName, NewTMMessage})
 	      end,
 	      RTMKeys).
-		      
+
 send_to_participants_with_lookup(TMState, Message)->
     ?TLOG("sent_to_participants_with_lookup"),
     Keys = dict:fetch_keys(TMState#tm_state.items),
@@ -61,34 +60,29 @@ send_to_participants_with_lookup(TMState, Message)->
 
 send_to_replica_with_lookup(Key, Message)->
     ?TLOG("send_to_replica_with_lookup"),
-    ReplKeys = cs_symm_replication:get_keys_for_replicas(Key),
+    ReplKeys = ?RT:get_keys_for_replicas(Key),
     {MessName, MessText} = Message,
     lists:map(fun(RKey) -> 
 		      NewMessText = MessText#tp_message{item_key = RKey, orig_key = Key},
 		      cs_lookup:unreliable_lookup(RKey, {MessName, NewMessText})
 	      end, 
 	      ReplKeys).
-	
+
 send_to_participants(TMState, Message)->
     dict:map(fun(_Key, Item) ->
 		     send_to_tp(Item, Message) end, TMState#tm_state.items).
 
-send_to_rtms(TMState, Message)->
-    lists:map(fun({_Key, Address, _})->
-		      cs_send:send(Address, Message)
-	      end,
-	      TMState#tm_state.rtms).
+send_to_rtms(TMState, Message) ->
+    [ cs_send:send(Address, Message) ||
+        {_Key, Address, _ } <- TMState#tm_state.rtms ].
 
 send(Address, Message)->
     cs_send:send(Address, Message).
 
 send_vote_to_rtms(RTMS, Vote)->
-    lists:map(fun(RTM)->
-		      {_, Address, _} = RTM,
-%		      ?TLOGN("message ~p", [{vote, self(), Vote}]),
-		      cs_send:send(Address, {vote, cs_send:this(), Vote})
-	      end,
-	      RTMS).
+    Me = cs_send:this(),
+    [ cs_send:send(Address, {vote, Me, Vote}) ||
+        {_, Address, _} <- RTMS ].
 
 send_to_tp(Item, Message)->
     {MessName, MessText} = Message,

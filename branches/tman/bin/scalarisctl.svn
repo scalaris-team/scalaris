@@ -49,6 +49,7 @@ bootstart(){
     pushd $BEAMDIR > /dev/null
 	erl -setcookie "$SCALARIS_COOKIE" \
 	    -pa $SCALARISDIR/contrib/yaws/ebin \
+	    -pa $SCALARISDIR/contrib/log4erl/ebin \
 	    -pa $BEAMDIR \
 	    -noinput \
 	    -detached \
@@ -81,6 +82,7 @@ nodestart(){
     pushd $BEAMDIR > /dev/null
 	erl -setcookie "$SCALARIS_COOKIE" \
 	    -pa $SCALARISDIR/contrib/yaws/ebin \
+	    -pa $SCALARISDIR/contrib/log4erl/ebin \
 	    -pa $BEAMDIR \
 	    -yaws embedded true \
 	    -chordsharp log_path "\"$LOGDIR\"" \

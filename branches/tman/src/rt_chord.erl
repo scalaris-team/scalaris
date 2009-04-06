@@ -29,14 +29,8 @@
 -behaviour(routingtable).
 
 % routingtable behaviour
--export([empty/1, 
-	 hash_key/1, getRandomNodeId/0, 
-	 next_hop/2, 
-	 stabilize/3, 
-	 filterDeadNode/2,
-	 to_pid_list/1, to_node_list/1, get_size/1, 
-	 get_keys_for_replicas/1, is_equal_key/2, get_standard_key/1, 
-	 get_other_replicas_for_key/1, 
+-export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3, 
+	 filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1, 
 	 dump/1, to_dict/1]).
 
 % stabilize for Chord
@@ -66,7 +60,7 @@ getRandomNodeId() ->
     rt_simple:getRandomNodeId().
 
 %% @doc returns the next hop to contact for a lookup
-%% @spec next_hop(cs_state:state(), key()) -> node()
+-spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
 next_hop(State, Id) -> 
     case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
 	%succ is responsible for the key
@@ -79,35 +73,31 @@ next_hop(State, Id) ->
     end.
 
 % @private
+-spec(next_hop/5 :: (key(), rt(), key(), pos_integer(), cs_send:mypid()) -> cs_send:mypid()).
 next_hop(_N, _RT, _Id, 0, Candidate) -> Candidate;
 next_hop(N, RT, Id, Index, Candidate) ->
-    case gb_trees:is_defined(Index, RT) of
-	true ->
-	    case gb_trees:get(Index, RT) of
-		null ->
-		    next_hop(N, RT, Id, Index - 1, Candidate);
-		Entry ->
-		    case util:is_between_closed(N, node:id(Entry), Id) of
-			true ->
-			    node:pidX(Entry);
-			false ->
-			    next_hop(N, RT, Id, Index - 1, Candidate)
-		    end
-		end;
-	false ->
+    case gb_trees:lookup(Index, RT) of
+	{value, Entry} ->
+	    case util:is_between_closed(N, node:id(Entry), Id) of
+		true ->
+		    node:pidX(Entry);
+		false ->
+		    next_hop(N, RT, Id, Index - 1, Candidate)
+	    end;
+	none ->
 	    next_hop(N, RT, Id, Index - 1, Candidate)
     end.
 
 %% @doc starts the stabilization routine
--spec(stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
-stabilize(Id, Succ, RT) ->
+-spec(init_stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
+init_stabilize(Id, Succ, RT) ->
     % calculate the longest finger
     Key = calculateKey(Id, 127),
     % trigger a lookup for Key
     cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), 127}),
     cleanup(gb_trees:iterator(RT), RT, Succ).
 
-%% @doc remove all entries with the given ids
+%% @doc remove all entries
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, DeadPid) ->
     DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT), 
@@ -120,36 +110,16 @@ filterDeadNode(RT, DeadPid) ->
 to_pid_list(RT) ->
     lists:map(fun ({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
 
-%% @doc returns the pids of the routing table entries .
--spec(to_node_list/1 :: (rt()) -> list(node:node_type())).
-to_node_list(RT) ->
-    lists:map(fun ({_Idx, Node}) -> Node end, gb_trees:to_list(RT)).
-
 %% @doc returns the size of the routing table.
 %%      inefficient standard implementation
 -spec(get_size/1 :: (rt()) -> pos_integer()).
 get_size(RT) ->
-    length(to_pid_list(RT)).
-    
+    gb_trees:size(RT).
+
 %% @doc returns the replicas of the given key
 -spec(get_keys_for_replicas/1 :: (key()) -> list(key())).
 get_keys_for_replicas(Key) ->
     rt_simple:get_keys_for_replicas(Key).
-
-%% @doc returns true if both keys describe the same item under replication
--spec(is_equal_key/2 :: (key(), key()) -> bool()).
-is_equal_key(Key1, Key2) ->
-    rt_simple:is_equal_key(Key1, Key2).
-
-%% @doc perform "undo" on replication
--spec(get_standard_key/1 :: (key()) -> key()).
-get_standard_key(Key) ->    
-    rt_simple:get_standard_key(Key).
-
-%% @doc get other replicas of the given replicated tree
--spec(get_other_replicas_for_key/1 :: (key()) -> list(key())).
-get_other_replicas_for_key(Key) ->
-    rt_simple:get_other_replicas_for_key(Key).
 
 %% @doc 
 -spec(dump/1 :: (rt()) -> any()).
@@ -187,7 +157,7 @@ calculateKey(Id, Idx) ->
 % 2 -> next longer finger
 % 3 -> ...
 % n -> me
-% @spec to_dict(cs_state:state()) -> dict:dictionary()
+-spec(to_dict/1 :: (cs_state:state()) -> dict:dictionary()).
 to_dict(State) ->
     RT = cs_state:rt(State),
     Succ = cs_state:succ(State),
@@ -230,5 +200,3 @@ prune_table(RT, Index) ->
     lists:foldl(fun (Key, Table) ->
 			gb_trees:delete(Key, Table)
 		end, RT, Keys).
-	     
-    

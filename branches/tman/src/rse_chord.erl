@@ -22,7 +22,7 @@
 -export([start_link/1]).
 -export([init/1, on/2]).
 
-% state of a rse_chord process
+% state of an rse_chord process
 -type(state() :: {float()}).
 
 % accepted messages of rse_chord processes
@@ -42,7 +42,7 @@ shuffle_reset_interval() ->
 %% @doc start_link for supervisor
 -spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [InstanceId], [profile]).
+    gen_component:start_link(?MODULE, [InstanceId], [sync_start]).
 
 %% @doc initializes component
 -spec(init/1 :: ([any()]) -> state()).

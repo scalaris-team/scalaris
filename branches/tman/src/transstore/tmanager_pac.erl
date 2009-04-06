@@ -27,17 +27,17 @@
 -vsn('$Id$').
 
 -include("trecords.hrl").
+-include("../chordsharp.hrl").
 
 -export([process_vote/2, process_vote_ack/5, process_read_vote/2, collect_rv_ack/5, vote_for_suspected/1]).
 
--import(cs_symm_replication).
--import(cs_send).
--import(io).
--import(dict).
--import(lists).
 -import(config).
+-import(cs_send).
+-import(dict).
 -iport(erlang).
-
+-import(io).
+-import(lists).
+-import(?RT).
 
 %%--------------------------------------------------------------------
 %% Function: check_vote/2
@@ -71,9 +71,10 @@ process_vote(TMState, Vote)->
     end.
 
 
-process_vote_ack(TMState, Key, RKey, Dec, TS)->
+process_vote_ack(#tm_state{decision = undecided} = TMState, Key, RKey, Dec, TS) ->
     TMState2 = trecords:store_vote_acks(TMState, Key, RKey, {Dec, TS}),
     Decision = check_acks(TMState2),
+    %io:format("~p ~p~n", [self(), process_vote_ack]),
     if
 	Decision == undecided ->
 	    TMState2;
@@ -86,9 +87,10 @@ process_vote_ack(TMState, Key, RKey, Dec, TS)->
 			      },
 	    tsend:send_to_participants(TMState2, Message),
 	    tsend:send_to_rtms(TMState2, {decision, Decision}),
-	    TMState2
-    end.
-
+	    TMState2#tm_state{decision = Decision}
+    end;
+process_vote_ack(TMState, Key, RKey, Dec, TS) ->
+    trecords:store_vote_acks(TMState, Key, RKey, {Dec, TS}).
 
 %%--------------------------------------------------------------------
 %% Function: check_acks/1
@@ -122,25 +124,19 @@ check_acks(TMState)->
 check_acks_item([])->
     commit;
 check_acks_item([{_, AcksReplica}| Rest]) ->
-    PreparedList = [],
-    AbortList = [],
     %% sort replicas that have decision prepared into PreparedList, those who are abort into AbortList
-    {NewPreparedList, NewAbortList} = dict:fold(fun(RKey, AcksPerReplicaList, {PLAcc, ALAcc})-> 
-							DecisionReplica = check_acks_replica(AcksPerReplicaList),
-							if
-							    DecisionReplica == prepared ->
-								{[RKey | PLAcc], ALAcc};
-							    DecisionReplica == abort ->
-								{PLAcc, [RKey | ALAcc]};
-							    true ->
-								{PLAcc, ALAcc}
-							end
-						end,
-						{PreparedList, AbortList},
-						AcksReplica),
-    NumPrepared = length(NewPreparedList),
-    NumAbort = length(NewAbortList),
- 
+    {NumPrepared, NumAbort} = dict:fold(fun(_RKey, AcksPerReplicaList, {PreparedAcc, AbortAcc})-> 
+						case check_acks_replica(AcksPerReplicaList) of
+						    prepared ->
+							{PreparedAcc + 1, AbortAcc};
+						    abort ->
+							{PreparedAcc, AbortAcc + 1};
+						    _ ->
+							{PreparedAcc, AbortAcc}
+						end
+					end,
+					{0, 0},
+					AcksReplica),
     PreparedLimit = config:quorumFactor(),
     AbortLimit = config:replicationFactor() - config:quorumFactor() + 1, 
 
@@ -169,35 +165,23 @@ check_acks_item([{_, AcksReplica}| Rest]) ->
 %%                   Paxos consensus instance with that timestamp can
 %%                   make a decision.
 %%-------------------------------------------------------------------
-check_acks_replica(ARList)->
-    CounterList = [],
+-type(decision_type() :: prepared | abort).
+-type(timestamp_type() :: pos_integer()).
+-spec(check_acks_replica/1 :: (list({decision_type(),timestamp_type()})) -> decision_type() | undecided).
+check_acks_replica(AcksForReplicaList) ->
+    count_acks_replica(-1, bottom, 0, erlang:trunc(config:replicationFactor()/2) + 1, lists:keysort(2, AcksForReplicaList)).
     
-    NewCounterList = lists:foldl(fun({Dec, Ts}, CAcc)->
-				     CurrCounter = lists:keysearch(Ts, 1, CAcc), %% false | {value, Val}
-				     if
-					 false == CurrCounter -> 
-					     NewCounter = {Ts, Dec, 1},
-					     [NewCounter | CAcc];
-					 true ->
-					     {value, {_Ts, _Dec, Count}} = CurrCounter,
-					     NewCounter = {Ts, Dec, (Count + 1)},
-					     lists:keyreplace(Ts, 1, CAcc, NewCounter)
-				     end
-				 end,
-				 CounterList,
-				 ARList),
-    Limit = erlang:trunc(config:replicationFactor()/2) + 1,
-    check_counter(NewCounterList, Limit).
-    
-check_counter([], _Limit)->
+count_acks_replica(_LastTimeStamp, LastDecision, Count, Limit, _) when Count >= Limit ->
+    LastDecision;
+count_acks_replica(_LastTimeStamp, _LastDecision, _Count, _Limit, []) ->
     undecided;
-check_counter([{_Ts, Dec, Count}| Rest], Limit) ->
-    if
-	Count >= Limit->
-	    Dec;
-	true ->
-	    check_counter(Rest, Limit)
-    end.
+count_acks_replica(LastTimeStamp, LastDecision, Count, Limit, [{LastDecision, LastTimeStamp} | Rest]) ->
+    count_acks_replica(LastTimeStamp, LastDecision, Count + 1, Limit, Rest);
+count_acks_replica(_LastTimeStamp, _LastDecision, _Count, Limit, [{NewDecision, NewTimeStamp} | Rest]) ->
+    count_acks_replica(NewTimeStamp, NewDecision, 1, Limit, Rest).
+    
+    
+
 
 %%--------------------------------------------------------------------
 %% Function: read_vote/2
@@ -318,7 +302,7 @@ vote_for_suspected(TMState)->
     %%Filter all items that have no decision yet
     Undecided = filter_undecided_items(TMState),
     lists:foreach(fun({Key, _Val})->
-			  RKeys = cs_symm_replication:get_keys_for_replicas(Key),
+			  RKeys = ?RT:get_keys_for_replicas(Key),
 			  lists:foreach(fun(RKey)->
 						Vote = trecords:new_vote(TMState#tm_state.transID, Key, RKey, abort, TMState#tm_state.myBallot),
 						Message = {read_vote, Vote},

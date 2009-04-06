@@ -41,6 +41,7 @@
 -import(io).
 -import(cs_send).
 -import(cs_state).
+-import(timer).
 
 
 
@@ -51,16 +52,17 @@
 tp_validate(State, Tid, Item)->
     %?TLOGN("validating item ~p", [Item]),
     %% Check whether the version is still valid
-    {DB, LockRes} = case ?DB:read(cs_state:get_db(State), Item#item.rkey) of
+    StateDB = cs_state:get_db(State),
+    {DB, LockRes} = case ?DB:read(StateDB, Item#item.rkey) of
 			 {ok, _Value, Version} ->
-			     set_lock(cs_state:get_db(State), check_version(Item, Version), Item);
+			     set_lock(StateDB, check_version(Item, Version), Item);
 			 _Any ->
 			     case Item#item.operation of
 				 write ->
-				     set_lock(cs_state:get_db(State), success, Item);
+				     set_lock(StateDB, success, Item);
 				 _Any2 ->
-				     {cs_state:get_db(State), failed}
-			     end    
+				     {StateDB, failed}
+			     end
 		     end,
     Decision = decision(LockRes),
     NewState = update_transaction_participant_log(cs_state:set_db(State, DB), Tid, Item, Decision),
@@ -109,14 +111,14 @@ tp_commit(State, TransactionID)->
     %?TLOGN("committing transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
     TransLogUndecided = TransLog#translog.undecided, 
-    case gb_trees:is_defined(TransactionID, TransLogUndecided) of
-	true ->
-	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
+    case gb_trees:lookup(TransactionID, TransLogUndecided) of
+	{value, LogEntries} ->
+	    %LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
 	    DB = tp_commit_store_unlock(cs_state:get_db(State), LogEntries),
 	    State2 = cs_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);
-	_Any ->
+	none ->
 	    %%get information about transaction --- might have missed something before
 	    State
     end.
@@ -139,14 +141,14 @@ tp_abort(State, TransactionID)->
     ?TLOGN("aborting transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
     TransLogUndecided = TransLog#translog.undecided,
-    case gb_trees:is_defined(TransactionID, TransLogUndecided) of
-	true ->
+    case gb_trees:lookup(TransactionID, TransLogUndecided) of
+	{value, LogEntries} ->
 	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
 	    DB = tp_abort_unlock(cs_state:get_db(State), LogEntries),
 	    State2 = cs_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);
-	_Any ->
+	none ->
 	    %%get information about transaction --- might have missed something before
 	    State
     end.
