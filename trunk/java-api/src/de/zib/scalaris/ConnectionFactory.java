@@ -169,8 +169,8 @@ public class ConnectionFactory {
 			clientNameAppendUUID = false;
 		}
 		
-		//fixLocalhostName();
-//		System.out.println("node: " + node);
+		fixLocalhostName();
+		//System.out.println("node: " + node);
 	}
 
 	/**
@@ -254,7 +254,7 @@ public class ConnectionFactory {
 			String hostname = "localhost";
 			try {
 				InetAddress addr = InetAddress.getLocalHost();
-				hostname = addr.getHostName();
+				hostname = addr.getCanonicalHostName();
 			} catch (UnknownHostException e) {
 			}
 			node = node.replaceAll("@localhost$", "@" + hostname);

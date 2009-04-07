@@ -41,8 +41,10 @@
 %% @doc generates a failure detector for the calling process on the given pid.
 -spec(subscribe/1 :: (cs_send:mypid() | list(cs_send:mypid())) -> ok).
 subscribe(PidList) when is_list(PidList) ->
+		%log:log(debug,"Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),PidList]),
     gen_server:call(?MODULE, {subscribe_list, PidList, self()}, 20000);
 subscribe(Pid) ->
+		%log:log(debug,"Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),Pid]),
     gen_server:call(?MODULE, {subscribe_list, [Pid], self()}, 20000).
 
 %% @doc deletes the failure detector for the given pid.
@@ -70,7 +72,7 @@ start_pinger(Pid) ->
 
 loop_ping(Pid, Count) ->
     cs_send:send(Pid, {ping, cs_send:this(), Count}),
-    timer:send_after(config:failureDetectorInterval(), {timeout}), 
+    erlang:send_after(config:failureDetectorInterval(), self(), {timeout}), 
     receive
 	{stop} ->
 	    ok;
@@ -130,14 +132,9 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_dictionary:register_process("fd", failure_detector, self()),
-    %% mapping: remote_process -> list(subscribers)
-    %%MyPid2Subscribers = ets:new(?MODULE, [set, protected]),
-    %% list of {subscriber (local process), watched process}
-    %% {pid(), cs_send:mypid()}
-    SubscriberTable = ets:new(?MODULE, [bag, protected]),
-    Pinger = ets:new(?MODULE, [set, protected]),
-    Linker = start_linker(),
-    {ok, {SubscriberTable, Pinger, Linker}}.
+    fd_db:init(),
+	Linker = start_linker(),
+    {ok, {Linker}}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -149,48 +146,50 @@ init([]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 %% @private
-handle_call({subscribe_list, PidList, Subscriber}, _From,{SubscriberTable, PingerTable, Linker} = State) ->
+handle_call({subscribe_list, PidList, Subscriber}, _From,{ Linker} = State) ->
     % link subscriber
     Linker ! {link, Subscriber},
     % make ping processes for subscription
-    [make_pinger(PingerTable, Pid) || Pid <- PidList],
+    [make_pinger(Pid) || Pid <- PidList],
     % store subscription
-    [subscribe(SubscriberTable, Pid, Subscriber) || Pid <- PidList],
+    [subscribe( Pid, Subscriber) || Pid <- PidList],
     {reply, ok, State};
-handle_call({unsubscribe_list, TargetList, Unsubscriber}, _From,{SubscriberTable, PingerTable, _Linker} = State) ->
-	[ unsubscribe(SubscriberTable, PingerTable, Target, Unsubscriber) || Target <- TargetList ],
+handle_call({unsubscribe_list, TargetList, Unsubscriber}, _From,{_Linker} = State) ->
+	[ unsubscribe(Target, Unsubscriber) || Target <- TargetList ],
     {reply, ok, State};
-handle_call({crash, Pid}, _From,  {SubscriberTable, PingerTable, _Linker} = State) ->
+
+handle_call({crash, Target}, _From,  {_Linker} = State) ->
    	
-    %G = (catch  erlang:process_display(element(3,Pid),backtrace)),
-    %io:format("~p~n",[G]),
-    
-    ets:delete(PingerTable, Pid),
-    case ets:match(SubscriberTable, {'$1', Pid}) of
+    fd_db:del_pinger(fd_db:get_pinger(Target)),
+   	
+	Subscribers = fd_db:get_subscribers(Target),
+	    
+    case fd_db:get_subscribers(Target) of
 		[] ->
 	    	log:log(error,"[ FD ] shouldn't happen1");
 		Subscribers ->
 	    	% notify and unsubscribe
-            
-	    	[crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, X) || [X] <- Subscribers]
-    
+	    	[crash_and_unsubscribe(Target, Subscriber) || Subscriber <- Subscribers]
+   
     end,
     {reply, ok, State};
+
 handle_call({remove_subscriber, Subscriber}, _From, 
-	    {SubscriberTable, PingerTable, _Linker} = State) ->
-    WatchedPids = ets:lookup(SubscriberTable, Subscriber),
-    ets:delete(SubscriberTable, Subscriber),
-    lists:map(fun (Pid) ->
-                       case ets:match(SubscriberTable, {'$1', Pid}) of
+	    {_Linker} = State) ->
+    WatchedPids = fd_db:get_subscriptions(Subscriber),
+    [ fd_db:del_subscription(Subscriber,WatchedPid) || WatchedPid <- WatchedPids ],
+
+    lists:map(fun (WatchedPid) ->
+                       case fd_db:get_subscribers(WatchedPid) of
                            [] ->
-                               kill_pinger(PingerTable, Pid);
+                               kill_pinger(WatchedPid);
                            _ ->
                                ok
                        end
               	end, WatchedPids),
     {reply, ok, State};
-handle_call({getmytargets, Pid}, _From,{SubscriberTable, _PingerTable, _Linker} = State) ->
-    Targets=ets:lookup(SubscriberTable, Pid),
+handle_call({getmytargets, Subscriber}, _From,{_Linker} = State) ->
+    Targets=fd_db:get_subscriptions(Subscriber),
     {reply, Targets, State}.
 
 
@@ -201,16 +200,6 @@ handle_call({getmytargets, Pid}, _From,{SubscriberTable, _PingerTable, _Linker} 
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
 %@private
-handle_cast({debug_info, Requestor}, {SubscriberTable, PingerTable, _Linker} = State) ->
-    Subscribers = length(lists:usort(ets:match(SubscriberTable, {'$1', '_'}))), 
-    Targets     = length(lists:usort(ets:match(SubscriberTable, {'_', '$1'}))), 
-    Requestor ! {debug_info_response, [
-					       	{"SubscriberTable", lists:flatten(io_lib:format("~p", [length(ets:tab2list(SubscriberTable))]))},
-						   	{"Pinger", lists:flatten(io_lib:format("~p", [length(ets:tab2list(PingerTable))]))},
-					       	{"Subscribers", lists:flatten(io_lib:format("~p", [Subscribers]))},
-						   	{"Targets", lists:flatten(io_lib:format("~p", [Targets]))}
-                                      ]},
-    {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -247,85 +236,50 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-make_pinger(PingerTable, Target) ->
-    case ets:lookup(PingerTable, Target) of
-	[] ->
-	   log:log(info,"[ FD ~p ] starting pinger for ~p", [self(), Target]),
-	    Pinger = start_pinger(Target),
-	    ets:insert(PingerTable, {Target, Pinger}),
-	    ok;
-	[{_Pid, _Pinger}] ->
-	    ok
+make_pinger(Target) ->
+    case fd_db:get_pinger(Target) of
+		none ->
+	   		log:log(info,"[ FD ~p ] starting pinger for ~p", [self(), Target]),
+	    	Pinger = start_pinger(Target),
+		    fd_db:add_pinger(Target, Pinger),
+	    	ok;
+		{ok,_} ->
+		    ok
     end.
 
-kill_pinger(PingerTable, Target) ->
-    case ets:lookup(PingerTable, Target) of
-	[] ->
-	    aua;
-	[{_Pid, Pinger}] ->
-	    ets:delete(PingerTable, {Target, Pinger}),
-	    Pinger ! {stop}
-    end.   
+kill_pinger(Target) ->
+	case fd_db:get_pinger(Target) of
+      {ok,X} ->
+          X	! {stop},
+      		fd_db:del_pinger(Target);
+      none ->
+          failed
+	end.
+  
+          
+    
 
 %% (mypid() -> list(pid()), pid() -> mypid())
-subscribe(SubscriberTable, Pid, Subscriber) ->
-	ets:insert(SubscriberTable, {Subscriber, Pid}).
+subscribe(Target, Subscriber) ->
+	fd_db:add_subscription(Subscriber, Target).
 
-%% (mypid() -> list(pid()), pid() -> mypid())
-unsubscribe(SubscriberTable, PingerTable, Target, Unsubscriber) ->
-    %io:format("unsub: ~p~n",[{Unsubscriber, Target}]),
-    ets:delete_object(SubscriberTable, {Unsubscriber, Target}),
-	case ets:match(SubscriberTable, {'$1', Target}) of
-    	[] ->
-        	RES= kill_pinger(PingerTable, Target),
-			case RES==aua of 
-				true ->
-					 %io:format("should not happend!~n"),
-					 %io:format("unsub: ~p~n",[{Unsubscriber, Target}]);
-                    mhh;
-				false ->
-					ok
-			end;
-        _X ->
-            %io:format("After del: ~p~n",[X])
-            ok
-     end.
+-spec(unsubscribe/2 :: (cs_node:mypid(),pid()) -> ok).
+unsubscribe(Target, Subscriber) ->
+	fd_db:del_subscription(Subscriber, Target),
+	case fd_db:get_subscribers(Target) of
+  	[] ->
+    	kill_pinger(Target);
+	_X ->
+		ok
+	end.
 
-crash_and_unsubscribe(SubscriberTable, PingerTable, Pid, Owner) ->
-    %io:format("+ ~p~n", [{SubscriberTable, PingerTable, Pid, Owner}]),
-    Owner ! {crash, Pid},
-    %io:format("Send crash to ~p~n",[Pid]),
-    unsubscribe(SubscriberTable, PingerTable, Pid, Owner).
-	%io:format("after unsubscribe~n").
+crash_and_unsubscribe(Target, Subscriber) ->
+    %io:format("~p got a crash message for ~p~n",[process_dictionary:lookup_process(Subscriber), Target]),
+    Subscriber ! {crash, Target},
+    unsubscribe(Target,Subscriber).
 
 -spec(report_crash/1 :: (cs_send:mypid()) -> ok).
 report_crash(Pid) ->
     log:log(warn,"[ FD ] ~p crashed",[Pid]),
-%%  debug code; only usable with distributed Erlang
-%%     case dump_to_file(Pid) of
-%% 	ok ->
-%% 	    {Group, Name} = process_dictionary:lookup_process(Pid),
-%% 	    log:log(warn,"[ FD ] a ~p process died",[Name]),
-%% 	    TManPid = process_dictionary:lookup_process(Group, ring_maintenance),
-%% 	    dump_to_file(TManPid);
-%% 	failed ->
-%% 	    ok
-%%     end,
-    %io:format("~p b crashed ~n",[Pid]),
     gen_server:call(?MODULE, {crash, Pid}, 20000).
     
--spec(dump_to_file/1 :: (pid()) -> ok | failed).
-dump_to_file(Pid) ->
-   	Res =  (catch erlang:process_info(Pid, backtrace)),
-    (catch erlang:process_display(Pid, backtrace)),
-	case Res of
-        {backtrace, Bin} ->
-            Trace =  binary_to_list(Bin),
-			N = "/tmp/scalaris-crash.log",
-			{ok,S} = file:open(N,[append]),
-			io:format(S,"FD ~p | ~p crashed~n#~p~n",[self(),Pid,Trace]),
-			file:close(S),
-			ok;
-        _ -> 
-			failed
-	end.

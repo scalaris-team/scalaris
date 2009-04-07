@@ -25,7 +25,7 @@
 %% @version $Id $
 -module(comm_layer.comm_connection).
 
--export([send/3, open_new/4, new/3]).
+-export([send/3, open_new/4, new/3, open_new_async/4]).
 
 -import(config).
 -import(gen_tcp).
@@ -33,6 +33,7 @@
 -import(io).
 -import(io_lib).
 -import(log).
+-import(timer).
 
 -include("comm_layer.hrl").
 
@@ -82,19 +83,45 @@ open_new(Address, Port, _MyAddress, MyPort) ->
 	    {connection, LocalPid, Socket}
     end.
 
+% ===============================================================================
+% @doc open a new connection asynchronously
+% ===============================================================================
+-spec(open_new_async/4 :: (any(), any(), any(), any()) -> pid()).
+open_new_async(Address, Port, _MyAddr, MyPort) ->
+    Pid = spawn(fun () ->
+			case new_connection(Address, Port, MyPort) of
+			    fail ->
+				comm_port:unregister_connection(Address, Port),
+				ok;
+			    Socket ->
+				loop(Socket, Address, Port)
+			end
+		end),
+    Pid.
+
+
 send({Address, Port, Socket}, Pid, Message) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message}),
-    case gen_tcp:send(Socket, BinaryMessage) of
+    SendTimeout    = config:read(tcp_send_timeout),
+    {Time, Result} = timer:tc(gen_tcp, send, [Socket, BinaryMessage]),
+    if
+	Time > 1200 * SendTimeout ->
+	    log:log(error,"[ CC ] send to ~p took ~p: ~p", 
+		    [Address, Time, inet:getopts(Socket, [keep_alive, send_timeout])]);
+	true ->
+	    ok
+    end,
+    case Result of
 	ok ->
 	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(BinaryMessage)),
 	    ok;
 	{error, closed} ->
 	    comm_port:unregister_connection(Address, Port),
-	    gen_tcp:close(Socket);
+	    close_connection(Socket);
 	{error, Reason} ->
-	    log:log(error,"[ CC ] couldn't send to ~p:~p (~p)", [Address, Port, Reason]),
+	    %log:log(error,"[ CC ] couldn't send to ~p:~p (~p)", [Address, Port, Reason]),
 	    comm_port:unregister_connection(Address, Port),
-	    gen_tcp:close(Socket)
+	    close_connection(Socket)
     end.
 
 loop(fail, Address, Port) ->
@@ -137,32 +164,43 @@ loop(Socket, Address, Port) ->
 	    loop(Socket, Address, Port)
     end.
 
-%% @spec new_connection(inet:ip_address(), int(), int()) -> inet:socket() | fail
+% ===============================================================================
+
+-spec(new_connection(inet:ip_address(), integer(), integer()) -> inet:socket() | fail).
 new_connection(Address, Port, MyPort) ->
     case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, 
 					 {send_timeout, config:read(tcp_send_timeout)}], 
 			 config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
-                                                % send end point data
+	    % send end point data
 	    case inet:sockname(Socket) of
 		{ok, {MyAddress, _MyPort}} ->
-	            gen_tcp:send(Socket, term_to_binary({endpoint, MyAddress, MyPort})),
+		    Message = term_to_binary({endpoint, MyAddress, MyPort}),
+	            gen_tcp:send(Socket, Message),
 		    case inet:peername(Socket) of
 			{ok, {RemoteIP, RemotePort}} ->
-		            gen_tcp:send(Socket, term_to_binary({youare, RemoteIP, RemotePort})),
+			    YouAre = term_to_binary({youare, RemoteIP, RemotePort}),
+		            gen_tcp:send(Socket, YouAre),
 		            Socket;
 			{error, Reason} ->
-			   log:log(error,"[ CC ] reconnect to ~p because socket is ~p", [Address, Reason]),
-			    gen_tcp:close(Socket),
+			    %log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
+				%    [Address, Reason]),
+			    close_connection(Socket),
 	    		    new_connection(Address, Port, MyPort)
 		    end;
 		{error, Reason} ->
-		    log:log(error,"[ CC ] reconnect to ~p because socket is ~p", [Address, Reason]),
-		    gen_tcp:close(Socket),
+		    %log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
+			%    [Address, Reason]),
+		    close_connection(Socket),
 	            new_connection(Address, Port, MyPort)
 	    end;
         {error, Reason} ->
-            log:log(error,"[ CC ] couldn't connect to ~p:~p (~p)", [Address, Port, Reason]),
+            %log:log(error,"[ CC ] couldn't connect to ~p:~p (~p)", 
+		    %[Address, Port, Reason]),
 	    fail
     end.
     
+close_connection(Socket) ->
+    spawn( fun () ->
+		   gen_tcp:close(Socket)
+	   end ).

@@ -74,7 +74,7 @@ reliable_get_node_service_using_boot(InstanceId, Id, Node) ->
     reliable_get_node_service_using_boot(Id, Node).
 
 reliable_get_node_service_using_boot(Id, Node) ->
-    NodeList = boot_server:node_list(),
+    NodeList = util:shuffle(boot_server:node_list()),
     reliable_get_node_service_using_boot_iter(NodeList, [], Id, Node).
 
 reliable_get_node_service_using_boot_iter([First | Rest], Suspected, Id, Node) ->

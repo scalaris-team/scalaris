@@ -78,13 +78,13 @@ start_fetchers(Index, [Interval | Tail]) ->
 fetch_interval(Owner, Index, Interval) ->
     bulkowner:issue_bulk_owner(Interval, 
 			       {bulk_read_with_version, cs_send:this()}),
-    timer:send_after(5000, self(), {timeout}),
+    erlang:send_after(5000, self(), {timeout}),
     fetch_interval_loop(Owner, Index, Interval, [], []).
 
 fetch_interval_loop(Owner, Index, Interval, Done, FetchedData) ->
     receive
 	{timeout} ->
-	    timer:send_after(5000, self(), {timeout}),
+	    erlang:send_after(5000, self(), {timeout}),
 	    fetch_interval_loop(Owner, Index, Interval, Done, FetchedData);
 	{bulk_read_with_version_response, Interval, NewData} ->
 	    Done2 = [Interval | Done],

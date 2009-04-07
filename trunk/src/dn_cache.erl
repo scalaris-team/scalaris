@@ -65,19 +65,20 @@ unsubscribe() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 start() ->
-      	erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
-        log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
-	    loop(fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()).
+    erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
+    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
+	loop(fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()).
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
 loop(Queue,Subscriber) ->
  	receive
 	{zombiehunter} ->
-        fix_queue:filter(fun (X) -> cs:send(node:pidX(X),{ping,self(),X}) end,Queue), 
+      	
+        fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this(),X}) end,Queue), 
         erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
         loop(Queue,Subscriber);
 	{pong,Zombie} ->
-        gb_sets:filter(fun (X) -> X ! {zombie,Zombie} end, Subscriber),
+        gb_sets:fold(fun (X,_) -> X ! {zombie,Zombie} end,0, Subscriber),
         loop(Queue,Subscriber);
 	{add_zombie_candidate, Node} ->
 		loop(fix_queue:add(Node,Queue),Subscriber);

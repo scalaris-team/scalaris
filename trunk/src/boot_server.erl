@@ -51,10 +51,10 @@
 %% @spec number_of_nodes() -> integer()
 -spec(number_of_nodes/0 :: () -> pos_integer()).
 number_of_nodes() ->
-    cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
+    cs_send:send(config:bootPid(), {get_list_length, cs_send:this()}),
     receive
-	{get_list_response, Nodes} ->
-	    length(Nodes)
+	{get_list_length_response, Nodes} ->
+	    Nodes
     end.
 
 connect() ->
@@ -109,6 +109,9 @@ loop(Nodes) ->
 	    loop(Nodes);
 	{get_list, Ping_PID} ->
 	    cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
+	    loop(Nodes);
+    {get_list_length,Ping_PID} ->
+        cs_send:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
 	    loop(Nodes);
 	{register, Ping_PID} ->
 	    failuredetector2:subscribe(Ping_PID),
