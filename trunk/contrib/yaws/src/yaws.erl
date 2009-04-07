@@ -99,11 +99,11 @@
 -export([sconf_to_srvstr/1, 
          redirect_host/2, redirect_port/1,
          redirect_scheme_port/1, redirect_scheme/1,
-         tmpdir/0,
+         tmpdir/0, split_at/2,
          id_dir/1, ctl_file/1]).
          
 % TS: added export
--export([setup_gconf/2, setup_sconf/3]).         
+-export([setup_gconf/2, setup_sconf/3]).        
          
 
 -import(lists, [reverse/1, reverse/2]).
@@ -2190,3 +2190,12 @@ get_chunk(Fd, N, Asz,SSL) ->
             exit(normal)
     end.
 
+%% split inputstring at first occurrence of Char
+split_at(String, Char) ->
+    split_at(String, Char, []).
+split_at([H|T], H, Ack) ->
+    {lists:reverse(Ack), T};
+split_at([H|T], Char, Ack) ->
+    split_at(T, Char, [H|Ack]);
+split_at([], _Char, Ack) ->
+    {lists:reverse(Ack), []}.

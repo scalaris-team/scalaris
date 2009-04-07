@@ -7,7 +7,7 @@
 %%% @author  Torbjorn Tornkvist <tobbe@tornkvist.org>
 %%% @end
 %%%
-%%% $Id: yaws_rss.erl 1241 2008-05-15 08:34:50Z etnt $
+%%% $Id$
 %%%----------------------------------------------------------------------
 -module(yaws_rss).
 
