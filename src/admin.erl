@@ -26,8 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([add_nodes/1, add_nodes/2, check_ring/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3]).
+-export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1, dd_check_ring/1,dd_check_ring/0 ]).
 
 %%====================================================================
 %% API functions
@@ -170,3 +170,41 @@ loop() ->
 				  comm_layer.comm_logger:dump()}),
 	    loop()
     end.
+
+%%--------------------------------------------------------------------
+%% Function: nodes() -> list()
+%% Description: contact boot server and list the known ip addresses
+%%--------------------------------------------------------------------
+% @doc contact boot server and list the known ip addresses
+% @spec nodes() -> list()
+nodes() ->
+    util:uniq([IP || {IP, _, _} <- lists:sort(boot_server:node_list())]).
+
+%%===============================================================================
+%% Debug functions
+%%===============================================================================
+
+print_ages() ->
+	Nodes = boot_server:node_list(),
+	[ cs_send:send_to_group_member(Node,cyclon,{get_ages,self()}) || Node <- Nodes ],
+    worker_loop().
+		
+worker_loop() ->
+	receive 
+		{ages,Ages} ->
+			io:format("~p~n",[Ages]),
+			worker_loop()
+    after 400 ->
+            ok
+	end.
+
+check_routing_tables(Port) ->
+	Nodes = boot_server:node_list(),
+	[ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- Nodes ].
+
+dd_check_ring() ->
+    dd_check_ring(0).    
+dd_check_ring(Token) ->
+    {ok,One} = process_dictionary:find_cs_node(),
+    One ! {send_to_group_member,ring_maintenance,{init_check_ring,Token}},
+    {token_on_the_way}.

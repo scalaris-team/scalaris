@@ -33,8 +33,7 @@
 
 	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
 	 pointerStabilizationInterval/0, failureDetectorInterval/0, 
-	 failureDetectorPingInterval/0, 
-	 failureDetectorUpdateInterval/0, bootPid/0, 
+	 bootPid/0, 
 	 logPid/0, loadBalanceInterval/0, loadBalanceStartupInterval/0, loadBalanceFlagResetInterval/0, 
 	 collectorInterval/0, error_log_file/0, 
 	 debugQueueLength/0, debug_log_file/0, transaction_log_file/0, reregisterInterval/0, 
@@ -84,10 +83,6 @@ succListLength() ->
 failureDetectorInterval() ->
     read(failure_detector_interval).
 
-%% @doc the interval between two failure detection runs
-%% @spec failureDetectorPingInterval() -> integer() | failed
-failureDetectorPingInterval() ->
-    read(failure_detector_ping_interval).
 
 %% @doc the interval between two stabilization runs Max
 %% @spec stabilizationInterval() -> integer() | failed
@@ -108,11 +103,6 @@ stabilizationInterval_min() ->
 %% @spec pointerStabilizationInterval() -> integer() | failed
 pointerStabilizationInterval() ->
     read(pointer_stabilization_interval).
-
-%% @doc interval between two updates of the nodes to be supervised 
-%% @spec failureDetectorUpdateInterval() -> integer() | failed
-failureDetectorUpdateInterval() ->
-    read(failure_detector_update_interval).
 
 %% @doc interval between two load balance rounds
 %% @spec loadBalanceInterval() -> integer() | failed

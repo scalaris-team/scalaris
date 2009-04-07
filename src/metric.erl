@@ -24,15 +24,15 @@
 %%
 %% Exported Functions
 %%
--export([ring_health/0]).
+-export([ring_health/0,rpc_get_node_list/0]).
 
 %%
 %% API Functions
 %%
 
 ring_health() ->
-    RealRing = statistics:get_ring_details(),
-    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
+    RealRing = get_ring_details(),
+    Ring = lists:sort(fun compare_node_details/2, RealRing),
     RingSize = length(Ring),
     case RingSize>1 of 
         true ->
@@ -46,7 +46,7 @@ ring_health() ->
 
 
 
-node_health({ok, Details},Ring) ->
+node_health(Details,Ring) ->
 	Node = node_details:me(Details),
 	MyIndex = get_indexed_id(Node, Ring),
     NIndex = length(Ring),
@@ -73,6 +73,7 @@ node_health({ok, Details},Ring) ->
     Error = (lists:foldr( P , 0, NormPs)*CorrectFakP+lists:foldr( P , 0, NormSs)*CorrectFakS)/2,
     %io:format("~p~n",[{NormPs,NormSs}]),
     Error;
+
 node_health(failed,_Ring) ->
     0.
 
@@ -93,28 +94,24 @@ is_valid({failed}) ->
     false.
 
 
-
 get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
     case get_indexed_id(Node, Ring) of
-        "null" -> "null";
-        "none" -> "none";
+        "null" -> -1*(NIndex-1);
+        "none" -> -1*(NIndex-1);
         Index -> ((Index-MyIndex+NIndex) rem NIndex)-NIndex
     end.
-
 get_indexed_succ_id(Node, Ring, MyIndex, NIndex) ->
     case get_indexed_id(Node, Ring) of
-        "null" -> "null";
-        "none" -> "none";
+        "null" -> (NIndex-1);
+        "none" -> (NIndex-1);
         Index -> (Index-MyIndex+NIndex) rem NIndex
     end.
-
 get_indexed_id(Node, Ring) ->
     case node:is_null(Node) of
         true -> "null";
         false -> get_indexed_id(Node, Ring, 0)
     end.
-
-get_indexed_id(Node, [{ok, Details}|Ring], Index) ->
+get_indexed_id(Node, [Details|Ring], Index) ->
     case node:id(Node) =:= node:id(node_details:me(Details)) of
         true -> Index;
         false -> get_indexed_id(Node, Ring, Index+1)
@@ -129,3 +126,45 @@ get_indexed_id(_Node, [], _Index) ->
 %% Local Functions
 %%
 
+get_ring_details() ->
+    Nodes = node_list(),
+    lists:map(fun (Pid) -> send_get_node_details(Pid) end, Nodes),
+    receive_get_node_details([]).
+    
+
+%% @doc returns all nodes known to the boot server
+%% @spec node_list() -> list(pid())
+-spec(node_list/0 :: () -> list(cs_send:mypid())).
+node_list() ->
+    %Local = rpc_get_node_list(),
+    Remote =
+        case rpc:multicall([boot@ubuntu1.zib.de,node@ubuntu2.zib.de], metric, rpc_get_node_list, [], 1000) of
+            {badrpc, _Reason} ->
+                [];
+            {ResL, _BadNodes} ->
+                lists:flatten(ResL)
+        end,
+    Remote.
+    %cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
+    %receive
+    %{get_list_response, Nodes} ->
+    %    Nodes
+    %end.
+
+rpc_get_node_list() ->
+    lists:map(fun (Pid) -> cs_send:get(Pid, cs_send:this()) end, process_dictionary:find_all_cs_nodes()).
+
+send_get_node_details(Pid) ->
+    cs_send:send(Pid, {get_node_details, cs_send:this(), Pid}).
+
+receive_get_node_details(List) ->
+    receive
+    {get_node_details_response, _Pid, Details} -> 
+        receive_get_node_details([Details|List])
+    after
+    1000 ->
+        List
+    end.
+
+compare_node_details( X,  Y) ->
+    node:id(node_details:me(X)) < node:id(node_details:me(Y)).

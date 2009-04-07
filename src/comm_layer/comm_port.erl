@@ -31,7 +31,11 @@
 
 -import(ets).
 -import(gen_server).
+-import(io).
 -import(log).
+
+-define(ASYNC, true).
+%-define(SYNC, true).
 
 %% API
 -export([start_link/0,
@@ -49,6 +53,11 @@
 
 %% @doc 
 %% @spec send({inet:ip_address(), int(), pid()}, term()) -> ok
+-ifdef(ASYNC).
+send({Address, Port, Pid}, Message) ->
+    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, 20000).
+-endif.
+-ifdef(SYNC).
 send({Address, Port, Pid}, Message) ->
     case ets:lookup(?MODULE, {Address, Port}) of
 	[{{Address, Port}, {_LPid, Socket}}] ->
@@ -57,6 +66,8 @@ send({Address, Port, Pid}, Message) ->
 	[] ->
 	    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, 20000)
     end.
+-endif.
+
 
 %% @doc 
 %% @spec unregister_connection(inet:ip_address(), int()) -> ok
@@ -116,31 +127,7 @@ init([]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 handle_call({send, Address, Port, Pid, Message}, _From, State) ->
-    case ets:lookup(?MODULE, {Address, Port}) of
-	[{{Address, Port}, {_LPid, Socket}}] ->
-	    comm_connection:send({Address, Port, Socket}, Pid, Message), 
-	    {reply, ok, State};
-	[] ->
-	    {DepAddr,DepPort} = get_local_address_port(),
-	    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
-		{local_ip, MyIP, MyPort, MyPid, MySocket} ->
-		    comm_connection:send({Address, Port, MySocket}, Pid, Message),
-		   log:log(info,"[ CC ] this() == ~w", [{MyIP, MyPort}]),
-%		    set_local_address(t, {MyIP,MyPort}}),
-%		    register_connection(Address, Port, MyPid, MySocket),
-		    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
-		    ets:insert(?MODULE, {{Address, Port}, {MyPid, MySocket}}),
-		    {reply, ok, State};
-		fail ->
-		    % drop message (remote node not reachable, failure detector will notice)
-		    {reply, ok, State};
-		{connection, LocalPid, NewSocket} ->
-		    comm_connection:send({Address, Port, NewSocket}, Pid, Message),
-		    ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),
-%		    register_connection(Address, Port, LPid, NewSocket),
-		    {reply, ok, State}
-	    end
-    end;
+    send(Address, Port, Pid, Message, State);
 
 handle_call({unregister_conn, Address, Port}, _From, State) ->
     ets:delete(?MODULE, {Address, Port}),
@@ -197,3 +184,57 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+-ifdef(ASYNC).
+send(Address, Port, Pid, Message, State) ->
+    {DepAddr,DepPort} = get_local_address_port(),
+    if
+	DepAddr == undefined ->
+	    open_sync_connection(Address, Port, Pid, Message, State);
+	true ->
+	    case ets:lookup(?MODULE, {Address, Port}) of
+		[{{Address, Port}, {ConnPid, _Socket}}] ->
+		    ConnPid ! {send, Pid, Message},
+		    {reply, ok, State};
+		[] ->
+		    ConnPid = comm_connection:open_new_async(Address, Port, 
+							     DepAddr, DepPort),
+		    ets:insert(?MODULE, {{Address, Port}, {ConnPid, undef}}),
+		    ConnPid ! {send, Pid, Message},
+		    {reply, ok, State}
+	    end
+    end.
+-endif.
+
+-ifdef(SYNC).
+send(Address, Port, Pid, Message, State) ->
+    case ets:lookup(?MODULE, {Address, Port}) of
+	[{{Address, Port}, {_LPid, Socket}}] ->
+	    comm_connection:send({Address, Port, Socket}, Pid, Message), 
+	    {reply, ok, State};
+	[] ->
+	    open_sync_connection(Address, Port, Pid, Message, State)
+    end.
+-endif.
+
+
+open_sync_connection(Address, Port, Pid, Message, State) ->
+    {DepAddr,DepPort} = get_local_address_port(),
+    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
+	{local_ip, MyIP, MyPort, MyPid, MySocket} ->
+	    comm_connection:send({Address, Port, MySocket}, Pid, Message),
+	    log:log(info,"[ CC ] this() == ~w", [{MyIP, MyPort}]),
+						%		    set_local_address(t, {MyIP,MyPort}}),
+						%		    register_connection(Address, Port, MyPid, MySocket),
+	    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
+	    ets:insert(?MODULE, {{Address, Port}, {MyPid, MySocket}}),
+	    {reply, ok, State};
+	fail ->
+						% drop message (remote node not reachable, failure detector will notice)
+	    {reply, ok, State};
+	{connection, LocalPid, NewSocket} ->
+	    comm_connection:send({Address, Port, NewSocket}, Pid, Message),
+	    ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),
+						%		    register_connection(Address, Port, LPid, NewSocket),
+	    {reply, ok, State}
+    end.

@@ -16,6 +16,7 @@
 DIRNAME=`dirname $0`
 GLOBAL_CFG="$DIRNAME/scalaris.cfg.sh"
 LOCAL_CFG="$DIRNAME/scalaris.local.cfg.sh"
+
 if [ -f "$GLOBAL_CFG" ] ; then source "$GLOBAL_CFG" ; fi
 if [ -f "$LOCAL_CFG" ] ; then source "$LOCAL_CFG" ; fi
 

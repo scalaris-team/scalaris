@@ -48,18 +48,12 @@ start_link(InstanceId) ->
    
 start(InstanceId) ->
     process_dictionary:register_process(InstanceId, cyclon, self()),
-    %process_dictionary:register_process(InstanceId, cyclonNode, cs_send:this()),
-    %{observer,'me@csr-pc38.zib.de' } ! {cyclon, self()},
-    
-    
-    get_pid() !	{get_node, cs_send:this(),2.71828183},
+   	get_pid() !	{get_node, cs_send:this(),2.71828183},
     get_pid() ! {get_pred_succ, cs_send:this()},
-    
     receive
     	{get_node_response, 2.71828183, Me} ->
           	Node = Me
-	end,
-    
+		end,
     receive
     {get_pred_succ_response, Pred, Succ} ->
 	    %Me = cs_send:get(get_pid(), cs_send:this()),
@@ -71,7 +65,6 @@ start(InstanceId) ->
 				Cache =  cache:new()
 		end
     end,
-    
     erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
     loop(Cache,Node,0).
@@ -89,47 +82,51 @@ loop(Cache,Node,Cycles) ->
         loop(Cache,Node,Cycles);
     
     {get_subset,all,Pid} ->
-		Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
-		loop(Cache,Node,Cycles);
+			Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
+			loop(Cache,Node,Cycles);
+
+    {get_subset_max_age,Age,Pid} ->
+            Pid ! {cache,cache:get_subset_max_age(Age,Cache)},
+            loop(Cache,Node,Cycles);    
+        
 	{get_subset,N,Pid} ->
-		Pid ! {cache,cache:get_youngest(N,Cache)},
-		loop(Cache,Node,Cycles);
-	{get_cache,Pid} ->
-		Pid ! {cache,cache:get_list_of_nodes(Cache)},
-		loop(Cache,Node,Cycles);
-	{flush_cache} ->
-		get_pid() ! {get_pred_succ, cs_send:this()},
-		loop(cache:new(),Node,0);	
-	{start_shuffling} ->
-		erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-		loop(Cache,Node,Cycles);
-			
-	
-		
-	{'$gen_cast', {debug_info, Requestor}}  ->
+			Pid ! {cache,cache:get_youngest(N,Cache)},
+			loop(Cache,Node,Cycles);
+        
+		{get_cache,Pid} ->
+			Pid ! {cache,cache:get_list_of_nodes(Cache)},
+			loop(Cache,Node,Cycles);
+        
+		{flush_cache} ->
+			get_pid() ! {get_pred_succ, cs_send:this()},
+			loop(cache:new(),Node,0);	
+		{start_shuffling} ->
+			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+			loop(Cache,Node,Cycles);
+		{'$gen_cast', {debug_info, Requestor}}  ->
 	    %io:format("gen_cast~n", []),
-		% io:format("~p~n", [lists:flatten(io_lib:format("~p", [State]))]),
+			% io:format("~p~n", [lists:flatten(io_lib:format("~p", [State]))]),
 	    Requestor ! {debug_info_response, [
-					       	{"cs_node", lists:flatten(io_lib:format("~p", [get_pid()]))},
-						   	{"cache-items", lists:flatten(io_lib:format("~p", [cache:size(Cache)]))},
-							{"cache", lists:flatten(io_lib:format("~p", [Cache])) }
-					      ]},
+					       		{"cs_node", lists:flatten(io_lib:format("~p", [get_pid()]))},
+						   			{"cache-items", lists:flatten(io_lib:format("~p", [cache:size(Cache)]))},
+										{"cache", lists:flatten(io_lib:format("~p", [Cache])) }
+					      	]},
 	    loop(Cache,Node,Cycles);
 	{shuffle} 	->
-	    %io:format("shuffle~n", []),
-		case Node of	
-		    nil ->
-			loop(Cache,Node,Cycles);
-		    _	->
-			NewCache = 
-                case cache:size(Cache) of
-					0 -> 
-					   Cache;	
+	 	case Node of	
+			nil ->
+				loop(Cache,Node,Cycles);
+		  _	->
+				NewCache = 
+        	case cache:size(Cache) of
+						0 ->
+                        log:log(warn,"[ CY | ~p] Cache is empty",[self()]),
+					  	Cache;	
 				    _  ->
 					   enhanced_shuffle(Cache,Node)
-				end,
-			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-			loop(NewCache,Node,Cycles+1)
+					end,
+				erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+				loop(NewCache,Node,Cycles+1)
 		end;
 	{cy_subset,P,Subset} ->
 		%io:format("subset~n", []),
