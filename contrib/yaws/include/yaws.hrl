@@ -157,7 +157,10 @@
 -record(sconf,
         {port = 8000,                %% which port is this server listening to
          flags = ?SC_DEF,
-         redirect_map=[],            %% redirect all requests to HostPort
+         redirect_map=[],            %% a list of 
+                                     %% {Prefix, #url{}, append|noappend}
+                                     %% #url{} can be partially populated
+
          rhost,                      %% forced redirect host (+ optional port)
          rmethod,                    %% forced redirect method
          docroot,                    %% path to the docs
@@ -177,7 +180,12 @@
          allowed_scripts = [yaws,php,cgi],
          tilde_allowed_scripts = [],
          revproxy = [],
-         soptions = []
+         soptions = [],
+
+         %% [{Extension:string(), Mod:atom()]
+         %% work in progress .....
+         extension_mods = [{"yxxxxxx", yaws_ext_handler_yaws}] 
+
         }).
 
 %% we cannot compare sconfs directly due to the ets
