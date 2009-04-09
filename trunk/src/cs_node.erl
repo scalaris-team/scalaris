@@ -353,8 +353,7 @@ on(_, _State) ->
 %% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
 -spec(init/1 :: ([any()]) -> cs_state:state()).
-init([InstanceId, Options]) ->
-    process_dictionary:register_process(InstanceId, cs_node, self()),
+init([_InstanceId, Options]) ->
     case lists:member(first, Options) of
 	true ->
 	    ok;
@@ -380,7 +379,7 @@ start_link(InstanceId) ->
     start_link(InstanceId, []).
 
 start_link(InstanceId, Options) ->
-    gen_component:start_link(?MODULE, [InstanceId, Options], [sync_start]).
+    gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, cs_node}]).
 %% userdevguide-end cs_node:start_link
 
 get_local_cyclon_pid() ->
