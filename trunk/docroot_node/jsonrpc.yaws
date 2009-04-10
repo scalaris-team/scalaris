@@ -46,5 +46,9 @@ handler([{ip, IP}] = _State, {call, write, [Key, Value]} = _Request, Session) ->
            {true, 0, Session, {response, "ok"}};
 	 {fail, Reason} ->
            {true, 0, Session, {response, {struct, [{failure, atom_to_list(Reason)}]}}}
-       end.
+       end;
+
+handler([{ip, IP}] = _State, Any, Session) ->
+       io:format("Unknown request = ~p~n", [Any]),
+       {true, 0, Session, {response, {struct, [{failure, "unknownreq"}]}}}.
 </erl>
