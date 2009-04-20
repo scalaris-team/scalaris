@@ -50,8 +50,7 @@ get_key() ->
 	    Key
     end.
 
-reinit() ->
-    get_pid() ! {reinit}.
+
 
 start(InstanceId) ->
     process_dictionary:register_process(InstanceId, cs_keyholder, self()),
@@ -62,6 +61,11 @@ start(InstanceId) ->
 
 start_link(InstanceId) ->
     {ok, spawn_link(?MODULE, start, [InstanceId])}.
+
+
+
+reinit() ->
+    get_pid() ! {reinit}.
 
 
     

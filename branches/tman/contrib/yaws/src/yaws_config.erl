@@ -275,19 +275,32 @@ make_default_sconf() ->
     #sconf{docroot = filename:join([Y, "www"])}.
 
 yaws_dir() ->
-    P = filename:split(code:which(?MODULE)),
-    P1 = del_tail(P),
-    filename:join(P1).
+    case  yaws_generated:is_local_install() of
+        true ->
+            P = filename:split(code:which(?MODULE)),
+            P1 = del_tail(P),
+            filename:join(P1);
+        false ->
+            code:lib_dir(yaws)
+    end.
 
+del_tail(Parts) ->
+     del_tail(Parts,[]).
+%% Initial ".." should be preserved
+del_tail([".." |Tail], Acc) ->
+    del_tail(Tail, [".."|Acc]);
+del_tail(Parts, Acc) ->
+    del_tail2(Parts, Acc).
 
-del_tail([_H, ".." |Tail]) ->
-    del_tail(Tail);
-del_tail(["..", _H |Tail]) ->
-    del_tail(Tail);
-del_tail([_X, _Y]) ->
-    [];
-del_tail([H|T]) ->
-    [H|del_tail(T)].
+%% Embedded ".." should be removed together with preceding dir
+del_tail2([_H, ".." |Tail], Acc) ->
+    del_tail2(Tail, Acc);
+del_tail2([".." |Tail], [_P|Acc]) ->
+    del_tail2(Tail, Acc);
+del_tail2([_X, _Y], Acc) ->
+    lists:reverse(Acc);
+del_tail2([H|T], Acc) ->
+    del_tail2(T, [H|Acc]).
 
 
 
@@ -1068,20 +1081,28 @@ fload(FD, server_redirect, _GC, _C, _Cs, Lno, eof, _RedirMap) ->
 fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
     %%?Debug("Chars: ~s", [Chars]),
     Next = io:get_line(FD, ''),
-    case toks(Chars) of
+    Toks = toks(Chars),
+    case Toks of
         [] ->
             fload(FD, server_redirect, GC, C, Cs, Lno+1, Next, RedirMap);
-        [Path, '=', MethodHostPort] ->
-            Entry  = case MethodHostPort of
-                         "http://"++HostPort ->
-                             {Path, "http://", HostPort};
-                         "https://"++HostPort ->
-                             {Path, "https://", HostPort};
-                         HostPort ->
-                             {Path, HostPort}
-                     end,
-            fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
-                  [Entry|RedirMap]);
+        [Path, '=', URL] ->
+            io:format(" = ~p ~p~n", [URL, Toks]),
+            try yaws_api:parse_url(URL, sloppy) of
+                U when record(U, url) ->
+                     fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
+                           [{Path, U, append}|RedirMap])
+            catch _:_ ->
+                    {error, ?F("bad redir ~p at line ~w", [URL, Lno])}
+            end;
+        [Path, '=', '=', URL] ->
+            io:format(" == ~p~n", [URL]),
+            try yaws_api:parse_url(URL, sloppy) of
+                U when record(U, url) ->
+                     fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
+                           [{Path, U, noappend}|RedirMap])
+            catch _:_ ->
+                    {error, ?F("Bad redir ~p at line ~w", [URL, Lno])}
+            end;
         ['<', "/redirect", '>'] ->
             C2 = C#sconf{redirect_map = lists:reverse(RedirMap)},
             fload(FD, server, GC, C2, Cs, Lno+1, Next);

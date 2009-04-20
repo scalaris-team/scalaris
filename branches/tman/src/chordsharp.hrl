@@ -40,5 +40,9 @@
 %-define(RM, rm_chord).
 
 %% ring maintenance by T-man
--define(RM, rm_tman).
+%-define(RM, rm_tman).
+
+%% ring maintenance by T-man-Sharp
+-define(RM, rm_tmansharp).
+
 

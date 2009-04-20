@@ -42,12 +42,12 @@ shuffle_reset_interval() ->
 %% @doc start_link for supervisor
 -spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [InstanceId], [sync_start]).
+    gen_component:start_link(?MODULE, [InstanceId], [{register, InstanceId, rse_chord}]).
 
 %% @doc initializes component
 -spec(init/1 :: ([any()]) -> state()).
-init([InstanceId]) ->
-    process_dictionary:register_process(InstanceId, rse_chord, self()),
+init([_]) ->
+    %process_dictionary:register_process(InstanceId, rse_chord, self()),
     erlang:send_after(shuffle_interval(), self(), {shuffle_trigger}),
     erlang:send_after(shuffle_reset_interval(), self(), {init_shuffle}),
     self() ! {init_shuffle},

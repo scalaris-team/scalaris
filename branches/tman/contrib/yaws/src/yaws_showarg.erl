@@ -2,8 +2,7 @@
 
 -export([out/1]).
 
-% TS: changed paths
--include_lib("yaws_api.hrl").
+-include_lib("yaws/include/yaws_api.hrl").
 
 f(Fmt, Args) ->
     io_lib:format(Fmt, Args).
