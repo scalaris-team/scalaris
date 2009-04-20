@@ -22,6 +22,7 @@
 \usepackage{graphicx}
 %\usepackage{color}
 %\usepackage{colortbl}
+\usepackage{longtable}
 \usepackage{makeidx}
 \usepackage{fancyhdr}
 \usepackage{fancyvrb}
@@ -392,6 +393,173 @@ to be started from the bin directory.
 
 
 \chapter{Using the system}
+
+\section{JSON API}
+
+\scalaris{} supports a JSON API for transactions. To minimize the necessary
+round trips between a client and \scalaris{}, it uses request lists, which
+contain all requests that can be done in parallel. The request list is then
+send over to a \scalaris{} node with a POST message. The result is an opaque
+TransLog and a list containing the results of the requests. To add further
+requests to the transaction, the TransLog and another list of requests may
+be send to \scalaris{}.  This process may be repeated as necessary. To finish
+the transaction, the request list can contain a 'commit' request as last
+element, which triggers the validation phase of the transaction processing.
+
+The JSON-API can be accessed via the \scalaris-Web-Server running on port
+8000 by default and the page \code{jsonrpc.yaws} (For example at:
+\url{http://localhost:8000/jsonrpc.yaws}).  The following example
+illustrates the message flow:
+
+\begin{longtable}{p{0.45\textwidth}cp{0.45\textwidth}}
+\bf Client & & \bf \scalaris{} node \\
+Make a transaction, that sets two keys:
+\begin{lstlisting}[language=java]
+{
+  "method":"req_list",
+  "version":"1.1",
+  "params":
+    [
+      [
+        { "write":{"keyA":"valueA"} },
+        { "write":{"keyB":"valueB"} },
+        { "commit":"commit" }
+      ]
+    ],
+  "id":0
+}
+\end{lstlisting}
+& $\to$
+& \\
+
+& $\leftarrow$ &
+\scalaris{} sends results back
+\begin{lstlisting}[language=java]
+{ "result":
+  { "results":
+      [
+        { "op":"commit",
+          "value":"ok",
+          "key":"ok" },
+        { "op":"write",
+          "value":"valueB",
+          "key":"keyB" },
+        { "op":"write",
+          "value":"valueA",
+          "key":"keyA" }
+      ],
+    "translog":
+     [...]
+  },
+  "id" : 0
+}
+\end{lstlisting}
+\\
+
+In a second transaction: Read the two keys
+\begin{lstlisting}[language=java]
+{
+  "method":"req_list",
+  "version":"1.1",
+  "params":
+    [
+      [
+        { "read":"keyA" },
+        { "read":"keyB" }
+      ]
+    ]
+  "id":0
+}
+\end{lstlisting}
+& $\to$ & \\
+
+& $\leftarrow$ &
+\scalaris{} sends results back
+\begin{lstlisting}[language=java]
+{ "result":
+  {"results":
+    [
+      { "op":"read",
+        "value":"valueB",
+        "key":"keyB" },
+      { "op":"read",
+        "value":"valueA",
+        "key":"keyA" }
+    ],
+   "translog":
+    [...] // this list is the translog
+          // for further operations!
+          // We name it TLOG here.
+  },
+  "id" : 0
+}
+\end{lstlisting}\\
+
+Calculate something with the read values and make further requests, here a
+write and the commit for the whole transaction. Include also the latest
+translog we got from \scalaris{} (named \code{TLOG} here).
+
+\begin{lstlisting}[language=java]
+{
+  "method":"req_list",
+  "version":"1.1",
+  "params":
+    [
+      TLOG, // translog from prev. result.
+      [
+        { "write":{"keyA":"valueA2"} },
+        { "commit":"commit" }
+      ]
+\end{lstlisting}
+& $\to$ & \\
+
+& $\leftarrow$ &
+\scalaris{} sends results back
+\begin{lstlisting}[language=java]
+{ "result":
+  { "results":
+    [ { "op":"commit",
+        "value":"ok",
+        "key":"ok" },
+      { "op":"write",
+        "value":"valueA2",
+        "key":"keyA" }
+    ],
+    "translog":
+    [...]
+  },
+  "id" : 0
+}
+\end{lstlisting}\\
+\end{longtable}
+
+A sample usage of the JSON API using Ruby can be found in \code{contrib/jsonrpc.rb}.
+
+A single request list must not contain a key more than once!
+
+The allowed requests are:
+\begin{lstlisting}[language=java]
+{ "read":"any_key" }
+
+{ "write":{"any_key":"any_value"} }
+
+{ "commit":"commit" }
+\end{lstlisting}
+
+The possible results are:
+\begin{lstlisting}[language=java]
+{ "op":"read", "key":"any_key", "value":"any_value" }
+{ "op":"read", "key":"any_value", "fail":"reason" } // 'not_found' or 'timeout'
+
+{ "op":"write",  "key":"any_key", "value":"any_value" }
+{ "op":"read", "key":"any_key", "fail":"reason" }
+
+{ "op":"commit", "value":"ok", "key":"ok" }
+{ "op":"commit", "value":"fail", "fail":"reason" }
+\end{lstlisting}
+
+
+
 
 \section{Erlang}
 
@@ -1242,7 +1410,7 @@ The directory tree of \scalaris{} is structured as follows: \\
  \code{java-api} & a java api to \scalaris{} \\
  \code{log} & log files \\
  \code{src} & contains the \scalaris{} source code\\
- \code{tests} & unit tests for Scalaris \\
+ \code{tests} & unit tests for \scalaris{} \\
  \code{user-dev-guide} & contains the sources for this document\\
  \hline
 \end{tabular}
