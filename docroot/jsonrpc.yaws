@@ -64,7 +64,6 @@ handler(req_list, [TransLog, {array, ReqList}]) ->
                              {commit};
                          Any -> Any
                      end || {struct, [Elem]} <- ReqList ],
-    io:format("Translog: ~p ~p~n", [TransLog, json_to_translog(TransLog)]),
     ErlResult = cs_api:process_request_list(json_to_translog(TransLog), CleanReqList),
     make_result_json_conforming(ErlResult);
 
@@ -81,14 +80,12 @@ make_result_json_conforming(ErlResult) ->
     end.
 
 translog_to_json(TLog) ->
-    io:format("Erl Translog: ~p~n", [TLog]),
     Entries = [ {struct, [{op, atom_to_list(Op)},
                           {key, Key},
                           {state, atom_to_list(State)},
                           {value, Val},
                           {version, Vers}]}
                 || {Op, Key, State, Val, Vers} <- TLog],
-    io:format("Json Translog: ~p~n", [{array, Entries}]),
     {array, Entries}.
 
 json_to_translog(JsonTLog) ->
@@ -101,7 +98,6 @@ json_to_translog(JsonTLog) ->
       || {struct, Elem} <- Entries].
 
 results_to_json(Results) ->
-    io:format("Erl Results: ~p~n", [Results]),
     Entries = [ {struct, [{op, atom_to_list(Op)},
                           case Op of
                               commit -> {key, atom_to_list(Key)};
@@ -112,7 +108,6 @@ results_to_json(Results) ->
                               {value, Value} -> {value, Value}
                           end ]} 
                 || {Op, Key, Val} <- Results ],
-    io:format("JSON Results: ~p~n", [{array, Entries}]),
     {array, Entries}.
 
 </erl>
