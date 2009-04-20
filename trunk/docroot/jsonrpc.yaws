@@ -2,53 +2,117 @@
 -compile(export_all).
 
 out(A) ->
-       Peer = if
-		tuple(A#arg.clisock),
-	    	element(1, A#arg.clisock) == sslsocket ->
-			   ssl:peername(A#arg.clisock);
-                true ->
-                           inet:peername(A#arg.clisock)
-              end,
+    Peer = if
+               tuple(A#arg.clisock),
+               element(1, A#arg.clisock) == sslsocket ->
+                   ssl:peername(A#arg.clisock);
+               true ->
+                   inet:peername(A#arg.clisock)
+           end,
+    {ok, {IP, _}} = Peer,
+    A2 = A#arg{state = [{ip, IP}]},
+    yaws_rpc:handler_session(A2, {?MODULE, handler}).
 
-       {ok, {IP, _}} = Peer,
-       A2 = A#arg{state = [{ip, IP}]},
-       yaws_rpc:handler_session(A2, {?MODULE, handler}).
+handler([{ip, _IP}] = _State, {call, Operation, Params}, Session) ->
+    {true, 0, Session, {response, handler(Operation, Params)}}.
 
-handler([{ip, IP}] = _State, {call, nop, [Value]} = _Request, Session) ->
-       {true, 0, Session, {response, "ok"}};
+handler(nop, [Value]) ->
+    "ok";
 
-handler([{ip, IP}] = _State, {call, test_and_set, [Key, OldValue, NewValue]} = _Request, Session) ->
-       %io:format("Request = test_and_set(~p)~n", [_Request]),
-       case cs_api:test_and_set(Key, OldValue, NewValue) of
-         ok ->
-           {true, 0, Session, {response, "ok"}};
-	 {fail, {key_changed, Value}} ->
-           {true, 0, Session, {response, {struct, [{failure, "key_changed"}, 
-                  {value, lists:flatten(io_lib:format("~s", [Value]))}]}}};
-	 Res ->
-           io:format("~p~n", [Res]),
-           {true, 0, Session, {response, lists:flatten(io_lib:write(Res))}}
-       end;
+handler(test_and_set, [Key, OldValue, NewValue]) ->
+    %io:format("Request = test_and_set(~p)~n", [_Request]),
+    case cs_api:test_and_set(Key, OldValue, NewValue) of
+        ok ->
+            "ok";
+        {fail, {key_changed, Value}} ->
+            {struct, [{failure, "key_changed"},
+                      {value, lists:flatten(io_lib:format("~s", [Value]))}]};
+        Res ->
+            io:format("~p~n", [Res]),
+            lists:flatten(io_lib:write(Res))
+    end;
 
-handler([{ip, IP}] = _State, {call, read, [Key]} = _Request, Session) ->
+handler(read, [Key]) ->
        %io:format("Request = read(~p)~n", [_Request]),
-       case cs_api:read(Key) of 
-         {fail, Reason} ->
-           {true, 0, Session, {response, {struct, [{failure, atom_to_list(Reason)}]}}};
-         Value ->	 
-           {true, 0, Session, {response, Value}}
-       end;
+    case cs_api:read(Key) of
+        {fail, Reason} ->
+            {struct, [{failure, atom_to_list(Reason)}]};
+        Value ->
+            Value
+    end;
 
-handler([{ip, IP}] = _State, {call, write, [Key, Value]} = _Request, Session) ->
-       %io:format("Request = write(~p)~n", [_Request]),
-       case cs_api:write(Key, Value) of
-         ok ->
-           {true, 0, Session, {response, "ok"}};
-	 {fail, Reason} ->
-           {true, 0, Session, {response, {struct, [{failure, atom_to_list(Reason)}]}}}
-       end;
+handler(write, [Key, Value]) ->
+    %io:format("Request = write(~p)~n", [_Request]),
+    case cs_api:write(Key, Value) of
+        ok ->
+            "ok";
+        {fail, Reason} ->
+            {struct, [{failure, atom_to_list(Reason)}]}
+    end;
 
-handler([{ip, IP}] = _State, Any, Session) ->
-       io:format("Unknown request = ~p~n", [Any]),
-       {true, 0, Session, {response, {struct, [{failure, "unknownreq"}]}}}.
+handler(req_list, [Param]) ->
+    handler(req_list, [translog_to_json(transstore.trecords:new_translog()), Param]);
+
+handler(req_list, [TransLog, {array, ReqList}]) ->
+    % convert req-list to clean reqlist without json artefacts
+    CleanReqList = [ case Elem of
+                         {read, Key} ->
+                             {read, Key};
+                         {write, {struct, [{Key, Val}]}} ->
+                             {write, atom_to_list(Key), Val};
+                         {commit, Commit} ->
+                             {commit};
+                         Any -> Any
+                     end || {struct, [Elem]} <- ReqList ],
+    io:format("Translog: ~p ~p~n", [TransLog, json_to_translog(TransLog)]),
+    ErlResult = cs_api:process_request_list(json_to_translog(TransLog), CleanReqList),
+    make_result_json_conforming(ErlResult);
+
+handler(AnyOp, AnyParams) ->
+    io:format("Unknown request = ~p(~p)~n", [AnyOp, AnyParams]),
+    {struct, [{failure, "unknownreq"}]}.
+
+make_result_json_conforming(ErlResult) ->
+    case ErlResult of
+        {{translog, TLog}, {results, Results}} ->
+            {struct, [{translog, translog_to_json(TLog)}, {results, results_to_json(Results)}]};
+        Any ->
+            ok
+    end.
+
+translog_to_json(TLog) ->
+    io:format("Erl Translog: ~p~n", [TLog]),
+    Entries = [ {struct, [{op, atom_to_list(Op)},
+                          {key, Key},
+                          {state, atom_to_list(State)},
+                          {value, Val},
+                          {version, Vers}]}
+                || {Op, Key, State, Val, Vers} <- TLog],
+    io:format("Json Translog: ~p~n", [{array, Entries}]),
+    {array, Entries}.
+
+json_to_translog(JsonTLog) ->
+    {array, Entries} = JsonTLog,
+    [ {list_to_atom(proplists:get_value(op, Elem)),
+       proplists:get_value(key, Elem),
+       list_to_atom(proplists:get_value(state, Elem)),
+       proplists:get_value(value, Elem),
+       proplists:get_value(version, Elem)}
+      || {struct, Elem} <- Entries].
+
+results_to_json(Results) ->
+    io:format("Erl Results: ~p~n", [Results]),
+    Entries = [ {struct, [{op, atom_to_list(Op)},
+                          case Op of
+                              commit -> {key, atom_to_list(Key)};
+                              Any -> {key, Key}
+                          end,
+                          case Val of
+                              {fail, Reason} -> {fail, atom_to_list(Reason)};
+                              {value, Value} -> {value, Value}
+                          end ]} 
+                || {Op, Key, Val} <- Results ],
+    io:format("JSON Results: ~p~n", [{array, Entries}]),
+    {array, Entries}.
+
 </erl>
