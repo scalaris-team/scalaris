@@ -52,8 +52,6 @@ process_request_list(TLog, ReqList) ->
     {{translog, TransLogResult}, {results, lists:reverse(ReverseResultList)}}.
 
 process_request(TLog, Request) ->
-    io:format("process request TLOG: ~p~n", [TLog]),
-    io:format("process request Req : ~p~n", [Request]),
     case Request of
         {read, Key} ->
             case transstore.transaction_api:read(Key, TLog) of
@@ -70,7 +68,6 @@ process_request(TLog, Request) ->
                     {NTLog, {write, Key, {fail, Reason}}}
             end;
         {commit} ->
-            io:format("do_transaction ~p~n", [TLog]),
             case transstore.transaction_api:commit(TLog) of
                 {ok} ->
                     {TLog, {commit, ok, {value, "ok"}}};

@@ -38,33 +38,40 @@ def nop(value)
 end
 
 def req_list()
-  # request list preparation
+  puts "Start sample request list run..."
+
+  # first transaction sets two keys and commits
+  puts "  Write keyA, KeyB and commit."
   rlist = []
-#  rlist[0] = { :read => 'keyA' }
-#  rlist[1] = { :read => 'keyB' }
   rlist[0] = { :write => {'keyA', 'valueA'} }
   rlist[1] = { :write => {'keyB', 'valueB'} }
   rlist[2] = { :commit => 'commit' }
 
-  puts rlist.to_json
-  puts json_call('req_list', [rlist]).to_json
+  result = json_call('req_list', [rlist])
+  values = result['results']
+  puts "  Commit was: #{values[2]['value']}."
 
-
+  # second transaction reads two keys and then modifies one of them
   rlist2 = []
   rlist2[0] = { :read => 'keyA' }
   rlist2[1] = { :read => 'keyB' }
   result = json_call('req_list', [rlist2])
-  puts "Result: #{result.keys}"
 
   translog = result['translog']
-  puts translog.to_json
+  values = result['results']
+
+  puts "  Read key #{values[0]['key']} as: #{values[0]['value']}"
+  puts "  Read key #{values[1]['key']} as: #{values[1]['value']}"
+
+  puts "  Modify keyA and commit."
   rlist3 = []
   rlist3[0] = { :write => {'keyA', 'valueA2'} }
   rlist3[1] = { :commit => 'commit' }
+  result = json_call('req_list', [translog, rlist3])
+  values = result['results']
 
-  puts rlist3.to_json
-  puts json_call('req_list', [translog, rlist3]).to_json
-
+  puts "  Commit was: #{values[1]['value']}, written value is #{values[0]['value']}."
+  puts
 end
 
 n = 100
