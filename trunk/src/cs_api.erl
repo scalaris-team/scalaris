@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([process_request_list/2, read/1, write/2, test_and_set/3]).
+-export([process_request_list/2, read/1, write/2, delete/1, test_and_set/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -98,6 +98,9 @@ write(Key, Value) ->
 	{fail, Reason} ->
 	    {fail, Reason}
     end.
+
+delete(Key) ->
+    transstore.transaction_api:delete(Key, 2000).
 
 %% @doc atomic compare and swap
 %% @spec test_and_set(key(), value(), value()) -> {fail, Reason} | ok
