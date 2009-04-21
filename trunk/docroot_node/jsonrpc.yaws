@@ -51,7 +51,7 @@ handler(write, [Key, Value]) ->
     end;
 
 handler(delete, [Key]) ->
-       %io:format("Request = delete(~p)~n", [_Request]),
+    %io:format("Request = delete(~p)~n", [_Request]),
     case cs_api:delete(Key) of
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]};
@@ -94,22 +94,10 @@ make_result_json_conforming(ErlResult) ->
     end.
 
 translog_to_json(TLog) ->
-    Entries = [ {struct, [{op, atom_to_list(Op)},
-                          {key, Key},
-                          {state, atom_to_list(State)},
-                          {value, Val},
-                          {version, Vers}]}
-                || {Op, Key, State, Val, Vers} <- TLog],
-    {array, Entries}.
+    base64:encode_to_string(term_to_binary(TLog, [compressed])).
 
 json_to_translog(JsonTLog) ->
-    {array, Entries} = JsonTLog,
-    [ {list_to_atom(proplists:get_value(op, Elem)),
-       proplists:get_value(key, Elem),
-       list_to_atom(proplists:get_value(state, Elem)),
-       proplists:get_value(value, Elem),
-       proplists:get_value(version, Elem)}
-      || {struct, Elem} <- Entries].
+    binary_to_term(base64:decode(JsonTLog)).
 
 results_to_json(Results) ->
     Entries = [ {struct, [{op, atom_to_list(Op)},
@@ -120,7 +108,7 @@ results_to_json(Results) ->
                           case Val of
                               {fail, Reason} -> {fail, atom_to_list(Reason)};
                               {value, Value} -> {value, Value}
-                          end ]}
+                          end ]} 
                 || {Op, Key, Val} <- Results ],
     {array, Entries}.
 

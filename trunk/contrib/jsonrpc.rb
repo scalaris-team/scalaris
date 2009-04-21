@@ -76,9 +76,39 @@ def req_list()
   puts
 end
 
+def req_list2()
+  # first transaction sets two keys and commits
+  rlist = []
+  rlist[0] = { :write => {'keyA', 'valueA'} }
+  rlist[1] = { :write => {'keyB', 'valueB'} }
+  rlist[2] = { :commit => 'commit' }
+
+  result = json_call('req_list', [rlist])
+  values = result['results']
+
+  # second transaction reads two keys and then modifies one of them
+  rlist2 = []
+  rlist2[0] = { :read => 'keyA' }
+  rlist2[1] = { :read => 'keyB' }
+  result = json_call('req_list', [rlist2])
+
+  translog = result['translog']
+  values = result['results']
+
+  rlist3 = []
+  rlist3[0] = { :write => {'keyA', 'valueA2'} }
+  rlist3[1] = { :commit => 'commit' }
+  result = json_call('req_list', [translog, rlist3])
+  values = result['results']
+
+  result = json_call('delete', ["keyA"])
+end
+
 n = 100
 
 req_list()
+
+puts "benchmarking ..."
 
 nop = Benchmark.realtime {
   n.times do
@@ -104,8 +134,15 @@ test_and_set = Benchmark.realtime {
   end
 }
 
+reql = Benchmark.realtime {
+  n.times do
+    req_list2()
+  end
+}
+
 printf("              time[s]\t1/s\n")
 printf("nop          : %0.02f     %0.02f\n", nop, n/nop)
 printf("read         : %0.02f     %0.02f\n", read, n/read)
 printf("write        : %0.02f     %0.02f\n", write, n/write)
 printf("test_and_set : %0.02f     %0.02f\n", test_and_set, n/test_and_set)
+printf("req_list     : %0.02f     %0.02f\n", reql, n/reql)
