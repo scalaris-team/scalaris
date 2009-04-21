@@ -70,7 +70,9 @@ def req_list()
   result = json_call('req_list', [translog, rlist3])
   values = result['results']
 
-  puts "  Commit was: #{values[1]['value']}, written value is #{values[0]['value']}."
+  puts "  Commit was: #{values[1]['value']}#{values[1]['fail']}, write request was #{values[0]['value']}."
+   result = json_call('delete', ["keyA"])
+   puts "  Delete keyA: #{result['ok']} replicas deleted. Report: #{result['results'].to_json}."
   puts
 end
 

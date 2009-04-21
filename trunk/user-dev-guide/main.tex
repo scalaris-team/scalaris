@@ -510,6 +510,9 @@ translog we got from \scalaris{} (named \code{TLOG} here).
         { "write":{"keyA":"valueA2"} },
         { "commit":"commit" }
       ]
+    ],
+  "id" : 0
+}
 \end{lstlisting}
 & $\to$ & \\
 
@@ -558,7 +561,39 @@ The possible results are:
 { "op":"commit", "value":"fail", "fail":"reason" }
 \end{lstlisting}
 
+\subsection{Deleting a key}
 
+Outside transactions keys can also be deleted, but it has to be done with
+care, as explained in the following thread on the mailing list:
+\url{http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799}.
+
+\begin{lstlisting}[language=java]
+{
+  "method":"delete",
+  "version":"1.1",
+  "params":
+    [
+      { "key":"any_key" }
+    ],
+  "id" : 0
+}
+\end{lstlisting}
+
+Two sample results
+
+\begin{lstlisting}[language=java]
+{ "result":
+  { "ok":2, // how many replicas were deleted successsfully
+    "results": [ "ok", "ok", "locks_set", "undef" ]
+  }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=java]
+{ "result":
+  { "failure":"reason" }
+}
+\end{lstlisting}
 
 
 \section{Erlang}
