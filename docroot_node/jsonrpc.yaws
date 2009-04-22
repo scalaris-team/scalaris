@@ -19,6 +19,10 @@ handler([{ip, _IP}] = _State, {call, Operation, Params}, Session) ->
 handler(nop, [Value]) ->
     "ok";
 
+handler(range_read, [From, To]) ->
+    {ErrorCode, Data} = cs_api:range_read(From, To),
+    {struct, [{success, atom_to_list(ErrorCode)}, {data, data_to_json(Data)}]};
+
 handler(test_and_set, [Key, OldValue, NewValue]) ->
     %io:format("Request = test_and_set(~p)~n", [_Request]),
     case cs_api:test_and_set(Key, OldValue, NewValue) of
@@ -112,4 +116,9 @@ results_to_json(Results) ->
                 || {Op, Key, Val} <- Results ],
     {array, Entries}.
 
+data_to_json(Data) ->
+    {array, [ {struct, [{key, Key},
+	       {value, Value},
+	       {version, Version}]} || 
+		{Key, Value, Version, WriteLock, ReadLock} <- Data]}.
 </erl>
