@@ -104,7 +104,23 @@ def req_list2()
   result = json_call('delete', ["keyA"])
 end
 
+def range_query()
+  result = json_call('range_read', 
+                     [0, 0x40000000000000000000000000000000])
+  puts result.to_json
+  write("keyA", "valueA")
+  write("keyB", "valueB")
+  write("keyC", "valueC")
+  result = json_call('range_read', 
+                     [0, 0x40000000000000000000000000000000])
+  puts result.to_json
+end
+
 n = 100
+
+range_query()
+
+exit
 
 req_list()
 

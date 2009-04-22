@@ -26,7 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([process_request_list/2, read/1, write/2, delete/1, test_and_set/3]).
+-export([process_request_list/2, read/1, write/2, delete/1, 
+	 test_and_set/3, range_read/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -153,3 +154,27 @@ do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
 	Timeout ->
 	   do_transaction_locally(TransFun, SuccessFun, Failure, Timeout)
     end.
+
+%@doc range a range of key-value pairs
+range_read(From, To) ->
+    Interval = intervals:new(From, To),
+    bulkowner:issue_bulk_owner(Interval, 
+			       {bulk_read_with_version, cs_send:this()}),
+    erlang:send_after(5000, self(), {timeout}),
+    range_read_loop(Interval, [], []).
+
+range_read_loop(Interval, Done, Data) ->
+    receive
+	{timeout} ->
+	    {timeout, lists:flatten(Data)};
+	{bulk_read_with_version_response, {From, To}, NewData} ->
+	    Done2 = [intervals:new(From, To) | Done],
+	    case intervals:is_covered(Interval, Done2) of
+		false ->
+		    range_read_loop(Interval, Done2, [NewData | Data]);
+		true ->
+		    {ok, lists:flatten([NewData | Data])}
+	    end
+    end.
+    
+    
