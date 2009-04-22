@@ -41,7 +41,7 @@
 	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 
 	 unset_read_lock/2, get_locks/2,
 
-	 read/2, write/4, get_version/2, 
+	 read/2, write/4, delete/2, get_version/2, 
 
 	 get_range/3, get_range_with_version/2, get_range_only_with_version/2,
 
@@ -71,6 +71,7 @@ get_pid() ->
 
 %% @doc initializes a new database
 new() ->
+    gen_server:call(get_pid(), {drop_everything}, 20000),
     ok.
 
 %% @doc sets a write lock on a key.
@@ -112,6 +113,12 @@ read(ok = _DB, Key) ->
 write(ok = DB, Key, Value, Version) ->
     gen_server:call(get_pid(), {write, Key, Value, Version}, 20000),
     DB.
+
+%% @doc deletes the key
+-spec(delete/2 :: (db(), key()) -> {db(), ok | locks_set
+				    | undef}).
+delete(ok = _DB, Key) ->
+    gen_server:call(get_pid(), {delete, Key}, 20000).
 
 %% @doc reads the version of a key
 %% @spec get_version(db(), string()) -> {ok, integer()} | failed
@@ -212,6 +219,11 @@ stop() ->
 %% gen_server callbacks
 %%===============================================================================
 
+% drop_everything
+%@private
+handle_call({drop_everything}, _From, DB) ->
+    {reply, ok, gb_trees:empty()};
+
 % set write lock
 %@private
 handle_call({set_write_lock, Key}, _From, DB) ->
@@ -281,9 +293,9 @@ handle_call({unset_read_lock, Key}, _From, DB) ->
 handle_call({get_locks, Key}, _From, DB) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, WriteLock, ReadLock, Version}} ->
-	    {reply, {WriteLock, ReadLock, Version}, DB};
+	    {reply, {ok, {WriteLock, ReadLock, Version}}, DB};
 	none ->
-	    {reply, failed, DB}
+	    {reply, {ok, failed}, DB}
     end;
 
 % read
@@ -311,6 +323,18 @@ handle_call({write, Key, Value, Version}, _From, DB) ->
 	    end,
     {reply, ok, NewDB};
 
+% delete
+%@private
+handle_call({delete, Key}, _From, DB) ->
+    case gb_trees:lookup(Key, DB) of
+	{value, {_Value, false, 0, _Version}} ->
+	    {reply, {ok, ok}, gb_trees:delete(Key, DB)};
+	{value, _Value} ->
+	    {reply, {ok, locks_set}, DB};
+	none ->
+	    {reply, {ok, undef}, DB}
+    end;
+
 % get_version
 %@private
 handle_call({get_version, Key}, _From, DB) ->
@@ -337,7 +361,7 @@ handle_call({get_middle_key}, _From, DB) ->
 	    Keys = gb_trees:keys(DB),
 	    Middle = length(Keys) div 2,
 	    MiddleKey = lists:nth(Middle, Keys),
-	    {reply, MiddleKey, DB}
+	    {reply, {ok, MiddleKey}, DB}
     end;
 
 % split_data
