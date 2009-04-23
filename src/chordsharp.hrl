@@ -32,9 +32,9 @@
 %-define(RT, rt_simple).
 
 %%Standard database backend
--define(DB, cs_db_otp).
+%-define(DB, cs_db_otp).
 %-define(DB, db_gb_trees).
-%-define(DB, db_ets).
+-define(DB, db_ets).
 
 %%Standard chord ring maintenance
 -define(RM, rm_chord).

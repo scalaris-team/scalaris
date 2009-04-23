@@ -182,7 +182,7 @@ delete(DB, Key) ->
 	none ->
 	    {DB, undef}
     end.
-    
+
 %% @doc reads the version of a key
 %% @spec get_version(db(), string()) -> {ok, integer()} | failed
 get_version(DB, Key) ->
@@ -192,9 +192,6 @@ get_version(DB, Key) ->
 	none ->
 	    failed
     end.
-
-
-
 
 %% @doc returns the number of stored keys
 %% @spec get_load(db()) -> integer()
@@ -236,55 +233,27 @@ add_data(DB, Data) ->
 %% @doc get keys in a range
 %% @spec get_range(db(), string(), string()) -> [{string(), string()}]
 get_range(DB, From, To) ->
-    Items = lists:foldl(fun ({Key, {Value, _WriteLock, _ReadLock, _Version}}, List) -> 
-				case util:is_between(From, Key, To) of
-				    true ->
-					[{Key, Value} | List];
-				    false ->
-					List
-				end
-			end, 
-		[], gb_trees:to_list(DB)),
-    Items.
+    [ {Key, Value} || {Key, {Value, _WLock, _RLock, _Vers}} <- gb_trees:to_list(DB),
+                      util:is_between(From, Key, To) ].
 
 %% @doc get keys and versions in a range
-%% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(), 
+%% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(),
 %%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
-get_range_with_version(DB, Interval) ->    
+get_range_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
-    Items = lists:foldl(fun ({Key, {Value, WriteLock, ReadLock, Version}}, List) -> 
-				case util:is_between(From, Key, To) of
-				    true ->
-					[{Key, Value, Version, WriteLock, ReadLock} | List];
-				    false ->
-					List
-				end
-			end, 
-		[], gb_trees:to_list(DB)),
-    Items.
-
-
-
-
-
-
-
+    [ {Key, Value, Version, WriteLock, ReadLock}
+      || {Key, {Value, WriteLock, ReadLock, Version}} <- gb_trees:to_list(DB),
+         util:is_between(From, Key, To) ].
 
 % get_range_with_version
 %@private
 
 get_range_only_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
-    Items = lists:foldl(fun ({Key, {Value, WriteLock, _ReadLock, Version}}, List) -> 
-				case WriteLock == false andalso util:is_between(From, Key, To) of
-				    true ->
-					[{Key, Value, Version} | List];
-				    false ->
-					List
-				end
-			end, 
-		[], gb_trees:to_list(DB)),
-    Items.
+    [ {Key, Value, Vers}
+      || {Key, {Value, WLock, _RLock, Vers}} <- gb_trees:to_list(DB),
+         WLock == false andalso util:is_between(From, Key, To) ].
+
 
 build_merkle_tree(DB, Range) ->
     {From, To} = intervals:unpack(Range),
