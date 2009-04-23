@@ -40,7 +40,7 @@ run_2() ->
     admin:add_nodes(Size),
     %M = lists:flatten(io_lib:format("/work/bzchenni/tman_run_1_Extend_~p.log", [Size])),
 	%{ok,F} = file:open(M,[write]),
-    Time=wait2(Size),
+    _Time=wait2(Size),
     Ende = erlang:now(),
     N = "/work/bzchenni/tman_run_1.log",
 	{ok,S} = file:open(N,[append]),
@@ -73,7 +73,7 @@ run_1() ->
 
 wait2(Size) ->
     erlang:send_after(1000, self() ,{go}),
-    Ende = erlang:now(),
+    _Ende = erlang:now(),
     Res = admin:check_ring(),
     receive
         {go} ->

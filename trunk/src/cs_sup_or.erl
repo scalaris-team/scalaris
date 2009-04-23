@@ -109,7 +109,7 @@ init([Options]) ->
        DeadNodeCache,
 	   RingMaintenance,
 	   RoutingTable,
-	   Supervisor_AND,
-	   RSE
+	   Supervisor_AND
+	   %RSE
 	  ]}}.
 %% userdevguide-end cs_sup_or:init

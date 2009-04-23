@@ -208,7 +208,12 @@ in(_, {element,_}) ->
     false.
 
 sanitize(X) when is_list(X) ->
-    sanitize_helper(X, []);
+    case sanitize_helper(X, []) of
+	[Y] ->
+	    Y;
+	Y ->
+	    Y
+    end;
 sanitize(X) ->
     X.
 

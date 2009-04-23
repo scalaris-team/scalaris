@@ -47,7 +47,7 @@ make_ring(Size) ->
     end,
     check_ring_size(Size),
     wait_for_stable_ring(),
-    timer:sleep(5000),
+    timer:sleep(30000),
     Pid.
 
 stop_ring(Pid) ->
