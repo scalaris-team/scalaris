@@ -236,25 +236,56 @@ add_data(DB, Data) ->
 
 %% @doc get keys in a range
 %% @spec get_range(db(), string(), string()) -> [{string(), string()}]
-get_range(_DB, _From, _To) ->
-    ct:pal("db_ets: get range not implemented yet.~n").
+get_range(DB, From, To) ->
+    [ {Key, Value} || {Key, {Value, _WLock, _RLock, _Vers}} <- ets:tab2list(DB),
+                      util:is_between(From, Key, To) ].
 
 %% @doc get keys and versions in a range
-%% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(), 
+%% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(),
 %%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
-get_range_with_version(_DB, _Interval) ->    
-    ct:pal("db_ets: get range with version not implemented yet.~n").
+get_range_with_version(DB, Interval) ->
+    {From, To} = intervals:unpack(Interval),
+    [ {Key, Value, Version, WriteLock, ReadLock}
+      || {Key, {Value, WriteLock, ReadLock, Version}} <- ets:tab2list(DB),
+         util:is_between(From, Key, To) ].
 
 % get_range_with_version
 %@private
 
-get_range_only_with_version(_DB, _Interval) ->
-    ct:pal("db_ets: get range only with version not implemented yet.~n").
+get_range_only_with_version(DB, Interval) ->
+    {From, To} = intervals:unpack(Interval),
+    [ {Key, Value, Vers}
+      || {Key, {Value, WLock, _RLock, Vers}} <- ets:tab2list(DB),
+         WLock == false andalso util:is_between(From, Key, To) ].
 
-build_merkle_tree(_DB, _Range) ->
-    ct:pal("db_ets: build merkle tree not implemented yet.~n").
+build_merkle_tree(DB, Range) ->
+    {From, To} = intervals:unpack(Range),
+    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
+				     case util:is_between(From, Key, To) of
+					 true ->
+					     merkerl:insert({Key, 0}, Tree);
+					 false ->
+					     Tree
+				     end
+			     end,
+		undefined, ets:tab2list(DB)),
+    MerkleTree.
 
 % update only if no locks are taken and version number is higher
-update_if_newer(_OldDB, _KVs) ->
-    ct:pal("db_ets: update_if_newer not implemented yet.~n").
-
+update_if_newer(OldDB, KVs) ->
+    F = fun ({Key, Value, Version}, DB) ->
+		case ets:lookup(DB, Key) of
+		    none ->
+			ets:insert(DB, {Key, {Value, false, 0, Version}});
+		    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
+			case not WriteLock andalso
+                            ReadLock == 0 andalso
+                            OldVersion < Version of
+			    true ->
+				ets:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}});
+			    false ->
+				DB
+			end
+		end
+	end,
+    lists:foldl(F, OldDB, KVs).

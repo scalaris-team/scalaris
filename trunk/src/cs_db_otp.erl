@@ -208,7 +208,7 @@ start(InstanceId) ->
 %@private
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, cs_db_otp, self()),
-    {ok, gb_trees:empty()}.
+    {ok, db_gb_trees:new()}.
 
 
 %@private
@@ -221,240 +221,105 @@ stop() ->
 
 % drop_everything
 %@private
-handle_call({drop_everything}, _From, DB) ->
-    {reply, ok, gb_trees:empty()};
+handle_call({drop_everything}, _From, _DB) ->
+    {reply, ok, db_gb_trees:new()};
 
 % set write lock
 %@private
 handle_call({set_write_lock, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {Value, false, 0, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, true, 0, Version}, 
-				    DB),
-	    {reply, ok, NewDB};
-	{value, {_Value, _WriteLock, _ReadLock, _Version}} ->
-	    {reply, failed, DB};
-	none ->
-	    % no value stored yet
-	    NewDB = gb_trees:enter(Key, 
-				   {empty_val, true, 0, -1},
-				   DB),
-	    {reply, ok, NewDB}
-    end;
+    {NewDB, Res} = db_gb_trees:set_write_lock(DB, Key),
+    {reply, Res, NewDB};
 
 % unset write lock
 %@private
 handle_call({unset_write_lock, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {Value, true, ReadLock, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, false, ReadLock, Version}, 
-				    DB),
-	    {reply, ok, NewDB};
-	{value, {_Value, false, _ReadLock, _Version}} ->
-	    {reply, failed, DB};
-	none ->
-	    {reply, failed, DB}
-    end;
+    {NewDB, Res} = db_gb_trees:unset_write_lock(DB, Key),
+    {reply, Res, NewDB};
 
 % set read lock
 %@private
 handle_call({set_read_lock, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {Value, false, ReadLock, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, false, ReadLock + 1, Version}, 
-				    DB),
-	    {reply, ok, NewDB};
-	{value, {_Value, _WriteLock, _ReadLock, _Version}} ->
-	    {reply, failed, DB};
-	none ->
-	    {reply, failed, DB}
-    end;
+    {NewDB, Res} = db_gb_trees:set_read_lock(DB, Key),
+    {reply, Res, NewDB};
 
 % unset read lock
 %@private
 handle_call({unset_read_lock, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {_Value, _WriteLock, 0, _Version}} ->
-	    {reply, failed, DB};
-	{value, {Value, WriteLock, ReadLock, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, WriteLock, ReadLock - 1, Version}, 
-				    DB),
-	    {reply, ok, NewDB};
-	none ->
-	    {reply, failed, DB}
-    end;
+    {NewDB, Res} = db_gb_trees:unset_read_lock(DB, Key),
+    {reply, Res, NewDB};
 
 % get locks
 %@private
 handle_call({get_locks, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {_Value, WriteLock, ReadLock, Version}} ->
-	    {reply, {ok, {WriteLock, ReadLock, Version}}, DB};
-	none ->
-	    {reply, {ok, failed}, DB}
-    end;
+    {_DropDB, Res} = db_gb_trees:get_locks(DB, Key),
+    {reply, {ok, Res}, DB};
 
 % read
 %@private
 handle_call({read, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {Value, _WriteLock, _ReadLock, Version}} ->
-	    {reply, {ok, Value, Version}, DB};
-	none ->
-	    {reply, failed, DB}
-    end;
+    {reply, db_gb_trees:read(DB, Key), DB};
 
 % write
 %@private
 handle_call({write, Key, Value, Version}, _From, DB) ->
-    NewDB = case gb_trees:lookup(Key, DB) of
-		{value, {_Value, WriteLock, ReadLock, _Version}} ->
-		    gb_trees:enter(Key, 
-				   {Value, WriteLock, ReadLock, Version}, 
-				   DB);
-		none ->
-		    gb_trees:enter(Key, 
-				   {Value, false, 0, Version}, 
-				   DB)
-	    end,
-    {reply, ok, NewDB};
+    {reply, ok, db_gb_trees:write(DB, Key, Value, Version)};
 
 % delete
 %@private
 handle_call({delete, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {_Value, false, 0, _Version}} ->
-	    {reply, {ok, ok}, gb_trees:delete(Key, DB)};
-	{value, _Value} ->
-	    {reply, {ok, locks_set}, DB};
-	none ->
-	    {reply, {ok, undef}, DB}
-    end;
+    {NewDB, Res} = db_gb_trees:delete(DB, Key),
+    {reply, {ok, Res}, NewDB};
 
 % get_version
 %@private
 handle_call({get_version, Key}, _From, DB) ->
-    case gb_trees:lookup(Key, DB) of
-	{value, {_Value, _WriteLock, _ReadLock, Version}} ->
-	    {reply, {ok, Version}, DB};
-	none ->
-	    {reply, failed, DB}
-    end;
+    {reply, db_gb_trees:get_version(DB, Key), DB};
 
 % get_load
 %@private
 handle_call({get_load}, _From, DB) ->
-    {reply, gb_trees:size(DB), DB};
+    {reply, db_gb_trees:get_load(DB), DB};
 
 % get_middle_key
 %@private
 handle_call({get_middle_key}, _From, DB) ->
-    Size = gb_trees:size(DB),
-    if
-	Size < 3 ->
-	    {reply, failed, DB};
-	true ->
-	    Keys = gb_trees:keys(DB),
-	    Middle = length(Keys) div 2,
-	    MiddleKey = lists:nth(Middle, Keys),
-	    {reply, {ok, MiddleKey}, DB}
-    end;
+    {reply, db_gb_trees:get_middle_key(DB), DB};
 
 % split_data
 %@private
 handle_call({split_data, MyKey, HisKey}, _From, DB) ->
-    DataList = gb_trees:to_list(DB),
-    {MyList, HisList} = lists:partition(fun ({Key, _}) -> util:is_between(HisKey, Key, MyKey) end, DataList),
-    {reply, HisList, gb_trees:from_orddict(MyList)};
+    {MyDB, HisList} = db_gb_trees:split_data(DB, MyKey, HisKey),
+    {reply, HisList, MyDB};
 
 % get_data
 %@private
 handle_call({get_data}, _From, DB) ->
-    {reply, gb_trees:to_list(DB), DB};
+    {reply, db_gb_trees:get_data(DB), DB};
 
 % add_data
 %@private
 handle_call({add_data, Keys}, _From, DB) ->
-    NewDB = lists:foldl(fun ({Key, Value}, Tree) -> gb_trees:enter(Key, Value, Tree) end, DB, Keys),
-    {reply, ok, NewDB};
+    {reply, ok, db_gb_trees:add_data(DB, Keys)};
 
 % get_range
 %@private
 handle_call({get_range, From, To}, _From, DB) ->
-    Items = lists:foldl(fun ({Key, {Value, _WriteLock, _ReadLock, _Version}}, List) -> 
-				case util:is_between(From, Key, To) of
-				    true ->
-					[{Key, Value} | List];
-				    false ->
-					List
-				end
-			end, 
-		[], gb_trees:to_list(DB)),
-    {reply, Items, DB};
+    {reply, db_gb_trees:get_range(DB, From, To), DB};
+
+handle_call({get_range_with_version, Interval}, _From, DB) ->
+    {reply, db_gb_trees:get_range_with_version(DB, Interval), DB};
 
 % get_range_with_version
 %@private
 handle_call({get_range_only_with_version, Interval}, _From, DB) ->
-    {From, To} = intervals:unpack(Interval),
-    Items = lists:foldl(fun ({Key, {Value, WriteLock, _ReadLock, Version}}, List) -> 
-				case WriteLock == false andalso util:is_between(From, Key, To) of
-				    true ->
-					[{Key, Value, Version} | List];
-				    false ->
-					List
-				end
-			end, 
-		[], gb_trees:to_list(DB)),
-    {reply, Items, DB};
-handle_call({get_range_with_version, Interval}, _From, DB) ->
-    {From, To} = intervals:unpack(Interval),
-    Items = lists:foldl(fun ({Key, {Value, WriteLock, ReadLock, Version}}, List) -> 
-				case util:is_between(From, Key, To) of
-				    true ->
-					[{Key, Value, Version, WriteLock, ReadLock} | List];
-				    false ->
-					List
-				end
-			end, 
-		[], gb_trees:to_list(DB)),
-    {reply, Items, DB};
+    {reply, db_gb_trees:get_range_only_with_version(DB, Interval), DB};
 
 handle_call({build_merkle_tree, Range}, _From, DB) ->
-    {From, To} = intervals:unpack(Range),
-    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) -> 
-				     case util:is_between(From, Key, To) of
-					 true ->
-					     merkerl:insert({Key, 0}, Tree);
-					 false ->
-					     Tree
-				     end
-			     end, 
-		undefined, gb_trees:to_list(DB)),
-    {reply, MerkleTree, DB};
+    {reply, db_gb_trees:build_merkle_tree(DB, Range), DB};
 
 % update only if no locks are taken and version number is higher
-handle_call({update_if_newer, KVs}, _From, OldDB) ->
-    F = fun ({Key, Value, Version}, DB) ->
-		case gb_trees:lookup(Key, DB) of
-		    none ->
-			gb_trees:insert(Key, {Value, false, 0, Version}, DB);
-		    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
-			case not WriteLock andalso ReadLock == 0 andalso OldVersion < Version of
-			    true ->
-				gb_trees:update(Key, 
-						{Value, WriteLock, ReadLock, Version}, 
-						DB);
-			    false ->
-				DB
-			end
-		end
-	end, 
-    DB2 = lists:foldl(F, OldDB, KVs),
-    {reply, ok, DB2};
+handle_call({update_if_newer, KVs}, _From, DB) ->
+    {reply, ok, db_gb_trees:update_if_newer(DB, KVs)};
 
 %%===============================================================================
 %% for testing purpose 
