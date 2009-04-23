@@ -52,9 +52,11 @@ init_per_suite(Config) ->
     case ?DB of
 	cs_db_otp ->
 	    Pid = spawn(fun () ->
+				process_dictionary:start_link_for_unittest(),
 				?DB:start_link("db_SUITE.erl"),
 				timer:sleep(30000)
 			end),
+	    timer:sleep(100),
 	    [{wrapper_pid, Pid} | Config];
 	db_gb_trees ->
 	    Config;
