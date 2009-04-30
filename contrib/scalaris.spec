@@ -11,15 +11,14 @@ URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
-Requires:       jre >= 1.6.0
+BuildRequires:  java-devel >= 1.6.0
+BuildRequires:  erlang >= R12B-4
+Requires:       erlang >= R12B-4
 
 ##########################################################################################  
 ## Fedora, RHEL or CentOS  
 ########################################################################################## 
-%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}  
-BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  erlang >= R12B-4
-Requires:       erlang >= R12B-4
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %endif 
 
 ##########################################################################################  
@@ -27,15 +26,10 @@ Requires:       erlang >= R12B-4
 ##########################################################################################  
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 %if 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
-BuildRequires:  java-devel >= 1.6.0
 BuildRequires:  erlang-stack >= R12B-4
 Requires:       erlang-stack >= R12B-4
 %else
-#BuildRequires:  java-1.5.0-gcj-devel
-BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  classpathx-jaf
-BuildRequires:  erlang >= R12B-4
-Requires:       erlang >= R12B-4
+#BuildRequires:  classpathx-jaf
 %endif
 %endif
 
@@ -43,9 +37,6 @@ Requires:       erlang >= R12B-4
 # SuSE, openSUSE
 ###########################################################################################
 %if 0%{?suse_version}
-BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  erlang >= R12B-4
-Requires:       erlang >= R12B-4
 %endif
 
 %description 
@@ -66,8 +57,12 @@ Documentation for scalaris.
 %package java
 Summary:    Java API for scalaris
 Group:      Applications/Databases
-Requires:   jre
+Requires:   jre >= 1.6.0
+%if 0%{?suse_version} || 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
+Requires:   erlang-jinterface >= R12B-4
+%else
 Requires:   erlang
+%endif
 Requires:   jakarta-commons-cli
 Requires:   %{name} == %{version}
 
@@ -117,13 +112,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %doc AUTHORS README LICENSE
 %{_bindir}/scalarisctl
-#%{_libdir}/%{name}/ebin
 %{_libdir}/%{name}
-#%{_libdir}/%{name}/*
-#%{_libdir}/%{name}/contrib/yaws/ebin
-#%{_libdir}/%{name}/contrib/yaws/include
-#%{_libdir}/%{name}/docroot
-#%{_libdir}/%{name}/docroot_node
 %{_localstatedir}/log/%{name}
 %{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/scalaris.cfg
