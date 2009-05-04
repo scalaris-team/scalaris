@@ -23,7 +23,7 @@ import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Provides an example for using the {@code write} methods of the
+ * Provides an example for using the <tt>write</tt> methods of the
  * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -32,10 +32,10 @@ import de.zib.scalaris.UnknownException;
  */
 public class ScalarisWriteExample {
 	/**
-	 * Writes a key/value pair given on the command line with the {@code write}
+	 * Writes a key/value pair given on the command line with the <tt>write</tt>
 	 * methods of {@link Scalaris}.<br />
-	 * If no value or key is given, the default key {@code "key"} and the
-	 * default value {@code "value"} is used.
+	 * If no value or key is given, the default key <tt>"key"</tt> and the
+	 * default value <tt>"value"</tt> is used.
 	 * 
 	 * @param args
 	 *            command line arguments (first argument can be an optional key

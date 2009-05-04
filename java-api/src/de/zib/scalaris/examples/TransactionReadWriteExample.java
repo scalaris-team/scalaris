@@ -25,7 +25,7 @@ import de.zib.scalaris.TransactionNotFinishedException;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Provides an example for using the {@code read} and {@code write} methods of
+ * Provides an example for using the <code>read</code> and <code>write</code> methods of
  * the {@link Transaction} class together in one transaction.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -38,8 +38,8 @@ public class TransactionReadWriteExample {
 	 * the erlang (OTP) type methods. The keys and values are given on the
 	 * command line as "key1 value1 key2 value2 key3".<br />
 	 * If no values are given, the default values
-	 * {@code (key1, value1) = ("key1", "value1")},
-	 * {@code (key2, value2) = ("key2", "value2")} and {@code key3 = "key3"} are
+	 * <code>(key1, value1) = ("key1", "value1")</code>,
+	 * <code>(key2, value2) = ("key2", "value2")</code> and <code>key3 = "key3"</code> are
 	 * used.
 	 * 
 	 * <h3>Transaction 1:</h3>
@@ -372,9 +372,9 @@ public class TransactionReadWriteExample {
 	}
 
 	/**
-	 * Writes the given {@code key} and {@code value} with the
+	 * Writes the given <code>key</code> and <code>value</code> with the
 	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} method on the
-	 * given {@code transaction} object and generates output according to the
+	 * given <code>transaction</code> object and generates output according to the
 	 * result.
 	 * 
 	 * @param transaction
@@ -420,9 +420,9 @@ public class TransactionReadWriteExample {
 	}
 
 	/**
-	 * Writes the given {@code key} and {@code value} with the
+	 * Writes the given <code>key</code> and <code>value</code> with the
 	 * {@link Transaction#write(String, String)} method on the given
-	 * {@code transaction} object and generates output according to the result.
+	 * <code>transaction</code> object and generates output according to the result.
 	 * 
 	 * @param transaction
 	 *            the transaction object to operate on
@@ -462,9 +462,9 @@ public class TransactionReadWriteExample {
 	}
 
 	/**
-	 * Reads the given {@code key} with the
+	 * Reads the given <code>key</code> with the
 	 * {@link Transaction#readObject(OtpErlangString)} method on the given
-	 * {@code transaction} object and generates output according to the result.
+	 * <code>transaction</code> object and generates output according to the result.
 	 * 
 	 * @param transaction
 	 *            the transaction object to operate on
@@ -517,8 +517,8 @@ public class TransactionReadWriteExample {
 	}
 
 	/**
-	 * Reads the given {@code key} with the {@link Transaction#read(String)}
-	 * method on the given {@code transaction} object and generates output
+	 * Reads the given <code>key</code> with the {@link Transaction#read(String)}
+	 * method on the given <code>transaction</code> object and generates output
 	 * according to the result.
 	 * 
 	 * @param transaction

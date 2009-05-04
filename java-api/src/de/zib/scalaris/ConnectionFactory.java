@@ -24,19 +24,19 @@ import de.zib.tools.PropertyLoader;
  * creating its own connections.
  * 
  * The location of the default configuration file used by
- * {@link #ConnectionFactory()} can be overridden by specifying the {@code
- * scalaris.java.config} system property - otherwise the class tries to load
- * {@code scalaris.properties}.
+ * {@link #ConnectionFactory()} can be overridden by specifying the <tt>
+ * scalaris.java.config</tt> system property - otherwise the class tries to load
+ * <tt>scalaris.properties</tt>.
  * 
  * A user-defined {@link Properties} object can also be used by creating objects
  * with {@link #ConnectionFactory(Properties)} or setting the new values with
  * {@link #setProperties(Properties)} but must provide the following values
  * (default values as shown)
  * <ul>
- * <li>{@code scalaris.node = "boot@localhost"}</li>
- * <li>{@code scalaris.cookie = "chocolate chip cookie"}</li>
- * <li>{@code scalaris.client.name = "java_client"}</li>
- * <li>{@code scalaris.client.appendUUID = "true"}</li>
+ * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+ * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
+ * <li><tt>scalaris.client.name = "java_client"</tt></li>
+ * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
  * </ul>
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -95,19 +95,19 @@ public class ConnectionFactory {
 
 	/**
 	 * Constructor, sets the parameters to use for connections according to
-	 * values given in a {@code scalaris.properties} file and falls back to
+	 * values given in a <tt>scalaris.properties</tt> file and falls back to
 	 * default values if values don't exist.
 	 * 
 	 * By default the config file is assumed to be in the same directory as
-	 * the classes. Specify the {@code scalaris.java.config} system property
+	 * the classes. Specify the <tt>scalaris.java.config</tt> system property
 	 * to set a different location.
 	 * 
 	 * Default values are:
 	 * <ul>
-	 * <li>{@code scalaris.node = "boot@localhost"}</li>
-	 * <li>{@code scalaris.cookie = "chocolate chip cookie"}</li>
-	 * <li>{@code scalaris.client.name = "java_client"}</li>
-	 * <li>{@code scalaris.client.appendUUID = "true"}</li>
+	 * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+	 * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
+	 * <li><tt>scalaris.client.name = "java_client"</tt></li>
+	 * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
 	 * </ul>
 	 */
 	public ConnectionFactory() {
@@ -129,10 +129,10 @@ public class ConnectionFactory {
 	 * The {@link Properties} object should provide the following values
 	 * (default values as shown):
 	 * <ul>
-	 * <li>{@code scalaris.node = "boot@localhost"}</li>
-	 * <li>{@code scalaris.cookie = "chocolate chip cookie"}</li>
-	 * <li>{@code scalaris.client.name = "java_client"}</li>
-	 * <li>{@code scalaris.client.appendUUID = "true"}</li>
+	 * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+	 * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
+	 * <li><tt>scalaris.client.name = "java_client"</tt></li>
+	 * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
 	 * </ul>
 	 * 
 	 * @param properties
@@ -148,10 +148,10 @@ public class ConnectionFactory {
 	 * The {@link Properties} object should provide the following values
 	 * (default values as shown):
 	 * <ul>
-	 * <li>{@code scalaris.node = "boot@localhost"}</li>
-	 * <li>{@code scalaris.cookie = "chocolate chip cookie"}</li>
-	 * <li>{@code scalaris.client.name = "java_client"}</li>
-	 * <li>{@code scalaris.client.appendUUID = "true"}</li>
+	 * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+	 * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
+	 * <li><tt>scalaris.client.name = "java_client"</tt></li>
+	 * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
 	 * </ul>
 	 * 
 	 * NOTE: Existing connections are not changed!
@@ -177,7 +177,7 @@ public class ConnectionFactory {
 	 * Creates a connection to a scalaris erlang node specified by the given
 	 * parameters. Uses the given client name.
 	 * 
-	 * If {@code clientNameAppendUUID} is specified a pseudo UUID is appended to
+	 * If <tt>clientNameAppendUUID</tt> is specified a pseudo UUID is appended to
 	 * the given name. BEWARE that scalaris nodes accept only one connection per
 	 * client name!
 	 * 
@@ -242,11 +242,11 @@ public class ConnectionFactory {
 	}
 
 	/**
-	 * Replaces {@code localhost} in the node's name to the machine's real
+	 * Replaces <tt>localhost</tt> in the node's name to the machine's real
 	 * host name.
 	 * 
 	 * Due to a "feature" of OtpErlang >= 1.4.1 erlang nodes are now only
-	 * reachable by their official host name - so {@code ...@localhost} does
+	 * reachable by their official host name - so <tt>...@localhost</tt> does
 	 * not work anymore if there is a real host name.
 	 */
 	private void fixLocalhostName() {
@@ -323,7 +323,7 @@ public class ConnectionFactory {
 	/**
 	 * Returns whether an UUID is appended to client names or not.
 	 * 
-	 * @return {@code true} if an UUID is appended, {@code false} otherwise
+	 * @return <tt>true</tt> if an UUID is appended, <tt>false</tt> otherwise
 	 */
 	public boolean isClientNameAppendUUID() {
 		return clientNameAppendUUID;
@@ -333,7 +333,7 @@ public class ConnectionFactory {
 	 * Sets whether to append an UUID to client names or not.
 	 * 
 	 * @param clientNameAppendUUID
-	 *            {@code true} if an UUID is appended, {@code false} otherwise
+	 *            <tt>true</tt> if an UUID is appended, <tt>false</tt> otherwise
 	 */
 	public void setClientNameAppendUUID(boolean clientNameAppendUUID) {
 		this.clientNameAppendUUID = clientNameAppendUUID;
