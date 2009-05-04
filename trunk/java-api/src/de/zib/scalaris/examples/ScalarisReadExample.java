@@ -24,7 +24,7 @@ import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Provides an example for using the {@code read} methods of the
+ * Provides an example for using the <tt>read</tt> methods of the
  * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -33,9 +33,9 @@ import de.zib.scalaris.UnknownException;
  */
 public class ScalarisReadExample {
 	/**
-	 * Reads a key given on the command line with the {@code read} methods of
+	 * Reads a key given on the command line with the <tt>read</tt> methods of
 	 * {@link Scalaris}.<br />
-	 * If no key is given, the default key {@code "key"} is used.
+	 * If no key is given, the default key <tt>"key"</tt> is used.
 	 * 
 	 * @param args
 	 *            command line arguments (first argument can be an optional key

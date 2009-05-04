@@ -272,12 +272,12 @@ public class Transaction {
 	}
 
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <code>key</code>.
 	 * 
 	 * @param key
 	 *            the key to look up
 	 *
-	 * @return the value stored under the given {@code key} as a raw erlang type
+	 * @return the value stored under the given <code>key</code> as a raw erlang type
 	 * 
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
@@ -341,12 +341,12 @@ public class Transaction {
 	}
 
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <code>key</code>.
 	 * 
 	 * @param key
 	 *            the key to look up
 	 *
-	 * @return the (string) value stored under the given {@code key}
+	 * @return the (string) value stored under the given <code>key</code>
 	 * 
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
@@ -376,7 +376,7 @@ public class Transaction {
 	}
 
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <code>key</code>.
 	 * 
 	 * @param key
 	 *            the key to look up
@@ -409,7 +409,7 @@ public class Transaction {
 	}
 
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <code>key</code>/<code>value</code> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for
@@ -475,7 +475,7 @@ public class Transaction {
 	}
 
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <code>key</code>/<code>value</code> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for
@@ -500,7 +500,7 @@ public class Transaction {
 	}
 	
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <code>key</code>/<code>value</code> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for

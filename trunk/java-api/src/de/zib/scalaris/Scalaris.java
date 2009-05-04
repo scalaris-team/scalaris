@@ -206,12 +206,12 @@ public class Scalaris {
 	// /////////////////////////////
 	
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <tt>key</tt>.
 	 * 
 	 * @param key
 	 *            the key to look up
 	 * 
-	 * @return the value stored under the given {@code key}
+	 * @return the value stored under the given <tt>key</tt>
 	 * 
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
@@ -272,12 +272,12 @@ public class Scalaris {
 	}
 
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <tt>key</tt>.
 	 * 
 	 * @param key
 	 *            the key to look up
 	 * 
-	 * @return the (string) value stored under the given {@code key}
+	 * @return the (string) value stored under the given <tt>key</tt>
 	 * 
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
@@ -307,7 +307,7 @@ public class Scalaris {
 	}
 	
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <tt>key</tt>.
 	 * 
 	 * @param key
 	 *            the key to look up
@@ -344,7 +344,7 @@ public class Scalaris {
 	// /////////////////////////////
 
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <tt>key</tt>/<tt>value</tt> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for
@@ -410,7 +410,7 @@ public class Scalaris {
 	}
 
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <tt>key</tt>/<tt>value</tt> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for
@@ -435,7 +435,7 @@ public class Scalaris {
 	}
 	
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <tt>key</tt>/<tt>value</tt> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for
@@ -464,7 +464,7 @@ public class Scalaris {
 	// /////////////////////////////
 	
 	/**
-	 * Publishes an event under a given {@code topic}.
+	 * Publishes an event under a given <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to publish the content under
@@ -483,8 +483,8 @@ public class Scalaris {
 					.sendRPC("pubsub.pubsub_api", "publish", new OtpErlangList(
 							new OtpErlangObject[] { topic, content }));
 			/**
-             * The specification of {@code pubsub.pubsub_api:publish/2} states
-             * that the only returned value is {@code ok}, so no further evaluation is
+             * The specification of <tt>pubsub.pubsub_api:publish/2</tt> states
+             * that the only returned value is <tt>ok</tt>, so no further evaluation is
              * necessary.
 			 */
 			connection.receiveRPC();
@@ -502,7 +502,7 @@ public class Scalaris {
 	}
 	
 	/**
-	 * Publishes an event under a given {@code topic}.
+	 * Publishes an event under a given <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to publish the content under
@@ -524,7 +524,7 @@ public class Scalaris {
 	// /////////////////////////////
 
 	/**
-	 * Subscribes a url to a {@code topic}.
+	 * Subscribes a url to a <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to subscribe the url to
@@ -583,7 +583,7 @@ public class Scalaris {
 	}
 	
 	/**
-	 * Subscribes a url to a {@code topic}.
+	 * Subscribes a url to a <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to subscribe the url to
@@ -610,7 +610,7 @@ public class Scalaris {
 	// /////////////////////////////
 
 	/**
-	 * Unsubscribes a url from a {@code topic}.
+	 * Unsubscribes a url from a <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to unsubscribe the url from
@@ -674,7 +674,7 @@ public class Scalaris {
 	}
 	
 	/**
-	 * Unsubscribes a url from a {@code topic}.
+	 * Unsubscribes a url from a <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to unsubscribe the url from
@@ -704,7 +704,7 @@ public class Scalaris {
 	// /////////////////////////////
 	
 	/**
-	 * Converts the given erlang {@code list} of erlang strings to a Java {@link ArrayList}.
+	 * Converts the given erlang <tt>list</tt> of erlang strings to a Java {@link ArrayList}.
 	 */
 	private static ArrayList<String> erlStrListToStrArrayList(OtpErlangList list) {
 		ArrayList<String> result = new ArrayList<String>(list.arity());
@@ -720,7 +720,7 @@ public class Scalaris {
 	// /////////////////////////////
 	
 	/**
-	 * Gets a list of subscribers to a {@code topic}.
+	 * Gets a list of subscribers to a <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to get the subscribers for
@@ -762,7 +762,7 @@ public class Scalaris {
 	}
 	
 	/**
-	 * Gets a list of subscribers to a {@code topic}.
+	 * Gets a list of subscribers to a <tt>topic</tt>.
 	 * 
 	 * @param topic
 	 *            the topic to get the subscribers for
@@ -787,7 +787,7 @@ public class Scalaris {
 	// /////////////////////////////
 	
 	/**
-	 * Tries to delete all replicas of the given {@code key} in 2000ms.
+	 * Tries to delete all replicas of the given <tt>key</tt> in 2000ms.
 	 * 
 	 * @param key
 	 *            the key to delete
@@ -815,7 +815,7 @@ public class Scalaris {
 	}
 
 	/**
-	 * Tries to delete all replicas of the given {@code key}.
+	 * Tries to delete all replicas of the given <tt>key</tt>.
 	 * 
 	 * WARNING: This function can lead to inconsistent data (e.g. deleted items
 	 * can re-appear). Also when re-creating an item the version before the

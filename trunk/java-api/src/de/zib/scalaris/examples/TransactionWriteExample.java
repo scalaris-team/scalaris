@@ -26,7 +26,7 @@ import de.zib.scalaris.TransactionNotFinishedException;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Provides an example for using the {@code write} method of the
+ * Provides an example for using the <code>write</code> method of the
  * {@link Transaction} class.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -40,8 +40,8 @@ public class TransactionWriteExample {
 	 * {@link Transaction#write(String, String)} and
 	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} methods
 	 * in a single transaction.<br />
-	 * If no key/value pair is given, the default pairs {@code (key1, value1)},
-	 * {@code (key2, value2)} and {@code (key3, value3)} are used.
+	 * If no key/value pair is given, the default pairs <code>(key1, value1)</code>,
+	 * <code>(key2, value2)</code> and <code>(key3, value3)</code> are used.
 	 * 
 	 * @param args
 	 *            command line arguments (optional key/value pairs to store)

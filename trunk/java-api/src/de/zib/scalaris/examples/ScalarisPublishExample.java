@@ -21,7 +21,7 @@ import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.Scalaris;
 
 /**
- * Provides an example for using the {@code publish} methods of the
+ * Provides an example for using the <tt>publish</tt> methods of the
  * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -31,9 +31,9 @@ import de.zib.scalaris.Scalaris;
 public class ScalarisPublishExample {
 	/**
 	 * Publishes content under a given topic, both provided on the command line,
-	 * with the {@code publish} methods of {@link Scalaris}.<br />
-	 * If no content or topic is given, the default key {@code "key"} and the
-	 * default value {@code "value"} is used.
+	 * with the <tt>publish</tt> methods of {@link Scalaris}.<br />
+	 * If no content or topic is given, the default key <tt>"key"</tt> and the
+	 * default value <tt>"value"</tt> is used.
 	 * 
 	 * @param args
 	 *            command line arguments (first argument can be an optional
