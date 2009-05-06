@@ -25,6 +25,7 @@
  * </p>
  * 
  * <h4>Example:</h4>
+ * <pre>
  * <code style="white-space:pre;">
  *   try {
  *     Scalaris sc = new Scalaris();
@@ -39,6 +40,7 @@
  *     System.err.println("read failed with not found: " + e.getMessage());
  *   }
  * </code>
+ * </pre>
  * 
  * <p>See the {@link de.zib.scalaris.Scalaris} class documentation for more details.</p>
  * 
@@ -51,6 +53,7 @@
  * </p>
  * 
  * <h4>Example:</h4>
+ * <pre>
  * <code style="white-space:pre;">
  *   try {
  *     Transaction transaction = new Transaction();
@@ -71,6 +74,7 @@
  *     return;
  *   }
  * </code>
+ * </pre>
  * 
  * <p>See the {@link de.zib.scalaris.Transaction} class documentation for more details.</p>
  * 

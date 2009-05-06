@@ -54,6 +54,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * </p>
  * 
  * <h3>Example:</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   OtpErlangString otpKey;
  *   OtpErlangString otpValue;
@@ -74,6 +75,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   
  *   transaction.commit(); // {@link #commit()}
  * </code>
+ * </pre>
  * 
  * <p>
  * For more examples, have a look at {@link de.zib.scalaris.examples.TransactionReadExample},
