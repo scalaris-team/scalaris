@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
@@ -62,6 +62,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * </p>
  * 
  * <h3>Reading values</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   String key;
  *   OtpErlangString otpKey;
@@ -70,10 +71,12 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   String value             = sc.read(key);          // {@link #read(String)}
  *   OtpErlangObject optValue = sc.readObject(otpKey); // {@link #readObject(OtpErlangString)}
  * </code>
+ * </pre>
  * 
  * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisReadExample}</p>
  * 
  * <h3>Writing values</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   String key;
  *   String value;
@@ -84,10 +87,12 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   sc.write(key, value);             // {@link #write(String, String)}
  *   sc.writeObject(otpKey, otpValue); // {@link #writeObject(OtpErlangString, OtpErlangObject)}
  * </code>
+ * </pre>
  * 
  * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisWriteExample}</p>
  * 
  * <h3>Deleting values</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   String key;
  *   int timeout;
@@ -98,8 +103,10 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   sc.delete(key, timeout);           // {@link #delete(String, int)}
  *   result = sc.getLastDeleteResult(); // {@link #getLastDeleteResult()}
  * </code>
+ * </pre>
  * 
  * <h3>Publishing topics</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   String topic;
  *   String content;
@@ -110,10 +117,12 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   sc.publish(topic, content);       // {@link #publish(String, String)}
  *   sc.publish(otpTopic, otpContent); // {@link #publish(OtpErlangString, OtpErlangString)}
  * </code>
+ * </pre>
  * 
  * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisPublishExample}</p>
  * 
  * <h3>Subscribing to topics</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   String topic;
  *   String URL;
@@ -124,6 +133,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   sc.subscribe(topic, URL);       // {@link #subscribe(String, String)}
  *   sc.subscribe(otpTopic, otpURL); // {@link #subscribe(OtpErlangString, OtpErlangString)}
  * </code>
+ * </pre>
  * 
  * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisSubscribeExample}</p>
  * 
@@ -133,6 +143,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * of a {@link NotFoundException} being thrown if either the topic does not
  * exist or the URL is not subscribed to the topic.
  * 
+ * <pre>
  * <code style="white-space:pre;">
  *   String topic;
  *   String URL;
@@ -143,8 +154,10 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   sc.unsubscribe(topic, URL);       // {@link #unsubscribe(String, String)}
  *   sc.unsubscribe(otpTopic, otpURL); // {@link #unsubscribe(OtpErlangString, OtpErlangString)}
  * </code>
+ * </pre>
  * 
  * <h3>Getting a list of subscribers to a topic</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   String topic;
  *   OtpErlangString otpTopic;
@@ -157,6 +170,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   subscribers = sc.getSubscribers(topic);             // {@link #getSubscribers(String)}
  *   otpSubscribers = sc.singleGetSubscribers(otpTopic); // {@link #getSubscribers(OtpErlangString)}
  * </code>
+ * </pre>
  * 
  * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisGetSubscribersExample}</p>
  * 
