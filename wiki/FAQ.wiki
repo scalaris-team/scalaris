@@ -93,3 +93,19 @@ Inside those repositories you will also find an erlang rpm - you don't need this
 = Can I store more Data in Scalaris than ram+swapspace is available in the cluster? =
 
 Currently not, but in principle the used data store could use mnesia, Tokyo Cabinet or something similar. Note however, that this would not provide persistency.
+
+= Does Scalaris run on Windows? =
+
+No. Well, maybe.
+
+  # Install Erlang
+  # Install OpenSSL (for crypto module)
+  # Checkout scalaris code from SVN
+  # copy an apropriate EMakefile_for from contrib\win32 to the trunk-directory
+  # Adapt the path to your Erlang installation in build.bat
+  # run build.bat
+  # Go to the bin sub-directory
+  # Adapt the path to your Erlang installation in boot.bat
+  # run boot.bat
+
+Note: we do not support Scalaris on Windows at the moment.
