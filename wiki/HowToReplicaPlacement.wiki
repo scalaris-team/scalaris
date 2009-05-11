@@ -1,4 +1,4 @@
-#summary How to steer the assignemnt of replicas to nodes.
+#summary How to steer the assignment of replicas to nodes.
 
 = Introduction =
 
