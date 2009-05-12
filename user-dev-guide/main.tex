@@ -204,7 +204,6 @@ required which are not included in the \scalaris{} sources:
 \setlength{\parskip}{0pt}
 \item Erlang R12
 \item Erlang OTP (included in Erlang R12)
-\item Erlang yaws
 \item GNU Make
 \end{itemize}
 
@@ -244,7 +243,7 @@ Releases can be found under the 'Download' tab on the web-page.
 
 \section{Configuration}
 
-\scalaris{} reads the two configuration files from the working directory:
+\scalaris{} reads two configuration files from the working directory:
 \code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
 (optional). The former defines default settings and is included in the
 release. The latter can be created by the user to alter settings.  A sample
@@ -279,19 +278,48 @@ contacted to join the system.
 
 \subsection{Linux}
 
-Read the file \code{README} in the main \scalaris{} checkout directory.
+\scalaris{} uses autoconf for configuring the build environment and
+GNU Make for building the code.
+
+\begin{lstlisting}[language=sh]
+%> ./configure
+%> make
+%> make docs
+\end{lstlisting}
+
+For more details read \code{README} in the main \scalaris{} checkout
+directory.
+
+\subsection{Windows}
+
+We are currently not supporting \scalaris{} on Windows. However, we
+have two small {\tt bat} files for building and running a boot
+server. It seems to work but we make no guarantees.
+
+\begin{itemize}
+\item Install Erlang
+\item Install OpenSSL (for crypto module)
+\item Checkout scalaris code from SVN
+\item copy an appropriate EMakefile\_for from \code{contrib/win32} to the trunk-directory
+\item Adapt the path to your Erlang installation in build.bat
+\item run build.bat
+\item Go to the bin sub-directory
+\item Adapt the path to your Erlang installation in boot.bat
+\item run boot.bat
+\end{itemize}
+
 
 \subsection{Java-API}
 
 The following commands will build the Java API for \scalaris{}:
 \begin{lstlisting}[language=sh]
-%> cd java-api
-%> ant
+%> make java
 \end{lstlisting}
 
-This will build chordsharp4j.jar, which is the library for accessing
+This will build scalaris.jar, which is the library for accessing
 the overlay network. Optionally, the documentation can be build:
 \begin{lstlisting}[language=sh]
+%> cd java-api
 %> ant doc
 \end{lstlisting}
 
@@ -327,17 +355,17 @@ couple of seconds a first \scalaris{} should have started in the boot server
 and the number should increase to one. The main page will also allow you to
 store and retrieve key-value pairs.
 
-The boot server should show output similar to the following, when
-starting the first \scalaris{} nodes. The first line is printed when
-the \scalaris{} is spawned. Afterwards it will try to connect the
-boot server. When the third line is printed, it managed to contact the
-boot server and joined the ring. In this case, it was the first node
-in the ring.
-\begin{lstlisting}
-[ I | Node   | <0.97.0> ] joining "23947834870"
-[ I | Node   | <0.97.0> ] join as first [50,51,57,52,55,56,51,52,56,55,48]
-[ I | Node   | <0.97.0> ] joined
-\end{lstlisting}
+%The boot server should show output similar to the following, when
+%starting the first \scalaris{} nodes. The first line is printed when
+%the \scalaris{} is spawned. Afterwards it will try to connect the
+%boot server. When the third line is printed, it managed to contact the
+%boot server and joined the ring. In this case, it was the first node
+%in the ring.
+%\begin{lstlisting}
+%[ I | Node   | <0.97.0> ] joining "23947834870"
+%[ I | Node   | <0.97.0> ] join as first [50,51,57,52,55,56,51,52,56,55,48]
+%[ I | Node   | <0.97.0> ] joined
+%\end{lstlisting}
 
 In a second shell, you can now start a second \scalaris{} node. This
 will be a `regular server'. Go in the bin directory:
@@ -370,27 +398,87 @@ This will add 3 nodes to the network. The web pages at
 
 \subsection{Running distributed}
 
-\scalaris{} can be installed on other machines in the same way as described
-in Sect.~\ref{sec:install}. Please make sure, that the
-\code{scalaris.local.cfg} refers to available boot servers. Otherwise the
-other nodes will not find the boot server. On the remote nodes, you only
-need to call \code{./cs_local.sh} and they will automatically contact the
+\scalaris{} can be installed on other machines in the same way as
+described in Sect.~\ref{sec:install}. In the default configuration,
+nodes will look for the boot server on localhost on port 14195. You
+should create a \code{scalaris.local.cfg} pointing to the node running
+the boot server.
+
+\begin{lstlisting}[language=Erlang]
+% Insert the appropriate IP-addresses for your setup
+% as comma separated integers:
+% IP Address, Port, and label of the boot server
+{boot_host, {{127,0,0,1},14195,boot}}.
+\end{lstlisting}
+
+If you are using the default configuration on the boot server it will
+listen on port 14195 and you only have to change the IP address in the
+configuration file. Otherwise the other nodes will not find the boot
+server. On the remote nodes, you only need to call
+\code{./cs_local.sh} and they will automatically contact the
 configured boot server.
 
-\subsection{Running on PlanetLab}
+%\subsection{Running on PlanetLab}
 
-\subsection{Replication Degree}
+%\subsection{Replication Degree}
 
-\subsection{Routing Scheme}
+%\subsection{Routing Scheme}
 
 \section{Installation}
 \label{sec:install}
 
-Note: there is no \code{make install} at the moment! The nodes have
-to be started from the bin directory.
+For simple tests, you do not need to install \scalaris{}. You can run
+it directly from the source directory. Note: \code{make install} will
+install scalaris into \code{/usr/local}. But is more convenient to
+build RPMs and install those.
 
+\begin{lstlisting}{language=sh}
+svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
+tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1 --exclude-vcs
+cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
+rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
+\end{lstlisting}
 
+Your source and binary rpm will be generated in
+/usr/src/packages/SRPMS and RPMS.  We also build rpms using checkouts
+from svn and provide them using the openSUSE BuildService at
+http://download.opensuse.org/repositories/home:/tschuett/. RPM
+packages are available for
 
+\begin{itemize}
+\item Fedora 9, 10,
+\item Mandriva 2008, 2009,
+\item openSUSE 11.0, 11.1,
+\item SLE 10, 11,
+\item CentOS 5 and
+\item RHEL 5.
+\end{itemize}
+
+Inside those repositories you will also find an erlang rpm - you don't
+need this if you already have a recent enough erlang version!
+
+\section{Logging}
+\label{sec:logging}
+
+\scalaris{} uses the log4erl library (see \code{contrib/log4erl} for
+logging status information and error messages. The log level can be
+configured in \code{bin/scalaris.cfg}.  The default value is {\tt
+  error}; only errors and severe problems are logged.
+
+\begin{lstlisting}[language=Erlang]
+%% @doc Loglevel: debug < info < warn < error < fatal < none
+{log_level, error}.
+\end{lstlisting}
+
+In some cases, it might be necessary to get more complete logging
+information, e.g. for debugging. In \sieheref{sec:start-addit-local},
+we are explaining the startup process of \scalaris nodes in more
+detail, here the {\tt info} level provides more detailed information.
+
+\begin{lstlisting}[language=Erlang]
+%% @doc Loglevel: debug < info < warn < error < fatal < none
+{log_level, info}.
+\end{lstlisting}
 
 \chapter{Using the system}
 
@@ -596,22 +684,27 @@ Two sample results
 \end{lstlisting}
 
 
-\section{Erlang}
+%\section{Erlang}
 
 \section{Java command line interface}
 
-The jar file contains a small command line interface client.
+The jar file contains a small command line interface client. For
+convenience, we provide a wrapper script called \code{scalaris} which
+setups the Java environment:
 
 \begin{lstlisting}[language=sh]
-%> java -jar chordsharp4j.jar -help
-usage: chordsharp
- -getsubscribers <topic>   get subscribers of a topic
- -help                     print this message
- -publish <params>         publish a new message for a topic: <topic>
-                           <message>
- -read <key>               read an item
- -subscribe <params>       subscribe to a topic: <topic> <url>
- -write <params>           write an item: <key> <value>
+%> cd java-api
+%> ./scalaris -help
+usage: scalaris
+ -g,--getsubscribers <topic>   get subscribers of a topic
+ -help                         print this message
+ -minibench                    run mini benchmark
+ -p,--publish <params>         publish a new message for a topic: <topic>
+                               <message>
+ -r,--read <key>               read an item
+ -s,--subscribe <params>       subscribe to a topic: <topic> <url>
+ -u,--unsubscribe <params>     unsubscribe from a topic: <topic> <url>
+ -w,--write <params>           write an item: <key> <value>
 \end{lstlisting}
 
 Read and write can be used to read resp. write from/to the
@@ -619,25 +712,55 @@ overlay. getsubscribers, publish, and subscribe are the PubSub
 functions.
 
 \begin{lstlisting}[language=sh]
-%> java -jar chordsharp4j.jar -write foo bar
+%> ./scalaris -write foo bar
 write(foo, bar)
-%> java -jar chordsharp4j.jar -read foo
+%> ./scalaris -read foo
 read(foo) == bar
 \end{lstlisting}
 
-The chordsharp4j library requires that you are running a `regular server' on
+The scalaris library requires that you are running a `regular server' on
 the same node. Having a boot server running on the same node is not
 sufficient.
 
 \section{Java API}
+
+The \code{scalaris.jar} provides the command line client as well as a
+library for Java programs to access \scalaris{}. The library provides two classes:
+
+\begin{itemize}
+\item \code{Scalaris} provides a high-level API similar to the command line client.
+\item \code{Transaction} provides a low-level API to the transaction
+  mechanism.
+\end{itemize}
+
+For details we refer the reader to the Javadoc:
+
+\begin{lstlisting}[language=sh]
+%> cd java-api
+%> ant doc
+%> firefox doc/index.html
+\end{lstlisting}
 
 \chapter{Testing the system}
 
 \section{Running the unit tests}
 There are some unit tests in the \code{test} directory. You can call them
 by running \code{make test} in the main directory. The results are stored
-in a local \code{index.html} file. The tests use the \code{common-test}
-package from the Erlang system.
+in a local \code{index.html} file. 
+
+The tests are implemented with the \code{common-test} package from the
+Erlang system. For running the tests we rely on \code{run\_test},
+which is part of the \code{common-test} package, but is not installed
+by default. \code{configure} will check whether \code{run\_test} is
+available. If it is not installed, it will show a warning and a short
+description of how to install the missing file.
+
+Note: for the unit tests, we are setting up and shutting down several
+overlay networks. During the shut down phase, the runtime environment
+will print extensive error messages. These error messages do not
+indicate that tests failed! Running the complete test suite takes
+about 5 minutes. Only when the complete suite finished, it will
+present statistics on failed and successful tests.
 
 \part{Developers Guide}
 
@@ -663,26 +786,33 @@ calls itself using tail-recursion in each branch. The loop works on a
 \code{State}, which can be modified when a message is handled.
 
 \section{Starting additional local nodes after boot}
+\label{sec:start-addit-local}
 
 After booting a new \scalaris-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
 by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the boot
-process opened.
+process opened~\footnote{Increase the log level to {\tt info} to get
+  the detailed startup logs. See Sect.~\sieheref{sec:logging}}.
 
 
 \lstset{language=Erlang}
 \begin{lstlisting}
 scalaris/bin> ./boot.sh
 [...]
-=INFO REPORT==== 18-Jul-2008::20:08:48 ===
+=INFO REPORT==== 12-May-2009::16:24:18 ===
 Yaws: Listening to 0.0.0.0:8000 for servers
  - http://localhost:8000 under ../docroot
-[ I | Fail   | <0.102.0> ] start detector
-this() == {{127,0,0,1},14195}
-[ I | Node   | <0.105.0> ] joining "22500913918"
-[ I | Node   | <0.105.0> ] join as first [50,50,53,48,48,57,49,51,57,49,56]
-[ I | Node   | <0.105.0> ] joined
+[info] [ CC ] this() == {{127,0,0,1},14195}
+[info] [ DNC <0.96.0> ] starting DeadNodeCache
+[info] [ DNC <0.96.0> ] starting Dead Node Cache
+[info] [ RM <0.97.0> ] starting ring maintainer
 
+[info] [ RT <0.99.0> ] starting routingtable
+[info] [ Node <0.101.0> ] joining 315238232250031455306327244779560426902
+[info] [ Node <0.101.0> ] join as first 315238232250031455306327244779560426902
+[info] [ FD <0.74.0> ] starting pinger for {{127,0,0,1},14195,<0.101.0>}
+[info] [ Node <0.101.0> ] joined
+[info] [ CY ] Cyclon spawn: {{127,0,0,1},14195,<0.102.0>}
 (boot@csr-pc9)1> admin:add_nodes(10)
 \end{lstlisting}
 
@@ -693,14 +823,13 @@ The function \code{admin:add_nodes(int)} is defined as follows.
 
 \codesnippet{admin.erl}{admin:add_nodes}{../src/admin.erl}
 
-It first initializes the random number generator and then calls
-\code{add_nodes_loop(Count)}.
-
-This function starts a new child for the main supervisor \code{main_sup}.
-As defined by the parameters, to actually perform the start, the function
-\code{cs_sup_or:start_link} is called by the Erlang supervisor mechanism.
-For more details on the OTP supervisor mechanism see Chapter 18 of the
-Erlang book~\cite{erlang-book} or the online documentation at
+It calls \code{add_nodes_loop(Count, Delay)} with a delay of 0. This
+function starts a new child for the main supervisor \code{main_sup}.
+As defined by the parameters, to actually perform the start, the
+function \code{cs_sup_or:start_link} is called by the Erlang
+supervisor mechanism.  For more details on the OTP supervisor
+mechanism see Chapter 18 of the Erlang book~\cite{erlang-book} or the
+online documentation at
 \url{http://www.erlang.org/doc/man/supervisor.html}.
 
 \subsection{Supervisor-tree of a \scalaris{} node}
