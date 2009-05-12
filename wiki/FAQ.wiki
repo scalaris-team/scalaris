@@ -101,7 +101,7 @@ No. Well, maybe.
   # Install Erlang
   # Install OpenSSL (for crypto module)
   # Checkout scalaris code from SVN
-  # copy an apropriate EMakefile_for from contrib\win32 to the trunk-directory
+  # copy an appropriate EMakefile_for from contrib\win32 to the trunk-directory
   # Adapt the path to your Erlang installation in build.bat
   # run build.bat
   # Go to the bin sub-directory
