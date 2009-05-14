@@ -842,35 +842,37 @@ created:
 
 \subsection{Starting the or-supervisor and general processes of a node}
 
-The supervisor mechanism first calls the \code{init()} function of the
-defined module (\code{cs_sup_or:init()} in this case) before calling the
-defined start function (\code{start_link} here.
+Starting supervisors is a two step process: the supervisor mechanism
+first calls the \code{init()} function of the defined module
+(\code{cs_sup_or:init()} in this case) and then calls the start
+function (\code{start_link} here.
 
 So, lets have a look at \code{cs_sup_or:init}, the 'Scalaris
 \emph{or} supervisor'.
 
 \codesnippet{cs_sup_or.erl}{cs_sup_or:init}{../src/cs_sup_or.erl}
 
-The \code{init()} function must return process descriptions that the
-supervisor should start, and how the processes have to be observed. Here, we
-define a list of processes to be observed by a \code{one_for_one}
-supervisor. The processes are: \code{Config}, \code{KeyHolder},
-\code{MessageStatisticsCollector} and a \code{Supervisor_AND} process.
 
-The term \code{\{one_for_one, 10, 1\}} defines that the supervisor should
-  retry 10 times to restart each process before giving
-  up. \code{one_for_one} supervision means, that if a single process stops,
-  only that process is restarted. The other processes run independently.
+The return value of the \code{init()} function specifies the child
+processes of the supervisor and how to start them. Here, we define a
+list of processes to be observed by a \code{one_for_one}
+supervisor. The processes are: \code{KeyHolder}, \code{DeadNodeCache},
+\code{RingMaintenance}, \code{RoutingTable}, and a
+\code{Supervisor_AND} process.
 
-The \code{cs_sup_or:init()} is finished and the supervisor
-module, starts all the defined processes by calling their corresponding
-\code{init()} functions and afterwards, the functions that were defined in
-the list of the \code{cs_sup_or:init()}.
+The term \code{\{one_for_one, 10, 1\}} specifies that the supervisor
+should try 10 times to restart each process before giving
+up. \code{one_for_one} supervision means, that if a single process
+stops, only that process is restarted. The other processes run
+independently.
 
-For a join of a new node, we are only interested in the starting of the
-\code{Supervisor_AND} process here, which was the last one in the list. At
-that point in time, all other defined processes are already started and
-running.
+The \code{cs_sup_or:init()} is finished and the supervisor module,
+starts all the defined processes by calling the functions that were
+defined in the list of the \code{cs_sup_or:init()}.
+
+For a join of a new node, we are only interested in the starting of
+the \code{Supervisor_AND} process here. At that point in time, all
+other defined processes are already started and running.
 
 \subsection{Starting the and-supervisor with a peer and its local database}
 
@@ -879,28 +881,28 @@ corresponding module:
 
 \codesnippet{cs_sup_and.erl}{cs_sup_and:init}{../src/cs_sup_and.erl}
 
-It defines two processes, that have to be observed using an
+It defines three processes, that have to be observed using an
 \code{one_for_all}-supervisor, which means, that if one fails, all have to
 be restarted. Passed to the \code{init} function is the \code{InstanceId}, a
 random number to make nodes unique. It was calculated a bit earlier in
 the code. Exercise: Try to find where.
 
 As you can see from the list, the \code{DB} is started before the
-\code{Node}. This is intended and important, because \code{cs_node} uses the
-database, but not vice versa.
-
-After the \code{cs_sup_and:init()} finished, the DB is initialized and
-afterwards \code{cs_node:start_link} is called by the and-supervisor.
-We only go into details here, for the latter.
+\code{Node}. This is intended and important, because \code{cs_node}
+uses the database, but not vice versa. The supervisor first completely
+initializes the DB process and afterwards calls
+\code{cs_node:start_link}. We only go into details here, for the
+latter.
 
 \codesnippet{cs_node.erl}{cs_node:start_link}{../src/cs_node.erl}
 
-This spawns a new process, that executes \code{cs_node:start()} and
-maintains a link to that process. This function is called in the context of
-the and-supervisor process, so the and-supervisor process will be informed,
-when the spawned process finishes. After the spawn is submitted,
-\code{cs_node:start_link} returns to the supervisor, which starts observing
-the processes in a loop.
+\code{cs_node} implements the \code{gen_component} behaviour. This
+component was developed by us to enable us to write code which is
+similar in syntax and semantics to the examples in~\cite{rachid-book}.
+Similar to the \code{supervisor} behaviour, the component has to
+provide an \code{init} function, but here it is used to initialize the
+state of the component. This function is described in the next
+section.
 
 Note: \code{?MODULE} is a predefined Erlang macro, which expands to the
 module name, the code belongs to (here: \code{cs_node}).
@@ -909,10 +911,16 @@ module name, the code belongs to (here: \code{cs_node}).
 
 \codesnippet{cs_node.erl}{cs_node:start}{../src/cs_node.erl}
 
-A \code{cs_node} first registers itself in the process dictionary.  Then,
-the process sleeps for a random amount of time. Otherwise, if you would
-start 1000 processes with \code{admin:add_nodes(1000)}, the boot-server
-would receive many join requests at the same time, which is not intended.
+The \code{gen_component} behaviour registers the \code{cs_node} in the
+process dictionary. Formerly, the process had to do this himself, but
+we moved this code into the behaviour. If the \code{cs_node} is the
+first node, he will start immediately. Otherwise, the process sleeps
+for a random amount of time. Ff you would start 1000 processes with
+\code{admin:add_nodes(1000)}, the boot-server would receive many join
+requests at the same time, which is not intended. It will also make
+the ring stabilization process more complicated. Adding 100s of nodes
+within a short period of time induces more churn into the system, than
+the ring maintenance can handle.
 
 Then, the node retrieves its \code{Id} from the keyholder: \code{Id =
   cs_keyholder:get_key()}. In the first call, a random identifier is
@@ -935,42 +943,49 @@ there.
   that mean, that a node can only change its position in the ring 10 times
   (caused by load-balancing)?}
 
-Next, the \code{cs_node} registers itself as the owner of the
-failuredetector \code{failuredetector:set_owner(self())} to become informed,
-when the failuredetector detects failing nodes.
+%Next, the \code{cs_node} registers itself as the owner of the
+%failuredetector \code{failuredetector:set_owner(self())} to become informed,
+%when the failuredetector detects failing nodes.
 
-With \code{boot_server:connect()} a connection to the boot-server is
-established.
+%With \code{boot_server:connect()} a connection to the boot-server is
+%established.
 
 \subsection{Actually joining the ring}
 
-\code{cs_join:join} is called next in \code{cs_node:start()}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\codesnippet{cs_join.erl}{cs_join:join}{../src/cs_join.erl}
+After retrieving its identifier, the node starts the join process
+(\code{cs_join:join}).
+
+\codesnippet{cs_join.erl}{cs_join:join1}{../src/cs_join.erl}
 
 The boot-server is contacted to retrieve the known number of nodes in the
 ring. If the ring is empty, \code{join_first} is called. Otherwise,
 \code{join_ring} is called.
 
-\code{join_first} just creates a new state for a \scalaris{} node consisting
-of an empty routing table, a successorlist containing itself, itself as its
-predecessor, a reference to itself, its responsibility area from \code{Id}
-to \code{Id} (the full ring), and a load balancing schema.
+If the ring is empty, the joining node is the only node in the ring
+and will be responsible for the whole key space. \code{join_first}
+just creates a new state for a \scalaris{} node consisting of an empty
+routing table, a successorlist containing itself, itself as its
+predecessor, a reference to itself, its responsibility area from
+\code{Id} to \code{Id} (the full ring), and a load balancing schema.
 
 \codesnippet{cs_join.erl}{cs_join:join_first}{../src/cs_join.erl}
 
-The macro \code{?RT} maps to the configured routing algorithm. It is defined
-in \code{chordsharp.erl}. For further details on the routing see Chapter~\sieheref{chapter.routing}.
+The macro \code{?RT} maps to the configured routing algorithm and
+\code{?RM} to the configured ring maintenance algorithm. It is defined
+in \code{chordsharp.hrl}. For further details on the routing see
+Chapter~\sieheref{chapter.routing}.
 
 The state is defined in
 
 \codesnippet{cs_state.erl}{cs_state:state}{../src/cs_state.erl}
 
-If a node joins an existing ring, \code{reliable_get_node} for the own
-\code{Id} is called in \code{cs_join:join()}. This lookup delivers the
-successor for the joining node. The node, that is currently responsible for
-\code{Id}, but which has a larger \code{Id} itself.  If this lookup fails
-for some reason, it is tried again, by recursivly calling the \code{join()}.
+If a node joins an existing ring, \code{reliable_get_node} is called
+for the own \code{Id} in \code{cs_join:join()}. This lookup delivers
+the node who is currently responsible for the new node's identifier --
+the successor for the joining node. If this lookup fails for some
+reason, it is tried again, by recursivly calling the \code{join()}.
 
 \todo{What, if the \code{Id} is exactly the same as that of the existing
   node? This could lead to lookup and responsibility inconsistency? Can this
@@ -2024,6 +2039,12 @@ failed read is still in the transaction's log.
 J. Armstrong.
 \newblock \emph{Programming Erlang: Software for a Concurrent World.}
 \newblock Pragmatic Programmers, ISBN: 978-1-9343560-0-5, July 2007
+
+\bibitem{rachid-book}
+Rachid Guerraoui and Luis Rodrigues.
+\newblock \emph{Introduction to Reliable Distributed Programming.}
+\newblock Springer-Verlag, 2006.
+
 \end{thebibliography}
 
 \end{document}
