@@ -83,7 +83,7 @@ join_ring(Id, Succ) ->
     end.
 %% userdevguide-end cs_join:join_ring
 
-%% userdevguide-begin cs_join:join
+%% userdevguide-begin cs_join:join1
 %% @doc join a ring and return initial state
 %%      the boolean indicates whether it was the first 
 %%      node in the ring or not
@@ -108,5 +108,5 @@ join(Id) ->
 		    {false, State}
 	    end
     end.
-%% userdevguide-end cs_join:join
+%% userdevguide-end cs_join:join1
 
