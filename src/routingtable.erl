@@ -38,6 +38,7 @@
 % Behaviour definition
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% userdevguide-begin routingtable:behaviour
 behaviour_info(callbacks) ->
     [
      % create a default routing table
@@ -59,6 +60,7 @@ behaviour_info(callbacks) ->
      % for bulkowner
      {to_dict, 1}
     ];
+%% userdevguide-end routingtable:behaviour
 
 behaviour_info(_Other) ->
     undefined.

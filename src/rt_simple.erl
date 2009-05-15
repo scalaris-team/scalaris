@@ -35,6 +35,7 @@
 
 -behaviour(routingtable).
 
+%% userdevguide-begin rt_simple:types
 % @type key(). Identifier.
 -type(key()::pos_integer()).
 % @type rt(). Routing Table.
@@ -43,20 +44,25 @@
 -else.
 -type(rt()::{node:node_type(), gb_trees:gb_tree()}).
 -endif.
+%% userdevguide-end rt_simple:types
 
+%% userdevguide-begin rt_simple:empty
 %% @doc creates an empty routing table.
 %%      per default the empty routing should already include 
 %%      the successor
 -spec(empty/1 :: (node:node_type()) -> rt()).
 empty(Succ) ->
     {Succ, gb_trees:empty()}.
+%% userdevguide-end rt_simple:empty
 
+%% userdevguide-begin rt_simple:hash_key
 %% @doc hashes the key to the identifier space.
 -spec(hash_key/1 :: (any()) -> key()).
 hash_key(Key) ->
     BitString = binary_to_list(crypto:md5(Key)),
     % binary to integer
     lists:foldl(fun(El, Total) -> (Total bsl 8) bor El end, 0, BitString).
+%% userdevguide-end rt_simple:hash_key
 
 %% @doc generates a random node id
 %%      In this case it is a random 128-bit string.
@@ -65,32 +71,44 @@ getRandomNodeId() ->
     % generates 128 bits of randomness
     hash_key(integer_to_list(crypto:rand_uniform(1, 65536 * 65536))).
 
+%% userdevguide-begin rt_simple:next_hop
 %% @doc returns the next hop to contact for a lookup
 %% @spec next_hop(cs_state:state(), key()) -> pid()
 next_hop(State, _Key) ->
     cs_state:succ_pid(State).
+%% userdevguide-end rt_simple:next_hop
 
+%% userdevguide-begin rt_simple:init_stabilize
 %% @doc triggered by a new stabilization round
 -spec(init_stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
 init_stabilize(_Id, Succ, _RT) ->
     % renew routing table
     empty(Succ).
+%% userdevguide-end rt_simple:init_stabilize
 
+%% userdevguide-begin rt_simple:filterDeadNode
 %% @doc removes dead nodes from the routing table
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, _DeadPid) ->
     RT.
+%% userdevguide-end rt_simple:filterDeadNode
 
+%% userdevguide-begin rt_simple:to_pid_list
 %% @doc returns the pids of the routing table entries .
 -spec(to_pid_list/1 :: (rt()) -> [cs_send:mypid()]).
 to_pid_list({Succ, _RoutingTable} = _RT) ->
     [node:pidX(Succ)].
+%% userdevguide-end rt_simple:to_pid_list
 
 %% @doc returns the size of the routing table.
 -spec(get_size/1 :: (rt()) -> pos_integer()).
 get_size(_RT) ->
     1.
-    
+
+%% userdevguide-begin rt_simple:get_keys_for_replicas
+normalize(Key) ->
+    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
+
 %% @doc returns the replicas of the given key
 -spec(get_keys_for_replicas/1 :: (key() | string()) -> [key()]).
 get_keys_for_replicas(Key) when is_integer(Key) ->
@@ -101,14 +119,15 @@ get_keys_for_replicas(Key) when is_integer(Key) ->
     ];
 get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
+%% userdevguide-end rt_simple:get_keys_for_replicas
     
+
+%% userdevguide-begin rt_simple:dump
 %% @doc 
 -spec(dump/1 :: (rt()) -> ok).
 dump(_State) ->
     ok.
-
-normalize(Key) ->
-    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
+%% userdevguide-end rt_simple:dump
 
 % 0 -> succ
 % 1 -> shortest finger
