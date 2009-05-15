@@ -189,9 +189,11 @@ on({lookup_pointer, Source_Pid, Index}, State) ->
     cs_send:send(Source_Pid, {lookup_pointer_response, Index, ?RT:lookup(cs_state:rt(State), Index)}),
     State;
 
+%% userdevguide-begin cs_node:rt_get_node
 on({rt_get_node, Source_PID, Cookie}, State) ->
     cs_send:send(Source_PID, {rt_get_node_response, Cookie, cs_state:me(State)}),
     State;
+%% userdevguide-end cs_node:rt_get_node
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lookup (see lookup.erl) 

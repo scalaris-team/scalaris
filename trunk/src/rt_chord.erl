@@ -36,17 +36,21 @@
 % stabilize for Chord
 -export([stabilize/5]).
 
+%% userdevguide-begin rt_chord:types
 -type(key()::pos_integer()).
 -ifdef(types_are_builtin).
 -type(rt()::gb_tree()).
 -else.
 -type(rt()::gb_trees:gb_tree()).
 -endif.
+%% userdevguide-end rt_chord:types
 
+%% userdevguide-begin rt_chord:empty
 %% @doc creates an empty routing table.
 -spec(empty/1 :: (node:node_type()) -> rt()).
 empty(_Succ) ->
     gb_trees:empty().
+%% userdevguide-end rt_chord:empty
 
 %% @doc hashes the key to the identifier space.
 -spec(hash_key/1 :: (any()) -> key()).
@@ -59,6 +63,7 @@ hash_key(Key) ->
 getRandomNodeId() ->
     rt_simple:getRandomNodeId().
 
+%% userdevguide-begin rt_chord:next_hop1
 %% @doc returns the next hop to contact for a lookup
 -spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
 next_hop(State, Id) -> 
@@ -71,7 +76,9 @@ next_hop(State, Id) ->
 	    RT = cs_state:rt(State),
 	    next_hop(cs_state:id(State), RT, Id, 127, cs_state:succ_pid(State))
     end.
+%% userdevguide-end rt_chord:next_hop1
 
+%% userdevguide-begin rt_chord:next_hop2
 % @private
 -spec(next_hop/5 :: (key(), rt(), key(), pos_integer(), cs_send:mypid()) -> cs_send:mypid()).
 next_hop(_N, _RT, _Id, 0, Candidate) -> Candidate;
@@ -87,7 +94,9 @@ next_hop(N, RT, Id, Index, Candidate) ->
 	none ->
 	    next_hop(N, RT, Id, Index - 1, Candidate)
     end.
+%% userdevguide-end rt_chord:next_hop2
 
+%% userdevguide-begin rt_chord:init_stab
 %% @doc starts the stabilization routine
 -spec(init_stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
 init_stabilize(Id, Succ, RT) ->
@@ -96,7 +105,9 @@ init_stabilize(Id, Succ, RT) ->
     % trigger a lookup for Key
     cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), 127}),
     cleanup(gb_trees:iterator(RT), RT, Succ).
+%% userdevguide-end rt_chord:init_stab
 
+%% userdevguide-begin rt_chord:filterDeadNode
 %% @doc remove all entries
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, DeadPid) ->
@@ -104,6 +115,7 @@ filterDeadNode(RT, DeadPid) ->
 			   node:pidX(Node) == DeadPid],
     lists:foldl(fun (Index, Tree) -> gb_trees:delete(Index, Tree) end,
 		RT, DeadIndices).
+%% userdevguide-end rt_chord:filterDeadNode
 
 %% @doc returns the pids of the routing table entries .
 -spec(to_pid_list/1 :: (rt()) -> list(cs_send:mypid())).
@@ -126,6 +138,7 @@ get_keys_for_replicas(Key) ->
 dump(RT) ->
     lists:flatten(io_lib:format("~p", [gb_trees:to_list(RT)])).
 
+%% userdevguide-begin rt_chord:stab
 %% @doc updates one entry in the routing table
 %%      and triggers the next update
 -spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(), node:node_type()) -> rt()).
@@ -145,6 +158,7 @@ stabilize(Id, Succ, RT, Index, Node) ->
 		    NewRT
 	    end
     end.
+%% userdevguide-end rt_chord:stab
 
 % @private
 -spec(calculateKey/2 :: (key(), pos_integer()) -> key()).

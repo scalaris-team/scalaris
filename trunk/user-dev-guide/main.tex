@@ -966,8 +966,6 @@ there.
 
 \subsection{Actually joining the ring}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 After retrieving its identifier, the node starts the join process
 (\code{cs_join:join}).
 
@@ -1018,37 +1016,29 @@ a \code{\{join, X\}} handler.
 
 \codesnippet{cs_node.erl}{cs_node:join_message}{../src/cs_node.erl}
 
-This triggers to call \code{join_request} on the old node. 
+This triggers a call to \code{join_request} on the old node.
 
 \codesnippet{cs_join.erl}{cs_join:join_request}{../src/cs_join.erl}
 
-This resets the local predecessor to the new node and splits the data.
-Then it sends a \code{join_response} to the new node with its former
+The \code{cs_node} notifies the ring maintenance, that he has a new
+predecessor. Then he removes the key-value pairs from his database
+which are now in the responsibility of the joining node. Then it
+sends a \code{join_response} to the new node with its former
 predecessor, the data, it has to host, and its successorlist.
-Additionally, the new node will be observed by the failuredetector.
 
-Note: Here, the observation of the former predecessor could be deleted from
-the failure detector. But periodically, all known hosts are reregistered
-with the failure detector, and then all other nodes are thrown away from the
-list of nodes to observe in the failure detector. So, we do not care here.
+%Note: Here, the observation of the former predecessor could be deleted from
+%the failure detector. But periodically, all known hosts are reregistered
+%with the failure detector, and then all other nodes are thrown away from the
+%list of nodes to observe in the failure detector. So, we do not care here.
 
-Finally, the new predecessor is set and the \code{join_request()} is finished.
- 
-Back on the new node: it waits for the \code{join_response} message in
-\code{cs_join:join_ring()}. The next steps after the message was received
-from the old node are to register the predecessor, to register all new nodes
-in the failure detector, to send a message to the predecessor, that its
-successor has changed.
+%Finally, the new predecessor is set and the \code{join_request()} is finished.
 
-Finally, all data are added to the database and the succlist is build by
-putting the successor to the head of the successor list of the successor
-(old node): \code{[Succ | SuccList]}.
 
-The next step in \code{cs_join:join()} is to call
-\code{cs_reregister:reregister} which reregisters the node periodically with
-the boot server. Then \code{\{false, State\}} is returned, which means 'this
-was not the first node in the ring'. Now, the \code{cs_join:join()} is
-completed.
+Back on the joining node: it waits for the \code{join_response}
+message in \code{cs_join:join_ring()}. The next steps after the
+message was received from the old node are to initialize the
+maintenance components for the ring and routing table, the database
+and the state of the \code{cs_node}.
 
 \subsection{Beginning to serve requests}
 
@@ -1061,30 +1051,29 @@ The \code{cs_replica_stabilization:recreate_replicas()} function is called,
 which is not yet implemented. It would recreated necessary replicas that
 were lost due to load-balancing and node failures.
 
-Finally all the self-management services are started with
-\code{timer:after} and the loop for request handling is started. 
+Finally, the loop for request handling is started.
 
-\subsection{FAQ}
+% \subsection{FAQ}
 
-\paragraph{Question:} How are the routing-table, load-balancing and paxos 
-  processes started, that can be seen in the supervisor tree?
+% \paragraph{Question:} How are the routing-table, load-balancing and paxos 
+%   processes started, that can be seen in the supervisor tree?
 
-  \paragraph{Answer:} They are currently not implemented as separate Erlang
-  processes. All the requests are handled by the loop started by
-  \code{cs_node:start()}. Nevertheless, they could be implemented as
-  separate processes to make the software architecture cleaner.
+%   \paragraph{Answer:} They are currently not implemented as separate Erlang
+%   processes. All the requests are handled by the loop started by
+%   \code{cs_node:start()}. Nevertheless, they could be implemented as
+%   separate processes to make the software architecture cleaner.
 
 \chapter{Routing and routing tables in the Overlay}
 \label{chapter.routing}
 
-\hfill\emph{2008-07-25, SVN revision 12}
+%\hfill\emph{2008-07-25, SVN revision 12}
 
 Each node of the ring can perform searches in the overlay.
 
-A search is done by a lookup in the overlay, but there are several other
-demands for communication between peers, so \scalaris{} provides a general
-interface to route a message another peer, that is currently responsible for
-a given \code{key}.
+A search is done by a lookup in the overlay, but there are several
+other demands for communication between peers, so \scalaris{} provides
+a general interface to route a message to another peer, that is
+currently responsible for a given \code{key}.
 
 \begin{lstlisting}[title=\filetitle{cs_lookup.erl}]
 [...]
@@ -1123,12 +1112,13 @@ lookup_aux(State, Key, Msg) ->
 [...]
 \end{lstlisting}
 
-Each node is responsible for a certain key interval. 
-With the function \code{util:is_between} it is decided, whether the key is
-between the current node and its successor. If that is the case, 
-final step is done using \code{lookup_fin()}, which delivers the message to
-the local node. Otherwise, the message is forwarded to the next nearest
-known peer (listed in the routing table) determined by \code{?RT:next_hop}.
+Each node is responsible for a certain key interval.  The function
+\code{util:is_between} is used to decide, whether the key is between
+the current node and its successor. If that is the case, final step is
+done using \code{lookup_fin()}, which delivers the message to the
+local node. Otherwise, the message is forwarded to the next nearest
+known peer (listed in the routing table) determined by
+\code{?RT:next_hop}.
 
 
 % \begin{lstlisting}[language=Java]
@@ -1138,56 +1128,21 @@ known peer (listed in the routing table) determined by \code{?RT:next_hop}.
 % }
 % \end{lstlisting}
 
-\code{routingtable.erl} is a generic interface for routing tables, like a
-Java interface. In Erlang interfaces can be defined using a `behaviour'.
-The files \code{rt_simple} and \code{rt_chord} implement the behaviour
-`routingtable'.
+\code{routingtable.erl} is a generic interface for routing tables. It
+can be compared to interfaces in Java. In Erlang interfaces can be
+defined using a so called `behaviour'.  The files \code{rt_simple} and
+\code{rt_chord} implement the behaviour `routingtable'.
 
-The macro ?RT in other files replaces to the active module, which is defined
-in \code{chordsharp.hrl}.
+The macro ?RT is used to select the current implementation of routing
+tables. It is defined in \code{chordsharp.hrl}.
 
-\begin{lstlisting}[title=\filetitle{chordsharp.hrl}]
-[...]
-%%This file determines which kind of routingtable is used. Uncomment the
-%%one that is desired.
-
-%%Standard Chord routingtable
--define(RT, rt_chord).
-
-%%Simple routingtable
-%-define(RT, rt_simple).
-[...]
-\end{lstlisting}
+\codesnippet{chordsharp.hrl}{chordsharp:rt}{../src/chordsharp.hrl}
 
 The functions, that have to be implemented for a routing mechanism are
 defined in the following file:
 
-\begin{lstlisting}[title=\filetitle{routingtable.erl}]
-[...]
-behaviour_info(callbacks) ->
-    [
-     % create a default routing table
-     {empty, 1}, 
-     % key space -> identifier space
-     {hash_key, 1}, {getRandomNodeId, 0},
-     % routing
-     {next_hop, 2}, 
-     % trigger for new stabilization round
-     {stabilize, 1}, 
-     % dead nodes filtering
-     {filterDeadNodes, 2}, 
-     % statistics
-     {to_pid_list, 1}, {to_node_list, 1}, {get_size, 1},
-     % for symmetric replication
-     {get_keys_for_replicas, 1},
-     % for debugging
-     {dump, 1}
-    ];
+\codesnippet{routingtable.erl}{routingtable:behaviour}{../src/routingtable.erl}
 
-behaviour_info(_Other) ->
-    undefined.
-[...]
-\end{lstlisting}
 
 \begin{description}
 \setlength{\parskip}{0pt}
@@ -1196,30 +1151,37 @@ behaviour_info(_Other) ->
   table.  The data structure of the routing table is undefined. It can be a
   list, a tree, a matrix \ldots
 
-\item \code{hash_key/1} gets a key and translates it to an id for the
-  overlay.
+\item \code{hash_key/1} gets a key and maps it into the overlay's
+  identifier space.
 
-\item \code{getrandomnodeid/0} returns a random node id.
+\item \code{getRandomNodeId/0} returns a random node id from the
+  overlay's identifier space. This is used for example when a new node
+  joins the system.
 
 \item \code{next_hop/2} gets a routing table and a key and returns the node,
   that should be contacted next (is nearest to the id).
 
-\item \code{stabilize/1} is called periodically to rebuild the routing table.
+\item \code{init_stabilize/3} is called periodically to rebuild the
+  routing table. The parameters are the identifier of the node, the
+  successor and the old routing table state.
 
-\item \code{filterDeadNodes} is called by the failuredetector and tells the
+\item \code{filterDeadNode/2} is called by the failuredetector and tells the
   routing table about dead nodes to be eliminated from the routing
   table. This function cleans the routing table.
 
 \item \code{to_pid_list/1} get all PIDs of the routing table entries.
-\item \code{to_node_list/1} get all nodes in the routing table as complete
-  reference including IP, range, etc.
-\item \code{get_size/1} get the size of the routing table.
 
-\item \code{get_keys_for_replicas/1} Returns for a given \code{Key} the keys
-  of its replicas. Thereby one can implement successorlist replication or
-  symmetric replication or any other schema.
+\item \code{get_size/1} get the routing table's size.
+
+\item \code{get_keys_for_replicas/1} Returns for a given \code{Key}
+  the keys of its replicas. This used for implementing symmetric
+  replication.
 
 \item \code{dump/1} dump the state. Not mandatory, may just return \code{ok}.
+
+\item \code{to_dict/1} returns the routing tables entries in an
+  array-like structure. This is used by bulk-operations to create a
+  broadcast tree.
 \end{description}
 
 \section{Simple routing table}
@@ -1231,146 +1193,48 @@ list. This implementation is not very efficient on churn.
 
 \subsection{Data types}
 First, the data structure of the routing table is defined:
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @type rt() = {node:node(), gb_trees:gb_tree()}. Sample routing table
-%% @type key() = int(). Identifier
-[...]
-\end{lstlisting}
-A routing table is a pair of a node (the successor) and an (unused) gbtree.
-Keys in the overlay are identified by integers.
+
+\codesnippet{rt_simple.erl}{rt_simple:types}{../src/rt_simple.erl}
+
+A routing table is a pair of a node (the successor) and an (unused)
+\code{gb_tree}.  Keys in the overlay are identified by integers.
 
 \subsection{A simple routingtable behaviour}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc creates an empty routing table.
-%%      per default the empty routing should already include 
-%%      the successor
-%% @spec empty(node:node()) -> rt()
-empty(Succ) ->
-    {Succ, gb_trees:empty()}.
-[...]
-\end{lstlisting}
-The empty routing table consists of the successor.
+\codesnippet{rt_simple.erl}{rt_simple:empty}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc hashes the key to the identifier space.
-%% @spec hash_key(string()) -> key()
-hash_key(Key) ->
-    BitString = binary_to_list(crypto:md5(Key)),
-    % binary to integer
-    lists:foldl(fun(El, Total) -> (Total bsl 8) bor El end, 0, BitString).
+The empty routing table consists of the successor and an empty
+\code{gb_tree}.
 
-%% @doc generates a random node id
-%%      In this case it is a random 128-bit string.
-%% @spec getRandomNodeId() -> key()
-getRandomNodeId() ->
-    % generates 128 bits of randomness
-    hash_key(integer_to_list(random:uniform(65536 * 65536))).
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:hash_key}{../src/rt_simple.erl}
+
 Keys are hashed using MD5 and have a length of 128 bits.
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc returns the next hop to contact for a lookup
-%% @spec next_hop(cs_state:state(), key()) -> pid()
-next_hop(State, _Key) ->
-    cs_state:succ_pid(State).
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:next_hop}{../src/rt_simple.erl}
+
 Next hop is always the successor.
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc triggers a new stabilization round
-%% @spec stabilize(cs_state:state()) -> cs_state:state()
-stabilize(State) ->
-    % trigger the next stabilization round
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
-    % renew routing table
-    cs_state:set_rt(State, empty(cs_state:succ(State))).
-[...]
-\end{lstlisting}
-The \code{stabilize/1} first triggers to be called again after the pointer
-stabilization interval defined in the configuration. Then it resets its
-routing table with the current successor.
+\codesnippet{rt_simple.erl}{rt_simple:init_stabilize}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc removes dead nodes from the routing table
-%% @spec filterDeadNodes(rt(), [node:node()]) -> rt()
-filterDeadNodes(RT, _DeadNodes) ->
-    RT.
-[...]
-\end{lstlisting}
-\code{FilterDeadNodes/2} does nothing, as only the successor is listed in
-the routing table and that is reset periodically in \code{stabilize/1}.
+\code{init_stabilize/3} resets its routing table with the current
+successor.
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc returns the pids of the routing table entries .
-%% @spec to_pid_list(rt()) -> [pid()]
-to_pid_list({Succ, _RoutingTable} = _RT) ->
-    [node:pidX(Succ)].
-[...]
-\end{lstlisting}
-\code{to_pid_list/1} return the pids of the routing tables, as defined in \code{node.erl}.
+\codesnippet{rt_simple.erl}{rt_simple:filterDeadNode}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc returns the pids of the routing table entries .
-%% @spec to_node_list(rt()) -> [node:node()]
-to_node_list({Succ, _RoutingTable} = _RT) ->
-    [Succ].
-[...]
-\end{lstlisting}
-Return whole node definitions as defined in \code{node.erl}
+\code{filterDeadNodes/2} does nothing, as only the successor is listed in
+the routing table and that is reset periodically in \code{init_stabilize/3}.
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
--record(node, {pid, id, uniqueId}).
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:to_pid_list}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @doc returns the size of the routing table.
-%%      inefficient standard implementation
-%% @spec get_size(rt()) -> int()
-get_size(RT) ->
-    length(to_pid_list(RT)).
-    
-%% @doc returns the replicas of the given key
-%% @spec get_keys_for_replicas(key() | string()) -> [key()]
-get_keys_for_replicas(Key) when is_integer(Key) ->
-    [Key, 
-     normalize(Key + 16#40000000000000000000000000000000),
-     normalize(Key + 16#80000000000000000000000000000000),
-     normalize(Key + 16#C0000000000000000000000000000000)
-    ];
-get_keys_for_replicas(Key) when is_list(Key) ->
-    get_keys_for_replicas(hash_key(Key)).
+\code{to_pid_list/1} returns the pids of the routing tables, as defined in \code{node.erl}.
 
-normalize(Key) ->
-    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:get_keys_for_replicas}{../src/rt_simple.erl}
 
 The \code{get_keys_for_replicas/1} implements symmetric replication, here.
 The call to \code{normalize} implements the modulo by throwing high bits
 away.
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @doc 
-%% @spec dump(cs_state:state()) -> term()
-dump(_State) ->
-    ok.
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:dump}{../src/rt_simple.erl}
 
 \code{dump/1} is not implemented.
 
@@ -1381,72 +1245,28 @@ The file \code{rt_chord.erl} implements Chord's routing.
 
 \subsection{Data types}
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @type rt() = gb_trees:gb_tree(). Chord routing table
-%% @type key() = int(). Identifier
-[...]
-\end{lstlisting}
-The routing table is a \code{gb_tree}. Identifiers in the ring are integers.
+\codesnippet{rt_chord.erl}{rt_chord:types}{../src/rt_chord.erl}
+
+The routing table is a \code{gb_tree}. Identifiers in the ring are
+integers. Note, that in Erlang integer can be of arbitrary
+precision. For Chord, the identifiers are in $[0, 2^{128})$,
+i.e. 128-bit strings.
 
 \subsection{The routingtable behaviour for Chord}
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @doc creates an empty routing table.
-%% @spec empty(node:node()) -> rt()
-empty(_Succ) ->
-    gb_trees:empty().
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:empty}{../src/rt_chord.erl}
 
-\todo{This function should return \code{_Succ}?}
+\code{empty/1} returns an empty \code{gb_tree}.
 
 \code{hash_key(Key)} and \code{getRandomNodeId} call their counterparts from
 \code{rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-%% @doc returns the next hop to contact for a lookup
-%% @spec next_hop(cs_state:state(), key()) -> node()
-next_hop(State, Id) -> 
-    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
-	%succ is responsible for the key
-	true ->
-	    cs_state:succ_pid(State);
-	% check routing table
-	false ->
-	    RT = cs_state:rt(State),
-	    next_hop(cs_state:id(State), RT, Id, 127, cs_state:succ_pid(State))
-    end.
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:next_hop1}{../src/rt_chord.erl}
 
 \code{next_hop} traverses the routing table beginning with the longest
 finger ($2^{127}$) by calling the helper function \code{next_hop/5}.
 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-% @private
-next_hop(N, RT, Id, Index, Candidate) ->
-    case gb_trees:is_defined(Index, RT) of
-	true ->
-	    case gb_trees:get(Index, RT) of
-		null ->
-		    Candidate;
-		Entry ->
-		    case util:is_between_closed(N, node:id(Entry), Id) of
-			true ->
-			    node:pidX(Entry);
-			false ->
-			    next_hop(N, RT, Id, Index - 1, Candidate)
-		    end
-		end;
-	false ->
-	    Candidate
-    end.
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:next_hop2}{../src/rt_chord.erl}
 
 If the entry exists, it is retrieved from the \code{gb_tree}.  If the id of
 the routing table entry is between ourselves and the searched id, the finger
@@ -1459,81 +1279,35 @@ changes entries to \code{null}.
   traverse the routing table for shorter appropriate fingers. If doing so, a
   check whether \code{Index} is zero, would become necessary.}
 
-If the finger is to long, recursivly try the next shorter finger.
+If the finger is to long, recursively try the next shorter finger.
 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-%% @doc starts the stabilization routine
-%% @spec stabilize(cs_state:state()) -> cs_state:state()
-stabilize(State) ->
-    % trigger the next stabilization round
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
-    % calculate the longest finger
-    Key = calculateKey(State, 127),
-    % trigger a lookup for Key
-    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), 127}),
-    State.
-[...]
-calculateKey(State, Idx) ->
-    % n + 2^Idx
-    rt_simple:normalize(cs_state:id(State) + (1 bsl Idx)).
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:init_stab}{../src/rt_chord.erl}
 
-The routing table stabilization is triggered with the index 127 and then
-runs asynchronously, as we do not want to block the \code{cs_node} to
-perform other request while recalculating the routing table.
+The routing table stabilization is triggered with the index 127 and
+then runs asynchronously, as we do not want to block the
+\code{rt_loop} to perform other request while recalculating the
+routing table.
 
 We have to find the node responsible for the calculated finger and therefore
 perform a lookup for the node with a \code{rt_get_node} message, including
 a reference to ourselves as the reply-to address and the index to be set.
 
-The lookup performs an overlay routing by passing the massage until the
-responsible node is found. There, the message is delivered to the
-\code{cs_node}.
+The lookup performs an overlay routing by passing the massage until
+the responsible node is found. There, the message is delivered to the
+\code{cs_node}. At the destination the message is handled in
+\code{cs_node.erl}:
 
-At the destination the message is handled in \code{cs_node.erl}:
+\codesnippet{cs_node.erl}{cs_node:rt_get_node}{../src/cs_node.erl}
 
-\begin{lstlisting}[title=\filetitle{cs_node.erl}]
-[...]
-	% for chord_rt
-	{rt_get_node, Source_PID, Idx} ->
-	    cs_send:send(Source_PID, {rt_get_node_response, Idx, cs_state:me(State)}),
-	    loop(State, ?DEBUG(Debug));
+The remote node just sends the requested information back directly in
+a \code{rt_get_node_response} message including a reference to itself.
+When receiving the routing table entry, we call \code{stabilize/5}.
 
-	{rt_get_node_response, Index, Node} = _Message ->
-	    NewState = ?RT:stabilize(State, Index, Node),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:stab}{../src/rt_chord.erl}
 
-The remote node just sends the requested information back directly in a
-\code{rt_get_node_response} message including a reference to itself.
+%%%%%%%%%%
 
-When receiving the routing table entry, we call \code{stabilize/3}!, which
-is different from the \code{stabilize/1} above.
-
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-stabilize(State, Index, Node) ->
-    RT = cs_state:rt(State),
-    case node:is_null(Node) of
-	true ->
-	    State;
-	false ->
-	    case cs_state:succ(State) == Node of
-		true ->
-		    State;
-		false ->
-		    NewRT = gb_trees:enter(Index, Node, RT),
-		    Key = calculateKey(State, Index - 1),
-		    self() ! {lookup_aux, Key, {rt_get_node, cs_send:this(), Index - 1}},
-		    cs_state:set_rt(State, NewRT)
-	    end
-    end.
-[...]
-\end{lstlisting}
-
-\code{stabilize/3} assigns the received routing table entry and triggers to
+\code{stabilize/5} assigns the received routing table entry and triggers to
 fill the next shorter one using the same mechanisms as described.
 
 When the shortest finger is the successor, then filling the routing table is
@@ -1541,54 +1315,9 @@ stopped, as no further new entries would occur. It is not necessary, that
 \code{Index} reaches 1 to make that happen. If less than $2^{128}$ nodes
 participate in the system, it may happen earlier.
 
-\code{filterDeadNodes} updates the \code{gb_tree} accordingly. 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-%% @doc remove all entries with the given ids
-%% @spec filterDeadNodes(gb_trees:gb_tree(), term()) -> gb_trees:gb_tree()
-filterDeadNodes(RT, DeadNodes) ->
-    gb_sets:fold(fun (Id, RT2) -> filter_intern(gb_trees:iterator(RT2), RT2, Id) end, RT, DeadNodes).
+\code{filterDeadNode} removes dead entries from the \code{gb_tree}.
 
-% @private
-filter_intern(nil, RT, _) ->
-    RT;
-filter_intern([], RT, _) ->
-    RT;
-filter_intern(Iterator, RT, Id) ->
-    {Index, Value, Next} = gb_trees:next(Iterator),
-    case node:uniqueId(Value) == Id of
-	true ->
-	    filter_intern(Next, gb_trees:delete(Index, RT), Id);
-	false ->
-	    filter_intern(Next, RT, Id)
-    end.
-
-
-%% @doc returns the pids of the routing table entries .
-%% @spec to_pid_list(rt()) -> [pid()]
-to_pid_list(RT) ->
-    lists:map(fun ({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
-
-%% @doc returns the pids of the routing table entries .
-%% @spec to_node_list(rt()) -> [node:node()]
-to_node_list(RT) ->
-    lists:map(fun ({_Idx, Node}) -> Node end, gb_trees:to_list(RT)).
-
-%% @doc returns the size of the routing table.
-%%      inefficient standard implementation
-%% @spec get_size(rt()) -> int()
-get_size(RT) ->
-    length(to_pid_list(RT)).
-    
-%% @doc returns the replicas of the given key
-%% @spec get_keys_for_replicas(key() | string()) -> [key()]
-get_keys_for_replicas(Key) ->
-    rt_simple:get_keys_for_replicas(Key).
-[...]
-\end{lstlisting}
-
-Also the remaining functions are implemented as one would expect.
-
+\codesnippet{rt_chord.erl}{rt_chord:filterDeadNode}{../src/rt_chord.erl}
 
 \chapter{Directory Structure of the Source Code}
 
@@ -1597,460 +1326,61 @@ The directory tree of \scalaris{} is structured as follows: \\
 \begin{tabular}{|r|p{11.5cm}|}
  \hline
  \code{bin} & contains shell scripts needed to work with \scalaris{} (e.g.\ start the boot services, start a node, \dots)\\
- \code{contrib} & necessary third party packages \\
+ \code{contrib} & necessary third party packages (yaws and log4erl) \\
  \code{doc} & generated erlang documentation \\
- \code{docroot} & root directory of the integrated webserver \\
+ \code{docroot} & root directory of the bootserver's webserver \\
+ \code{docroot_node} & root directory of the normal node's webserver \\
+ \code{ebin} & the compiled Erlang code (beam files)\\
  \code{java-api} & a java api to \scalaris{} \\
  \code{log} & log files \\
  \code{src} & contains the \scalaris{} source code\\
- \code{tests} & unit tests for \scalaris{} \\
+ \code{test} & unit tests for \scalaris{} \\
  \code{user-dev-guide} & contains the sources for this document\\
  \hline
 \end{tabular}
 
-\chapter{System Components}
+%\chapter{System Components}
 
 
 
-\chapter{Processes}
+%\chapter{Processes}
 
-\chapter{Troubleshooting}
+%\chapter{Troubleshooting}
 
-\section{ApplicationMonitor appmon:start()}
-
-
-
-\appendix
+%\section{ApplicationMonitor appmon:start()}
 
 \chapter{Java API}
 
-\section{de.zib.chordsharp.ChordSharp}
+For the Java API documentation, we refer the reader to Javadoc
+resp. doxygen. The following commands create the documentation:
 
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-public class ChordSharp
+\begin{lstlisting}[language=sh]
+%> cd java-api
+%> ant doc
+%> doxygen
 \end{lstlisting}
 
-Public ChordSharp Interface. 
-\\
-
-\begin{description}
-\item[\textbf{Version:}]1.1
-\item[\textbf{Author:}]Nico Kruber, kruber@zib.de
-\end{description}
-
-\begin{tabular}{|l|l|}
-\hline 
- \textbf{Method Summary}
- & \\
- \hline 
- static Vector$<$String$>$ &\textbf{getSubscribers}(String topic)\\ 
-& Gets a list of subscribers of a topic. \\
- \hline 
- static void &\textbf{publish}(String topic, String content)\\ 
- & Publishes an event under a given topic. \\
- \hline 
- static String &\textbf{read}(String key)\\ 
- & Gets the value stored with the given key. \\
- \hline 
- static void &\textbf{subscribe}(String topic, String url)\\ 
- & Subscribes a url for a topic. \\
- \hline 
- static void &\textbf{write}(String key, String value)\\ 
- & Stores the given key/value pair. \\
- \hline 
-
-\end{tabular}
-
-\subsection*{ read}
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-public static String read(String key)
-                   throws ConnectionException,
-                          TimeoutException,
-                          UnknownException,
-                          NotFoundException
-\end{lstlisting}
-
-Gets the value stored with the given key. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]key - the key to look up 
-\item[\textbf{Returns:}]the value stored under the given key
-\item[\textbf{Throws:}]
-\end{description}
-\begin{tabular}{ll}
-ConnectionException & if the connection is not active or a \\
-& communication error occurs or an exit signal \\
-& was received or the remote node sends a \\
-& message containing an invalid cookie \\
-TimeoutException & if a timeout occurred while trying to fetch the \\
-& value \\
-NotFoundException & if the requested key does not exist \\
-UnknownException & if any other error occurs\\
-\end{tabular}
-
-
-\subsection*{ write}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static void write(String key,
-                         String value)
-                  throws ConnectionException,
-                         TimeoutException,
-                         UnknownException
-\end{lstlisting}
-Stores the given key/value pair. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]key - the key to store the value for
-value - the value to store 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to write the value 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{ publish}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static void publish(String topic,
-                           String content)
-                    throws ConnectionException
-\end{lstlisting}
-Publishes an event under a given topic. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]topic - the topic to publish the content under
-content - the content to publish 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
-\end{description}
-
-\subsection*{ subscribe}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static void subscribe(String topic,
-                             String url)
-                      throws ConnectionException
-\end{lstlisting}
-Subscribes a url for a topic. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]topic - the topic to subscribe the url for
-url - the url of the subscriber (this is where the events are send to) 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
-
-\end{description}
-
-
-\subsection*{ getSubscribers}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static Vector<String> getSubscribers(String topic)
-                                     throws ConnectionException,
-                                            UnknownException
-\end{lstlisting}
-Gets a list of subscribers of a topic. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]topic - the topic to get the subscribers for 
-\item[\textbf{Returns:}]the subscriber URLs 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-UnknownException - is thrown if the return type of the erlang method does not match the expected one
-
-\end{description}
-
-\subsection*{ de.zib.chordsharp.Transaction}
-
-
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-public class \textbf{Transaction}
-\end{lstlisting}
-
-
-
-  Provides means to realise a transaction with the chordsharp ring using Java. 
-
-
-  It reads the connection parameters from a file called ChordSharpConnection.properties or uses default properties defined in ChordSharpConnection.defaultProperties. 
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-OtpErlangString otpKey; 
-OtpErlangString otpValue; 
-OtpErlangString otpResult; 
-String key; 
-String value; 
-String result; 
-
-Transaction transaction = new Transaction(); // Transaction() 
-transaction.start(); // start() 
-transaction.write(otpKey, otpValue); // write(OtpErlangString, OtpErlangString) 
-transaction.write(key, value); // write(String, String) 
-otpResult = transaction.read(otpKey); //read(OtpErlangString) 
-result = transaction.read(key); //read(String) 
-transaction.commit(); // commit() 
-\end{lstlisting}
-
-For more examples, have a look at TransactionReadExample,
-TransactionParallelReadsExample, TransactionWriteExample and
-TransactionReadWriteExample.
-
-\subsubsection*{Attention:}
-
-If a read or write operation fails within a transaction all subsequent
-operations on that key will fail as well. This behaviour may
-particularly be undesirable if a read operation just checks whether a
-value already exists or not. To overcome this situation call
-revertLastOp() immediately after the failed operation which restores
-the state as it was before that operation.
-
-The TransactionReadWriteExample example shows such a use case.
-
-
- 
-
-
-\begin{description}
-\item[\textbf{Version:}]1.0
-\item[\textbf{Author:}]Nico Kruber, kruber@zib.de
-\end{description}
-
-\begin{tabular}{|l|}
-\hline 
- \textbf{Constructor Summary}
- \\
- \hline 
-\textbf{Transaction}()\\ 
- Creates the object's connection to the chordsharp node specified in the \\
-``ChordSharpConnection.properties'' file. \\
- \hline 
-
-\end{tabular}
-
-    
-
-\begin{tabular}{|l|l|}
-\hline 
- \textbf{Method Summary} & \\
- \hline 
-  void &\textbf{abort}()\\ 
- & Cancels the current transaction. \\
- \hline 
-  void &\textbf{commit}()\\ 
- & Commits the current transaction. \\
- \hline 
-  OtpErlangString &\textbf{read}(OtpErlangString key)\\ 
- & Gets the value stored under the given key. \\
- \hline 
-  String &\textbf{read}(String key)\\ 
- & Gets the value stored under the given key. \\
- \hline 
-  void &\textbf{revertLastOp}()\\ 
- & Reverts the last (read or write) operation by \\
- & restoring the last state. \\
- \hline 
-  void &\textbf{start}()\\ 
- & Starts a new transaction by generating a new transaction log. \\
- \hline 
-  void &\textbf{write}(OtpErlangString key, OtpErlangString value)\\ 
- & Stores the given key/value pair. \\
- \hline 
-  void &\textbf{write}(String key, String value)\\ 
- & Stores the given key/value pair. \\
- \hline 
-
-\end{tabular}
-
-
-\subsection*{Transaction}
-
-\begin{lstlisting}[language=Java]
-public Transaction()
-            throws ConnectionException
-\end{lstlisting}
-Creates the object's connection to the chordsharp node specified in the ``ChordSharpConnection.properties'' file. 
-
-\begin{description}
-\item[\textbf{Throws:}]ConnectionException - if the connection fails
-\end{description}
-
-\subsection*{start}
-
-\begin{lstlisting}[language=Java]
-public void start()
-           throws ConnectionException,
-                  TransactionNotFinishedException,
-                  UnknownException
-\end{lstlisting}
-Starts a new transaction by generating a new transaction log. 
-
- 
-
-\begin{description}
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TransactionNotFinishedException - if an old transaction is not finished (via commit() or abort()) yet 
-UnknownException - if the returned value from erlang does not have the expected type/structure
-
-\end{description}
-
-
-\subsection*{commit}
-
-\begin{lstlisting}[language=Java]
-public void commit()
-            throws UnknownException,
-                   ConnectionException
-\end{lstlisting}
-Commits the current transaction. The transaction's log is reset if the commit was successful, otherwise it still retains in the transaction which must be successfully committed or aborted in order to be restarted. 
-
- 
-
-\begin{description}
-\item[\textbf{Throws:}
-]UnknownException - If the commit fails or the returned value from erlang is of an unknown type/structure, this exception is thrown. Neither the transaction log nor the local operations buffer is emptied, so that the commit can be tried again. 
-ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
-\item[\textbf{See Also:}
-]abort()
-
-\end{description}
-
-\subsection*{ abort}
-
-\begin{lstlisting}[language=Java]
-public void abort()
-\end{lstlisting}
-Cancels the current transaction. 
-
-  For a transaction to be cancelled, only the transLog needs to be reset. Nothing else needs to be done since the data was not modified until the transaction was committed. 
-
-
- 
-
-\subsection*{read}
-
-\begin{lstlisting}[language=Java] 
-public OtpErlangString read(OtpErlangString key)
-                     throws ConnectionException,
-                            TimeoutException,
-                            UnknownException,
-                            NotFoundException
-\end{lstlisting}
-Gets the value stored under the given key. 
-
-\begin{description}
-\item[\textbf{Parameters:}
-]key - the key to look up 
-\item[\textbf{Returns:}
-]the value stored under the given key
-\item[\textbf{Throws:}
-]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to fetch the value 
-NotFoundException - if the requested key does not exist 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{read}
-
-\begin{lstlisting}[language=Java]
-public String read(String key)
-            throws ConnectionException,
-                   TimeoutException,
-                   UnknownException,
-                   NotFoundException
-\end{lstlisting}
-Gets the value stored under the given key. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}
-]key - the key to look up 
-\item[\textbf{Returns:}
-]the value stored under the given key
-\item[\textbf{Throws:}
-]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to fetch the value 
-NotFoundException - if the requested key does not exist 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{write}
-
-\begin{lstlisting}[language=Java] 
-public void write(OtpErlangString key,
-                  OtpErlangString value)
-           throws ConnectionException,
-                  TimeoutException,
-                  UnknownException
-\end{lstlisting}
-Stores the given key/value pair. 
-
-\begin{description}
-\item[\textbf{Parameters:}
-]key - the key to store the value for
-value - the value to store 
-\item[\textbf{Throws:}
-]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to write the value 
-UnknownException - if any other error occurs
-
-\end{description}
-
-\subsection*{write}
-
-\begin{lstlisting}[language=Java] 
-public void write(String key,
-                  String value)
-           throws ConnectionException,
-                  TimeoutException,
-                  UnknownException
-\end{lstlisting}
-Stores the given key/value pair. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]key - the key to store the value for
-value - the value to store 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to write the value 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{revertLastOp}
-
-\begin{lstlisting}[language=Java] 
-public void revertLastOp()
-\end{lstlisting}
-
-Reverts the last (read, parallelRead or write) operation by restoring
-the last state. If no operation was initiated yet, this method does
-nothing.
-
-This method is especially useful if after an unsuccessful read a value
-with the same key should be written which is not possible if the
-failed read is still in the transaction's log.
+The Javadoc can be found in \code{java-api/doc/index.html}. The
+doxygen is in \\ \code{doc-doxygen/html/index.html}.
+
+We provide two kinds of APIs:
+
+\begin{itemize}
+\item high-level access with \code{de.zib.scalaris.Scalaris}
+\item low-level access with \code{de.zib.scalaris.Transaction}
+\end{itemize}
+
+The former provides general functions for reading and writing single
+key-value pairs and an API for the built-in PubSub-service. The latter
+allows the user to write custom transactions which can modify an
+arbitrary number of key-value pairs within one transaction.
 
 \bibliographystyle{plainnat}
 
 \begin{thebibliography}{9}
 
 \bibitem{erlang-book}
-J. Armstrong.
+Joe Armstrong.
 \newblock \emph{Programming Erlang: Software for a Concurrent World.}
 \newblock Pragmatic Programmers, ISBN: 978-1-9343560-0-5, July 2007
 
@@ -2066,3 +1396,4 @@ Rachid Guerraoui and Luis Rodrigues.
 %%% mode: latex
 %%% TeX-master: t
 %%% End: 
+
