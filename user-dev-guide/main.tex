@@ -192,6 +192,40 @@ limitations under the License.
 
 \part{Users Guide}
 
+\chapter{Introduction}
+
+Scalaris is a scalable, transactional, distributed key-value store based on
+the peer-to-peer principle. It can be used to build scalable Web 2.0
+services. The concept of Scalaris is quite simple: Its architecture consists
+of three layers.
+
+It provides self-management and scalability by replicating services and data
+among peers. Without system interruption it scales from a few PCs to
+thousands of servers. Servers can be added or removed on the fly without any
+service downtime.
+
+\begin{center}
+\includegraphics[width=0.7\linewidth]{layers}
+\end{center}
+
+Scalaris takes care of:
+
+\begin{itemize}
+\item Fail-over
+\item Data distribution
+\item Replication
+\item Strong consistency
+\item Transactions
+\end{itemize}
+
+
+
+The Scalaris project was initiated by Zuse Institute Berlin and onScale
+solutions and is partly funded by the EU projects Selfman and
+XtreemOS. Additional information (papers, videos) can be found at
+\url{http://www.zib.de/CSR/Projects/scalaris} and
+\url{http://www.onscale.de/scalaris.html}.
+
 \chapter{Download and Installation}
 
 \section{Requirements}
@@ -257,25 +291,6 @@ contacted to join the system.
 
 \section{Build}
 
-%\subsection{Windows (Win32)}
-% \begin{enumerate}
-% \setlength{\itemsep}{0pt}
-% \setlength{\parskip}{0pt}
-% \item Copy \code{make.exe} from \code{contrib/win32} to \code{src} 
-% \item Copy \code{Makefile_to_src} from \code{contrib/win32} to \code{src} 
-% \item Copy \code{Makefile_to_src_comm_layer} from \code{contrib/win32} to \code{src/comm_layer} 
-% \item Copy \code{Makefile_to_src_transstore} from \code{contrib/win32} to \code{src/transstore} 
-% \item Rename Makefiles
-% \item Open MS-DOS Command Shell 
-% \item Go into \code{src} directory 
-% \item Call \code{make}
-% \item Go into bin directory 
-% \item Call \code{boot.bat}
-% \end{enumerate}
-% 
-% \subsubsection{Troubleshooting}
-% Check path to Erlang Installation in Makefiles.
-
 \subsection{Linux}
 
 \scalaris{} uses autoconf for configuring the build environment and
@@ -307,7 +322,6 @@ server. It seems to work but we make no guarantees.
 \item Adapt the path to your Erlang installation in boot.bat
 \item run boot.bat
 \end{itemize}
-
 
 \subsection{Java-API}
 
@@ -915,7 +929,7 @@ The \code{gen_component} behaviour registers the \code{cs_node} in the
 process dictionary. Formerly, the process had to do this himself, but
 we moved this code into the behaviour. If the \code{cs_node} is the
 first node, he will start immediately. Otherwise, the process sleeps
-for a random amount of time. Ff you would start 1000 processes with
+for a random amount of time. If you would start 1000 processes with
 \code{admin:add_nodes(1000)}, the boot-server would receive many join
 requests at the same time, which is not intended. It will also make
 the ring stabilization process more complicated. Adding 100s of nodes
