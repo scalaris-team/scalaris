@@ -1,0 +1,18 @@
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    {value, {_, P0}} = lists:keysearch("p0", 1, yaws_api:parse_query(A)),
+    {value, {_, P1}} = lists:keysearch("p1", 1, yaws_api:parse_query(A)),
+    if 
+	P0 == undefined -> 
+	  {ehtml, 
+       	    {pre, [], 
+            ""}}; 
+	P1 == undefined ->
+      	  {ehtml, 
+       		{pre, [], 
+        	""}};
+	true ->
+	      {html, json:encode(process_dictionary:get_info(P0, P1))}
+     end.
+</erl>
