@@ -15,7 +15,7 @@ workdir="$tmpdir/scalaris-$version"
 mkdir -p "$workdir"
 cp -a * "$workdir/"
 cd $workdir
-make clean || exit 1
+make clean
 #rm -Rf lib logs
 cd ..
 echo "Creating scalaris-$version.tar.bz2"
