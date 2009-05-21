@@ -63,7 +63,7 @@ send_to_rtms_with_lookup(TID, Message)->
 
 send_to_participants_with_lookup(TMState, Message)->
     ?TLOG("sent_to_participants_with_lookup"),
-    Keys = dict:fetch_keys(TMState#tm_state.items),
+    Keys = trecords:items_get_keys(TMState#tm_state.items),
     [ send_to_replica_with_lookup(Key, Message) || Key <- Keys ].
 
 send_to_replica_with_lookup(Key, Message)->
@@ -77,9 +77,7 @@ send_to_replica_with_lookup(Key, Message)->
     [ F(RKey) || RKey <- ReplKeys ].
 
 send_to_participants(TMState, Message)->
-    dict:map(fun(_Key, Item) ->
-                     send_to_tp(Item, Message) end,
-             TMState#tm_state.items).
+    [ send_to_tp(Item, Message) || Item <- TMState#tm_state.items ].
 
 send_to_rtms(TMState, Message) ->
     [ cs_send:send(Address, Message)
