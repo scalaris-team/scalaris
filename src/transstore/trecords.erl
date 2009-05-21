@@ -26,9 +26,25 @@
 -include("trecords.hrl").
 -include("../chordsharp.hrl").
 
--export([new_tm_state/4, get_vote/3, store_vote/4, get_vote_acks/1, get_vote_acks/2, get_vote_acks/3, store_vote_acks/4, get_read_vote_acks/3, store_read_vote_acks/4, new_tm_item/4, new_tm_message/2, new_vote/5, create_items/1]).
-%get_decision/3, store_decision/4, 
-%get_read_vote_acks/1, 
+-export([new_tm_state/4, 
+         get_vote/3, 
+         store_vote/4, 
+         get_vote_acks/1, 
+         get_vote_acks/2, 
+         get_vote_acks/3, 
+         store_vote_acks/4, 
+         get_read_vote_acks/3, 
+         store_read_vote_acks/4, 
+         new_tm_item/4, 
+         new_tm_message/2, 
+         new_vote/5, 
+         create_items/1]).
+% get_decision/3, 
+% store_decision/4, 
+% get_read_vote_acks/1, 
+-export([items_get_keys/1]).
+-export([items_get_item_by_key/2, items_update_item/3]).
+
 -import(dict).
 -import(lists).
 -import(?RT).
@@ -72,66 +88,43 @@ new_tm_state(TransID, Items, Leader, Self)->
     %%                  0: initial write timestamp}
     %%                  a leader voting on behalf of a tp must start with ts 2!!!!
     %% Initially acks are an empty list
- 
-    
-    {NewVotes, 
+
+    {NewVotes,
      NewVoteAcks,
      NewRVAcks,
-     NewDecisions} = dict:fold(fun(Key, _Entry, {MyVotes, MyAcks, MyRVAcks, MyDec})->
-				       %ReplicaDict = dict:new(),
-				       AcksRepDict = dict:new(),
-				       RVAcksDict = dict:new(),
-				       DecRepDict = dict:new(),
-				       
-				       RKeys = ?RT:get_keys_for_replicas(Key),
-				       
-				       VotesReplica = lists:foldl(fun(Elem, Acc)->
-									  dict:store(Elem, {bottom, 0, 0}, Acc)
-								  end,
-								  %ReplicaDict,
-								  MyVotes,
-								  RKeys),
-				       AcksReplica = lists:foldl(fun(Elem, Acc) ->
-								      dict:store(Elem, [], Acc)
-								 end,
-								 AcksRepDict,
-								 RKeys),
-				       
-				       RVAcksReplica = lists:foldl(fun(Elem, Acc) ->
-									   dict:store(Elem, [], Acc)
-								   end,
-								   %RVAcksDict,
-								   MyRVAcks,
-								   RKeys),
-%% 				       DecReplica = lists:foldl(fun(Elem, Acc)->
-%% 									dict:store(Elem, undecided, Acc)
-%% 								end,
-%% 								DecRepDict,
-%% 								RKeys),
-				       
-				    {VotesReplica,%dict:store(Key, VotesReplica, MyVotes), 
-				     dict:store(Key, AcksReplica, MyAcks),
-				     MyRVAcks,%dict:store(Key, RVAcksReplica, MyRVAcks),
-				     MyDec %dict:store(Key, DecReplica, MyDec)
-				    }
-			    end,
-			    {Votes, Acks, RVAcks, Decisions},
-			    Items),
-    
+     NewDecisions} = lists:foldl(fun(Entry, {MyVotes, MyAcks, MyRVAcks, MyDec}) ->
+                                         Key = Entry#tm_item.key,
+                                         RKeys = ?RT:get_keys_for_replicas(Key),
+                                         {VotesReplica, AcksReplica, RVAcksReplica} =
+                                             lists:foldl(fun(Elem, {Acc1,Acc2,Acc3})->
+                                                                 {dict:store(Elem, {bottom, 0, 0}, Acc1),
+                                                                  dict:store(Elem, [], Acc2),
+                                                                  dict:store(Elem, [], Acc3)}
+                                                         end,
+                                                         {MyVotes, dict:new(), MyRVAcks},
+                                                         RKeys),
+                                         {VotesReplica,%dict:store(Key, VotesReplica, MyVotes),
+                                          dict:store(Key, AcksReplica, MyAcks),
+                                          MyRVAcks,%dict:store(Key, RVAcksReplica, MyRVAcks),
+                                          MyDec %dict:store(Key, DecReplica, MyDec)
+                                         }
+                                 end,
+                                 {Votes, Acks, RVAcks, Decisions},
+                                 Items),
     #tm_state{transID = TransID,
-	      items = Items,
-	      leader = Leader,
-	      myBallot = 0,
-	      rtms = [Self], %% the replicated transaction managers
-	      votes = NewVotes,
-	      vote_acks = NewVoteAcks,
-	      read_vote_acks = NewRVAcks,
-	      %decisions = NewDecisions,
-	      rtms_found = false,
-	      tps_found = false,
-	      status = collecting,
-	      decision = undecided
-	     }.
+              items = Items,
+              leader = Leader,
+              myBallot = 0,
+              rtms = [Self], %% the replicated transaction managers
+              votes = NewVotes,
+              vote_acks = NewVoteAcks,
+              read_vote_acks = NewRVAcks,
+                                                %decisions = NewDecisions,
+              rtms_found = false,
+              tps_found = false,
+              status = collecting,
+              decision = undecided
+             }.
 
 %%--------------------------------------------------------------------
 %% @spec get_vote(TMState::tm_state, Key::string(), RKey::List)->{Dec, ReadTS, WriteTS}
@@ -218,7 +211,7 @@ store_read_vote_acks(TMState, Key, RKey, Ack)->
     RKeyAcks = dict:fetch(RKey, RVAcks),
     
     NewRKeyAcks = [Ack | RKeyAcks],
-    
+
     NewVoteAcks = dict:store(RKey, NewRKeyAcks, RVAcks),
     TMState#tm_state{read_vote_acks = NewVoteAcks}.
 
@@ -229,11 +222,11 @@ store_read_vote_acks(TMState, Key, RKey, Ack)->
 %% store_decision(TMState, Key, RKey, Decision)->
 %%     Decisions = TMState#tm_state.decisions,
 %%     ItemDecs = dict:fetch(Key, Decisions),
-    
+
 %%     NewItemDecs = dict:store(RKey, Decision, ItemDecs),
-%%     NewDecisions = dict:store(Key, NewItemDecs, Decisions), 
+%%     NewDecisions = dict:store(Key, NewItemDecs, Decisions),
 %%     TMState#tm_state{decisions = NewDecisions}.
- 
+
 
 %%--------------------------------------------------------------------
 %% Function: new_tm_item/4
@@ -244,14 +237,14 @@ store_read_vote_acks(TMState, Key, RKey, Ack)->
 %%           Operation - read/write
 %% Returns:  record tm_item
 %%-------------------------------------------------------------------
-new_tm_item(Key, Value, Version, Operation)->
+new_tm_item(Key, Value, Version, Operation) ->
     #tm_item{
-	     key = Key,
-	     value = Value,
-	     version = Version,
-	     operation = Operation,
-	     tps = [] %% list with tuple: {key_of_replica, tpPID}
-	     }.
+             key = Key,
+             value = Value,
+             version = Version,
+             operation = Operation,
+             tps = [] %% list with tuple: {key_of_replica, tpPID}
+     }.
 
 %%--------------------------------------------------------------------
 %% Function: new_tm_message/2
@@ -262,10 +255,10 @@ new_tm_item(Key, Value, Version, Operation)->
 %%-------------------------------------------------------------------
 new_tm_message(TID, Message)->
     #tm_message{
-		transaction_id = TID,
-		tm_key = unknown,
-		message = Message
-	       }.
+                transaction_id = TID,
+                tm_key = unknown,
+                message = Message
+               }.
 
 
 %%--------------------------------------------------------------------
@@ -288,15 +281,25 @@ new_vote(TID, Key, RN, Decision, TS)->
 
 %%--------------------------------------------------------------------
 %% Function: create_items/1
-%% Purpose:  create an Items dictionary from a TransLog
+%% Purpose:  create an Items list from a TransLog
 %% Args:     TransLog = [{read,"key3",ok,"value3",0},...]
-%% Returns:  items dictionary
+%% Returns:  items list
 %%-------------------------------------------------------------------
-create_items(TransLog)->
-    F = fun(Entry, Dict) ->
-                dict:store(txlog:get_entry_key(Entry),
-                           txlog:get_entry_as_tm_item(Entry),
-                           Dict)
-        end,
-    lists:foldl(F, dict:new(), TransLog).
+create_items(TransLog) ->
+    [ txlog:get_entry_as_tm_item(X) || X <- TransLog].
 
+items_get_keys(Items) ->
+    [ Elem#tm_item.key || Elem <- Items ].
+
+items_get_item_by_key(Items, Key) ->
+    [Item] = [ X || X <- Items,
+                    Key == X#tm_item.key ],
+    Item.
+
+items_update_item(Items, OldItem, NewItem) ->
+    F = fun(X) -> case X of
+                      OldItem -> NewItem;
+                      _ -> X
+                  end
+        end,
+    [ F(X) || X <- Items ].

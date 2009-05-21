@@ -61,10 +61,10 @@ add_entry(TransLog, Entry) ->
     [ Entry | TransLog ].
 
 filter_by_key(TransLog, Key) ->
-    [ X || {_, ElemKey, _, _, _} = X <- TransLog, Key == ElemKey ].
+    [ X || X <- TransLog, Key == get_entry_key(X) ].
 
 filter_by_status(TransLog, Status) ->
-    [ X || {_, _, XStatus, _, _} = X <- TransLog, Status == XStatus ].
+    [ X || X <- TransLog, Status == get_entry_status(X) ].
 
 update_entry(TransLog, {read,LogKey,LogSuccess,_,LogVers} = Element,
              write, Value) ->

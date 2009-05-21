@@ -79,17 +79,17 @@
 start_manager(TransFun, SuccessFun, FailureFun, Owner, TID, InstanceId)->
     erlang:put(instance_id, InstanceId),
     {TimeRP, {Res, ResVal}} = timer:tc(transstore.tmanager, read_phase, [TransFun]),
-    if
-	Res == ok ->
-	    {ReadPVal, Items} = ResVal,
-	    commit_phase(Items, SuccessFun, ReadPVal, FailureFun, Owner, TID, TimeRP);
-	Res == fail->
-	    tsend:send_to_client(Owner, FailureFun(ResVal));
-	Res == abort ->
-	    tsend:send_to_client(Owner, SuccessFun({user_abort, ResVal}));
-	true ->
-	    io:format("readphase res: ~p ; resval: ~p~n", [Res, ResVal]),
-	    tsend:send_to_client(Owner, FailureFun(Res))
+    case Res of
+        ok ->
+            {ReadPVal, Items} = ResVal,
+            commit_phase(Items, SuccessFun, ReadPVal, FailureFun, Owner, TID, TimeRP);
+        fail->
+            tsend:send_to_client(Owner, FailureFun(ResVal));
+        abort ->
+            tsend:send_to_client(Owner, SuccessFun({user_abort, ResVal}));
+        _ ->
+            io:format("readphase res: ~p ; resval: ~p~n", [Res, ResVal]),
+            tsend:send_to_client(Owner, FailureFun(Res))
     end.
 
 %% start a manager without a read phase
@@ -126,30 +126,31 @@ read_phase(TFun)->
 %% commit phase
 commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID, _TimeRP)->
     %% BEGIN only for time measurements
-    _ItemsListLength = length(dict:to_list(Items)),
-    %boot_logger:transaction_log(io_lib:format("| ~p | | | | | | ~p ", [TID, _ItemsListLength])),
+    _ItemsListLength = length(Items),
+    %% boot_logger:transaction_log(io_lib:format("| ~p | | | | | | ~p ", [TID, _ItemsListLength])),
     %% END only for time measurements
     TMState1 = init_leader_state(TID, Items),
-    {_TimeIP, {InitRes, TMState2}} = timer:tc(transstore.tmanager, init_phase, [TMState1]),
-    %?TLOGN("init phase: initres ~p", [InitRes]),
-    if
-	InitRes == ok->
-	    erlang:send_after(config:tpFailureTimeout(), self(), {check_failed_tps}),
-	    {_TimeCP, TransRes} = timer:tc(transstore.tmanager, start_commit, [TMState2]),
-	    ?TIMELOG("commit phase", _TimeCP/1000),
-	    %?TLOGN("Result of transaction: ~p", [TransRes]),
-	    if
-		TransRes == commit->
-		    %boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | commit | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
-		    %io:format("| ~p | ~f | ~f |~f | commit | ~p~n", [TID, _TimeRP/1000, _TimeIP/1000, _TimeCP/1000, _ItemsListLength]),
-		    tsend:send_to_client(Owner, SuccessFun({commit, ReadPhaseResult}));
-		true ->
-		    %boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | abort | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
-		    tsend:send_to_client(Owner, FailureFun(abort))
-	    end;
-	true ->
-	    ?TLOGN("Init Phase Failed ~p", [InitRes]),
-	    tsend:send_to_client(Owner, FailureFun(abort))
+    %% {_TimeIP, {InitRes, TMState2}} = timer:tc(transstore.tmanager, init_phase, [TMState1]),
+    {InitRes, TMState2} = tmanager:init_phase(TMState1),
+    %% ?TLOGN("init phase: initres ~p", [InitRes]),
+    case InitRes of
+        ok ->
+            erlang:send_after(config:tpFailureTimeout(), self(), {check_failed_tps}),
+            {_TimeCP, TransRes} = timer:tc(transstore.tmanager, start_commit, [TMState2]),
+            ?TIMELOG("commit phase", _TimeCP/1000),
+            %% ?TLOGN("Result of transaction: ~p", [TransRes]),
+            case TransRes of
+                commit ->
+                    %% boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | commit | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
+                    %% io:format("| ~p | ~f | ~f |~f | commit | ~p~n", [TID, _TimeRP/1000, _TimeIP/1000, _TimeCP/1000, _ItemsListLength]),
+                    tsend:send_to_client(Owner, SuccessFun({commit, ReadPhaseResult}));
+                _ ->
+                    %% boot_logger:transaction_log(io_lib:format("| ~p | ~f | ~f |~f | abort | ~p", [TID, TimeRP/1000, TimeIP/1000, TimeCP/1000, ItemsListLength])),
+                    tsend:send_to_client(Owner, FailureFun(abort))
+            end;
+        _ ->
+            ?TLOGN("Init Phase Failed ~p", [InitRes]),
+            tsend:send_to_client(Owner, FailureFun(abort))
     end.
 
 init_leader_state(TID, Items)->
@@ -160,14 +161,22 @@ init_leader_state(TID, Items)->
 
 
 %% Init Phase, lookup all transaction participants and replicated managers
-init_phase(TMState)->
-    TMMessage = {init_rtm, trecords:new_tm_message(TMState#tm_state.transID, {cs_send:this(), TMState#tm_state.items})},
+init_phase(TMState) ->
+    TMMessage = {init_rtm,
+                 trecords:new_tm_message(TMState#tm_state.transID,
+                                         {cs_send:this(),
+                                          TMState#tm_state.items})
+                },
     tsend:send_to_rtms_with_lookup(TMState#tm_state.transID, TMMessage),
-    
-    TPMessage = {lookup_tp, #tp_message{item_key = unknown, message={cs_send:this()}}},
+
+    TPMessage = {lookup_tp,
+                 #tp_message{item_key = unknown,
+                             message={cs_send:this()}
+                            }
+                },
     tsend:send_to_participants_with_lookup(TMState, TPMessage),
-    erlang:send_after(config:transactionLookupTimeout(), self(), {rtm_lookup_timeout}),
-    
+    erlang:send_after(config:transactionLookupTimeout(), self(),
+                      {rtm_lookup_timeout}),
     receive_lookup_rtms_tps_repl(TMState).
 
 receive_lookup_rtms_tps_repl(TMState)->
@@ -224,27 +233,27 @@ receive_lookup_rtms_tps_repl(TMState)->
 	    end
     end.
 
-%% ad a tp to the TMState
+%% add a tp to the TMState
 add_tp(TMState, ItemKey, OriginalKey, Address) ->
     %OriginalKey = ?RT:get_original_key(ItemKey),
-    Item = dict:fetch(OriginalKey, TMState#tm_state.items),
+    Item = trecords:items_get_item_by_key(TMState#tm_state.items, OriginalKey),
     TPs = Item#tm_item.tps,
     NewTPs = [{ItemKey, Address} | TPs],
     NewItem = Item#tm_item{tps = NewTPs},
-    TMState#tm_state{items = dict:store(OriginalKey, NewItem, TMState#tm_state.items)}.
+    TMState#tm_state{items =
+                     trecords:items_update_item(TMState#tm_state.items,
+                                                Item, NewItem)}.
 
 %% check whether we have enough TPs for all items
 check_tps(TMState, Limit) ->
-    dict:fold(fun(_Item, ItemValues, Accum) ->
-		      Accum andalso length(ItemValues#tm_item.tps) >= Limit
-	      end, true, TMState#tm_state.items).
-
+    lists:foldl(fun(ItemValues, Accum) ->
+                        Accum andalso length(ItemValues#tm_item.tps) >= Limit
+                end, true, TMState#tm_state.items).
 
 start_commit(TMState)->
     tsend:tell_rtms(TMState),
-    dict:map(fun(_Key, Item)-> 
-		     tsend:send_prepare_item(TMState, Item) end, 
-	     TMState#tm_state.items),
+    [ tsend:send_prepare_item(TMState, Item)
+      || Item <- TMState#tm_state.items ],
     loop(TMState).
 
 start_replicated_manager(Message, InstanceId)->
