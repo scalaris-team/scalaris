@@ -30,10 +30,10 @@
 -include("../chordsharp.hrl").
 
 -export([do_transaction/5,
-	 do_transaction_wo_readphase/6,
-	 generateTID/1,
-	 getRTMKeys/1,
-	 initRTM/2,
+         do_transaction_wo_readphase/6,
+         generateTID/1,
+         getRTMKeys/1,
+         initRTM/2,
          write/3,
          read/2,
          delete/2,
@@ -42,9 +42,9 @@
          do_parallel_reads/4,
          parallel_quorum_reads/3,
          quorum_read/2,
-         do_quorum_read/3,
-%        write_read_receive/3,
-         translog_new/0]).
+         do_quorum_read/3
+%        write_read_receive/3
+         ]).
 
 -import(config).
 -import(cs_lookup).
@@ -57,7 +57,7 @@
 -import(node).
 -import(process_dictionary).
 -import(?RT).
-
+-import(transstore.txlog).
 
 
 %%--------------------------------------------------------------------
@@ -111,42 +111,32 @@ read(Key, TransLog)->
     read_or_write(Key, 0, TransLog, read).
 
 read_or_write(Key, Value, TransLog, Operation) ->
-    ElementsInTransLog = [ X || {_, ElemKey, _, _, _} = X <- TransLog,
-                                Key == ElemKey ],
-    NumInLog = length(ElementsInTransLog),
+    ElementsInTransLog = txlog:filter_by_key(TransLog, Key),
     %% check whether we have already logged the item
-    if NumInLog > 1 ->
-            %% there should be only one entry per item
-            {{fail, fail}, TransLog};
-       NumInLog == 1 ->
+    case ElementsInTransLog of
+        [Element] ->
             %% retrieve the information from the log.
             %% for a write, update the value and the version number.
-            [Element] = ElementsInTransLog,
-            {LogOperation,LogKey,LogSuccess,LogValue,LogVersion} = Element,
-            if (LogSuccess == ok) and (Operation == write) ->
-                    NewVersion = case LogOperation of
-                                     write -> LogVersion;
-                                     read -> LogVersion + 1
-                                 end,
-                    NewElement = {write, LogKey, LogSuccess, Value, NewVersion},
-                    NewTransLog1 = lists:delete(Element, TransLog),
-                    NewTransLog2 = [NewElement | NewTransLog1],
-                    {ok, NewTransLog2};
-               (LogSuccess == ok) and (Operation == read) ->
-                    {{value, LogValue}, TransLog};
-               true ->
+            case {txlog:get_entry_status(Element),Operation} of
+                {ok, write} ->
+                    {ok, txlog:update_entry(TransLog, Element, write, Value)};
+                {ok, read} ->
+                    {{value, txlog:get_entry_value(Element)}, TransLog};
+                _ ->
                     {{fail, fail}, TransLog}
             end;
-       %% we do not have any information for the key in the log read the
-       %% information from remote
-       true ->
+        [] ->
+            %% we do not have any information for the key in the log read the
+            %% information from remote
             ReplicaKeys = ?RT:get_keys_for_replicas(Key),
             [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
             erlang:send_after(config:transactionLookupTimeout(), self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
             {Flag, Result} = write_read_receive(ReplicaKeys, Operation),
             if Flag == fail ->
-                    NewTransLog = [{Operation, Key, fail, 0, 0}| TransLog],
+                    NewTransLog =
+                        txlog:add_entry(TransLog,
+                          txlog:new_entry(Operation, Key, fail, 0, 0)),
                     {{fail, Result}, NewTransLog};
                true -> %% Flag == value
                     {ReadVal, Version} = Result,
@@ -154,12 +144,18 @@ read_or_write(Key, Value, TransLog, Operation) ->
                                                write -> {Version + 1, Value};
                                                read -> {Version, ReadVal}
                                            end,
-                    NewTransLog = [{Operation, Key, ok, NewVal, NewVersion} | TransLog],
+                    NewTransLog =
+                      txlog:add_entry(TransLog,
+                        txlog:new_entry(Operation, Key, ok, NewVal, NewVersion)),
+
                     case Operation of
                         write -> {ok, NewTransLog};
                         read -> {{value, NewVal}, NewTransLog}
                     end
-            end
+            end;
+        _ ->
+            %% there should be only one entry per item
+            {{fail, fail}, TransLog}
     end.
 
 %%--------------------------------------------------------------------
@@ -408,27 +404,27 @@ check_results_parallel([Head |Results], AllResults)->
             NumSuccessfulResponses = length(TMPResults),
             NumFailedResponses = length(TMPResultsFailed),
 
-	    if
-		NumSuccessfulResponses >= QuorumFactor ->
-		    MaxElem = get_max_element(TMPResults, {0,-1}),
-		    NewAllResults = lists:delete(Head, AllResults),
-		    NewAllResults2 = [{Key, ResKey, MaxElem} | NewAllResults],
-		    check_results_parallel(Results, NewAllResults2);
-		NumFailedResponses >= (QuorumFactor)->
-		    NewAllResults = lists:delete(Head, AllResults),
-		    NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
-		    check_results_parallel(Results, NewAllResults2);
-		true ->
-		    NumResponses = length(ResKey),
-		    if
-			NumResponses == ReplFactor ->
-			    NewAllResults = lists:delete(Head, AllResults),
-			    NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
-			    check_results_parallel(Results, NewAllResults2);
-			true ->
-			    continue
-		    end
-	    end
+            if
+                NumSuccessfulResponses >= QuorumFactor ->
+                    MaxElem = get_max_element(TMPResults, {0,-1}),
+                    NewAllResults = lists:delete(Head, AllResults),
+                    NewAllResults2 = [{Key, ResKey, MaxElem} | NewAllResults],
+                    check_results_parallel(Results, NewAllResults2);
+                NumFailedResponses >= (QuorumFactor)->
+                    NewAllResults = lists:delete(Head, AllResults),
+                    NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
+                    check_results_parallel(Results, NewAllResults2);
+                true ->
+                    NumResponses = length(ResKey),
+                    if
+                        NumResponses == ReplFactor ->
+                            NewAllResults = lists:delete(Head, AllResults),
+                            NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
+                            check_results_parallel(Results, NewAllResults2);
+                        true ->
+                            continue
+                    end
+            end
     end.
 
 get_max_element([], {ValMaxElement, VersMaxElement})->
@@ -442,16 +438,16 @@ get_max_element([{Value, Versionnr}|Rest], {ValMaxElement, VersMaxElement})->
 build_translog(Results)->
     EndResultAccum = [],
     lists:foldl(fun(Elem, Acc)->
-			{CurrKey, _ResultsForKey, {Value, Version}} = Elem,
-			if
-			    Version == -1 ->
-				[{read, CurrKey, fail, Value, Version}| Acc];
-			    true ->
-				[{read, CurrKey, ok, Value, Version}| Acc]
-			end
-		end,
-		EndResultAccum,
-		Results).
+                        {CurrKey, _ResultsForKey, {Value, Version}} = Elem,
+                        if
+                            Version == -1 ->
+                                [{read, CurrKey, fail, Value, Version}| Acc];
+                            true ->
+                                [{read, CurrKey, ok, Value, Version}| Acc]
+                        end
+                end,
+                EndResultAccum,
+                Results).
 
 
 %%====================================================================
@@ -535,14 +531,3 @@ delete_collect_results(ReplicaKeys, Source_PID, Results) ->
 				       Results}})
     end.
 
-%%===============================================================================
-%% Functions to manipulate TransLog's
-%%===============================================================================
-
-%%-------------------------------------------------------------------------------
-%% Function: new_translog/0
-%% Purpose:  create an empty list
-%% Returns:  empty list
-%%-------------------------------------------------------------------------------
-translog_new()->
-    trecords:new_translog().

@@ -26,12 +26,13 @@
 -include("trecords.hrl").
 -include("../chordsharp.hrl").
 
--export([new_tm_state/4, get_vote/3, store_vote/4, get_vote_acks/1, get_vote_acks/2, get_vote_acks/3, store_vote_acks/4, get_read_vote_acks/3, store_read_vote_acks/4, new_tm_item/4, new_translog/0, new_tm_message/2, new_vote/5, create_items/1]).
+-export([new_tm_state/4, get_vote/3, store_vote/4, get_vote_acks/1, get_vote_acks/2, get_vote_acks/3, store_vote_acks/4, get_read_vote_acks/3, store_read_vote_acks/4, new_tm_item/4, new_tm_message/2, new_vote/5, create_items/1]).
 %get_decision/3, store_decision/4, 
 %get_read_vote_acks/1, 
 -import(dict).
 -import(lists).
 -import(?RT).
+-import(transstore.txlog).
 
 %%--------------------------------------------------------------------
 %% Function: new_tm_state/4
@@ -253,15 +254,6 @@ new_tm_item(Key, Value, Version, Operation)->
 	     }.
 
 %%--------------------------------------------------------------------
-%% Function: new_translog/0
-%% Purpose:  create an empty list
-%% Returns:  empty list
-%%-------------------------------------------------------------------
-
-new_translog()->
-    [].
-
-%%--------------------------------------------------------------------
 %% Function: new_tm_message/2
 %% Purpose:  create a message sent by a tm
 %% Args:     TID - Transaction ID
@@ -301,10 +293,10 @@ new_vote(TID, Key, RN, Decision, TS)->
 %% Returns:  items dictionary
 %%-------------------------------------------------------------------
 create_items(TransLog)->
-    insert_item_list_dict(TransLog, dict:new()).
+    F = fun(Entry, Dict) ->
+                dict:store(txlog:get_entry_key(Entry),
+                           txlog:get_entry_as_tm_item(Entry),
+                           Dict)
+        end,
+    lists:foldl(F, dict:new(), TransLog).
 
-insert_item_list_dict([], Dict)->
-    Dict;
-insert_item_list_dict([{Operation, Key, _, Value, Version}|Rest], Dict) ->
-    Item = new_tm_item(Key, Value, Version, Operation),
-    insert_item_list_dict(Rest, dict:store(Key, Item, Dict)).

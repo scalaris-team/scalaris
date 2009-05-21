@@ -40,6 +40,7 @@
 -import(lists).
 -import(?RT).
 -import(timer).
+-import(transstore.txlog).
 
 -export([start_manager/6, start_manager_commit/6, start_replicated_manager/2]).
 
@@ -100,34 +101,26 @@ start_manager_commit(Items, SuccessFun, FailureFun, Owner, TID, InstanceId)->
 %% it can fail, due to an indication in the TFun given by the user
 %% or when operations on items fail, not catched by the user in the TFun
 read_phase(TFun)->
-    TLog = transstore.trecords:new_translog(),
-    {{TFunFlag, ReadVal}, TLog2} = try 
-				       TFun(TLog)
-				       catch {abort, State} ->
-					   State
-				   end,
-					       
+    TLog = transstore.txlog:new(),
+    {{TFunFlag, ReadVal}, TLog2} = try
+                                       TFun(TLog)
+                                   catch {abort, State} ->
+                                           State
+                                   end,
+
     %?TLOGN("TLOG in readphase ~p~n", [TLog2]),
     if
-	TFunFlag == ok ->
-	     FailedItems = lists:filter(fun({_,_, ItemResult, _, _}) ->
-					       if
-						   ItemResult == fail ->
-						       true;
-						   true ->
-						       false
-					       end
-					end, 
-					TLog2),
-	    NumFailedItems = length(FailedItems),
-	    if
-		NumFailedItems > 0 ->
-		    {fail, fail};
-		true ->
-		    {ok, {ReadVal, trecords:create_items(TLog2)}}
-	    end;  
-	true -> %%TFunFlag == abort/fail ReadVal not_found, timeout, fail
-	    {TFunFlag, ReadVal}
+        TFunFlag == ok ->
+            FailedItems = txlog:filter_by_status(TLog2, fail),
+            NumFailedItems = length(FailedItems),
+            if
+                NumFailedItems > 0 ->
+                    {fail, fail};
+                true ->
+                    {ok, {ReadVal, trecords:create_items(TLog2)}}
+            end;
+        true -> %%TFunFlag == abort/fail ReadVal not_found, timeout, fail
+            {TFunFlag, ReadVal}
     end.
 
 %% commit phase

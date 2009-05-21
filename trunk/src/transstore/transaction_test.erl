@@ -32,8 +32,11 @@
 
 -export([test_reads_writes/2, do_test_reads_writes_init/2, writer/3, reader/2, initiator_writer/4, initiator_reader/3]).
 
+-export([write2_read2/0]).
+
 -import(cs_send).
 -import(util).
+-import(ct).
 -import(boot_server).
 -import(boot_logger).
 -import(io).
@@ -481,9 +484,40 @@ reader(Word, Owner)->
 	    Message = {RF, RR}
     end,
     Owner ! {trresult, Result, Message, Word}.
-    
-    
-    
-	
-    
-    
+
+write2_read2() ->
+    KeyA = "1F80397E34E59658504DC8ABA29E47FF5A234271.MessageAttributes",
+    KeyB = "1F80397E34E59658504DC8ABA29E47FF5A234271.MessageBody",
+%    KeyA = 1,
+%    KeyB = 2,
+    ValueA = [{"am1","vm1"}],
+    ValueB = "VGhpcyBpcyB0aGUgbWVzc2FnZSBib2R5",
+%    ValueA = 1,
+%    ValueB = 2,
+    SuccessFun = fun(X) -> {success, X} end,
+    FailureFun = fun(Reason)-> {failure, Reason} end,
+
+    TWrite2 =
+        fun(TransLog)->
+                {ok, TransLog1} = transstore.transaction_api:write(KeyA, ValueA, TransLog),
+                {ok, TransLog2} = transstore.transaction_api:write(KeyB, ValueB, TransLog1),
+                {{ok, ok}, TransLog2}
+        end,
+    TRead2 =
+        fun(X)->
+                Res1 = transstore.transaction_api:read(KeyA, X),
+                ct:pal("Res1: ~p~n", [Res1]),
+                {{value, ValA}, Y} = Res1,
+                Res2 = transstore.transaction_api:read(KeyB, Y),
+                ct:pal("Res2: ~p~n", [Res2]),
+                {{value, ValB}, TransLog2} = Res2,
+                {{ok, ok}, TransLog2}
+        end,
+
+    {ResultW, TLogW} = transstore.transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
+    io:format("Write TLOG: ~p~n", [TLogW]),
+
+    {ResultR, TLogR} = transstore.transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
+    io:format("Read TLOG: ~p~n", [TLogR]),
+
+    ok.
