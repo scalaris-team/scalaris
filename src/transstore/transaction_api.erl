@@ -34,6 +34,7 @@
 -import(cs_send).
 -import(erlang).
 -import(io).
+-import(ct).
 -import(lists).
 -import(process_dictionary).
 -import(random).
@@ -152,7 +153,7 @@ do_transaction(TFun, SuccessFun, FailureFun)->
 %% Thus it is necessary to provide a proper list with items for TMItems
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
     {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
-    if 
+    if
 	Flag /= ok->
 	    fail;
 	true ->
@@ -219,7 +220,7 @@ read2(TransLog, Key) ->
     case read(Key, TransLog) of
 	{{fail, _Details}, _TransLog1} = Result ->
 	    throw({abort, Result});
-	{{value, Value}, TransLog1} = _Result ->
+	{{value, Value}, TransLog1} ->
 	    {Value, TransLog1}
     end.
 

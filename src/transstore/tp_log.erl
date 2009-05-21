@@ -14,8 +14,9 @@
 %%%-------------------------------------------------------------------
 %%% File    : tp_log.erl
 %%% Author  : Monika Moser <moser@zib.de>
-%%% Description : operations on the transaction log of a transaction participant 
-%%%               functions to extract certain information 
+%%% Description : operations on the transaction log of a transaction
+%%%               participant functions to extract certain information
+%%%
 %%% Created :  10 Jul 2007 by Monika Moser <moser@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Monika Moser <moser@zib.de>
@@ -38,7 +39,7 @@
 %%% Structure of the transaction log:
 %%% top gb_tree:  key: TransID
 %%%               value: Transaction data (transaction record)
-%%%       
+%%%
 
 new_item(Key, RKey, Value, Version, Operation, TransactionManagers) ->
     #item{
@@ -77,8 +78,8 @@ add_to_undecided(State, TransID, LogEntry)->
 				[LogEntry]
 			end,
     NewTransInLog = gb_trees:enter(TransID, NewTransInLogList, TransLog#translog.undecided),
-    cs_state:set_trans_log(State, TransLog#translog{undecided=NewTransInLog}).   
-    
+    cs_state:set_trans_log(State, TransLog#translog{undecided=NewTransInLog}).
+
 remove_from_undecided(State, TransID, TransLog, TransLogUndecided)->
     NewLogEntries = gb_trees:delete(TransID, TransLogUndecided),
     cs_state:set_trans_log(State, TransLog#translog{undecided=NewLogEntries}).

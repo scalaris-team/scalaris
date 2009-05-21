@@ -26,8 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([process_request_list/2, read/1, write/2, delete/1, 
-	 test_and_set/3, range_read/2]).
+-export([process_request_list/2, read/1, write/2, delete/1,
+         test_and_set/3, range_read/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface

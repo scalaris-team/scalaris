@@ -69,7 +69,7 @@ handler(delete, [Key]) ->
     end;
 
 handler(req_list, [Param]) ->
-    handler(req_list, [translog_to_json(transstore.trecords:new_translog()), Param]);
+    handler(req_list, [translog_to_json(transstore.txlog:new()), Param]);
 
 handler(req_list, [TransLog, {array, ReqList}]) ->
     % convert req-list to clean reqlist without json artefacts
