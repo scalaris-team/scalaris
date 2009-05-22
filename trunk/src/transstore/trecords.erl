@@ -113,15 +113,16 @@ new_tm_state(TransID, Items, Leader, Self)->
                                  Items),
     #tm_state{transID = TransID,
               items = Items,
+              numitems = length(Items),
               leader = Leader,
               myBallot = 0,
               rtms = [Self], %% the replicated transaction managers
+              rtms_found = 1,
               votes = NewVotes,
               vote_acks = NewVoteAcks,
               read_vote_acks = NewRVAcks,
-                                                %decisions = NewDecisions,
-              rtms_found = false,
-              tps_found = false,
+              %% decisions = NewDecisions,
+              tps_found = 0,
               status = collecting,
               decision = undecided
              }.
@@ -183,9 +184,9 @@ store_vote_acks(TMState, Key, RKey, Ack)->
     VoteAcks = TMState#tm_state.vote_acks,
     RKeyDict = dict:fetch(Key, VoteAcks),
     RKeyAcks = dict:fetch(RKey, RKeyDict),
-    
+
     NewRKeyAcks = [Ack | RKeyAcks],
-    
+
     NewRKeyDict = dict:store(RKey, NewRKeyAcks, RKeyDict),
     NewVoteAcks = dict:store(Key, NewRKeyDict, VoteAcks),
     TMState#tm_state{vote_acks = NewVoteAcks}.
@@ -209,7 +210,7 @@ get_read_vote_acks(TMState, Key, RKey)->
 store_read_vote_acks(TMState, Key, RKey, Ack)->
     RVAcks = TMState#tm_state.read_vote_acks,
     RKeyAcks = dict:fetch(RKey, RVAcks),
-    
+
     NewRKeyAcks = [Ack | RKeyAcks],
 
     NewVoteAcks = dict:store(RKey, NewRKeyAcks, RVAcks),
@@ -233,7 +234,7 @@ store_read_vote_acks(TMState, Key, RKey, Ack)->
 %% Purpose:  create a record with the state of the tm
 %% Args:     Key - the key
 %%           Value - the value
-%%           Version - the version 
+%%           Version - the version
 %%           Operation - read/write
 %% Returns:  record tm_item
 %%-------------------------------------------------------------------
@@ -243,7 +244,8 @@ new_tm_item(Key, Value, Version, Operation) ->
              value = Value,
              version = Version,
              operation = Operation,
-             tps = [] %% list with tuple: {key_of_replica, tpPID}
+             tps = [], %% list with tuple: {key_of_replica, tpPID}
+             tps_found = 0
      }.
 
 %%--------------------------------------------------------------------
