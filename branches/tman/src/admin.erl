@@ -90,7 +90,7 @@ check_ring_foldl({ok, Node}, PredsSucc) ->
 	MyId == PredsSucc ->
 	    get_id(hd(node_details:succlist(Node)));
 	true ->
-	    {error, lists:flatten(io_lib:format("~.16B didn't match ~.16B", [MyId, PredsSucc]))}
+	    {error, lists:flatten(io_lib:format("~p didn't match ~p", [MyId, PredsSucc]))}
     end.
 
 

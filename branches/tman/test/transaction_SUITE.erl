@@ -28,11 +28,11 @@
 -include("unittest.hrl").
 
 all() ->
-    [read, write, write_read, tfuns, multi_write].
+    [read, write, write_read, write2_read2, tfuns, multi_write].
 
 suite() ->
     [
-     {timetrap, {seconds, 30}}
+     {timetrap, {seconds, 40}}
     ].
 
 init_per_suite(Config) ->
@@ -57,6 +57,39 @@ write(_Config) ->
 write_read(_Config) ->
     ?equals(transstore.transaction_api:single_write("Key", "Value"), commit),
     ?equals(transstore.transaction_api:quorum_read("Key"), {"Value", 0}),
+    ok.
+
+write2_read2(_Config) ->
+    KeyA = "KeyA",
+    KeyB = "KeyB",
+    ValueA = "Value1",
+    ValueB = "Value2",
+    SuccessFun = fun(X) -> {success, X} end,
+    FailureFun = fun(Reason)-> {failure, Reason} end,
+
+    TWrite2 = 
+        fun(TransLog)->
+                {ok, TransLog1} = transstore.transaction_api:write(KeyA, ValueA, TransLog),
+                {ok, TransLog2} = transstore.transaction_api:write(KeyB, ValueB, TransLog1),
+                {{ok, ok}, TransLog2}
+        end,
+    TRead2 = 
+        fun(X)->
+                Res1 = transstore.transaction_api:read(KeyA, X),
+                ct:pal("Res1: ~p~n", [Res1]),
+                {{value, ValA}, Y} = Res1,
+                Res2 = transstore.transaction_api:read(KeyB, Y),
+                ct:pal("Res2: ~p~n", [Res2]),
+                {{value, ValB}, TransLog2} = Res2,
+                {{ok, ok}, TransLog2}
+        end,
+
+    {ResultW, TLogW} = transstore.transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
+    ct:pal("Write TLOG: ~p~n", [TLogW]),
+    ?equals(ResultW, success),
+    {ResultR, TLogR} = transstore.transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
+    ct:pal("Read TLOG: ~p~n", [TLogR]),
+    ?equals(ResultR, success),
     ok.
 
 multi_write(_Config) ->

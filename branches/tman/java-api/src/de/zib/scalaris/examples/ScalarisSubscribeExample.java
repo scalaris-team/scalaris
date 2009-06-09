@@ -23,7 +23,7 @@ import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Provides an example for using the {@code subscribe} methods of the
+ * Provides an example for using the <tt>subscribe</tt> methods of the
  * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -33,9 +33,9 @@ import de.zib.scalaris.UnknownException;
 public class ScalarisSubscribeExample {
 	/**
 	 * Subscribes a given URL to a given topic, both provided on the command
-	 * line, with the {@code subscribe} methods of {@link Scalaris}.<br />
-	 * If no URL or topic is given, the default URL {@code "url"} and the
-	 * default topic {@code "topic"} is used.
+	 * line, with the <tt>subscribe</tt> methods of {@link Scalaris}.<br />
+	 * If no URL or topic is given, the default URL <tt>"url"</tt> and the
+	 * default topic <tt>"topic"</tt> is used.
 	 * 
 	 * @param args
 	 *            command line arguments (first argument can be an optional

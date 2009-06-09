@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,6 +54,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * </p>
  * 
  * <h3>Example:</h3>
+ * <pre>
  * <code style="white-space:pre;">
  *   OtpErlangString otpKey;
  *   OtpErlangString otpValue;
@@ -74,6 +75,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   
  *   transaction.commit(); // {@link #commit()}
  * </code>
+ * </pre>
  * 
  * <p>
  * For more examples, have a look at {@link de.zib.scalaris.examples.TransactionReadExample},
@@ -272,12 +274,12 @@ public class Transaction {
 	}
 
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <code>key</code>.
 	 * 
 	 * @param key
 	 *            the key to look up
 	 *
-	 * @return the value stored under the given {@code key} as a raw erlang type
+	 * @return the value stored under the given <code>key</code> as a raw erlang type
 	 * 
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
@@ -341,12 +343,12 @@ public class Transaction {
 	}
 
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <code>key</code>.
 	 * 
 	 * @param key
 	 *            the key to look up
 	 *
-	 * @return the (string) value stored under the given {@code key}
+	 * @return the (string) value stored under the given <code>key</code>
 	 * 
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
@@ -376,7 +378,7 @@ public class Transaction {
 	}
 
 	/**
-	 * Gets the value stored under the given {@code key}.
+	 * Gets the value stored under the given <code>key</code>.
 	 * 
 	 * @param key
 	 *            the key to look up
@@ -409,7 +411,7 @@ public class Transaction {
 	}
 
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <code>key</code>/<code>value</code> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for
@@ -475,7 +477,7 @@ public class Transaction {
 	}
 
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <code>key</code>/<code>value</code> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for
@@ -500,7 +502,7 @@ public class Transaction {
 	}
 	
 	/**
-	 * Stores the given {@code key}/{@code value} pair.
+	 * Stores the given <code>key</code>/<code>value</code> pair.
 	 * 
 	 * @param key
 	 *            the key to store the value for

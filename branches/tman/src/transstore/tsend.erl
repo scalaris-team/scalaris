@@ -31,7 +31,16 @@
 -include("trecords.hrl").
 -include("../chordsharp.hrl").
 
--export([send/2, send_to_rtms_with_lookup/2, send_to_participants_with_lookup/2, send_to_participants/2, send_to_rtms/2, send_to_tp/2, tell_rtms/1, send_to_client/2, send_prepare_item/2, send_vote_to_rtms/2]).
+-export([send/2,
+         send_to_rtms_with_lookup/2,
+         send_to_participants_with_lookup/2,
+         send_to_participants/2,
+         send_to_rtms/2,
+         send_to_tp/2,
+         tell_rtms/1,
+         send_to_client/2,
+         send_prepare_item/2,
+         send_vote_to_rtms/2]).
 
 -import(cs_lookup).
 -import(cs_send).
@@ -47,80 +56,75 @@ send_to_rtms_with_lookup(TID, Message)->
     RTMKeys = transaction:getRTMKeys(TID),
     ?TLOG("sent_to_rtms_with_lookup"),
     {MessName, TMMessage} = Message,
-    lists:map(fun(RKey) -> 
-		      NewTMMessage = TMMessage#tm_message{tm_key = RKey},
-		      cs_lookup:unreliable_lookup(RKey, {MessName, NewTMMessage})
-	      end,
-	      RTMKeys).
+    F = fun(X) -> NewTMMessage = TMMessage#tm_message{tm_key = X},
+                  cs_lookup:unreliable_lookup(X, {MessName, NewTMMessage})
+        end,
+    [ F(RKey) || RKey <- RTMKeys ].
 
 send_to_participants_with_lookup(TMState, Message)->
     ?TLOG("sent_to_participants_with_lookup"),
-    Keys = dict:fetch_keys(TMState#tm_state.items),
-    lists:map(fun(Key)-> send_to_replica_with_lookup(Key, Message) end, Keys).
+    Keys = trecords:items_get_keys(TMState#tm_state.items),
+    [ send_to_replica_with_lookup(Key, Message) || Key <- Keys ].
 
 send_to_replica_with_lookup(Key, Message)->
     ?TLOG("send_to_replica_with_lookup"),
     ReplKeys = ?RT:get_keys_for_replicas(Key),
     {MessName, MessText} = Message,
-    lists:map(fun(RKey) -> 
-		      NewMessText = MessText#tp_message{item_key = RKey, orig_key = Key},
-		      cs_lookup:unreliable_lookup(RKey, {MessName, NewMessText})
-	      end, 
-	      ReplKeys).
+    F = fun(XKey) -> NewMessText =
+                      MessText#tp_message{item_key = XKey, orig_key = Key},
+                  cs_lookup:unreliable_lookup(XKey, {MessName, NewMessText})
+        end,
+    [ F(RKey) || RKey <- ReplKeys ].
 
 send_to_participants(TMState, Message)->
-    dict:map(fun(_Key, Item) ->
-		     send_to_tp(Item, Message) end, TMState#tm_state.items).
+    [ send_to_tp(Item, Message) || Item <- TMState#tm_state.items ].
 
 send_to_rtms(TMState, Message) ->
-    [ cs_send:send(Address, Message) ||
-        {_Key, Address, _ } <- TMState#tm_state.rtms ].
+    [ cs_send:send(Address, Message)
+      || {_Key, Address, _ } <- TMState#tm_state.rtms ].
 
 send(Address, Message)->
     cs_send:send(Address, Message).
 
 send_vote_to_rtms(RTMS, Vote)->
     Me = cs_send:this(),
-    [ cs_send:send(Address, {vote, Me, Vote}) ||
-        {_, Address, _} <- RTMS ].
+    [ cs_send:send(Address, {vote, Me, Vote})
+      || {_, Address, _} <- RTMS ].
 
 send_to_tp(Item, Message)->
     {MessName, MessText} = Message,
-    lists:map(fun({RKey, TP})->
-		      NewMessText = MessText#tp_message{item_key = RKey},
-		      cs_send:send(TP, {MessName, NewMessText}) end, Item#tm_item.tps).
-
+    F = fun(X, Y) -> NewMessText = MessText#tp_message{item_key = X},
+                     cs_send:send(Y, {MessName, NewMessText}) 
+        end,
+    [ F(RKey, TP) || {RKey, TP} <- Item#tm_item.tps ].
 
 %@private
 %% get_pid(Id) ->
 %%     InstanceId = erlang:get(instance_id),
 %%     if
-%% 	InstanceId == undefined ->
-%% 	    io:format("~p~n", [util:get_stacktrace()]);
-%% 	true ->
-%% 	    ok
+%%       InstanceId == undefined ->
+%%       io:format("~p~n", [util:get_stacktrace()]);
+%%     true ->
+%%       ok
 %%     end,
 %%     process_dictionary:lookup_process(InstanceId, Id).
 
 tell_rtms(TMState)->
-    lists:map(fun({_Key, Address, Ballot})->
-		      cs_send:send(Address, {rtms, TMState#tm_state.rtms, Ballot})
-	      end,
-	      TMState#tm_state.rtms).
+    [ cs_send:send(Address, {rtms, TMState#tm_state.rtms, Ballot})
+      ||  {_Key, Address, Ballot} <- TMState#tm_state.rtms ].
 
 send_to_client(Pid, Message)->
     cs_send:send(Pid, {trans, Message}).
 
-send_prepare_item(TMState, Item)->
-    TPs = Item#tm_item.tps,
-    lists:map(fun({RKey, TP}) -> 
-		      NItem = tp_log:new_item(Item#tm_item.key, 
-							  RKey, 
-							  Item#tm_item.value,
-							  Item#tm_item.version, 
-							  Item#tm_item.operation, 
-							  TMState#tm_state.rtms),
-		      Message = {validate, TMState#tm_state.transID, NItem},
-		      cs_send:send(TP, Message) 
-	      end, 
-	      TPs).
+send_prepare_item(TMState, Item) ->
+    F = fun(XKey,XTP) ->
+                NItem = tp_log:new_item(Item#tm_item.key,
+                                        XKey,
+                                        Item#tm_item.value,
+                                        Item#tm_item.version,
+                                        Item#tm_item.operation,
+                                        TMState#tm_state.rtms),
+                Message = {validate, TMState#tm_state.transID, NItem},
+                cs_send:send(XTP, Message)
+        end,
+    [ F(RKey, TP) || {RKey, TP} <- Item#tm_item.tps ].

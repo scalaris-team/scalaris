@@ -22,6 +22,7 @@
 \usepackage{graphicx}
 %\usepackage{color}
 %\usepackage{colortbl}
+\usepackage{longtable}
 \usepackage{makeidx}
 \usepackage{fancyhdr}
 \usepackage{fancyvrb}
@@ -191,6 +192,40 @@ limitations under the License.
 
 \part{Users Guide}
 
+\chapter{Introduction}
+
+Scalaris is a scalable, transactional, distributed key-value store based on
+the peer-to-peer principle. It can be used to build scalable Web 2.0
+services. The concept of Scalaris is quite simple: Its architecture consists
+of three layers.
+
+It provides self-management and scalability by replicating services and data
+among peers. Without system interruption it scales from a few PCs to
+thousands of servers. Servers can be added or removed on the fly without any
+service downtime.
+
+\begin{center}
+\includegraphics[width=0.7\linewidth]{layers}
+\end{center}
+
+Scalaris takes care of:
+
+\begin{itemize}
+\item Fail-over
+\item Data distribution
+\item Replication
+\item Strong consistency
+\item Transactions
+\end{itemize}
+
+
+
+The Scalaris project was initiated by Zuse Institute Berlin and onScale
+solutions and is partly funded by the EU projects Selfman and
+XtreemOS. Additional information (papers, videos) can be found at
+\url{http://www.zib.de/CSR/Projects/scalaris} and
+\url{http://www.onscale.de/scalaris.html}.
+
 \chapter{Download and Installation}
 
 \section{Requirements}
@@ -203,7 +238,6 @@ required which are not included in the \scalaris{} sources:
 \setlength{\parskip}{0pt}
 \item Erlang R12
 \item Erlang OTP (included in Erlang R12)
-\item Erlang yaws
 \item GNU Make
 \end{itemize}
 
@@ -243,7 +277,7 @@ Releases can be found under the 'Download' tab on the web-page.
 
 \section{Configuration}
 
-\scalaris{} reads the two configuration files from the working directory:
+\scalaris{} reads two configuration files from the working directory:
 \code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
 (optional). The former defines default settings and is included in the
 release. The latter can be created by the user to alter settings.  A sample
@@ -257,40 +291,49 @@ contacted to join the system.
 
 \section{Build}
 
-%\subsection{Windows (Win32)}
-% \begin{enumerate}
-% \setlength{\itemsep}{0pt}
-% \setlength{\parskip}{0pt}
-% \item Copy \code{make.exe} from \code{contrib/win32} to \code{src} 
-% \item Copy \code{Makefile_to_src} from \code{contrib/win32} to \code{src} 
-% \item Copy \code{Makefile_to_src_comm_layer} from \code{contrib/win32} to \code{src/comm_layer} 
-% \item Copy \code{Makefile_to_src_transstore} from \code{contrib/win32} to \code{src/transstore} 
-% \item Rename Makefiles
-% \item Open MS-DOS Command Shell 
-% \item Go into \code{src} directory 
-% \item Call \code{make}
-% \item Go into bin directory 
-% \item Call \code{boot.bat}
-% \end{enumerate}
-% 
-% \subsubsection{Troubleshooting}
-% Check path to Erlang Installation in Makefiles.
-
 \subsection{Linux}
 
-Read the file \code{README} in the main \scalaris{} checkout directory.
+\scalaris{} uses autoconf for configuring the build environment and
+GNU Make for building the code.
+
+\begin{lstlisting}[language=sh]
+%> ./configure
+%> make
+%> make docs
+\end{lstlisting}
+
+For more details read \code{README} in the main \scalaris{} checkout
+directory.
+
+\subsection{Windows}
+
+We are currently not supporting \scalaris{} on Windows. However, we
+have two small {\tt bat} files for building and running a boot
+server. It seems to work but we make no guarantees.
+
+\begin{itemize}
+\item Install Erlang
+\item Install OpenSSL (for crypto module)
+\item Checkout scalaris code from SVN
+\item copy an appropriate EMakefile\_for from \code{contrib/win32} to the trunk-directory
+\item Adapt the path to your Erlang installation in build.bat
+\item run build.bat
+\item Go to the bin sub-directory
+\item Adapt the path to your Erlang installation in boot.bat
+\item run boot.bat
+\end{itemize}
 
 \subsection{Java-API}
 
 The following commands will build the Java API for \scalaris{}:
 \begin{lstlisting}[language=sh]
-%> cd java-api
-%> ant
+%> make java
 \end{lstlisting}
 
-This will build chordsharp4j.jar, which is the library for accessing
+This will build scalaris.jar, which is the library for accessing
 the overlay network. Optionally, the documentation can be build:
 \begin{lstlisting}[language=sh]
+%> cd java-api
 %> ant doc
 \end{lstlisting}
 
@@ -326,17 +369,17 @@ couple of seconds a first \scalaris{} should have started in the boot server
 and the number should increase to one. The main page will also allow you to
 store and retrieve key-value pairs.
 
-The boot server should show output similar to the following, when
-starting the first \scalaris{} nodes. The first line is printed when
-the \scalaris{} is spawned. Afterwards it will try to connect the
-boot server. When the third line is printed, it managed to contact the
-boot server and joined the ring. In this case, it was the first node
-in the ring.
-\begin{lstlisting}
-[ I | Node   | <0.97.0> ] joining "23947834870"
-[ I | Node   | <0.97.0> ] join as first [50,51,57,52,55,56,51,52,56,55,48]
-[ I | Node   | <0.97.0> ] joined
-\end{lstlisting}
+%The boot server should show output similar to the following, when
+%starting the first \scalaris{} nodes. The first line is printed when
+%the \scalaris{} is spawned. Afterwards it will try to connect the
+%boot server. When the third line is printed, it managed to contact the
+%boot server and joined the ring. In this case, it was the first node
+%in the ring.
+%\begin{lstlisting}
+%[ I | Node   | <0.97.0> ] joining "23947834870"
+%[ I | Node   | <0.97.0> ] join as first [50,51,57,52,55,56,51,52,56,55,48]
+%[ I | Node   | <0.97.0> ] joined
+%\end{lstlisting}
 
 In a second shell, you can now start a second \scalaris{} node. This
 will be a `regular server'. Go in the bin directory:
@@ -369,46 +412,313 @@ This will add 3 nodes to the network. The web pages at
 
 \subsection{Running distributed}
 
-\scalaris{} can be installed on other machines in the same way as described
-in Sect.~\ref{sec:install}. Please make sure, that the
-\code{scalaris.local.cfg} refers to available boot servers. Otherwise the
-other nodes will not find the boot server. On the remote nodes, you only
-need to call \code{./cs_local.sh} and they will automatically contact the
+\scalaris{} can be installed on other machines in the same way as
+described in Sect.~\ref{sec:install}. In the default configuration,
+nodes will look for the boot server on localhost on port 14195. You
+should create a \code{scalaris.local.cfg} pointing to the node running
+the boot server.
+
+\begin{lstlisting}[language=Erlang]
+% Insert the appropriate IP-addresses for your setup
+% as comma separated integers:
+% IP Address, Port, and label of the boot server
+{boot_host, {{127,0,0,1},14195,boot}}.
+\end{lstlisting}
+
+If you are using the default configuration on the boot server it will
+listen on port 14195 and you only have to change the IP address in the
+configuration file. Otherwise the other nodes will not find the boot
+server. On the remote nodes, you only need to call
+\code{./cs_local.sh} and they will automatically contact the
 configured boot server.
 
-\subsection{Running on PlanetLab}
+%\subsection{Running on PlanetLab}
 
-\subsection{Replication Degree}
+%\subsection{Replication Degree}
 
-\subsection{Routing Scheme}
+%\subsection{Routing Scheme}
 
 \section{Installation}
 \label{sec:install}
 
-Note: there is no \code{make install} at the moment! The nodes have
-to be started from the bin directory.
+For simple tests, you do not need to install \scalaris{}. You can run
+it directly from the source directory. Note: \code{make install} will
+install scalaris into \code{/usr/local}. But is more convenient to
+build RPMs and install those.
 
+\begin{lstlisting}{language=sh}
+svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
+tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1 --exclude-vcs
+cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
+rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
+\end{lstlisting}
 
+Your source and binary rpm will be generated in
+/usr/src/packages/SRPMS and RPMS.  We also build rpms using checkouts
+from svn and provide them using the openSUSE BuildService at
+http://download.opensuse.org/repositories/home:/tschuett/. RPM
+packages are available for
 
+\begin{itemize}
+\item Fedora 9, 10,
+\item Mandriva 2008, 2009,
+\item openSUSE 11.0, 11.1,
+\item SLE 10, 11,
+\item CentOS 5 and
+\item RHEL 5.
+\end{itemize}
+
+Inside those repositories you will also find an erlang rpm - you don't
+need this if you already have a recent enough erlang version!
+
+\section{Logging}
+\label{sec:logging}
+
+\scalaris{} uses the log4erl library (see \code{contrib/log4erl} for
+logging status information and error messages. The log level can be
+configured in \code{bin/scalaris.cfg}.  The default value is {\tt
+  error}; only errors and severe problems are logged.
+
+\begin{lstlisting}[language=Erlang]
+%% @doc Loglevel: debug < info < warn < error < fatal < none
+{log_level, error}.
+\end{lstlisting}
+
+In some cases, it might be necessary to get more complete logging
+information, e.g. for debugging. In \sieheref{sec:start-addit-local},
+we are explaining the startup process of \scalaris nodes in more
+detail, here the {\tt info} level provides more detailed information.
+
+\begin{lstlisting}[language=Erlang]
+%% @doc Loglevel: debug < info < warn < error < fatal < none
+{log_level, info}.
+\end{lstlisting}
 
 \chapter{Using the system}
 
-\section{Erlang}
+\section{JSON API}
+
+\scalaris{} supports a JSON API for transactions. To minimize the necessary
+round trips between a client and \scalaris{}, it uses request lists, which
+contain all requests that can be done in parallel. The request list is then
+send over to a \scalaris{} node with a POST message. The result is an opaque
+TransLog and a list containing the results of the requests. To add further
+requests to the transaction, the TransLog and another list of requests may
+be send to \scalaris{}.  This process may be repeated as necessary. To finish
+the transaction, the request list can contain a 'commit' request as last
+element, which triggers the validation phase of the transaction processing.
+
+The JSON-API can be accessed via the \scalaris-Web-Server running on port
+8000 by default and the page \code{jsonrpc.yaws} (For example at:
+\url{http://localhost:8000/jsonrpc.yaws}).  The following example
+illustrates the message flow:
+
+\begin{longtable}{p{0.45\textwidth}cp{0.45\textwidth}}
+\bf Client & & \bf \scalaris{} node \\
+Make a transaction, that sets two keys:
+\begin{lstlisting}[language=java]
+{
+  "method":"req_list",
+  "version":"1.1",
+  "params":
+    [
+      [
+        { "write":{"keyA":"valueA"} },
+        { "write":{"keyB":"valueB"} },
+        { "commit":"commit" }
+      ]
+    ],
+  "id":0
+}
+\end{lstlisting}
+& $\to$
+& \\
+
+& $\leftarrow$ &
+\scalaris{} sends results back
+\begin{lstlisting}[language=java]
+{ "result":
+  { "results":
+      [
+        { "op":"commit",
+          "value":"ok",
+          "key":"ok" },
+        { "op":"write",
+          "value":"valueB",
+          "key":"keyB" },
+        { "op":"write",
+          "value":"valueA",
+          "key":"keyA" }
+      ],
+    "translog":
+     [...]
+  },
+  "id" : 0
+}
+\end{lstlisting}
+\\
+
+In a second transaction: Read the two keys
+\begin{lstlisting}[language=java]
+{
+  "method":"req_list",
+  "version":"1.1",
+  "params":
+    [
+      [
+        { "read":"keyA" },
+        { "read":"keyB" }
+      ]
+    ]
+  "id":0
+}
+\end{lstlisting}
+& $\to$ & \\
+
+& $\leftarrow$ &
+\scalaris{} sends results back
+\begin{lstlisting}[language=java]
+{ "result":
+  {"results":
+    [
+      { "op":"read",
+        "value":"valueB",
+        "key":"keyB" },
+      { "op":"read",
+        "value":"valueA",
+        "key":"keyA" }
+    ],
+   "translog":
+    [...] // this list is the translog
+          // for further operations!
+          // We name it TLOG here.
+  },
+  "id" : 0
+}
+\end{lstlisting}\\
+
+Calculate something with the read values and make further requests, here a
+write and the commit for the whole transaction. Include also the latest
+translog we got from \scalaris{} (named \code{TLOG} here).
+
+\begin{lstlisting}[language=java]
+{
+  "method":"req_list",
+  "version":"1.1",
+  "params":
+    [
+      TLOG, // translog from prev. result.
+      [
+        { "write":{"keyA":"valueA2"} },
+        { "commit":"commit" }
+      ]
+    ],
+  "id" : 0
+}
+\end{lstlisting}
+& $\to$ & \\
+
+& $\leftarrow$ &
+\scalaris{} sends results back
+\begin{lstlisting}[language=java]
+{ "result":
+  { "results":
+    [ { "op":"commit",
+        "value":"ok",
+        "key":"ok" },
+      { "op":"write",
+        "value":"valueA2",
+        "key":"keyA" }
+    ],
+    "translog":
+    [...]
+  },
+  "id" : 0
+}
+\end{lstlisting}\\
+\end{longtable}
+
+A sample usage of the JSON API using Ruby can be found in \code{contrib/jsonrpc.rb}.
+
+A single request list must not contain a key more than once!
+
+The allowed requests are:
+\begin{lstlisting}[language=java]
+{ "read":"any_key" }
+
+{ "write":{"any_key":"any_value"} }
+
+{ "commit":"commit" }
+\end{lstlisting}
+
+The possible results are:
+\begin{lstlisting}[language=java]
+{ "op":"read", "key":"any_key", "value":"any_value" }
+{ "op":"read", "key":"any_value", "fail":"reason" } // 'not_found' or 'timeout'
+
+{ "op":"write",  "key":"any_key", "value":"any_value" }
+{ "op":"read", "key":"any_key", "fail":"reason" }
+
+{ "op":"commit", "value":"ok", "key":"ok" }
+{ "op":"commit", "value":"fail", "fail":"reason" }
+\end{lstlisting}
+
+\subsection{Deleting a key}
+
+Outside transactions keys can also be deleted, but it has to be done with
+care, as explained in the following thread on the mailing list:
+\url{http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799}.
+
+\begin{lstlisting}[language=java]
+{
+  "method":"delete",
+  "version":"1.1",
+  "params":
+    [
+      { "key":"any_key" }
+    ],
+  "id" : 0
+}
+\end{lstlisting}
+
+Two sample results
+
+\begin{lstlisting}[language=java]
+{ "result":
+  { "ok":2, // how many replicas were deleted successsfully
+    "results": [ "ok", "ok", "locks_set", "undef" ]
+  }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=java]
+{ "result":
+  { "failure":"reason" }
+}
+\end{lstlisting}
+
+
+%\section{Erlang}
 
 \section{Java command line interface}
 
-The jar file contains a small command line interface client.
+The jar file contains a small command line interface client. For
+convenience, we provide a wrapper script called \code{scalaris} which
+setups the Java environment:
 
 \begin{lstlisting}[language=sh]
-%> java -jar chordsharp4j.jar -help
-usage: chordsharp
- -getsubscribers <topic>   get subscribers of a topic
- -help                     print this message
- -publish <params>         publish a new message for a topic: <topic>
-                           <message>
- -read <key>               read an item
- -subscribe <params>       subscribe to a topic: <topic> <url>
- -write <params>           write an item: <key> <value>
+%> cd java-api
+%> ./scalaris -help
+usage: scalaris
+ -g,--getsubscribers <topic>   get subscribers of a topic
+ -help                         print this message
+ -minibench                    run mini benchmark
+ -p,--publish <params>         publish a new message for a topic: <topic>
+                               <message>
+ -r,--read <key>               read an item
+ -s,--subscribe <params>       subscribe to a topic: <topic> <url>
+ -u,--unsubscribe <params>     unsubscribe from a topic: <topic> <url>
+ -w,--write <params>           write an item: <key> <value>
 \end{lstlisting}
 
 Read and write can be used to read resp. write from/to the
@@ -416,25 +726,55 @@ overlay. getsubscribers, publish, and subscribe are the PubSub
 functions.
 
 \begin{lstlisting}[language=sh]
-%> java -jar chordsharp4j.jar -write foo bar
+%> ./scalaris -write foo bar
 write(foo, bar)
-%> java -jar chordsharp4j.jar -read foo
+%> ./scalaris -read foo
 read(foo) == bar
 \end{lstlisting}
 
-The chordsharp4j library requires that you are running a `regular server' on
+The scalaris library requires that you are running a `regular server' on
 the same node. Having a boot server running on the same node is not
 sufficient.
 
 \section{Java API}
+
+The \code{scalaris.jar} provides the command line client as well as a
+library for Java programs to access \scalaris{}. The library provides two classes:
+
+\begin{itemize}
+\item \code{Scalaris} provides a high-level API similar to the command line client.
+\item \code{Transaction} provides a low-level API to the transaction
+  mechanism.
+\end{itemize}
+
+For details we refer the reader to the Javadoc:
+
+\begin{lstlisting}[language=sh]
+%> cd java-api
+%> ant doc
+%> firefox doc/index.html
+\end{lstlisting}
 
 \chapter{Testing the system}
 
 \section{Running the unit tests}
 There are some unit tests in the \code{test} directory. You can call them
 by running \code{make test} in the main directory. The results are stored
-in a local \code{index.html} file. The tests use the \code{common-test}
-package from the Erlang system.
+in a local \code{index.html} file. 
+
+The tests are implemented with the \code{common-test} package from the
+Erlang system. For running the tests we rely on \code{run\_test},
+which is part of the \code{common-test} package, but is not installed
+by default. \code{configure} will check whether \code{run\_test} is
+available. If it is not installed, it will show a warning and a short
+description of how to install the missing file.
+
+Note: for the unit tests, we are setting up and shutting down several
+overlay networks. During the shut down phase, the runtime environment
+will print extensive error messages. These error messages do not
+indicate that tests failed! Running the complete test suite takes
+about 5 minutes. Only when the complete suite finished, it will
+present statistics on failed and successful tests.
 
 \part{Developers Guide}
 
@@ -460,26 +800,33 @@ calls itself using tail-recursion in each branch. The loop works on a
 \code{State}, which can be modified when a message is handled.
 
 \section{Starting additional local nodes after boot}
+\label{sec:start-addit-local}
 
 After booting a new \scalaris-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
 by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the boot
-process opened.
+process opened~\footnote{Increase the log level to {\tt info} to get
+  the detailed startup logs. See Sect.~\sieheref{sec:logging}}.
 
 
 \lstset{language=Erlang}
 \begin{lstlisting}
 scalaris/bin> ./boot.sh
 [...]
-=INFO REPORT==== 18-Jul-2008::20:08:48 ===
+=INFO REPORT==== 12-May-2009::16:24:18 ===
 Yaws: Listening to 0.0.0.0:8000 for servers
  - http://localhost:8000 under ../docroot
-[ I | Fail   | <0.102.0> ] start detector
-this() == {{127,0,0,1},14195}
-[ I | Node   | <0.105.0> ] joining "22500913918"
-[ I | Node   | <0.105.0> ] join as first [50,50,53,48,48,57,49,51,57,49,56]
-[ I | Node   | <0.105.0> ] joined
+[info] [ CC ] this() == {{127,0,0,1},14195}
+[info] [ DNC <0.96.0> ] starting DeadNodeCache
+[info] [ DNC <0.96.0> ] starting Dead Node Cache
+[info] [ RM <0.97.0> ] starting ring maintainer
 
+[info] [ RT <0.99.0> ] starting routingtable
+[info] [ Node <0.101.0> ] joining 315238232250031455306327244779560426902
+[info] [ Node <0.101.0> ] join as first 315238232250031455306327244779560426902
+[info] [ FD <0.74.0> ] starting pinger for {{127,0,0,1},14195,<0.101.0>}
+[info] [ Node <0.101.0> ] joined
+[info] [ CY ] Cyclon spawn: {{127,0,0,1},14195,<0.102.0>}
 (boot@csr-pc9)1> admin:add_nodes(10)
 \end{lstlisting}
 
@@ -490,14 +837,13 @@ The function \code{admin:add_nodes(int)} is defined as follows.
 
 \codesnippet{admin.erl}{admin:add_nodes}{../src/admin.erl}
 
-It first initializes the random number generator and then calls
-\code{add_nodes_loop(Count)}.
-
-This function starts a new child for the main supervisor \code{main_sup}.
-As defined by the parameters, to actually perform the start, the function
-\code{cs_sup_or:start_link} is called by the Erlang supervisor mechanism.
-For more details on the OTP supervisor mechanism see Chapter 18 of the
-Erlang book~\cite{erlang-book} or the online documentation at
+It calls \code{add_nodes_loop(Count, Delay)} with a delay of 0. This
+function starts a new child for the main supervisor \code{main_sup}.
+As defined by the parameters, to actually perform the start, the
+function \code{cs_sup_or:start_link} is called by the Erlang
+supervisor mechanism.  For more details on the OTP supervisor
+mechanism see Chapter 18 of the Erlang book~\cite{erlang-book} or the
+online documentation at
 \url{http://www.erlang.org/doc/man/supervisor.html}.
 
 \subsection{Supervisor-tree of a \scalaris{} node}
@@ -510,35 +856,37 @@ created:
 
 \subsection{Starting the or-supervisor and general processes of a node}
 
-The supervisor mechanism first calls the \code{init()} function of the
-defined module (\code{cs_sup_or:init()} in this case) before calling the
-defined start function (\code{start_link} here.
+Starting supervisors is a two step process: the supervisor mechanism
+first calls the \code{init()} function of the defined module
+(\code{cs_sup_or:init()} in this case) and then calls the start
+function (\code{start_link} here.
 
 So, lets have a look at \code{cs_sup_or:init}, the 'Scalaris
 \emph{or} supervisor'.
 
 \codesnippet{cs_sup_or.erl}{cs_sup_or:init}{../src/cs_sup_or.erl}
 
-The \code{init()} function must return process descriptions that the
-supervisor should start, and how the processes have to be observed. Here, we
-define a list of processes to be observed by a \code{one_for_one}
-supervisor. The processes are: \code{Config}, \code{KeyHolder},
-\code{MessageStatisticsCollector} and a \code{Supervisor_AND} process.
 
-The term \code{\{one_for_one, 10, 1\}} defines that the supervisor should
-  retry 10 times to restart each process before giving
-  up. \code{one_for_one} supervision means, that if a single process stops,
-  only that process is restarted. The other processes run independently.
+The return value of the \code{init()} function specifies the child
+processes of the supervisor and how to start them. Here, we define a
+list of processes to be observed by a \code{one_for_one}
+supervisor. The processes are: \code{KeyHolder}, \code{DeadNodeCache},
+\code{RingMaintenance}, \code{RoutingTable}, and a
+\code{Supervisor_AND} process.
 
-The \code{cs_sup_or:init()} is finished and the supervisor
-module, starts all the defined processes by calling their corresponding
-\code{init()} functions and afterwards, the functions that were defined in
-the list of the \code{cs_sup_or:init()}.
+The term \code{\{one_for_one, 10, 1\}} specifies that the supervisor
+should try 10 times to restart each process before giving
+up. \code{one_for_one} supervision means, that if a single process
+stops, only that process is restarted. The other processes run
+independently.
 
-For a join of a new node, we are only interested in the starting of the
-\code{Supervisor_AND} process here, which was the last one in the list. At
-that point in time, all other defined processes are already started and
-running.
+The \code{cs_sup_or:init()} is finished and the supervisor module,
+starts all the defined processes by calling the functions that were
+defined in the list of the \code{cs_sup_or:init()}.
+
+For a join of a new node, we are only interested in the starting of
+the \code{Supervisor_AND} process here. At that point in time, all
+other defined processes are already started and running.
 
 \subsection{Starting the and-supervisor with a peer and its local database}
 
@@ -547,28 +895,28 @@ corresponding module:
 
 \codesnippet{cs_sup_and.erl}{cs_sup_and:init}{../src/cs_sup_and.erl}
 
-It defines two processes, that have to be observed using an
+It defines three processes, that have to be observed using an
 \code{one_for_all}-supervisor, which means, that if one fails, all have to
 be restarted. Passed to the \code{init} function is the \code{InstanceId}, a
 random number to make nodes unique. It was calculated a bit earlier in
 the code. Exercise: Try to find where.
 
 As you can see from the list, the \code{DB} is started before the
-\code{Node}. This is intended and important, because \code{cs_node} uses the
-database, but not vice versa.
-
-After the \code{cs_sup_and:init()} finished, the DB is initialized and
-afterwards \code{cs_node:start_link} is called by the and-supervisor.
-We only go into details here, for the latter.
+\code{Node}. This is intended and important, because \code{cs_node}
+uses the database, but not vice versa. The supervisor first completely
+initializes the DB process and afterwards calls
+\code{cs_node:start_link}. We only go into details here, for the
+latter.
 
 \codesnippet{cs_node.erl}{cs_node:start_link}{../src/cs_node.erl}
 
-This spawns a new process, that executes \code{cs_node:start()} and
-maintains a link to that process. This function is called in the context of
-the and-supervisor process, so the and-supervisor process will be informed,
-when the spawned process finishes. After the spawn is submitted,
-\code{cs_node:start_link} returns to the supervisor, which starts observing
-the processes in a loop.
+\code{cs_node} implements the \code{gen_component} behaviour. This
+component was developed by us to enable us to write code which is
+similar in syntax and semantics to the examples in~\cite{rachid-book}.
+Similar to the \code{supervisor} behaviour, the component has to
+provide an \code{init} function, but here it is used to initialize the
+state of the component. This function is described in the next
+section.
 
 Note: \code{?MODULE} is a predefined Erlang macro, which expands to the
 module name, the code belongs to (here: \code{cs_node}).
@@ -577,10 +925,16 @@ module name, the code belongs to (here: \code{cs_node}).
 
 \codesnippet{cs_node.erl}{cs_node:start}{../src/cs_node.erl}
 
-A \code{cs_node} first registers itself in the process dictionary.  Then,
-the process sleeps for a random amount of time. Otherwise, if you would
-start 1000 processes with \code{admin:add_nodes(1000)}, the boot-server
-would receive many join requests at the same time, which is not intended.
+The \code{gen_component} behaviour registers the \code{cs_node} in the
+process dictionary. Formerly, the process had to do this himself, but
+we moved this code into the behaviour. If the \code{cs_node} is the
+first node, he will start immediately. Otherwise, the process sleeps
+for a random amount of time. If you would start 1000 processes with
+\code{admin:add_nodes(1000)}, the boot-server would receive many join
+requests at the same time, which is not intended. It will also make
+the ring stabilization process more complicated. Adding 100s of nodes
+within a short period of time induces more churn into the system, than
+the ring maintenance can handle.
 
 Then, the node retrieves its \code{Id} from the keyholder: \code{Id =
   cs_keyholder:get_key()}. In the first call, a random identifier is
@@ -603,42 +957,47 @@ there.
   that mean, that a node can only change its position in the ring 10 times
   (caused by load-balancing)?}
 
-Next, the \code{cs_node} registers itself as the owner of the
-failuredetector \code{failuredetector:set_owner(self())} to become informed,
-when the failuredetector detects failing nodes.
+%Next, the \code{cs_node} registers itself as the owner of the
+%failuredetector \code{failuredetector:set_owner(self())} to become informed,
+%when the failuredetector detects failing nodes.
 
-With \code{boot_server:connect()} a connection to the boot-server is
-established.
+%With \code{boot_server:connect()} a connection to the boot-server is
+%established.
 
 \subsection{Actually joining the ring}
 
-\code{cs_join:join} is called next in \code{cs_node:start()}.
+After retrieving its identifier, the node starts the join process
+(\code{cs_join:join}).
 
-\codesnippet{cs_join.erl}{cs_join:join}{../src/cs_join.erl}
+\codesnippet{cs_join.erl}{cs_join:join1}{../src/cs_join.erl}
 
 The boot-server is contacted to retrieve the known number of nodes in the
 ring. If the ring is empty, \code{join_first} is called. Otherwise,
 \code{join_ring} is called.
 
-\code{join_first} just creates a new state for a \scalaris{} node consisting
-of an empty routing table, a successorlist containing itself, itself as its
-predecessor, a reference to itself, its responsibility area from \code{Id}
-to \code{Id} (the full ring), and a load balancing schema.
+If the ring is empty, the joining node is the only node in the ring
+and will be responsible for the whole key space. \code{join_first}
+just creates a new state for a \scalaris{} node consisting of an empty
+routing table, a successorlist containing itself, itself as its
+predecessor, a reference to itself, its responsibility area from
+\code{Id} to \code{Id} (the full ring), and a load balancing schema.
 
 \codesnippet{cs_join.erl}{cs_join:join_first}{../src/cs_join.erl}
 
-The macro \code{?RT} maps to the configured routing algorithm. It is defined
-in \code{chordsharp.erl}. For further details on the routing see Chapter~\sieheref{chapter.routing}.
+The macro \code{?RT} maps to the configured routing algorithm and
+\code{?RM} to the configured ring maintenance algorithm. It is defined
+in \code{chordsharp.hrl}. For further details on the routing see
+Chapter~\sieheref{chapter.routing}.
 
 The state is defined in
 
 \codesnippet{cs_state.erl}{cs_state:state}{../src/cs_state.erl}
 
-If a node joins an existing ring, \code{reliable_get_node} for the own
-\code{Id} is called in \code{cs_join:join()}. This lookup delivers the
-successor for the joining node. The node, that is currently responsible for
-\code{Id}, but which has a larger \code{Id} itself.  If this lookup fails
-for some reason, it is tried again, by recursivly calling the \code{join()}.
+If a node joins an existing ring, \code{reliable_get_node} is called
+for the own \code{Id} in \code{cs_join:join()}. This lookup delivers
+the node who is currently responsible for the new node's identifier --
+the successor for the joining node. If this lookup fails for some
+reason, it is tried again, by recursivly calling the \code{join()}.
 
 \todo{What, if the \code{Id} is exactly the same as that of the existing
   node? This could lead to lookup and responsibility inconsistency? Can this
@@ -657,37 +1016,29 @@ a \code{\{join, X\}} handler.
 
 \codesnippet{cs_node.erl}{cs_node:join_message}{../src/cs_node.erl}
 
-This triggers to call \code{join_request} on the old node. 
+This triggers a call to \code{join_request} on the old node.
 
 \codesnippet{cs_join.erl}{cs_join:join_request}{../src/cs_join.erl}
 
-This resets the local predecessor to the new node and splits the data.
-Then it sends a \code{join_response} to the new node with its former
+The \code{cs_node} notifies the ring maintenance, that he has a new
+predecessor. Then he removes the key-value pairs from his database
+which are now in the responsibility of the joining node. Then it
+sends a \code{join_response} to the new node with its former
 predecessor, the data, it has to host, and its successorlist.
-Additionally, the new node will be observed by the failuredetector.
 
-Note: Here, the observation of the former predecessor could be deleted from
-the failure detector. But periodically, all known hosts are reregistered
-with the failure detector, and then all other nodes are thrown away from the
-list of nodes to observe in the failure detector. So, we do not care here.
+%Note: Here, the observation of the former predecessor could be deleted from
+%the failure detector. But periodically, all known hosts are reregistered
+%with the failure detector, and then all other nodes are thrown away from the
+%list of nodes to observe in the failure detector. So, we do not care here.
 
-Finally, the new predecessor is set and the \code{join_request()} is finished.
- 
-Back on the new node: it waits for the \code{join_response} message in
-\code{cs_join:join_ring()}. The next steps after the message was received
-from the old node are to register the predecessor, to register all new nodes
-in the failure detector, to send a message to the predecessor, that its
-successor has changed.
+%Finally, the new predecessor is set and the \code{join_request()} is finished.
 
-Finally, all data are added to the database and the succlist is build by
-putting the successor to the head of the successor list of the successor
-(old node): \code{[Succ | SuccList]}.
 
-The next step in \code{cs_join:join()} is to call
-\code{cs_reregister:reregister} which reregisters the node periodically with
-the boot server. Then \code{\{false, State\}} is returned, which means 'this
-was not the first node in the ring'. Now, the \code{cs_join:join()} is
-completed.
+Back on the joining node: it waits for the \code{join_response}
+message in \code{cs_join:join_ring()}. The next steps after the
+message was received from the old node are to initialize the
+maintenance components for the ring and routing table, the database
+and the state of the \code{cs_node}.
 
 \subsection{Beginning to serve requests}
 
@@ -700,30 +1051,29 @@ The \code{cs_replica_stabilization:recreate_replicas()} function is called,
 which is not yet implemented. It would recreated necessary replicas that
 were lost due to load-balancing and node failures.
 
-Finally all the self-management services are started with
-\code{timer:after} and the loop for request handling is started. 
+Finally, the loop for request handling is started.
 
-\subsection{FAQ}
+% \subsection{FAQ}
 
-\paragraph{Question:} How are the routing-table, load-balancing and paxos 
-  processes started, that can be seen in the supervisor tree?
+% \paragraph{Question:} How are the routing-table, load-balancing and paxos 
+%   processes started, that can be seen in the supervisor tree?
 
-  \paragraph{Answer:} They are currently not implemented as separate Erlang
-  processes. All the requests are handled by the loop started by
-  \code{cs_node:start()}. Nevertheless, they could be implemented as
-  separate processes to make the software architecture cleaner.
+%   \paragraph{Answer:} They are currently not implemented as separate Erlang
+%   processes. All the requests are handled by the loop started by
+%   \code{cs_node:start()}. Nevertheless, they could be implemented as
+%   separate processes to make the software architecture cleaner.
 
 \chapter{Routing and routing tables in the Overlay}
 \label{chapter.routing}
 
-\hfill\emph{2008-07-25, SVN revision 12}
+%\hfill\emph{2008-07-25, SVN revision 12}
 
 Each node of the ring can perform searches in the overlay.
 
-A search is done by a lookup in the overlay, but there are several other
-demands for communication between peers, so \scalaris{} provides a general
-interface to route a message another peer, that is currently responsible for
-a given \code{key}.
+A search is done by a lookup in the overlay, but there are several
+other demands for communication between peers, so \scalaris{} provides
+a general interface to route a message to another peer, that is
+currently responsible for a given \code{key}.
 
 \begin{lstlisting}[title=\filetitle{cs_lookup.erl}]
 [...]
@@ -762,12 +1112,13 @@ lookup_aux(State, Key, Msg) ->
 [...]
 \end{lstlisting}
 
-Each node is responsible for a certain key interval. 
-With the function \code{util:is_between} it is decided, whether the key is
-between the current node and its successor. If that is the case, 
-final step is done using \code{lookup_fin()}, which delivers the message to
-the local node. Otherwise, the message is forwarded to the next nearest
-known peer (listed in the routing table) determined by \code{?RT:next_hop}.
+Each node is responsible for a certain key interval.  The function
+\code{util:is_between} is used to decide, whether the key is between
+the current node and its successor. If that is the case, final step is
+done using \code{lookup_fin()}, which delivers the message to the
+local node. Otherwise, the message is forwarded to the next nearest
+known peer (listed in the routing table) determined by
+\code{?RT:next_hop}.
 
 
 % \begin{lstlisting}[language=Java]
@@ -777,56 +1128,21 @@ known peer (listed in the routing table) determined by \code{?RT:next_hop}.
 % }
 % \end{lstlisting}
 
-\code{routingtable.erl} is a generic interface for routing tables, like a
-Java interface. In Erlang interfaces can be defined using a `behaviour'.
-The files \code{rt_simple} and \code{rt_chord} implement the behaviour
-`routingtable'.
+\code{routingtable.erl} is a generic interface for routing tables. It
+can be compared to interfaces in Java. In Erlang interfaces can be
+defined using a so called `behaviour'.  The files \code{rt_simple} and
+\code{rt_chord} implement the behaviour `routingtable'.
 
-The macro ?RT in other files replaces to the active module, which is defined
-in \code{chordsharp.hrl}.
+The macro ?RT is used to select the current implementation of routing
+tables. It is defined in \code{chordsharp.hrl}.
 
-\begin{lstlisting}[title=\filetitle{chordsharp.hrl}]
-[...]
-%%This file determines which kind of routingtable is used. Uncomment the
-%%one that is desired.
-
-%%Standard Chord routingtable
--define(RT, rt_chord).
-
-%%Simple routingtable
-%-define(RT, rt_simple).
-[...]
-\end{lstlisting}
+\codesnippet{chordsharp.hrl}{chordsharp:rt}{../src/chordsharp.hrl}
 
 The functions, that have to be implemented for a routing mechanism are
 defined in the following file:
 
-\begin{lstlisting}[title=\filetitle{routingtable.erl}]
-[...]
-behaviour_info(callbacks) ->
-    [
-     % create a default routing table
-     {empty, 1}, 
-     % key space -> identifier space
-     {hash_key, 1}, {getRandomNodeId, 0},
-     % routing
-     {next_hop, 2}, 
-     % trigger for new stabilization round
-     {stabilize, 1}, 
-     % dead nodes filtering
-     {filterDeadNodes, 2}, 
-     % statistics
-     {to_pid_list, 1}, {to_node_list, 1}, {get_size, 1},
-     % for symmetric replication
-     {get_keys_for_replicas, 1},
-     % for debugging
-     {dump, 1}
-    ];
+\codesnippet{routingtable.erl}{routingtable:behaviour}{../src/routingtable.erl}
 
-behaviour_info(_Other) ->
-    undefined.
-[...]
-\end{lstlisting}
 
 \begin{description}
 \setlength{\parskip}{0pt}
@@ -835,30 +1151,37 @@ behaviour_info(_Other) ->
   table.  The data structure of the routing table is undefined. It can be a
   list, a tree, a matrix \ldots
 
-\item \code{hash_key/1} gets a key and translates it to an id for the
-  overlay.
+\item \code{hash_key/1} gets a key and maps it into the overlay's
+  identifier space.
 
-\item \code{getrandomnodeid/0} returns a random node id.
+\item \code{getRandomNodeId/0} returns a random node id from the
+  overlay's identifier space. This is used for example when a new node
+  joins the system.
 
 \item \code{next_hop/2} gets a routing table and a key and returns the node,
   that should be contacted next (is nearest to the id).
 
-\item \code{stabilize/1} is called periodically to rebuild the routing table.
+\item \code{init_stabilize/3} is called periodically to rebuild the
+  routing table. The parameters are the identifier of the node, the
+  successor and the old routing table state.
 
-\item \code{filterDeadNodes} is called by the failuredetector and tells the
+\item \code{filterDeadNode/2} is called by the failuredetector and tells the
   routing table about dead nodes to be eliminated from the routing
   table. This function cleans the routing table.
 
 \item \code{to_pid_list/1} get all PIDs of the routing table entries.
-\item \code{to_node_list/1} get all nodes in the routing table as complete
-  reference including IP, range, etc.
-\item \code{get_size/1} get the size of the routing table.
 
-\item \code{get_keys_for_replicas/1} Returns for a given \code{Key} the keys
-  of its replicas. Thereby one can implement successorlist replication or
-  symmetric replication or any other schema.
+\item \code{get_size/1} get the routing table's size.
+
+\item \code{get_keys_for_replicas/1} Returns for a given \code{Key}
+  the keys of its replicas. This used for implementing symmetric
+  replication.
 
 \item \code{dump/1} dump the state. Not mandatory, may just return \code{ok}.
+
+\item \code{to_dict/1} returns the routing tables entries in an
+  array-like structure. This is used by bulk-operations to create a
+  broadcast tree.
 \end{description}
 
 \section{Simple routing table}
@@ -870,146 +1193,48 @@ list. This implementation is not very efficient on churn.
 
 \subsection{Data types}
 First, the data structure of the routing table is defined:
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @type rt() = {node:node(), gb_trees:gb_tree()}. Sample routing table
-%% @type key() = int(). Identifier
-[...]
-\end{lstlisting}
-A routing table is a pair of a node (the successor) and an (unused) gbtree.
-Keys in the overlay are identified by integers.
+
+\codesnippet{rt_simple.erl}{rt_simple:types}{../src/rt_simple.erl}
+
+A routing table is a pair of a node (the successor) and an (unused)
+\code{gb_tree}.  Keys in the overlay are identified by integers.
 
 \subsection{A simple routingtable behaviour}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc creates an empty routing table.
-%%      per default the empty routing should already include 
-%%      the successor
-%% @spec empty(node:node()) -> rt()
-empty(Succ) ->
-    {Succ, gb_trees:empty()}.
-[...]
-\end{lstlisting}
-The empty routing table consists of the successor.
+\codesnippet{rt_simple.erl}{rt_simple:empty}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc hashes the key to the identifier space.
-%% @spec hash_key(string()) -> key()
-hash_key(Key) ->
-    BitString = binary_to_list(crypto:md5(Key)),
-    % binary to integer
-    lists:foldl(fun(El, Total) -> (Total bsl 8) bor El end, 0, BitString).
+The empty routing table consists of the successor and an empty
+\code{gb_tree}.
 
-%% @doc generates a random node id
-%%      In this case it is a random 128-bit string.
-%% @spec getRandomNodeId() -> key()
-getRandomNodeId() ->
-    % generates 128 bits of randomness
-    hash_key(integer_to_list(random:uniform(65536 * 65536))).
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:hash_key}{../src/rt_simple.erl}
+
 Keys are hashed using MD5 and have a length of 128 bits.
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc returns the next hop to contact for a lookup
-%% @spec next_hop(cs_state:state(), key()) -> pid()
-next_hop(State, _Key) ->
-    cs_state:succ_pid(State).
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:next_hop}{../src/rt_simple.erl}
+
 Next hop is always the successor.
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc triggers a new stabilization round
-%% @spec stabilize(cs_state:state()) -> cs_state:state()
-stabilize(State) ->
-    % trigger the next stabilization round
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
-    % renew routing table
-    cs_state:set_rt(State, empty(cs_state:succ(State))).
-[...]
-\end{lstlisting}
-The \code{stabilize/1} first triggers to be called again after the pointer
-stabilization interval defined in the configuration. Then it resets its
-routing table with the current successor.
+\codesnippet{rt_simple.erl}{rt_simple:init_stabilize}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc removes dead nodes from the routing table
-%% @spec filterDeadNodes(rt(), [node:node()]) -> rt()
-filterDeadNodes(RT, _DeadNodes) ->
-    RT.
-[...]
-\end{lstlisting}
-\code{FilterDeadNodes/2} does nothing, as only the successor is listed in
-the routing table and that is reset periodically in \code{stabilize/1}.
+\code{init_stabilize/3} resets its routing table with the current
+successor.
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc returns the pids of the routing table entries .
-%% @spec to_pid_list(rt()) -> [pid()]
-to_pid_list({Succ, _RoutingTable} = _RT) ->
-    [node:pidX(Succ)].
-[...]
-\end{lstlisting}
-\code{to_pid_list/1} return the pids of the routing tables, as defined in \code{node.erl}.
+\codesnippet{rt_simple.erl}{rt_simple:filterDeadNode}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_simple.erl}]
-[...]
-%% @doc returns the pids of the routing table entries .
-%% @spec to_node_list(rt()) -> [node:node()]
-to_node_list({Succ, _RoutingTable} = _RT) ->
-    [Succ].
-[...]
-\end{lstlisting}
-Return whole node definitions as defined in \code{node.erl}
+\code{filterDeadNodes/2} does nothing, as only the successor is listed in
+the routing table and that is reset periodically in \code{init_stabilize/3}.
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
--record(node, {pid, id, uniqueId}).
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:to_pid_list}{../src/rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @doc returns the size of the routing table.
-%%      inefficient standard implementation
-%% @spec get_size(rt()) -> int()
-get_size(RT) ->
-    length(to_pid_list(RT)).
-    
-%% @doc returns the replicas of the given key
-%% @spec get_keys_for_replicas(key() | string()) -> [key()]
-get_keys_for_replicas(Key) when is_integer(Key) ->
-    [Key, 
-     normalize(Key + 16#40000000000000000000000000000000),
-     normalize(Key + 16#80000000000000000000000000000000),
-     normalize(Key + 16#C0000000000000000000000000000000)
-    ];
-get_keys_for_replicas(Key) when is_list(Key) ->
-    get_keys_for_replicas(hash_key(Key)).
+\code{to_pid_list/1} returns the pids of the routing tables, as defined in \code{node.erl}.
 
-normalize(Key) ->
-    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:get_keys_for_replicas}{../src/rt_simple.erl}
 
 The \code{get_keys_for_replicas/1} implements symmetric replication, here.
 The call to \code{normalize} implements the modulo by throwing high bits
 away.
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @doc 
-%% @spec dump(cs_state:state()) -> term()
-dump(_State) ->
-    ok.
-[...]
-\end{lstlisting}
+\codesnippet{rt_simple.erl}{rt_simple:dump}{../src/rt_simple.erl}
 
 \code{dump/1} is not implemented.
 
@@ -1020,72 +1245,28 @@ The file \code{rt_chord.erl} implements Chord's routing.
 
 \subsection{Data types}
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @type rt() = gb_trees:gb_tree(). Chord routing table
-%% @type key() = int(). Identifier
-[...]
-\end{lstlisting}
-The routing table is a \code{gb_tree}. Identifiers in the ring are integers.
+\codesnippet{rt_chord.erl}{rt_chord:types}{../src/rt_chord.erl}
+
+The routing table is a \code{gb_tree}. Identifiers in the ring are
+integers. Note, that in Erlang integer can be of arbitrary
+precision. For Chord, the identifiers are in $[0, 2^{128})$,
+i.e. 128-bit strings.
 
 \subsection{The routingtable behaviour for Chord}
 
-\begin{lstlisting}[title=\filetitle{node.erl}]
-[...]
-%% @doc creates an empty routing table.
-%% @spec empty(node:node()) -> rt()
-empty(_Succ) ->
-    gb_trees:empty().
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:empty}{../src/rt_chord.erl}
 
-\todo{This function should return \code{_Succ}?}
+\code{empty/1} returns an empty \code{gb_tree}.
 
 \code{hash_key(Key)} and \code{getRandomNodeId} call their counterparts from
 \code{rt_simple.erl}
 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-%% @doc returns the next hop to contact for a lookup
-%% @spec next_hop(cs_state:state(), key()) -> node()
-next_hop(State, Id) -> 
-    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
-	%succ is responsible for the key
-	true ->
-	    cs_state:succ_pid(State);
-	% check routing table
-	false ->
-	    RT = cs_state:rt(State),
-	    next_hop(cs_state:id(State), RT, Id, 127, cs_state:succ_pid(State))
-    end.
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:next_hop1}{../src/rt_chord.erl}
 
 \code{next_hop} traverses the routing table beginning with the longest
 finger ($2^{127}$) by calling the helper function \code{next_hop/5}.
 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-% @private
-next_hop(N, RT, Id, Index, Candidate) ->
-    case gb_trees:is_defined(Index, RT) of
-	true ->
-	    case gb_trees:get(Index, RT) of
-		null ->
-		    Candidate;
-		Entry ->
-		    case util:is_between_closed(N, node:id(Entry), Id) of
-			true ->
-			    node:pidX(Entry);
-			false ->
-			    next_hop(N, RT, Id, Index - 1, Candidate)
-		    end
-		end;
-	false ->
-	    Candidate
-    end.
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:next_hop2}{../src/rt_chord.erl}
 
 If the entry exists, it is retrieved from the \code{gb_tree}.  If the id of
 the routing table entry is between ourselves and the searched id, the finger
@@ -1098,81 +1279,35 @@ changes entries to \code{null}.
   traverse the routing table for shorter appropriate fingers. If doing so, a
   check whether \code{Index} is zero, would become necessary.}
 
-If the finger is to long, recursivly try the next shorter finger.
+If the finger is to long, recursively try the next shorter finger.
 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-%% @doc starts the stabilization routine
-%% @spec stabilize(cs_state:state()) -> cs_state:state()
-stabilize(State) ->
-    % trigger the next stabilization round
-    timer:send_after(config:pointerStabilizationInterval(), self(), {stabilize_pointers}),
-    % calculate the longest finger
-    Key = calculateKey(State, 127),
-    % trigger a lookup for Key
-    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), 127}),
-    State.
-[...]
-calculateKey(State, Idx) ->
-    % n + 2^Idx
-    rt_simple:normalize(cs_state:id(State) + (1 bsl Idx)).
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:init_stab}{../src/rt_chord.erl}
 
-The routing table stabilization is triggered with the index 127 and then
-runs asynchronously, as we do not want to block the \code{cs_node} to
-perform other request while recalculating the routing table.
+The routing table stabilization is triggered with the index 127 and
+then runs asynchronously, as we do not want to block the
+\code{rt_loop} to perform other request while recalculating the
+routing table.
 
 We have to find the node responsible for the calculated finger and therefore
 perform a lookup for the node with a \code{rt_get_node} message, including
 a reference to ourselves as the reply-to address and the index to be set.
 
-The lookup performs an overlay routing by passing the massage until the
-responsible node is found. There, the message is delivered to the
-\code{cs_node}.
+The lookup performs an overlay routing by passing the massage until
+the responsible node is found. There, the message is delivered to the
+\code{cs_node}. At the destination the message is handled in
+\code{cs_node.erl}:
 
-At the destination the message is handled in \code{cs_node.erl}:
+\codesnippet{cs_node.erl}{cs_node:rt_get_node}{../src/cs_node.erl}
 
-\begin{lstlisting}[title=\filetitle{cs_node.erl}]
-[...]
-	% for chord_rt
-	{rt_get_node, Source_PID, Idx} ->
-	    cs_send:send(Source_PID, {rt_get_node_response, Idx, cs_state:me(State)}),
-	    loop(State, ?DEBUG(Debug));
+The remote node just sends the requested information back directly in
+a \code{rt_get_node_response} message including a reference to itself.
+When receiving the routing table entry, we call \code{stabilize/5}.
 
-	{rt_get_node_response, Index, Node} = _Message ->
-	    NewState = ?RT:stabilize(State, Index, Node),
-	    loop(NewState, ?DEBUG(cs_debug:debug(Debug, NewState, _Message)));
-[...]
-\end{lstlisting}
+\codesnippet{rt_chord.erl}{rt_chord:stab}{../src/rt_chord.erl}
 
-The remote node just sends the requested information back directly in a
-\code{rt_get_node_response} message including a reference to itself.
+%%%%%%%%%%
 
-When receiving the routing table entry, we call \code{stabilize/3}!, which
-is different from the \code{stabilize/1} above.
-
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-stabilize(State, Index, Node) ->
-    RT = cs_state:rt(State),
-    case node:is_null(Node) of
-	true ->
-	    State;
-	false ->
-	    case cs_state:succ(State) == Node of
-		true ->
-		    State;
-		false ->
-		    NewRT = gb_trees:enter(Index, Node, RT),
-		    Key = calculateKey(State, Index - 1),
-		    self() ! {lookup_aux, Key, {rt_get_node, cs_send:this(), Index - 1}},
-		    cs_state:set_rt(State, NewRT)
-	    end
-    end.
-[...]
-\end{lstlisting}
-
-\code{stabilize/3} assigns the received routing table entry and triggers to
+\code{stabilize/5} assigns the received routing table entry and triggers to
 fill the next shorter one using the same mechanisms as described.
 
 When the shortest finger is the successor, then filling the routing table is
@@ -1180,54 +1315,9 @@ stopped, as no further new entries would occur. It is not necessary, that
 \code{Index} reaches 1 to make that happen. If less than $2^{128}$ nodes
 participate in the system, it may happen earlier.
 
-\code{filterDeadNodes} updates the \code{gb_tree} accordingly. 
-\begin{lstlisting}[title=\filetitle{rt_chord.erl}]
-[...]
-%% @doc remove all entries with the given ids
-%% @spec filterDeadNodes(gb_trees:gb_tree(), term()) -> gb_trees:gb_tree()
-filterDeadNodes(RT, DeadNodes) ->
-    gb_sets:fold(fun (Id, RT2) -> filter_intern(gb_trees:iterator(RT2), RT2, Id) end, RT, DeadNodes).
+\code{filterDeadNode} removes dead entries from the \code{gb_tree}.
 
-% @private
-filter_intern(nil, RT, _) ->
-    RT;
-filter_intern([], RT, _) ->
-    RT;
-filter_intern(Iterator, RT, Id) ->
-    {Index, Value, Next} = gb_trees:next(Iterator),
-    case node:uniqueId(Value) == Id of
-	true ->
-	    filter_intern(Next, gb_trees:delete(Index, RT), Id);
-	false ->
-	    filter_intern(Next, RT, Id)
-    end.
-
-
-%% @doc returns the pids of the routing table entries .
-%% @spec to_pid_list(rt()) -> [pid()]
-to_pid_list(RT) ->
-    lists:map(fun ({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
-
-%% @doc returns the pids of the routing table entries .
-%% @spec to_node_list(rt()) -> [node:node()]
-to_node_list(RT) ->
-    lists:map(fun ({_Idx, Node}) -> Node end, gb_trees:to_list(RT)).
-
-%% @doc returns the size of the routing table.
-%%      inefficient standard implementation
-%% @spec get_size(rt()) -> int()
-get_size(RT) ->
-    length(to_pid_list(RT)).
-    
-%% @doc returns the replicas of the given key
-%% @spec get_keys_for_replicas(key() | string()) -> [key()]
-get_keys_for_replicas(Key) ->
-    rt_simple:get_keys_for_replicas(Key).
-[...]
-\end{lstlisting}
-
-Also the remaining functions are implemented as one would expect.
-
+\codesnippet{rt_chord.erl}{rt_chord:filterDeadNode}{../src/rt_chord.erl}
 
 \chapter{Directory Structure of the Source Code}
 
@@ -1236,462 +1326,69 @@ The directory tree of \scalaris{} is structured as follows: \\
 \begin{tabular}{|r|p{11.5cm}|}
  \hline
  \code{bin} & contains shell scripts needed to work with \scalaris{} (e.g.\ start the boot services, start a node, \dots)\\
- \code{contrib} & necessary third party packages \\
+ \code{contrib} & necessary third party packages (yaws and log4erl) \\
  \code{doc} & generated erlang documentation \\
- \code{docroot} & root directory of the integrated webserver \\
+ \code{docroot} & root directory of the bootserver's webserver \\
+ \code{docroot_node} & root directory of the normal node's webserver \\
+ \code{ebin} & the compiled Erlang code (beam files)\\
  \code{java-api} & a java api to \scalaris{} \\
  \code{log} & log files \\
  \code{src} & contains the \scalaris{} source code\\
- \code{tests} & unit tests for Scalaris \\
+ \code{test} & unit tests for \scalaris{} \\
  \code{user-dev-guide} & contains the sources for this document\\
  \hline
 \end{tabular}
 
-\chapter{System Components}
+%\chapter{System Components}
 
 
 
-\chapter{Processes}
+%\chapter{Processes}
 
-\chapter{Troubleshooting}
+%\chapter{Troubleshooting}
 
-\section{ApplicationMonitor appmon:start()}
-
-
-
-\appendix
+%\section{ApplicationMonitor appmon:start()}
 
 \chapter{Java API}
 
-\section{de.zib.chordsharp.ChordSharp}
+For the Java API documentation, we refer the reader to Javadoc
+resp. doxygen. The following commands create the documentation:
 
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-public class ChordSharp
+\begin{lstlisting}[language=sh]
+%> cd java-api
+%> ant doc
+%> doxygen
 \end{lstlisting}
 
-Public ChordSharp Interface. 
-\\
-
-\begin{description}
-\item[\textbf{Version:}]1.1
-\item[\textbf{Author:}]Nico Kruber, kruber@zib.de
-\end{description}
-
-\begin{tabular}{|l|l|}
-\hline 
- \textbf{Method Summary}
- & \\
- \hline 
- static Vector$<$String$>$ &\textbf{getSubscribers}(String topic)\\ 
-& Gets a list of subscribers of a topic. \\
- \hline 
- static void &\textbf{publish}(String topic, String content)\\ 
- & Publishes an event under a given topic. \\
- \hline 
- static String &\textbf{read}(String key)\\ 
- & Gets the value stored with the given key. \\
- \hline 
- static void &\textbf{subscribe}(String topic, String url)\\ 
- & Subscribes a url for a topic. \\
- \hline 
- static void &\textbf{write}(String key, String value)\\ 
- & Stores the given key/value pair. \\
- \hline 
-
-\end{tabular}
-
-\subsection*{ read}
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-public static String read(String key)
-                   throws ConnectionException,
-                          TimeoutException,
-                          UnknownException,
-                          NotFoundException
-\end{lstlisting}
-
-Gets the value stored with the given key. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]key - the key to look up 
-\item[\textbf{Returns:}]the value stored under the given key
-\item[\textbf{Throws:}]
-\end{description}
-\begin{tabular}{ll}
-ConnectionException & if the connection is not active or a \\
-& communication error occurs or an exit signal \\
-& was received or the remote node sends a \\
-& message containing an invalid cookie \\
-TimeoutException & if a timeout occurred while trying to fetch the \\
-& value \\
-NotFoundException & if the requested key does not exist \\
-UnknownException & if any other error occurs\\
-\end{tabular}
-
-
-\subsection*{ write}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static void write(String key,
-                         String value)
-                  throws ConnectionException,
-                         TimeoutException,
-                         UnknownException
-\end{lstlisting}
-Stores the given key/value pair. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]key - the key to store the value for
-value - the value to store 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to write the value 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{ publish}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static void publish(String topic,
-                           String content)
-                    throws ConnectionException
-\end{lstlisting}
-Publishes an event under a given topic. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]topic - the topic to publish the content under
-content - the content to publish 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
-\end{description}
-
-\subsection*{ subscribe}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static void subscribe(String topic,
-                             String url)
-                      throws ConnectionException
-\end{lstlisting}
-Subscribes a url for a topic. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]topic - the topic to subscribe the url for
-url - the url of the subscriber (this is where the events are send to) 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
-
-\end{description}
-
-
-\subsection*{ getSubscribers}
-\begin{lstlisting}[language=Java, morekeywords={bool, throws}]
-
-public static Vector<String> getSubscribers(String topic)
-                                     throws ConnectionException,
-                                            UnknownException
-\end{lstlisting}
-Gets a list of subscribers of a topic. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]topic - the topic to get the subscribers for 
-\item[\textbf{Returns:}]the subscriber URLs 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-UnknownException - is thrown if the return type of the erlang method does not match the expected one
-
-\end{description}
-
-\subsection*{ de.zib.chordsharp.Transaction}
-
-
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-public class \textbf{Transaction}
-\end{lstlisting}
-
-
-
-  Provides means to realise a transaction with the chordsharp ring using Java. 
-
-
-  It reads the connection parameters from a file called ChordSharpConnection.properties or uses default properties defined in ChordSharpConnection.defaultProperties. 
-\begin{lstlisting}[language=Java, morekeywords={bool}]
-OtpErlangString otpKey; 
-OtpErlangString otpValue; 
-OtpErlangString otpResult; 
-String key; 
-String value; 
-String result; 
-
-Transaction transaction = new Transaction(); // Transaction() 
-transaction.start(); // start() 
-transaction.write(otpKey, otpValue); // write(OtpErlangString, OtpErlangString) 
-transaction.write(key, value); // write(String, String) 
-otpResult = transaction.read(otpKey); //read(OtpErlangString) 
-result = transaction.read(key); //read(String) 
-transaction.commit(); // commit() 
-\end{lstlisting}
-
-For more examples, have a look at TransactionReadExample,
-TransactionParallelReadsExample, TransactionWriteExample and
-TransactionReadWriteExample.
-
-\subsubsection*{Attention:}
-
-If a read or write operation fails within a transaction all subsequent
-operations on that key will fail as well. This behaviour may
-particularly be undesirable if a read operation just checks whether a
-value already exists or not. To overcome this situation call
-revertLastOp() immediately after the failed operation which restores
-the state as it was before that operation.
-
-The TransactionReadWriteExample example shows such a use case.
-
-
- 
-
-
-\begin{description}
-\item[\textbf{Version:}]1.0
-\item[\textbf{Author:}]Nico Kruber, kruber@zib.de
-\end{description}
-
-\begin{tabular}{|l|}
-\hline 
- \textbf{Constructor Summary}
- \\
- \hline 
-\textbf{Transaction}()\\ 
- Creates the object's connection to the chordsharp node specified in the \\
-``ChordSharpConnection.properties'' file. \\
- \hline 
-
-\end{tabular}
-
-    
-
-\begin{tabular}{|l|l|}
-\hline 
- \textbf{Method Summary} & \\
- \hline 
-  void &\textbf{abort}()\\ 
- & Cancels the current transaction. \\
- \hline 
-  void &\textbf{commit}()\\ 
- & Commits the current transaction. \\
- \hline 
-  OtpErlangString &\textbf{read}(OtpErlangString key)\\ 
- & Gets the value stored under the given key. \\
- \hline 
-  String &\textbf{read}(String key)\\ 
- & Gets the value stored under the given key. \\
- \hline 
-  void &\textbf{revertLastOp}()\\ 
- & Reverts the last (read or write) operation by \\
- & restoring the last state. \\
- \hline 
-  void &\textbf{start}()\\ 
- & Starts a new transaction by generating a new transaction log. \\
- \hline 
-  void &\textbf{write}(OtpErlangString key, OtpErlangString value)\\ 
- & Stores the given key/value pair. \\
- \hline 
-  void &\textbf{write}(String key, String value)\\ 
- & Stores the given key/value pair. \\
- \hline 
-
-\end{tabular}
-
-
-\subsection*{Transaction}
-
-\begin{lstlisting}[language=Java]
-public Transaction()
-            throws ConnectionException
-\end{lstlisting}
-Creates the object's connection to the chordsharp node specified in the ``ChordSharpConnection.properties'' file. 
-
-\begin{description}
-\item[\textbf{Throws:}]ConnectionException - if the connection fails
-\end{description}
-
-\subsection*{start}
-
-\begin{lstlisting}[language=Java]
-public void start()
-           throws ConnectionException,
-                  TransactionNotFinishedException,
-                  UnknownException
-\end{lstlisting}
-Starts a new transaction by generating a new transaction log. 
-
- 
-
-\begin{description}
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TransactionNotFinishedException - if an old transaction is not finished (via commit() or abort()) yet 
-UnknownException - if the returned value from erlang does not have the expected type/structure
-
-\end{description}
-
-
-\subsection*{commit}
-
-\begin{lstlisting}[language=Java]
-public void commit()
-            throws UnknownException,
-                   ConnectionException
-\end{lstlisting}
-Commits the current transaction. The transaction's log is reset if the commit was successful, otherwise it still retains in the transaction which must be successfully committed or aborted in order to be restarted. 
-
- 
-
-\begin{description}
-\item[\textbf{Throws:}
-]UnknownException - If the commit fails or the returned value from erlang is of an unknown type/structure, this exception is thrown. Neither the transaction log nor the local operations buffer is emptied, so that the commit can be tried again. 
-ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie
-\item[\textbf{See Also:}
-]abort()
-
-\end{description}
-
-\subsection*{ abort}
-
-\begin{lstlisting}[language=Java]
-public void abort()
-\end{lstlisting}
-Cancels the current transaction. 
-
-  For a transaction to be cancelled, only the transLog needs to be reset. Nothing else needs to be done since the data was not modified until the transaction was committed. 
-
-
- 
-
-\subsection*{read}
-
-\begin{lstlisting}[language=Java] 
-public OtpErlangString read(OtpErlangString key)
-                     throws ConnectionException,
-                            TimeoutException,
-                            UnknownException,
-                            NotFoundException
-\end{lstlisting}
-Gets the value stored under the given key. 
-
-\begin{description}
-\item[\textbf{Parameters:}
-]key - the key to look up 
-\item[\textbf{Returns:}
-]the value stored under the given key
-\item[\textbf{Throws:}
-]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to fetch the value 
-NotFoundException - if the requested key does not exist 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{read}
-
-\begin{lstlisting}[language=Java]
-public String read(String key)
-            throws ConnectionException,
-                   TimeoutException,
-                   UnknownException,
-                   NotFoundException
-\end{lstlisting}
-Gets the value stored under the given key. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}
-]key - the key to look up 
-\item[\textbf{Returns:}
-]the value stored under the given key
-\item[\textbf{Throws:}
-]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to fetch the value 
-NotFoundException - if the requested key does not exist 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{write}
-
-\begin{lstlisting}[language=Java] 
-public void write(OtpErlangString key,
-                  OtpErlangString value)
-           throws ConnectionException,
-                  TimeoutException,
-                  UnknownException
-\end{lstlisting}
-Stores the given key/value pair. 
-
-\begin{description}
-\item[\textbf{Parameters:}
-]key - the key to store the value for
-value - the value to store 
-\item[\textbf{Throws:}
-]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to write the value 
-UnknownException - if any other error occurs
-
-\end{description}
-
-\subsection*{write}
-
-\begin{lstlisting}[language=Java] 
-public void write(String key,
-                  String value)
-           throws ConnectionException,
-                  TimeoutException,
-                  UnknownException
-\end{lstlisting}
-Stores the given key/value pair. 
-
- 
-
-\begin{description}
-\item[\textbf{Parameters:}]key - the key to store the value for
-value - the value to store 
-\item[\textbf{Throws:}]ConnectionException - if the connection is not active or a communication error occurs or an exit signal was received or the remote node sends a message containing an invalid cookie 
-TimeoutException - if a timeout occurred while trying to write the value 
-UnknownException - if any other error occurs
-
-\end{description}
-
-
-\subsection*{revertLastOp}
-
-\begin{lstlisting}[language=Java] 
-public void revertLastOp()
-\end{lstlisting}
-
-Reverts the last (read, parallelRead or write) operation by restoring
-the last state. If no operation was initiated yet, this method does
-nothing.
-
-This method is especially useful if after an unsuccessful read a value
-with the same key should be written which is not possible if the
-failed read is still in the transaction's log.
+The Javadoc can be found in \code{java-api/doc/index.html}. The
+doxygen is in \\ \code{doc-doxygen/html/index.html}.
+
+We provide two kinds of APIs:
+
+\begin{itemize}
+\item high-level access with \code{de.zib.scalaris.Scalaris}
+\item low-level access with \code{de.zib.scalaris.Transaction}
+\end{itemize}
+
+The former provides general functions for reading and writing single
+key-value pairs and an API for the built-in PubSub-service. The latter
+allows the user to write custom transactions which can modify an
+arbitrary number of key-value pairs within one transaction.
 
 \bibliographystyle{plainnat}
 
 \begin{thebibliography}{9}
 
 \bibitem{erlang-book}
-J. Armstrong.
+Joe Armstrong.
 \newblock \emph{Programming Erlang: Software for a Concurrent World.}
 \newblock Pragmatic Programmers, ISBN: 978-1-9343560-0-5, July 2007
+
+\bibitem{rachid-book}
+Rachid Guerraoui and Luis Rodrigues.
+\newblock \emph{Introduction to Reliable Distributed Programming.}
+\newblock Springer-Verlag, 2006.
+
 \end{thebibliography}
 
 \end{document}
@@ -1699,3 +1396,4 @@ J. Armstrong.
 %%% mode: latex
 %%% TeX-master: t
 %%% End: 
+

@@ -36,7 +36,7 @@ import de.zib.scalaris.CustomOtpObject;
  * </p>
  * 
  * <p>
- * Run with {@code java -cp scalaris-examples.jar de.zib.scalaris.examples.FastStringBenchmark}
+ * Run with <code>java -cp scalaris-examples.jar de.zib.scalaris.examples.FastStringBenchmark</code>
  * </p>
  * 
  * @author Nico Kruber, kruber@zib.de

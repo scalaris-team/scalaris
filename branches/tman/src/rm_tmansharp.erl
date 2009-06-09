@@ -131,11 +131,7 @@ loop(Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache) -
 			Pid ! {get_predlist_response, get_preds(View)},
             loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
     	{stabilize,AktToken} -> % new stabilization interval
-
-            case View of
-                [] -> io:format("~p is leer ~n",[self()]);
-                _  -> io:format("~p ~p~n",[self(),length(View)])
-            end,                
+              
             % Triger an update of the Random view
             get_cyclon_pid() ! {get_subset_max_age,RandViewSize,self()},
             RndView=get_RndView(RandViewSize,RandomCache),

@@ -65,7 +65,7 @@ bootstart(){
 
 debug(){
     # look into epmd -list: boot or node
-    erl -setcookie "$SCALARIS_COOKIE" -name rem -remsh boot
+    erl -setcookie "$SCALARIS_COOKIE" -name rem -remsh boot@`hostname -f`
 }
 
 bootstop(){
@@ -74,7 +74,7 @@ bootstop(){
 	-name ctl \
 	-pa $BEAMDIR \
 	-noinput \
-	-s scalaris_ctl -extra boot stop
+	-s scalaris_ctl -extra boot@`hostname -f` stop
     popd > /dev/null
 }
 
@@ -103,7 +103,7 @@ nodestop(){
 	-name ctl \
 	-pa $BEAMDIR \
 	-noinput \
-	-s scalaris_ctl -extra node stop
+	-s scalaris_ctl -extra node@`hostname -f` stop
     popd > /dev/null
 }
 

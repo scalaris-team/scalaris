@@ -72,10 +72,7 @@ node_health(Details,Ring) ->
     P = fun(A, AccIn) -> A + AccIn end,
     Error = (lists:foldr( P , 0, NormPs)*CorrectFakP+lists:foldr( P , 0, NormSs)*CorrectFakS)/2,
     %io:format("~p~n",[{NormPs,NormSs}]),
-    Error;
-
-node_health(failed,_Ring) ->
-    0.
+    Error.
 
 norm([],_) ->
     [];
@@ -88,10 +85,6 @@ save_abs(H,X) ->
         _ -> X
 	end.
 
-is_valid({ok, _}) ->
-    true;
-is_valid({failed}) ->
-    false.
 
 
 get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->

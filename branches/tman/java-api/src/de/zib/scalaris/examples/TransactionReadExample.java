@@ -26,7 +26,7 @@ import de.zib.scalaris.TransactionNotFinishedException;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Provides an example for using the {@code read} method of the
+ * Provides an example for using the <code>read</code> method of the
  * {@link Transaction} class.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -39,8 +39,8 @@ public class TransactionReadExample {
 	 * the {@link Transaction#read(String)} and
 	 * {@link Transaction#readObject(OtpErlangString)} methods in a single
 	 * transaction.<br />
-	 * If no keys are given, the default keys {@code "key1"}, {@code "key2"},
-	 * {@code "key3"} are used.
+	 * If no keys are given, the default keys <code>"key1"</code>, <code>"key2"</code>,
+	 * <code>"key3"</code> are used.
 	 * 
 	 * @param args
 	 *            command line arguments (optional keys to look up)

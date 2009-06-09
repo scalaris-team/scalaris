@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,7 +39,7 @@ public class Main {
 	 * Queries the command line options for an action to perform.
 	 * 
 	 * <pre>
-	 * {@code
+	 * <code>
 	 * > java -jar scalaris.jar -help
 	 * usage: scalaris
 	 *  -getsubscribers <topic>   get subscribers of a topic
@@ -50,7 +50,7 @@ public class Main {
 	 *  -unsubscribe <params>     unsubscribe from a topic: <topic> <url>
 	 *  -write <params>           write an item: <key> <value>
 	 *  -minibench                run mini benchmark
-	 * }
+	 * </code>
 	 * </pre>
 	 * 
 	 * @param args

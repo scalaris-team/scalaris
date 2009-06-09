@@ -267,30 +267,27 @@ get_RndView(N,Cache) ->
 update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
     OldView=lists:usort(Preds++Succs),
     NewView=lists:usort(PredsNew++SuccsNew),
-    %OldTargets=failuredetector2:getmytargets(),
-    %AktFD=length(failuredetector2:getmytargets()),
-		%AktPS=length(lists:usort(Preds++Succs)),
-		%io:format("RM ~p | Old ~p ~p~n",[self(),AktFD,AktPS]),
-		case (NewView /= OldView) of
+						%OldTargets=failuredetector2:getmytargets(),
+						%AktFD=length(failuredetector2:getmytargets()),
+						%AktPS=length(lists:usort(Preds++Succs)),
+						%io:format("RM ~p | Old ~p ~p~n",[self(),AktFD,AktPS]),
+    case (NewView /= OldView) of
         true ->
-            	
-                %io:format("#~n"),
-                %NewNodes = lists:usort(minus(PredsNew,Preds)++minus(SuccsNew,Succs)),
-                %OldNodes = lists:usort(minus(Preds,PredsNew)++minus(Succs,SuccsNew)),
-                NewNodes = util:minus(NewView,OldView),
-                OldNodes = util:minus(OldView,NewView),
-                %io:format("~p : in: ~p | out: ~p~n",[self(),length(NewNodes),length(OldNodes)]),
-                %io:format("~p : in: ~p | out: ~p~n",[self(),NewNodes,OldNodes]),
-                
-                update_fd([node:pidX(Node) || Node <- OldNodes],fun failuredetector2:unsubscribe/1),
-           		update_fd([node:pidX(Node) || Node <- NewNodes],fun failuredetector2:subscribe/1);
-                
-        		
-		false ->
-            	NewNodes = util:minus(NewView,OldView),
-                OldNodes = util:minus(OldView,NewView),
-              	ok
-		end,
+	    
+						%io:format("#~n"),
+						%NewNodes = lists:usort(minus(PredsNew,Preds)++minus(SuccsNew,Succs)),
+						%OldNodes = lists:usort(minus(Preds,PredsNew)++minus(Succs,SuccsNew)),
+	    NewNodes = util:minus(NewView,OldView),
+	    OldNodes = util:minus(OldView,NewView),
+						%io:format("~p : in: ~p | out: ~p~n",[self(),length(NewNodes),length(OldNodes)]),
+						%io:format("~p : in: ~p | out: ~p~n",[self(),NewNodes,OldNodes]),
+	    update_fd([node:pidX(Node) || Node <- OldNodes],fun failuredetector2:unsubscribe/1),
+	    update_fd([node:pidX(Node) || Node <- NewNodes],fun failuredetector2:subscribe/1);
+	false ->
+	    _NewNodes = util:minus(NewView,OldView),
+	    _OldNodes = util:minus(OldView,NewView),
+	    ok
+    end,
     %NewAktPS=length(NewView),
     %NewTargets=failuredetector2:getmytargets(),
     %NewAktFD=length(NewTargets),

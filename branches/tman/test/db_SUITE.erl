@@ -49,24 +49,40 @@ suite() ->
 init_per_suite(Config) ->
     crypto:start(),
     ct:pal("DB suite running with: ~p~n", [?DB]),
-    Config.
+    case ?DB of
+	cs_db_otp ->
+	    Pid = spawn(fun () ->
+				process_dictionary:start_link_for_unittest(),
+				?DB:start_link("db_SUITE.erl"),
+				timer:sleep(30000)
+			end),
+	    timer:sleep(100),
+	    [{wrapper_pid, Pid} | Config];
+	db_gb_trees ->
+	    Config;
+	db_ets ->
+	    Config
+    end.
 
 end_per_suite(_Config) ->
     crypto:stop(),
     ok.
 
 read(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     ?assert(?DB:read(DB, "Unknown") == failed),
     ok.
 
 write(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     DB2 = ?DB:write(DB, "Key1", "Value1", 1),
     ?assert(?DB:read(DB2, "Key1") == {ok, "Value1", 1}),
     ok.
 
 write_lock(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     % lock on a key
     {DB2, ok}     = ?DB:set_write_lock(DB, "WriteLockKey1"),
@@ -83,6 +99,7 @@ write_lock(_Config) ->
     ok.
 
 read_lock(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     % read lock on new key should fail
     {DB2, failed} = ?DB:set_read_lock(DB, "ReadLockKey1"),
@@ -100,6 +117,7 @@ read_lock(_Config) ->
     ok.
 
 read_write_lock(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     DB2           = ?DB:write(DB, "ReadWriteLockKey1", "Value1", 1),
     {DB3, ok}     = ?DB:set_read_lock(DB2, "ReadWriteLockKey1"),
@@ -108,6 +126,7 @@ read_write_lock(_Config) ->
     ok.
 
 write_read_lock(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     DB2 = ?DB:write(DB, "WriteReadLockKey1", "Value1", 1),
     {DB3, ok} = ?DB:set_write_lock(DB2, "WriteReadLockKey1"),
@@ -116,6 +135,7 @@ write_read_lock(_Config) ->
     ok.
 
 delete(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     DB2 = ?DB:write(DB, "Key1", "Value1", 1),
     {DB3, ok} = ?DB:delete(DB2, "Key1"),
@@ -127,6 +147,7 @@ delete(_Config) ->
     ok.
 
 get_load_and_middle(_Config) ->
+    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(),
     ?assert(?DB:get_load(DB) == 0),
     DB2 = ?DB:write(DB, "Key1", "Value1", 1),

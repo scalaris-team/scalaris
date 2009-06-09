@@ -33,7 +33,7 @@
 %% contains information about the item and the transaction
 %% status: prepared/local_abort/commit/abort
 -record(logentry, {status, key, rkey, value, version, operation,
-		   transactionID, tms}).
+                   transactionID, tms}).
 
 %% the vote of a participant
 -record(vote, {transactionID, key, rkey, decision, timestamp}).
@@ -45,12 +45,12 @@
 -record(tm_message, {transaction_id, tm_key, message}).
 
 %% the state of a transaction manager
--record(tm_state, {transID,  items, leader,  myBallot, rtms,
-		   votes, vote_acks, read_vote_acks, decisions,
-		   rtms_found, tps_found, status, decision}).
+-record(tm_state, {transID,  items, numitems, leader,  myBallot, rtms,
+                   votes, vote_acks, read_vote_acks, decisions,
+                   rtms_found, tps_found, status, decision}).
 
 %% information on an item hold by a transaction manager
--record(tm_item, {key, value, version, operation, tps}).
+-record(tm_item, {key, value, version, operation, tps, tps_found}).
 
 %-define(TLOG(X), io:format("TRANSACTION ~p:~p ~p~n" ,[?MODULE, ?LINE, X])).
 %-define(TLOG2(X, Y), io:format("TRANSACTION ~p:~p ~p ~p ~n" ,[?MODULE, ?LINE, X, Y])).

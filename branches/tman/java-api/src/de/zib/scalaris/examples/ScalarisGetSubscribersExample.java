@@ -26,7 +26,7 @@ import de.zib.scalaris.Scalaris;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Provides an example for using the {@code getSubscribers} methods of the
+ * Provides an example for using the <tt>getSubscribers</tt> methods of the
  * {@link Scalaris} class.
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -36,9 +36,9 @@ import de.zib.scalaris.UnknownException;
 public class ScalarisGetSubscribersExample {
 	/**
 	 * Prints a list of all subscribers to a given topic, provided on the
-	 * command line with the {@code getSubscribers} methods of
+	 * command line with the <tt>getSubscribers</tt> methods of
 	 * {@link Scalaris}.<br />
-	 * If no topic is given, the default topic {@code "topic"} is used.
+	 * If no topic is given, the default topic <tt>"topic"</tt> is used.
 	 * 
 	 * @param args
 	 *            command line arguments (first argument can be an optional

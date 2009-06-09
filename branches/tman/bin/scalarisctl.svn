@@ -58,23 +58,23 @@ bootstart(){
 	    -boot_cs docroot "\"$DOCROOTDIR\"" \
 	    -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
 	    -boot_cs local_config "\"$ETCDIR/scalaris.local.cfg\"" \
-	    -connect_all false -hidden -sname boot@$HOST \
+	    -connect_all false -hidden -name boot \
 	    -s boot;
 	popd > /dev/null
 }
 
 debug(){
     # look into epmd -list: boot@ or node@
-    erl -setcookie "$SCALARIS_COOKIE" -sname rem -remsh boot@$HOST
+    erl -setcookie "$SCALARIS_COOKIE" -name rem -remsh boot@`hostname -f`
 }
 
 bootstop(){
     pushd $BEAMDIR > /dev/null
     erl -setcookie "$SCALARIS_COOKIE" \
-	-sname ctl \
+	-name ctl \
 	-pa $BEAMDIR \
 	-noinput \
-	-s scalaris_ctl -extra boot@$HOST stop
+	-s scalaris_ctl -extra boot@`hostname -f` stop
     popd > /dev/null
 }
 
@@ -89,7 +89,7 @@ nodestart(){
 	    -chordsharp docroot "\"$NODEDOCROOTDIR\"" \
 	    -chordsharp config "\"$ETCDIR/scalaris.cfg\"" \
 	    -chordsharp local_config "\"$ETCDIR/scalaris.local.cfg\"" \
-	    -connect_all false -hidden -sname node@$HOST \
+	    -connect_all false -hidden -name node \
 	    -noinput \
 	    -detached \
 	    -s chordsharp;
@@ -100,10 +100,10 @@ nodestart(){
 nodestop(){
     pushd $BEAMDIR > /dev/null
     erl -setcookie "$SCALARIS_COOKIE" \
-	-sname ctl \
+	-name ctl \
 	-pa $BEAMDIR \
 	-noinput \
-	-s scalaris_ctl -extra node@$HOST stop
+	-s scalaris_ctl -extra node@`hostname -f` stop
     popd > /dev/null
 }
 

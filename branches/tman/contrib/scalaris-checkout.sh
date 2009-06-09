@@ -30,15 +30,16 @@ fi
 
 if [ ${result} -eq 0 ]; then
   tarfile="${folder}-svn${revision}.tar.bz2"
+  newfoldername="${folder}-svn${revision}"
   echo "making ${tarfile} ..."
-  tar -cjf ${tarfile} ${folder} --exclude-vcs
+  mv "${folder}" "${newfoldername}" && tar -cjf ${tarfile} ${newfoldername} --exclude-vcs && mv "${newfoldername}" "${folder}"
   result=$?
 fi
 
 if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
   #cp ${name}-${revision}/contrib/scalaris.spec ./scalaris.spec.svn
-  sed "s/%define pkg_version 0.0.1/%define pkg_version svn${revision}/g" < ${folder}/contrib/scalaris.spec > ./scalaris.spec
+  sed "s/%define pkg_version .*/%define pkg_version svn${revision}/g" < ${folder}/contrib/scalaris.spec > ./scalaris.spec
   result=$?
 fi
 
