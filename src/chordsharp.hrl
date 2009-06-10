@@ -39,8 +39,12 @@
 -define(DB, db_ets).
 
 %%Standard chord ring maintenance
--define(RM, rm_chord).
+-define(RM, rm_tman).
 
 %% ring maintenance by T-man
 %-define(RM, rm_tman).
+
+%% ring maintenance by T-man-Sharp
+%-define(RM, rm_tmansharp).
+
 
