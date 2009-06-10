@@ -120,7 +120,7 @@ loop(Cache,Node,Cycles) ->
 				NewCache = 
         	case cache:size(Cache) of
 						0 ->
-                        log:log(warn,"[ CY | ~p] Cache is empty",[self()]),
+                        %log:log(warn,"[ CY | ~p] Cache is empty",[self()]),
 					  	Cache;	
 				    _  ->
 					   enhanced_shuffle(Cache,Node)
