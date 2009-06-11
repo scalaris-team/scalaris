@@ -82,8 +82,7 @@ loop_profile(Module, State, {Options, Slowest} = _ComponentState) ->
 	    case fprof:apply(Module, on, [Message, State]) of
 		unknown_event ->
 		    {NewState, NewComponentState} = 
-			handle_unknown_event(Message, State, 
-					     {Options, Slowest}),
+			handle_unknown_event(Message, State,{Options, Slowest},Module),
 		    loop(Module, NewState, NewComponentState);
 		kill ->
 		    ok;
@@ -109,7 +108,7 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
 		unknown_event ->
 		    {NewState, NewComponentState} = 
 			handle_unknown_event(Message, State, 
-					     {Options, Slowest}),
+					     {Options, Slowest},Module),
 		    loop(Module, NewState, NewComponentState);
 		kill ->
 		    ok;
@@ -118,6 +117,6 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
 	    end
     end.
 
-handle_unknown_event(UnknownMessage, State, ComponentState) ->
-    io:format("unknown message: ~p~n", [UnknownMessage]),
+handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->
+   log:log(warn,"unknown message: ~p in ~p~n",[UnknownMessage,Module]),
     {State, ComponentState}.

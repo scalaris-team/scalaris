@@ -32,6 +32,7 @@
 -behaviour(gen_component).
 
 -export([start_link/1, start_link/2]).
+
 -export([on/2, init/1]).
 
 % state of the cs_node loop
@@ -360,7 +361,10 @@ init([_InstanceId, Options]) ->
 	true ->
 	    ok;
 	false ->
-	    timer:sleep(crypto:rand_uniform(1, 100) * 100)
+        %timer:sleep(crypto:rand_uniform(1, 100) * 100)
+        %Workaround to spawn not so much nodes a the same time
+        % @TODO: put the delay in admin:add_nodes() !
+        ok
     end,
     Id = cs_keyholder:get_key(),
     {First, State} = cs_join:join(Id),
