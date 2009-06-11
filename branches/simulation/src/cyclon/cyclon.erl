@@ -26,6 +26,9 @@
 -import(erlang).
 -import(node).
 -import(log).
+
+-behaviour(gen_component).
+
 %% API
 -export([start_link/1, start/1]).
 
