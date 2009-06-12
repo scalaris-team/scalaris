@@ -118,5 +118,5 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
     end.
 
 handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->
-   log:log(warn,"unknown message: ~p in ~p~n",[UnknownMessage,Module]),
+   log:log(error,"unknown message: ~p in ~p~n",[UnknownMessage,Module]),
     {State, ComponentState}.

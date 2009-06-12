@@ -26,6 +26,7 @@
 -import(erlang).
 -import(node).
 -import(log).
+-import(gen_component).
 
 -behaviour(gen_component).
 
@@ -70,6 +71,16 @@ init(_Args) ->
 %% State: {preshuffle|shuffle}
 %% Cycles: the amount of shuffle-cycles
 
+
+% state of cyclon 
+%-type(state() :: {null|cyclon.cache:cache(),null|cs_node(),integer()}).
+-type(state() :: {any(),any(),integer()}).
+
+% accepted messages of cs_node processes
+-type(message() :: any()).
+
+%% @doc message handler
+-spec(on/2 :: (message(), state()) -> state()).
 on({get_ages,Pid},{Cache,Node,Cycles}) ->
     Pid ! {ages,cache:ages(Cache)},
     {Cache,Node,Cycles};
@@ -116,13 +127,10 @@ on({'$gen_cast', {debug_info, Requestor}},{Cache,Node,Cycles})  ->
 					      	]},
 	    {Cache,Node,Cycles};
 
+on({shuffle},{Cache,null,Cycles}) ->
+     {Cache,null,Cycles};
 on({shuffle},{Cache,Node,Cycles}) 	->
-	 	case Node of	
-			nil ->
-				{Cache,Node,Cycles};
-		  _	->
-				NewCache = 
-        	case cache:size(Cache) of
+	 NewCache =	case cache:size(Cache) of
 						0 ->
                         %log:log(warn,"[ CY | ~p] Cache is empty",[self()]),
 					  	Cache;	
@@ -130,8 +138,8 @@ on({shuffle},{Cache,Node,Cycles}) 	->
 					   enhanced_shuffle(Cache,Node)
 					end,
 				erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-				{NewCache,Node,Cycles+1}
-		end;
+		{NewCache,Node,Cycles+1};
+		
 on({cy_subset,P,Subset},{Cache,Node,Cycles}) ->
 		%io:format("subset~n", []),
 		ForSend=cache:get_random_subset(get_L(Cache),Cache),

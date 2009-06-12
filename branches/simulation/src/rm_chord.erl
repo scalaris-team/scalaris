@@ -26,9 +26,12 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([start/2]).
+
 
 -behavior(ring_maintenance).
+-behavior(gen_component).
+
+-export([init/1,on/2]).
 
 -export([start_link/1, initialize/4, 
 	 get_successorlist/0, succ_left/1, pred_left/1, 
@@ -45,20 +48,27 @@
 %% @doc spawns a chord-like ring maintenance process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-    Link = spawn_link(?MODULE, start, [InstanceId, self()]),
-    receive
-	start_done ->
-	    ok
-    end,
-    {ok, Link}.
+    start_link(InstanceId, []).
 
-%% @doc called once by the cs_node when joining the ring
+start_link(InstanceId,Options) ->
+   gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, ring_maintenance}]).
+
+
+%% @doc called once by the cs_node when joining the ring in cs_join.erl
 initialize(Id, Me, Pred, Succ) ->
     get_pid() ! {init, Id, Me, Pred, [Succ], self()},
-    receive
-	{init_done} ->
-	    ok
-    end.
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Startup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc starts ring maintenance
+
+init(_Args) ->
+    log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
+    timer:send_interval(config:stabilizationInterval(), self(), {stabilize}),
+    uninit.
+    
 
 get_successorlist() ->
     get_pid() ! {get_successorlist, self()},
@@ -108,34 +118,31 @@ get_predlist() ->
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start() ->
-    receive
-	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
-	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-	    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-	    failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
-	    CSNode ! {init_done},
-	    loop(NewId, NewMe, NewPred, NewSuccList)
-    end.
-
-loop(Id, Me, Pred, Succs) ->
-    receive
-	{get_successorlist, Pid} ->
+%set info for cs_node
+on({init, NewId, NewMe, NewPred, NewSuccList, CSNode},uninit) ->
+        ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
+        cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
+        failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
+        %CSNode ! {init_done},
+        {NewId, NewMe, NewPred, NewSuccList};
+on(_,uninit) ->
+        uninit;
+on({get_successorlist, Pid},{Id, Me, Pred, Succs})  ->
 	    Pid ! {get_successorlist_response, Succs},
-	    loop(Id, Me, Pred, Succs);
-    {get_predlist, Pid} ->
+	    {Id, Me, Pred, Succs};
+on({get_predlist, Pid},{Id, Me, Pred, Succs})  ->
         Pid ! {get_predlist_response, [Pred]},
-       	loop(Id, Me, Pred, Succs);
+       	{Id, Me, Pred, Succs};
 
-	{stabilize} -> % new stabilization interval
+on({stabilize},{Id, Me, Pred, Succs})  -> % new stabilization interval
         case Succs of
             [] -> 
                 ok;
             _  -> 
                 cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
         end,
-	    loop(Id, Me, Pred, Succs);
-	{get_pred_response, SuccsPred} ->
+	    {Id, Me, Pred, Succs};
+on({get_pred_response, SuccsPred},{Id, Me, Pred, Succs})  ->
 	    case node:is_null(SuccsPred) of
 		false ->
 		    case util:is_between_stab(Id, node:id(SuccsPred), node:id(hd(Succs))) of
@@ -143,53 +150,52 @@ loop(Id, Me, Pred, Succs) ->
 			    cs_send:send(node:pidX(SuccsPred), {get_succ_list, cs_send:this()}),
 			    ring_maintenance:update_succ_and_pred(Pred, SuccsPred),
 			    failuredetector2:subscribe(node:pidX(SuccsPred)),
-			    loop(Id, Me, Pred, [SuccsPred | Succs]);
+			    {Id, Me, Pred, [SuccsPred | Succs]};
 			false ->
 			    cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
-			    loop(Id, Me, Pred, Succs)
+			    {Id, Me, Pred, Succs}
 		    end;
 		true ->
 		    cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
-		    loop(Id, Me, Pred, Succs)
+		    {Id, Me, Pred, Succs}
 	    end;
-	{get_succ_list_response, Succ, SuccsSuccList} ->
+on({get_succ_list_response, Succ, SuccsSuccList},{Id, Me, Pred, Succs})  ->
 	    NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), config:succListLength()),
 	    %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
 	    cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
 	    ring_maintenance:update_succ_and_pred(Pred, hd(NewSuccs)), 
 	    failuredetector2:subscribe([node:pidX(Node) || Node <- NewSuccs]),
-	    loop(Id, Me, Pred, NewSuccs);
-	{notify, NewPred} ->
+	    {Id, Me, Pred, NewSuccs};
+on({notify, NewPred},{Id, Me, Pred, Succs})  ->
 	    case node:is_null(Pred) of
 		true ->
 		    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
 		    failuredetector2:subscribe(node:pidX(NewPred)),
-		    loop(Id, Me, NewPred, Succs);
+		    {Id, Me, NewPred, Succs};
 		false ->
 		    case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
 			true ->
 			    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
 			    failuredetector2:subscribe(node:pidX(NewPred)),
-			    loop(Id, Me, NewPred, Succs);
+			    {Id, Me, NewPred, Succs};
 			false ->
-			    loop(Id, Me, Pred, Succs)
+			    {Id, Me, Pred, Succs}
 		    end
 	    end;
-	{crash, DeadPid} ->
+on({crash, DeadPid},{Id, Me, Pred, Succs})  ->
 	    case node:is_null(Pred) orelse DeadPid == node:pidX(Pred) of
 		true ->
-		    loop(Id, Me, node:null(), filter(DeadPid, Succs));
+		    {Id, Me, node:null(), filter(DeadPid, Succs)};
 		false ->
-		    loop(Id, Me, Pred, filter(DeadPid, Succs))
+		    {Id, Me, Pred, filter(DeadPid, Succs)}
 	    end;
-	{'$gen_cast', {debug_info, Requestor}} ->
+on({'$gen_cast', {debug_info, Requestor}},{Id, Me, Pred, Succs})  ->
 	    Requestor ! {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Pred]))}, 
 					       {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]},
-	    loop(Id, Me, Pred, Succs);
-	X ->
-	   log:log(warn,"[ RM ] unknown message ~p~n", [X]),
-	    loop(Id, Me, Pred, Succs)
-    end.
+	    {Id, Me, Pred, Succs};
+
+on(_, _State) ->
+    unknown_event.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
@@ -216,16 +222,7 @@ filter(Pid, [Succ | Rest]) ->
 	    [Succ | filter(Pid, Rest)]
     end.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc starts ring maintenance
-start(InstanceId, Sup) ->
-    process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-   log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
-    timer:send_interval(config:stabilizationInterval(), self(), {stabilize}),
-    Sup ! start_done,
-    start().
+
 
 % @private
 get_pid() ->

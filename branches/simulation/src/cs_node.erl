@@ -361,8 +361,8 @@ init([_InstanceId, Options]) ->
 	true ->
 	    ok;
 	false ->
-        %timer:sleep(crypto:rand_uniform(1, 100) * 100)
-        %Workaround to spawn not so much nodes a the same time
+        % timer:sleep(crypto:rand_uniform(1, 100) * 100),
+        % Workaround to spawn not so much nodes a the same time
         % @TODO: put the delay in admin:add_nodes() !
         ok
     end,
