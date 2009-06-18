@@ -12,7 +12,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : rm_tman.erl
+%%% File    : dn_cache.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
 %%% Description : T-Man ring maintenance
 %%%
@@ -26,8 +26,10 @@
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
+-export([init/1,on/2]).
+-behavior(gen_component).
 
--export([start_link/1, start/2,
+-export([start_link/1, 
 		subscribe/0,
 		unsubscribe/0,
 	 	add_zombie_candidate/1]).
@@ -41,12 +43,11 @@
 %% @doc spawns a Dead Node Cache
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-    Link = spawn_link(?MODULE, start, [InstanceId, self()]),
-	receive 
-        {init_done} ->
-            ok
-    end,
-    {ok, Link}.
+    start_link(InstanceId, []).
+
+start_link(InstanceId,Options) ->
+   gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, dn_cache}]).
+
 
 
 
@@ -64,46 +65,28 @@ unsubscribe() ->
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start() ->
+init(_ARG) ->
     erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
-	loop(fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()).
+	{fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()}.
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
-loop(Queue,Subscriber) ->
- 	receive
-	{zombiehunter} ->
-      	
+
+on({zombiehunter},{Queue,Subscriber}) ->
         fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this(),X}) end,Queue), 
         erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
-        loop(Queue,Subscriber);
-	{pong,Zombie} ->
+        {Queue,Subscriber};
+on({pong,Zombie},{Queue,Subscriber}) ->
         gb_sets:fold(fun (X,_) -> X ! {zombie,Zombie} end,0, Subscriber),
-        loop(Queue,Subscriber);
-	{add_zombie_candidate, Node} ->
-		loop(fix_queue:add(Node,Queue),Subscriber);
-    {subscribe,Node} ->
-		loop(Queue,gb_sets:insert(Node,Subscriber));
-	{unsubscribe,Node} ->
-		loop(Queue,gb_sets:del_element(Node,Subscriber))
-	end.
-
-
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc starts ring maintenance
-start(InstanceId, Sup) ->
-    process_dictionary:register_process(InstanceId, dn_cache, self()),
-   	log:log(info,"[ DNC ~p ] starting DeadNodeCache", [self()]),
-    Sup ! {init_done},
-    start().
-
+        {Queue,Subscriber};
+on({add_zombie_candidate, Node},{Queue,Subscriber}) ->
+		{fix_queue:add(Node,Queue),Subscriber};
+on({subscribe,Node},{Queue,Subscriber}) ->
+		{Queue,gb_sets:insert(Node,Subscriber)};
+on({unsubscribe,Node},{Queue,Subscriber}) ->
+		{Queue,gb_sets:del_element(Node,Subscriber)};
+on(_, _State) ->
+    unknown_event.
 % @private
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), dn_cache).

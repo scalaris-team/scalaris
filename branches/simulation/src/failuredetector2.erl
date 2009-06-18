@@ -26,88 +26,75 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behaviour(gen_server).
+-behaviour(gen_component).
+
+-export([init/1, on/2]).
 
 -export([start_link/0, subscribe/1, unsubscribe/1,remove_subscriber/1,getmytargets/0]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([terminate/2, code_change/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc generates a failure detector for the calling process on the given pid.
--spec(subscribe/1 :: (cs_send:mypid() | list(cs_send:mypid())) -> ok).
+%-spec(subscribe/1 :: (cs_send:mypid() | list(cs_send:mypid())) -> ok).
 subscribe(PidList) when is_list(PidList) ->
 		%log:log(debug,"Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),PidList]),
-    gen_server:call(?MODULE, {subscribe_list, PidList, self()}, 20000);
+    get_pid() ! {subscribe_list, PidList, self()},
+    ok;
 subscribe(Pid) ->
 		%log:log(debug,"Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),Pid]),
-    gen_server:call(?MODULE, {subscribe_list, [Pid], self()}, 20000).
+    get_pid() ! {subscribe_list, [Pid], self()},
+    ok.
 
 %% @doc deletes the failure detector for the given pid.
 -spec(unsubscribe/1 :: (cs_send:mypid()) -> ok).
 unsubscribe(TargetList) when is_list(TargetList) ->
-    gen_server:call(?MODULE, {unsubscribe_list, TargetList, self()}, 20000);
+    get_pid() ! {unsubscribe_list, TargetList, self()};
 unsubscribe(Target) ->
-    gen_server:call(?MODULE, {unsubscribe_list, [Target], self()}, 20000).
+    get_pid() ! {unsubscribe_list, [Target], self()}.
 
 %% 
 -spec(remove_subscriber/1 :: (pid()) -> ok).
 remove_subscriber(Pid) ->
-    gen_server:call(?MODULE, {remove_subscriber, Pid}, 20000).
+    get_pid() ! {remove_subscriber, Pid}.
     
 getmytargets()  ->
-    gen_server:call(?MODULE, {getmytargets, self()}, 20000).	
+    get_pid() ! {getmytargets, self()}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ping Process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 start_pinger(Pid) ->
-    spawn(fun() ->
-		  loop_ping(Pid, 0)
-	  end).
+   {ok,Pid2} = fd_pinger:start_link([get_pid(),Pid]),
+   Pid2.
 
-loop_ping(Pid, Count) ->
-    cs_send:send(Pid, {ping, cs_send:this(), Count}),
-    erlang:send_after(config:failureDetectorInterval(), self(), {timeout}), 
-    receive
-	{stop} ->
-	    ok;
-	{pong, _Count} ->
-	    receive
-		{timeout} ->
-		    loop_ping(Pid, Count + 1)
-	    end;
-	{timeout} ->
-     	    report_crash(Pid)
-	    %loop_ping(Pid, Count + 1)
-    end.
+%% loop_ping(Pid, Count) ->
+%%     cs_send:send(Pid, {ping, cs_send:this(), Count}),
+%%     erlang:send_after(config:failureDetectorInterval(), self(), {timeout}), 
+%%     receive
+%% 	{stop} ->
+%% 	    ok;
+%% 	{pong, _Count} ->
+%% 	    receive
+%% 		{timeout} ->
+%% 		    loop_ping(Pid, Count + 1)
+%% 	    end;
+%% 	{timeout} ->
+%%      	    report_crash(Pid)
+%% 	    %loop_ping(Pid, Count + 1)
+%%     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Link Process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start_linker() ->
-    spawn(fun() ->
-		  process_flag(trap_exit, true),
-		  loop_link()
-	  end).
+%start_linker() ->
+%    fd_linker:start_link(randoms:getRandomId(),[get_pid(),{process_flag(trap_exit, true)}]).
 
-loop_link() ->
-    receive
-	{'EXIT', Pid, _Reason} ->
-	    remove_subscriber(Pid),
-	    loop_link();
-	{link, Pid} ->
-	    link(Pid),
-	    loop_link();
-	{unlink, Pid} ->
-	    unlink(Pid),
-	    loop_link()
-    end.
 
 %%====================================================================
 %% API
@@ -116,8 +103,9 @@ loop_link() ->
 %% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
 %% Description: Starts the server
 %%--------------------------------------------------------------------
+
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+   gen_component:start_link(?MODULE, [], [{register_SP, failure_detector2}]).
 
 %%====================================================================
 %% gen_server callbacks
@@ -130,11 +118,11 @@ start_link() ->
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
-init([]) ->
-    process_dictionary:register_process("fd", failure_detector, self()),
+init(_Args) ->
     fd_db:init(),
-	Linker = start_linker(),
-    {ok, {Linker}}.
+    log:log(info,"[ FD ~p ] starting FD", [self()]),
+	%Linker = start_linker(),
+    {null}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -146,39 +134,34 @@ init([]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 %% @private
-handle_call({subscribe_list, PidList, Subscriber}, _From,{ Linker} = State) ->
+on({subscribe_list, PidList, Subscriber},State) ->
     % link subscriber
-    Linker ! {link, Subscriber},
+    % Linker ! {link, Subscriber},
     % make ping processes for subscription
     [make_pinger(Pid) || Pid <- PidList],
     % store subscription
     [subscribe( Pid, Subscriber) || Pid <- PidList],
-    {reply, ok, State};
-handle_call({unsubscribe_list, TargetList, Unsubscriber}, _From,{_Linker} = State) ->
+    State;
+on({unsubscribe_list, TargetList, Unsubscriber},{_Linker} = State) ->
 	[ unsubscribe(Target, Unsubscriber) || Target <- TargetList ],
-    {reply, ok, State};
+    {State};
 
-handle_call({crash, Target}, _From,  {_Linker} = State) ->
+on({crash, Target}, {_Linker} = State) ->
    	
     fd_db:del_pinger(fd_db:get_pinger(Target)),
-   	
-	Subscribers = fd_db:get_subscribers(Target),
-	    
-    case fd_db:get_subscribers(Target) of
+  	Subscribers = fd_db:get_subscribers(Target),
+	case fd_db:get_subscribers(Target) of
 		[] ->
 	    	log:log(error,"[ FD ] shouldn't happen1");
 		Subscribers ->
 	    	% notify and unsubscribe
 	    	[crash_and_unsubscribe(Target, Subscriber) || Subscriber <- Subscribers]
-   
     end,
-    {reply, ok, State};
+    {State};
 
-handle_call({remove_subscriber, Subscriber}, _From, 
-	    {_Linker} = State) ->
+on({remove_subscriber, Subscriber},{_Linker} = State) ->
     WatchedPids = fd_db:get_subscriptions(Subscriber),
     [ fd_db:del_subscription(Subscriber,WatchedPid) || WatchedPid <- WatchedPids ],
-
     lists:map(fun (WatchedPid) ->
                        case fd_db:get_subscribers(WatchedPid) of
                            [] ->
@@ -187,10 +170,13 @@ handle_call({remove_subscriber, Subscriber}, _From,
                                ok
                        end
               	end, WatchedPids),
-    {reply, ok, State};
-handle_call({getmytargets, Subscriber}, _From,{_Linker} = State) ->
+    {State};
+on({getmytargets, Subscriber},{_Linker} = State) ->
     Targets=fd_db:get_subscriptions(Subscriber),
-    {reply, Targets, State}.
+    Subscriber ! Targets,
+    State;
+ on(_, _State) ->
+    unknown_event.
 
 
 %%--------------------------------------------------------------------
@@ -200,8 +186,7 @@ handle_call({getmytargets, Subscriber}, _From,{_Linker} = State) ->
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
 %@private
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+
 
 %%--------------------------------------------------------------------
 %% Function: handle_info(Info, State) -> {noreply, State} |
@@ -210,8 +195,7 @@ handle_cast(_Msg, State) ->
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
 %% @private
-handle_info(_Info, State) ->
-    {noreply, State}.
+
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
@@ -278,8 +262,14 @@ crash_and_unsubscribe(Target, Subscriber) ->
     Subscriber ! {crash, Target},
     unsubscribe(Target,Subscriber).
 
--spec(report_crash/1 :: (cs_send:mypid()) -> ok).
-report_crash(Pid) ->
-    log:log(warn,"[ FD ] ~p crashed",[Pid]),
-    gen_server:call(?MODULE, {crash, Pid}, 20000).
+
+
+get_pid() ->
+    case whereis(failure_detector2) of
+        undefined ->
+            log:log(error, "[ FD ] call of get_pid undefined");
+        PID ->
+            log:log(info, "[ FD ] find right pid"),
+            PID
+    end.
     

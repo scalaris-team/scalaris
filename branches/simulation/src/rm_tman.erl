@@ -31,10 +31,8 @@
 
 
 -export([init/1,on/2]).
-
--behavior(ring_maintenance).
 -behavior(gen_component).
-
+-behavior(ring_maintenance).
 -export([start_link/1, initialize/4, 
 	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1, 
          update_succ/1, update_pred/1, 

@@ -25,8 +25,8 @@
 %@doc This module provides a mechanism to implement process
 %     groups. Within a process group, the names of processes have to
 %     be unique, but the same name can be used in different
-%     groups. The motivation for this module was to run several Chord#
-%     nodes in one erlang vm. But for the processes forming a Chord#
+%     groups. The motivation for this module was to run several scalaris
+%     nodes in one erlang vm. But for the processes forming a scalaris
 %     node being able to talk to each other, they have to now their
 %     names (cs_node, config, etc.). This module allows the processes
 %     to keep their names. 

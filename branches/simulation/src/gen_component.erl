@@ -62,8 +62,14 @@ start(Module, Args, Options, Supervisor) ->
 	    process_dictionary:register_process(InstanceId, Name, self()),
 	    Supervisor ! {started, self()};
 	false ->
-	    Supervisor ! {started, self()},
-	    ok
+            case lists:keysearch(register_SP, 1, Options) of
+            {value, {register_SP,Name}} ->
+                register(Name, self()),
+                Supervisor ! {started, self()};
+            false ->
+                Supervisor ! {started, self()},
+                ok
+            end
     end,
     InitialState = Module:init(Args),
     case lists:member(profile, Options) of
@@ -103,7 +109,8 @@ loop_profile(Module, State, {Options, Slowest} = _ComponentState) ->
 
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive
-	Message ->
+    Message ->
+        %io:format("~p ~p ~n", [Message, Module]),
 	    case Module:on(Message, State) of
 		unknown_event ->
 		    {NewState, NewComponentState} = 
