@@ -107,32 +107,13 @@ start_pinger(Pid) ->
 start_link() ->
    gen_component:start_link(?MODULE, [], [{register_SP, failure_detector2}]).
 
-%%====================================================================
-%% gen_server callbacks
-%%====================================================================
 
-%%--------------------------------------------------------------------
-%% Function: init(Args) -> {ok, State} |
-%%                         {ok, State, Timeout} |
-%%                         ignore               |
-%%                         {stop, Reason}
-%% Description: Initiates the server
-%%--------------------------------------------------------------------
 init(_Args) ->
     fd_db:init(),
     log:log(info,"[ FD ~p ] starting FD", [self()]),
 	%Linker = start_linker(),
     {null}.
 
-%%--------------------------------------------------------------------
-%% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
-%%                                      {reply, Reply, State, Timeout} |
-%%                                      {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, Reply, State} |
-%%                                      {stop, Reason, State}
-%% Description: Handling call messages
-%%--------------------------------------------------------------------
 %% @private
 on({subscribe_list, PidList, Subscriber},State) ->
     % link subscriber
@@ -175,6 +156,8 @@ on({getmytargets, Subscriber},{_Linker} = State) ->
     Targets=fd_db:get_subscriptions(Subscriber),
     Subscriber ! Targets,
     State;
+
+
  on(_, _State) ->
     unknown_event.
 
