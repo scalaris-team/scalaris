@@ -105,7 +105,7 @@ get_id(Node) ->
 
 
 %%===============================================================================
-%% comm_layer:comm_logger functions
+%% comm_logger functions
 %%===============================================================================
 get_dump() ->
     [cs_send:send(cs_send:get(admin_server, Server), {get_comm_layer_dump, cs_send:this()}) 
@@ -167,7 +167,7 @@ loop() ->
     receive
 	{get_comm_layer_dump, Sender} ->
 	    cs_send:send(Sender, {get_comm_layer_dump_response, 
-				  comm_layer.comm_logger:dump()}),
+				  comm_logger:dump()}),
 	    loop()
     end.
 

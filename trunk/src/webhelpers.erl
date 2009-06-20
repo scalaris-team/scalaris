@@ -41,10 +41,10 @@ isPost(A) ->
 %%%-----------------------------Lookup/Put---------------------------
 
 lookup(Key) ->
-    timer:tc(transstore.transaction_api, quorum_read, [Key]).
+    timer:tc(transaction_api, quorum_read, [Key]).
 
 set_key(Key, Value) ->
-    timer:tc(transstore.transaction_api, single_write, [Key, Value]).
+    timer:tc(transaction_api, single_write, [Key, Value]).
 
 %%%-----------------------------Load----------------------------------
 
@@ -283,15 +283,15 @@ renderIndexedRing({ok, Details}, Ring) ->
     PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, Ring, MyIndex, NIndex) end, PredList),
     SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, Ring, MyIndex, NIndex) end, SuccList),
     [FirstSuccIndex|_] = SuccIndices,
-    {tr, [], 
+    {tr, [],
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
        case is_list(PredIndex) orelse PredIndex =/= -1 of
            true -> case hd(PredIndex) == -1 of
                        true->
-                           {td, [], io_lib:format('~p', [PredIndex])};                                                      
+                           {td, [], io_lib:format('~p', [PredIndex])};
                        false ->
-                 			{td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
+                           {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
                    end;
            false -> {td, [], io_lib:format('~p', [PredIndex])}
        end,
@@ -305,7 +305,7 @@ renderIndexedRing({ok, Details}, Ring) ->
       ]};
 
 renderIndexedRing({failed}, _Ring) ->
-    {tr, [], 
+    {tr, [],
       [
        {td, [], "-"},
        {td, [], "-"},

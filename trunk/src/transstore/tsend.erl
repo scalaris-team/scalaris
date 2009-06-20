@@ -22,7 +22,7 @@
 %%%                  and replace the corresponding part in the message
 %%% Created : 20 Sep 2007 by Monika Moser <moser@zib.de>
 %%%-------------------------------------------------------------------
--module(transstore.tsend).
+-module(tsend).
 
 -author('moser@zib.de').
 -vsn('$Id$').

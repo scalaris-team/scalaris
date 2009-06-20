@@ -172,7 +172,7 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transstore.transaction", "translog_new",
+			connection.sendRPC("transaction", "translog_new",
 					new OtpErlangList());
 			// return value: []
 			received_raw = connection.receiveRPC();
@@ -222,7 +222,7 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transstore.transaction_api", "commit",
+			connection.sendRPC("transaction_api", "commit",
 					new OtpErlangList(transLog));
 			/*
 			 * possible return values:
@@ -300,7 +300,7 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transstore.transaction_api", "jRead",
+			connection.sendRPC("transaction_api", "jRead",
 					new OtpErlangList(new OtpErlangObject[] {key, transLog}));
 			/*
 			 * possible return values:
@@ -434,7 +434,7 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transstore.transaction_api", "jWrite",
+			connection.sendRPC("transaction_api", "jWrite",
 					new OtpErlangList(new OtpErlangObject[] {key, value, transLog}));
 			/*
 			 * possible return values:

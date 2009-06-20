@@ -18,7 +18,7 @@
 %%%
 %%% Created : 20 Sep 2007 by Monika Moser <moser@zib.de>
 %%%-------------------------------------------------------------------
--module(transstore.trecords).
+-module(trecords).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').
@@ -48,7 +48,7 @@
 -import(dict).
 -import(lists).
 -import(?RT).
--import(transstore.txlog).
+-import(txlog).
 
 %%--------------------------------------------------------------------
 %% Function: new_tm_state/4

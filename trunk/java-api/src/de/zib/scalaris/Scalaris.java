@@ -243,7 +243,7 @@ public class Scalaris {
 			NotFoundException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transstore.transaction_api", "quorum_read",
+			connection.sendRPC("transaction_api", "quorum_read",
 					new OtpErlangList(key));
 			received_raw = connection.receiveRPC();
 			OtpErlangTuple received = (OtpErlangTuple) received_raw;
@@ -378,7 +378,7 @@ public class Scalaris {
 			throws ConnectionException, TimeoutException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transstore.transaction_api", "single_write",
+			connection.sendRPC("transaction_api", "single_write",
 					new OtpErlangList(new OtpErlangObject[] { key, value }));
 			received_raw = connection.receiveRPC();
 			OtpErlangObject received = received_raw;
@@ -494,10 +494,10 @@ public class Scalaris {
 			throws ConnectionException {
 		try {
 			connection
-					.sendRPC("pubsub.pubsub_api", "publish", new OtpErlangList(
+					.sendRPC("pubsub_api", "publish", new OtpErlangList(
 							new OtpErlangObject[] { topic, content }));
 			/**
-             * The specification of <tt>pubsub.pubsub_api:publish/2</tt> states
+             * The specification of <tt>pubsub_api:publish/2</tt> states
              * that the only returned value is <tt>ok</tt>, so no further evaluation is
              * necessary.
 			 */
@@ -559,7 +559,7 @@ public class Scalaris {
 			TimeoutException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("pubsub.pubsub_api", "subscribe",
+			connection.sendRPC("pubsub_api", "subscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
 			received_raw = connection.receiveRPC();
 			OtpErlangObject received = received_raw;
@@ -648,7 +648,7 @@ public class Scalaris {
 			UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("pubsub.pubsub_api", "unsubscribe",
+			connection.sendRPC("pubsub_api", "unsubscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
 			received_raw = connection.receiveRPC();
 			OtpErlangObject received = received_raw;
@@ -753,7 +753,7 @@ public class Scalaris {
 			OtpErlangString topic) throws ConnectionException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("pubsub.pubsub_api", "get_subscribers",
+			connection.sendRPC("pubsub_api", "get_subscribers",
 					new OtpErlangList(topic));
 			// return value: [string,...]
 			received_raw = connection.receiveRPC();
@@ -861,7 +861,7 @@ public class Scalaris {
 	TimeoutException, UnknownException, NodeNotFoundException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transstore.transaction_api", "delete",
+			connection.sendRPC("transaction_api", "delete",
 					new OtpErlangList( new OtpErlangObject[] {
 							new OtpErlangString(key),
 							new OtpErlangInt(timeout) }));

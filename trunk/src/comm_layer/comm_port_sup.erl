@@ -21,7 +21,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(comm_layer.comm_port_sup).
+-module(comm_port_sup).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -61,21 +61,21 @@ init([]) ->
     InstanceId = string:concat("comm_port_", randoms:getRandomId()),
     CommPort =
 	{comm_port,
-	 {comm_layer.comm_port, start_link, []},
+	 {comm_port, start_link, []},
 	 permanent,
 	 brutal_kill,
 	 worker,
 	 []},
     CommAcceptor =
 	{comm_acceptor,
-	 {comm_layer.comm_acceptor, start_link, [InstanceId]},
+	 {comm_acceptor, start_link, [InstanceId]},
 	 permanent,
 	 brutal_kill,
 	 worker,
 	 []},
     CommLogger =
 	{comm_logger,
-	 {comm_layer.comm_logger, start_link, []},
+	 {comm_logger, start_link, []},
 	 permanent,
 	 brutal_kill,
 	 worker,

@@ -44,13 +44,12 @@ send_to_group_member(Csnodepid,Processname,Mesg) ->
 -spec(this/0 :: () -> mypid()).
 this() ->
     %self().
-    comm_layer.comm_layer:this().
+    comm_layer:this().
 
 -spec(send/2 :: (mypid(), any()) -> ok).
 send(Pid, Message) ->
     %Pid ! Message.
-    
-    comm_layer.comm_layer:send(Pid, Message).
+    comm_layer:send(Pid, Message).
 
 % get process Name on node Node
 get(Name, {IP, Port, _Pid}=_Node) ->

@@ -25,6 +25,6 @@
 -vsn('$Id$ ').
 
 % enable logging of message statistics
-%-define(LOG_MESSAGE(TAG, SIZE), comm_layer.comm_logger:log(TAG, SIZE)).
+%-define(LOG_MESSAGE(TAG, SIZE), comm_logger:log(TAG, SIZE)).
 -define(LOG_MESSAGE(TAG, SIZE), ok).
 

@@ -25,7 +25,7 @@
 
 -compile(export_all).
 
--import(transstore.transaction_api, [read2/2, write2/3]).
+-import(transaction_api, [read2/2, write2/3]).
 
 -include("unittest.hrl").
 
@@ -80,7 +80,7 @@ process(Parent, MyAccount, OtherAccount, Count) ->
 process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
     Parent ! {done, AbortCount};
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
-    case transstore.transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
+    case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
 	{success, {commit, _Y}} ->
 	    process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
 	{failure, abort} ->
@@ -90,18 +90,18 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     end.
 
 banking_account(_Config) ->
-    ?equals(transstore.transaction_api:single_write("a", 1000), commit),
-    ?equals(transstore.transaction_api:single_write("b", 0), commit),
-    ?equals(transstore.transaction_api:single_write("c", 0), commit),
+    ?equals(transaction_api:single_write("a", 1000), commit),
+    ?equals(transaction_api:single_write("b", 0), commit),
+    ?equals(transaction_api:single_write("c", 0), commit),
     Self = self(),
     Count = 100,
     spawn(banking_account_SUITE, process, [Self, "a", "c", Count]),
     spawn(banking_account_SUITE, process, [Self, "b", "a", Count]),
     spawn(banking_account_SUITE, process, [Self, "c", "b", Count]),
     _Aborts = wait_for_done(3),
-    {A, _} = transstore.transaction_api:quorum_read("a"),
-    {B, _} = transstore.transaction_api:quorum_read("b"),
-    {C, _} = transstore.transaction_api:quorum_read("c"),
+    {A, _} = transaction_api:quorum_read("a"),
+    {B, _} = transaction_api:quorum_read("b"),
+    {C, _} = transaction_api:quorum_read("c"),
     ct:pal("balance: ~p ~p ~p~n", [A, B, C]),
     ?equals(A + B + C, 1000),
     ok.
