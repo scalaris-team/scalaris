@@ -76,7 +76,7 @@ init([]) ->
      },
     CommunicationPort = {
       comm_port,
-      {comm_layer.comm_layer, start_link, []},
+      {comm_layer, start_link, []},
       permanent,
       brutal_kill,
       worker,

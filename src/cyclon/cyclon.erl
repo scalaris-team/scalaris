@@ -6,13 +6,13 @@
 %%% Created :  1 Dec 2008 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fÃ¼r Informationstechnik Berlin
 %% @version $Id $
 %% @reference S. Voulgaris, D. Gavidia, M. van Steen. CYCLON: 
 %% Inexpensive Membership Management for Unstructured P2P Overlays. 
 %% Journal of Network and Systems Management, Vol. 13, No. 2, June 2005.
 
--module(cyclon.cyclon).
+-module(cyclon).
 -author('hennig@zib.de').
 -vsn('$Id $ ').
 
@@ -77,40 +77,41 @@ start(InstanceId) ->
 
 loop(Cache,Node,Cycles) ->
     receive
-    {get_ages,Pid} ->
-        Pid ! {ages,cache:ages(Cache)},
-        loop(Cache,Node,Cycles);
-    
-    {get_subset,all,Pid} ->
-			Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
-			loop(Cache,Node,Cycles);
-
-    {get_subset_max_age,Age,Pid} ->
+        {get_ages,Pid} ->
+            Pid ! {ages,cache:ages(Cache)},
+            loop(Cache,Node,Cycles);
+        
+        {get_subset,all,Pid} ->
+            Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
+            loop(Cache,Node,Cycles);
+        
+        {get_subset_max_age,Age,Pid} ->
             Pid ! {cache,cache:get_subset_max_age(Age,Cache)},
             loop(Cache,Node,Cycles);    
         
-	{get_subset,N,Pid} ->
-			Pid ! {cache,cache:get_youngest(N,Cache)},
-			loop(Cache,Node,Cycles);
+        {get_subset,N,Pid} ->
+            Pid ! {cache,cache:get_youngest(N,Cache)},
+            loop(Cache,Node,Cycles);
         
-		{get_cache,Pid} ->
-			Pid ! {cache,cache:get_list_of_nodes(Cache)},
-			loop(Cache,Node,Cycles);
+        {get_cache,Pid} ->
+            Pid ! {cache,cache:get_list_of_nodes(Cache)},
+            loop(Cache,Node,Cycles);
         
-		{flush_cache} ->
-			get_pid() ! {get_pred_succ, cs_send:this()},
-			loop(cache:new(),Node,0);	
-		{start_shuffling} ->
-			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
-			loop(Cache,Node,Cycles);
-		{'$gen_cast', {debug_info, Requestor}}  ->
-	    %io:format("gen_cast~n", []),
-			% io:format("~p~n", [lists:flatten(io_lib:format("~p", [State]))]),
+        {flush_cache} ->
+            get_pid() ! {get_pred_succ, cs_send:this()},
+            loop(cache:new(),Node,0);	
+
+        {start_shuffling} ->
+            erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+            loop(Cache,Node,Cycles);
+        {'$gen_cast', {debug_info, Requestor}}  ->
+                                                %io:format("gen_cast~n", []),
+                                                % io:format("~p~n", [lists:flatten(io_lib:format("~p", [State]))]),
 	    Requestor ! {debug_info_response, [
-					       		{"cs_node", lists:flatten(io_lib:format("~p", [get_pid()]))},
-						   			{"cache-items", lists:flatten(io_lib:format("~p", [cache:size(Cache)]))},
-										{"cache", lists:flatten(io_lib:format("~p", [Cache])) }
-					      	]},
+                                               {"cs_node", lists:flatten(io_lib:format("~p", [get_pid()]))},
+                                               {"cache-items", lists:flatten(io_lib:format("~p", [cache:size(Cache)]))},
+                                               {"cache", lists:flatten(io_lib:format("~p", [Cache])) }
+                                              ]},
 	    loop(Cache,Node,Cycles);
 	{shuffle} 	->
 	 	case Node of	
@@ -129,21 +130,21 @@ loop(Cache,Node,Cycles) ->
 				loop(NewCache,Node,Cycles+1)
 		end;
 	{cy_subset,P,Subset} ->
-		%io:format("subset~n", []),
-		ForSend=cache:get_random_subset(get_L(Cache),Cache),
-		%io:format("<",[]),
-		cs_send:send_to_group_member(node:pidX(P),cyclon,{cy_subset_response,ForSend,Subset}),
-		N2=cache:minus(Subset,Cache),
-		NewCache = cache:merge(Cache,N2,ForSend),
-		loop(NewCache,Node,Cycles);
+                                                %io:format("subset~n", []),
+            ForSend=cache:get_random_subset(get_L(Cache),Cache),
+                                                %io:format("<",[]),
+            cs_send:send_to_group_member(node:pidX(P),cyclon,{cy_subset_response,ForSend,Subset}),
+            N2=cache:minus(Subset,Cache),
+            NewCache = cache:merge(Cache,N2,ForSend),
+            loop(NewCache,Node,Cycles);
 	{cy_subset_response,Subset,OldSubset} ->
-		%io:format("subset_response~n", []),
-		N1=cache:delete({Node,nil},Subset),
-		N2=cache:minus(N1,Cache),
-		NewCache=cache:merge(Cache,N2,OldSubset),
-		loop(NewCache,Node,Cycles);
+                                                %io:format("subset_response~n", []),
+            N1=cache:delete({Node,nil},Subset),
+            N2=cache:minus(N1,Cache),
+            NewCache=cache:merge(Cache,N2,OldSubset),
+            loop(NewCache,Node,Cycles);
 	X ->
-		log:log(warn,"[ CY | ~p ] Unhandle Message: ~p", [self(),X]),
+            log:log(warn,"[ CY | ~p ] Unhandle Message: ~p", [self(),X]),
 	    loop(Cache,Node,Cycles)
     end.
 
@@ -163,7 +164,7 @@ enhanced_shuffle(Cache, Node) ->
 			      NSubset_pre
 		      end,
 	    ForSend=cache:add_element({Node,0},NSubset),
-	    %io:format(">",[]),
+                                                %io:format(">",[]),
 	    cs_send:send_to_group_member(node:pidX(QCyclon),cyclon,{cy_subset,Node,ForSend}),
 	    cache:delete(Q,Cache_1);	
 	false -> 
@@ -179,33 +180,33 @@ simple_shuffle(Cache, Node) ->
 	true ->
 	    NSubset=cache:delete(Q,Subset),
 	    ForSend=cache:add_element({Node,0},NSubset),
-	    %io:format("~p",[length(ForSend)]),
+            %% io:format("~p",[length(ForSend)]),
 	    cs_send:send_to_group_member(node:pidX(QCyclon),cyclon,{cy_subset,Node,ForSend}),
 	    cache:delete(Q,Cache);	
-	false -> 
+	false ->
 	    Cache
     end.
 	
 
 
 get_L(Cache) ->
-	Cl= config:read(cyclon_shuffle_length),
-	Size =  cache:size(Cache),
-	if
-		Cl < Size ->
-			L=Cl;
-		true ->
-			L=cache:size(Cache)
-	end,
-	L.
-	
+    Cl= config:read(cyclon_shuffle_length),
+    Size = cache:size(Cache),
+    if
+        Cl < Size ->
+            L = Cl;
+        true ->
+            L = cache:size(Cache)
+    end,
+    L.
+
 get_pid() ->
     InstanceId = erlang:get(instance_id),
     if
-	InstanceId == undefined ->
-	   log:log(error,"[ CY | ~w ] ~p", [self(),util:get_stacktrace()]);
-	true ->
-	    ok
+        InstanceId == undefined ->
+            log:log(error,"[ CY | ~w ] ~p", [self(),util:get_stacktrace()]);
+        true ->
+            ok
     end,
     process_dictionary:lookup_process(InstanceId, cs_node).
 

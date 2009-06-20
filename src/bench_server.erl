@@ -137,7 +137,7 @@ bench_runner(Threads, Iterations, Bench) ->
 run_bench_read(Owner, _Key, 0) ->
     Owner ! {done, ok};
 run_bench_read(Owner, Key, Iterations) ->
-    case transstore.transaction_api:quorum_read(Key) of
+    case transaction_api:quorum_read(Key) of
 	{fail, _Reason} ->
 	    run_bench_read(Owner, Key, Iterations);
 	{_Value, _Version} ->
@@ -176,7 +176,7 @@ start_link() ->
 %%==============================================================================
 get_and_init_key() ->
     Key = ?RT:getRandomNodeId(),
-    case transstore.transaction_api:single_write(Key, 0) of
+    case transaction_api:single_write(Key, 0) of
       commit ->
         Key;
       {fail, abort} ->

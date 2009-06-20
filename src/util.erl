@@ -229,7 +229,7 @@ uniq(_, [Head | Rest], Uniq) ->
     uniq(Head, Rest, [Head | Uniq]);
 uniq(_, [], Uniq) ->
     Uniq.
-    
+
 -spec(get_nodes/0 :: () -> list()).
 get_nodes() ->
     Nodes = boot_server:node_list(),

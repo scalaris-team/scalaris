@@ -21,7 +21,7 @@
 %% @author Monika Moser <moser@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(transstore.transaction).
+-module(transaction).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').
@@ -57,7 +57,7 @@
 -import(node).
 -import(process_dictionary).
 -import(?RT).
--import(transstore.txlog).
+-import(txlog).
 
 
 %%--------------------------------------------------------------------
@@ -72,7 +72,7 @@
 do_transaction(State, TransFun, SuccessMessage, FailureFun, Owner)->
     TID = transaction:generateTID(State),
     InstanceId = erlang:get(instance_id),
-    TM = spawn(transstore.tmanager, start_manager, [TransFun, SuccessMessage, FailureFun, Owner,  TID, InstanceId]),
+    TM = spawn(tmanager, start_manager, [TransFun, SuccessMessage, FailureFun, Owner,  TID, InstanceId]),
     {{tid, TID},{tm, TM}}.
 
 %%--------------------------------------------------------------------
@@ -88,7 +88,7 @@ do_transaction(State, TransFun, SuccessMessage, FailureFun, Owner)->
 do_transaction_wo_readphase(State, Items, _SuccessFunArgument, SuccessFun, FailureFun, Owner)->
     TID = transaction:generateTID(State),
     InstanceId = erlang:get(instance_id),
-    TM = spawn(transstore.tmanager, start_manager_commit, [Items, SuccessFun, FailureFun, Owner, TID, InstanceId]),
+    TM = spawn(tmanager, start_manager_commit, [Items, SuccessFun, FailureFun, Owner, TID, InstanceId]),
     {{tid, TID},{tm, TM}}.
 
 %%====================================================================
@@ -166,7 +166,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
 %%--------------------------------------------------------------------
 quorum_read(Key, SourcePID)->
     InstanceId = erlang:get(instance_id),
-    spawn(transstore.transaction, do_quorum_read, [Key, SourcePID, InstanceId]).
+    spawn(transaction, do_quorum_read, [Key, SourcePID, InstanceId]).
 
 do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
@@ -245,7 +245,7 @@ write_read_receive(ReplicaKeys, Operation, State)->
 %%--------------------------------------------------------------------
 parallel_quorum_reads(Keys, TransLog, SourcePID)->
     InstanceId = erlang:get(instance_id),
-    spawn(transstore.transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
+    spawn(transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
 
 do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
     erlang:put(instance_id, InstanceId),
@@ -480,7 +480,7 @@ getRTMKeys(TID)->
 
 initRTM(State, Message)->
     TransID = Message#tm_message.transaction_id,
-    ERTMPID = spawn(transstore.tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
+    ERTMPID = spawn(tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
     RTMPID = cs_send:get(ERTMPID, cs_send:this()),
     %% update transaction log: store mapping between transaction ID and local TM
     TransLog = cs_state:get_trans_log(State),
@@ -494,7 +494,7 @@ initRTM(State, Message)->
 -spec(delete/2 :: (cs_send:mypid(), any()) -> pos_integer()).
 delete(SourcePID, Key) ->
     InstanceId = erlang:get(instance_id),
-    spawn(transstore.transaction, do_delete, [Key, SourcePID, InstanceId]).
+    spawn(transaction, do_delete, [Key, SourcePID, InstanceId]).
 
 do_delete(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),

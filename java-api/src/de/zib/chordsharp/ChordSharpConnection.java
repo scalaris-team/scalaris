@@ -718,7 +718,7 @@ public class ChordSharpConnection {
 	 * Publishes an event under a given {@code topic}. Uses the given
 	 * {@code connection}.
 	 * 
-	 * Note: The specification of {@code pubsub.pubsub_api:publish/2} states
+	 * Note: The specification of {@code pubsub_api:publish/2} states
 	 * that the only returned value is {@code ok}, so no further evaluation is
 	 * necessary.
 	 * 
@@ -750,7 +750,7 @@ public class ChordSharpConnection {
 	 * Publishes an event under a given {@code topic}. Uses the given
 	 * {@code connection}.
 	 * 
-	 * Note: The specification of {@code pubsub.pubsub_api:publish/2} states
+	 * Note: The specification of {@code pubsub_api:publish/2} states
 	 * that the only returned value is {@code ok}, so no further evaluation is
 	 * necessary.
 	 * 

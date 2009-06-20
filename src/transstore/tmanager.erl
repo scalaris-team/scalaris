@@ -21,7 +21,7 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 %% @doc
--module(transstore.tmanager).
+-module(tmanager).
 
 -author('moser@zib.de').
 -vsn('$Id$').
@@ -40,7 +40,7 @@
 -import(lists).
 -import(?RT).
 -import(timer).
--import(transstore.txlog).
+-import(txlog).
 
 -export([start_manager/6, start_manager_commit/6, start_replicated_manager/2]).
 
@@ -95,7 +95,7 @@ start_manager_commit(Items, SuccessFun, FailureFun, Owner, TID, InstanceId)->
 %% it can fail, due to an indication in the TFun given by the user
 %% or when operations on items fail, not catched by the user in the TFun
 read_phase(TFun)->
-    TLog = transstore.txlog:new(),
+    TLog = txlog:new(),
     {{TFunFlag, ReadVal}, TLog2} = try TFun(TLog)
                                    catch {abort, State} ->
                                            State
@@ -125,7 +125,7 @@ commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID)->
         ok ->
             erlang:send_after(config:tpFailureTimeout(), self(),
                               {check_failed_tps}),
-            {_TimeCP, TransRes} = timer:tc(transstore.tmanager, start_commit, [TMState2]),
+            {_TimeCP, TransRes} = timer:tc(tmanager, start_commit, [TMState2]),
             ?TIMELOG("commit phase", _TimeCP/1000),
             %% ?TLOGN("Result of transaction: ~p", [TransRes]),
             case TransRes of

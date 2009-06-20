@@ -22,7 +22,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(comm_layer.comm_port).
+-module(comm_port).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').

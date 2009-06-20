@@ -48,16 +48,16 @@ end_per_suite(Config) ->
 
 make_tfun(Key) ->
     fun (TransLog)->
-	    {Result, TransLog1} = transstore.transaction_api:read(Key, TransLog),
+	    {Result, TransLog1} = transaction_api:read(Key, TransLog),
 	    {Result2, TransLog2} =
 		if
 		    Result == fail ->
 			Value = 0,
-			transstore.transaction_api:write(Key, Value, TransLog);
+			transaction_api:write(Key, Value, TransLog);
 		    true ->
 			{value, Val} = Result,
 			Value = Val + 1,
-			transstore.transaction_api:write(Key, Value, TransLog1)
+			transaction_api:write(Key, Value, TransLog1)
 		end,
 	    if
 		Result2 == ok ->
@@ -79,7 +79,7 @@ process(Parent, Key, Count) ->
 process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
     Parent ! {done, AbortCount};
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
-    case transstore.transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
+    case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
 	{success, {commit, _}} ->
 	    process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
 	{failure, abort} ->
@@ -92,7 +92,7 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
 increment_test_8(_Config) ->
     % init: i = 0
     Key = "i",
-    ?equals(transstore.transaction_api:single_write("i", 0), commit),
+    ?equals(transaction_api:single_write("i", 0), commit),
 
     Self = self(),
     Count = 100,
@@ -107,7 +107,7 @@ increment_test_8(_Config) ->
 
     Aborts = wait_for_done(8),
     ct:pal("aborts: ~p~n", [Aborts]),
-    Foo = transstore.transaction_api:quorum_read(Key),
+    Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
     ?equals(Total, 8 * Count),
     ok.
@@ -115,7 +115,7 @@ increment_test_8(_Config) ->
 increment_test_4(_Config) ->
     % init: i = 0
     Key = "i",
-    ?equals(transstore.transaction_api:single_write("i", 0), commit),
+    ?equals(transaction_api:single_write("i", 0), commit),
 
     Self = self(),
     Count = 100,
@@ -126,7 +126,7 @@ increment_test_4(_Config) ->
 
     Aborts = wait_for_done(4),
     ct:pal("aborts: ~p~n", [Aborts]),
-    Foo = transstore.transaction_api:quorum_read(Key),
+    Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
     ?equals(Total, 4 * Count),
     ok.
@@ -134,7 +134,7 @@ increment_test_4(_Config) ->
 increment_test_2(_Config) ->
     % init: i = 0
     Key = "i",
-    ?equals(transstore.transaction_api:single_write("i", 0), commit),
+    ?equals(transaction_api:single_write("i", 0), commit),
 
     Self = self(),
     Count = 100,
@@ -143,7 +143,7 @@ increment_test_2(_Config) ->
 
     Aborts = wait_for_done(2),
     ct:pal("aborts: ~p~n", [Aborts]),
-    Foo = transstore.transaction_api:quorum_read(Key),
+    Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
     ?equals(Total, 2 * Count),
     ok.

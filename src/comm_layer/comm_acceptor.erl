@@ -23,7 +23,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(comm_layer.comm_acceptor).
+-module(comm_acceptor).
 
 -export([start_link/1, init/2]).
 
@@ -35,7 +35,7 @@
 -import(process_dictionary).
 
 start_link(InstanceId) ->
-    Pid = spawn_link(comm_layer.comm_acceptor, init, [InstanceId, self()]),
+    Pid = spawn_link(comm_acceptor, init, [InstanceId, self()]),
     receive
         {started} ->
             {ok, Pid}

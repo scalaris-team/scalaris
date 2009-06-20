@@ -70,9 +70,9 @@ init([InstanceId, Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-    Cyclon = 
+    Cyclon =
 	{cyclon,
-	 {cyclon.cyclon, start_link, [InstanceId]},
+	 {cyclon, start_link, [InstanceId]},
 	 permanent,
 	 brutal_kill,
 	 worker,

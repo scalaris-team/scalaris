@@ -47,16 +47,16 @@ end_per_suite(Config) ->
     ok.
 
 read(_Config) ->
-    ?equals(transstore.transaction_api:quorum_read("UnknownKey"), {fail, not_found}),
+    ?equals(transaction_api:quorum_read("UnknownKey"), {fail, not_found}),
     ok.
 
 write(_Config) ->
-    ?equals(transstore.transaction_api:single_write("WriteKey", "Value"), commit),
+    ?equals(transaction_api:single_write("WriteKey", "Value"), commit),
     ok.
 
 write_read(_Config) ->
-    ?equals(transstore.transaction_api:single_write("Key", "Value"), commit),
-    ?equals(transstore.transaction_api:quorum_read("Key"), {"Value", 0}),
+    ?equals(transaction_api:single_write("Key", "Value"), commit),
+    ?equals(transaction_api:quorum_read("Key"), {"Value", 0}),
     ok.
 
 write2_read2(_Config) ->
@@ -69,25 +69,25 @@ write2_read2(_Config) ->
 
     TWrite2 = 
         fun(TransLog)->
-                {ok, TransLog1} = transstore.transaction_api:write(KeyA, ValueA, TransLog),
-                {ok, TransLog2} = transstore.transaction_api:write(KeyB, ValueB, TransLog1),
+                {ok, TransLog1} = transaction_api:write(KeyA, ValueA, TransLog),
+                {ok, TransLog2} = transaction_api:write(KeyB, ValueB, TransLog1),
                 {{ok, ok}, TransLog2}
         end,
     TRead2 = 
         fun(X)->
-                Res1 = transstore.transaction_api:read(KeyA, X),
+                Res1 = transaction_api:read(KeyA, X),
                 ct:pal("Res1: ~p~n", [Res1]),
                 {{value, ValA}, Y} = Res1,
-                Res2 = transstore.transaction_api:read(KeyB, Y),
+                Res2 = transaction_api:read(KeyB, Y),
                 ct:pal("Res2: ~p~n", [Res2]),
                 {{value, ValB}, TransLog2} = Res2,
                 {{ok, ok}, TransLog2}
         end,
 
-    {ResultW, TLogW} = transstore.transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
+    {ResultW, TLogW} = transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
     ct:pal("Write TLOG: ~p~n", [TLogW]),
     ?equals(ResultW, success),
-    {ResultR, TLogR} = transstore.transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
+    {ResultR, TLogR} = transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
     ct:pal("Read TLOG: ~p~n", [TLogR]),
     ?equals(ResultR, success),
     ok.
@@ -97,8 +97,8 @@ multi_write(_Config) ->
     Value1 = "Value1",
     Value2 = "Value2",
     TFun = fun(TransLog)->
-                   {ok, TransLog1} = transstore.transaction_api:write(Key, Value1, TransLog),
-                   {ok, TransLog2} = transstore.transaction_api:write(Key, Value2, TransLog1),
+                   {ok, TransLog1} = transaction_api:write(Key, Value1, TransLog),
+                   {ok, TransLog2} = transaction_api:write(Key, Value2, TransLog1),
 		   {{ok, ok}, TransLog2}
            end,
     SuccessFun = fun(X) ->
@@ -108,7 +108,7 @@ multi_write(_Config) ->
                          {failure, Reason}
                  end,
 
-    {Result, _} = transstore.transaction_api:do_transaction(TFun, SuccessFun, FailureFun),
+    {Result, _} = transaction_api:do_transaction(TFun, SuccessFun, FailureFun),
     ?equals(Result, success),
     ok.
 

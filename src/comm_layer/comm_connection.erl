@@ -23,7 +23,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(comm_layer.comm_connection).
+-module(comm_connection).
 
 -export([send/3, open_new/4, new/3, open_new_async/4]).
 
