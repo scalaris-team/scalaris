@@ -21,7 +21,7 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 %% @doc 
--module(tmanager_pac).
+-module(transstore.tmanager_pac).
 
 -author('moser@zib.de').
 -vsn('$Id$').
