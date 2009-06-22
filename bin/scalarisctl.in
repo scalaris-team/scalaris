@@ -54,6 +54,7 @@ bootstart(){
 	    -noinput \
 	    -detached \
 	    -yaws embedded true \
+            -boot_cs yaws_port 9001 \
 	    -boot_cs log_path "\"$LOGDIR\"" \
 	    -boot_cs docroot "\"$DOCROOTDIR\"" \
 	    -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
@@ -85,6 +86,7 @@ nodestart(){
 	    -pa $SCALARISDIR/contrib/log4erl/ebin \
 	    -pa $BEAMDIR \
 	    -yaws embedded true \
+            -chordsharp yaws_port 9001 \
 	    -chordsharp log_path "\"$LOGDIR\"" \
 	    -chordsharp docroot "\"$NODEDOCROOTDIR\"" \
 	    -chordsharp config "\"$ETCDIR/scalaris.cfg\"" \
@@ -106,6 +108,12 @@ nodestop(){
 	-s scalaris_ctl -extra node@`hostname -f` stop
     popd > /dev/null
 }
+
+FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
+if [ "x0" -eq "x$FQDN_SET" ]; then
+    echo "you have to set a fully qualified domain name (FQDN)"
+    exit -1
+fi
 
 case $1 in
     boot)
