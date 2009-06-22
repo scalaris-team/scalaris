@@ -113,25 +113,25 @@ on({rt_update, RoutingTable}, State) ->
 % Transactions (see transstore/*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({read, SourcePID, Key}, State) ->
-    transaction:quorum_read(Key, SourcePID),
+    transstore.transaction:quorum_read(Key, SourcePID),
     State;
 
 on({delete, SourcePID, Key}, State) ->
-    transaction:delete(SourcePID, Key),
+    transstore.transaction:delete(SourcePID, Key),
     State;
 
 on({parallel_reads, SourcePID, Keys, TLog}, State) ->
-    transaction:parallel_quorum_reads(Keys, TLog, SourcePID),
+    transstore.transaction:parallel_quorum_reads(Keys, TLog, SourcePID),
     State;
 
 %%  initiate a read phase
 on({do_transaction, TransFun, SuccessFun, FailureFun, Owner}, State) ->
-    transaction:do_transaction(State, TransFun, SuccessFun, FailureFun, Owner),
+    transstore.transaction:do_transaction(State, TransFun, SuccessFun, FailureFun, Owner),
     State;
 
 %% do a transaction without a read phase
 on({do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner}, State) ->
-    transaction:do_transaction_wo_readphase(State, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner),
+    transstore.transaction:do_transaction_wo_readphase(State, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner),
     State;
 
 %% answer - lookup for transaction participant
@@ -150,20 +150,20 @@ on({lookup_tp, Message}, State) ->
 
 	%% answer - lookup for replicated transaction manager
 on({init_rtm, Message}, State) ->
-    transaction:initRTM(State, Message);
+    transstore.transaction:initRTM(State, Message);
 
 %% a validation request for a node acting as a transaction participant
 on({validate, TransID, Item}, State) ->
-    tparticipant:tp_validate(State, TransID, Item);
+    transstore.tparticipant:tp_validate(State, TransID, Item);
 
 %% this message contains the final decision for a certain transaction
 on({decision, Message}, State) ->
     {_, TransID, Decision} = Message#tp_message.message,
     if
 	Decision == commit ->
-	    tparticipant:tp_commit(State, TransID);
+	    transstore.tparticipant:tp_commit(State, TransID);
 	true ->
-	    tparticipant:tp_abort(State, TransID)
+	    transstore.tparticipant:tp_abort(State, TransID)
     end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

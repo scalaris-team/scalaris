@@ -26,8 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([process_request_list/2, read/1, write/2, delete/1,
-         test_and_set/3, range_read/2]).
+-export([process_request_list/2, read/1, write/2, delete/1, 
+	 test_and_set/3, range_read/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -38,7 +38,7 @@
 
 process_request_list(TLog, ReqList) ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    % should just call transaction_api:process_request_list
+    % should just call transstore.transaction_api:process_request_list
     % for parallel quorum reads and scan for commit request to actually do
     % the transaction
     % and there should scan for duplicate keys in ReqList
@@ -55,21 +55,21 @@ process_request_list(TLog, ReqList) ->
 process_request(TLog, Request) ->
     case Request of
         {read, Key} ->
-            case transaction_api:read(Key, TLog) of
+            case transstore.transaction_api:read(Key, TLog) of
                 {{value, Val}, NTLog} ->
                     {NTLog, {read, Key, {value, Val}}};
                 {{fail, Reason}, NTLog} ->
                     {NTLog, {read, Key, {fail, Reason}}}
             end;
         {write, Key, Value} ->
-            case transaction_api:write(Key, Value, TLog) of
+            case transstore.transaction_api:write(Key, Value, TLog) of
                 {ok, NTLog} ->
                     {NTLog, {write, Key, {value, Value}}};
                 {{fail, Reason}, NTLog} ->
                     {NTLog, {write, Key, {fail, Reason}}}
             end;
         {commit} ->
-            case transaction_api:commit(TLog) of
+            case transstore.transaction_api:commit(TLog) of
                 {ok} ->
                     {TLog, {commit, ok, {value, "ok"}}};
                 {fail, Reason} ->
@@ -80,7 +80,7 @@ process_request(TLog, Request) ->
 %% @doc reads the value of a key
 %% @spec read(key()) -> {failure, term()} | value()
 read(Key) ->
-    case transaction_api:quorum_read(Key) of
+    case transstore.transaction_api:quorum_read(Key) of
         {fail, Reason} ->
 	       {fail, Reason};
         {Value, _Version} ->
@@ -90,7 +90,7 @@ read(Key) ->
 %% @doc writes the value of a key
 %% @spec write(key(), value()) -> ok | {fail, term()}
 write(Key, Value) ->
-    case transaction_api:single_write(Key, Value) of
+    case transstore.transaction_api:single_write(Key, Value) of
 	commit ->
 	    ok;
 	{fail, Reason} ->
@@ -98,18 +98,18 @@ write(Key, Value) ->
     end.
 
 delete(Key) ->
-    transaction_api:delete(Key, 2000).
+    transstore.transaction_api:delete(Key, 2000).
 
 %% @doc atomic compare and swap
 %% @spec test_and_set(key(), value(), value()) -> {fail, Reason} | ok
 test_and_set(Key, OldValue, NewValue) ->
     TFun = fun(TransLog) ->
-                   {Result, TransLog1} = transaction_api:read(Key, TransLog),
+                   {Result, TransLog1} = transstore.transaction_api:read(Key, TransLog),
                    case Result of
                        {value, ReadValue} ->
                            if
                                ReadValue == OldValue ->
-                                   {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog1),
+                                   {Result2, TransLog2} = transstore.transaction_api:write(Key, NewValue, TransLog1),
                                    if
                                        Result2 == ok ->
                                            {{ok, done}, TransLog2};
@@ -120,7 +120,7 @@ test_and_set(Key, OldValue, NewValue) ->
                                    {{fail, {key_changed, ReadValue}}, TransLog1}
                            end;
                        {fail, not_found} ->
-                           {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog),
+                           {Result2, TransLog2} = transstore.transaction_api:write(Key, NewValue, TransLog),
                            if
                                Result2 == ok ->
                                    {{ok, done}, TransLog2};

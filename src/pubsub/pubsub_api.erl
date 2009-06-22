@@ -21,14 +21,14 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(pubsub_api).
+-module(pubsub.pubsub_api).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
 
--import(transaction_api).
+-import(transstore.transaction_api).
 -import(io).
 -import(lists).
 

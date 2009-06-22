@@ -25,7 +25,7 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 
--module(tparticipant).
+-module(transstore.tparticipant).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').
