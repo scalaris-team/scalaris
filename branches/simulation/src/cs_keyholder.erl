@@ -45,10 +45,11 @@ set_key(Key) ->
 -spec(get_key/0 :: () -> ?RT:key()).
 get_key() ->
     get_pid() ! {get_key_keyholder, self()},
-    receive
-	{get_key_response_keyholder, Key} ->
-	    Key
-    end.
+    %receive
+	%{get_key_response_keyholder, Key} ->
+	%    Key
+    %end.
+    ok.
 
 start(InstanceId) ->
     process_dictionary:register_process(InstanceId, cs_keyholder, self()),

@@ -39,10 +39,7 @@
 -type(boot_node_list()::gb_sets:gb_set()).
 -endif.
 
-%logging on
-%-define(LOG(S, L), io:format(S, L)).
-%logging off
--define(LOG(S,L), ok).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -52,10 +49,7 @@
 -spec(number_of_nodes/0 :: () -> pos_integer()).
 number_of_nodes() ->
     cs_send:send(config:bootPid(), {get_list_length, cs_send:this()}),
-    receive
-	{get_list_length_response, Nodes} ->
-	    Nodes
-    end.
+    ok.
 
 connect() ->
     cs_send:send(config:bootPid(), {connect}).

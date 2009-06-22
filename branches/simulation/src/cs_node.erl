@@ -302,6 +302,9 @@ on({reset_loadbalance_flag}, State) ->
 %% userdevguide-begin cs_node:join_message
 on({join, Source_PID, Id, UniqueId}, State) ->
     cs_join:join_request(State, Source_PID, Id, UniqueId);
+
+
+
 %% userdevguide-end cs_node:join_message
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -350,6 +353,21 @@ on({send_to_group_member,Processname,Mesg}, State) ->
     Pid ! Mesg,
     State;
 
+on({get_list_length_response,Ringsize},{join_state1}) ->
+    cs_keyholder:get_key(),
+    {join_state2,Ringsize};
+
+on({get_key_response_keyholder, Key},{join_state2,Ringsize}) ->
+    {First, State} = cs_join:join(Key,Ringsize),
+    if
+    not First ->
+        cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State));
+    true ->
+        ok
+    end,
+    log:log(info,"[ Node ~w ] joined",[self()]),
+    State;
+
 on(_, _State) ->
     unknown_event.
 
@@ -366,16 +384,9 @@ init([_InstanceId, Options]) ->
         % @TODO: put the delay in admin:add_nodes() !
         ok
     end,
-    Id = cs_keyholder:get_key(),
-    {First, State} = cs_join:join(Id),
-    if
-	not First ->
-	    cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State));
-	true ->
-	    ok
-    end,
-    log:log(info,"[ Node ~w ] joined",[self()]),
-    State.
+    boot_server:number_of_nodes(),
+    {join_state1}.
+   
 %% userdevguide-end cs_node:start
 
 %% userdevguide-begin cs_node:start_link

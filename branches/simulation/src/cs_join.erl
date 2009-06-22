@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([join/1, join_request/4]).
+-export([join/2, join_request/4]).
 
 -include("chordsharp.hrl").
 
@@ -89,9 +89,8 @@ join_ring(Id, Succ) ->
 %%      node in the ring or not
 %% @spec join(Id) -> {true|false, state:state()}
 %%   Id = term()
-join(Id) -> 
+join(Id,Ringsize) -> 
     log:log(info,"[ Node ~w ] joining ~p",[self(), Id]),
-    Ringsize = boot_server:number_of_nodes(),
     if
 	Ringsize == 0 ->
 	    State = join_first(Id),
@@ -101,7 +100,7 @@ join(Id) ->
 	    case cs_lookup:reliable_get_node(erlang:get(instance_id), 
 					     Id, 60000) of
 		error ->
-		    join(Id);
+		    join(Id,Ringsize);
 		{ok, Succ} ->
 		    State = join_ring(Id, Succ),
 		    cs_reregister:reregister(),

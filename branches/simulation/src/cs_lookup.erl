@@ -29,10 +29,7 @@
 -export([reliable_get_node/3, reliable_get_node_service/3, unreliable_lookup/2,
 	unreliable_get_key/1]).
 
-%logging on
-%-define(LOG(S, L), io:format(S, L)).
-%logging off
--define(LOG(S, L), ok).
+
 
 -include("chordsharp.hrl").
 
@@ -42,11 +39,11 @@ reliable_get_node(InstanceId, Id, Timeout) ->
     spawn(cs_lookup, reliable_get_node_service, [InstanceId, Id, cs_send:this()]),
     receive
 	{get_node_response, Id, Node} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node succeeded~n",[calendar:universal_time(), self()]),
+	    
 	    {ok, Node}
     after
 	Timeout ->
-	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node failed ~p~n",[calendar:universal_time(), self(), boot_server:node_list()]),
+	    log:log(error,"[ ~w | I | Node   | ~w ] reliable_get_node failed ~p~n",[calendar:universal_time(), self(), boot_server:node_list()]),
 	    error
     end.
 
@@ -84,7 +81,7 @@ reliable_get_node_service_using_boot_iter([First | Rest], Suspected, Id, Node) -
 	    cs_send:send(Node, {get_node_response, Id, Response})
     after
 	3000 ->
-	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node_using_boot failed~n",[calendar:universal_time(), self()]),
+	    log:log(error,"[ ~w | I | Node   | ~w ] reliable_get_node_using_boot failed~n",[calendar:universal_time(), self()]),
 	    reliable_get_node_service_using_boot_iter(Rest, [First | Suspected], Id, Node)
     end;
 reliable_get_node_service_using_boot_iter([], _Suspected, Id, Node) ->
