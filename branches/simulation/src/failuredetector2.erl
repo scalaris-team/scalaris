@@ -105,7 +105,7 @@ start_pinger(Pid) ->
 %%--------------------------------------------------------------------
 
 start_link() ->
-   gen_component:start_link(?MODULE, [], [{register_SP, failure_detector2}]).
+   gen_component:start_link(?MODULE, [], [{register_native, failure_detector2}]).
 
 
 init(_Args) ->
@@ -252,7 +252,7 @@ get_pid() ->
         undefined ->
             log:log(error, "[ FD ] call of get_pid undefined");
         PID ->
-            log:log(info, "[ FD ] find right pid"),
+            %log:log(info, "[ FD ] find right pid"),
             PID
     end.
     

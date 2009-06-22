@@ -16,7 +16,7 @@
 
 -export([behaviour_info/1]).
 
--export([start_link/2, start_link/3, start/4]).
+-export([start_link/2, start_link/3, start/4, wait_for_ok/0]).
 
 %================================================================================
 % behaviour definition
@@ -62,8 +62,8 @@ start(Module, Args, Options, Supervisor) ->
 	    process_dictionary:register_process(InstanceId, Name, self()),
 	    Supervisor ! {started, self()};
 	false ->
-            case lists:keysearch(register_SP, 1, Options) of
-            {value, {register_SP,Name}} ->
+            case lists:keysearch(register_native, 1, Options) of
+            {value, {register_native,Name}} ->
                 register(Name, self()),
                 Supervisor ! {started, self()};
             false ->
@@ -122,6 +122,12 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
 		NewState ->
 		    loop(Module, NewState, {Options, Slowest})
 	    end
+    end.
+
+wait_for_ok() ->
+    receive
+    {ok} ->
+        ok
     end.
 
 handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->

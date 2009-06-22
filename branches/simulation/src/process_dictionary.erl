@@ -83,10 +83,7 @@ register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
     get_pid() ! {register_process, InstanceId, Name, Pid},
-    receive
-        {ok} ->
-            ok
-    end.
+    gen_component:wait_for_ok().
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
 %% @spec lookup_process(term(), term()) -> term()
@@ -186,7 +183,7 @@ get_all_pids() ->
 %%--------------------------------------------------------------------
 %@doc Starts the server
 start_link() ->
-    gen_component:start_link(?MODULE, [], [{register_SP, process_dictionary}]).
+    gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
   
 
 %@doc Starts the server for unit testing
@@ -304,6 +301,6 @@ get_pid() ->
         undefined ->
             log:log(error, "[ PD ] call of get_pid undefined");
         PID ->
-            log:log(info, "[ PD ] find right pid"),
+            %log:log(info, "[ PD ] find right pid"),
             PID
     end.
