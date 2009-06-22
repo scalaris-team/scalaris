@@ -97,6 +97,9 @@ set_write_lock(DB, Key) ->
 %% @spec unset_write_lock(db(), string()) -> {db(), ok | failed}
 unset_write_lock(DB, Key) ->
     case ets:lookup(DB, Key) of
+	[{Key, {empty_val, true, 0, -1}}] ->
+	    ets:delete(DB, Key),
+	    {DB, ok};
 	[{Key, {Value, true, ReadLock, Version}}] ->
 	    ets:insert(DB, {Key, {Value, false, ReadLock, Version}}),
 	    {DB, ok};

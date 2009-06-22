@@ -93,6 +93,9 @@ set_write_lock(DB, Key) ->
 %% @spec unset_write_lock(db(), string()) -> {db(), ok | failed}
 unset_write_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
+	{value, {empty_val, true, 0, -1}} ->
+	    NewDB = gb_trees:delete(Key, DB),
+            {NewDB, ok};
 	{value, {Value, true, ReadLock, Version}} ->
 	    NewDB = gb_trees:update(Key, 
 				    {Value, false, ReadLock, Version}, 
