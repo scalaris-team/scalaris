@@ -1,0 +1,31 @@
+# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+This project can be build using the ant build tool.
+
+The following targets are available:
+ - jar:			creates chordsharp4j.jar, chordsharp4j-lib.jar and chordsharp4j-examples.jar
+ - doc:			generates the API-docs (public entities only) in ./doc
+ - devel-doc:	generates the API-docs (public and private) in ./doc-devel
+ - dist:		generates archives containing the sources, the jars and the documentation:
+ 				DistributedLogger.zip, DistributedLogger.tar.gz, DistributedLogger.tar.bz2
+ - clean:		removes all generated files
+ - test:		runs unit tests
+
+For more information regarding the implementation of the Chord# Java Interface
+have a look into the API-docs. The general structure is described in the
+documentation of the package "de.zib.chordsharp".
+
+./src	contains the application's sources
+./test	contains the sources of the junit test cases
