@@ -50,11 +50,13 @@ JAVADIR=$(DESTDIR)@datarootdir@/java
 # /var/log/scalaris
 LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
 
+all: compile
+#all: compile dialyzer java test docs
+
 #cp priv/xbin/*beam bin/
 compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
-all: compile dialyzer java test docs
 
 test: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
