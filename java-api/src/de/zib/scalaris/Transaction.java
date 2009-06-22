@@ -172,7 +172,7 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transaction", "translog_new",
+			connection.sendRPC("txlog", "new",
 					new OtpErlangList());
 			// return value: []
 			received_raw = connection.receiveRPC();
