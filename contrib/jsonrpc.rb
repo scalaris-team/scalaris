@@ -120,6 +120,8 @@ n = 100
 
 range_query()
 
+exit
+
 req_list()
 
 puts "benchmarking ..."

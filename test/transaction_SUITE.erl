@@ -28,11 +28,11 @@
 -include("unittest.hrl").
 
 all() ->
-    [read, write, write_read, write2_read2, tfuns, multi_write].
+    [read, write, write_read, tfuns, multi_write].
 
 suite() ->
     [
-     {timetrap, {seconds, 40}}
+     {timetrap, {seconds, 30}}
     ].
 
 init_per_suite(Config) ->
@@ -47,49 +47,16 @@ end_per_suite(Config) ->
     ok.
 
 read(_Config) ->
-    ?equals(transaction_api:quorum_read("UnknownKey"), {fail, not_found}),
+    ?equals(transstore.transaction_api:quorum_read("UnknownKey"), {fail, not_found}),
     ok.
 
 write(_Config) ->
-    ?equals(transaction_api:single_write("WriteKey", "Value"), commit),
+    ?equals(transstore.transaction_api:single_write("WriteKey", "Value"), commit),
     ok.
 
 write_read(_Config) ->
-    ?equals(transaction_api:single_write("Key", "Value"), commit),
-    ?equals(transaction_api:quorum_read("Key"), {"Value", 0}),
-    ok.
-
-write2_read2(_Config) ->
-    KeyA = "KeyA",
-    KeyB = "KeyB",
-    ValueA = "Value1",
-    ValueB = "Value2",
-    SuccessFun = fun(X) -> {success, X} end,
-    FailureFun = fun(Reason)-> {failure, Reason} end,
-
-    TWrite2 = 
-        fun(TransLog)->
-                {ok, TransLog1} = transaction_api:write(KeyA, ValueA, TransLog),
-                {ok, TransLog2} = transaction_api:write(KeyB, ValueB, TransLog1),
-                {{ok, ok}, TransLog2}
-        end,
-    TRead2 = 
-        fun(X)->
-                Res1 = transaction_api:read(KeyA, X),
-                ct:pal("Res1: ~p~n", [Res1]),
-                {{value, ValA}, Y} = Res1,
-                Res2 = transaction_api:read(KeyB, Y),
-                ct:pal("Res2: ~p~n", [Res2]),
-                {{value, ValB}, TransLog2} = Res2,
-                {{ok, ok}, TransLog2}
-        end,
-
-    {ResultW, TLogW} = transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
-    ct:pal("Write TLOG: ~p~n", [TLogW]),
-    ?equals(ResultW, success),
-    {ResultR, TLogR} = transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
-    ct:pal("Read TLOG: ~p~n", [TLogR]),
-    ?equals(ResultR, success),
+    ?equals(transstore.transaction_api:single_write("Key", "Value"), commit),
+    ?equals(transstore.transaction_api:quorum_read("Key"), {"Value", 0}),
     ok.
 
 multi_write(_Config) ->
@@ -97,8 +64,8 @@ multi_write(_Config) ->
     Value1 = "Value1",
     Value2 = "Value2",
     TFun = fun(TransLog)->
-                   {ok, TransLog1} = transaction_api:write(Key, Value1, TransLog),
-                   {ok, TransLog2} = transaction_api:write(Key, Value2, TransLog1),
+                   {ok, TransLog1} = transstore.transaction_api:write(Key, Value1, TransLog),
+                   {ok, TransLog2} = transstore.transaction_api:write(Key, Value2, TransLog1),
 		   {{ok, ok}, TransLog2}
            end,
     SuccessFun = fun(X) ->
@@ -108,7 +75,7 @@ multi_write(_Config) ->
                          {failure, Reason}
                  end,
 
-    {Result, _} = transaction_api:do_transaction(TFun, SuccessFun, FailureFun),
+    {Result, _} = transstore.transaction_api:do_transaction(TFun, SuccessFun, FailureFun),
     ?equals(Result, success),
     ok.
 

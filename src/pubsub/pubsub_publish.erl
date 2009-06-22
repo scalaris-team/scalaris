@@ -21,7 +21,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(pubsub_publish).
+-module(pubsub.pubsub_publish).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
