@@ -126,7 +126,9 @@ test_and_set(Key, OldValue, NewValue) ->
                                    {{ok, done}, TransLog2};
                                true ->
                                    {{fail, write}, TransLog2}
-                           end
+                           end;
+                       {fail,timeout} ->
+                           {{fail, timeout}, TransLog}
                        end
            end,
     SuccessFun = fun(X) -> {success, X} end,
@@ -136,9 +138,10 @@ test_and_set(Key, OldValue, NewValue) ->
 	    ok;
 	{trans, {failure, Reason}} ->
 	    {fail, Reason};
-	X ->
-	   log:log(warn,"[ Node ~w ] ~p", [self(),X]),
-	    X
+ 	X ->
+ 	   io:format("cs_api:test_and_set unexpected: Node ~w got ~p", [self(),X]),
+ 	   log:log(warn,"[ Node ~w ] ~p", [self(),X]),
+ 	    X
     end.
 
 

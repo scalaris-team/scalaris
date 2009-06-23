@@ -31,8 +31,10 @@ handler(test_and_set, [Key, OldValue, NewValue]) ->
         {fail, {key_changed, Value}} ->
             {struct, [{failure, "key_changed"},
                       {value, lists:flatten(io_lib:format("~s", [Value]))}]};
+        {fail, abort} ->
+            {struct, [{failure, "abort"}]};
         Res ->
-            io:format("~p~n", [Res]),
+            io:format("test_and_set: ~p~n", [Res]),
             lists:flatten(io_lib:write(Res))
     end;
 

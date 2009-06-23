@@ -93,10 +93,10 @@ reliable_get_node_service_using_boot_iter([], _Suspected, Id, Node) ->
 
 get_pid(Id) ->
     InstanceId = erlang:get(instance_id),
-    if
-  	InstanceId == undefined ->
-  	    io:format("~p~n", [util:get_stacktrace()]);
-  	true ->
-  	    ok
-    end,
+%     if
+%   	InstanceId == undefined ->
+%   	    io:format("~p~n", [util:get_stacktrace()]);
+%   	true ->
+%   	    ok
+%     end,
     process_dictionary:lookup_process(InstanceId, Id).

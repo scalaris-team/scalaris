@@ -58,10 +58,10 @@ start_link() ->
 send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
     {MyIP,MyPort} = comm_port:get_local_address_port(),
     %io:format("send: ~p:~p -> ~p:~p(~p) : ~p\n", [MyIP, MyPort, _IP, _Port, _Pid, Message]),
-    IsLocal = (MyIP == _IP) and (MyPort == _Port),
+    IsLocal = (MyPort =:= _Port) andalso (MyIP =:= _IP),
     if
  	IsLocal ->        
-	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(term_to_binary(Message))),
+%	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(term_to_binary(Message))),
  	    _Pid ! Message;
  	true ->
 	    comm_port:send(Target, Message)
