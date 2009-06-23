@@ -150,6 +150,8 @@ public class Transaction {
 			throw new ConnectionException(e);
 		} catch (de.zib.scalaris.UnknownException e) {
 			throw new UnknownException(e);
+		} catch (de.zib.scalaris.TransactionNotStartedException e) {
+			throw new TransactionNotStartedException(e);
 		}
 	}
 
@@ -190,6 +192,8 @@ public class Transaction {
 			throw new TimeoutException(e);
 		} catch (de.zib.scalaris.NotFoundException e) {
 			throw new NotFoundException(e);
+		} catch (de.zib.scalaris.TransactionNotStartedException e) {
+			throw new TransactionNotStartedException(e);
 		}
 	}
 	
@@ -249,6 +253,8 @@ public class Transaction {
 			throw new TimeoutException(e);
 		} catch (de.zib.scalaris.NotFoundException e) {
 			throw new NotFoundException(e);
+		} catch (de.zib.scalaris.TransactionNotStartedException e) {
+			throw new TransactionNotStartedException(e);
 		}
 	}
 
@@ -278,6 +284,8 @@ public class Transaction {
 			throw new UnknownException(e);
 		} catch (de.zib.scalaris.TimeoutException e) {
 			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.TransactionNotStartedException e) {
+			throw new TransactionNotStartedException(e);
 		}
 	}
 
@@ -308,6 +316,8 @@ public class Transaction {
 			throw new UnknownException(e);
 		} catch (de.zib.scalaris.TimeoutException e) {
 			throw new TimeoutException(e);
+		} catch (de.zib.scalaris.TransactionNotStartedException e) {
+			throw new TransactionNotStartedException(e);
 		}
 	}
 
