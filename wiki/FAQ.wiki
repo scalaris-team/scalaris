@@ -81,10 +81,10 @@ rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
 }}}
 Your source and binary rpm will be generated in /usr/src/packages/SRPMS and RPMS.
 
-Also we build rpms using checkouts from svn and provide them using the openSUSE !BuildService at http://download.opensuse.org/repositories/home:/tschuett/. Rpm packages are available for
-  * Fedora [http://download.opensuse.org/repositories/home:/tschuett/Fedora_9/ 9], [http://download.opensuse.org/repositories/home:/tschuett/Fedora_10/ 10],
+Also we build rpms using checkouts from svn trunk and the latest tagged version and provide them using the openSUSE !BuildService at http://download.opensuse.org/repositories/home:/tschuett/. Rpm packages are available for
+  * Fedora [http://download.opensuse.org/repositories/home:/tschuett/Fedora_9/ 9], [http://download.opensuse.org/repositories/home:/tschuett/Fedora_10/ 10], [http://download.opensuse.org/repositories/home:/tschuett/Fedora_11/ 11]
   * Mandriva [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2008/ 2008], [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009/ 2009],
-  * openSUSE [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/ 11.0], [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/ 11.1],
+  * openSUSE [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_10.3/ 10.3], [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/ 11.0], [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/ 11.1], [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/ Factory]
   * SLE [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/ 10], [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/ 11],
   * [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/ CentOS 5] and
   * [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/ RHEL 5].
