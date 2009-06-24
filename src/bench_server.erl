@@ -27,7 +27,7 @@
 -author('schuett@zib.de').
 -vsn('$Id').
 
--export([start_link/0, start/0, run_increment/2, run_read/2, run_increment/3,
+-export([start_link/0, start/0, run_increment/2, run_increment_locally/2, run_read/2, run_increment/3,
 	bench_runner/3]).
 
 -include("chordsharp.hrl").
@@ -39,6 +39,10 @@
 run_increment(ThreadsPerVM, Iterations) ->
     Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
     runner(ThreadsPerVM, Iterations, [], Msg).
+
+run_increment_locally(ThreadsPerVM, Iterations) ->
+    Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
+    runner(ThreadsPerVM, Iterations, [locally], Msg).
 
 %% @doc run an increment benchmark (i++) on all nodes
 %% profile : enable profiling
@@ -53,12 +57,18 @@ run_read(ThreadsPerVM, Iterations) ->
     runner(ThreadsPerVM, Iterations, [], Msg).
 
 runner(ThreadsPerVM, Iterations, Options, Message) ->
-    ServerList = case lists:keysearch(copies, 1, Options) of
-      {value, {copies, Copies}} ->
-	lists:sublist(util:get_nodes(), Copies);
-      false ->
-	util:get_nodes()
-    end,
+    ServerList = case lists:member(locally, Options) of
+                     true ->
+                         [cs_send:get(bench_server, cs_send:this())];
+                     false ->
+                         case lists:keysearch(copies, 1, Options) of
+                             {value, {copies, Copies}} ->
+                                 lists:sublist(util:get_nodes(), Copies);
+                             false ->
+                                 util:get_nodes()
+                         end
+                 end,
+    io:format("~p~n", [ServerList]),
     {BeforeDump, _} = admin:get_dump(),
     Before = erlang:now(),
     Times = case lists:member(profile, Options) of
