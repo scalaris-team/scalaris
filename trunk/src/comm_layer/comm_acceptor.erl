@@ -27,6 +27,7 @@
 
 -export([start_link/1, init/2]).
 
+-import(comm_connection).
 -import(config).
 -import(gen_tcp).
 -import(inet).
@@ -87,7 +88,7 @@ server(LS) ->
 		    end,
 		    NewPid = comm_connection:new(NewAddress, Port, S),
 		    gen_tcp:controlling_process(S, NewPid),
-		    inet:setopts(S, [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}]),
+		    inet:setopts(S, comm_connection:tcp_options()),
 		    comm_port:register_connection(NewAddress, Port, NewPid, S)
 	    end,
 	    server(LS);
