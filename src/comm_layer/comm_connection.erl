@@ -25,7 +25,7 @@
 %% @version $Id $
 -module(comm_connection).
 
--export([send/3, open_new/4, new/3, open_new_async/4]).
+-export([send/3, tcp_options/0, open_new/4, new/3, open_new_async/4]).
 
 -import(config).
 -import(gen_tcp).
@@ -41,6 +41,9 @@
 %% @spec new(inet:ip_address(), int(), socket()) -> pid()
 new(Address, Port, Socket) ->
     spawn(fun () -> loop(Socket, Address, Port) end).
+
+tcp_options() ->
+    [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}].
 
 %% @doc open new connection
 %% @spec open_new(inet:ip_address(), int(), inet:ip_address(), int()) -> 
@@ -168,8 +171,7 @@ loop(Socket, Address, Port) ->
 
 -spec(new_connection(inet:ip_address(), integer(), integer()) -> inet:socket() | fail).
 new_connection(Address, Port, MyPort) ->
-    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, 
-					 {send_timeout, config:read(tcp_send_timeout)}], 
+    case gen_tcp:connect(Address, Port, [binary, {packet, 4}] ++ comm_connection:tcp_options(), 
 			 config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
 	    % send end point data

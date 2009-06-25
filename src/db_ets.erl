@@ -151,6 +151,8 @@ get_locks(DB, Key) ->
 %% @spec read(db(), string()) -> {ok, string(), integer()} | failed
 read(DB, Key) ->
     case ets:lookup(DB, Key) of
+	[{Key, {empty_val, true, 0, -1}}] ->
+            failed;
 	[{Key, {Value, _WriteLock, _ReadLock, Version}}] ->
 	    {ok, Value, Version};
 	[] ->
@@ -241,7 +243,7 @@ add_data(DB, Data) ->
 %% @spec get_range(db(), string(), string()) -> [{string(), string()}]
 get_range(DB, From, To) ->
     [ {Key, Value} || {Key, {Value, _WLock, _RLock, _Vers}} <- ets:tab2list(DB),
-                      util:is_between(From, Key, To) ].
+                      util:is_between(From, Key, To), Value =/= empty_val ].
 
 %% @doc get keys and versions in a range
 %% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(),
@@ -250,7 +252,7 @@ get_range_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
     [ {Key, Value, Version, WriteLock, ReadLock}
       || {Key, {Value, WriteLock, ReadLock, Version}} <- ets:tab2list(DB),
-         util:is_between(From, Key, To) ].
+         util:is_between(From, Key, To), Value =/= empty_val ].
 
 % get_range_with_version
 %@private
@@ -259,7 +261,7 @@ get_range_only_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
     [ {Key, Value, Vers}
       || {Key, {Value, WLock, _RLock, Vers}} <- ets:tab2list(DB),
-         WLock == false andalso util:is_between(From, Key, To) ].
+         WLock == false andalso util:is_between(From, Key, To), Value =/= empty_val ].
 
 build_merkle_tree(DB, Range) ->
     {From, To} = intervals:unpack(Range),
