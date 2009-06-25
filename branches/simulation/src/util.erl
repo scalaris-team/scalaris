@@ -232,7 +232,11 @@ uniq(_, [], Uniq) ->
     
 -spec(get_nodes/0 :: () -> list()).
 get_nodes() ->
-    Nodes = boot_server:node_list(),
+    boot_server:node_list(),
+    Nodes = receive
+         {get_list_response, N} ->
+            N
+    end,    
     lists:usort([cs_send:get(bench_server, CSNode) || CSNode <- Nodes]).
 
 sleep_for_ever() ->

@@ -36,13 +36,99 @@
 -export([on/2, init/1]).
 
 % state of the cs_node loop
--type(state() :: cs_state:state()).
+-type(state() :: any()).
 
 % accepted messages of cs_node processes
 -type(message() :: any()).
 
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Join Messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% join protocol
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({get_list_length_response,Ringsize},{join_state1}) ->
+    %io:format("STATE1~n"),
+    cs_keyholder:get_key(),
+    {join_state2,Ringsize};
+
+on({get_key_response_keyholder, Key},{join_state2,Ringsize}) ->
+    %io:format("STATE2~n"),
+    log:log(info,"[ Node ~w ] joining ~p ~p",[self(), Key,Ringsize]),
+    case Ringsize of 
+        0 ->
+            cs_reregister:reregister(),
+            S = cs_join:join_first(Key),
+            %log:log(info,"[ Node ~w ] joined",[self()]),
+            S;  % JOIN Completet, alone S is the first "State"
+        _ ->  % We are not alone, so we have to do the Join Protocoll
+            InstanceId = erlang:get(instance_id),
+            erlang:put(instance_id, InstanceId),
+            boot_server:node_list(),
+            {join_state2_b,Key}            
+    end;
+
+on({get_list_response,Nodes},{join_state2_b,Key}) ->
+    %io:format("STATE2_b~n"),
+    [First | Rest] = util:shuffle(Nodes),
+    cs_send:send(First, {lookup_aux, Key, 0, {get_node, cs_send:this(), Key}}),
+    erlang:send_after(3000, self() , {join_timeout}),
+    {join_state3,Rest,[],Key};
+
+on({join_timeout},{join_state3,[], _Suspected,_Key}) ->
+    %io:format("STATE3_a~n"),
+    boot_server:number_of_nodes(),
+    {join_state1};
+
+on({join_timeout},{join_state3,[First | Rest], Suspected, Id}) ->
+    %io:format("STATE3~n"),
+    cs_send:send(First, {lookup_aux, Id, 0, {get_node, cs_send:this(), Id}}),
+    erlang:send_after(3000, self() , {join_timeout}),
+    {join_state3,Rest,Suspected,Id};
+
+on({join_timeout},State) ->
+    %io:format("TimeOUT ~p~n",[State]),
+    State;
+   
+on({get_node_response, Key, Response},{join_state3,_, _Suspected, Key}) ->
+    %io:format("STATE3_[]~n"),
+    Me = node:make(cs_send:this(), Key),
+    UniqueId = node:uniqueId(Me),
+    cs_send:send(node:pidX(Response), {join, cs_send:this(), Key, UniqueId}),
+    {join_state4,Key,Response,Me};
+    
+on({join_response, Pred, Data},{join_state4,Id,Succ,Me}) ->
+    %io:format("STATE4~n"),
+    log:log(info,"[ Node ~w ] got pred ~w",[self(), Pred]),
+    State = case node:is_null(Pred) of
+        true ->
+            DB = ?DB:add_data(?DB:new(), Data),
+            ?RM:initialize(Id, Me, Pred, Succ),
+            routingtable:initialize(Id, Pred, Succ),
+            cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
+        false ->
+            cs_send:send(node:pidX(Pred), {update_succ, Me}),
+            DB = ?DB:add_data(?DB:new(), Data),
+            ?RM:initialize(Id, Me, Pred, Succ),
+            routingtable:initialize(Id, Pred, Succ),
+            cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id},cs_lb:new(), DB)
+    end,
+    cs_reregister:reregister(),
+    cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State)),
+    %io:format("STATE4 FERTIG~n"),
+    State;
+
+% Catch all messages untel the join protocol is finshed 
+on(Msg, State) when element(1, State) /= state ->
+  self() ! Msg,
+  %erlang:send_after(100, self(), Msg),
+  State;  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Kill Messages
@@ -296,13 +382,6 @@ on({get_middle_key_response, Source_PID, MiddleKey}, State) ->
 on({reset_loadbalance_flag}, State) ->
     cs_lb:reset_loadbalance_flag(State);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% join messages (see cs_join.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% userdevguide-begin cs_node:join_message
-on({join, Source_PID, Id, UniqueId}, State) ->
-    cs_join:join_request(State, Source_PID, Id, UniqueId);
-
 
 
 %% userdevguide-end cs_node:join_message
@@ -343,8 +422,8 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
     State;
 
 %% @TODO buggy ...
-on({get_node_response, _, _}, State) ->
-    State;
+%on({get_node_response, _, _}, State) ->
+%    State;
 
 %% @TODO: cleanup
 on({send_to_group_member,Processname,Mesg}, State) ->
@@ -353,20 +432,14 @@ on({send_to_group_member,Processname,Mesg}, State) ->
     Pid ! Mesg,
     State;
 
-on({get_list_length_response,Ringsize},{join_state1}) ->
-    cs_keyholder:get_key(),
-    {join_state2,Ringsize};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% join messages (see cs_join.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% userdevguide-begin cs_node:join_message
+on({join, Source_PID, Id, UniqueId}, State) ->
+    cs_join:join_request(State, Source_PID, Id, UniqueId);
 
-on({get_key_response_keyholder, Key},{join_state2,Ringsize}) ->
-    {First, State} = cs_join:join(Key,Ringsize),
-    if
-    not First ->
-        cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State));
-    true ->
-        ok
-    end,
-    log:log(info,"[ Node ~w ] joined",[self()]),
-    State;
+
 
 on(_, _State) ->
     unknown_event.

@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([join/2, join_request/4]).
+-export([join_request/4, join_first/1]).
 
 -include("chordsharp.hrl").
 
@@ -46,41 +46,14 @@ join_request(State, Source_PID, Id, UniqueId) ->
 
 %%%------------------------------Join---------------------------------
 
-%% userdevguide-begin cs_join:join_first
-%% @doc join an empty ring
+
+
 join_first(Id) -> 
-   	log:log(info,"[ Node ~w ] join as first ~w",[self(), Id]),
+    log:log(info,"[ Node ~w ] join as first ~w",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
     ?RM:initialize(Id, Me, Me, Me),
     routingtable:initialize(Id, Me, Me),
     cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
-%% userdevguide-end cs_join:join_first
-
-%% @doc join a ring
-%% userdevguide-begin cs_join:join_ring
-join_ring(Id, Succ) ->
-    log:log(info,"[ Node ~w ] join_ring ~w",[self(), Id]),
-    Me = node:make(cs_send:this(), Id),
-    UniqueId = node:uniqueId(Me),
-    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Id, UniqueId}),
-    receive
-	{join_response, Pred, Data} -> 
-	    log:log(info,"[ Node ~w ] got pred ~w",[self(), Pred]),
-	    case node:is_null(Pred) of
-		true ->
-		    DB = ?DB:add_data(?DB:new(), Data),
-		    ?RM:initialize(Id, Me, Pred, Succ),
-		    routingtable:initialize(Id, Pred, Succ),
-		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
-		false ->
-		    cs_send:send(node:pidX(Pred), {update_succ, Me}),
-		    DB = ?DB:add_data(?DB:new(), Data),
-		    ?RM:initialize(Id, Me, Pred, Succ),
-		    routingtable:initialize(Id, Pred, Succ),
-		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id}, 
-				 cs_lb:new(), DB)
-	    end
-    end.
 %% userdevguide-end cs_join:join_ring
 
 %% userdevguide-begin cs_join:join1
@@ -89,23 +62,5 @@ join_ring(Id, Succ) ->
 %%      node in the ring or not
 %% @spec join(Id) -> {true|false, state:state()}
 %%   Id = term()
-join(Id,Ringsize) -> 
-    log:log(info,"[ Node ~w ] joining ~p",[self(), Id]),
-    if
-	Ringsize == 0 ->
-	    State = join_first(Id),
-	    cs_reregister:reregister(),
-	    {true, State};
-	true ->
-	    case cs_lookup:reliable_get_node(erlang:get(instance_id), 
-					     Id, 60000) of
-		error ->
-		    join(Id,Ringsize);
-		{ok, Succ} ->
-		    State = join_ring(Id, Succ),
-		    cs_reregister:reregister(),
-		    {false, State}
-	    end
-    end.
-%% userdevguide-end cs_join:join1
+
 

@@ -29,9 +29,11 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+-behaviour(gen_component).
+
 -include("chordsharp.hrl").
 
--export([start_link/1, start/1, set_key/1, get_key/0, reinit/0]).
+-export([start_link/1,init/1, on/2,set_key/1, get_key/0, reinit/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
@@ -51,15 +53,13 @@ get_key() ->
     %end.
     ok.
 
-start(InstanceId) ->
-    process_dictionary:register_process(InstanceId, cs_keyholder, self()),
-    Key = get_initial_key(config:read(key_creator)),
-    %@TODO reimplement
-    %error_logger:add_report_handler(cs_error_logger),
-    loop(Key).
+init(_Arg) ->
+    get_initial_key(config:read(key_creator)).
+    
 
 start_link(InstanceId) ->
-    {ok, spawn_link(?MODULE, start, [InstanceId])}.
+    gen_component:start_link(?MODULE, [InstanceId,[]], [{register, InstanceId, cs_keyholder}]).
+    
 
 reinit() ->
     get_pid() ! {reinit}.
@@ -69,16 +69,17 @@ reinit() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Server process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-loop(Key) ->
-    receive
-    {reinit} ->
-        loop(get_initial_key(config:read(key_creator)));
-	{set_key_keyholder, NewKey} -> 
-	    loop(NewKey);
-	{get_key_keyholder, PID} -> 
+
+
+on({reinit},_Key) ->
+        get_initial_key(config:read(key_creator));
+on({set_key_keyholder, NewKey},_Key) -> 
+	    NewKey;
+on({get_key_keyholder, PID},Key) -> 
 	    PID ! {get_key_response_keyholder, Key},
-	    loop(Key)
-	end.
+	    Key;
+on(_, _State) ->
+    unknown_event.
 
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), cs_keyholder).

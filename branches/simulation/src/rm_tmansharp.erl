@@ -123,19 +123,27 @@ on(_,uninit) ->
         uninit;
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
+on({get_successorlist, Pid},{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+            Pid ! {get_successorlist_response,[Me]},
+	    	{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({get_predlist, Pid},{Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+			Pid ! {get_predlist_response, [Me]},
+            {Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({get_successorlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             Pid ! {get_successorlist_response, get_succs(View)},
-	    	{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+            {Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({get_predlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-			Pid ! {get_predlist_response, get_preds(View)},
+            Pid ! {get_predlist_response, get_preds(View)},
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+
+
 on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) -> % new stabilization interval
               
             % Triger an update of the Random view
             get_cyclon_pid() ! {get_subset_max_age,RandViewSize,self()},
             RndView=get_RndView(RandViewSize,RandomCache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-			P =selectPeer(rank(View++RndView,node:id(Me))),
+			P =selectPeer(rank(View++RndView,node:id(Me)),Me),
             %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
             %Test for being alone
             case (P == Me) of 
@@ -248,7 +256,10 @@ rank(MergedList,Id) ->
     end,
     %io:format("out: ~p ~p ~n",[self(),A]),
     A.
-selectPeer(View) ->
+
+selectPeer([],Me) ->
+    Me;
+selectPeer(View,_) ->
     NTH = crypto:rand_uniform(1, 3),
     case (NTH=<length(View)) of
         true -> lists:nth( NTH,View);
@@ -270,6 +281,7 @@ merge(X,[]) ->
     X;
 merge([],[]) ->
     [].
+
 
 get_succs([T]) ->
     [T];

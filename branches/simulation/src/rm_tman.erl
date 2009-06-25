@@ -123,6 +123,12 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         {NewId, NewMe, [NewPred], NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
 on(_,uninit) ->
         uninit;
+on({get_successorlist, Pid},{Id, Me, Preds, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
+            Pid ! {get_successorlist_response, [Me]},
+            {Id, Me, Preds, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
+on({get_predlist, Pid},{Id, Me, [], Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
+            Pid ! {get_predlist_response, [Me]},
+            {Id, Me, [], Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({get_successorlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
             Pid ! {get_successorlist_response, Succs},
 	    	{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
