@@ -125,10 +125,16 @@ loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache) 
 
     receive
     	{get_successorlist, Pid} ->
-            Pid ! {get_successorlist_response, Succs},
+            case Succs of
+              []  ->  Pid ! {get_successorlist_response, [Me]};
+              _   ->  Pid ! {get_successorlist_response, Succs}
+            end,
 	    	loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache);
     	{get_predlist, Pid} ->
-			Pid ! {get_predlist_response, Preds},
+            case Preds of
+              []  -> Pid ! {get_predlist_response, [Me]};
+              _   -> Pid ! {get_predlist_response, Preds}
+            end,
             loop(Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache);
     	{stabilize,AktToken} -> % new stabilization interval
        	

@@ -136,7 +136,7 @@ loop(Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache) -
             get_cyclon_pid() ! {get_subset_max_age,RandViewSize,self()},
             RndView=get_RndView(RandViewSize,RandomCache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-			P =selectPeer(rank(View++RndView,node:id(Me))),
+			P =selectPeer(rank(View++RndView,node:id(Me)),Me),
             %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
             %Test for being alone
             case (P == Me) of 
@@ -253,7 +253,9 @@ rank(MergedList,Id) ->
     end,
     %io:format("out: ~p ~p ~n",[self(),A]),
     A.
-selectPeer(View) ->
+selectPeer([],Me) ->
+    Me;
+selectPeer(View,_) ->
     NTH = crypto:rand_uniform(1, 3),
     case (NTH=<length(View)) of
         true -> lists:nth( NTH,View);

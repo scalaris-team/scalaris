@@ -168,7 +168,7 @@ enhanced_shuffle(Cache, Node) ->
 	    cs_send:send_to_group_member(node:pidX(QCyclon),cyclon,{cy_subset,Node,ForSend}),
 	    cache:delete(Q,Cache_1);	
 	false -> 
-	    error
+	    Cache 
     end.
 
 %% @doc simple shuffle without age
