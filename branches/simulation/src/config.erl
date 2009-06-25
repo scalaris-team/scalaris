@@ -26,8 +26,13 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+-behavior(gen_component).
+
+
 -export([
-	 start_link/1, start/2,
+	 start_link/1, 
+    
+    init/1,on/2,    
 
 	 read/1,
 
@@ -275,35 +280,25 @@ knownHosts()->
 start_link(Files) ->
     io:format("Config files: ~p~n", [Files]),
     Owner = self(),
-    Link = spawn_link(?MODULE, start, [Files, Owner]),
-    receive
-	done ->
-	    ok;
-	X ->
-	    io:format("unknown config message  ~p", [X])
-    end,
-    {ok, Link}.
+    gen_component:start_link(?MODULE,{Files, Owner},[]).
 
 %@private
-start([File], Owner) ->
+init({[File], Owner}) ->
     catch ets:new(config_ets, [set, protected, named_table]),
     populate_db(File),
-    Owner ! done,
-    loop();
+    {ok};
 
 %@private
-start([Global, Local], Owner) ->
+init({[Global, Local], Owner}) ->
     catch ets:new(config_ets, [set, protected, named_table]),
     populate_db(Global),
     populate_db(Local),
-    Owner ! done,
-    loop().
+   
+    {ok}.
 
-loop() ->
-    receive
-	_ ->
-	    loop()
-    end.
+on(_,S) ->
+    S.
+
 
 %@private
 populate_db(File) ->

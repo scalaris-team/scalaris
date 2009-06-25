@@ -64,16 +64,20 @@ init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     erlang:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    receive
-	{init, Id, Pred, Succ} ->
-	    {Id, Pred, Succ, ?RT:empty(Succ)}
-    end.
+    {uninit}.
+    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Private Code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
+
+on({init, Id, Pred, Succ},{uninit}) ->
+    {Id, Pred, Succ, ?RT:empty(Succ)};
+on(Message,{uninit}) ->
+    self() ! Message,
+    {uninit};
 
 % re-initialize routing table
 on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState}) ->
