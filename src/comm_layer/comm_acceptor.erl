@@ -87,7 +87,7 @@ server(LS) ->
 		    end,
 		    NewPid = comm_connection:new(NewAddress, Port, S),
 		    gen_tcp:controlling_process(S, NewPid),
-		    inet:setopts(S, [{active, once}, {send_timeout, config:read(tcp_send_timeout)}]),
+		    inet:setopts(S, [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}]),
 		    comm_port:register_connection(NewAddress, Port, NewPid, S)
 	    end,
 	    server(LS);
