@@ -261,9 +261,13 @@ on({get_pred, Source_Pid}, State) ->
     State;
 
 on({get_succ_list, Source_Pid}, State) ->
-    cs_send:send(Source_Pid, {get_succ_list_response, cs_state:me(State), 
-			      rm_chord:get_successorlist()}),
+    rm_chord:get_successorlist(Source_Pid),
     State;
+
+on({get_successorlist_response, SuccList,Source_Pid}, State) ->
+    cs_send:send(Source_Pid, {get_succ_list_response, cs_state:me(State),SuccList}),
+    State;
+
 
 on({notify, Pred}, State) -> 
     rm_chord:notify(Pred),

@@ -34,9 +34,9 @@
 -export([init/1,on/2]).
 
 -export([start_link/1, initialize/4, 
-	 get_successorlist/0, succ_left/1, pred_left/1, 
+	 get_successorlist/1, succ_left/1, pred_left/1, 
 	 notify/1, update_succ/1, update_pred/1, 
-	 get_as_list/0,get_predlist/0]).
+	 get_predlist/0]).
 
 % unit testing
 -export([merge/3]).
@@ -70,12 +70,9 @@ init(_Args) ->
     uninit.
     
 
-get_successorlist() ->
-    get_pid() ! {get_successorlist, self()},
-    receive
-	{get_successorlist_response, SuccList} ->
-	    SuccList
-    end.
+get_successorlist(Source) ->
+    get_pid() ! {get_successorlist,Source,Source}.
+    
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
@@ -104,10 +101,10 @@ update_pred(_Pred) ->
 notify(Pred) ->
     get_pid() ! {notify, Pred}.
 
-get_as_list() ->
-    get_successorlist().
+
 
 get_predlist() ->
+    log:log(error, "[ RM-CHORD] OLD FUNCTION use broke with gen_component"),
     get_pid() ! {get_predlist, self()},
     receive
 	{get_predlist_response, PredList} ->
@@ -130,6 +127,9 @@ on(_,uninit) ->
 on({get_successorlist, Pid},{Id, Me, Pred, Succs})  ->
 	    Pid ! {get_successorlist_response, Succs},
 	    {Id, Me, Pred, Succs};
+on({get_successorlist, Pid,S},{Id, Me, Pred, Succs})  ->
+        Pid ! {get_successorlist_response, Succs,S},
+        {Id, Me, Pred, Succs};
 on({get_predlist, Pid},{Id, Me, Pred, Succs})  ->
         Pid ! {get_predlist_response, [Pred]},
        	{Id, Me, Pred, Succs};
