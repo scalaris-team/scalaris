@@ -93,6 +93,9 @@ set_write_lock(DB, Key) ->
 %% @spec unset_write_lock(db(), string()) -> {db(), ok | failed}
 unset_write_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
+	{value, {empty_val, true, 0, -1}} ->
+	    NewDB = gb_trees:delete(Key, DB),
+            {NewDB, ok};
 	{value, {Value, true, ReadLock, Version}} ->
 	    NewDB = gb_trees:update(Key, 
 				    {Value, false, ReadLock, Version}, 
@@ -150,6 +153,8 @@ get_locks(DB, Key) ->
 %% @spec read(db(), string()) -> {ok, string(), integer()} | failed
 read(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
+	[{Key, {empty_val, true, 0, -1}}] ->
+            failed;
 	{value, {Value, _WriteLock, _ReadLock, Version}} ->
 	    {ok, Value, Version};
 	none ->
@@ -234,7 +239,7 @@ add_data(DB, Data) ->
 %% @spec get_range(db(), string(), string()) -> [{string(), string()}]
 get_range(DB, From, To) ->
     [ {Key, Value} || {Key, {Value, _WLock, _RLock, _Vers}} <- gb_trees:to_list(DB),
-                      util:is_between(From, Key, To) ].
+                      util:is_between(From, Key, To), Value =/= empty_val ].
 
 %% @doc get keys and versions in a range
 %% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(),
@@ -243,7 +248,7 @@ get_range_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
     [ {Key, Value, Version, WriteLock, ReadLock}
       || {Key, {Value, WriteLock, ReadLock, Version}} <- gb_trees:to_list(DB),
-         util:is_between(From, Key, To) ].
+         util:is_between(From, Key, To), Value =/= empty_val ].
 
 % get_range_with_version
 %@private
@@ -252,7 +257,7 @@ get_range_only_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
     [ {Key, Value, Vers}
       || {Key, {Value, WLock, _RLock, Vers}} <- gb_trees:to_list(DB),
-         WLock == false andalso util:is_between(From, Key, To) ].
+         WLock == false andalso util:is_between(From, Key, To), Value =/= empty_val ].
 
 
 build_merkle_tree(DB, Range) ->

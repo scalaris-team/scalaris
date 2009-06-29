@@ -21,7 +21,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(transstore.transaction_test).
+-module(transaction_test).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -299,11 +299,11 @@ random_list_select(NumElements, DictIn, Outlist) ->
 % Transaction Tests - Using Transaction API
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%transstore.transaction_test:transtest_write_read(1).
+%transaction_test:transtest_write_read(1).
 transtest_write_read(Value)->
 %    InstanceId = erlang:get(instance_id),
     InstanceId = cs_send:this(),
-    spawn(transstore.transaction_test, do_transtest_write_read, [InstanceId, Value]).
+    spawn(transaction_test, do_transtest_write_read, [InstanceId, Value]).
 
 
 do_transtest_write_read(InstanceId, Value)->
@@ -349,16 +349,16 @@ do_transtest_write_read(InstanceId, Value)->
     end.
 
 
-%transstore.transaction_test:test_reads_writes(100, 1).
-%transstore.transaction_test:test_reads_writes(1, 1).
+%transaction_test:test_reads_writes(100, 1).
+%transaction_test:test_reads_writes(1, 1).
 
 %lists:map(fun(E)->I=process_info(E), io:format("Proc ~p ~n", [I]) end, processes()).            
 test_reads_writes(Rate, Value)->
-    spawn(transstore.transaction_test, do_test_reads_writes_init, [Rate, Value]).
+    spawn(transaction_test, do_test_reads_writes_init, [Rate, Value]).
 
 do_test_reads_writes_init(Rate, Value)->
     Dict = ioutils:for_each_line_in_file("../data/SQLiteWords.txt", fun(Line, Accum) -> [Line|Accum] end, [read], []),
-    spawn(transstore.transaction_test, initiator_writer, [Dict, Value, self(), Rate]),
+    spawn(transaction_test, initiator_writer, [Dict, Value, self(), Rate]),
     timer:send_after(400000, self(), {tresult}),
     Result = test_reads_writes_loop([], Dict, tresult),
     SuccList = lists:filter(fun({S,_It})-> if S == success-> true; true -> false end end, Result),
@@ -379,7 +379,7 @@ do_test_reads_writes_init(Rate, Value)->
     
     SuccWords = lists:map(fun({_, {Key, _}})-> Key end, SuccList),
 
-    spawn(transstore.transaction_test, initiator_reader, [SuccWords, self(), Rate]),
+    spawn(transaction_test, initiator_reader, [SuccWords, self(), Rate]),
 
     timer:send_after(400000, self(), {trresult}),
     ReadResult = test_reads_writes_loop([], Dict, trresult),
@@ -436,7 +436,7 @@ accumulate_res(Result, Message, Word, ToReceive, Accum)->
     {[{Result, Message}|Accum], TR2}.
 
 spawn_writer(Word, Iteration, Owner)->
-    spawn(transstore.transaction_test, writer, [Word, Iteration, Owner]).
+    spawn(transaction_test, writer, [Word, Iteration, Owner]).
 
 writer(Word, Iteration, Owner)->
 %%     TFun =
@@ -471,7 +471,7 @@ writer(Word, Iteration, Owner)->
     end.
     
 spawn_reader(Word, Owner)->
-    spawn(transstore.transaction_test, reader, [Word,  Owner]).
+    spawn(transaction_test, reader, [Word,  Owner]).
 
 reader(Word, Owner)->
     {RF, RR} = transaction_api:quorum_read(Word),
@@ -499,25 +499,25 @@ write2_read2() ->
 
     TWrite2 =
         fun(TransLog)->
-                {ok, TransLog1} = transstore.transaction_api:write(KeyA, ValueA, TransLog),
-                {ok, TransLog2} = transstore.transaction_api:write(KeyB, ValueB, TransLog1),
+                {ok, TransLog1} = transaction_api:write(KeyA, ValueA, TransLog),
+                {ok, TransLog2} = transaction_api:write(KeyB, ValueB, TransLog1),
                 {{ok, ok}, TransLog2}
         end,
     TRead2 =
         fun(X)->
-                Res1 = transstore.transaction_api:read(KeyA, X),
+                Res1 = transaction_api:read(KeyA, X),
                 ct:pal("Res1: ~p~n", [Res1]),
                 {{value, ValA}, Y} = Res1,
-                Res2 = transstore.transaction_api:read(KeyB, Y),
+                Res2 = transaction_api:read(KeyB, Y),
                 ct:pal("Res2: ~p~n", [Res2]),
                 {{value, ValB}, TransLog2} = Res2,
                 {{ok, ok}, TransLog2}
         end,
 
-    {ResultW, TLogW} = transstore.transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
+    {ResultW, TLogW} = transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
     io:format("Write TLOG: ~p~n", [TLogW]),
 
-    {ResultR, TLogR} = transstore.transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
+    {ResultR, TLogR} = transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
     io:format("Read TLOG: ~p~n", [TLogR]),
 
     ok.

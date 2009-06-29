@@ -22,7 +22,7 @@
 %% @author Monika Moser <moser@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(transstore.tp_log).
+-module(tp_log).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').

@@ -51,10 +51,12 @@ JAVADIR=$(DESTDIR)@datarootdir@/java
 LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
 
 all: compile
+#all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
 compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
+
 
 test: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
@@ -67,13 +69,7 @@ java:
 
 clean:
 	-rm -rf bin/*.beam
-	-rm -rf bin/comm_layer/*.beam
-	-rm -rf bin/pubsub/*.beam
-	-rm -rf bin/transstore/*.beam
 	-rm -rf ebin/*.beam
-	-rm -rf ebin/comm_layer/*.beam
-	-rm -rf ebin/pubsub/*.beam
-	-rm -rf ebin/transstore/*.beam
 	-rm -rf src/*.beam
 	-rm -rf src/comm_layer/*.beam
 	-rm -rf src/pubsub/*.beam
@@ -95,25 +91,17 @@ svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
 
 dialyzer:
-	$(DIALYZER) -c src/*.erl -I $(YAWS_PATH)/include/
+	$(DIALYZER) -Wunderspecs -Werror_handling -c ebin contrib/log4erl/ebin/ contrib/yaws/ebin/
 
 rrd-init:
-	@echo This is target is deprecated
+	@echo This target is deprecated
 
 install: all java
 	@echo $(DESTDIR)
 	@echo @prefix@
 	mkdir -p $(BEAMDIR)
-	mkdir -p $(BEAMDIR)/comm_layer
-	mkdir -p $(BEAMDIR)/cyclon
-	mkdir -p $(BEAMDIR)/pubsub
-	mkdir -p $(BEAMDIR)/transstore
 	install -m 644 bin/*.app $(BEAMDIR)
 	install -m 644 ebin/*.beam $(BEAMDIR)
-	install -m 644 ebin/comm_layer/*.beam $(BEAMDIR)/comm_layer
-	install -m 644 ebin/cyclon/*.beam $(BEAMDIR)/cyclon
-	install -m 644 ebin/pubsub/*.beam     $(BEAMDIR)/pubsub
-	install -m 644 ebin/transstore/*.beam $(BEAMDIR)/transstore
 	mkdir -p $(ETCDIR)
 	install bin/scalaris.cfg bin/scalaris.local.cfg.example $(ETCDIR)
 	mkdir -p $(DOCROOTDIR)

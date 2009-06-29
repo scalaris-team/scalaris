@@ -12,7 +12,7 @@
 %% Inexpensive Membership Management for Unstructured P2P Overlays. 
 %% Journal of Network and Systems Management, Vol. 13, No. 2, June 2005.
 
--module(cyclon.cyclon).
+-module(cyclon).
 -author('hennig@zib.de').
 -vsn('$Id $ ').
 

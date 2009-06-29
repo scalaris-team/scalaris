@@ -47,10 +47,11 @@ make_ring(Size) ->
     end,
     check_ring_size(Size),
     wait_for_stable_ring(),
-    timer:sleep(30000),
+%    timer:sleep(30000),
     Pid.
 
 stop_ring(Pid) ->
+    error_logger:tty(false),
     exit(Pid, kill).
 
 wait_for_stable_ring() ->

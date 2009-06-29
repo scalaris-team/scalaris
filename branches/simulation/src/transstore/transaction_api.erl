@@ -18,7 +18,7 @@
 %%%
 %%% Created : 17 Sep 2007 by Monika Moser <moser@zib.de>
 %%%-------------------------------------------------------------------
--module(transstore.transaction_api).
+-module(transaction_api).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').
@@ -77,7 +77,7 @@
 quorum_read(Key)->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
     RTO = 2000,
-    transstore.transaction:quorum_read(Key, cs_send:this()),
+    transaction:quorum_read(Key, cs_send:this()),
     receive
         {single_read_return, {value, Page, Version}}->
             ?TLOG2("read_page returned", [Page]),

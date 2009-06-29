@@ -33,8 +33,8 @@
 -export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3]).
 
 %-define(TCP_LAYER, true). % TCP communication
--define(BUILTIN, true).   % distributed Erlang native communication
-%-define(SIMULATION, true).
+%-define(BUILTIN, true).   % distributed Erlang native communication
+-define(SIMULATION, true).
 
 send_to_group_member(Csnodepid,Processname,Mesg) ->
     send(Csnodepid,{send_to_group_member,Processname,Mesg}).
@@ -44,12 +44,12 @@ send_to_group_member(Csnodepid,Processname,Mesg) ->
 -spec(this/0 :: () -> mypid()).
 this() ->
     %self().
-    comm_layer.comm_layer:this().
+    comm_layer:this().
 
 -spec(send/2 :: (mypid(), any()) -> ok).
 send(Pid, Message) ->
     %Pid ! Message.
-    comm_layer.comm_layer:send(Pid, Message).
+    comm_layer:send(Pid, Message).
 
 send_after(Delay,Pid, Message) ->
     erlang:send_after(Delay,Pid,Message).
@@ -84,11 +84,11 @@ this() ->
     self().
 
 send(Pid, Message) ->
-    simulation.scheduler:send(0,Pid,Message).
+    %Pid ! Message.
+    scheduler:send(0,Pid,Message).
 
 send_after(Delay,Pid, Message) ->
-    
-    simulation.scheduler:send(Delay,Pid,Message).
+    scheduler:send(Delay,Pid,Message).
 
 get(Name, {_Pid,Host}) ->
     {Name, Host};

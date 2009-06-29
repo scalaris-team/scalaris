@@ -48,10 +48,10 @@ end_per_suite(Config) ->
     ok.
 
 count(_Config) ->
-    ?equals(transstore.transaction_api:single_write("i", 2), commit),
-    ?equals(transstore.transaction_api:single_write("j", 3), commit),
-    ?equals(transstore.transaction_api:single_write("k", 5), commit),
-    ?equals(transstore.transaction_api:single_write("l", 7), commit),
+    ?equals(transaction_api:single_write("i", 2), commit),
+    ?equals(transaction_api:single_write("j", 3), commit),
+    ?equals(transaction_api:single_write("k", 5), commit),
+    ?equals(transaction_api:single_write("l", 7), commit),
     bulkowner:issue_bulk_owner(intervals:new(0, 0), {unit_test_bulkowner, self()}),
     ?equals(collect(0), 68),
     ok.

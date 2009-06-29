@@ -23,10 +23,11 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(comm_layer.comm_acceptor).
+-module(comm_acceptor).
 
 -export([start_link/1, init/2]).
 
+-import(comm_connection).
 -import(config).
 -import(gen_tcp).
 -import(inet).
@@ -35,7 +36,7 @@
 -import(process_dictionary).
 
 start_link(InstanceId) ->
-    Pid = spawn_link(comm_layer.comm_acceptor, init, [InstanceId, self()]),
+    Pid = spawn_link(comm_acceptor, init, [InstanceId, self()]),
     receive
         {started} ->
             {ok, Pid}
@@ -87,7 +88,7 @@ server(LS) ->
 		    end,
 		    NewPid = comm_connection:new(NewAddress, Port, S),
 		    gen_tcp:controlling_process(S, NewPid),
-		    inet:setopts(S, [{active, once}, {send_timeout, config:read(tcp_send_timeout)}]),
+		    inet:setopts(S, comm_connection:tcp_options()),
 		    comm_port:register_connection(NewAddress, Port, NewPid, S)
 	    end,
 	    server(LS);

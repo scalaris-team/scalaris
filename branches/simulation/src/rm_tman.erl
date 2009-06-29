@@ -130,10 +130,16 @@ on({get_predlist, Pid},{Id, Me, [], Succs,RandViewSize,Interval,AktToken,AktPred
             Pid ! {get_predlist_response, [Me]},
             {Id, Me, [], Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({get_successorlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
-            Pid ! {get_successorlist_response, Succs},
+            case Succs of
+              []  ->  Pid ! {get_successorlist_response, [Me]};
+              _   ->  Pid ! {get_successorlist_response, Succs}
+            end,
 	    	{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({get_predlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
-			Pid ! {get_predlist_response, Preds},
+            case Preds of
+              []  -> Pid ! {get_predlist_response, [Me]};
+              _   -> Pid ! {get_predlist_response, Preds}
+            end,
             {Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({stabilize,AktToken},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  -> % new stabilization interval
             % Triger an update of the Random view

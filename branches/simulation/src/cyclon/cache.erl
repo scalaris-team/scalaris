@@ -8,7 +8,7 @@
 %% @author Christian Hennig <hennig@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(cyclon.cache).
+-module(cache).
 -author('hennig@zib.de').
 -vsn('$Id $ ').
 

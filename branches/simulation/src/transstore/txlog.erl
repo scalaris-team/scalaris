@@ -22,7 +22,7 @@
 %% @copyright 2009 onScale solutions GmbH
 %% @version $Id$
 
--module(transstore.txlog).
+-module(txlog).
 
 -author('schintke@onscale.de').
 -vsn('$Id$').
