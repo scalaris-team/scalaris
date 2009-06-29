@@ -1,7 +1,7 @@
 %% Author: christian
 %% Created: Jun 11, 2009
 %% Description: TODO: Add description to simulator
--module(main).
+-module(simulation).
 
 %%
 %% Include files
