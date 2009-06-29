@@ -283,13 +283,13 @@ start_link(Files) ->
     gen_component:start_link(?MODULE,{Files, Owner},[]).
 
 %@private
-init({[File], Owner}) ->
+init({[File], _Owner}) ->
     catch ets:new(config_ets, [set, protected, named_table]),
     populate_db(File),
     {ok};
 
 %@private
-init({[Global, Local], Owner}) ->
+init({[Global, Local], _Owner}) ->
     catch ets:new(config_ets, [set, protected, named_table]),
     populate_db(Global),
     populate_db(Local),

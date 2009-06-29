@@ -65,7 +65,7 @@
 
 	 get_groups/0,
 	 get_processes_in_group/1, 
-	 get_info/2,
+	 %get_info/2,
 
 	 %for fprof
 	 get_all_pids/0]).
@@ -149,25 +149,25 @@ get_processes_in_group(Group) ->
     
 %% @doc get info about process (for web interface)
 %% @spec get_info(term(), term()) -> term()
-get_info(InstanceId, Name) ->   
-    KVs = case lookup_process2(InstanceId, list_to_atom(Name)) of
-	      failed ->
-		  [{"process", "unknown"}];
-	      {ok, Pid} ->
-		  Pid ! {'$gen_cast', {debug_info, self()}},
-		  {memory, Memory} = process_info(Pid, memory),
-		  {reductions, Reductions} = process_info(Pid, reductions),
-		  {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
-		  AddInfo = receive
-				{debug_info_response, LocalKVs} ->
-				    LocalKVs
-			    after 1000 ->
-				    []
-			    end,
-		  [{"memory", Memory}, {"reductions", Reductions}, {"message_queue_len", QueueLen} | AddInfo]
-	  end,
-    JsonKVs = lists:map(fun({K, V}) -> {struct, [{key, K}, {value, toString(V)}]} end, KVs),
-    {struct, [{pairs, {array, JsonKVs}}]}.
+%% get_info(InstanceId, Name) ->   
+%%     KVs = case lookup_process2(InstanceId, list_to_atom(Name)) of
+%% 	      failed ->
+%% 		  [{"process", "unknown"}];
+%% 	      {ok, Pid} ->
+%% 		  Pid ! {'$gen_cast', {debug_info, self()}},
+%% 		  {memory, Memory} = process_info(Pid, memory),
+%% 		  {reductions, Reductions} = process_info(Pid, reductions),
+%% 		  {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
+%% 		  AddInfo = receive
+%% 				{debug_info_response, LocalKVs} ->
+%% 				    LocalKVs
+%% 			    after 1000 ->
+%% 				    []
+%% 			    end,
+%% 		  [{"memory", Memory}, {"reductions", Reductions}, {"message_queue_len", QueueLen} | AddInfo]
+%% 	  end,
+%%     JsonKVs = lists:map(fun({K, V}) -> {struct, [{key, K}, {value, toString(V)}]} end, KVs),
+%%     {struct, [{pairs, {array, JsonKVs}}]}.
 
 %% @doc get all pids (for fprof)
 %% @spec get_all_pids() -> [pid()]
@@ -246,14 +246,14 @@ on({drop_state}, State) ->
 on(_, _State) ->
     unknown_event.
 
-lookup_process2(InstanceId, Name) ->
-    Result = case ets:lookup(?MODULE, {InstanceId, Name}) of
-        [{{InstanceId, Name}, Value}] ->
-            {ok, Value};
-        [] ->
-            failed
-    end,
-    Result.
+%% lookup_process2(InstanceId, Name) ->
+%%     Result = case ets:lookup(?MODULE, {InstanceId, Name}) of
+%%         [{{InstanceId, Name}, Value}] ->
+%%             {ok, Value};
+%%         [] ->
+%%             failed
+%%     end,
+%%     Result.
 
 find_process(Name) ->
     case ets:match(?MODULE, {{'_', Name}, '$1'}) of

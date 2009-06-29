@@ -14,7 +14,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : cs_node.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : chord# node main file
+%%% Description : cs_node main file
 %%%
 %%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
