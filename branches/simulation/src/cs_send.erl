@@ -30,17 +30,17 @@
 
 -include("transstore/trecords.hrl").
 
--export([send/2, this/0, get/2, send_to_group_member/3]).
+-export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3]).
 
--define(TCP_LAYER, true). % TCP communication
-%-define(BUILTIN, true).   % distributed Erlang native communication
+%-define(TCP_LAYER, true). % TCP communication
+-define(BUILTIN, true).   % distributed Erlang native communication
+%-define(SIMULATION, true).
 
 send_to_group_member(Csnodepid,Processname,Mesg) ->
     send(Csnodepid,{send_to_group_member,Processname,Mesg}).
 
 -ifdef(TCP_LAYER).
 -type(mypid() :: {inet:ip_address(), integer(), pid()}).
-
 -spec(this/0 :: () -> mypid()).
 this() ->
     %self().
@@ -49,23 +49,46 @@ this() ->
 -spec(send/2 :: (mypid(), any()) -> ok).
 send(Pid, Message) ->
     %Pid ! Message.
-    
     comm_layer.comm_layer:send(Pid, Message).
+
+send_after(Delay,Pid, Message) ->
+    erlang:send_after(Delay,Pid,Message).
 
 % get process Name on node Node
 get(Name, {IP, Port, _Pid}=_Node) ->
     {IP, Port, Name}.
 
 -endif.
-
 -ifdef(BUILTIN).
 -type(mypid() :: pid()).
 this() ->
     self().
 
+send_after(Delay,Pid, Message) ->
+    erlang:send_after(Delay,Pid,Message).
+
 send(Pid, Message) ->
-    
     Pid ! Message.
+
+
+
+get(Name, {_Pid,Host}) ->
+    {Name, Host};
+get(Name, Pid) ->
+    {Name, node(Pid)}.
+
+-endif.
+
+-ifdef(SIMULATION).
+this() ->
+    self().
+
+send(Pid, Message) ->
+    simulation.scheduler:send(0,Pid,Message).
+
+send_after(Delay,Pid, Message) ->
+    
+    simulation.scheduler:send(Delay,Pid,Message).
 
 get(Name, {_Pid,Host}) ->
     {Name, Host};
