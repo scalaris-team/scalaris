@@ -80,6 +80,32 @@ start(Module, Args, Options, Supervisor) ->
     end.
 
 
+loop_profile(Module, State, {Options, Slowest} = _ComponentState) ->
+    receive
+	Message ->
+	    %io:format("~p ~p ~n", [Message, State]),
+	    Start = erlang:now(),
+	    case fprof:apply(Module, on, [Message, State]) of
+		unknown_event ->
+		    {NewState, NewComponentState} = 
+			handle_unknown_event(Message, State,{Options, Slowest},Module),
+		    loop(Module, NewState, NewComponentState);
+		kill ->
+		    ok;
+		NewState ->
+		    Stop = erlang:now(),
+		    case timer:now_diff(Stop, Start) > 30000 of
+			true ->
+			    io:format("~p:~p~n", [timer:now_diff(Stop, Start), Message]),
+			    fprof:profile(),
+			    fprof:analyse(),
+			    ok;
+			false ->
+			    ok
+		    end,
+		    loop_profile(Module, NewState, {Options, Slowest})
+	    end
+    end.
 
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive

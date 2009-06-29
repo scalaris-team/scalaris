@@ -10,14 +10,24 @@
 %%
 %% Exported Functions
 %%
--export([]).
+-export([start/0,init/1,on/2]).
 
 %%
 %% API Functions
 %%
 
+-behaviour(gen_component).
 
+start() ->
+    
+    ok.
 
+init(_) ->
+    ok.
+
+on(_,_) ->
+ 
+    ok.
 %%
 %% Local Functions
 %%
