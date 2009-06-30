@@ -93,9 +93,9 @@ write_lock(_Config) ->
     {DB5, ok}     = ?DB:unset_write_lock(DB4, "WriteLockKey2"),
     % lockable again?
     {DB6, ok}     = ?DB:set_write_lock(DB5, "WriteLockKey2"),
+    {DB7, {true,0,_Version}} = ?DB:get_locks(DB6, "WriteLockKey2"),
     % unlock to finish
-    {DB7, ok}     = ?DB:unset_write_lock(DB6, "WriteLockKey2"),
-    {_DB8, {false,0,_Version}} = ?DB:get_locks(DB7, "WriteLockKey2"),
+    {_DB8, ok}     = ?DB:unset_write_lock(DB7, "WriteLockKey2"),
     ok.
 
 read_lock(_Config) ->
