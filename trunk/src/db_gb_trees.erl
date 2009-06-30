@@ -153,7 +153,7 @@ get_locks(DB, Key) ->
 %% @spec read(db(), string()) -> {ok, string(), integer()} | failed
 read(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	[{Key, {empty_val, true, 0, -1}}] ->
+	{value, {empty_val, true, 0, -1}} ->
             failed;
 	{value, {Value, _WriteLock, _ReadLock, Version}} ->
 	    {ok, Value, Version};
