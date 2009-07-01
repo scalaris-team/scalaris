@@ -280,14 +280,16 @@ build_merkle_tree(DB, Range) ->
 update_if_newer(OldDB, KVs) ->
     F = fun ({Key, Value, Version}, DB) ->
 		case ets:lookup(DB, Key) of
-		    none ->
-			ets:insert(DB, {Key, {Value, false, 0, Version}});
-		    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
+		    [] ->
+			ets:insert(DB, {Key, {Value, false, 0, Version}}),
+                        DB;
+		    [{_Value, WriteLock, ReadLock, OldVersion}] ->
 			case not WriteLock andalso
                             ReadLock == 0 andalso
                             OldVersion < Version of
 			    true ->
-				ets:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}});
+				ets:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}}), 
+                                DB;
 			    false ->
 				DB
 			end
