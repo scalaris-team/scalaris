@@ -346,26 +346,21 @@ write_read_receive_parallel(Results, ReplicaKeys)->
         {get_key_response, Key, failed} ->
             NewResults = add_result(Results, Key, fail, Results),
             CRRes = check_results_parallel(NewResults, NewResults),
-            if
-                CRRes == continue ->
+            case CRRes of
+                continue ->
                     write_read_receive_parallel(NewResults, ReplicaKeys);
-                %% should not occur? only for write operations
-                CRRes == fail ->
-                    {fail, not_found};
-                true -> % {found, TLog}
+                _ -> % {found, TLog}
                     CRRes
             end;
         {get_key_response, Key, {ok, Value, Versionnr}} ->
-                NewResults = add_result(Results, Key, {Value, Versionnr}, Results),
-                CRRes = check_results_parallel(NewResults, NewResults),
-                if
-                    CRRes == fail ->
-                        {fail, not_found};
-                    CRRes == continue ->
-                        write_read_receive_parallel(NewResults, ReplicaKeys);
-                    true -> % {found, TLog}
-                        CRRes
-                end;
+            NewResults = add_result(Results, Key, {Value, Versionnr}, Results),
+            CRRes = check_results_parallel(NewResults, NewResults),
+            case CRRes of 
+                continue ->
+                    write_read_receive_parallel(NewResults, ReplicaKeys);
+                _ -> % {found, TLog}
+                    CRRes
+            end;
         {write_read_receive_timeout, _Key} ->
             {fail, timeout};
         Any ->
@@ -397,7 +392,7 @@ check_results_parallel([Head |Results], AllResults)->
             check_results_parallel(Results, AllResults);
         true ->
             TMPResults = [ Elem || Elem <- ResKey, Elem /= fail ],
-            TMPResultsFailed = [ Elem || Elem <- Results, Elem == fail ],
+            TMPResultsFailed = [ Elem || Elem <- ResKey, Elem == fail ],
 
             ReplFactor = config:replicationFactor(),
             QuorumFactor = config:quorumFactor(),
@@ -491,10 +486,11 @@ initRTM(State, Message)->
 %% @doc deletes all replicas of an item, but respects locks
 %%      the return value is the number of successfully deleted items
 %%      WARNING: this function can lead to inconsistencies
--spec(delete/2 :: (cs_send:mypid(), any()) -> pos_integer()).
+-spec(delete/2 :: (cs_send:mypid(), any()) -> ok).
 delete(SourcePID, Key) ->
     InstanceId = erlang:get(instance_id),
-    spawn(transaction, do_delete, [Key, SourcePID, InstanceId]).
+    spawn(transaction, do_delete, [Key, SourcePID, InstanceId]), 
+    ok.
 
 do_delete(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
