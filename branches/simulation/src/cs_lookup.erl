@@ -41,7 +41,7 @@
 	
 
 unreliable_lookup(Key, Msg) ->
-    get_pid(cs_node) ! {lookup_aux, Key, 0, Msg}.
+    cs_send:send_local(get_pid(cs_node) , {lookup_aux, Key, 0, Msg}).
 
 unreliable_get_key(Key) ->
     unreliable_lookup(Key, {get_key, cs_send:this(), Key}).

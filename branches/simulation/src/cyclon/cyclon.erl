@@ -58,9 +58,9 @@ start_link(InstanceId, Options) ->
 
    
 init(_Args) ->
-   	get_pid() !	{get_node, cs_send:this(),2.71828183},
-    get_pid() ! {get_pred_succ, cs_send:this()},
-    erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+   	cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
+    cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
+    cs_send:send_after(config:read(cyclon_interval), self(), {shuffle}),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
     {null,null,0}.
 
@@ -82,7 +82,7 @@ init(_Args) ->
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
 on({get_ages,Pid},{Cache,Node,Cycles}) ->
-    Pid ! {ages,cache:ages(Cache)},
+    cs_send:send_local(Pid , {ages,cache:ages(Cache)}),
     {Cache,Node,Cycles};
 
 on({get_node_response, 2.71828183, Me},{Cache,null,Cycles}) ->
@@ -98,33 +98,33 @@ on({get_pred_succ_response, Pred, Succ},{null,Node,Cycles}) ->
    
 
 on({get_subset,all,Pid},{Cache,Node,Cycles}) ->
-			Pid ! {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)},
+			cs_send:send_local(Pid , {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)}),
 			{Cache,Node,Cycles};
 
 on({get_subset_max_age,Age,Pid},{Cache,Node,Cycles}) ->
-            Pid ! {cache,cache:get_subset_max_age(Age,Cache)},
+            cs_send:send_local(Pid , {cache,cache:get_subset_max_age(Age,Cache)}),
             {Cache,Node,Cycles};    
         
 on({get_subset,N,Pid},{Cache,Node,Cycles}) ->
-			Pid ! {cache,cache:get_youngest(N,Cache)},
+			cs_send:send_local(Pid , {cache,cache:get_youngest(N,Cache)}),
 			{Cache,Node,Cycles};
         
 on({get_cache,Pid},{Cache,Node,Cycles}) ->
-			Pid ! {cache,cache:get_list_of_nodes(Cache)},
+			cs_send:send_local(Pid , {cache,cache:get_list_of_nodes(Cache)}),
 			{Cache,Node,Cycles};
         
 on({flush_cache},{_Cache,Node,_Cycles}) ->
-			get_pid() ! {get_pred_succ, cs_send:this()},
+			cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
 			{cache:new(),Node,0};	
 on({start_shuffling},{Cache,Node,Cycles}) ->
-			erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+			cs_send:send_after(config:read(cyclon_interval), self(), {shuffle}),
 			{Cache,Node,Cycles};
 on({'$gen_cast', {debug_info, Requestor}},{Cache,Node,Cycles})  ->
-	    Requestor ! {debug_info_response, [
+	    cs_send:send_local(Requestor , {debug_info_response, [
 					       		{"cs_node", lists:flatten(io_lib:format("~p", [get_pid()]))},
 						   			{"cache-items", lists:flatten(io_lib:format("~p", [cache:size(Cache)]))},
 										{"cache", lists:flatten(io_lib:format("~p", [Cache])) }
-					      	]},
+					      	]}),
 	    {Cache,Node,Cycles};
 
 on({shuffle},{Cache,null,Cycles}) ->
@@ -137,7 +137,7 @@ on({shuffle},{Cache,Node,Cycles}) 	->
 				    _  ->
 					   enhanced_shuffle(Cache,Node)
 					end,
-				erlang:send_after(config:read(cyclon_interval), self(), {shuffle}),
+				cs_send:send_after(config:read(cyclon_interval), self(), {shuffle}),
 		{NewCache,Node,Cycles+1};
 		
 on({cy_subset,P,Subset},{Cache,Node,Cycles}) ->

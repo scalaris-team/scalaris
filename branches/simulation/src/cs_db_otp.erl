@@ -348,7 +348,7 @@ handle_cast(stop, DB) ->
     {stop, normal, DB};
 %@private
 handle_cast({debug_info, Requestor}, DB) ->
-    Requestor ! {debug_info_response, [{"db_items", gb_trees:size(DB)}]},
+    cs_send:send_local(Requestor , {debug_info_response, [{"db_items", gb_trees:size(DB)}]}),
     {noreply, DB};
 %@private
 handle_cast(_Msg, DB) ->

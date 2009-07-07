@@ -82,7 +82,7 @@
 register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
-    get_pid() ! {register_process, InstanceId, Name, Pid},
+    cs_send:send_local(get_pid() , {register_process, InstanceId, Name, Pid}),
     gen_component:wait_for_ok().
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
@@ -154,7 +154,7 @@ get_processes_in_group(Group) ->
 %% 	      failed ->
 %% 		  [{"process", "unknown"}];
 %% 	      {ok, Pid} ->
-%% 		  Pid ! {'$gen_cast', {debug_info, self()}},
+%% 		  cs_send:send_local(Pid , {'$gen_cast', {debug_info, self()}}),
 %% 		  {memory, Memory} = process_info(Pid, memory),
 %% 		  {reductions, Reductions} = process_info(Pid, reductions),
 %% 		  {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
@@ -183,6 +183,7 @@ get_all_pids() ->
 %%--------------------------------------------------------------------
 %@doc Starts the server
 start_link() ->
+    io:format("Start PD~n"),
     gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
   
 
@@ -202,7 +203,8 @@ start_link_for_unittest() ->
 %%--------------------------------------------------------------------
 %@doc Starts the server; for use with the test framework
 start() ->
-    gen_component:start_link(?MODULE, [], [{register_SP, process_dictionary}]).
+    
+    gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
 
 
 
@@ -237,7 +239,7 @@ init(_Args) ->
 
 on({register_process, InstanceId, Name, Pid}, State) ->
     ets:insert(?MODULE, {{InstanceId, Name}, Pid}),
-    Pid ! {ok},
+    cs_send:send_local(Pid , {ok}),
     {State};
 on({drop_state}, State) ->
     ets:delete_all_objects(?MODULE),

@@ -55,7 +55,7 @@ start_link() ->
 %% specifications.
 %%--------------------------------------------------------------------
 init([]) ->
-    crypto:start(),
+    randoms:start(),
     inets:start(),
     %util:logger(),
     error_logger:logfile({open, preconfig:cs_log_file()}),

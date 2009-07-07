@@ -11,6 +11,10 @@
 %% @version $Id$
 -module(gen_component).
 
+%-define(REALTIME, true). % TCP communication
+%-define(BUILTIN, true). 
+-define(SIMULATION, true).
+
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
@@ -57,6 +61,7 @@ start_link(Module, Args, Options) ->
     
 
 start(Module, Args, Options, Supervisor) ->
+    %io:format("Sarting ~p~n",[Module]),
     case lists:keysearch(register, 1, Options) of
 	{value, {register, InstanceId, Name}} ->
 	    process_dictionary:register_process(InstanceId, Name, self()),
@@ -72,41 +77,13 @@ start(Module, Args, Options, Supervisor) ->
             end
     end,
     InitialState = Module:init(Args),
-    case lists:member(profile, Options) of
-	true ->
-	    loop_profile(Module, InitialState, {Options, 0.0});
-	false ->
-	    loop(Module, InitialState, {Options, 0.0})
-    end.
+    
+   
+        loop(Module, InitialState, {Options, 0.0}).
 
 
-loop_profile(Module, State, {Options, Slowest} = _ComponentState) ->
-    receive
-	Message ->
-	    %io:format("~p ~p ~n", [Message, State]),
-	    Start = erlang:now(),
-	    case fprof:apply(Module, on, [Message, State]) of
-		unknown_event ->
-		    {NewState, NewComponentState} = 
-			handle_unknown_event(Message, State,{Options, Slowest},Module),
-		    loop(Module, NewState, NewComponentState);
-		kill ->
-		    ok;
-		NewState ->
-		    Stop = erlang:now(),
-		    case timer:now_diff(Stop, Start) > 30000 of
-			true ->
-			    io:format("~p:~p~n", [timer:now_diff(Stop, Start), Message]),
-			    fprof:profile(),
-			    fprof:analyse(),
-			    ok;
-			false ->
-			    ok
-		    end,
-		    loop_profile(Module, NewState, {Options, Slowest})
-	    end
-    end.
 
+-ifdef(REALTIME).
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive
     Message ->
@@ -123,12 +100,52 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
 		    loop(Module, NewState, {Options, Slowest})
 	    end
     end.
-
 wait_for_ok() ->
     receive
     {ok} ->
         ok
     end.
+-endif.
+
+-ifdef(SIMULATION).
+loop(Module, State, {Options, Slowest} = _ComponentState) ->
+    
+    receive
+    Message ->
+        %io:format("~p ~p ~n", [Message, Module]),
+        case Module:on(Message, State) of
+        unknown_event ->
+            {NewState, NewComponentState} = 
+            handle_unknown_event(Message, State, 
+                         {Options, Slowest},Module),
+            unlock(),
+            loop(Module, NewState, NewComponentState);
+        kill ->
+            unlock(),
+            ok;
+        NewState ->
+            unlock(),
+            loop(Module, NewState, {Options, Slowest})
+        end
+    end.
+wait_for_ok() ->
+    %io:format("Warte auf ok~n"),
+    release_ok(),
+    receive
+    {ok} ->
+        %io:format("ok is da~n"),
+        ok
+    end.
+
+
+-endif.
+
+release_ok() ->
+    scheduler ! {release_ok}.
+
+unlock() ->
+    scheduler ! {unlock}.
+
 
 handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->
    log:log(error,"unknown message: ~p in ~p~n",[UnknownMessage,Module]),

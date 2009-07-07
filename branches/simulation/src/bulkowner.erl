@@ -38,10 +38,10 @@
 %% @spec issue_bulk_owner(intervals:interval(), term()) -> ok
 issue_bulk_owner(I, Msg) ->
     {ok, CSNode} = process_dictionary:find_cs_node(),
-    CSNode ! {start_bulk_owner, I, Msg}.
+    cs_send:send_local(CSNode , {start_bulk_owner, I, Msg}).
 
 start_bulk_owner(I, Msg) ->
-    self() ! {bulk_owner, I, Msg}.
+    cs_send:send_local(self() , {bulk_owner, I, Msg}).
 
 %% @doc main routine. It spans a broadcast tree over the nodes in I
 %% @spec bulk_owner(State::cs_state:state(), I::intervals:interval(), 

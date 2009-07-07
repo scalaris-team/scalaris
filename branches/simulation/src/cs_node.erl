@@ -78,7 +78,7 @@ on({get_list_response,Nodes},{join_state2_b,Key}) ->
     %io:format("STATE2_b~n"),
     [First | Rest] = util:shuffle(Nodes),
     cs_send:send(First, {lookup_aux, Key, 0, {get_node, cs_send:this(), Key}}),
-    erlang:send_after(3000, self() , {join_timeout}),
+    cs_send:send_after(3000, self() , {join_timeout}),
     {join_state3,Rest,[],Key};
 
 on({join_timeout},{join_state3,[], _Suspected,_Key}) ->
@@ -89,7 +89,7 @@ on({join_timeout},{join_state3,[], _Suspected,_Key}) ->
 on({join_timeout},{join_state3,[First | Rest], Suspected, Id}) ->
     %io:format("STATE3~n"),
     cs_send:send(First, {lookup_aux, Id, 0, {get_node, cs_send:this(), Id}}),
-    erlang:send_after(3000, self() , {join_timeout}),
+    cs_send:send_after(3000, self() , {join_timeout}),
     {join_state3,Rest,Suspected,Id};
 
 on({join_timeout},State) ->
@@ -126,8 +126,8 @@ on({join_response, Pred, Data},{join_state4,Id,Succ,Me}) ->
 
 % Catch all messages untel the join protocol is finshed 
 on(Msg, State) when element(1, State) /= state ->
-  self() ! Msg,
-  %erlang:send_after(100, self(), Msg),
+  %cs_send:send_local(self() , Msg),
+  cs_send:send_after(100, self(), Msg),
   State;  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -407,7 +407,7 @@ on({dump}, State) ->
     State;
 
 on({'$gen_cast', {debug_info, Requestor}}, State) ->
-    Requestor ! {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]},
+    cs_send:send_local(Requestor , {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]}),
     State;
 
 on({reregister}, State) ->
@@ -422,7 +422,7 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 		    lists:filter(fun ({Key, _}) ->
 					 intervals:in(Key, Range)
 				 end, ?DB:get_data(cs_state:get_db(State)))),
-    Owner ! {unit_test_bulkowner_response, Res, cs_state:id(State)},
+    cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, cs_state:id(State)}),
     State;
 
 %% @TODO buggy ...
@@ -433,7 +433,7 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 on({send_to_group_member,Processname,Mesg}, State) ->
     InstanceId = erlang:get(instance_id),
     Pid = process_dictionary:lookup_process(InstanceId,Processname),
-    Pid ! Mesg,
+    cs_send:send_local(Pid , Mesg),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

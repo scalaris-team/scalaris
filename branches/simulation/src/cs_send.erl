@@ -30,7 +30,7 @@
 
 -include("transstore/trecords.hrl").
 
--export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3]).
+-export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3, send_local/2]).
 
 %-define(TCP_LAYER, true). % TCP communication
 %-define(BUILTIN, true).   % distributed Erlang native communication
@@ -51,6 +51,9 @@ send(Pid, Message) ->
     %Pid ! Message.
     comm_layer:send(Pid, Message).
 
+send_local(Pid, Message) ->
+    Pid ! Message.
+
 send_after(Delay,Pid, Message) ->
     erlang:send_after(Delay,Pid,Message).
 
@@ -70,7 +73,8 @@ send_after(Delay,Pid, Message) ->
 send(Pid, Message) ->
     Pid ! Message.
 
-
+send_local(Pid, Message) ->
+    Pid ! Message.
 
 get(Name, {_Pid,Host}) ->
     {Name, Host};
@@ -85,7 +89,10 @@ this() ->
 
 send(Pid, Message) ->
     %Pid ! Message.
-    scheduler:send(0,Pid,Message).
+    scheduler:send(Pid,Message).
+
+send_local(Pid, Message) ->
+    scheduler:send(0, Pid , Message).
 
 send_after(Delay,Pid, Message) ->
     scheduler:send(Delay,Pid,Message).

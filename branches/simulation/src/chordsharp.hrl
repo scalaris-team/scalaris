@@ -46,4 +46,6 @@
 %% ring maintenance by T-man-Sharp
 %-define(RM, rm_tmansharp).
 
-
+%-define(REALTIME, true). % TCP communication
+%-define(BUILTIN, true). 
+-define(SIMULATION, true).

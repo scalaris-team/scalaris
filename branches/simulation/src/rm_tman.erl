@@ -63,22 +63,17 @@ init(_Args) ->
 
 %% @doc called once by the cs_node when joining the ring in cs_join.erl
 initialize(Id, Me, Pred, Succ) ->
-    get_pid() ! {init, Id, Me, Pred, [Succ], self()},
+    cs_send:send_local(get_pid() , {init, Id, Me, Pred, [Succ], self()}),
     ok.
 
 get_successorlist() ->
-    get_pid() ! {get_successorlist, self()},
-    receive
-	{get_successorlist_response, SuccList} ->
-	    SuccList
-    end.
+    cs_send:send_local(get_pid() , {get_successorlist, self()}).
+
+   
 
 get_predlist() ->
-    get_pid() ! {get_predlist, self()},
-    receive
-	{get_predlist_response, PredList} ->
-	    PredList
-    end.
+    cs_send:send_local(get_pid() , {get_predlist, self()}).
+  
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
@@ -119,31 +114,31 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
-        erlang:send_after(config:stabilizationInterval_min(), self(), {stabilize,Token}),
+        cs_send:send_after(config:stabilizationInterval_min(), self(), {stabilize,Token}),
         {NewId, NewMe, [NewPred], NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
 on(_,uninit) ->
         uninit;
 on({get_successorlist, Pid},{Id, Me, Preds, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
-            Pid ! {get_successorlist_response, [Me]},
+            cs_send:send_local(Pid , {get_successorlist_response, [Me]}),
             {Id, Me, Preds, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({get_predlist, Pid},{Id, Me, [], Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
-            Pid ! {get_predlist_response, [Me]},
+            cs_send:send_local(Pid , {get_predlist_response, [Me]}),
             {Id, Me, [], Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({get_successorlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
             case Succs of
-              []  ->  Pid ! {get_successorlist_response, [Me]};
-              _   ->  Pid ! {get_successorlist_response, Succs}
+              []  ->  cs_send:send_local(Pid , {get_successorlist_response, [Me]});
+              _   ->  cs_send:send_local(Pid , {get_successorlist_response, Succs})
             end,
 	    	{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({get_predlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
             case Preds of
-              []  -> Pid ! {get_predlist_response, [Me]};
-              _   -> Pid ! {get_predlist_response, Preds}
+              []  -> cs_send:send_local(Pid , {get_predlist_response, [Me]});
+              _   -> cs_send:send_local(Pid , {get_predlist_response, Preds})
             end,
             {Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
 on({stabilize,AktToken},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  -> % new stabilization interval
             % Triger an update of the Random view
-            get_cyclon_pid() ! {get_subset_max_age,RandViewSize,self()},
+            cs_send:send_local(get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
             RndView=get_RndView(RandViewSize,Cache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
 			{Pred,Succ} =get_safe_pred_succ(Preds,Succs,RndView,Me),
@@ -161,7 +156,7 @@ on({stabilize,AktToken},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,Akt
         			NewAktSucc =AktSucc,
 					NewAktPred =AktPred
 	    	end,
-			erlang:send_after(Interval, self(), {stabilize,AktToken}),
+			cs_send:send_after(Interval, self(), {stabilize,AktToken}),
             {Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,NewAktPred,NewAktSucc,Cache};
 on({stabilize,_},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
             {Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
@@ -176,7 +171,7 @@ on({rm_buffer,Q,Buffer_q},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,A
             {NewAktPred,NewAktSucc} = update_cs_node(PredsNew,SuccsNew,AktPred,AktSucc),
             update_failuredetector(Preds,Succs,PredsNew,SuccsNew),
             NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval),
-            erlang:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
             {Id, Me, PredsNew, SuccsNew,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,Cache};	
 on({rm_buffer_response,Buffer_p},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->	
             RndView=get_RndView(RandViewSize,Cache),
@@ -194,7 +189,7 @@ on({rm_buffer_response,Buffer_p},{Id, Me, Preds, Succs,RandViewSize,Interval,Akt
                 false ->
                     RandViewSize
             end,
-            erlang:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
             {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,AktToken+1,NewAktPred,NewAktSucc,Cache};
 on({zombie,Node},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
             erlang:send(self(), {stabilize,AktToken+1}),
@@ -207,8 +202,8 @@ on({crash, DeadPid},{Id, Me, Preds, Succs,_RandViewSize,_Interval,AktToken,AktPr
             erlang:send(self(), {stabilize,AktToken+1}),
 		 	{Id, Me, PredsNew ,SuccsNew,0,config:stabilizationInterval_min(),AktToken+1,AktPred,AktSucc ,NewCache};
 on({'$gen_cast', {debug_info, Requestor}},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->
-	    	Requestor ! {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Preds]))}, 
-					       {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]},
+	    	cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Preds]))}, 
+					       {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]}),
 	    	{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache};
         
 on({check_ring,0,Me},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache})  ->

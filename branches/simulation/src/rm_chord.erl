@@ -56,7 +56,7 @@ start_link(InstanceId,Options) ->
 
 %% @doc called once by the cs_node when joining the ring in cs_join.erl
 initialize(Id, Me, Pred, Succ) ->
-    get_pid() ! {init, Id, Me, Pred, [Succ], self()},
+    cs_send:send_local(get_pid() , {init, Id, Me, Pred, [Succ], self()}),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -66,12 +66,12 @@ initialize(Id, Me, Pred, Succ) ->
 
 init(_Args) ->
     log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
-    timer:send_interval(config:stabilizationInterval(), self(), {stabilize}),
+    cs_send:send_after(config:stabilizationInterval(), self(), {stabilize}),
     uninit.
     
 
 get_successorlist(Source) ->
-    get_pid() ! {get_successorlist,Source,Source}.
+    cs_send:send_local(get_pid() , {get_successorlist,Source,Source}).
     
 
 %% @doc notification that my succ left
@@ -99,13 +99,13 @@ update_pred(_Pred) ->
     ok.
 
 notify(Pred) ->
-    get_pid() ! {notify, Pred}.
+    cs_send:send_local(get_pid() , {notify, Pred}).
 
 
 
 get_predlist() ->
     log:log(error, "[ RM-CHORD] OLD FUNCTION use broke with gen_component"),
-    get_pid() ! {get_predlist, self()},
+    cs_send:send_local(get_pid() , {get_predlist, self()}),
     receive
 	{get_predlist_response, PredList} ->
 	    PredList
@@ -120,18 +120,18 @@ on({init, NewId, NewMe, NewPred, NewSuccList, CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
         failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
-        %CSNode ! {init_done},
+       
         {NewId, NewMe, NewPred, NewSuccList};
 on(_,uninit) ->
         uninit;
 on({get_successorlist, Pid},{Id, Me, Pred, Succs})  ->
-	    Pid ! {get_successorlist_response, Succs},
+	    cs_send:send_local(Pid , {get_successorlist_response, Succs}),
 	    {Id, Me, Pred, Succs};
 on({get_successorlist, Pid,S},{Id, Me, Pred, Succs})  ->
-        Pid ! {get_successorlist_response, Succs,S},
+        cs_send:send_local(Pid , {get_successorlist_response, Succs,S}),
         {Id, Me, Pred, Succs};
 on({get_predlist, Pid},{Id, Me, Pred, Succs})  ->
-        Pid ! {get_predlist_response, [Pred]},
+        cs_send:send_local(Pid , {get_predlist_response, [Pred]}),
        	{Id, Me, Pred, Succs};
 
 on({stabilize},{Id, Me, Pred, Succs})  -> % new stabilization interval
@@ -141,6 +141,7 @@ on({stabilize},{Id, Me, Pred, Succs})  -> % new stabilization interval
             _  -> 
                 cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
         end,
+        cs_send:send_after(config:stabilizationInterval(), self(), {stabilize}),
 	    {Id, Me, Pred, Succs};
 on({get_pred_response, SuccsPred},{Id, Me, Pred, Succs})  ->
 	    case node:is_null(SuccsPred) of
@@ -190,8 +191,7 @@ on({crash, DeadPid},{Id, Me, Pred, Succs})  ->
 		    {Id, Me, Pred, filter(DeadPid, Succs)}
 	    end;
 on({'$gen_cast', {debug_info, Requestor}},{Id, Me, Pred, Succs})  ->
-	    Requestor ! {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Pred]))}, 
-					       {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]},
+	    cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Pred]))},{"succs", lists:flatten(io_lib:format("~p", [Succs]))}]}),
 	    {Id, Me, Pred, Succs};
 
 on(_, _State) ->

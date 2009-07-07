@@ -48,9 +48,9 @@ start_link(InstanceId) ->
 -spec(init/1 :: ([any()]) -> state()).
 init([_]) ->
     %process_dictionary:register_process(InstanceId, rse_chord, self()),
-    erlang:send_after(shuffle_interval(), self(), {shuffle_trigger}),
-    erlang:send_after(shuffle_reset_interval(), self(), {init_shuffle}),
-    self() ! {init_shuffle},
+    cs_send:send_after(shuffle_interval(), self(), {shuffle_trigger}),
+    cs_send:send_after(shuffle_reset_interval(), self(), {init_shuffle}),
+    cs_send:send_local(self() , {init_shuffle}),
     {0.0}.
     
 %================================================================================
@@ -62,8 +62,8 @@ init([_]) ->
 %% trigger new estimation round
 on({init_shuffle}, State) ->
     %io:format("last guess ~p~n", [State]),
-    erlang:send_after(shuffle_reset_interval(), self(), {init_shuffle}),
-    get_node_pid() ! {get_pred_succ, cs_send:this()},
+    cs_send:send_after(shuffle_reset_interval(), self(), {init_shuffle}),
+    cs_send:send_local(get_node_pid() , {get_pred_succ, cs_send:this()}),
     State;
 
 %% new estimation round: initialize with pred and succ info
@@ -75,8 +75,8 @@ on({get_pred_succ_response, Pred, Succ}, _State) ->
 
 %% trigger new shuffle with a random node
 on({shuffle_trigger}, State) ->
-    erlang:send_after(shuffle_interval(), self(), {shuffle_trigger}),
-    get_cyclon_pid() ! {get_subset, 1, self()},
+    cs_send:send_after(shuffle_interval(), self(), {shuffle_trigger}),
+    cs_send:send_local(get_cyclon_pid() , {get_subset, 1, self()}),
     State;
 
 %% shuffle with a random node (got random node from cyclon)

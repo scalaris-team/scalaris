@@ -145,7 +145,7 @@ bench_runner(Threads, Iterations, Bench) ->
     end.
 
 run_bench_read(Owner, _Key, 0) ->
-    Owner ! {done, ok};
+    cs_send:send_local(Owner , {done, ok});
 run_bench_read(Owner, Key, Iterations) ->
     case transaction_api:quorum_read(Key) of
 	{fail, _Reason} ->

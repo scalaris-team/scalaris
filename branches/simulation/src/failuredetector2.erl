@@ -43,27 +43,27 @@
 %-spec(subscribe/1 :: (cs_send:mypid() | list(cs_send:mypid())) -> ok).
 subscribe(PidList) when is_list(PidList) ->
 		%log:log(debug,"Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),PidList]),
-    get_pid() ! {subscribe_list, PidList, self()},
+    cs_send:send_local(get_pid() , {subscribe_list, PidList, self()}),
     ok;
 subscribe(Pid) ->
 		%log:log(debug,"Subscrib by ~p : ~p~n",[process_dictionary:lookup_process(self()),Pid]),
-    get_pid() ! {subscribe_list, [Pid], self()},
+    cs_send:send_local(get_pid() , {subscribe_list, [Pid], self()}),
     ok.
 
 %% @doc deletes the failure detector for the given pid.
 -spec(unsubscribe/1 :: (cs_send:mypid()) -> ok).
 unsubscribe(TargetList) when is_list(TargetList) ->
-    get_pid() ! {unsubscribe_list, TargetList, self()};
+    cs_send:send_local(get_pid() , {unsubscribe_list, TargetList, self()});
 unsubscribe(Target) ->
-    get_pid() ! {unsubscribe_list, [Target], self()}.
+    cs_send:send_local(get_pid() , {unsubscribe_list, [Target], self()}).
 
 %% 
 -spec(remove_subscriber/1 :: (pid()) -> ok).
 remove_subscriber(Pid) ->
-    get_pid() ! {remove_subscriber, Pid}.
+    cs_send:send_local(get_pid() , {remove_subscriber, Pid}).
     
 getmytargets()  ->
-    get_pid() ! {getmytargets, self()}.
+    cs_send:send_local(get_pid() , {getmytargets, self()}).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ping Process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -74,7 +74,7 @@ start_pinger(Pid) ->
 
 %% loop_ping(Pid, Count) ->
 %%     cs_send:send(Pid, {ping, cs_send:this(), Count}),
-%%     erlang:send_after(config:failureDetectorInterval(), self(), {timeout}), 
+%%     cs_send:send_after(config:failureDetectorInterval(), self(), {timeout}), 
 %%     receive
 %% 	{stop} ->
 %% 	    ok;
@@ -154,7 +154,7 @@ on({remove_subscriber, Subscriber},{_Linker} = State) ->
     {State};
 on({getmytargets, Subscriber},{_Linker} = State) ->
     Targets=fd_db:get_subscriptions(Subscriber),
-    Subscriber ! Targets,
+    cs_send:send_local(Subscriber , Targets),
     State;
 
 
@@ -217,7 +217,7 @@ make_pinger(Target) ->
 kill_pinger(Target) ->
 	case fd_db:get_pinger(Target) of
       {ok,X} ->
-          X	! {stop},
+          cs_send:send_local(X	, {stop}),
       		fd_db:del_pinger(Target);
       none ->
           failed
@@ -242,7 +242,7 @@ unsubscribe(Target, Subscriber) ->
 
 crash_and_unsubscribe(Target, Subscriber) ->
     %io:format("~p got a crash message for ~p~n",[process_dictionary:lookup_process(Subscriber), Target]),
-    Subscriber ! {crash, Target},
+    cs_send:send_local(Subscriber , {crash, Target}),
     unsubscribe(Target,Subscriber).
 
 

@@ -52,13 +52,13 @@ start_link(InstanceId,Options) ->
 
 
 add_zombie_candidate(Node) ->
-    get_pid() ! {add_zombie_candidate, Node}.
+    cs_send:send_local(get_pid() , {add_zombie_candidate, Node}).
 
 subscribe() ->
-    get_pid() ! {subscribe, self()}.
+    cs_send:send_local(get_pid() , {subscribe, self()}).
 
 unsubscribe() ->
-    get_pid() ! {unsubscribe, self()}.
+    cs_send:send_local(get_pid() , {unsubscribe, self()}).
 
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -66,7 +66,7 @@ unsubscribe() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init(_ARG) ->
-    erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
+    cs_send:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
 	{fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()}.
 
@@ -74,10 +74,10 @@ init(_ARG) ->
 
 on({zombiehunter},{Queue,Subscriber}) ->
         fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this(),X}) end,Queue), 
-        erlang:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
+        cs_send:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
         {Queue,Subscriber};
 on({pong,Zombie},{Queue,Subscriber}) ->
-        gb_sets:fold(fun (X,_) -> X ! {zombie,Zombie} end,0, Subscriber),
+        gb_sets:fold(fun (X,_) -> cs_send:send_local(X , {zombie,Zombie}) end,0, Subscriber),
         {Queue,Subscriber};
 on({add_zombie_candidate, Node},{Queue,Subscriber}) ->
 		{fix_queue:add(Node,Queue),Subscriber};

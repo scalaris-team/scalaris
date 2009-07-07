@@ -41,12 +41,12 @@
 %% @doc sets the key of the cs_node
 -spec(set_key/1 :: (?RT:key()) -> any()).
 set_key(Key) ->
-    get_pid() ! {set_key_keyholder, Key}.
+    cs_send:send_local(get_pid() , {set_key_keyholder, Key}).
 
 %% @doc reads the key of the cs_node
 -spec(get_key/0 :: () -> ?RT:key()).
 get_key() ->
-    get_pid() ! {get_key_keyholder, self()},
+    cs_send:send_local(get_pid() , {get_key_keyholder, self()}),
     %receive
 	%{get_key_response_keyholder, Key} ->
 	%    Key
@@ -62,7 +62,7 @@ start_link(InstanceId) ->
     
 
 reinit() ->
-    get_pid() ! {reinit}.
+    cs_send:send_local(get_pid() , {reinit}).
 
 
     
@@ -76,7 +76,7 @@ on({reinit},_Key) ->
 on({set_key_keyholder, NewKey},_Key) -> 
 	    NewKey;
 on({get_key_keyholder, PID},Key) -> 
-	    PID ! {get_key_response_keyholder, Key},
+	    cs_send:send_local(PID , {get_key_response_keyholder, Key}),
 	    Key;
 on(_, _State) ->
     unknown_event.

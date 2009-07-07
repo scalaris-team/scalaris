@@ -57,7 +57,7 @@ add_nodes_loop(Count, Delay) ->
 				      brutal_kill,
 				      worker,
 				      []}),
-    timer:sleep(Delay),
+    %timer:sleep(Delay),
     add_nodes_loop(Count - 1, Delay).
 %% userdevguide-end admin:add_nodes
 
@@ -206,5 +206,5 @@ dd_check_ring() ->
     dd_check_ring(0).    
 dd_check_ring(Token) ->
     {ok,One} = process_dictionary:find_cs_node(),
-    One ! {send_to_group_member,ring_maintenance,{init_check_ring,Token}},
+    cs_send:send_local(One , {send_to_group_member,ring_maintenance,{init_check_ring,Token}}),
     {token_on_the_way}.

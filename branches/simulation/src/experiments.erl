@@ -29,6 +29,7 @@
 %% API Functions
 %%
 start() ->
+    
     application:start(boot_cs),
 	timer:sleep(2000),
 	erlang:spawn(?MODULE,run_2,[]).
@@ -72,7 +73,7 @@ run_1() ->
 %%
 
 wait2(Size) ->
-    erlang:send_after(1000, self() ,{go}),
+    cs_send:send_after(1000, self() ,{go}),
     _Ende = erlang:now(),
     Res = admin:check_ring(),
     receive
@@ -88,7 +89,7 @@ wait2(Size) ->
     
 
 wait(F,Size,Start) ->
-    erlang:send_after(1000, self() ,{go}),
+    cs_send:send_after(1000, self() ,{go}),
     {Error,AktSize} = metric:ring_health(),
     Ende = erlang:now(),
 	io:format(F,"~p ~p ~p ~p~n",[time_diff(Start,Ende),Error,AktSize,Size]),

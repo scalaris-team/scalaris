@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum f�r Informationstechnik Berlin
+%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : fd_linker.erl
+%%% File    : simu_slave.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
 %%% Description : 
 %%%
@@ -21,16 +21,16 @@
 %% @author Christian Hennig <hennig@zib.de>
 %% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 
--module(fd_linker).
+-module(simu_slave).
 
 -author('hennig@zib.de').
 
 
 
 -behavior(gen_component).
--export([init/1,on/2,start_link/1]).
+-export([init/1,on/2,start/0]).
 
--export([]).
+
 
 
 
@@ -38,42 +38,30 @@
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc spawns a fd_linker instance
-%% @spec start_link(term()) -> {ok, pid()}
-start_link(InstanceId) ->
-    start_link(InstanceId, []).
 
-start_link(InstanceId,[Module,Param]) ->
-   gen_component:start_link(?MODULE,Module, [{Param},{register, InstanceId,fd_linker}]).
+start() ->
+   gen_component:start_link(?MODULE, [], [{register_native, simu_slave}]).
 
-init(Module) ->
-    
-    log:log(info,"[ fd_linker ~p ] starting Node", [self()]),
-    {Module}.
+init(_ARG) ->
+    cs_send:send_after(5000, self(), {addnodes}),
+    cs_send:send_after(1000*60*60, self(), {simu_stop}),
+    {initState}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-on({'EXIT', Pid, _Reason},{Module}) ->
-        remove_subscriber(Pid,Module),
-        {nostate};
-on({link, Pid},{Module}) ->
-        link(Pid),
-        {nostate};
-on({unlink, Pid},{Module}) ->
-        unlink(Pid),
-        {nostate};
+on({addnodes},{initState}) ->
+    admin:add_nodes(100),
+    {state_1}; 
+on({simu_stop},{state_1}) ->
+    
+    halt(0),
+    {kill};
 on(_, _State) ->
     unknown_event.
 % @private
 
 get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id),fd_linker).
-
-
-remove_subscriber(Pid,Module) ->
- cs_send:send_local(Module , {remove_subscriber, Pid}).
-
-
+    process_dictionary:lookup_process(erlang:get(instance_id),simu_slave).

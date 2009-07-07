@@ -37,7 +37,7 @@
 
 lookup_fin(_Hops, Msg) ->
     %io:format("Hops: ~p~n", [Hops]),
-    self() ! Msg.
+    cs_send:send_local(self() , Msg).
     
 lookup_aux(State, Key, Hops, Msg) ->
     Terminate = util:is_between(cs_state:id(State), Key, cs_state:succ_id(State)),

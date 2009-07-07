@@ -53,7 +53,7 @@ getLoad() ->
     get_load(Nodes).
     
 get_load([Head | Tail]) ->
-    Head ! {get_load, self()},
+    cs_send:send_local(Head , {get_load, self()}),
     receive
 	{get_load_response, Node, Value} -> [{ok, Node, Value} | get_load(Tail)]
     after

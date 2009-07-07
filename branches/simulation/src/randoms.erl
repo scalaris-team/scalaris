@@ -29,11 +29,74 @@
 
 -include("chordsharp.hrl").
 
--export([getRandomId/0]).
+-export([getRandomId/0, start/0, rand_uniform/2, init/2, start_seed/1]).
 
 %% @doc generates a random id
 %% @spec getRandomId() -> list()
+
+
+
+-ifdef(SIMULATION).
+
+start() -> 
+    crypto:start().
+start_seed(Seed) ->
+    spawn_link(?MODULE,init,[Seed,self()]),
+    receive 
+        {ok} ->
+                ok
+    end.
+
+getRandomId() ->
+    random ! {getRandomId,self()},
+    receive
+         {getRandomId_response,T} ->
+               T
+    end.
+    
+rand_uniform(L,H) ->
+  
+    random ! {rand_uniform,L,H,self()},
+    receive
+         {rand_uniform_response,T} ->
+               
+               T
+    end.
+    
+
+    
+
+-else.
+
+
+start() -> crypto:start().
 getRandomId() ->
     integer_to_list(crypto:rand_uniform(1, 65536 * 65536)).
+rand_uniform(L,H) ->
+    crypto:rand_uniform(L, H).
 
+
+-endif.
+
+init({A,B,C},Sup) ->
+    random:seed(A,B,C),
+    register(random,self()),
+    Sup ! {ok},
+    loop().
+
+loop() ->
+    
+    receive
+        {rand_uniform,L,H,S} ->
+            %S ! crypto:rand_uniform(L, H),
+            S !  {rand_uniform_response,random:uniform(H-L)+L-1},
+            loop();
+        {getRandomId,S} ->
+            S ! {getRandomId_response,integer_to_list(random:uniform(65536 * 65536))},
+            loop();
+
+        _ -> 
+            io:format("Randoms unhadle message"),
+             halt(-1)
+     end.
 

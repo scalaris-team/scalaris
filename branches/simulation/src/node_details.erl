@@ -27,15 +27,13 @@
 -vsn('$Id$ ').
 
 -export([new/8, predlist/1, me/1, succlist/1, load/1, hostname/1, rt_size/1, message_log/1, memory/1]).
-
+-include("chordsharp.hrl").
 -record(node_details, {predlist, node, succlist, load, hostname, rt_size, message_log, memory}).
-new(_Pred, Node, _SuccList, Load, Hostname, RTSize, Log, Memory) ->
+new(Pred, Node, SuccList, Load, Hostname, RTSize, Log, Memory) ->
     #node_details{
-     %predlist = Pred,
-     predlist = rm_tman:get_predlist(),
+     predlist = Pred,
      node = Node,
-     %succlist = SuccList,
-     succlist = rm_tman:get_successorlist(),
+     succlist = SuccList,
      load = Load,
      hostname = Hostname,
      rt_size = RTSize,
@@ -43,9 +41,19 @@ new(_Pred, Node, _SuccList, Load, Hostname, RTSize, Log, Memory) ->
      memory = Memory
     }.
 			
-predlist(#node_details{predlist=Pred}) -> Pred.
+predlist(#node_details{predlist=Pred}) ->   ?RM:get_predlist(),
+    predlist =
+        receive
+            {get_predlist_response, PredList} ->
+                PredList
+        end.
 me(#node_details{node=Me}) -> Me.
-succlist(#node_details{succlist=SuccList}) -> SuccList.
+succlist(#node_details{succlist=SuccList}) -> ?RM:get_successorlist(),
+     succlist= 
+        receive
+            {get_successorlist_response, SuccList} ->
+                SuccList
+        end.
 load(#node_details{load=Load}) -> Load.
 hostname(#node_details{hostname=Hostname}) -> Hostname.
 rt_size(#node_details{rt_size=RTSize}) -> RTSize.

@@ -69,4 +69,4 @@ behaviour_info(_Other) ->
 
 initialize(Id, Pred, Succ) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), routing_table),
-    Pid ! {init, Id, Pred, Succ}.
+    cs_send:send_local(Pid , {init, Id, Pred, Succ}).

@@ -31,7 +31,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([start_link/1, number_of_nodes/0, node_list/0, ping/0, ping/1, connect/0]).
+-export([start_link/1, number_of_nodes/0, node_list/0, connect/0]).
 
 -behaviour(gen_component).
 
@@ -65,26 +65,6 @@ node_list() ->
     cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
     ok.
 
-%% @doc pings all known nodes
-%% @spec ping() -> list(int)
-ping() ->
-    Nodes = node_list(),
-    lists:map(fun (PID) ->
-		      {Time, _ } = timer:tc(boot_server, ping, [PID]),
-		      Time
-	      end,
-	      Nodes).
-
-ping(PID) ->
-    Me = cs_send:this(),
-    cs_send:send(PID, {ping, Me}),
-    receive
-	{pong, Me} ->
-	    ok
-    after 2000 ->
-	  fail
-    end.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -106,6 +86,7 @@ on({get_list, Ping_PID},Nodes) ->
 	    Nodes;
 on({get_list_length,Ping_PID},Nodes) ->
         cs_send:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
+        
 	    Nodes;
 on({register, Ping_PID},Nodes) ->
 	    failuredetector2:subscribe(Ping_PID),
@@ -121,11 +102,10 @@ on(_, _State) ->
 %-spec(start/1 :: (any()) -> no_return()).
 init(_Arg) ->
     log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
-    register(boot, self()),
     gb_sets:empty().
 
 %% @doc starts the server; called by the boot supervisor
 %% @see boot_sup
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-     gen_component:start_link(?MODULE, [InstanceId, []], [{register, InstanceId, boot_server},{register_native, boot}]).
+     gen_component:start_link(?MODULE, [InstanceId, []], [{register_native, boot}]).

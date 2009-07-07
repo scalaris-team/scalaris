@@ -110,7 +110,7 @@ min(A, B) ->
 
 randomelem(List)->
     Length= length(List),
-    RandomNum = crypto:rand_uniform(1, Length),
+    RandomNum = randoms:rand_uniform(1, Length),
     lists:nth(RandomNum, List).
 
 logged_exec(Cmd) ->

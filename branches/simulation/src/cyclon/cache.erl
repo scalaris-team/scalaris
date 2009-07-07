@@ -84,7 +84,7 @@ add_list([NodePid|T],Foo) ->
 
 get_random_element(State) ->
     L=cache:size(State),
-    P=crypto:rand_uniform(0, L)+1,
+    P=randoms:rand_uniform(0, L)+1,
     % picks nth element of state
     lists:nth(P,State).
 

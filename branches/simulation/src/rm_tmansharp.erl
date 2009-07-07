@@ -63,22 +63,15 @@ init(_Args) ->
 
 %% @doc called once by the cs_node when joining the ring in cs_join.erl
 initialize(Id, Me, Pred, Succ) ->
-    get_pid() ! {init, Id, Me, Pred, [Succ], self()},
+    cs_send:send_local(get_pid() , {init, Id, Me, Pred, [Succ], self()}),
     ok.
 
 get_successorlist() ->
-    get_pid() ! {get_successorlist, self()},
-    receive
-	{get_successorlist_response, SuccList} ->
-	    SuccList
-    end.
+    cs_send:send_local(get_pid() , {get_successorlist, self()}).
 
 get_predlist() ->
-    get_pid() ! {get_predlist, self()},
-    receive
-	{get_predlist_response, PredList} ->
-	    PredList
-    end.
+    cs_send:send_local(get_pid() , {get_predlist, self()}).
+    
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
@@ -117,30 +110,30 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
-        erlang:send_after(config:stabilizationInterval_min(), self(), {stabilize,Token}),
+        cs_send:send_after(config:stabilizationInterval_min(), self(), {stabilize,Token}),
         {NewId, NewMe, [NewPred]++NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
 on(_,uninit) ->
         uninit;
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
 on({get_successorlist, Pid},{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            Pid ! {get_successorlist_response,[Me]},
+            cs_send:send_local(Pid , {get_successorlist_response,[Me]}),
 	    	{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({get_predlist, Pid},{Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-			Pid ! {get_predlist_response, [Me]},
+			cs_send:send_local(Pid , {get_predlist_response, [Me]}),
             {Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({get_successorlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            Pid ! {get_successorlist_response, get_succs(View)},
+            cs_send:send_local(Pid , {get_successorlist_response, get_succs(View)}),
             {Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({get_predlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            Pid ! {get_predlist_response, get_preds(View)},
+            cs_send:send_local(Pid , {get_predlist_response, get_preds(View)}),
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 
 
 on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) -> % new stabilization interval
               
             % Triger an update of the Random view
-            get_cyclon_pid() ! {get_subset_max_age,RandViewSize,self()},
+            cs_send:send_local(get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
             RndView=get_RndView(RandViewSize,RandomCache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
 			P =selectPeer(rank(View++RndView,node:id(Me)),Me),
@@ -153,7 +146,7 @@ on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,Ak
           		false ->
                     cs_send:send_to_group_member(node:pidX(P), ring_maintenance, {rm_buffer,Me,extractMessage(View++[Me]++RndView,P)})
         	end,
-			erlang:send_after(Interval, self(), {stabilize,AktToken}),
+			cs_send:send_after(Interval, self(), {stabilize,AktToken}),
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({stabilize,_},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
@@ -170,7 +163,7 @@ on({rm_buffer,Q,Buffer_q},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,
             {NewAktPred,NewAktSucc} = update_cs_node(NewView,AktPred,AktSucc),
             update_failuredetector(View,NewView),
             NewInterval = new_interval(View,NewView,Interval),
-            erlang:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
             %io:format("loop~p~n",[self()]),   
             {Id, Me, NewView,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};	
 on({rm_buffer_response,Buffer_p},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache})->
@@ -190,7 +183,7 @@ on({rm_buffer_response,Buffer_p},{Id, Me, View ,RandViewSize,Interval,AktToken,A
                 false ->
                     RandViewSize
             end,
-            erlang:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
             
             {Id, Me, NewView,RandViewSizeNew,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};
 on({zombie,Node},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
@@ -204,8 +197,8 @@ on({crash, DeadPid},{Id, Me, View ,_RandViewSize,_Interval,AktToken,AktPred,AktS
             erlang:send(self(), {stabilize,AktToken+1}),
 		 	{Id, Me, NewView,0,config:stabilizationInterval_min(),AktToken+1,AktPred,AktSucc,NewCache};
 on({'$gen_cast', {debug_info, Requestor}},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-	    	Requestor ! {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))}, 
-					       {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]},
+	    	cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))}, 
+					       {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]}),
 	    	{Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
         
 on({check_ring,0,Me},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
@@ -260,7 +253,7 @@ rank(MergedList,Id) ->
 selectPeer([],Me) ->
     Me;
 selectPeer(View,_) ->
-    NTH = crypto:rand_uniform(1, 3),
+    NTH = randoms:rand_uniform(1, 3),
     case (NTH=<length(View)) of
         true -> lists:nth( NTH,View);
         false -> lists:nth(length(View),View)

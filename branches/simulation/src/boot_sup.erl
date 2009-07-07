@@ -55,7 +55,7 @@ start_link() ->
 %% specifications.
 %%--------------------------------------------------------------------
 init(_Args) ->
-    crypto:start(),
+    randoms:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
     %error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
@@ -147,14 +147,14 @@ init(_Args) ->
 	   Config,
 	   Logger,
 	   %Tracer,
-	   CommPort,
+	   %CommPort,
 	   FailureDetector,
 	   AdminServer,
 	   %XMLRPC,
 	   
 	   Node,
-	   YAWS,
-	   BenchServer,
+	   %YAWS,
+	   %BenchServer,
 	   CSNode
 	   ]}}.
     
