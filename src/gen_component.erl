@@ -105,10 +105,19 @@ loop_profile(Module, State, {Options, Slowest} = _ComponentState) ->
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive
 	Message ->
-	    case Module:on(Message, State) of
+	    case (try Module:on(Message, State) catch
+                                                    throw:Term -> {exception, Term};
+                                                    exit:Reason -> {exception,Reason};
+                                                    error:Reason -> {exception, {Reason,
+                                                                                 erlang:get_stacktrace()}}
+                                                end) of
+                {exception, Exception} ->
+                    io:format("Error: exception ~p during handling of ~p in module ~p~n",
+                              [Exception, Message, Module]),
+		    loop(Module, State, {Options, Slowest});
 		unknown_event ->
-		    {NewState, NewComponentState} = 
-			handle_unknown_event(Message, State, 
+		    {NewState, NewComponentState} =
+			handle_unknown_event(Message, State,
 					     {Options, Slowest}),
 		    loop(Module, NewState, NewComponentState);
 		kill ->
