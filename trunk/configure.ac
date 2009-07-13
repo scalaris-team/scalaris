@@ -76,7 +76,7 @@ AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([you won't be able to run the u
 
 AC_CHECK_FILE($erlang_cv_lib_dir_common_test/priv/bin/run_test, , AC_MSG_NOTICE([please consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests]))
 
-AC_COMPILE_IFELSE(
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
        [GBTREESISBUILTIN=", {d, types_are_builtin}"; AC_MSG_NOTICE([gb_tree() is a built-in type])],
        [GBTREESISBUILTIN=""; AC_MSG_NOTICE([gb_tree() is not built-in])])
