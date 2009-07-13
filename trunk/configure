@@ -1652,15 +1652,9 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 ###########################################################
 #
-# check tokyo cabinet
+# check tokyo cabinet and tcerl
 #
 ###########################################################
-ac_ext=c
-ac_cpp='$CPP $CPPFLAGS'
-ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_c_compiler_gnu
-
 
 
 if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
@@ -1782,6 +1776,15 @@ echo "${ECHO_T}no" >&6; }
 
 fi
 
+TCERLPREFIX=no
+# Check whether --enable-tcerl was given.
+if test "${enable_tcerl+set}" = set; then
+  enableval=$enable_tcerl; TCERLPREFIX=$enableval
+fi
+
+
+export PKG_CONFIG_PATH=$TCERLPREFIX/lib/pkgconfig
+if test "x$TCERLPREFIX" != xno; then
 
 pkg_failed=no
 { echo "$as_me:$LINENO: checking for TOKYOCABINET" >&5
@@ -1891,25 +1894,6 @@ echo "${ECHO_T}yes" >&6; }
 fi
 
 
-
-
-LDFLAGS="$TOKYOCABINET_LIBS $LDFLAGS"
-CFLAGS="$TOKYOCABINET_CFLAGS $CFLAGS"
-
-###########################################################
-#
-# check tcerl
-#
-###########################################################
-TCERLPREFIX=no
-# Check whether --enable-tcerl was given.
-if test "${enable_tcerl+set}" = set; then
-  enableval=$enable_tcerl; TCERLPREFIX=$enableval
-fi
-
-
-export PKG_CONFIG_PATH=$TCERLPREFIX/lib/pkgconfig
-if test "x$TCERLPREFIX" != xno; then
 
 pkg_failed=no
 { echo "$as_me:$LINENO: checking for TCERLDRV" >&5

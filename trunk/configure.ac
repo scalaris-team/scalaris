@@ -17,33 +17,20 @@ AC_INIT(chordsharp, 0.0.1, schuett@zib.de)
 
 ###########################################################
 #
-# check tokyo cabinet
+# check tokyo cabinet and tcerl
 #
 ###########################################################
-AC_LANG_C
 PKG_PROG_PKG_CONFIG
 
-PKG_CHECK_MODULES([TOKYOCABINET],
-                  [tokyocabinet],
-                  [])
-
-AC_SUBST([TOKYOCABINET_CFLAGS])
-AC_SUBST([TOKYOCABINET_LIBS])
-
-LDFLAGS="$TOKYOCABINET_LIBS $LDFLAGS"
-CFLAGS="$TOKYOCABINET_CFLAGS $CFLAGS"
-
-###########################################################
-#
-# check tcerl
-#
-###########################################################
 TCERLPREFIX=no
 AC_ARG_ENABLE([tcerl], AS_HELP_STRING([enable support for tokyo cabinet]), [TCERLPREFIX=$enableval])
 
 export PKG_CONFIG_PATH=$TCERLPREFIX/lib/pkgconfig
 AS_IF([test "x$TCERLPREFIX" != xno],
-            [PKG_CHECK_MODULES([TCERLDRV],
+            [PKG_CHECK_MODULES([TOKYOCABINET],[tokyocabinet], [])
+             AC_SUBST([TOKYOCABINET_CFLAGS])
+             AC_SUBST([TOKYOCABINET_LIBS])
+             PKG_CHECK_MODULES([TCERLDRV],
                                [tcerldrv-1.0],
                                [[HAVETCERL='-define(HAVE_TCERL, true).']],
                                [HAVETCERL=""])])
