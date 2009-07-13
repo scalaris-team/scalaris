@@ -134,3 +134,4 @@ chmod u+x bin/cs_local2.sh
 chmod u+x bin/cs_local3.sh
 chmod u+x bin/scalarisctl
 chmod u+x bin/scalarisclient
+chmod ugo-x bin/*.in
