@@ -2746,7 +2746,7 @@ mkdir -p ~/.yaws 2> /dev/null
 #SCALARIS_ROOT=`pwd`
 #AC_SUBST(SCALARIS_ROOT)
 
-ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl bin/boot.sh bin/scalarisclient include/autoconf.hrl"
+ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl bin/boot.sh bin/cs_local.sh bin/cs_local2.sh bin/cs_local3.sh bin/scalarisclient include/autoconf.hrl"
 
 
 cat >confcache <<\_ACEOF
@@ -3307,6 +3307,9 @@ do
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "bin/scalarisctl") CONFIG_FILES="$CONFIG_FILES bin/scalarisctl" ;;
     "bin/boot.sh") CONFIG_FILES="$CONFIG_FILES bin/boot.sh" ;;
+    "bin/cs_local.sh") CONFIG_FILES="$CONFIG_FILES bin/cs_local.sh" ;;
+    "bin/cs_local2.sh") CONFIG_FILES="$CONFIG_FILES bin/cs_local2.sh" ;;
+    "bin/cs_local3.sh") CONFIG_FILES="$CONFIG_FILES bin/cs_local3.sh" ;;
     "bin/scalarisclient") CONFIG_FILES="$CONFIG_FILES bin/scalarisclient" ;;
     "include/autoconf.hrl") CONFIG_FILES="$CONFIG_FILES include/autoconf.hrl" ;;
 
@@ -3756,5 +3759,9 @@ fi
 
 
 chmod u+x bin/boot.sh
+chmod u+x bin/cs_local.sh
+chmod u+x bin/cs_local2.sh
+chmod u+x bin/cs_local3.sh
 chmod u+x bin/scalarisctl
 chmod u+x bin/scalarisclient
+chmod ugo-x bin/*.in
