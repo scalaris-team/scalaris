@@ -47,20 +47,20 @@ end_per_suite(_Config) ->
 
 read(_Config) ->
     erlang:put(instance_id, test_instance_id),
-    DB = cs_db_otp:new(),
+    DB = cs_db_otp:new(1),
     ?assert(cs_db_otp:read(DB, "Unknown") == failed),
     ok.
 
 write(_Config) ->
     erlang:put(instance_id, test_instance_id),
-    DB = cs_db_otp:new(),
+    DB = cs_db_otp:new(1),
     DB2 = cs_db_otp:write(DB, "Key1", "Value1", 1),
     ?assert(cs_db_otp:read(DB2, "Key1") == {ok, "Value1", 1}),
     ok.
 
 write_lock(_Config) ->
     erlang:put(instance_id, test_instance_id),
-    DB = cs_db_otp:new(),
+    DB = cs_db_otp:new(1),
     {DB2, ok}     = cs_db_otp:set_write_lock(DB, "WriteLockKey1"),
     {DB3, ok}     = cs_db_otp:set_write_lock(DB2, "WriteLockKey2"),
     {DB4, failed} = cs_db_otp:set_write_lock(DB3, "WriteLockKey2"),
@@ -69,7 +69,7 @@ write_lock(_Config) ->
 
 read_lock(_Config) ->
     erlang:put(instance_id, test_instance_id),
-    DB = cs_db_otp:new(),
+    DB = cs_db_otp:new(1),
     {DB2, failed} = cs_db_otp:set_read_lock(DB, "ReadLockKey1"),
     DB3           = cs_db_otp:write(DB2, "ReadLockKey2", "Value1", 1),
     {DB4, ok}     = cs_db_otp:set_read_lock(DB3, "ReadLockKey2"),
@@ -79,7 +79,7 @@ read_lock(_Config) ->
 
 read_write_lock(_Config) ->
     erlang:put(instance_id, test_instance_id),
-    DB = cs_db_otp:new(),
+    DB = cs_db_otp:new(1),
     DB2           = cs_db_otp:write(DB, "ReadWriteLockKey1", "Value1", 1),
     {DB3, ok}     = cs_db_otp:set_read_lock(DB2, "ReadWriteLockKey1"),
     {_DB4, failed} = cs_db_otp:set_write_lock(DB3, "ReadWriteLockKey1"),
@@ -87,7 +87,7 @@ read_write_lock(_Config) ->
 
 write_read_lock(_Config) ->
     erlang:put(instance_id, test_instance_id),
-    DB = cs_db_otp:new(),
+    DB = cs_db_otp:new(1),
     DB2           = cs_db_otp:write(DB, "WriteReadLockKey1", "Value1", 1),
     {DB3, ok}     = cs_db_otp:set_write_lock(DB2, "WriteReadLockKey1"),
     {_DB4, failed} = cs_db_otp:set_read_lock(DB3, "WriteReadLockKey1"),

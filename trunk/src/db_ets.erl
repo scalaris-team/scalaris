@@ -57,7 +57,7 @@
 	 get_range_only_with_version/2,
 	 build_merkle_tree/2,
 	 update_if_newer/2,
-	 new/0]).
+	 new/1, close/1]).
 
 %%====================================================================
 %% public functions
@@ -67,7 +67,7 @@ start_link(_InstanceId) ->
     ignore.
 
 %% @doc initializes a new database; returns the DB name.
-new() ->
+new(_) ->
     % ets prefix: DB_ + random name
     DBname = list_to_atom(string:concat("db_", randoms:getRandomId())),
     % better protected? All accesses would have to go to DB-process
@@ -75,136 +75,8 @@ new() ->
     ets:new(DBname, [ordered_set, public, named_table]).
 
 %% delete DB (missing function)
-
-%% @doc sets a write lock on a key.
-%%      the write lock is a boolean value per key
-%% @spec set_write_lock(db(), string()) -> {db(), ok | failed}
-set_write_lock(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {Value, false, 0, Version}}] ->
-	    ets:insert(DB, {Key, {Value, true, 0, Version}}),
-	    {DB, ok};
-	[{Key, {_Value, _WriteLock, _ReadLock, _Version}}] ->
-	    {DB, failed};
-	[] ->
-	    % no value stored yet
-	    ets:insert(DB, {Key, {empty_val, true, 0, -1}}),
-	    {DB, ok}
-    end.
-
-%% @doc unsets the write lock of a key
-%%      the write lock is a boolean value per key
-%% @spec unset_write_lock(db(), string()) -> {db(), ok | failed}
-unset_write_lock(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {empty_val, true, 0, -1}}] ->
-	    ets:delete(DB, Key),
-	    {DB, ok};
-	[{Key, {Value, true, ReadLock, Version}}] ->
-	    ets:insert(DB, {Key, {Value, false, ReadLock, Version}}),
-	    {DB, ok};
-	[{Key, {_Value, false, _ReadLock, _Version}}] ->
-	    {DB, failed};
-	[] ->
-	    {DB, failed}
-    end.
-
-%% @doc sets a read lock on a key
-%%      the read lock is an integer value per key
-%% @spec set_read_lock(db(), string()) -> {db(), ok | failed}
-set_read_lock(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {Value, false, ReadLock, Version}}] ->
-	    ets:insert(DB, {Key, {Value, false, ReadLock + 1, Version}}),
-	    {DB, ok};
-	[{Key, {_Value, _WriteLock, _ReadLock, _Version}}] ->
-	    {DB, failed};
-	[] ->
-	    {DB, failed}
-    end.
-
-%% @doc unsets a read lock on a key
-%%      the read lock is an integer value per key
-%% @spec unset_read_lock(db(), string()) -> {db(), ok | failed}
-unset_read_lock(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {_Value, _WriteLock, 0, _Version}}] ->
-	    {DB, failed};
-	[{Key, {Value, WriteLock, ReadLock, Version}}] ->
-	    ets:insert(DB, {Key, {Value, WriteLock, ReadLock - 1, Version}}),
-	    {DB, ok};
-	[] ->
-	    {DB, failed}
-    end.
-
-%% @doc get the locks and version of a key
-%% @spec get_locks(db(), string()) -> {bool(), int(), int()}| failed
-get_locks(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {_Value, WriteLock, ReadLock, Version}}] ->
-	    {DB, {WriteLock, ReadLock, Version}};
-	[] ->
-	    {DB, failed}
-    end.
-
-%% @doc reads the version and value of a key
-%% @spec read(db(), string()) -> {ok, string(), integer()} | failed
-read(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {empty_val, true, 0, -1}}] ->
-            failed;
-	[{Key, {Value, _WriteLock, _ReadLock, Version}}] ->
-	    {ok, Value, Version};
-	[] ->
-	    failed
-    end.
-
-%% @doc updates the value of key
-%% @spec write(db(), string(), string(), integer()) -> db()
-write(DB, Key, Value, Version) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {_Value, WriteLock, ReadLock, _Version}}] ->
-            % better use ets:update_element?
-	    ets:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}});
-	[] ->
-	    ets:insert(DB, {Key, {Value, false, 0, Version}})
-    end,
-    DB.
-
-%% @doc deletes the key
--spec(delete/2 :: (db(), key()) -> {db(), ok | locks_set
-				    | undef}).
-delete(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {_Value, false, 0, _Version}}] ->
-	    ets:delete(DB, Key),
-	    {DB, ok};
-	[{Key, _Value}] ->
-	    {DB, locks_set};
-	[] ->
-	    {DB, undef}
-    end.
-
-%% @doc reads the version of a key
-%% @spec get_version(db(), string()) -> {ok, integer()} | failed
-get_version(DB, Key) ->
-    case ets:lookup(DB, Key) of
-	[{Key, {_Value, _WriteLock, _ReadLock, Version}}] ->
-	    {ok, Version};
-	[] ->
-	    failed
-    end.
-
-
-
-
-%% @doc returns the number of stored keys
-%% @spec get_load(db()) -> integer()
-get_load(DB) ->
-    case ets:info(DB, size) of
-        undefined -> 0;
-        Result -> Result
-    end.
+close(DB) ->
+    ets:delete(DB).
 
 %% @doc returns the key, which splits the data into two equally 
 %%      sized groups
@@ -232,12 +104,6 @@ split_data(DB, MyKey, HisKey) ->
 %% @spec get_data(db()) -> [{string(), {string(), bool(), integer(), integer()}}]
 get_data(DB) ->
     ets:tab2list(DB).
-
-%% @doc adds keys
-%% @spec add_data(db(), [{string(), {string(), bool(), integer(), integer()}}]) -> any()
-add_data(DB, Data) ->
-    ets:insert(DB, Data),
-    DB.
 
 %% @doc get keys in a range
 %% @spec get_range(db(), string(), string()) -> [{string(), string()}]
@@ -276,23 +142,5 @@ build_merkle_tree(DB, Range) ->
 		undefined, ets:tab2list(DB)),
     MerkleTree.
 
-% update only if no locks are taken and version number is higher
-update_if_newer(OldDB, KVs) ->
-    F = fun ({Key, Value, Version}, DB) ->
-		case ets:lookup(DB, Key) of
-		    [] ->
-			ets:insert(DB, {Key, {Value, false, 0, Version}}),
-                        DB;
-		    [{_Value, WriteLock, ReadLock, OldVersion}] ->
-			case not WriteLock andalso
-                            ReadLock == 0 andalso
-                            OldVersion < Version of
-			    true ->
-				ets:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}}), 
-                                DB;
-			    false ->
-				DB
-			end
-		end
-	end,
-    lists:foldl(F, OldDB, KVs).
+-define(ETS, ets).
+-include("db_generic_ets.hrl").

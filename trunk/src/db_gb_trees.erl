@@ -55,7 +55,7 @@
 	 get_range_only_with_version/2,
 	 build_merkle_tree/2,
 	 update_if_newer/2,
-	 new/0]).
+	 new/1, close/1]).
 
 %%====================================================================
 %% public functions
@@ -65,8 +65,12 @@ start_link(_InstanceId) ->
     ignore.
 
 %% @doc initializes a new database
-new() ->
+new(_) ->
     gb_trees:empty().
+
+%% delete DB (missing function)
+close(_) ->
+    ok.
 
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
