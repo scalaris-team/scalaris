@@ -62,15 +62,27 @@ start(Module, Args, Options, Supervisor) ->
 	    process_dictionary:register_process(InstanceId, Name, self()),
 	    Supervisor ! {started, self()};
 	false ->
-	    Supervisor ! {started, self()},
-	    ok
+	    Supervisor ! {started, self()}
     end,
-    InitialState = Module:init(Args),
-    case lists:member(profile, Options) of
-	true ->
-	    loop_profile(Module, InitialState, {Options, 0.0});
-	false ->
-	    loop(Module, InitialState, {Options, 0.0})
+    try
+        InitialState = Module:init(Args),
+        case lists:member(profile, Options) of
+            true ->
+                loop_profile(Module, InitialState, {Options, 0.0});
+            false ->
+                loop(Module, InitialState, {Options, 0.0})
+        end
+    catch
+        throw:Term ->
+            io:format("exception in init of ~p: ~p~n", [Module, Term]),
+            throw(Term);
+        exit:Reason ->
+            io:format("exception in init of ~p: ~p~n", [Module, Reason]),
+            throw(Reason);
+        error:Reason ->
+            io:format("exception in init of ~p: ~p~n", [Module, {Reason,
+                                                                 erlang:get_stacktrace()}]),
+            throw(Reason)
     end.
 
 
@@ -82,7 +94,7 @@ loop_profile(Module, State, {Options, Slowest} = _ComponentState) ->
 	    case fprof:apply(Module, on, [Message, State]) of
 		unknown_event ->
 		    {NewState, NewComponentState} = 
-			handle_unknown_event(Message, State, 
+			handle_unknown_event(Module, Message, State, 
 					     {Options, Slowest}),
 		    loop(Module, NewState, NewComponentState);
 		kill ->
@@ -117,7 +129,7 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
 		    loop(Module, State, {Options, Slowest});
 		unknown_event ->
 		    {NewState, NewComponentState} =
-			handle_unknown_event(Message, State,
+			handle_unknown_event(Module, Message, State,
 					     {Options, Slowest}),
 		    loop(Module, NewState, NewComponentState);
 		kill ->
@@ -127,6 +139,6 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
 	    end
     end.
 
-handle_unknown_event(UnknownMessage, State, ComponentState) ->
-    io:format("unknown message: ~p~n", [UnknownMessage]),
+handle_unknown_event(Module, UnknownMessage, State, ComponentState) ->
+    io:format("unknown message in ~p: ~p~n", [Module, UnknownMessage]),
     {State, ComponentState}.
