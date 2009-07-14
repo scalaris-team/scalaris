@@ -29,7 +29,7 @@
 -export([
 	 start_link/1, start/2,
 
-	 read/1,
+	 read/1, read/2,
 
 	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
 	 pointerStabilizationInterval/0, failureDetectorInterval/0, 
@@ -54,15 +54,20 @@
 %%====================================================================
 
 %% @doc read config parameter
-%% @spec read(term()) -> term() | failed
+-spec(read/1 :: (term()) -> term() | failed).
 read(Key) ->
+    read(Key, failed).
+
+% @doc read with default-value
+-spec(read/2 :: (term(), term()) -> term()).
+read(Key, Default) ->
     case ets:lookup(config_ets, Key) of
 	[{Key, Value}] ->
 	    %% allow values defined as application environments to override
 	    Value;
 	[] ->
 	    case preconfig:get_env(Key, failed) of
-		failed -> failed;
+		failed -> Default;
 		X ->
 		    ets:insert(config_ets, {Key, X}),
 		    X

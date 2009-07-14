@@ -53,7 +53,7 @@ join_first(Id) ->
     Me = node:make(cs_send:this(), Id),
     ?RM:initialize(Id, Me, Me, Me),
     routingtable:initialize(Id, Me, Me),
-    cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
+    cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new(Id)).
 %% userdevguide-end cs_join:join_first
 
 %% @doc join a ring
@@ -68,13 +68,13 @@ join_ring(Id, Succ) ->
 	    log:log(info,"[ Node ~w ] got pred ~w",[self(), Pred]),
 	    case node:is_null(Pred) of
 		true ->
-		    DB = ?DB:add_data(?DB:new(), Data),
+		    DB = ?DB:add_data(?DB:new(Id), Data),
 		    ?RM:initialize(Id, Me, Pred, Succ),
 		    routingtable:initialize(Id, Pred, Succ),
 		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
 		false ->
 		    cs_send:send(node:pidX(Pred), {update_succ, Me}),
-		    DB = ?DB:add_data(?DB:new(), Data),
+		    DB = ?DB:add_data(?DB:new(Id), Data),
 		    ?RM:initialize(Id, Me, Pred, Succ),
 		    routingtable:initialize(Id, Pred, Succ),
 		    cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id}, 

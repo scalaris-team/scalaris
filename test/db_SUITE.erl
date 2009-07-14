@@ -40,7 +40,8 @@ all() ->
      write_read_lock,
      delete,
      get_version,
-     get_load_and_middle].
+     get_load_and_middle
+    ].
 
 suite() ->
     [
@@ -48,8 +49,10 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
+    application:start(log4erl),
     crypto:start(),
     ct:pal("DB suite running with: ~p~n", [?DB]),
+    file:set_cwd("../bin"),
     case ?DB of
 	cs_db_otp ->
 	    Pid = spawn(fun () ->
@@ -62,7 +65,15 @@ init_per_suite(Config) ->
 	db_gb_trees ->
 	    Config;
 	db_ets ->
-	    Config
+	    Config;
+        db_tcerl ->
+	    Pid = spawn(fun () ->
+                                config:start_link(["scalaris.cfg"]),
+				timer:sleep(10000)
+			end),
+            tcerl:start(),
+	    timer:sleep(100),
+	    [{wrapper_pid, Pid} | Config]
     end.
 
 end_per_suite(_Config) ->
@@ -71,101 +82,110 @@ end_per_suite(_Config) ->
 
 read(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
-    ?assert(?DB:read(DB, "Unknown") == failed),
+    DB = ?DB:new(1),
+    ?assert(?DB:read(DB, ?RT:hash_key("Unknown")) == failed),
+    ?DB:close(DB),
     ok.
 
 write(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
-    DB2 = ?DB:write(DB, "Key1", "Value1", 1),
-    ?assert(?DB:read(DB2, "Key1") == {ok, "Value1", 1}),
+    DB = ?DB:new(1),
+    DB2 = ?DB:write(DB, ?RT:hash_key("Key1"), "Value1", 1),
+    ?assert(?DB:read(DB2, ?RT:hash_key("Key1")) == {ok, "Value1", 1}),
+    ?DB:close(DB),
     ok.
 
 write_lock(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
+    DB = ?DB:new(1),
     % lock on a key
-    {DB2, ok}     = ?DB:set_write_lock(DB, "WriteLockKey1"),
-    {DB3, ok}     = ?DB:set_write_lock(DB2, "WriteLockKey2"),
+    {DB2, ok}     = ?DB:set_write_lock(DB, ?RT:hash_key("WriteLockKey1")),
+    {DB3, ok}     = ?DB:set_write_lock(DB2, ?RT:hash_key("WriteLockKey2")),
     % lock on locked key should fail
-    {DB4, failed} = ?DB:set_write_lock(DB3, "WriteLockKey2"),
+    {DB4, failed} = ?DB:set_write_lock(DB3, ?RT:hash_key("WriteLockKey2")),
     % unlock key
-    {DB5, ok}     = ?DB:unset_write_lock(DB4, "WriteLockKey2"),
+    {DB5, ok}     = ?DB:unset_write_lock(DB4, ?RT:hash_key("WriteLockKey2")),
     % lockable again?
-    {DB6, ok}     = ?DB:set_write_lock(DB5, "WriteLockKey2"),
-    {DB7, {true,0,_Version}} = ?DB:get_locks(DB6, "WriteLockKey2"),
+    {DB6, ok}     = ?DB:set_write_lock(DB5, ?RT:hash_key("WriteLockKey2")),
+    {DB7, {true,0,_Version}} = ?DB:get_locks(DB6, ?RT:hash_key("WriteLockKey2")),
     % unlock to finish
-    {DB8, ok}     = ?DB:unset_write_lock(DB7, "WriteLockKey2"),
+    {DB8, ok}     = ?DB:unset_write_lock(DB7, ?RT:hash_key("WriteLockKey2")),
     % unlock non existing key
-    {_DB9, failed}     = ?DB:unset_write_lock(DB8, "WriteLockKey2"),
+    {_DB9, failed}     = ?DB:unset_write_lock(DB8, ?RT:hash_key("WriteLockKey2")),
+    ?DB:close(DB),
     ok.
 
 read_lock(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
+    DB = ?DB:new(1),
     % read lock on new key should fail
-    {DB2, failed} = ?DB:set_read_lock(DB, "ReadLockKey1"),
-    {DB2b, failed} = ?DB:unset_read_lock(DB2, "ReadLockKey1"),
-    DB3           = ?DB:write(DB2b, "ReadLockKey2", "Value1", 1),
+    {DB2, failed} = ?DB:set_read_lock(DB, ?RT:hash_key("ReadLockKey1")),
+    {DB2b, failed} = ?DB:unset_read_lock(DB2, ?RT:hash_key("ReadLockKey1")),
+    DB3           = ?DB:write(DB2b, ?RT:hash_key("ReadLockKey2"), "Value1", 1),
     % read lock on existing key
-    {DB4, ok}     = ?DB:set_read_lock(DB3, "ReadLockKey2"),
-    {DB5, ok}     = ?DB:set_read_lock(DB4, "ReadLockKey2"),
+    {DB4, ok}     = ?DB:set_read_lock(DB3, ?RT:hash_key("ReadLockKey2")),
+    {DB5, ok}     = ?DB:set_read_lock(DB4, ?RT:hash_key("ReadLockKey2")),
     % read unlock on existing key
-    {DB6, ok}     = ?DB:unset_read_lock(DB5, "ReadLockKey2"),
-    {DB7, ok}     = ?DB:unset_read_lock(DB6, "ReadLockKey2"),
+    {DB6, ok}     = ?DB:unset_read_lock(DB5, ?RT:hash_key("ReadLockKey2")),
+    {DB7, ok}     = ?DB:unset_read_lock(DB6, ?RT:hash_key("ReadLockKey2")),
     % read unlock on non read locked key
-    {DB8, failed}     = ?DB:unset_read_lock(DB7, "ReadLockKey2"),
-    {DB9, {false,0,1}} = ?DB:get_locks(DB8, "ReadLockKey2"),
-    {DB10, failed} = ?DB:get_locks(DB9, "Unknown"),
+    {DB8, failed}     = ?DB:unset_read_lock(DB7, ?RT:hash_key("ReadLockKey2")),
+    {DB9, {false,0,1}} = ?DB:get_locks(DB8, ?RT:hash_key("ReadLockKey2")),
+    {DB10, failed} = ?DB:get_locks(DB9, ?RT:hash_key("Unknown")),
     % read on write locked new key should fail
-    {DB11, ok}     = ?DB:set_write_lock(DB10, "ReadLockKey1"),
-    failed     = ?DB:read(DB11, "ReadLockKey1"),
+    {DB11, ok}     = ?DB:set_write_lock(DB10, ?RT:hash_key("ReadLockKey1")),
+    failed     = ?DB:read(DB11, ?RT:hash_key("ReadLockKey1")),
+    ?DB:close(DB),
     ok.
 
 read_write_lock(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
-    DB2           = ?DB:write(DB, "ReadWriteLockKey1", "Value1", 1),
-    {DB3, ok}     = ?DB:set_read_lock(DB2, "ReadWriteLockKey1"),
+    DB = ?DB:new(2),
+    DB2 = ?DB:write(DB, ?RT:hash_key("ReadWriteLockKey1"), "Value1", 1),
+    1 = ?DB:get_load(DB2),
+    {DB3, ok}     = ?DB:set_read_lock(DB2, ?RT:hash_key("ReadWriteLockKey1")),
     % no write lock, when read locks exist
-    {_DB4, failed} = ?DB:set_write_lock(DB3, "ReadWriteLockKey1"),
+    {_DB4, failed} = ?DB:set_write_lock(DB3, ?RT:hash_key("ReadWriteLockKey1")),
+    ?DB:close(DB),
     ok.
 
 write_read_lock(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
-    DB2 = ?DB:write(DB, "WriteReadLockKey1", "Value1", 1),
-    {DB3, ok} = ?DB:set_write_lock(DB2, "WriteReadLockKey1"),
+    DB = ?DB:new(1),
+    DB2 = ?DB:write(DB, ?RT:hash_key("WriteReadLockKey1"), "Value1", 1),
+    {DB3, ok} = ?DB:set_write_lock(DB2, ?RT:hash_key("WriteReadLockKey1")),
     % no read lock, when a write lock exists
-    {_DB4, failed} = ?DB:set_read_lock(DB3, "WriteReadLockKey1"),
+    {_DB4, failed} = ?DB:set_read_lock(DB3, ?RT:hash_key("WriteReadLockKey1")),
+    ?DB:close(DB),
     ok.
 
 delete(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
-    DB2 = ?DB:write(DB, "Key1", "Value1", 1),
-    {DB3, ok} = ?DB:delete(DB2, "Key1"),
-    ?assert(?DB:read(DB3, "Key1") == failed),
-    {DB5, undef} = ?DB:delete(DB3, "Key1"),
-    DB6 = ?DB:write(DB5, "Key1", "Value1", 1),
-    {DB7, ok} = ?DB:set_read_lock(DB6, "Key1"),
-    {_DB8, locks_set} = ?DB:delete(DB7, "Key1"),
+    DB = ?DB:new(1),
+    DB2 = ?DB:write(DB, ?RT:hash_key("Key1"), "Value1", 1),
+    {DB3, ok} = ?DB:delete(DB2, ?RT:hash_key("Key1")),
+    ?assert(?DB:read(DB3, ?RT:hash_key("Key1")) == failed),
+    {DB5, undef} = ?DB:delete(DB3, ?RT:hash_key("Key1")),
+    DB6 = ?DB:write(DB5, ?RT:hash_key("Key1"), "Value1", 1),
+    {DB7, ok} = ?DB:set_read_lock(DB6, ?RT:hash_key("Key1")),
+    {_DB8, locks_set} = ?DB:delete(DB7, ?RT:hash_key("Key1")),
+    ?DB:close(DB),
     ok.
 
 get_version(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
-    failed = ?DB:get_version(DB, "Key1"),
-    DB2 = ?DB:write(DB, "Key1", "Value1", 10),
-    {ok, 10} = ?DB:get_version(DB2, "Key1"),
-    {DB3, ok} = ?DB:set_write_lock(DB2, "Key2"),
-    {ok, -1} = ?DB:get_version(DB3, "Key2"),
+    DB = ?DB:new(1),
+    failed = ?DB:get_version(DB, ?RT:hash_key("Key1")),
+    DB2 = ?DB:write(DB, ?RT:hash_key("Key1"), "Value1", 10),
+    {ok, 10} = ?DB:get_version(DB2, ?RT:hash_key("Key1")),
+    {DB3, ok} = ?DB:set_write_lock(DB2, ?RT:hash_key("Key2")),
+    {ok, -1} = ?DB:get_version(DB3, ?RT:hash_key("Key2")),
+    ?DB:close(DB),
     ok.
 
 get_load_and_middle(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?DB:new(),
+    DB = ?DB:new(1),
     ?assert(?DB:get_load(DB) == 0),
     DB2 = ?DB:write(DB, "Key1", "Value1", 1),
     ?assert(?DB:get_load(DB2) == 1),
@@ -185,5 +205,7 @@ get_load_and_middle(_Config) ->
     ?assert(length(HisList) == 2),
     ?assert(length(?DB:get_data(DB7)) == 2),
     DB8 = ?DB:add_data(DB7, HisList),
-    ?assert(OrigFullList == ?DB:get_data(DB8)).
+    ?assert(OrigFullList == ?DB:get_data(DB8)),
+    ?DB:close(DB).
+
 

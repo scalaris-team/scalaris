@@ -51,7 +51,7 @@
 -record(state, {routingtable, successor, predecessor, me, my_range, lb, deadnodes, join_time, trans_log, db}).
 
 new(RT, Successor, Predecessor, Me, MyRange, LB) ->
-    new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new()).
+    new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new(node:id(Me))).
 
 %% userdevguide-begin cs_state:state
 new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
