@@ -41,19 +41,12 @@ new(Pred, Node, SuccList, Load, Hostname, RTSize, Log, Memory) ->
      memory = Memory
     }.
 			
-predlist(#node_details{predlist=Pred}) ->   ?RM:get_predlist(),
-    predlist =
-        receive
-            {get_predlist_response, PredList} ->
-                PredList
-        end.
+predlist(#node_details{predlist=PredList}) ->   
+    PredList.
 me(#node_details{node=Me}) -> Me.
-succlist(#node_details{succlist=SuccList}) -> ?RM:get_successorlist(),
-     succlist= 
-        receive
-            {get_successorlist_response, SuccList} ->
-                SuccList
-        end.
+succlist(#node_details{succlist=SuccList}) ->
+                 SuccList.
+       
 load(#node_details{load=Load}) -> Load.
 hostname(#node_details{hostname=Hostname}) -> Hostname.
 rt_size(#node_details{rt_size=RTSize}) -> RTSize.

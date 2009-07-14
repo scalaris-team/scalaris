@@ -401,6 +401,9 @@ on({stabilize_loadbalance}, State) ->
 on({get_node_details, Pid, Cookie}, State) ->
     cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State)}),
     State;
+on({get_node_IdAndSucc, Pid, Cookie}, State) ->
+    cs_send:send_after(0,Pid, {get_node_IdAndSucc_response, Cookie, {cs_state:id(State),cs_state:succ_id(State)}}),
+    State;
 
 on({dump}, State) -> 
     cs_state:dump(State),

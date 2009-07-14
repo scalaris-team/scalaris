@@ -64,7 +64,7 @@ get_memory({failed}) ->
 
 get_ring_details() ->
     boot_server:node_list(),
-    Nodes =receive
+    Nodes = receive
         {get_list_response,N} -> N
     end,
     lists:sort(fun compare_node_details/2, lists:map(fun (Pid) -> get_node_details(Pid) end, Nodes)).

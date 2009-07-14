@@ -43,7 +43,8 @@ start() ->
    gen_component:start_link(?MODULE, [], [{register_native, simu_slave}]).
 
 init(_ARG) ->
-    cs_send:send_after(5000, self(), {addnodes}),
+    cs_send:send_after(2000, self(), {addnodes}),
+    cs_send:send_after(6400, self(), {check_ring}),
     cs_send:send_after(1000*60*60, self(), {simu_stop}),
     {initState}.
       
@@ -52,16 +53,85 @@ init(_ARG) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-on({addnodes},{initState}) ->
-    admin:add_nodes(100),
+on({addnodes},_) ->
+    admin:add_nodes(1000),
     {state_1}; 
-on({simu_stop},{state_1}) ->
+on({simu_stop},_) ->
+    scheduler:stop();
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check Ring
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
     
-    halt(0),
-    {kill};
+on({check_ring},_) ->
+    %io:format("Check"),
+    %scheduler ! {halt_simulation},
+    %Implement a Noneblocking CheckRing 
+    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    cs_send:send_after(0,config:bootPid(), {get_list, cs_send:this()}),
+    %io:format("A~n"),
+    {check_ring_p1};
+on({get_list_response,N},_) ->
+    [cs_send:send_after(0,Pid, {get_node_IdAndSucc, cs_send:this(), Pid}) ||  Pid <-N],
+    %io:format("C~n"),
+    {length(N),[]};
+on({get_node_IdAndSucc_response, Pid, Details},{1,Responses}) ->
+    %io:format("E~n"),
+    Sort = lists:sort(fun compare_node_details/2,[Details|Responses]),   
+   %io:format("F~n"),
+   Res = case lists:foldl(fun check_ring_foldl/2, first, Sort) of
+
+    {error, Reason} ->
+        {error, Reason};
+    _X ->
+        ok
+    end,
+    %io:format("G ~p~n",[Res]),
+    case Res of
+        ok -> scheduler:stop();
+         X ->   
+                %io:format("~p~n",[X]),
+                cs_send:send_after(1000, self(), {check_ring})
+    end,
+     %io:format("K~n"),
+    %scheduler ! {continue},
+    %io:format("Ring~n"),
+    {state_2};
+
+on({get_node_IdAndSucc_response, Pid, Details},{Counter,Responses}) ->
+    %io:format("D~n"),
+    {Counter-1,[Details|Responses]};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Catch unknown Events
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 on(_, _State) ->
     unknown_event.
 % @private
+
+compare_node_details(X, Y) ->
+    id(X) < id(Y).
+
+check_ring_foldl(Node, first) ->
+    succ(Node);
+check_ring_foldl({failed}, Last) ->
+    Last;
+check_ring_foldl(_, {error, Message}) ->
+    {error, Message};
+check_ring_foldl(Node, PredsSucc) ->
+    MyId = id(Node),
+    if
+    MyId == PredsSucc ->
+        succ(Node);
+    true ->
+        {error, lists:flatten(io_lib:format("~p didn't match ~p", [MyId, PredsSucc]))}
+    end.
+
+
+id({X,_}) -> X.
+succ({_,X}) -> X.
 
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id),simu_slave).

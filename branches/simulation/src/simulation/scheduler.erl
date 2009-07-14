@@ -10,7 +10,7 @@
 %%
 %% Exported Functions
 %%
--export([send/3, send/2,start/0,init/1]).
+-export([send/3, send/2,start/0,init/1,stop/0]).
 
 %%
 %% API Functions
@@ -30,6 +30,9 @@ send(Delay,Pid,MSG) ->
             R
     end.
 
+stop() ->
+    %io:format("Stoping Scheduler~n"),
+    scheduler ! {stop}.
 
     
 start() ->
@@ -40,7 +43,7 @@ start() ->
     end.
 
 init(Sup) ->
-    random:seed(9,9,9),
+ 
     register(scheduler,self()),
     Sup ! {started, self() },
     Q = message_queue:new(),
@@ -52,7 +55,14 @@ init(Sup) ->
 
 scheduler_loop(Q,Once,AkkTime,Ins) ->
     receive 
-        X -> 
+        %{halt_simulation} ->
+        %    MS = stop_loop([]),
+        %    [ self() ! M || M <- MS],
+        %    scheduler_loop(Q,Once,AkkTime,Ins);
+        {stop} ->
+                                  io:format("T: ~p ~p~n",[AkkTime,Ins]),
+                                  halt(0);
+         X -> 
             case X of
                 {release_ok} ->
                     {Time,Target,Msg} = message_queue:get_next_message_to_schedule(Q),
@@ -63,12 +73,7 @@ scheduler_loop(Q,Once,AkkTime,Ins) ->
                 {unlock} ->
                     {Time,Target,Msg} = message_queue:get_next_message_to_schedule(Q),  
                         NewAkkTime = Time,
-                        %io:format("T: ~p  ~p ! ~p ~n",[NewAkkTime,Target,Msg]),
-                        case Msg of 
-                             {simu_stop} ->
-                                  io:format("T: ~p ~p~n",[Time,Ins]);
-                             _ -> ok
-                        end,
+                        %io:format("~p  ~p ~p ~n",[NewAkkTime,Ins,length(Q)]),
                         Target ! Msg,
                         scheduler_loop(message_queue:pop(Q),Once,NewAkkTime,Ins+1);
                 {{ss_mesg},{Delay, Pid, MSG},S} ->
@@ -95,6 +100,26 @@ scheduler_loop(Q,Once,AkkTime,Ins) ->
     end.                    
              
             
+stop_loop(M) ->
+    receive 
+        {continue} -> 
+                M;
+        {{ss_mesg},{T, Pid, MSG},S} ->
+                case T > 60 of
+                    true ->
+                        io:format("~p~n",[{T, Pid, MSG}]),
+                         NewM =  M++[{{ss_mesg},{T, Pid, MSG},S}] ;
+                    false ->
+                        NewM = M,
+                        Pid ! MSG,
+                        S ! {ok}
+                end,
+                stop_loop(NewM);
+       X ->
+                io:format("~p~n",[X]),
+                stop_loop(M++[X])
+    end.
+
 
 get_delay(_,_) ->
     randoms:rand_uniform(30, 60).

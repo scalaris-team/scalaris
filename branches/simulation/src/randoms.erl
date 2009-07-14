@@ -40,6 +40,7 @@
 
 start() -> 
     crypto:start().
+
 start_seed(Seed) ->
     spawn_link(?MODULE,init,[Seed,self()]),
     receive 
@@ -94,7 +95,6 @@ loop() ->
         {getRandomId,S} ->
             S ! {getRandomId_response,integer_to_list(random:uniform(65536 * 65536))},
             loop();
-
         _ -> 
             io:format("Randoms unhadle message"),
              halt(-1)

@@ -69,7 +69,9 @@ add_nodes_loop(Count, Delay) ->
 -spec(check_ring/0 :: () -> {error, string()} | ok).
 check_ring() ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    
     Nodes = statistics:get_ring_details(),
+    
     case lists:foldl(fun check_ring_foldl/2, first, Nodes) of
 	{error, Reason} ->
 		{error, Reason};

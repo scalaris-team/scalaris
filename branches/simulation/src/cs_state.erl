@@ -132,11 +132,20 @@ dump(State) ->
     ok.
 
 details(State) ->
-    %Predlist = ?RM:get_predlist(),
-    Predlist = [pred(State)],
+    ?RM:get_predlist(),
+    Predlist =  receive
+            {get_predlist_response, X} ->
+                X
+    end,
+    
+    SuccList = receive
+            {get_successorlist_response, Y} ->
+               Y
+        end,
+    %Predlist = [pred(State)],
     Node = me(State),
-    %SuccList = ?RM:get_as_list(),
-    SuccList = [succ(State)],
+  
+    %SuccList = [succ(State)],
     Load = ?DB:get_load(get_db(State)),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),
