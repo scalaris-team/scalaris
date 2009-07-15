@@ -174,7 +174,8 @@ size([H|T]) ->
     end.
 
 
-
+get_subset_max_age(MaxAge,null) ->
+    [];
 get_subset_max_age(MaxAge,Cache) ->
     get_list_of_nodes(lists:filter(fun ({_,Age}) -> Age < MaxAge end ,Cache)).
 
