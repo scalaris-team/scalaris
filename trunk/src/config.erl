@@ -54,12 +54,12 @@
 %%====================================================================
 
 %% @doc read config parameter
--spec(read/1 :: (term()) -> term() | failed).
+-spec(read/1 :: (atom()) -> any() | failed).
 read(Key) ->
     read(Key, failed).
 
 % @doc read with default-value
--spec(read/2 :: (term(), term()) -> term()).
+-spec(read/2 :: (atom(), any()) -> any()).
 read(Key, Default) ->
     case ets:lookup(config_ets, Key) of
 	[{Key, Value}] ->
