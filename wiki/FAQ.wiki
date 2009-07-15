@@ -1,4 +1,5 @@
 #summary Frequently asked questions.
+#labels Featured
 
 == Questions ==
 
