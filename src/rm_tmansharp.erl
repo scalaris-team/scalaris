@@ -391,10 +391,10 @@ new_interval(View,NewView,Interval) ->
 get_cyclon_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), cyclon).
 
-print_view(Me,View) ->
-    io:format("[~p] -> ",[node:pidX(Me)]),
-    [io:format("~p",[node:pidX(Node)]) || Node <- View],
-    io:format("~n").
+% print_view(Me,View) ->
+%     io:format("[~p] -> ",[node:pidX(Me)]),
+%     [io:format("~p",[node:pidX(Node)]) || Node <- View],
+%     io:format("~n").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup

@@ -70,7 +70,7 @@ init(_Args) ->
     %error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
     start_tcerl(),
-    Tracer = {
+    _Tracer = {
       tracer,
       {tracer, start_link, []},
       permanent,

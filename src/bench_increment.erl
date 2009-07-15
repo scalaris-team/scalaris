@@ -92,23 +92,23 @@ bench_raw() ->
     wait_for_done(6),
     Count.
 
-bench_cprof() ->    
-    Self = self(),
-    Count = 300,
-    Key = "i",
-    cprof:start(), 
-    spawn(fun () -> process(Self, Key, Count) end),
-    wait_for_done(1),
-    cprof:pause(), 
-    io:format("~p~n", [cprof:analyse()]),
-    Count.
+% bench_cprof() ->    
+%     Self = self(),
+%     Count = 300,
+%     Key = "i",
+%     cprof:start(), 
+%     spawn(fun () -> process(Self, Key, Count) end),
+%     wait_for_done(1),
+%     cprof:pause(), 
+%     io:format("~p~n", [cprof:analyse()]),
+%     Count.
 
-bench_fprof() ->
-    Count = fprof:apply(bench_increment, bench_raw, [], [{procs, process_dictionary:get_all_pids()}]),
-    fprof:profile(),
-    %fprof:analyse(),
-    fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), % , totals, no_details, no_callers, {sort, acc}, 
-    Count.
+% bench_fprof() ->
+%     Count = fprof:apply(bench_increment, bench_raw, [], [{procs, process_dictionary:get_all_pids()}]),
+%     fprof:profile(),
+%     %fprof:analyse(),
+%     fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), % , totals, no_details, no_callers, {sort, acc}, 
+%     Count.
 
 
 

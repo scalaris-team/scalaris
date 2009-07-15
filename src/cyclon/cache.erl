@@ -131,17 +131,17 @@ get_youngest(N,Cache) ->
     SortAge = lists:sort(Order,Cache),
 		lists:map(fun(X) -> get_node(X) end ,lists:sublist(SortAge,1, N)).
 
-first_same_age([]) ->
-    0;
-first_same_age([_X]) ->
-    1;
-first_same_age([H|T]) ->
-    case get_age(H) == get_age(hd(T)) of
-        true ->
-            1 + first_same_age(T);
-        false ->
-            1
-		end.
+% first_same_age([]) ->
+%     0;
+% first_same_age([_X]) ->
+%     1;
+% first_same_age([H|T]) ->
+%     case get_age(H) == get_age(hd(T)) of
+%         true ->
+%             1 + first_same_age(T);
+%         false ->
+%             1
+% 		end.
         
   
 

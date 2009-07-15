@@ -26,11 +26,12 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3, 
-	 trunc/2, min/2, max/2, randomelem/1, logged_exec/1, 
-	 wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0, find/2, 
-     logger/0, dump3/0, uniq/1, get_nodes/0, minus/2, sleep_for_ever/0, shuffle/1]).
-                          
+-export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
+         trunc/2, min/2, max/2, randomelem/1, logged_exec/1,
+         wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0, find/2,
+         logger/0, dump3/0, uniq/1, get_nodes/0, minus/2, sleep_for_ever/0, shuffle/1,
+         random_subset/2]).
+
 escape_quotes(String) ->
 	lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).
 
@@ -247,8 +248,8 @@ random_subset(Size, List) -> shuffle(List, [], Size).
 -spec(shuffle/1 :: (list()) -> list()).
 shuffle(List) -> shuffle(List, [], length(List)).
 
-shuffle([], Acc, Size) -> Acc;
-shuffle(List, Acc, 0) -> Acc;
+shuffle([], Acc, _Size) -> Acc;
+shuffle(_List, Acc, 0) -> Acc;
 shuffle(List, Acc, Size) ->
     {Leading, [H | T]} = lists:split(random:uniform(length(List)) - 1, List),
     shuffle(Leading ++ T, [H | Acc], Size - 1).
