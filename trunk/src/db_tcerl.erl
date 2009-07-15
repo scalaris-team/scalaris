@@ -31,13 +31,9 @@
 -include("chordsharp.hrl").
 -include("autoconf.hrl").
 
--type(key()::integer() | string()).
+-type(key()::database:key()).
 
--ifdef(types_are_builtin).
 -type(db()::atom()).
--else.
--type(db()::atom()).
--endif.
 
 -export([start_link/1,
 	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 

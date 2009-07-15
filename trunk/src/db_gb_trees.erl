@@ -32,7 +32,7 @@
 
 -import(ct).
 
--type(key()::integer() | string()).
+-type(key()::database:key()).
 
 -ifdef(types_are_builtin).
 -type(db()::gb_tree()).

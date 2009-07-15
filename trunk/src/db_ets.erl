@@ -14,11 +14,11 @@
 %%%-------------------------------------------------------------------
 %%% File    : db_ets.erl
 %%% Author  : Florian Schintke <schintke@onscale.de>
-%%% Description : In-process Database using ets
+%%% Description : In-process database using ets
 %%%
 %%% Created : 21 Mar 2009 by Florian Schintke <schintke@onscale.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schintke@onscale.de>
+%% @author Florian Schintke <schintke@onscale.de>
 %% @copyright 2009 onScale solutions
 %% @version $Id $
 -module(db_ets).
@@ -34,13 +34,9 @@
 -import(randoms).
 -import(string).
 
--type(key()::integer() | string()).
+-type(key()::database:key()).
 
--ifdef(types_are_builtin).
 -type(db()::atom()).
--else.
--type(db()::atom()).
--endif.
 
 -export([start_link/1,
 	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 
