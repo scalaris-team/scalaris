@@ -1,0 +1,33 @@
+#summary Using Tokyocabinet as the backend.
+
+= Introduction =
+
+Tokyocabinet can be used to store more data in a Scalaris node than would fit into its main memory.
+
+Note: you don't get persistency!!! DB files are truncated on first access!!!
+
+= Prerequisites =
+
+You will need:
+  * [http://tokyocabinet.sourceforge.net/ Tokyocabinet]
+  * [http://code.google.com/p/tcerl/ tcerl and tcerldrv]
+
+= Switching to tcerl =
+
+  # Install Tokyocabinet
+  # Install tcerl and tcerldrv
+  # Rerun configure with --enable-tcerl. configure assumes that you installed tcerl with prefix "/usr". If you used a different directory, e.g. /home/scalaris/apps/tcerl, you have to provide the path to configure:
+{{{
+./configure --enable-tcerl=/home/scalaris/apps/tcerl/
+}}}
+  # Switch the database in src/chordsharp.hrl to db_tcerl
+{{{
+-define(DB, db_tcerl).
+%-define(DB, db_ets).
+}}}
+  # recompile
+{{{
+make
+}}}
+
+The database files are currently stored in the data sub-directory. Each node creates its own sub-directory in there and each scalaris node will have a different file. The path can be changed in scalaris.cfg with the _db_directory_ option.
