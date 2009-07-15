@@ -4,7 +4,7 @@
 
 Tokyocabinet can be used to store more data in a Scalaris node than would fit into its main memory.
 
-Note: you don't get [FAQ persistency]!!! DB files are truncated on first access!!!
+Note: you don't get [FAQ#Is_the_store_persisted_on_disk? persistency]!!! DB files are truncated on first access!!!
 
 = Prerequisites =
 
