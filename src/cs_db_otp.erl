@@ -31,7 +31,7 @@
 
 -include("chordsharp.hrl").
 
--type(key()::integer() | string()).
+-type(key()::database:key()).
 
 -type(db()::ok).
 
@@ -47,7 +47,7 @@
 
 	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
 	 add_data/2,
-	new/1,
+	new/1, close/1,
 
 	build_merkle_tree/2,
 	update_if_newer/2]).

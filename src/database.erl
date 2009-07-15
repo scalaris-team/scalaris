@@ -28,6 +28,8 @@
 
 -export([behaviour_info/1]).
 
+-type(key()::integer() | string()).
+
 behaviour_info(callbacks) ->
     [
      % init (node identifier)
