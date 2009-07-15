@@ -12,27 +12,24 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : db_ets.erl
-%%% Author  : Florian Schintke <schintke@onscale.de>
-%%% Description : In-process Database using ets
+%%% File    : db_tcerl.erl
+%%% Author  : Thorsten Schuett <schuett@zib.de>
+%%% Description : In-process Database using tcerl
 %%%
-%%% Created : 21 Mar 2009 by Florian Schintke <schintke@onscale.de>
+%%% Created : 13 Jul 2009 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schintke@onscale.de>
-%% @copyright 2009 onScale solutions
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @copyright 2009 Konrad-Zuse-Zentrum f<FC>r Informationstechnik Berlin
 %% @version $Id $
--module(db_ets).
+-module(db_tcerl).
 
--author('schintke@onscale.de').
+-author('schuett@zib.de').
 -vsn('$Id').
 
 -behaviour(database).
 
 -include("chordsharp.hrl").
-
--import(ct).
--import(randoms).
--import(string).
+-include("autoconf.hrl").
 
 -type(key()::integer() | string()).
 
@@ -67,21 +64,26 @@ start_link(_InstanceId) ->
     ignore.
 
 %% @doc initializes a new database; returns the DB name.
-new(_) ->
-    % ets prefix: DB_ + random name
-    DBname = list_to_atom(string:concat("db_", randoms:getRandomId())),
-    % better protected? All accesses would have to go to DB-process
-    % ets:new(DBname, [ordered_set, protected, named_table]).
-    ets:new(DBname, [ordered_set, public, named_table]).
+new(Id) ->
+    Dir = lists:flatten(io_lib:format("~s/~s", [config:read(db_directory),
+                                  atom_to_list(node())])),
+    file:make_dir(Dir),
+    FileName = lists:flatten(io_lib:format("~s/db_~p.tc", [Dir, Id])),
+    case tcbdbets:open_file([{file, FileName}, truncate]) of
+        {ok, Handle} ->
+            Handle;
+        {error, Reason} ->
+            log:log(error, "[ TCERL ] ~p", [Reason])
+    end.
 
 %% delete DB (missing function)
 close(DB) ->
-    ets:delete(DB).
+    tcbdbets:close(DB).
 
 %% @doc returns all keys
 %% @spec get_data(db()) -> [{string(), {string(), bool(), integer(), integer()}}]
 get_data(DB) ->
-    ets:tab2list(DB).
+    tcbdbets:traverse(DB, fun (X) -> {continue, X} end).
 
 build_merkle_tree(DB, Range) ->
     {From, To} = intervals:unpack(Range),
@@ -96,5 +98,10 @@ build_merkle_tree(DB, Range) ->
 		undefined, ets:tab2list(DB)),
     MerkleTree.
 
--define(ETS, ets).
+%%====================================================================
+%% internal functions
+%%====================================================================
+
+-define(ETS, tcbdbets).
 -include("db_generic_ets.hrl").
+
