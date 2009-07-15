@@ -114,7 +114,7 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
-        cs_send:send_after(config:stabilizationInterval_min(), self(), {stabilize,Token}),
+        cs_send:send_after(0, self(), {stabilize,Token}),
         {NewId, NewMe, [NewPred], NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
 on(_,uninit) ->
         uninit;
