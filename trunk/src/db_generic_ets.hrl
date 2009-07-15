@@ -141,9 +141,6 @@ get_version(DB, Key) ->
 	    failed
     end.
 
-
-
-
 %% @doc returns the number of stored keys
 %% @spec get_load(db()) -> integer()
 get_load(DB) ->
@@ -154,6 +151,23 @@ get_load(DB) ->
 add_data(DB, Data) ->
     ?ETS:insert(DB, Data),
     DB.
+
+%% @doc returns all keys (and removes them from the db) which belong 
+%%      to a new node with id HisKey
+-spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {key(), bool(), integer(), integer()}}]}).
+split_data(DB, MyKey, HisKey) ->
+    F = fun (KV = {Key, _}, HisList) ->
+                case util:is_between(HisKey, Key, MyKey) of
+                    true ->
+                        HisList;
+                    false ->
+                        [KV | HisList]
+                end
+        end,
+    HisList = ?ETS:foldl(F, [], DB),
+    [ ?ETS:delete(DB, AKey) || {AKey, _} <- HisList],
+    {DB, HisList}.
+
 
 
 % update only if no locks are taken and version number is higher
@@ -176,3 +190,66 @@ update_if_newer(OldDB, KVs) ->
 		end
 	end,
     lists:foldl(F, OldDB, KVs).
+
+%% @doc get keys in a range
+%% @spec get_range(db(), string(), string()) -> [{string(), string()}]
+get_range(DB, From, To) ->
+    F = fun ({Key, {Value, _, _, _}}, Data) ->
+                case util:is_between(From, Key, To) andalso Value =/= empty_val of
+                    true ->
+                        [{Key, Value} | Data];
+                    false ->
+                        Data
+                end
+        end,
+    ?ETS:foldl(F, [], DB).
+
+%% @doc get keys and versions in a range
+%% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(),
+%%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
+get_range_with_version(DB, Interval) ->
+    {From, To} = intervals:unpack(Interval),
+    F = fun ({Key, {Value, WriteLock, ReadLock, Version}}, Data) ->
+                case util:is_between(From, Key, To) andalso Value =/= empty_val of
+                    true ->
+                        [{Key, Value, Version, WriteLock, ReadLock} | Data];
+                    false ->
+                        Data
+                end
+        end,
+    ?ETS:foldl(F, [], DB).
+
+% get_range_with_version
+%@private
+
+get_range_only_with_version(DB, Interval) ->
+    {From, To} = intervals:unpack(Interval),
+    F = fun ({Key, {Value, WLock, _, Version}}, Data) ->
+                case WLock == false andalso util:is_between(From, Key, To) andalso Value =/= empty_val of
+                    true ->
+                        [{Key, Value, Version} | Data];
+                    false ->
+                        Data
+                end
+        end,
+    ?ETS:foldl(F, [], DB).
+
+%% @doc returns the key, which splits the data into two equally
+%%      sized groups
+%% @spec get_middle_key(db()) -> {ok, string()} | failed
+get_middle_key(DB) ->
+    case (Length = ?ETS:info(DB, size)) < 3 of
+	true ->
+            failed;
+	false ->
+            {ok, nth_key(DB, Length div 2 - 1)}
+    end.
+
+nth_key(DB, N) ->
+    First = ?ETS:first(DB),
+    nth_key_iter(DB, First, N).
+
+nth_key_iter(_DB, Key, 0) ->
+    Key;
+nth_key_iter(DB, Key, N) ->
+    nth_key_iter(DB, ?ETS:next(DB, Key), N - 1).
