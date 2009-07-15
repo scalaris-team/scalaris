@@ -32,25 +32,27 @@
 -include("autoconf.hrl").
 
 -type(key()::database:key()).
+-type(value()::database:value()).
+-type(version()::database:version()).
 
 -type(db()::atom()).
 
 -export([start_link/1,
-	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 
-	 unset_read_lock/2, get_locks/2,
+         set_write_lock/2, unset_write_lock/2, set_read_lock/2,
+         unset_read_lock/2, get_locks/2,
 
-	 read/2, write/4, get_version/2, 
+         read/2, write/4, get_version/2,
 
-	 delete/2,
+         delete/2,
 
-	 get_range/3, get_range_with_version/2,
+         get_range/3, get_range_with_version/2,
 
-	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
-	 add_data/2,
-	 get_range_only_with_version/2,
-	 build_merkle_tree/2,
-	 update_if_newer/2,
-	 new/1, close/1]).
+         get_load/1, get_middle_key/1, split_data/3, get_data/1,
+         add_data/2,
+         get_range_only_with_version/2,
+         build_merkle_tree/2,
+         update_if_newer/2,
+         new/1, close/1]).
 
 %%====================================================================
 %% public functions
@@ -84,14 +86,14 @@ get_data(DB) ->
 build_merkle_tree(DB, Range) ->
     {From, To} = intervals:unpack(Range),
     MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
-				     case util:is_between(From, Key, To) of
-					 true ->
-					     merkerl:insert({Key, 0}, Tree);
-					 false ->
-					     Tree
-				     end
-			     end,
-		undefined, ets:tab2list(DB)),
+                                     case util:is_between(From, Key, To) of
+                                         true ->
+                                             merkerl:insert({Key, 0}, Tree);
+                                         false ->
+                                             Tree
+                                     end
+                             end,
+                             undefined, ets:tab2list(DB)),
     MerkleTree.
 
 %%====================================================================
