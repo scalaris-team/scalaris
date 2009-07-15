@@ -29,6 +29,8 @@
 -export([behaviour_info/1]).
 
 -type(key()::integer() | string()).
+-type(value()::any()).
+-type(version()::pos_integer()).
 
 behaviour_info(callbacks) ->
     [
