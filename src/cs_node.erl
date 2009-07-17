@@ -360,7 +360,8 @@ init([_InstanceId, Options]) ->
 	true ->
 	    ok;
 	false ->
-	    timer:sleep(crypto:rand_uniform(1, 100) * 100)
+	    timer:sleep(crypto:rand_uniform(1, 100) * 10)
+    
     end,
     Id = cs_keyholder:get_key(),
     {First, State} = cs_join:join(Id),

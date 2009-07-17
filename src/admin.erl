@@ -165,6 +165,8 @@ start() ->
 
 loop() ->
     receive
+    {halt,N} ->
+        halt(N);
 	{get_comm_layer_dump, Sender} ->
 	    cs_send:send(Sender, {get_comm_layer_dump_response, 
 				  comm_logger:dump()}),
