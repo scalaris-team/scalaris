@@ -14,7 +14,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : rm_tman.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : T-Man ring maintenance
+%%% Description : T-Man# ring maintenance
 %%%
 %%% Created :  12 Jan 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------

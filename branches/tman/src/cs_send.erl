@@ -47,10 +47,11 @@ this() ->
     comm_layer.comm_layer:this().
 
 -spec(send/2 :: (mypid(), any()) -> ok).
+send({_, _, _} = Pid, Message) ->
+    %Pid ! Message.    
+    comm_layer.comm_layer:send(Pid, Message);
 send(Pid, Message) ->
-    %Pid ! Message.
-    
-    comm_layer.comm_layer:send(Pid, Message).
+    Pid ! Message.
 
 % get process Name on node Node
 get(Name, {IP, Port, _Pid}=_Node) ->
@@ -64,7 +65,6 @@ this() ->
     self().
 
 send(Pid, Message) ->
-    
     Pid ! Message.
 
 get(Name, {_Pid,Host}) ->
