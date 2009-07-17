@@ -1,0 +1,72 @@
+\documentclass[11pt]{article}
+\usepackage{color,graphicx}
+\usepackage{keyval}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{patterns}
+\usepackage{listings}
+\usepackage[pdftex,
+        colorlinks=true,
+        %urlcolor=rltblue,       % \href{...}{...} external (URL)
+        citecolor=green,
+        filecolor=rltgreen,     % \href{...} local file
+        linkcolor=black,      % \ref{...} and \pageref{...}
+%        pagebackref=true,
+        bookmarksopen=true]{hyperref}
+
+\title{Scalaris Benchmark Report for r<%= svninfo %>}
+
+\begin{document}
+\maketitle
+
+<% servergroups.each_value do |servergroup| %>
+
+\section{Servers: <%= servergroup.servers %>}
+
+\subsection{Top 5}
+
+Read
+
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+VMs/Server & Nodes/Server & Clients/Server & Iterations/Server & Read/s\\
+\hline
+<% servergroup.top_read(5).each {|run| %>
+<%= run.vms_per_server %> & <%= run.nodes_per_server %> & <%= run.clients_per_server %> & <%= run.iterations_per_server %> & <%= run.reads %>\\
+\hline
+<% } %>
+\end{tabular}
+
+Increment
+
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+VMs/Server & Nodes/Server & Clients/Server & Iterations/Server & Increments/s\\
+\hline
+<% servergroup.top_increment(5).each {|run| %>
+<%= run.vms_per_server %> & <%= run.nodes_per_server %> & <%= run.clients_per_server %> & <%= run.iterations_per_server %> & <%= run.increments %>\\
+\hline
+<% } %>
+\end{tabular}
+
+\subsection{Graphs: Read}
+
+\begin{tabular}{cc}
+\includegraphics[scale=0.5]{gnuplot/1_over_clients_reads.pdf} &
+\includegraphics[scale=0.5]{gnuplot/1_over_iterations_reads.pdf} \\
+\includegraphics[scale=0.5]{gnuplot/1_over_nodes_reads.pdf} &
+\includegraphics[scale=0.5]{gnuplot/1_over_vms_reads.pdf} \\
+\end{tabular}
+
+\subsection{Graphs: Increments}
+
+\begin{tabular}{cc}
+\includegraphics[scale=0.5]{gnuplot/1_over_clients_increments.pdf} &
+\includegraphics[scale=0.5]{gnuplot/1_over_iterations_increments.pdf} \\
+\includegraphics[scale=0.5]{gnuplot/1_over_nodes_increments.pdf} &
+\includegraphics[scale=0.5]{gnuplot/1_over_vms_increments.pdf} \\
+\end{tabular}
+
+<% end%>
+
+\end{document}
