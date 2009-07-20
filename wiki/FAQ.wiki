@@ -110,3 +110,13 @@ No. Well, maybe.
   # run boot.bat
 
 Note: we do not support Scalaris on Windows at the moment.
+
+= What does the "discarded messages" error message mean? =
+
+When you stop an scalaris node and immediately restart it, you can get the following message:
+{{{
+=ERROR REPORT==== 20-Jul-2009::14:51:06 ===
+Discarding message {ping,{{127,0,0,1},14195,<8031.110.0>},4} from <0.99.0> to <0.106.0> 
+in an old incarnation (3) of this node (1)
+}}}
+It is not so much an error but a message by the Erlang runtime, that this particular message was sent to the last "incarnation" of this scalaris node. Here it is the failure detector sending a ping message. After a couple of seconds, the failure detector will notice the change and the messages will stop to appear.
