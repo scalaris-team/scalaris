@@ -116,7 +116,7 @@ start() ->
   	    failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
 	    CSNode ! {init_done},
         Token = 0,
-    	erlang:send_after(config:stabilizationInterval_min(), self(), {stabilize,Token}),
+    	erlang:send_after(0, self(), {stabilize,Token}),
 	    loop(NewId, NewMe, [NewPred] ++ NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[])
     end.
 
