@@ -16,7 +16,7 @@
 
 -export([behaviour_info/1]).
 
--export([start_link/2, start_link/3, start/4]).
+-export([start_link/2, start_link/3, start/4, start/2, start/3]).
 
 %================================================================================
 % behaviour definition
@@ -51,10 +51,21 @@ start_link(Module, Args) ->
 start_link(Module, Args, Options) ->
     Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
     receive
-	{started, Pid} ->
-	    {ok, Pid}
+        {started, Pid} ->
+            {ok, Pid}
     end.
-    
+
+-spec(start/2 :: (any(), list()) -> {ok, pid()}).
+start(Module, Args) ->
+    start(Module, Args, []).
+
+-spec(start/3 :: (any(), list(), list()) -> {ok, pid()}).
+start(Module, Args, Options) ->
+    Pid = spawn(?MODULE, start, [Module, Args, Options, self()]),
+    receive
+        {started, Pid} ->
+            {ok, Pid}
+    end.
 
 start(Module, Args, Options, Supervisor) ->
     case lists:keysearch(register, 1, Options) of
@@ -65,6 +76,7 @@ start(Module, Args, Options, Supervisor) ->
 	    Supervisor ! {started, self()}
     end,
     try
+        register(list_to_atom(lists:flatten(io_lib:format("~p_~p", [Module, randoms:getRandomId()]))), self()),
         InitialState = Module:init(Args),
         case lists:member(profile, Options) of
             true ->
