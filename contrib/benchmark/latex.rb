@@ -107,4 +107,6 @@ f = File.new("main.tex", "w+")
 f.puts eruby.result(binding())
 f.close
 
-system "pdflatex main.tex"
+system "pdflatex main.tex > texlog.txt"
+system "mv main.pdf #{fn + '.pdf'}"
+puts "wrote results to #{fn + '.pdf'}"
