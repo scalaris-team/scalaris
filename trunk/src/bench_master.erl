@@ -23,17 +23,15 @@
 %%
 %% Exported Functions
 %%
+
 -export([run_1/0, start/0]).
  
 %%
 %% API Functions
 %%
 start() ->
-    
     application:start(boot_cs),
-
-	timer:sleep(1000),
-
+    timer:sleep(1000),
     erlang:spawn(?MODULE,run_1,[]).
 
 
@@ -43,17 +41,11 @@ run_1() ->
     Iterations = list_to_integer(os:getenv("ITERATIONS")),
     RingSize = list_to_integer(os:getenv("RING_SIZE")),
     io:format("Start ~p Nodes with ~p Clients per VMs and ~p Iterations~n",[Size,Worker,Iterations]),
-
     admin:add_nodes(Size-1),
-
     timer:sleep(1000),
-
     wait2(RingSize),
-
     bench_server:run_increment(Worker, Iterations),
-
     timer:sleep(3000),
-
     bench_server:run_read(Worker, Iterations),
     io:format("~p~n",[util:get_proc_in_vms(admin_server)]),
     [cs_send:send(Pid,{halt,1}) || Pid <- util:get_proc_in_vms(admin_server)],
@@ -66,17 +58,7 @@ run_1() ->
 %% Local Functions
 %%
 
-log_metrik(S,Start) ->
-    erlang:send_after(1000, self() ,{go}),
-    {Error,Size} = metric:ring_health(),
-     Ende = erlang:now(),
-    io:format(S,"~p ~p ~p~n",[time_diff(Start,Ende),Error,Size]),
-    file:sync(S),
-    receive 
-        {go} ->
-            ok
-    end,
-    log_metrik(S,Start).
+
 
 wait2(Size) ->
     io:format("G~n"),
@@ -94,18 +76,3 @@ wait2(Size) ->
     
     
 
-wait(F,Size,Start) ->
-    erlang:send_after(1000, self() ,{go}),
-    {Error,AktSize} = metric:ring_health(),
-    Ende = erlang:now(),
-	io:format(F,"~p ~p ~p ~p~n",[time_diff(Start,Ende),Error,AktSize,Size]),
-    receive 
-        {go} ->
-            ok
-    end,
-    case ((Error == 0) and (AktSize == Size+1)) of
-        true -> 1;
-        false -> 1+wait(F,Size,Start)
-    end.
-time_diff({SMe,SSe,SMi},{EMe,ESe,EMi}) ->
-    (EMe*1000000+ESe+EMi/1000000)-(SMe*1000000+SSe+SMi/1000000).

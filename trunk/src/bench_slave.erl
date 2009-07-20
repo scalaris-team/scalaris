@@ -47,47 +47,8 @@ run_1() ->
 %% Local Functions
 %%
 
-log_metrik(S,Start) ->
-    erlang:send_after(1000, self() ,{go}),
-    {Error,Size} = metric:ring_health(),
-     Ende = erlang:now(),
-    io:format(S,"~p ~p ~p~n",[time_diff(Start,Ende),Error,Size]),
-    file:sync(S),
-    receive 
-        {go} ->
-            ok
-    end,
-    log_metrik(S,Start).
 
 
-wait2(Size) ->
-    erlang:send_after(1000, self() ,{go}),
-    Ende = erlang:now(),
-    Res = admin:check_ring(),
-    receive
-        {go} ->
-            ok
-    end,
-    case ((Res==ok)and (boot_server:number_of_nodes() == Size+1))  of
-	        true -> ok;    	        
-	    	_ -> wait2(Size)
-	end.
     
     
     
-
-wait(F,Size,Start) ->
-    erlang:send_after(1000, self() ,{go}),
-    {Error,AktSize} = metric:ring_health(),
-    Ende = erlang:now(),
-	io:format(F,"~p ~p ~p ~p~n",[time_diff(Start,Ende),Error,AktSize,Size]),
-    receive 
-        {go} ->
-            ok
-    end,
-    case ((Error == 0) and (AktSize == Size+1)) of
-        true -> 1;
-        false -> 1+wait(F,Size,Start)
-    end.
-time_diff({SMe,SSe,SMi},{EMe,ESe,EMi}) ->
-    (EMe*1000000+ESe+EMi/1000000)-(SMe*1000000+SSe+SMi/1000000).
