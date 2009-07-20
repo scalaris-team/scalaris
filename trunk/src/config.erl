@@ -278,9 +278,15 @@ knownHosts()->
 %%====================================================================
 
 start_link(Files) ->
-    io:format("Config files: ~p~n", [Files]),
+    TheFiles = case application:get_env(add_config) of
+                   {ok, ConfigFile} ->
+                       lists:append(Files, [ConfigFile]);
+                   _Else ->
+                       Files
+               end,
+    io:format("Config files: ~p~n", [TheFiles]),
     Owner = self(),
-    Link = spawn_link(?MODULE, start, [Files, Owner]),
+    Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
     receive
 	done ->
 	    ok;
@@ -290,17 +296,9 @@ start_link(Files) ->
     {ok, Link}.
 
 %@private
-start([File], Owner) ->
+start(Files, Owner) ->
     catch ets:new(config_ets, [set, protected, named_table]),
-    populate_db(File),
-    Owner ! done,
-    loop();
-
-%@private
-start([Global, Local], Owner) ->
-    catch ets:new(config_ets, [set, protected, named_table]),
-    populate_db(Global),
-    populate_db(Local),
+    [ populate_db(File) || File <- Files],
     Owner ! done,
     loop().
 
