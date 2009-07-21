@@ -19,6 +19,14 @@
 \begin{document}
 \maketitle
 
+\section{All}
+
+\begin{tabular}{cc}
+\includegraphics[scale=0.5]{gnuplot/all_reads.pdf} &
+\includegraphics[scale=0.5]{gnuplot/all_increments.pdf} \\
+\end{tabular}
+
+
 <% servergroups.each_value do |servergroup| %>
 
 \section{Servers: <%= servergroup.servers %>}

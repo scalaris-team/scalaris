@@ -64,8 +64,12 @@ runs = Set.new
 IO.foreach(fn) {|line|
   elements = line.split(' ')
   server_count = elements[1].to_i 
-  clients_per_server = elements[11].to_i / server_count
+  clients_per_server = elements[11].to_i
   iterations_per_server = elements[13].to_f * clients_per_server
+  if iterations_per_server == 0
+    puts "#{elements[11]} #{elements[1]}"
+    puts line
+  end
   reads = elements[17].to_f
   increments = elements[15].to_f
   servers.add(server_count)
@@ -79,9 +83,20 @@ servers.each {|server_count|
 }
 
 # create groups per server_count
+f = File.new("all.data", "w+")
 runs.each {|run|
   servergroups[run.servers].add(run)
+  f.puts(run.to_gnuplot)
 }
+f.close
+template = File.read('plotall.gnuplot.erb')
+eruby = ERB.new(template)
+f = File.new("plotall.gnuplot", "w+")
+f.puts eruby.result(binding())
+f.close
+
+system "gnuplot plotall.gnuplot"
+
 
 # create gnuplot files
 servers.each {|server_count|
