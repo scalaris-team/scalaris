@@ -63,13 +63,13 @@ servers = Set.new
 runs = Set.new
 IO.foreach(fn) {|line|
   elements = line.split(' ')
-  server_count = elements[1].to_i / elements[5].to_i
-  clients_per_server = elements[9].to_i / server_count
-  iterations_per_server = elements[11].to_f * clients_per_server
-  reads = elements[15].to_f
-  increments = elements[13].to_f
+  server_count = elements[1].to_i 
+  clients_per_server = elements[11].to_i / server_count
+  iterations_per_server = elements[13].to_f * clients_per_server
+  reads = elements[17].to_f
+  increments = elements[15].to_f
   servers.add(server_count)
-  runs.add(Run.new(server_count, elements[3].to_i, elements[5].to_i, clients_per_server,
+  runs.add(Run.new(server_count, elements[5].to_i, elements[7].to_i, clients_per_server,
                    iterations_per_server, reads, increments))
 }
 
