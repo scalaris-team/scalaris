@@ -33,7 +33,7 @@ class ServerGroup
   attr_reader :runs
 
   def initialize(servers)
-    @servers = servers
+    @servers = servers.to_i
     @runs = Set.new
   end
 
@@ -49,6 +49,10 @@ class ServerGroup
   def top_increment(count)
     sorted_runs = @runs.sort {|x,y| y.increments <=> x.increments}
     sorted_runs[0, count]
+  end
+
+  def <=>(other)
+    @servers <=> other.servers
   end
 end
 

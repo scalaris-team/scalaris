@@ -19,6 +19,9 @@
 \begin{document}
 \maketitle
 
+\setcounter{tocdepth}{1}
+\tableofcontents
+
 \section{All}
 
 \begin{tabular}{cc}
@@ -27,7 +30,7 @@
 \end{tabular}
 
 
-<% servergroups.each_value do |servergroup| %>
+<% servergroups.values.sort.each do |servergroup| %>
 
 \section{Servers: <%= servergroup.servers %>}
 
@@ -62,19 +65,19 @@ Server & Server & Server   & Server      &        &              \\
 \subsection{Graphs: Read}
 
 \begin{tabular}{cc}
-\includegraphics[scale=0.5]{gnuplot/1_over_clients_reads.pdf} &
-\includegraphics[scale=0.5]{gnuplot/1_over_iterations_reads.pdf} \\
-\includegraphics[scale=0.5]{gnuplot/1_over_nodes_reads.pdf} &
-\includegraphics[scale=0.5]{gnuplot/1_over_vms_reads.pdf} \\
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_clients_reads.pdf} &
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_iterations_reads.pdf} \\
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_nodes_reads.pdf} &
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_vms_reads.pdf} \\
 \end{tabular}
 
 \subsection{Graphs: Increments}
 
 \begin{tabular}{cc}
-\includegraphics[scale=0.5]{gnuplot/1_over_clients_increments.pdf} &
-\includegraphics[scale=0.5]{gnuplot/1_over_iterations_increments.pdf} \\
-\includegraphics[scale=0.5]{gnuplot/1_over_nodes_increments.pdf} &
-\includegraphics[scale=0.5]{gnuplot/1_over_vms_increments.pdf} \\
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_clients_increments.pdf} &
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_iterations_increments.pdf} \\
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_nodes_increments.pdf} &
+\includegraphics[scale=0.5]{gnuplot/<%= servergroup.servers %>_over_vms_increments.pdf} \\
 \end{tabular}
 
 <% end%>
