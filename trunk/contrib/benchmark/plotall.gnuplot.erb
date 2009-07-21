@@ -1,0 +1,16 @@
+set terminal pdf
+
+set output "gnuplot/all_reads.pdf"
+set xlabel "server"
+set ylabel "reads/s"
+plot "all.data" using 1:6
+
+set output "gnuplot/all_increments.pdf"
+set xlabel "server"
+set ylabel "increments/s"
+plot "all.data" using 1:7
+
+
+
+
+
