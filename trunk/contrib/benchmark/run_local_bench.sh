@@ -1,17 +1,20 @@
 #!/bin/bash
 
+RUN=$1
+source $RUN
+
+
 cd ../../bin/
 
 SERVER=1
-ITERATIONS_PER_SERVER=5000
 
 START_TIME=`date +%m%d%y%H%m%S`
-LOG_FILE="../contrib/benchmark/bench_log_$START_TIME"
-LOG_FILE_CLEAN="../contrib/benchmark/sum_$START_TIME"
+REV=`svn info | grep Revision | awk '{print $2}'`
+LOG_FILE="../contrib/benchmark/log-$RUN-$REV-$START_TIME"
+LOG_FILE_CLEAN="../contrib/benchmark/sum-$RUN-$REV-$START_TIME"
 HOSTS="localhost"
-VMS_PER_SERVER_LIST="1 2"
-CLIENTS_PER_SERVER_LIST="1 2 4 8 16 32"
-CSNODES_PER_SERVER_LIST="1 2 4 8 16 32"
+
+
 date
 for CLIENTS_PER_SERVER in $CLIENTS_PER_SERVER_LIST
 do
@@ -40,7 +43,7 @@ do
 	                                        echo "{boot_host, {{$BOOTIP},14195,boot}}." > scalaris.local.cfg
 	                                        echo "{log_host,{{$BOOTIP},14195,boot_logger}}." >> scalaris.local.cfg
 						                              echo "####################################################################################" >> $LOG_FILE
-	                                        echo "RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT" >> $LOG_FILE
+	                                        echo "SV: $SERVER RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT" >> $LOG_FILE
 						                              ./bench_master.sh $NODES_VM $CLIENTS_PER_VM $ITERATIONS_PER_CLIENT $RING_SIZE >> $LOG_FILE &
 						                              BOOTPID=$! 
 						                              sleep 1;;
@@ -57,7 +60,7 @@ do
   done
 done
 done
-cat $LOG_FILE | egrep 1\/s\|NPV | xargs -n 16 | sort -r -n -k 14 > $LOG_FILE_CLEAN
+cat $LOG_FILE | egrep 1\/s\|NPV | xargs -n 18 | sort -r -n -k 16 > $LOG_FILE_CLEAN
 echo "Best config for your System:"
 head -n1 $LOG_FILE_CLEAN
 date
