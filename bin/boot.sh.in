@@ -22,5 +22,11 @@ if [ -f "$LOCAL_CFG" ] ; then source "$LOCAL_CFG" ; fi
 
 TCERLFLAGS=@ERLANG_TCERL_FLAGS@
 
+FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
+if [ "x0" = "x$FQDN_SET" ]; then
+    echo "you have to set a fully qualified domain name (FQDN)"
+    exit -1
+fi
+
 export ERL_MAX_PORTS=16384
 erl $ERL_OPTS $TCERLFLAGS +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -name boot -s boot
