@@ -107,6 +107,12 @@ nodestop(){
     popd > /dev/null
 }
 
+FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
+if [ "x0" = "x$FQDN_SET" ]; then
+    echo "you have to set a fully qualified domain name (FQDN)"
+    exit -1
+fi
+
 case $1 in
     boot)
 	[ 2 -eq $# ] || usage;
