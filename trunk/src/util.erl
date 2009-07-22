@@ -29,8 +29,9 @@
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
          trunc/2, min/2, max/2, randomelem/1, logged_exec/1,
          wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0, find/2,
-         logger/0, dump3/0, uniq/1, get_nodes/0, minus/2, sleep_for_ever/0, shuffle/1,get_proc_in_vms/1,random_subset/2]).
-        
+         logger/0, dump3/0, uniq/1, get_nodes/0, minus/2, sleep_for_ever/0, shuffle/1,
+         get_proc_in_vms/1,random_subset/2, largest_smaller_than/2]).
+
 
 escape_quotes(String) ->
 	lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).
@@ -257,3 +258,40 @@ shuffle(_List, Acc, 0) -> Acc;
 shuffle(List, Acc, Size) ->
     {Leading, [H | T]} = lists:split(random:uniform(length(List)) - 1, List),
     shuffle(Leading ++ T, [H | Acc], Size - 1).
+
+-ifdef(types_are_builtin).
+-spec(largest_smaller_than/2 :: (any(), gb_tree()) -> {value, any(), any()} | nil).
+-else.
+-spec(largest_smaller_than/2 :: (any(), gb_trees:gb_tree()) -> {value, any(), any()} | nil).
+-endif.
+largest_smaller_than(_Key, {0, _Tree}) ->
+    nil;
+largest_smaller_than(MyKey, {_Size, InnerTree} = Tree) ->
+    case largest_smaller_than_iter(MyKey, InnerTree) of
+        {value, _, _} = Value ->
+            Value;
+        nil ->
+            {LargestKey, LargestValue} = gb_trees:largest(Tree),
+            {value, LargestKey, LargestValue}
+    end.
+
+% find largest in subtree smaller than MyKey
+largest_smaller_than_iter(MyKey, nil) ->
+    nil;
+largest_smaller_than_iter(MyKey, {Key, Value, Smaller, Bigger}) ->
+    case Key < MyKey of
+        true ->
+            case largest_smaller_than_iter(MyKey, Bigger) of
+                {value, _, _} = AValue ->
+                    AValue;
+                nil ->
+                    {value, Key, Value}
+            end;
+        false ->
+            largest_smaller_than_iter(MyKey, Smaller)
+    end.
+
+
+
+
+
