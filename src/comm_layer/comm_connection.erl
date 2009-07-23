@@ -143,7 +143,7 @@ loop(Socket, Address, Port) ->
 	{tcp, Socket, Data} ->
 	    case binary_to_term(Data) of
 	        {deliver, Process, Message} ->
-		    Process ! Message,
+                    Process ! Message,
 		    inet:setopts(Socket, [{active, once}]),
 		    loop(Socket, Address, Port);
 		{user_close} ->

@@ -77,7 +77,7 @@ init([InstanceId]) ->
 
 % re-initialize routing table
 on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState}) ->
-    check(RTState, ?RT:empty(NewSucc)),
+    check(RTState, ?RT:empty(NewSucc), NewPred, NewSucc),
     {Id2, NewPred, NewSucc, ?RT:empty(NewSucc)};
 
 % start new periodic stabilization
@@ -89,7 +89,7 @@ on({stabilize}, {Id, Pred, Succ, RTState}) ->
     Pid ! {get_pred_succ, cs_send:this()},
     % start periodic stabilization
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
-    check(RTState, NewRTState),
+    check(RTState, NewRTState, Pred, Succ),
     {Id, Pred, Succ, NewRTState};
 
 % got new predecessor/successor
@@ -99,19 +99,19 @@ on({get_pred_succ_response, NewPred, NewSucc}, {Id, _, _, RTState}) ->
 %
 on({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState}) ->
     NewRTState = ?RT:stabilize(Id, Succ, RTState, Index, Node),
-    check(RTState, NewRTState),
+    check(RTState, NewRTState, Pred, Succ),
     {Id, Pred, Succ, NewRTState};
 
 %
 on({lookup_pointer_response, Index, Node}, {Id, Pred, Succ, RTState}) ->
     NewRTState = ?RT:stabilize_pointer(Id, RTState, Index, Node),
-    check(RTState, NewRTState),
+    check(RTState, NewRTState, Pred, Succ),
     {Id, Pred, Succ, NewRTState};
 
 % failure detector reported dead node
 on({crash, DeadPid}, {Id, Pred, Succ, RTState}) ->
     NewRT = ?RT:filterDeadNode(RTState, DeadPid),
-    check(RTState, NewRT, false),
+    check(RTState, NewRT, Pred, Succ, false),
     {Id, Pred, Succ, NewRT};
 
 % debug_info for web interface
@@ -125,21 +125,23 @@ on(_UnknownMessage, _State) ->
     unknown_event.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
--spec(check/2 :: (Old::?RT:state(), New::?RT:state()) -> any()).
-check(Old, New) ->
-    check(Old, New, true).
+-spec(check/4 :: (Old::?RT:state(), New::?RT:state(), node:node_type(),
+                  node:node_type()) -> any()).
+check(Old, New, Pred, Succ) ->
+    check(Old, New, Pred, Succ, true).
 
 % OldRT, NewRT, CheckFD
--spec(check/3 :: (Old::?RT:state(), New::?RT:state(), ReportFD::bool()) -> any()).
-check(X, X, _) ->
+-spec(check/5 :: (Old::?RT:state(), New::?RT:state(), node:node_type(),
+                  node:node_type(), ReportFD::bool()) -> any()).
+check(X, X, _Pred, _Succ, _) ->
     ok;
-check(OldRT, NewRT, true) ->
+check(OldRT, NewRT, Pred, Succ, true) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rt_update, NewRT},
+    Pid ! {rt_update, ?RT:export_rt_to_cs_node(NewRT, Pred, Succ)},
     check_fd(NewRT, OldRT);
-check(_OldRT, NewRT, false) ->
+check(_OldRT, NewRT, Pred, Succ, false) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rt_update, NewRT}.
+    Pid ! {rt_update, ?RT:export_rt_to_cs_node(NewRT, Pred, Succ)}.
 
 check_fd(X, X) ->
     ok;
@@ -148,5 +150,5 @@ check_fd(NewRT, OldRT) ->
     OldView = ?RT:to_pid_list(OldRT),
     NewNodes = util:minus(NewView,OldView),
     OldNodes = util:minus(OldView,NewView),
-    failuredetector2:unsubscribe(OldNodes),             
+    failuredetector2:unsubscribe(OldNodes),
     failuredetector2:subscribe(NewNodes).
