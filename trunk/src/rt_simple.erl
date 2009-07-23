@@ -29,7 +29,7 @@
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3, 
 	 filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1, 
-	 dump/1, to_dict/1]).
+	 dump/1, to_dict/1, export_rt_to_cs_node/3]).
 
 -export([normalize/1]).
 
@@ -41,8 +41,10 @@
 % @type rt(). Routing Table.
 -ifdef(types_are_builtin).
 -type(rt()::{node:node_type(), gb_tree()}).
+-type(external_rt()::{node:node_type(), gb_tree()}).
 -else.
 -type(rt()::{node:node_type(), gb_trees:gb_tree()}).
+-type(external_rt()::{node:node_type(), gb_trees:gb_tree()}).
 -endif.
 %% userdevguide-end rt_simple:types
 
@@ -73,7 +75,7 @@ getRandomNodeId() ->
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc returns the next hop to contact for a lookup
-%% @spec next_hop(cs_state:state(), key()) -> pid()
+-spec(next_hop/2 :: (cs_state:state(), key()) -> pid()).
 next_hop(State, _Key) ->
     cs_state:succ_pid(State).
 %% userdevguide-end rt_simple:next_hop
@@ -138,3 +140,7 @@ dump(_State) ->
 to_dict(State) ->
     Succ = cs_state:succ(State),
     dict:store(0, Succ, dict:store(1, cs_state:me(State), dict:new())).
+
+-spec(export_rt_to_cs_node/3 :: (rt(), node:node_type(), node:node_type()) -> external_rt()).
+export_rt_to_cs_node(RT, _Pred, _Succ) ->
+    RT.

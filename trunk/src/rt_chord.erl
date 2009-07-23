@@ -29,9 +29,9 @@
 -behaviour(routingtable).
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3, 
-	 filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1, 
-	 dump/1, to_dict/1]).
+-export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
+         filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
+         dump/1, to_dict/1, export_rt_to_cs_node/3]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -40,10 +40,16 @@
 -type(key()::pos_integer()).
 -ifdef(types_are_builtin).
 -type(rt()::gb_tree()).
+-type(external_rt()::gb_tree()).
 -else.
 -type(rt()::gb_trees:gb_tree()).
+-type(external_rt()::gb_trees:gb_tree()).
 -endif.
 %% userdevguide-end rt_chord:types
+
+%%====================================================================
+%% Key Handling
+%%====================================================================
 
 %% userdevguide-begin rt_chord:empty
 %% @doc creates an empty routing table.
@@ -63,38 +69,9 @@ hash_key(Key) ->
 getRandomNodeId() ->
     rt_simple:getRandomNodeId().
 
-%% userdevguide-begin rt_chord:next_hop1
-%% @doc returns the next hop to contact for a lookup
--spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
-next_hop(State, Id) -> 
-    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
-	%succ is responsible for the key
-	true ->
-	    cs_state:succ_pid(State);
-	% check routing table
-	false ->
-	    RT = cs_state:rt(State),
-	    next_hop(cs_state:id(State), RT, Id, 127, cs_state:succ_pid(State))
-    end.
-%% userdevguide-end rt_chord:next_hop1
-
-%% userdevguide-begin rt_chord:next_hop2
-% @private
--spec(next_hop/5 :: (key(), rt(), key(), pos_integer(), cs_send:mypid()) -> cs_send:mypid()).
-next_hop(_N, _RT, _Id, 0, Candidate) -> Candidate;
-next_hop(N, RT, Id, Index, Candidate) ->
-    case gb_trees:lookup(Index, RT) of
-	{value, Entry} ->
-	    case util:is_between_closed(N, node:id(Entry), Id) of
-		true ->
-		    node:pidX(Entry);
-		false ->
-		    next_hop(N, RT, Id, Index - 1, Candidate)
-	    end;
-	none ->
-	    next_hop(N, RT, Id, Index - 1, Candidate)
-    end.
-%% userdevguide-end rt_chord:next_hop2
+%%====================================================================
+%% RT Management
+%%====================================================================
 
 %% userdevguide-begin rt_chord:init_stab
 %% @doc starts the stabilization routine
@@ -214,3 +191,41 @@ prune_table(RT, Index) ->
     lists:foldl(fun (Key, Table) ->
 			gb_trees:delete(Key, Table)
 		end, RT, Keys).
+
+%%====================================================================
+%% Communication with cs_node
+%%====================================================================
+
+%% userdevguide-begin rt_chord:next_hop1
+%% @doc returns the next hop to contact for a lookup
+%%      Note, that this code will be called from the cs_node process and
+%%      it will have an external_rt!
+-spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
+next_hop(State, Id) ->
+    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
+        %succ is responsible for the key
+        true ->
+            cs_state:succ_pid(State);
+        % check routing table
+        false ->
+            case util:gb_trees_largest_smaller_than(Id, cs_state:rt(State)) of
+                nil ->
+                    cs_state:succ_pid(State);
+                {value, _Key, Value} ->
+                    Value
+            end
+    end.
+%% userdevguide-end rt_chord:next_hop1
+
+-spec(export_rt_to_cs_node/3 :: (rt(), node:node_type(), node:node_type())
+      -> external_rt()).
+export_rt_to_cs_node(RT, Pred, Succ) ->
+    Tree = gb_trees:enter(node:id(Succ), node:pidX(Succ),
+                          gb_trees:enter(node:id(Pred), node:pidX(Pred),
+                                         gb_trees:empty())),
+    util:gb_trees_foldl(fun (_K, V, Acc) ->
+                                % only store the ring id and pid
+                               gb_trees:enter(node:id(V), node:pidX(V), Acc)
+                        end,
+                        Tree,
+                        RT).
