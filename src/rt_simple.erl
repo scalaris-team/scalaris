@@ -27,9 +27,9 @@
 -vsn('$Id$ ').
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3, 
-	 filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1, 
-	 dump/1, to_dict/1, export_rt_to_cs_node/3]).
+-export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
+         filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
+         dump/1, to_dict/1, export_rt_to_cs_node/3, n/0]).
 
 -export([normalize/1]).
 
@@ -50,7 +50,7 @@
 
 %% userdevguide-begin rt_simple:empty
 %% @doc creates an empty routing table.
-%%      per default the empty routing should already include 
+%%      per default the empty routing should already include
 %%      the successor
 -spec(empty/1 :: (node:node_type()) -> rt()).
 empty(Succ) ->
@@ -111,10 +111,13 @@ get_size(_RT) ->
 normalize(Key) ->
     Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
+n() ->
+    16#100000000000000000000000000000000.
+
 %% @doc returns the replicas of the given key
 -spec(get_keys_for_replicas/1 :: (key() | string()) -> [key()]).
 get_keys_for_replicas(Key) when is_integer(Key) ->
-    [Key, 
+    [Key,
      normalize(Key + 16#40000000000000000000000000000000),
      normalize(Key + 16#80000000000000000000000000000000),
      normalize(Key + 16#C0000000000000000000000000000000)
@@ -122,10 +125,10 @@ get_keys_for_replicas(Key) when is_integer(Key) ->
 get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
 %% userdevguide-end rt_simple:get_keys_for_replicas
-    
+
 
 %% userdevguide-begin rt_simple:dump
-%% @doc 
+%% @doc
 -spec(dump/1 :: (rt()) -> ok).
 dump(_State) ->
     ok.
