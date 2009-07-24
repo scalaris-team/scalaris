@@ -86,6 +86,9 @@ servers.each {|server_count|
   servergroups[server_count] = ServerGroup.new(server_count)
 }
 
+min_server = servers.min
+max_server = servers.max
+
 # create groups per server_count
 f = File.new("all.data", "w+")
 runs.each {|run|
@@ -93,6 +96,21 @@ runs.each {|run|
   f.puts(run.to_gnuplot)
 }
 f.close
+
+#top 1
+r = File.new("top1read.data", "w+")
+w = File.new("top1write.data", "w+")
+servers.to_a.sort.each {|server_count|
+  servergroups[server_count].top_read(1).each {|run|
+    r.puts(run.to_gnuplot)
+  }
+  servergroups[server_count].top_increment(1).each {|run|
+    w.puts(run.to_gnuplot)
+  }
+}
+r.close
+w.close
+
 template = File.read('plotall.gnuplot.erb')
 eruby = ERB.new(template)
 f = File.new("plotall.gnuplot", "w+")
@@ -128,6 +146,8 @@ f = File.new("main.tex", "w+")
 f.puts eruby.result(binding())
 f.close
 
+system "rm main.toc main.aux main.log"
 system "pdflatex main.tex > texlog.txt"
+system "pdflatex main.tex >> texlog.txt"
 system "mv main.pdf #{fn + '.pdf'}"
 puts "wrote results to #{fn + '.pdf'}"
