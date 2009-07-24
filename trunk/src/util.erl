@@ -31,7 +31,7 @@
          wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0,
          find/2, logger/0, dump3/0, uniq/1, get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
-         gb_trees_largest_smaller_than/2, gb_trees_foldl/3]).
+         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2]).
 
 
 escape_quotes(String) ->
@@ -308,3 +308,21 @@ gb_trees_foldl_iter(F, Accu, {Key, Value, Smaller, Bigger}) ->
     Res1 = gb_trees_foldl_iter(F, Accu, Smaller),
     Res2 = F(Key, Value, Res1),
     gb_trees_foldl_iter(F, Res2, Bigger).
+
+pow(_X, 0) ->
+    1;
+pow(X, 1) ->
+    X;
+pow(X, 2) ->
+    X * X;
+pow(X, 3) ->
+    X * X * X;
+pow(X, Y) ->
+    case Y rem 2 of
+        0 ->
+            Half = pow(X, Y div 2),
+            Half * Half;
+        1 ->
+            Half = pow(X, Y div 2),
+            Half * Half * X
+    end.
