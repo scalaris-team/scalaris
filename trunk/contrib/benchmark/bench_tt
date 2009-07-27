@@ -1,6 +1,6 @@
 #!/bin/bash
 #######################################
-#PBS -N cs_[% server %]_4_de
+#PBS -N [% name %]_[% server %]_4_de
 #PBS -l nodes=[% server %]:ppn=4
 #PBS -l walltime=8:00:00
 #PBS -q gbe 
@@ -19,7 +19,7 @@ ITERATIONS_PER_SERVER=20000
 
 START_TIME=`date +%m%d%y%H%M%S`
 cp -r  [% scalaris %] ~/$START_TIME-$SERVER-$UUID
-WORKING_DIR="~/$START_TIME-$SERVER-$UUID/bin"
+WORKING_DIR=~/$START_TIME-$SERVER-$UUID/bin
 
 cd $WORKING_DIR
 
@@ -64,19 +64,19 @@ do
 	                        case "$i" in
 	                                1 )     BOOTIP=`/sbin/ifconfig  eth1 | grep inet\ | awk '{ print $2 }' | cut -c 6- | sed 's/\./,/g'`
                               						cd $WORKING_DIR
-                                          [% IF cl == 'tcp' %]  
+[% IF cl == 'tcp' %]  
                                           echo "{boot_host,{{$BOOTIP},14195,boot}}." > scalaris.local.cfg
                                           echo "{log_host,{{$BOOTIP},14195,boot_logger}}." >> scalaris.local.cfg
-	                                        [% ELSE %]
+[% ELSE %]
                                           echo "{boot_host, {boot,'boot@$host.1001.zib.de'}}." > scalaris.local.cfg
 	                                        echo "{log_host,{boot_logger,'boot@$host.1001.zib.de'}}." >> scalaris.local.cfg
-                                          [% END %]
+[% END %]
 					                                echo "####################################################################################" >> $LOG_FILE
 	                                        echo "SV: $SERVER RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT" >> $LOG_FILE
-                              						ssh $host " cd $WORKING_DIR ;./bench_master.sh $NODES_VM $CLIENTS_PER_VM $ITERATIONS_PER_CLIENT $RING_SIZE >> $LOG_FILE" &
+                              						ssh $host " cd ~/$START_TIME-$SERVER-$UUID/bin ; ./bench_master.sh $NODES_VM $CLIENTS_PER_VM $ITERATIONS_PER_CLIENT $RING_SIZE >> $LOG_FILE" &
                               						BOOTPID=$! 
 					                                sleep 1;;
-	                                * )     ssh $host "cd $WORKING_DIR ;./bench_slave.sh  $NODES_VM $i"  & ;;
+	                                * )     ssh $host "cd ~/$START_TIME-$SERVER-$UUID/bin ;./bench_slave.sh  $NODES_VM $i"  & ;;
 	                        esac
 	
 	                done
@@ -106,7 +106,7 @@ echo "Best config for your System:"
 head -n1 $LOG_FILE_CLEAN
 cp  $LOG_FILE  $RESULT_DIR
 cp   $LOG_FILE_CLEAN   $RESULT_DIR
-rm -rf  /work/bzchenni/$START_TIME-$SERVER-$UUID
+rm -rf  ~/$START_TIME-$SERVER-$UUID
 date
 
 #XPBS -o testjob.out
