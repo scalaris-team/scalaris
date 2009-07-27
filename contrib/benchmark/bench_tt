@@ -62,10 +62,15 @@ do
 	                        i=$((i+1))
 	                        
 	                        case "$i" in
-	                                1 )     #BOOTIP=`/sbin/ifconfig  eth1 | grep inet\ | awk '{ print $2 }' | cut -c 6- | sed 's/\./,/g'`
+	                                1 )     BOOTIP=`/sbin/ifconfig  eth1 | grep inet\ | awk '{ print $2 }' | cut -c 6- | sed 's/\./,/g'`
                               						cd $WORKING_DIR
-	                                        echo "{boot_host, {boot,'boot@$host.1001.zib.de'}}." > scalaris.local.cfg
+                                          [% IF cl == 'tcp' %]  
+                                          echo "{boot_host,{{$BOOTIP},14195,boot}}." > scalaris.local.cfg
+                                          echo "{log_host,{{$BOOTIP},14195,boot_logger}}." >> scalaris.local.cfg
+	                                        [% ELSE %]
+                                          echo "{boot_host, {boot,'boot@$host.1001.zib.de'}}." > scalaris.local.cfg
 	                                        echo "{log_host,{boot_logger,'boot@$host.1001.zib.de'}}." >> scalaris.local.cfg
+                                          [% END %]
 					                                echo "####################################################################################" >> $LOG_FILE
 	                                        echo "SV: $SERVER RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT" >> $LOG_FILE
                               						ssh $host " cd $WORKING_DIR ;./bench_master.sh $NODES_VM $CLIENTS_PER_VM $ITERATIONS_PER_CLIENT $RING_SIZE >> $LOG_FILE" &
@@ -86,9 +91,11 @@ do
 		sleep 1
 		for host in $HOSTS 
 		do
+		    ssh $host "killall -9 bench_master.sh"
 		    ssh $host "killall -9 bench_slave.sh "
 		    ssh $host "killall -9 beam.smp "
 		done 
+		sleep 5
 	fi
 	fi
   done
