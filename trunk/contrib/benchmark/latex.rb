@@ -70,12 +70,12 @@ IO.foreach(fn) {|line|
   server_count = elements[1].to_i 
   clients_per_server = elements[11].to_i
   iterations_per_server = elements[13].to_f * clients_per_server
-  if iterations_per_server == 0
-    puts "#{elements[11]} #{elements[1]}"
-    puts line
-  end
   reads = elements[17].to_f
   increments = elements[15].to_f
+  if server_count > 100
+    puts "#{elements[1]} #{elements[11]}"
+    puts line
+  end
   servers.add(server_count)
   runs.add(Run.new(server_count, elements[5].to_i, elements[7].to_i, clients_per_server,
                    iterations_per_server, reads, increments))
