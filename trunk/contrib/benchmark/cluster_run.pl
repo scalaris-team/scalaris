@@ -16,7 +16,9 @@ system "mkdir $resdir";
 system "svn checkout -r $rev http://scalaris.googlecode.com/svn/trunk/ $resdir/scalaris-read-only";
 #build scalairs
 if($cl eq 'de') {
+  # check out distributet erlang Patch
 	system "svn copy -r 389 http://scalaris.googlecode.com/svn/trunk/contrib/using_distributed_erlang.patch $resdir/scalaris-read-only/contrib";
+  # Patch 
 	system "patch -p1  $resdir/scalaris-read-only/src/cs_send.erl <  $resdir/scalaris-read-only/contrib/using_distributed_erlang.patch";
 }
 system "cd  $resdir/scalaris-read-only/ ; ./configure";
