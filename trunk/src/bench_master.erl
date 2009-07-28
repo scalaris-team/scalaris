@@ -44,6 +44,7 @@ run_1() ->
     admin:add_nodes(Size-1),
     timer:sleep(1000),
     wait2(RingSize),
+    timer:sleep(config:pointerStabilizationInterval()+1000),
     bench_server:run_increment(Worker, Iterations),
     timer:sleep(3000),
     bench_server:run_read(Worker, Iterations),
