@@ -60,7 +60,7 @@ do
   done
 done
 done
-cat $LOG_FILE | egrep 1\/s\|NPV | xargs -n 18 | sort -r -n -k 16 > $LOG_FILE_CLEAN
+cat $LOG_FILE | egrep 1\/s\|NPV | awk '{ if($1 == "SV:") {  b = $0;  x=1} if($1 == "1/s:") {  b = b " " $0;  x++}if($1 == "1/s:") {  b = b " " $0;  x++}if(x==3) print b}' | sort -r -n -k 16 > $LOG_FILE_CLEAN
 echo "Best config for your System:"
 head -n1 $LOG_FILE_CLEAN
 date
