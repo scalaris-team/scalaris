@@ -39,13 +39,13 @@
 % vivaldi types
 -type(network_coordinate() :: [float()]).
 
--type(confidence() :: float()).
+-type(error() :: float()).
 
 
 -type(latency() :: float()).
 
 % state of the vivaldi loop
--type(state() :: {network_coordinate(), confidence()}).
+-type(state() :: {network_coordinate(), error()}).
 
 
 % accepted messages of vivaldi processes
@@ -94,20 +94,19 @@ on({vivaldi_shuffle, RemoteNode, RemoteCoordinate, RemoteConfidence},
     vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
     State;
 
-on({vivaldi_shuffle_reply, RemoteNode, RemoteCoordinate, RemoteConfidence}, State) ->
+on({vivaldi_shuffle_reply, _RemoteNode, _RemoteCoordinate, _RemoteConfidence}, State) ->
     %io:format("{shuffle_reply, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
+    %vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
     State;
 
 on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
-   {Coordinate, Confidence} = State) ->
+   {Coordinate, Confidence}) ->
     %io:format("latency is ~pus~n", [Latency]),
     update_coordinate(RemoteCoordinate,
                       RemoteConfidence,
                       Latency,
                       Coordinate,
-                      Confidence),
-    State;
+                      Confidence);
 
 on({ping, Pid}, State) ->
     %log:log(info, "ping ~p", [Pid]),
@@ -124,7 +123,7 @@ on(_, _State) ->
 init([_InstanceId, []]) ->
     %io:format("vivaldi start ~n"),
     self() ! {start_vivaldi_shuffle},
-    {random_coordinate(), 0.0}.
+    {random_coordinate(), 1.0}.
 
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
@@ -145,9 +144,29 @@ get_local_cyclon_pid() ->
 
 -spec(random_coordinate/0 :: () -> network_coordinate()).
 random_coordinate() ->
-    [0.5, 0.5, 0.5].
+    % @TODO
+    Dim = config:read(vivaldi_dimensions, 2),
+    lists:map(fun(_) -> crypto:rand_uniform(1, 10) end, lists:seq(1, Dim)).
 
--spec(update_coordinate/5 :: (network_coordinate(), confidence(), latency(),
-                              network_coordinate(), confidence()) -> vivaldi:state()).
-update_coordinate(_RemoteCoordinate, _RemoteConfidence, _Latency, Coordinate, Confidence) ->
-    {Coordinate, Confidence}.
+-spec(update_coordinate/5 :: (network_coordinate(), error(), latency(),
+                              network_coordinate(), error()) -> vivaldi:state()).
+
+update_coordinate(_RemoteCoordinate, _RemoteError, _Latency, Coordinate, Error) ->
+    
+    Cc = 0.5, Ce = 0.5,
+    % sample weight balances local and remote error
+    W = Error/(Error + _RemoteError),
+    % relative error of sample
+    Es = abs(mathlib:euclideanDist(_RemoteCoordinate, Coordinate) - _Latency) / _Latency, 
+    % update weighted moving average of local error
+    Error1 = Es * Ce * W + Error * (1 - Ce * W),
+    % update local coordinates
+    Delta = Cc * W,
+    %io:format('expected latency: ~p~n', [mathlib:euclideanDist(Coordinate, _RemoteCoordinate)]),
+    C1 = mathlib:u(Coordinate, _RemoteCoordinate),
+    C2 = mathlib:euclideanDist(Coordinate, _RemoteCoordinate),
+    C3 = _Latency - C2,
+    C4 = C3 * Delta,
+    Coordinate1 = mathlib:vecAdd(Coordinate, mathlib:vecMult(C1, C4)),
+    %io:format("new coordinate ~p and error ~p~n", [Coordinate1, Error1]),
+    {Coordinate1, Error1}.

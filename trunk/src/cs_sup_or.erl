@@ -116,7 +116,7 @@ init([Options]) ->
            DeadNodeCache,
 	   RingMaintenance,
 	   RoutingTable,
-           %Vivaldi,
+           Vivaldi,
 	   Supervisor_AND
 	   %_RSE
 	  ]}}.
