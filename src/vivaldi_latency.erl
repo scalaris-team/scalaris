@@ -100,5 +100,4 @@ measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence) ->
 % Helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 calc_latency(Latencies) ->
-    % @TODO
-    hd(Latencies).
+    mathlib:median(Latencies).
