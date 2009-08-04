@@ -43,8 +43,8 @@ def req_list()
   # first transaction sets two keys and commits
   puts "  Write keyA, KeyB and commit."
   rlist = []
-  rlist[0] = { :write => {'keyA', 'valueA'} }
-  rlist[1] = { :write => {'keyB', 'valueB'} }
+  rlist[0] = { :write => {'keyA' => 'valueA'} }
+  rlist[1] = { :write => {'keyB' => 'valueB'} }
   rlist[2] = { :commit => 'commit' }
 
   result = json_call('req_list', [rlist])
@@ -65,7 +65,7 @@ def req_list()
 
   puts "  Modify keyA and commit."
   rlist3 = []
-  rlist3[0] = { :write => {'keyA', 'valueA2'} }
+  rlist3[0] = { :write => {'keyA' => 'valueA2'} }
   rlist3[1] = { :commit => 'commit' }
   result = json_call('req_list', [translog, rlist3])
   values = result['results']
@@ -79,8 +79,8 @@ end
 def req_list2()
   # first transaction sets two keys and commits
   rlist = []
-  rlist[0] = { :write => {'keyA', 'valueA'} }
-  rlist[1] = { :write => {'keyB', 'valueB'} }
+  rlist[0] = { :write => {'keyA' => 'valueA'} }
+  rlist[1] = { :write => {'keyB' => 'valueB'} }
   rlist[2] = { :commit => 'commit' }
 
   result = json_call('req_list', [rlist])
@@ -96,7 +96,7 @@ def req_list2()
   values = result['results']
 
   rlist3 = []
-  rlist3[0] = { :write => {'keyA', 'valueA2'} }
+  rlist3[0] = { :write => {'keyA' => 'valueA2'} }
   rlist3[1] = { :commit => 'commit' }
   result = json_call('req_list', [translog, rlist3])
   values = result['results']

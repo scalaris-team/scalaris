@@ -92,7 +92,7 @@ move_load(State, _, NewId) ->
     if 
 	not PredIsNull ->
 	    PredPid = cs_state:pred_pid(State),
-	    cs_send:send(PredPid, {succ_left, cs_state:succ_list(State)});
+	    cs_send:send(PredPid, {succ_left, cs_state:me(State)});
 	true ->
 	    void
     end,

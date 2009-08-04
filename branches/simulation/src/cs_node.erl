@@ -173,8 +173,8 @@ on({rm_update_pred, Pred}, State) ->
 on({rm_update_succ, Succ}, State) ->
     cs_state:update_succ(State,Succ);
     
-on({succ_left, SuccList}, State) ->
-    ?RM:succ_left(SuccList),
+on({succ_left, Succ}, State) ->
+    ?RM:succ_left(Succ),
     State;
 
 on({pred_left, Pred}, State) ->

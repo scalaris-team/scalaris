@@ -27,9 +27,9 @@
 -vsn('$Id$ ').
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3, 
-	 filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1, 
-	 dump/1, to_dict/1]).
+-export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
+         filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
+         dump/1, to_dict/1, export_rt_to_cs_node/3, n/0]).
 
 -export([normalize/1]).
 
@@ -41,14 +41,16 @@
 % @type rt(). Routing Table.
 -ifdef(types_are_builtin).
 -type(rt()::{node:node_type(), gb_tree()}).
+-type(external_rt()::{node:node_type(), gb_tree()}).
 -else.
 -type(rt()::{node:node_type(), gb_trees:gb_tree()}).
+-type(external_rt()::{node:node_type(), gb_trees:gb_tree()}).
 -endif.
 %% userdevguide-end rt_simple:types
 
 %% userdevguide-begin rt_simple:empty
 %% @doc creates an empty routing table.
-%%      per default the empty routing should already include 
+%%      per default the empty routing should already include
 %%      the successor
 -spec(empty/1 :: (node:node_type()) -> rt()).
 empty(Succ) ->
@@ -73,7 +75,7 @@ getRandomNodeId() ->
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc returns the next hop to contact for a lookup
-%% @spec next_hop(cs_state:state(), key()) -> pid()
+-spec(next_hop/2 :: (cs_state:state(), key()) -> pid()).
 next_hop(State, _Key) ->
     cs_state:succ_pid(State).
 %% userdevguide-end rt_simple:next_hop
@@ -109,10 +111,13 @@ get_size(_RT) ->
 normalize(Key) ->
     Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
+n() ->
+    16#100000000000000000000000000000000.
+
 %% @doc returns the replicas of the given key
 -spec(get_keys_for_replicas/1 :: (key() | string()) -> [key()]).
 get_keys_for_replicas(Key) when is_integer(Key) ->
-    [Key, 
+    [Key,
      normalize(Key + 16#40000000000000000000000000000000),
      normalize(Key + 16#80000000000000000000000000000000),
      normalize(Key + 16#C0000000000000000000000000000000)
@@ -120,10 +125,10 @@ get_keys_for_replicas(Key) when is_integer(Key) ->
 get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
 %% userdevguide-end rt_simple:get_keys_for_replicas
-    
+
 
 %% userdevguide-begin rt_simple:dump
-%% @doc 
+%% @doc
 -spec(dump/1 :: (rt()) -> ok).
 dump(_State) ->
     ok.
@@ -138,3 +143,7 @@ dump(_State) ->
 to_dict(State) ->
     Succ = cs_state:succ(State),
     dict:store(0, Succ, dict:store(1, cs_state:me(State), dict:new())).
+
+-spec(export_rt_to_cs_node/3 :: (rt(), node:node_type(), node:node_type()) -> external_rt()).
+export_rt_to_cs_node(RT, _Pred, _Succ) ->
+    RT.

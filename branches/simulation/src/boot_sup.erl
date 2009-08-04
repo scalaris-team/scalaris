@@ -28,6 +28,8 @@
 
 -behaviour(supervisor).
 
+-include("autoconf.hrl").
+
 -export([start_link/0, init/1]).
 
 %%====================================================================
@@ -54,12 +56,21 @@ start_link() ->
 %% to find out about restart strategy, maximum restart frequency and child 
 %% specifications.
 %%--------------------------------------------------------------------
+-ifdef(HAVE_TCERL).
+start_tcerl() ->
+    tcerl:start().
+-else.
+start_tcerl() ->
+    ok.
+-endif.
+
 init(_Args) ->
     randoms:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
     %error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
-    Tracer = {
+    start_tcerl(),
+    _Tracer = {
       tracer,
       {tracer, start_link, []},
       permanent,

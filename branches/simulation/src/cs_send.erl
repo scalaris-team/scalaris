@@ -29,12 +29,10 @@
 -vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
+-include("chordsharp.hrl").
 
 -export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3, send_local/2]).
 
-%-define(TCP_LAYER, true). % TCP communication
-%-define(BUILTIN, true).   % distributed Erlang native communication
--define(SIMULATION, true).
 
 send_to_group_member(Csnodepid,Processname,Mesg) ->
     send(Csnodepid,{send_to_group_member,Processname,Mesg}).

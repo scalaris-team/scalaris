@@ -32,7 +32,7 @@
 
 -import(ct).
 
--type(key()::integer() | string()).
+-type(key()::database:key()).
 
 -ifdef(types_are_builtin).
 -type(db()::gb_tree()).
@@ -55,7 +55,7 @@
 	 get_range_only_with_version/2,
 	 build_merkle_tree/2,
 	 update_if_newer/2,
-	 new/0]).
+	 new/1, close/1]).
 
 %%====================================================================
 %% public functions
@@ -65,8 +65,12 @@ start_link(_InstanceId) ->
     ignore.
 
 %% @doc initializes a new database
-new() ->
+new(_) ->
     gb_trees:empty().
+
+%% delete DB (missing function)
+close(_) ->
+    ok.
 
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
@@ -153,7 +157,7 @@ get_locks(DB, Key) ->
 %% @spec read(db(), string()) -> {ok, string(), integer()} | failed
 read(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	[{Key, {empty_val, true, 0, -1}}] ->
+	{value, {empty_val, true, 0, -1}} ->
             failed;
 	{value, {Value, _WriteLock, _ReadLock, Version}} ->
 	    {ok, Value, Version};

@@ -68,7 +68,7 @@ init([Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-    RSE =
+    _RSE =
 	{rse_chord,
 	 {rse_chord, start_link, [InstanceId]},
 	 permanent,
@@ -103,13 +103,21 @@ init([Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    Vivaldi =
+        {vivaldi,
+         {vivaldi, start_link, [InstanceId]},
+         permanent,
+         brutal_kill,
+         worker,
+         []},
     {ok, {{one_for_one, 10, 1},
 	  [
 	   KeyHolder,
-       DeadNodeCache,
+           DeadNodeCache,
 	   RingMaintenance,
 	   RoutingTable,
+           Vivaldi,
 	   Supervisor_AND
-	   %RSE
+	   %_RSE
 	  ]}}.
 %% userdevguide-end cs_sup_or:init

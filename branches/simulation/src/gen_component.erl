@@ -11,16 +11,14 @@
 %% @version $Id$
 -module(gen_component).
 
-%-define(REALTIME, true). % TCP communication
-%-define(BUILTIN, true). 
--define(SIMULATION, true).
+-include("chordsharp.hrl").
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -export([behaviour_info/1]).
 
--export([start_link/2, start_link/3, start/4, wait_for_ok/0]).
+-export([start_link/2, start_link/3, start/4, start/2, start/3,wait_for_ok/0]).
 
 %================================================================================
 % behaviour definition
@@ -55,10 +53,21 @@ start_link(Module, Args) ->
 start_link(Module, Args, Options) ->
     Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
     receive
-	{started, Pid} ->
-	    {ok, Pid}
+        {started, Pid} ->
+            {ok, Pid}
     end.
-    
+
+-spec(start/2 :: (any(), list()) -> {ok, pid()}).
+start(Module, Args) ->
+    start(Module, Args, []).
+
+-spec(start/3 :: (any(), list(), list()) -> {ok, pid()}).
+start(Module, Args, Options) ->
+    Pid = spawn(?MODULE, start, [Module, Args, Options, self()]),
+    receive
+        {started, Pid} ->
+            {ok, Pid}
+    end.
 
 start(Module, Args, Options, Supervisor) ->
     %io:format("Sarting ~p~n",[Module]),
@@ -76,30 +85,61 @@ start(Module, Args, Options, Supervisor) ->
                 ok
             end
     end,
-    InitialState = Module:init(Args),
-    
-   
-        loop(Module, InitialState, {Options, 0.0}).
+    try
+        register(list_to_atom(lists:flatten(io_lib:format("~p_~p",
+                                                          [Module,
+                                                           randoms:getRandomId()]))),
+                 self()),
+        InitialState = Module:init(Args),
+        loop(Module, InitialState, {Options, 0.0})
+    catch
+        throw:Term ->
+            io:format("exception in init of ~p: ~p~n", [Module, Term]),
+            throw(Term);
+        exit:Reason ->
+            io:format("exception in init of ~p: ~p~n", [Module, Reason]),
+            throw(Reason);
+        error:Reason ->
+            io:format("exception in init of ~p: ~p~n", [Module, {Reason,
+                                                                 erlang:get_stacktrace()}]),
+            throw(Reason)
+    end.
 
-
-
--ifdef(REALTIME).
+-ifndef(Simulation).
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive
-    Message ->
-        %io:format("~p ~p ~n", [Message, Module]),
-	    case Module:on(Message, State) of
-		unknown_event ->
-		    {NewState, NewComponentState} = 
-			handle_unknown_event(Message, State, 
-					     {Options, Slowest},Module),
-		    loop(Module, NewState, NewComponentState);
-		kill ->
-		    ok;
-		NewState ->
-		    loop(Module, NewState, {Options, Slowest})
-	    end
+        Message ->
+            %Start = erlang:now(),
+            case (try Module:on(Message, State) catch
+                                                    throw:Term -> {exception, Term};
+                                                    exit:Reason -> {exception,Reason};
+                                                    error:Reason -> {exception, {Reason,
+                                                                                 erlang:get_stacktrace()}}
+                                                end) of
+                {exception, Exception} ->
+                    io:format("Error: exception ~p during handling of ~p in module ~p~n",
+                              [Exception, Message, Module]),
+                    loop(Module, State, {Options, Slowest});
+                unknown_event ->
+                    {NewState, NewComponentState} =
+                        handle_unknown_event(Module, Message, State,
+                                             {Options, Slowest}),
+                    loop(Module, NewState, NewComponentState);
+                kill ->
+                    ok;
+                NewState ->
+                    %Stop = erlang:now(),
+                    %Span = timer:now_diff(Stop, Start),
+                    %if
+                        %Span > Slowest ->
+                            %io:format("slow message ~p (~p)~n", [Message, Span]),
+                            %loop(Module, NewState, {Options, Span});
+                        %true ->
+                            loop(Module, NewState, {Options, Slowest})
+                    %end
+            end
     end.
+
 wait_for_ok() ->
     receive
     {ok} ->

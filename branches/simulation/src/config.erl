@@ -26,15 +26,10 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behavior(gen_component).
-
-
 -export([
-	 start_link/1, 
-    
-    init/1,on/2,    
+	 start_link/1, start/2,
 
-	 read/1,
+	 read/1, read/2,
 
 	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
 	 pointerStabilizationInterval/0, failureDetectorInterval/0, 
@@ -59,15 +54,20 @@
 %%====================================================================
 
 %% @doc read config parameter
-%% @spec read(term()) -> term() | failed
+-spec(read/1 :: (atom()) -> any() | failed).
 read(Key) ->
+    read(Key, failed).
+
+% @doc read with default-value
+-spec(read/2 :: (atom(), any()) -> any()).
+read(Key, Default) ->
     case ets:lookup(config_ets, Key) of
 	[{Key, Value}] ->
 	    %% allow values defined as application environments to override
 	    Value;
 	[] ->
 	    case preconfig:get_env(Key, failed) of
-		failed -> failed;
+		failed -> Default;
 		X ->
 		    ets:insert(config_ets, {Key, X}),
 		    X
@@ -278,27 +278,35 @@ knownHosts()->
 %%====================================================================
 
 start_link(Files) ->
-    io:format("Config files: ~p~n", [Files]),
+    TheFiles = case application:get_env(add_config) of
+                   {ok, ConfigFile} ->
+                       lists:append(Files, [ConfigFile]);
+                   _Else ->
+                       Files
+               end,
+    io:format("Config files: ~p~n", [TheFiles]),
     Owner = self(),
-    gen_component:start_link(?MODULE,{Files, Owner},[]).
+    Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
+    receive
+	done ->
+	    ok;
+	X ->
+	    io:format("unknown config message  ~p", [X])
+    end,
+    {ok, Link}.
 
 %@private
-init({[File], _Owner}) ->
+start(Files, Owner) ->
     catch ets:new(config_ets, [set, protected, named_table]),
-    populate_db(File),
-    {ok};
+    [ populate_db(File) || File <- Files],
+    Owner ! done,
+    loop().
 
-%@private
-init({[Global, Local], _Owner}) ->
-    catch ets:new(config_ets, [set, protected, named_table]),
-    populate_db(Global),
-    populate_db(Local),
-   
-    {ok}.
-
-on(_,S) ->
-    S.
-
+loop() ->
+    receive
+	_ ->
+	    loop()
+    end.
 
 %@private
 populate_db(File) ->

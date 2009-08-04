@@ -26,11 +26,14 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3, 
-	 trunc/2, min/2, max/2, randomelem/1, logged_exec/1, 
-	 wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0, find/2, 
-     logger/0, dump3/0, uniq/1, get_nodes/0, minus/2, sleep_for_ever/0, shuffle/1]).
-                          
+-export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
+         trunc/2, min/2, max/2, randomelem/1, logged_exec/1,
+         wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0,
+         find/2, logger/0, dump3/0, uniq/1, get_nodes/0, minus/2,
+         sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
+         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2]).
+
+
 escape_quotes(String) ->
 	lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).
 
@@ -232,12 +235,12 @@ uniq(_, [], Uniq) ->
 
 -spec(get_nodes/0 :: () -> list()).
 get_nodes() ->
-    boot_server:node_list(),
-    Nodes = receive
-         {get_list_response, N} ->
-            N
-    end,    
-    lists:usort([cs_send:get(bench_server, CSNode) || CSNode <- Nodes]).
+    get_proc_in_vms(bench_server).
+
+-spec(get_proc_in_vms/1 :: (atom()) -> list()).
+get_proc_in_vms(Proc) ->
+    Nodes = boot_server:node_list(),
+    lists:usort([cs_send:get(Proc, CSNode) || CSNode <- Nodes]).
 
 sleep_for_ever() ->
 	timer:sleep(5000),
@@ -251,8 +254,75 @@ random_subset(Size, List) -> shuffle(List, [], Size).
 -spec(shuffle/1 :: (list()) -> list()).
 shuffle(List) -> shuffle(List, [], length(List)).
 
-shuffle([], Acc, Size) -> Acc;
-shuffle(List, Acc, 0) -> Acc;
+shuffle([], Acc, _Size) -> Acc;
+shuffle(_List, Acc, 0) -> Acc;
 shuffle(List, Acc, Size) ->
     {Leading, [H | T]} = lists:split(random:uniform(length(List)) - 1, List),
     shuffle(Leading ++ T, [H | Acc], Size - 1).
+
+-ifdef(types_are_builtin).
+-spec(gb_trees_largest_smaller_than/2 :: (any(), gb_tree()) -> {value, any(), any()} | nil).
+-else.
+-spec(gb_trees_largest_smaller_than/2 :: (any(), gb_trees:gb_tree()) -> {value, any(), any()} | nil).
+-endif.
+gb_trees_largest_smaller_than(_Key, {0, _Tree}) ->
+    nil;
+gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree} = Tree) ->
+    case largest_smaller_than_iter(MyKey, InnerTree) of
+        {value, _, _} = Value ->
+            Value;
+        nil ->
+            {LargestKey, LargestValue} = gb_trees:largest(Tree),
+            {value, LargestKey, LargestValue}
+    end.
+
+% find largest in subtree smaller than MyKey
+largest_smaller_than_iter(_MyKey, nil) ->
+    nil;
+largest_smaller_than_iter(MyKey, {Key, Value, Smaller, Bigger}) ->
+    case Key < MyKey of
+        true ->
+            case largest_smaller_than_iter(MyKey, Bigger) of
+                {value, _, _} = AValue ->
+                    AValue;
+                nil ->
+                    {value, Key, Value}
+            end;
+        false ->
+            largest_smaller_than_iter(MyKey, Smaller)
+    end.
+
+-ifdef(types_are_builtin).
+-spec(gb_trees_foldl/3 :: (any(), any(), gb_tree()) -> any()).
+-else.
+-spec(gb_trees_foldl/3 :: (any(), any(), gb_trees:gb_tree()) -> any()).
+-endif.
+gb_trees_foldl(_F, Accu, {0, _Tree}) ->
+    Accu;
+gb_trees_foldl(F, Accu, {_, Tree}) ->
+    gb_trees_foldl_iter(F, Accu, Tree).
+
+gb_trees_foldl_iter(_F, Accu, nil) ->
+    Accu;
+gb_trees_foldl_iter(F, Accu, {Key, Value, Smaller, Bigger}) ->
+    Res1 = gb_trees_foldl_iter(F, Accu, Smaller),
+    Res2 = F(Key, Value, Res1),
+    gb_trees_foldl_iter(F, Res2, Bigger).
+
+pow(_X, 0) ->
+    1;
+pow(X, 1) ->
+    X;
+pow(X, 2) ->
+    X * X;
+pow(X, 3) ->
+    X * X * X;
+pow(X, Y) ->
+    case Y rem 2 of
+        0 ->
+            Half = pow(X, Y div 2),
+            Half * Half;
+        1 ->
+            Half = pow(X, Y div 2),
+            Half * Half * X
+    end.

@@ -36,6 +36,7 @@
 %%Standard database backend
 %-define(DB, cs_db_otp).
 %-define(DB, db_gb_trees).
+%-define(DB, db_tcerl).
 -define(DB, db_ets).
 %%Standard chord ring maintenance
 %-define(RM, rm_chord).
@@ -46,6 +47,13 @@
 %% ring maintenance by T-man-Sharp
 %-define(RM, rm_tmansharp).
 
-%-define(REALTIME, true). % TCP communication
-%-define(BUILTIN, true). 
--define(SIMULATION, true).
+-define(TCP_LAYER, true). % TCP communication
+%-define(BUILTIN, true).   % distributed Erlang native communication
+
+%-define(SIMULATION, true).
+
+
+
+
+
+

@@ -286,14 +286,11 @@ renderIndexedRing({ok, Details}, Ring) ->
     {tr, [],
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
-       case is_list(PredIndex) orelse PredIndex =/= -1 of
-           true -> case hd(PredIndex) == -1 of
-                       true->
-                           {td, [], io_lib:format('~p', [PredIndex])};
-                       false ->
-                           {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
-                   end;
-           false -> {td, [], io_lib:format('~p', [PredIndex])}
+       case hd(PredIndex) == -1 of
+           true->
+               {td, [], io_lib:format('~p', [PredIndex])};
+           false ->
+               {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
        end,
        {td, [], io_lib:format('~p: ~p', [MyIndex, get_id(Node)])},
        case is_list(FirstSuccIndex) orelse FirstSuccIndex =/= 1 of

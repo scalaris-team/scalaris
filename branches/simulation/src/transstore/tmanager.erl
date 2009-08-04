@@ -238,12 +238,8 @@ start_replicated_manager(Message, InstanceId)->
     TransID = Message#tm_message.transaction_id,
     erlang:put(instance_id, InstanceId),
     cs_send:send(Leader, {rtm, cs_send:this(), RKey}),
-    NLeader = if Leader ->
-                      cs_send:this();
-                 true ->
-                      Leader
-              end,
-    TMState = trecords:new_tm_state(TransID, Items, NLeader, {RKey, cs_send:this(), unknownballot}),
+    TMState = trecords:new_tm_state(TransID, Items, Leader,
+                                    {RKey, cs_send:this(), unknownballot}),
     loop(TMState).
 
 loop(TMState)->

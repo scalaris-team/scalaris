@@ -507,17 +507,17 @@ write2_read2() ->
         fun(X)->
                 Res1 = transaction_api:read(KeyA, X),
                 ct:pal("Res1: ~p~n", [Res1]),
-                {{value, ValA}, Y} = Res1,
+                {{value, _ValA}, Y} = Res1,
                 Res2 = transaction_api:read(KeyB, Y),
                 ct:pal("Res2: ~p~n", [Res2]),
-                {{value, ValB}, TransLog2} = Res2,
+                {{value, _ValB}, TransLog2} = Res2,
                 {{ok, ok}, TransLog2}
         end,
 
-    {ResultW, TLogW} = transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
+    {_ResultW, TLogW} = transaction_api:do_transaction(TWrite2, SuccessFun, FailureFun),
     io:format("Write TLOG: ~p~n", [TLogW]),
 
-    {ResultR, TLogR} = transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
+    {_ResultR, TLogR} = transaction_api:do_transaction(TRead2, SuccessFun, FailureFun),
     io:format("Read TLOG: ~p~n", [TLogR]),
 
     ok.

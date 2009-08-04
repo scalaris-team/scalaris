@@ -12,9 +12,21 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-HOSTNAME=`uname -n`
-erl +S 4 +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin  -pa ../contrib/yaws/ebin -pa ../ebin \
-    -yaws embedded true -connect_all false \
-    -chordsharp cs_port 14198 \
-    -chordsharp yaws_port 8003 \
-    -sname node3@$HOSTNAME -s chordsharp
+
+DIRNAME=`dirname $0`
+GLOBAL_CFG="$DIRNAME/scalaris.cfg.sh"
+LOCAL_CFG="$DIRNAME/scalaris.local.cfg.sh"
+
+if [ -f "$GLOBAL_CFG" ] ; then source "$GLOBAL_CFG" ; fi
+if [ -f "$LOCAL_CFG" ] ; then source "$LOCAL_CFG" ; fi
+
+TCERLFLAGS=@ERLANG_TCERL_FLAGS@
+
+FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
+if [ "x0" = "x$FQDN_SET" ]; then
+    echo "you have to set a fully qualified domain name (FQDN)"
+    exit -1
+fi
+
+export ERL_MAX_PORTS=16384
+erl $ERL_OPTS $TCERLFLAGS +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -name boot -s boot

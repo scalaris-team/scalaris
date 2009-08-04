@@ -43,8 +43,8 @@ start() ->
    gen_component:start_link(?MODULE, [], [{register_native, simu_slave}]).
 
 init(_ARG) ->
-    cs_send:send_after(2000, self(), {addnodes}),
-    cs_send:send_after(6400, self(), {check_ring}),
+    cs_send:send_after(2000, self(), {addnodes,1000}),
+    cs_send:send_after(10000, self(), {check_ring}),
     cs_send:send_after(1000*60*60, self(), {simu_stop}),
     {initState}.
       
@@ -53,8 +53,12 @@ init(_ARG) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-on({addnodes},_) ->
-    admin:add_nodes(1000),
+on({addnodes,1},_) ->
+    admin:add_nodes(1),
+    {state_1};
+on({addnodes,N},_) ->
+    admin:add_nodes(1),
+    cs_send:send_after(1, self(), {addnodes,N-1}),
     {state_1}; 
 on({simu_stop},_) ->
     scheduler:stop();

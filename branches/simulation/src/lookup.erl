@@ -38,16 +38,16 @@
 lookup_fin(_Hops, Msg) ->
     %io:format("Hops: ~p~n", [Hops]),
     cs_send:send_local(self() , Msg).
-    
+
 lookup_aux(State, Key, Hops, Msg) ->
     Terminate = util:is_between(cs_state:id(State), Key, cs_state:succ_id(State)),
     P = ?RT:next_hop(State, Key),
     ?LOG("[ ~w | I | Node   | ~w ] lookup_aux ~w ~w ~s~n",[calendar:universal_time(), self(), Terminate, P, Key]),
     if
-	Terminate ->
-	    cs_send:send(cs_state:succ_pid(State), {lookup_fin, Hops + 1, Msg});
-	true ->
-	    cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
+        Terminate ->
+            cs_send:send(cs_state:succ_pid(State), {lookup_fin, Hops + 1, Msg});
+        true ->
+            cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
     end.
 
 get_key(State, Source_PID, HashedKey, Key) ->

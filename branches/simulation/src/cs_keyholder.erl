@@ -39,9 +39,9 @@
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc sets the key of the cs_node
--spec(set_key/1 :: (?RT:key()) -> any()).
+-spec(set_key/1 :: (?RT:key()) -> ok).
 set_key(Key) ->
-    cs_send:send_local(get_pid() , {set_key_keyholder, Key}).
+    cs_send:send_local(get_pid() , {set_key_keyholder, Key}),ok.
 
 %% @doc reads the key of the cs_node
 -spec(get_key/0 :: () -> ?RT:key()).

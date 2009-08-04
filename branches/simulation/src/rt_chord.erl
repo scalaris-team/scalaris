@@ -29,9 +29,9 @@
 -behaviour(routingtable).
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3, 
-	 filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1, 
-	 dump/1, to_dict/1]).
+-export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
+         filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
+         dump/1, to_dict/1, export_rt_to_cs_node/3]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -40,10 +40,17 @@
 -type(key()::pos_integer()).
 -ifdef(types_are_builtin).
 -type(rt()::gb_tree()).
+-type(external_rt()::gb_tree()).
 -else.
 -type(rt()::gb_trees:gb_tree()).
+-type(external_rt()::gb_trees:gb_tree()).
 -endif.
+-type(index() :: {pos_integer(), pos_integer()}).
 %% userdevguide-end rt_chord:types
+
+%%====================================================================
+%% Key Handling
+%%====================================================================
 
 %% userdevguide-begin rt_chord:empty
 %% @doc creates an empty routing table.
@@ -63,58 +70,29 @@ hash_key(Key) ->
 getRandomNodeId() ->
     rt_simple:getRandomNodeId().
 
-%% userdevguide-begin rt_chord:next_hop1
-%% @doc returns the next hop to contact for a lookup
--spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
-next_hop(State, Id) -> 
-    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
-	%succ is responsible for the key
-	true ->
-	    cs_state:succ_pid(State);
-	% check routing table
-	false ->
-	    RT = cs_state:rt(State),
-	    next_hop(cs_state:id(State), RT, Id, 127, cs_state:succ_pid(State))
-    end.
-%% userdevguide-end rt_chord:next_hop1
-
-%% userdevguide-begin rt_chord:next_hop2
-% @private
--spec(next_hop/5 :: (key(), rt(), key(), pos_integer(), cs_send:mypid()) -> cs_send:mypid()).
-next_hop(_N, _RT, _Id, 0, Candidate) -> Candidate;
-next_hop(N, RT, Id, Index, Candidate) ->
-    case gb_trees:lookup(Index, RT) of
-	{value, Entry} ->
-	    case util:is_between_closed(N, node:id(Entry), Id) of
-		true ->
-		    node:pidX(Entry);
-		false ->
-		    next_hop(N, RT, Id, Index - 1, Candidate)
-	    end;
-	none ->
-	    next_hop(N, RT, Id, Index - 1, Candidate)
-    end.
-%% userdevguide-end rt_chord:next_hop2
+%%====================================================================
+%% RT Management
+%%====================================================================
 
 %% userdevguide-begin rt_chord:init_stab
 %% @doc starts the stabilization routine
 -spec(init_stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
-init_stabilize(Id, Succ, RT) ->
+init_stabilize(Id, _Succ, RT) ->
     % calculate the longest finger
-    Key = calculateKey(Id, 127),
+    Key = calculateKey(Id, first_index()),
     % trigger a lookup for Key
-    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), 127}),
-    cleanup(gb_trees:iterator(RT), RT, Succ).
+    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), first_index()}),
+    RT.
 %% userdevguide-end rt_chord:init_stab
 
 %% userdevguide-begin rt_chord:filterDeadNode
 %% @doc remove all entries
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, DeadPid) ->
-    DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT), 
-			   node:pidX(Node) == DeadPid],
+    DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
+                           node:pidX(Node) == DeadPid],
     lists:foldl(fun (Index, Tree) -> gb_trees:delete(Index, Tree) end,
-		RT, DeadIndices).
+                RT, DeadIndices).
 %% userdevguide-end rt_chord:filterDeadNode
 
 %% @doc returns the pids of the routing table entries .
@@ -133,7 +111,7 @@ get_size(RT) ->
 get_keys_for_replicas(Key) ->
     rt_simple:get_keys_for_replicas(Key).
 
-%% @doc 
+%% @doc
 -spec(dump/1 :: (rt()) -> any()).
 dump(RT) ->
     lists:flatten(io_lib:format("~p", [gb_trees:to_list(RT)])).
@@ -141,31 +119,43 @@ dump(RT) ->
 %% userdevguide-begin rt_chord:stab
 %% @doc updates one entry in the routing table
 %%      and triggers the next update
--spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(), node:node_type()) -> rt()).
+-spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(),
+                      node:node_type()) -> rt()).
 stabilize(Id, Succ, RT, Index, Node) ->
-    case node:is_null(Node) of
-	true ->
-	    RT;
-	false ->
-	    case (node:id(Succ) == node:id(Node)) or (Id == node:id(Node)) or (Index == -1) of
-		true ->
-		    % delete lower entries
-		    prune_table(RT, Index);
-		false ->
-		    NewRT = gb_trees:enter(Index, Node, RT),
-		    Key = calculateKey(Id, Index - 1),
-		    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), Index - 1}),
-		    NewRT
-	    end
+    case node:is_null(Node) orelse (node:id(Succ) == node:id(Node)) of
+        true ->
+            RT;
+        false ->
+            NewRT = gb_trees:enter(Index, Node, RT),
+            Key = calculateKey(Id, next_index(Index)),
+            cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(),
+                                              next_index(Index)}),
+            NewRT
     end.
 %% userdevguide-end rt_chord:stab
 
+%%====================================================================
+%% Finger calculation
+%%====================================================================
 % @private
--spec(calculateKey/2 :: (key(), pos_integer()) -> key()).
-calculateKey(Id, Idx) ->
-    % n + 2^Idx
-    rt_simple:normalize(Id + (1 bsl Idx)).
+-spec(calculateKey/2 :: (key(), index()) -> key()).
+calculateKey(Id, {I, J}) ->
+    % N / K^I * (J + 1)
+    Offset = (rt_simple:n() div util:pow(config:read(chord_base), I)) * (J + 1),
+    %io:format("~p: ~p + ~p~n", [{I, J}, Id, Offset]),
+    rt_simple:normalize(Id + Offset).
 
+first_index() ->
+   {1, config:read(chord_base) - 2}.
+
+next_index({I, 1}) ->
+    {I + 1, config:read(chord_base) - 2};
+next_index({I, J}) ->
+    {I, J - 1}.
+
+%%====================================================================
+%%
+%%====================================================================
 % 0 -> succ
 % 1 -> shortest finger
 % 2 -> next longer finger
@@ -177,40 +167,54 @@ to_dict(State) ->
     Succ = cs_state:succ(State),
     Fingers = util:uniq(flatten(RT, 127)),
     {Dict, Next} = lists:foldl(fun(Finger, {Dict, Index}) ->
-				    {dict:store(Index, Finger, Dict), Index + 1}
-			    end, 
-			    {dict:store(0, Succ, dict:new()), 1}, lists:reverse(Fingers)),
+                                       {dict:store(Index, Finger, Dict), Index + 1}
+                               end,
+                               {dict:store(0, Succ, dict:new()), 1}, lists:reverse(Fingers)),
     dict:store(Next, cs_state:me(State), Dict).
 
 % @private
 flatten(RT, Index) ->
     case gb_trees:lookup(Index, RT) of
-	{value, Entry} ->
-	    [Entry | flatten(RT, Index - 1)];
-	none ->
-	    []
+        {value, Entry} ->
+            [Entry | flatten(RT, Index - 1)];
+        none ->
+            []
     end.
 
-% @private
-% @doc check whether the successor is stored by accident in the RT
-cleanup(It, RT, Succ) ->
-    case gb_trees:next(It) of
-	{Index, Node, Iter2} ->
-	    case node:id(Node) == node:id(Succ) of
-		true ->
-		    cleanup(Iter2, gb_trees:delete(Index, RT), Succ);
-		false ->
-		    cleanup(Iter2, RT, Succ)
-	    end;
-	none ->
-	    RT
-    end.
+%%====================================================================
+%% Communication with cs_node
+%%====================================================================
 
-%% @private
-%% @doc delete all entries whose index is smaller-equal than index
--spec(prune_table/2 :: (rt(), pos_integer()) -> rt()).
-prune_table(RT, Index) ->
-    Keys = [Key || Key <- gb_trees:keys(RT), Key =< Index],
-    lists:foldl(fun (Key, Table) ->
-			gb_trees:delete(Key, Table)
-		end, RT, Keys).
+%% userdevguide-begin rt_chord:next_hop1
+%% @doc returns the next hop to contact for a lookup
+%%      Note, that this code will be called from the cs_node process and
+%%      it will have an external_rt!
+-spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
+next_hop(State, Id) ->
+    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
+        %succ is responsible for the key
+        true ->
+            cs_state:succ_pid(State);
+        % check routing table
+        false ->
+            case util:gb_trees_largest_smaller_than(Id, cs_state:rt(State)) of
+                nil ->
+                    cs_state:succ_pid(State);
+                {value, _Key, Value} ->
+                    Value
+            end
+    end.
+%% userdevguide-end rt_chord:next_hop1
+
+-spec(export_rt_to_cs_node/3 :: (rt(), node:node_type(), node:node_type())
+      -> external_rt()).
+export_rt_to_cs_node(RT, Pred, Succ) ->
+    Tree = gb_trees:enter(node:id(Succ), node:pidX(Succ),
+                          gb_trees:enter(node:id(Pred), node:pidX(Pred),
+                                         gb_trees:empty())),
+    util:gb_trees_foldl(fun (_K, V, Acc) ->
+                                % only store the ring id and pid
+                               gb_trees:enter(node:id(V), node:pidX(V), Acc)
+                        end,
+                        Tree,
+                        RT).

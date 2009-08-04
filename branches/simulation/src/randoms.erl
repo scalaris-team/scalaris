@@ -29,7 +29,7 @@
 
 -include("chordsharp.hrl").
 
--export([getRandomId/0, start/0, rand_uniform/2, init/2, start_seed/1]).
+-export([getRandomId/0, start/0, rand_uniform/2, init/2]).
 
 %% @doc generates a random id
 %% @spec getRandomId() -> list()
@@ -37,6 +37,8 @@
 
 
 -ifdef(SIMULATION).
+
+-export([start_seed/1]).
 
 start() -> 
     crypto:start().

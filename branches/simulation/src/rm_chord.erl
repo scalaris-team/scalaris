@@ -76,7 +76,7 @@ get_successorlist(Source) ->
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
-succ_left(_SuccsSuccList) ->
+succ_left(_Succ) ->
     %% @TODO
     ok.
 

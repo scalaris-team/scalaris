@@ -28,10 +28,16 @@
 
 -export([behaviour_info/1]).
 
+-type(key()::integer() | string()).
+-type(value()::any()).
+-type(version()::pos_integer()).
+
 behaviour_info(callbacks) ->
     [
-     % init
-     {new, 0},
+     % init (node identifier)
+     {new, 1},
+     % close, delete?
+     {close, 1},
      % write locks
      {set_write_lock, 2}, {unset_write_lock, 2},
      % read locks

@@ -54,14 +54,12 @@ get_env(Env, Boot_Def, Chordsharp_Def, Client_Def) ->
     %% io:format("preconfig:get_env(~p,~p,~p) -> ~p~n", [Env, Boot_Def, Chordsharp_Def, application:get_env(Env)]),
     case application:get_env(Env) of
         {ok, Val} -> Val;
-        Else ->
+        _Else ->
             case application:get_application() of
                 {ok, boot_cs} -> Boot_Def;
                 {ok, chordsharp } -> Chordsharp_Def;
                 {ok, client_cs } -> Client_Def;
-		undefined -> Boot_Def;
-                Else ->
-                    io:format("application:get_application() returned ~p~n", [Else])
+		undefined -> Boot_Def
             end
     end.
 

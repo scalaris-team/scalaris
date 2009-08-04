@@ -72,6 +72,8 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
 	    process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
 	{failure, abort} ->
 	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
+	{failure, timeout} ->
+	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
 	X ->
 	    io:format("~p~n", [X])
     end.

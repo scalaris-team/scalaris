@@ -31,7 +31,7 @@
 
 -include("chordsharp.hrl").
 
--type(key()::integer() | string()).
+-type(key()::database:key()).
 
 -type(db()::ok).
 
@@ -47,7 +47,7 @@
 
 	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
 	 add_data/2,
-	new/0,
+	new/1, close/1,
 
 	build_merkle_tree/2,
 	update_if_newer/2]).
@@ -70,10 +70,13 @@ get_pid() ->
     process_dictionary:lookup_process(InstanceId, cs_db_otp).
 
 %% @doc initializes a new database
-new() ->
+new(_) ->
     gen_server:call(get_pid(), {drop_everything}, 20000),
     ok.
 
+%% @todo
+close(_) ->
+    ok.
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
 %% @spec set_write_lock(db(), string()) -> {db(), ok | failed}
@@ -208,7 +211,7 @@ start(InstanceId) ->
 %@private
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, cs_db_otp, self()),
-    {ok, db_gb_trees:new()}.
+    {ok, db_gb_trees:new(1)}.
 
 
 %@private
@@ -222,7 +225,7 @@ stop() ->
 % drop_everything
 %@private
 handle_call({drop_everything}, _From, _DB) ->
-    {reply, ok, db_gb_trees:new()};
+    {reply, ok, db_gb_trees:new(1)};
 
 % set write lock
 %@private

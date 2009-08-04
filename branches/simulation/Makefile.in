@@ -59,10 +59,10 @@ compile:
 
 
 test: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
 
 test-vts: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
 
 java:
 	$(CD) java-api && ant jar
@@ -88,10 +88,10 @@ docs:
 	$(CD) java-api && ant doc
 
 svn:
-	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
+	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/cyclon/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
 
 dialyzer:
-	$(DIALYZER) -Wunderspecs -Werror_handling -c ebin contrib/log4erl/ebin/ contrib/yaws/ebin/
+	$(DIALYZER) -Werror_handling -c ebin contrib/log4erl/ebin/ contrib/yaws/ebin/
 
 rrd-init:
 	@echo This target is deprecated

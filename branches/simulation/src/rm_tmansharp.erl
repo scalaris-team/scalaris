@@ -75,7 +75,7 @@ get_predlist() ->
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
-succ_left(_SuccsSuccList) ->
+succ_left(_Succ) ->
     %% @TODO
     ok.
 
@@ -110,7 +110,7 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
-        cs_send:send_after(config:stabilizationInterval_min(), self(), {stabilize,Token}),
+        cs_send:send_after(0, self(), {stabilize,Token}),
         {NewId, NewMe, [NewPred]++NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
 on(_,uninit) ->
         uninit;
@@ -389,10 +389,10 @@ new_interval(View,NewView,Interval) ->
 get_cyclon_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), cyclon).
 
-print_view(Me,View) ->
-    io:format("[~p] -> ",[node:pidX(Me)]),
-    [io:format("~p",[node:pidX(Node)]) || Node <- View],
-    io:format("~n").
+% print_view(Me,View) ->
+%     io:format("[~p] -> ",[node:pidX(Me)]),
+%     [io:format("~p",[node:pidX(Node)]) || Node <- View],
+%     io:format("~n").
 
 
 
