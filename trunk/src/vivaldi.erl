@@ -152,12 +152,11 @@ random_coordinate() ->
                               network_coordinate(), error()) -> vivaldi:state()).
 
 update_coordinate(_RemoteCoordinate, _RemoteError, _Latency, Coordinate, Error) ->
-    
     Cc = 0.5, Ce = 0.5,
     % sample weight balances local and remote error
     W = Error/(Error + _RemoteError),
     % relative error of sample
-    Es = abs(mathlib:euclideanDist(_RemoteCoordinate, Coordinate) - _Latency) / _Latency, 
+    Es = abs(mathlib:euclideanDist(_RemoteCoordinate, Coordinate) - _Latency) / _Latency,
     % update weighted moving average of local error
     Error1 = Es * Ce * W + Error * (1 - Ce * W),
     % update local coordinates
