@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([recreate_replicas/1, createReplicatedIntervals/2]).
 

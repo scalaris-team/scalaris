@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -behaviour(gen_component).
 

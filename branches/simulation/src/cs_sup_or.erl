@@ -28,7 +28,7 @@
 
 -behaviour(supervisor).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([start_link/1, start_link/0, init/1]).
 

@@ -11,7 +11,7 @@
 %% @version $Id$
 -module(gen_component).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').

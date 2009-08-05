@@ -27,7 +27,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([getRandomId/0, start/0, rand_uniform/2, init/2]).
 

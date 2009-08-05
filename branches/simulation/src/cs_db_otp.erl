@@ -29,7 +29,7 @@
 -behaviour(gen_server).
 -behaviour(database).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -type(key()::database:key()).
 

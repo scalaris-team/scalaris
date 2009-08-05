@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([lookup_aux/4, lookup_fin/2, get_key/4, set_key/5, delete_key/3]).
 

@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([new/6, new/7,
 	 id/1, me/1, uniqueId/1,

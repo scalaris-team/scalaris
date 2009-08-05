@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([new/0, balance_load/1, check_balance/3, get_middle_key/1, move_load/3, 
 	 get_loadbalance_flag/1, reset_loadbalance_flag/1]).

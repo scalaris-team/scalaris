@@ -32,7 +32,7 @@
 % for routing table implementation
 -export([initialize/3]).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Behaviour definition

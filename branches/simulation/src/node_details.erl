@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -export([new/8, predlist/1, me/1, succlist/1, load/1, hostname/1, rt_size/1, message_log/1, memory/1]).
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 -record(node_details, {predlist, node, succlist, load, hostname, rt_size, message_log, memory}).
 new(Pred, Node, SuccList, Load, Hostname, RTSize, Log, Memory) ->
     #node_details{

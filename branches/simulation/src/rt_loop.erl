@@ -32,7 +32,7 @@
 -export([start_link/1]).
 -export([init/1, on/2]).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 % state of the routing table loop
 -type(state() :: {Id::?RT:key(), 

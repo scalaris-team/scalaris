@@ -28,7 +28,7 @@
 
 -export([join_request/4, join_first/1]).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 %% @doc handle the join request of a new node
 %% @spec join_request(state:state(), pid(), Id, UniqueId) -> state:state()

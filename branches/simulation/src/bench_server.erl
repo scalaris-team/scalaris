@@ -30,7 +30,7 @@
 -export([start_link/0, start/0, run_increment/2, run_increment_locally/2, run_read/2, run_increment/3,
 	bench_runner/3]).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 %%==============================================================================
 %% public interface

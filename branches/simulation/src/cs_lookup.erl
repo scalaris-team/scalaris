@@ -32,7 +32,7 @@
 
 
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 %%%-----------------------Public API----------------------------------
 
