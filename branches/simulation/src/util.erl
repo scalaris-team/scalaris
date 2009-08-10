@@ -239,7 +239,14 @@ get_nodes() ->
 
 -spec(get_proc_in_vms/1 :: (atom()) -> list()).
 get_proc_in_vms(Proc) ->
-    Nodes = boot_server:node_list(),
+    boot_server:node_list(),
+    Nodes =
+        receive
+            {get_list_response,X} ->
+            X
+        after 2000 ->
+            {failed}
+        end,
     lists:usort([cs_send:get(Proc, CSNode) || CSNode <- Nodes]).
 
 sleep_for_ever() ->

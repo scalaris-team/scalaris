@@ -72,6 +72,7 @@ on({start_vivaldi_shuffle}, State) ->
 
 % got random node from cyclon
 on({cache, Cache}, {Coordinate, Confidence} = State) ->
+    %io:format("~p~n",[Cache]),
     case Cache of
         [] ->
             State;
