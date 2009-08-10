@@ -134,14 +134,16 @@ dump(State) ->
 details(State) ->
     ?RM:get_predlist(),
     Predlist =  receive
-            {get_predlist_response, X} ->
-                X
-    end,
-    
+                    {get_predlist_response, X} ->      
+                        X
+                   
+                end,
+    ?RM:get_successorlist(),
     SuccList = receive
-            {get_successorlist_response, Y} ->
-               Y
-        end,
+                   {get_successorlist_response, Y} ->
+                        Y
+                  
+               end,
     %Predlist = [pred(State)],
     Node = me(State),
   

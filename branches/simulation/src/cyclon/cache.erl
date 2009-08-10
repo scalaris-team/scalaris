@@ -121,7 +121,9 @@ get_oldest(Cache) ->
 get_youngest(X) ->
     get_youngest(1,X).
 
-%% @doc find youngest N element, List of nodes 
+%% @doc find youngest N element, List of nodes
+get_youngest(_,null) ->
+    [];
 get_youngest(_,[]) ->
     [];
 get_youngest(N,Cache) ->

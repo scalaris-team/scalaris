@@ -33,7 +33,7 @@
 
 -export([init/1,on/2]).
 
--export([start_link/1, initialize/4, 
+-export([start_link/1, 
 	 get_successorlist/1, succ_left/1, pred_left/1, 
 	 notify/1, update_succ/1, update_pred/1, 
 	 get_predlist/0]).
@@ -54,10 +54,7 @@ start_link(InstanceId,Options) ->
    gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, ring_maintenance}]).
 
 
-%% @doc called once by the cs_node when joining the ring in cs_join.erl
-initialize(Id, Me, Pred, Succ) ->
-    cs_send:send_local(get_pid() , {init, Id, Me, Pred, [Succ], self()}),
-    ok.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -66,6 +63,7 @@ initialize(Id, Me, Pred, Succ) ->
 
 init(_Args) ->
     log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
+    cs_send:send_local(get_cs_pid(), {init_rm,self()}),
     cs_send:send_after(config:stabilizationInterval(), self(), {stabilize}),
     uninit.
     
@@ -116,7 +114,7 @@ get_predlist() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %set info for cs_node
-on({init, NewId, NewMe, NewPred, NewSuccList, CSNode},uninit) ->
+on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
         failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
@@ -227,3 +225,14 @@ filter(Pid, [Succ | Rest]) ->
 % @private
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), ring_maintenance).
+
+% get Pid of assigned cs_node
+get_cs_pid() ->
+    InstanceId = erlang:get(instance_id),
+    if
+	InstanceId == undefined ->
+	   log:log(error,"[ RM | ~w ] ~p", [self(),util:get_stacktrace()]);
+	true ->
+	    ok
+    end,
+    process_dictionary:lookup_process(InstanceId, cs_node).

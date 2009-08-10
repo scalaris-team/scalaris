@@ -80,6 +80,7 @@
 %% @doc register a process with InstanceId and Name
 %% @spec register_process(term(), term(), pid()) -> ok
 register_process(InstanceId, Name, Pid) ->
+    
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
     cs_send:send_local(get_pid() , {register_process, InstanceId, Name, Pid}),
@@ -92,7 +93,7 @@ lookup_process(InstanceId, Name) ->
         [{{InstanceId, Name}, Value}] ->
             Value;
         [] ->
-            log:log(error, "[ PD ] lookup_process faild: ~p ~p",[InstanceId, Name]),
+            log:log(error, "[ PD ] lookup_process faild: ~p ~p ~p",[InstanceId, Name,util:get_stacktrace()]),
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).

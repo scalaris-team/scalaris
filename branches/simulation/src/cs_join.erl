@@ -51,9 +51,9 @@ join_request(State, Source_PID, Id, UniqueId) ->
 join_first(Id) -> 
     log:log(info,"[ Node ~w ] join as first ~w",[self(), Id]),
     Me = node:make(cs_send:this(), Id),
-    ?RM:initialize(Id, Me, Me, Me),
     routingtable:initialize(Id, Me, Me),
-    cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new()).
+    
+    cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new(Id)).
 %% userdevguide-end cs_join:join_ring
 
 %% userdevguide-begin cs_join:join1

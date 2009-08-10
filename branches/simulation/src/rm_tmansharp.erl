@@ -19,7 +19,7 @@
 %%% Created :  12 Jan 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2009 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id$
 -module(rm_tmansharp).
 
@@ -33,7 +33,7 @@
 -behavior(ring_maintenance).
 -behavior(gen_component).
 
--export([start_link/1, initialize/4, 
+-export([start_link/1, 
 	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1, 
          update_succ/1, update_pred/1, 
 	 get_as_list/0]).
@@ -55,16 +55,13 @@ start_link(InstanceId,Options) ->
 init(_Args) ->
     log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [self()]),
     dn_cache:subscribe(),
+     cs_send:send_local(get_cs_pid(), {init_rm,self()}),
     uninit.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc called once by the cs_node when joining the ring in cs_join.erl
-initialize(Id, Me, Pred, Succ) ->
-    cs_send:send_local(get_pid() , {init, Id, Me, Pred, [Succ], self()}),
-    ok.
 
 get_successorlist() ->
     cs_send:send_local(get_pid() , {get_successorlist, self()}).
@@ -399,3 +396,14 @@ get_cyclon_pid() ->
 % @private
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), ring_maintenance).
+
+% get Pid of assigned cs_node
+get_cs_pid() ->
+    InstanceId = erlang:get(instance_id),
+    if
+	InstanceId == undefined ->
+	   log:log(error,"[ RM | ~w ] ~p", [self(),util:get_stacktrace()]);
+	true ->
+	    ok
+    end,
+    process_dictionary:lookup_process(InstanceId, cs_node).

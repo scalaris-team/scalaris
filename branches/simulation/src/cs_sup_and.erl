@@ -70,18 +70,11 @@ init([InstanceId, Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-    Cyclon =
-	{cyclon,
-	 {cyclon, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
+   
     {ok, {{one_for_all, 10, 1},
 	  [
 	   DB,
-	   Node,
-	   Cyclon
-	  ]}}.
+	   Node
+	   ]}}.
 %% userdevguide-end cs_sup_and:init
 

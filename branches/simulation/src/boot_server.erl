@@ -48,9 +48,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc returns the number of nodes known to the boot server
-%% @spec number_of_nodes() -> integer()
--spec(number_of_nodes/0 :: () -> pos_integer()).
+%% @doc trigger a message with  the number of nodes known to the boot server
+%% @spec number_of_nodes() -> ok
+-spec(number_of_nodes/0 :: () -> ok).
 number_of_nodes() ->
     cs_send:send(config:bootPid(), {get_list_length, cs_send:this()}),
     ok.
@@ -58,11 +58,12 @@ number_of_nodes() ->
 connect() ->
     cs_send:send(config:bootPid(), {connect}).
 
-%% @doc returns all nodes known to the boot server
-%% @spec node_list() -> list(pid())
--spec(node_list/0 :: () -> list()).
+%% @doc trigger a message with all nodes known to the boot server
+%% @spec node_list() -> ok
+-spec(node_list/0 :: () -> ok).
 node_list() ->
     cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
+   
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -82,11 +83,10 @@ on({ping, Ping_PID},Nodes) ->
 	    cs_send:send(Ping_PID, {pong, Ping_PID}),
 	    Nodes;
 on({get_list, Ping_PID},Nodes) ->
-	    cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
-	    Nodes;
+       	    cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
+            Nodes;
 on({get_list_length,Ping_PID},Nodes) ->
-        cs_send:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
-        
+            cs_send:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
 	    Nodes;
 on({register, Ping_PID},Nodes) ->
 	    failuredetector2:subscribe(Ping_PID),

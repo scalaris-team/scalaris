@@ -19,7 +19,7 @@
 %%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id$
 -module(cs_node).
 
@@ -63,7 +63,7 @@ on({get_key_response_keyholder, Key},{join_state2,Ringsize}) ->
     log:log(info,"[ Node ~w ] joining ~p ~p",[self(), Key,Ringsize]),
     case Ringsize of 
         0 ->
-            cs_reregister:reregister(),
+            cs_reregister:trigger_reregister(),
             S = cs_join:join_first(Key),
             %log:log(info,"[ Node ~w ] joined",[self()]),
             S;  % JOIN Completet, alone S is the first "State"
@@ -108,18 +108,18 @@ on({join_response, Pred, Data},{join_state4,Id,Succ,Me}) ->
     log:log(info,"[ Node ~w ] got pred ~w",[self(), Pred]),
     State = case node:is_null(Pred) of
         true ->
-            DB = ?DB:add_data(?DB:new(), Data),
-            ?RM:initialize(Id, Me, Pred, Succ),
+            DB = ?DB:add_data(?DB:new(Id), Data),
+            %?RM:initialize(Id, Me, Pred, Succ),
             routingtable:initialize(Id, Pred, Succ),
             cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
         false ->
             cs_send:send(node:pidX(Pred), {update_succ, Me}),
-            DB = ?DB:add_data(?DB:new(), Data),
-            ?RM:initialize(Id, Me, Pred, Succ),
+            DB = ?DB:add_data(?DB:new(Id), Data),
+            %?RM:initialize(Id, Me, Pred, Succ),
             routingtable:initialize(Id, Pred, Succ),
             cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id},cs_lb:new(), DB)
     end,
-    cs_reregister:reregister(),
+    cs_reregister:trigger_reregister(),
     cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State)),
     %io:format("STATE4 FERTIG~n"),
     State;
@@ -164,6 +164,10 @@ on({ping_with_cookie, Ping_PID, Cookie}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({init_rm,Pid},State) ->
+    cs_send:send_local(Pid , {init, cs_state:id(State), cs_state:me(State),cs_state:pred(State), [cs_state:succ(State)], self()}),
+    State;
+
 on({rm_update_pred_succ, Pred, Succ}, State) ->
     cs_state:update_pred_succ(State, Pred, Succ);
     
@@ -399,7 +403,9 @@ on({stabilize_loadbalance}, State) ->
 
 %% misc.
 on({get_node_details, Pid, Cookie}, State) ->
+   
     cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State)}),
+  
     State;
 on({get_node_IdAndSucc, Pid, Cookie}, State) ->
     cs_send:send_after(0,Pid, {get_node_IdAndSucc_response, Cookie, {cs_state:id(State),cs_state:succ_id(State)}}),
@@ -414,7 +420,7 @@ on({'$gen_cast', {debug_info, Requestor}}, State) ->
     State;
 
 on({reregister}, State) ->
-    cs_reregister:reregister(),
+    cs_reregister:trigger_reregister(),
     State;
 
 %% unit_tests

@@ -32,8 +32,7 @@ behaviour_info(callbacks) ->
     [
      % start
      {start_link, 1},
-     % initialize
-     {initialize, 4},
+    
      % succ_left (you're succ left)
      {succ_left, 1},
      % pred_left (you're pred left)

@@ -49,11 +49,18 @@ set_key(Key, Value) ->
 %%%-----------------------------Load----------------------------------
 
 getLoad() ->
-    Nodes = boot_server:node_list(),
+    boot_server:node_list(),
+    Nodes =
+        receive
+            {get_list_response,X} ->
+                X
+        after 2000 ->
+            {failed}
+        end,
     get_load(Nodes).
     
 get_load([Head | Tail]) ->
-    cs_send:send_local(Head , {get_load, self()}),
+    cs_send:send(Head , {get_load, cs_send:this()}),
     receive
 	{get_load_response, Node, Value} -> [{ok, Node, Value} | get_load(Tail)]
     after
@@ -171,11 +178,19 @@ getRingRendered() ->
 		},
 		{tr, [],
 		 [
-		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
-		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
-		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-		  {td, [], io_lib:format('~p', [boot_server:node_list()])}
-		 ]
+                               {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
+                               {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
+                               {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
+                               {td, [], io_lib:format('~p', [fun () ->
+                                                        boot_server:node_list(),
+                                                        receive
+                                                            {get_list_response,X} ->
+                                                                X
+                                                        after 2000 ->
+                                                                {failed}
+                                                        end
+                                                             end])}
+                           ]
 		}
 	       ]
 	      },
@@ -248,7 +263,16 @@ getIndexedRingRendered() ->
 		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-		  {td, [], io_lib:format('~p', [boot_server:node_list()])}
+		  {td, [], io_lib:format('~p', [fun () ->
+                                                        boot_server:node_list(),
+                                                        receive
+                                                            {get_list_response,X} ->
+                                                                X
+                                                        after 2000 ->
+                                                                {failed}
+
+                                                        end
+                                                             end])}
 		 ]
 		}
 	       ]

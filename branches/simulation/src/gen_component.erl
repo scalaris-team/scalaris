@@ -51,6 +51,7 @@ start_link(Module, Args) ->
 
 -spec(start_link/3 :: (any(), list(), list()) -> {ok, pid()}).
 start_link(Module, Args, Options) ->
+    
     Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
     receive
         {started, Pid} ->
@@ -74,56 +75,57 @@ start(Module, Args, Options, Supervisor) ->
     case lists:keysearch(register, 1, Options) of
 	{value, {register, InstanceId, Name}} ->
 	    process_dictionary:register_process(InstanceId, Name, self()),
+            register(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
 	    Supervisor ! {started, self()};
 	false ->
+            
             case lists:keysearch(register_native, 1, Options) of
             {value, {register_native,Name}} ->
+               
                 register(Name, self()),
                 Supervisor ! {started, self()};
             false ->
+                register(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
                 Supervisor ! {started, self()},
                 ok
             end
     end,
     try
-        register(list_to_atom(lists:flatten(io_lib:format("~p_~p",
-                                                          [Module,
-                                                           randoms:getRandomId()]))),
-                 self()),
         InitialState = Module:init(Args),
         loop(Module, InitialState, {Options, 0.0})
     catch
         throw:Term ->
-            io:format("exception in init of ~p: ~p~n", [Module, Term]),
+            log:log(error,"exception in init/loop of ~p: ~p~n", [Module, Term]),
             throw(Term);
         exit:Reason ->
-            io:format("exception in init of ~p: ~p~n", [Module, Reason]),
+            log:log(error,"exception in init/loop of ~p: ~p~n", [Module, Reason]),
             throw(Reason);
         error:Reason ->
-            io:format("exception in init of ~p: ~p~n", [Module, {Reason,
-                                                                 erlang:get_stacktrace()}]),
+            log:log(error,"exception in init/loop of ~p: ~p~n", [Module, {Reason,
+                                                                      erlang:get_stacktrace()}]),
             throw(Reason)
     end.
 
--ifndef(Simulation).
+-ifndef(SIMULATION).
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive
         Message ->
             %Start = erlang:now(),
+           
             case (try Module:on(Message, State) catch
                                                     throw:Term -> {exception, Term};
                                                     exit:Reason -> {exception,Reason};
                                                     error:Reason -> {exception, {Reason,
-                                                                                 erlang:get_stacktrace()}}
+                                                    erlang:get_stacktrace()}}
                                                 end) of
                 {exception, Exception} ->
-                    io:format("Error: exception ~p during handling of ~p in module ~p~n",
+                    log:log(error,"Error: exception ~p during handling of ~p in module ~p~n",
                               [Exception, Message, Module]),
                     loop(Module, State, {Options, Slowest});
                 unknown_event ->
                     {NewState, NewComponentState} =
-                        handle_unknown_event(Module, Message, State,
-                                             {Options, Slowest}),
+                        handle_unknown_event(Message, State,
+                         {Options, Slowest},Module),
                     loop(Module, NewState, NewComponentState);
                 kill ->
                     ok;
@@ -140,11 +142,15 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
             end
     end.
 
+% Waiting for finish a  RPC
+% Workaround
 wait_for_ok() ->
     receive
     {ok} ->
+        %io:format("ok is da~n"),
         ok
     end.
+ 
 -endif.
 
 -ifdef(SIMULATION).
@@ -177,16 +183,17 @@ wait_for_ok() ->
         ok
     end.
 
-
--endif.
-
 release_ok() ->
     scheduler ! {release_ok}.
 
 unlock() ->
     scheduler ! {unlock}.
 
+-endif.
+
+
+
 
 handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->
-   log:log(error,"unknown message: ~p in ~p~n",[UnknownMessage,Module]),
+   log:log(error,"unknown message: ~p in Module: ~p ~n in State ~p ~n",[UnknownMessage,Module,State]),
     {State, ComponentState}.

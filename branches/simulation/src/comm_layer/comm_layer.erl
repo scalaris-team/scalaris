@@ -68,8 +68,8 @@ send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
     end;
 
 send(Target, Message) ->
-    log:log(error,"[ CC ] wrong call to cs_send:send: ~w ! ~w", [Target, Message]),
-    log:log(error,"[ CC ] stacktrace: ~w", [util:get_stacktrace()]),
+    log:log(error,"[ CL ] wrong call to cs_send:send: ~w ! ~w", [Target, Message]),
+    log:log(error,"[ CL ] stacktrace: ~w", [util:get_stacktrace()]),
     ok.
 
 %% @doc returns process descriptor for the calling process

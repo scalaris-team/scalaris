@@ -62,16 +62,20 @@ init([_]) ->
 %% trigger new estimation round
 on({init_shuffle}, State) ->
     %io:format("last guess ~p~n", [State]),
-    cs_send:send_after(shuffle_reset_interval(), self(), {init_shuffle}),
     cs_send:send_local(get_node_pid() , {get_pred_succ, cs_send:this()}),
     State;
 
 %% new estimation round: initialize with pred and succ info
 on({get_pred_succ_response, Pred, Succ}, _State) ->
     % init with distances to pred and succ
-    Id = cs_keyholder:get_key(),
+    cs_keyholder:get_key(),
+    {get_pred_succ_response, Pred, Succ};
+on({get_key_response_keyholder, Id},{get_pred_succ_response, Pred, Succ}) ->
     Estimate = get_initial_estimate(node:id(Pred), Id, node:id(Succ)),
+    cs_send:send_after(shuffle_reset_interval(), self(), {init_shuffle}),
     {Estimate};
+
+
 
 %% trigger new shuffle with a random node
 on({shuffle_trigger}, State) ->

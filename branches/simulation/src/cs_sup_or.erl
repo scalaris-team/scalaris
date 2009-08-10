@@ -110,14 +110,24 @@ init([Options]) ->
          brutal_kill,
          worker,
          []},
+     Cyclon =
+	{cyclon,
+	 {cyclon, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_one, 10, 1},
 	  [
 	   KeyHolder,
+           RoutingTable,
+           Supervisor_AND,
+           Cyclon,
            DeadNodeCache,
-	   RingMaintenance,
-	   RoutingTable,
-           Vivaldi,
-	   Supervisor_AND
+           RingMaintenance,
+           Vivaldi
+           
+	  
 	   %_RSE
 	  ]}}.
 %% userdevguide-end cs_sup_or:init

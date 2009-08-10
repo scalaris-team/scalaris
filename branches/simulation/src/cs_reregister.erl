@@ -26,9 +26,9 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([reregister/0]).
+-export([trigger_reregister/0]).
 
-reregister() ->
+trigger_reregister() ->
     RegisterMessage = {register, cs_send:this()},
     reregister(config:register_hosts(), RegisterMessage),
     cs_send:send_after(config:reregisterInterval(), self(), {reregister}).

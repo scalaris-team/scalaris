@@ -64,6 +64,7 @@ start_tcerl() ->
     ok.
 -endif.
 
+-ifdef(SIMULATION).
 init(_Args) ->
     randoms:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
@@ -153,6 +154,7 @@ init(_Args) ->
 	 brutal_kill,
 	 worker,
 	 []},
+
     {ok, {{one_for_one, 10, 1},
 	  [
 	   Config,
@@ -168,4 +170,112 @@ init(_Args) ->
 	   %BenchServer,
 	   CSNode
 	   ]}}.
+-else.
+    init(_Args) ->
     
+    randoms:start(),
+    InstanceId = string:concat("boot_server_", randoms:getRandomId()),
+    %error_logger:logfile({open, preconfig:cs_log_file()}),
+    inets:start(),
+    start_tcerl(),
+    _Tracer = {
+      tracer,
+      {tracer, start_link, []},
+      permanent,
+      brutal_kill,
+      worker,
+      []
+     },
+    FailureDetector = {
+      failure_detector2,
+      {failuredetector2, start_link, []},
+      permanent,
+      brutal_kill,
+      worker,
+      []
+     },
+    Node =
+	{boot_server,
+	 {boot_server, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+    Config =
+	{config,
+	 {config, start_link, [[preconfig:config(), preconfig:local_config()]]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+
+%%     XMLRPC =
+%% 	{boot_xmlrpc,
+%% 	 {boot_xmlrpc, start_link, [InstanceId]},
+%% 	 permanent,
+%% 	 brutal_kill,
+%% 	 worker,
+%% 	 []},
+    Logger =
+	{logger,
+	 {log, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+   CSNode =
+	{cs_node,
+	 {cs_sup_or, start_link, [[first]]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+    YAWS =
+	{yaws,
+	 {yaws_wrapper, start_link, [preconfig:docroot(),
+				     [{port, preconfig:yaws_port()},{listen, {0,0,0,0}}, {opaque, InstanceId}],
+				     [{max_open_conns, 800}, {access_log, false}, {logdir, preconfig:log_path()}]
+				    ]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+   CommPort =
+	{comm_port,
+	 {comm_layer, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+   BenchServer =
+	{bench_server,
+	 {bench_server, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+   AdminServer =
+	{admin_server,
+	 {admin, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
+
+    {ok, {{one_for_one, 10, 1},
+	    [
+     Config,
+     Logger,
+     %Tracer,
+     CommPort,
+     FailureDetector,
+     AdminServer,
+     %XMLRPC,
+
+     Node,
+     YAWS,
+     BenchServer,
+     CSNode
+     ]}}.
+
+-endif.

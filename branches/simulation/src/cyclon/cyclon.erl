@@ -6,7 +6,7 @@
 %%% Created :  1 Dec 2008 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id $
 %% @reference S. Voulgaris, D. Gavidia, M. van Steen. CYCLON: 
 %% Inexpensive Membership Management for Unstructured P2P Overlays. 
@@ -58,7 +58,7 @@ start_link(InstanceId, Options) ->
 
    
 init(_Args) ->
-   	cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
+    cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
     cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
     cs_send:send_after(config:read(cyclon_interval), self(), {shuffle}),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
@@ -201,15 +201,14 @@ simple_shuffle(Cache, Node) ->
 
 
 get_L(Cache) ->
-	Cl= config:read(cyclon_shuffle_length),
-	Size =  cache:size(Cache),
-	if
-		Cl < Size ->
-			L=Cl;
-		true ->
-			L=cache:size(Cache)
-	end,
-	L.
+    Cl = config:read(cyclon_shuffle_length),
+    case Cl < cache:size(Cache) of
+        true ->
+            Cl;
+        false ->
+            cache:size(Cache)
+    end.
+	
 
 
 % get Pid of assigned cs_node 	
