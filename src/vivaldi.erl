@@ -150,21 +150,26 @@ random_coordinate() ->
 
 -spec(update_coordinate/5 :: (network_coordinate(), error(), latency(),
                               network_coordinate(), error()) -> vivaldi:state()).
-
-update_coordinate(_RemoteCoordinate, _RemoteError, _Latency, Coordinate, Error) ->
+update_coordinate(Coordinate, _RemoteError, _Latency, Coordinate, Error) ->
+    %@TODO same coordinate
+    {Coordinate, Error};
+update_coordinate(Coordinate, _RemoteError, 0, Coordinate, Error) ->
+    %@TODO latency is 0
+    {Coordinate, Error};
+update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
     Cc = 0.5, Ce = 0.5,
     % sample weight balances local and remote error
-    W = Error/(Error + _RemoteError),
+    W = Error/(Error + RemoteError),
     % relative error of sample
-    Es = abs(mathlib:euclideanDist(_RemoteCoordinate, Coordinate) - _Latency) / _Latency,
+    Es = abs(mathlib:euclideanDist(RemoteCoordinate, Coordinate) - Latency) / Latency,
     % update weighted moving average of local error
     Error1 = Es * Ce * W + Error * (1 - Ce * W),
     % update local coordinates
     Delta = Cc * W,
     %io:format('expected latency: ~p~n', [mathlib:euclideanDist(Coordinate, _RemoteCoordinate)]),
-    C1 = mathlib:u(Coordinate, _RemoteCoordinate),
-    C2 = mathlib:euclideanDist(Coordinate, _RemoteCoordinate),
-    C3 = _Latency - C2,
+    C1 = mathlib:u(Coordinate, RemoteCoordinate),
+    C2 = mathlib:euclideanDist(Coordinate, RemoteCoordinate),
+    C3 = Latency - C2,
     C4 = C3 * Delta,
     Coordinate1 = mathlib:vecAdd(Coordinate, mathlib:vecMult(C1, C4)),
     %io:format("new coordinate ~p and error ~p~n", [Coordinate1, Error1]),
