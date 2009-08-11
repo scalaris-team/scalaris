@@ -113,6 +113,11 @@ on({ping, Pid}, State) ->
     cs_send:send(Pid, {pong, cs_send:this()}),
     State;
 
+on({query_vivaldi, Pid},
+   {Coordinate, Confidence}=State) ->
+    cs_send:send(Pid,{query_vivaldi_response,Coordinate,Confidence}),
+    State;
+
 on(_, _State) ->
     unknown_event.
 
