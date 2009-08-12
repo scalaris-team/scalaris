@@ -46,6 +46,8 @@ Number of nodes:
     {html, integer_to_list(Res)}.
 </erl>
 
+
+
 <p>
 <h3>Simple Storage </h3>
 <h4>Add Key Value</h4>
@@ -132,7 +134,8 @@ out(A) ->
 </erl>
 </p>
 
-
+<h3>Vivaldi Map</h3>
+<embed src="vivaldiMap.yaws"type="image/svg+xml"pluginspage="http://www.adobe.com/svg/viewer/install/" />
 
 <h3>Args</h3>
 <p>

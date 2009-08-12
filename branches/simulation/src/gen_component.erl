@@ -164,13 +164,13 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
             {NewState, NewComponentState} = 
             handle_unknown_event(Message, State, 
                          {Options, Slowest},Module),
-            unlock(),
+            yield(),
             loop(Module, NewState, NewComponentState);
         kill ->
-            unlock(),
+            yield(),
             ok;
         NewState ->
-            unlock(),
+            yield(),
             loop(Module, NewState, {Options, Slowest})
         end
     end.
@@ -186,8 +186,8 @@ wait_for_ok() ->
 release_ok() ->
     scheduler ! {release_ok}.
 
-unlock() ->
-    scheduler ! {unlock}.
+yield() ->
+    scheduler ! {yield}.
 
 -endif.
 

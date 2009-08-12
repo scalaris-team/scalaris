@@ -70,7 +70,7 @@ scheduler_loop(Q,Once,AkkTime,Ins) ->
                         %io:format("T: ~p  ~p ! ~p ~n",[NewAkkTime,Target,Msg]),
                         Target ! Msg,
                         scheduler_loop(message_queue:pop(Q),Once,NewAkkTime,Ins+1);                   
-                {unlock} ->
+                {yield} ->
                     {Time,Target,Msg} = message_queue:get_next_message_to_schedule(Q),  
                         NewAkkTime = Time,
                         %io:format("~p  ~p ~p ~n",[NewAkkTime,Ins,length(Q)]),

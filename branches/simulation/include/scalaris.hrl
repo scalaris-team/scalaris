@@ -47,8 +47,8 @@
 %% ring maintenance by T-man-Sharp
 %-define(RM, rm_tmansharp).
 
--define(TCP_LAYER, true). % TCP communication
-%-define(BUILTIN, true).   % distributed Erlang native communication
+%-define(TCP_LAYER, true). % TCP communication
+-define(BUILTIN, true).   % distributed Erlang native communication
 
 %-define(SIMULATION, true).
 
