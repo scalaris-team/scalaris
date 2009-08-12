@@ -74,7 +74,7 @@ start(Module, Args, Options, Supervisor) ->
     %io:format("Sarting ~p~n",[Module]),
     case lists:keysearch(register, 1, Options) of
 	{value, {register, InstanceId, Name}} ->
-	    process_dictionary:register_process(InstanceId, Name, self()),
+            process_dictionary:register_process(InstanceId, Name, self()),
             register(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
 	    Supervisor ! {started, self()};
 	false ->

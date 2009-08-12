@@ -64,7 +64,6 @@ get_memory({failed}) ->
 
 get_ring_details() ->
     boot_server:node_list(),
-    
     Nodes = receive
         {get_list_response,N} -> 
             

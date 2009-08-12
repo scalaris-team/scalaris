@@ -442,7 +442,11 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 on({send_to_group_member,Processname,Mesg}, State) ->
     InstanceId = erlang:get(instance_id),
     Pid = process_dictionary:lookup_process(InstanceId,Processname),
-    cs_send:send_local(Pid , Mesg),
+    case Pid of
+       failed ->
+           ok;
+       _ -> cs_send:send_local(Pid , Mesg)
+    end,
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

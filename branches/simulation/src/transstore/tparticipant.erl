@@ -31,7 +31,7 @@
 -vsn('$Id$ ').
 
 -include("trecords.hrl").
--include("../chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([tp_validate/3, tp_commit/2, tp_abort/2]).
 

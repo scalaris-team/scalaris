@@ -69,7 +69,12 @@ wait2(Size) ->
         {go} ->
             ok
     end,
-    case ((Res==ok)and (boot_server:number_of_nodes() == Size))  of
+    boot_server:number_of_nodes(),
+    RSize = receive
+        {get_list_length_response,L} ->
+            L
+    end,
+    case ((Res==ok)and (RSize == Size))  of
 	        true -> ok;    	        
 	    	_ -> wait2(Size)
 	end.

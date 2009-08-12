@@ -93,7 +93,7 @@ lookup_process(InstanceId, Name) ->
         [{{InstanceId, Name}, Value}] ->
             Value;
         [] ->
-            log:log(error, "[ PD ] lookup_process faild: ~p ~p ~p",[InstanceId, Name,util:get_stacktrace()]),
+            log:log(error, "[ PD ] lookup_process faild: InstanceID:  ~p  For: ~p",[InstanceId, Name]),
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
@@ -192,9 +192,9 @@ start_link() ->
 start_link_for_unittest() ->
     case whereis(process_dictionary) of
 	undefined ->
-	    gen_server:start({local, ?MODULE}, ?MODULE, [], []);
+	    gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]);
 	_ ->
-	    gen_server:call(?MODULE, {drop_state}, 20000),
+	    cs_send:send_local(get_pid() , {drop_state}),
 	    already_running
     end.
     
@@ -239,6 +239,7 @@ init(_Args) ->
 %@private
 
 on({register_process, InstanceId, Name, Pid}, State) ->
+    %io:format("insert: ~p ~n",[{{InstanceId, Name}, Pid}]),
     ets:insert(?MODULE, {{InstanceId, Name}, Pid}),
     cs_send:send_local(Pid , {ok}),
     {State};

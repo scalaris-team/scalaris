@@ -27,7 +27,7 @@
 -vsn('$Id$').
 
 -include("trecords.hrl").
--include("../chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([process_vote/2, process_vote_ack/5, process_read_vote/2, collect_rv_ack/5, vote_for_suspected/1]).
 

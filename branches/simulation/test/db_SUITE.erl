@@ -25,7 +25,7 @@
 
 -compile(export_all).
 
--include("../src/chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -import(?DB).
 

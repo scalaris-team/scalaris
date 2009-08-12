@@ -28,12 +28,19 @@
 make_ring(Size) ->
     error_logger:tty(true),
     Owner = self(),
-    Pid = spawn(fun () ->
+    Pid = spawn_link(fun () ->
 			timer:sleep(1000),
-			process_dictionary:start_link_for_unittest(), 
-			boot_sup:start_link(), 
+
+                        randoms:start(),
+
+			process_dictionary:start_link_for_unittest(),
+
+                        timer:sleep(1000),
+			boot_sup:start_link(),
+              
 			timer:sleep(1000),
 			boot_server:connect(),
+              
 			admin:add_nodes(Size - 1, 1000),
 			Owner ! {continue},
 			timer:sleep(180000) 
@@ -45,8 +52,11 @@ make_ring(Size) ->
 	{continue} -> 
 	    ok
     end,
+    log:log(error,"A~n"),
+
     check_ring_size(Size),
     wait_for_stable_ring(),
+    log:log(error,"B~n"),
 %    timer:sleep(30000),
     Pid.
 
@@ -65,7 +75,12 @@ wait_for_stable_ring() ->
 
 check_ring_size(Size) ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    case length(statistics:get_ring_details()) == Size of
+    boot_server:number_of_nodes(),
+    RSize = receive
+        {get_list_length_response,L} ->
+            L
+    end,
+    case (RSize == Size) of
 	true ->
 	    ok;
 	_ ->

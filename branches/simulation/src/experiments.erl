@@ -73,15 +73,20 @@ run_1() ->
 %%
 
 wait2(Size) ->
-    cs_send:send_after(1000, self() ,{go}),
-    _Ende = erlang:now(),
+    io:format("G~n"),
+    erlang:send_after(1000, self() ,{go}),
     Res = admin:check_ring(),
     receive
         {go} ->
             ok
     end,
-    case ((Res==ok)and (boot_server:number_of_nodes() == Size+1))  of
-	        true -> ok;    	        
+    boot_server:number_of_nodes(),
+    RSize = receive
+        {get_list_length_response,L} ->
+            L
+    end,
+    case ((Res==ok)and (RSize == Size))  of
+	        true -> ok;
 	    	_ -> wait2(Size)
 	end.
     
