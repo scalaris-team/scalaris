@@ -53,21 +53,22 @@
 % join protocol
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_list_length_response,Ringsize},{join_state1}) ->
+on({be_the_first_response,First},{join_state1}) ->
     %io:format("STATE1~n"),
     cs_keyholder:get_key(),
-    {join_state2,Ringsize};
+    {join_state2,First};
 
-on({get_key_response_keyholder, Key},{join_state2,Ringsize}) ->
+on({get_key_response_keyholder, Key},{join_state2,First}) ->
     %io:format("STATE2~n"),
-    log:log(info,"[ Node ~w ] joining ~p ~p",[self(), Key,Ringsize]),
-    case Ringsize of 
-        0 ->
-            cs_reregister:trigger_reregister(),
+    log:log(info,"[ Node ~w ] joining ~p ~p",[self(), Key,First]),
+    case First of
+        true ->
+           
             S = cs_join:join_first(Key),
+            cs_reregister:trigger_reregister(),
             %log:log(info,"[ Node ~w ] joined",[self()]),
             S;  % JOIN Completet, alone S is the first "State"
-        _ ->  % We are not alone, so we have to do the Join Protocoll
+        false ->  % We are not alone, so we have to do the Join Protocoll
             InstanceId = erlang:get(instance_id),
             erlang:put(instance_id, InstanceId),
             boot_server:node_list(),
@@ -256,6 +257,12 @@ on({decision, Message}, State) ->
 	true ->
 	    tparticipant:tp_abort(State, TransID)
     end;
+
+%% remove tm->tid mapping after transaction manager stopped
+on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
+    {translog, TID_TM_Mapping, Decided, Undecided} = cs_state:get_trans_log(State),
+    NewTID_TM_Mapping = dict:erase(TransID, TID_TM_Mapping),
+    cs_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance (rm_chord)
@@ -464,17 +471,8 @@ on(_, _State) ->
 %% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
 -spec(init/1 :: ([any()]) -> cs_state:state()).
-init([_InstanceId, Options]) ->
-    case lists:member(first, Options) of
-	true ->
-	    ok;
-	false ->
-        % timer:sleep(crypto:rand_uniform(1, 100) * 100),
-        % Workaround to spawn not so much nodes a the same time
-        % @TODO: put the delay in admin:add_nodes() !
-        ok
-    end,
-    boot_server:number_of_nodes(),
+init([_InstanceId, _Options]) ->
+    boot_server:be_the_first(),
     {join_state1}.
    
 %% userdevguide-end cs_node:start

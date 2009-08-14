@@ -31,7 +31,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([start_link/1, number_of_nodes/0, node_list/0, connect/0]).
+-export([start_link/1, number_of_nodes/0, node_list/0, connect/0, be_the_first/0]).
 
 -behaviour(gen_component).
 
@@ -55,6 +55,13 @@ number_of_nodes() ->
     cs_send:send(config:bootPid(), {get_list_length, cs_send:this()}),
     ok.
 
+
+be_the_first() ->
+    cs_send:send(config:bootPid(), {be_the_first, cs_send:this()}),
+    ok.
+
+
+
 connect() ->
     cs_send:send(config:bootPid(), {connect}).
 
@@ -73,27 +80,44 @@ node_list() ->
 %% @spec loop(gb_sets:gb_set(pid())) -> gb_sets:gb_set(pid())
 
 
-on({crash, PID},Nodes) ->
+on({crash, PID},{Nodes,First,Subscriber}) ->
 	    NewNodes = gb_sets:delete_any(PID, Nodes),
-	    NewNodes;
-on({ping, Ping_PID, Cookie},Nodes) ->
+	    {NewNodes,First,Subscriber};
+on({ping, Ping_PID, Cookie},{Nodes,First,Subscriber}) ->
 	    cs_send:send(Ping_PID, {pong, Cookie}),
-	    Nodes;
-on({ping, Ping_PID},Nodes) ->
+	    {Nodes,First,Subscriber};
+on({ping, Ping_PID},{Nodes,First,Subscriber}) ->
 	    cs_send:send(Ping_PID, {pong, Ping_PID}),
-	    Nodes;
-on({get_list, Ping_PID},Nodes) ->
-       	    cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
-            Nodes;
-on({get_list_length,Ping_PID},Nodes) ->
+	    {Nodes,First,Subscriber};
+on({get_list, Ping_PID},{Nodes,First,Subscriber}) ->
+            case gb_sets:is_empty(Nodes) of
+                true ->
+                    {Nodes,First,[Ping_PID|Subscriber]};
+                _ -> cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
+                    {Nodes,First,Subscriber}
+            end;
+on({be_the_first,Ping_PID},{Nodes,First,Subscriber}) ->
+            cs_send:send(Ping_PID, {be_the_first_response,First}),
+            {Nodes,false,Subscriber};
+
+on({get_list_length,Ping_PID},{Nodes,First,Subscriber}) ->
             cs_send:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
-	    Nodes;
-on({register, Ping_PID},Nodes) ->
-	    failuredetector2:subscribe(Ping_PID),
-	    gb_sets:add(Ping_PID, Nodes);
-on({connect},Nodes) ->
+	    {Nodes,First,Subscriber};
+on({register, Ping_PID},{Nodes,First,Subscriber}) ->
+            failuredetector2:subscribe(Ping_PID),
+            NewNodes = gb_sets:add(Ping_PID, Nodes),
+	    case Subscriber of
+                [] ->
+                    ct:pal("BS false~n"),
+                    ok;
+                _ ->
+                   ct:pal("BS true ~p ~n",[Subscriber]),
+                   [cs_send:send(Node,{get_list_response,gb_sets:to_list(NewNodes)} )|| Node <- Subscriber]
+            end,
+            {NewNodes,First,[]};
+on({connect},State) ->
 	    % ugly work around for finding the local ip by setting up a socket first
-	    Nodes;
+	    State;
 
 on(_, _State) ->
     unknown_event.
@@ -102,7 +126,7 @@ on(_, _State) ->
 %-spec(start/1 :: (any()) -> no_return()).
 init(_Arg) ->
     log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
-    gb_sets:empty().
+    {gb_sets:empty(),true,[]}.
 
 %% @doc starts the server; called by the boot supervisor
 %% @see boot_sup

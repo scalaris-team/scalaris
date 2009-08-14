@@ -166,7 +166,7 @@ init(_Args) ->
 	   %XMLRPC,
 	   
 	   Node,
-	   %YAWS,
+	   YAWS,
 	   %BenchServer,
 	   CSNode
 	   ]}}.

@@ -32,12 +32,12 @@ all() ->
 
 suite() ->
     [
-     {timetrap, {seconds, 20}}
+     {timetrap, {seconds, 120}}
     ].
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
-    Pid = unittest_helper:make_ring(4),
+    Pid = unittest_helper:make_ring(2),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->

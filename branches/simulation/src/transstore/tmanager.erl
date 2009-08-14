@@ -240,7 +240,11 @@ start_replicated_manager(Message, InstanceId)->
     cs_send:send(Leader, {rtm, cs_send:this(), RKey}),
     TMState = trecords:new_tm_state(TransID, Items, Leader,
                                     {RKey, cs_send:this(), unknownballot}),
-    loop(TMState).
+    loop(TMState),
+    % done: remove tid_tm_mapping.
+    CSNodePid = process_dictionary:lookup_process(erlang:get(instance_id),
+                                                 cs_node),
+    CSNodePid ! {remove_tm_tid_mapping, TransID, cs_send:this()}.
 
 loop(TMState)->
     receive

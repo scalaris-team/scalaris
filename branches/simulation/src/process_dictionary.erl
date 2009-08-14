@@ -120,6 +120,7 @@ find_all_cs_nodes() ->
 
 -spec(find_all_processes/1 :: (any()) -> list()).
 find_all_processes(Name) ->
+    %ct:pal("ets:info: ~p~n",[ets:info(?MODULE)]),
     Result = ets:match(?MODULE, {{'_', Name}, '$1'}),
     lists:flatten(Result).
 
