@@ -166,6 +166,12 @@ on({decision, Message}, State) ->
 	    tparticipant:tp_abort(State, TransID)
     end;
 
+%% remove tm->tid mapping after transaction manager stopped
+on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
+    {translog, TID_TM_Mapping, Decided, Undecided} = cs_state:get_trans_log(State),
+    NewTID_TM_Mapping = dict:erase(TransID, TID_TM_Mapping),
+    cs_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance (rm_chord)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
