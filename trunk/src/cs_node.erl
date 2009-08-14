@@ -14,12 +14,12 @@
 %%%-------------------------------------------------------------------
 %%% File    : cs_node.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : chord# node main file
+%%% Description : cs_node main file
 %%%
 %%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id$
 -module(cs_node).
 
@@ -27,21 +27,109 @@
 -vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -behaviour(gen_component).
 
 -export([start_link/1, start_link/2]).
+
 -export([on/2, init/1]).
 
 % state of the cs_node loop
--type(state() :: cs_state:state()).
+-type(state() :: any()).
 
 % accepted messages of cs_node processes
 -type(message() :: any()).
 
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Join Messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% join protocol
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({be_the_first_response,First},{join_state1}) ->
+    %io:format("STATE1~n"),
+    cs_keyholder:get_key(),
+    {join_state2,First};
+
+on({get_key_response_keyholder, Key},{join_state2,First}) ->
+    %io:format("STATE2~n"),
+    log:log(info,"[ Node ~w ] joining ~p ~p",[self(), Key,First]),
+    case First of
+        true ->
+           
+            S = cs_join:join_first(Key),
+            cs_reregister:trigger_reregister(),
+            %log:log(info,"[ Node ~w ] joined",[self()]),
+            S;  % JOIN Completet, alone S is the first "State"
+        false ->  % We are not alone, so we have to do the Join Protocoll
+            InstanceId = erlang:get(instance_id),
+            erlang:put(instance_id, InstanceId),
+            boot_server:node_list(),
+            {join_state2_b,Key}            
+    end;
+
+on({get_list_response,Nodes},{join_state2_b,Key}) ->
+    %io:format("STATE2_b~n"),
+    [First | Rest] = util:shuffle(Nodes),
+    cs_send:send(First, {lookup_aux, Key, 0, {get_node, cs_send:this(), Key}}),
+    cs_send:send_after(3000, self() , {join_timeout}),
+    {join_state3,Rest,[],Key};
+
+on({join_timeout},{join_state3,[], _Suspected,_Key}) ->
+    %io:format("STATE3_a~n"),
+    boot_server:number_of_nodes(),
+    {join_state1};
+
+on({join_timeout},{join_state3,[First | Rest], Suspected, Id}) ->
+    %io:format("STATE3~n"),
+    cs_send:send(First, {lookup_aux, Id, 0, {get_node, cs_send:this(), Id}}),
+    cs_send:send_after(3000, self() , {join_timeout}),
+    {join_state3,Rest,Suspected,Id};
+
+on({join_timeout},State) ->
+    %io:format("TimeOUT ~p~n",[State]),
+    State;
+   
+on({get_node_response, Key, Response},{join_state3,_, _Suspected, Key}) ->
+    %io:format("STATE3_[]~n"),
+    Me = node:make(cs_send:this(), Key),
+    UniqueId = node:uniqueId(Me),
+    cs_send:send(node:pidX(Response), {join, cs_send:this(), Key, UniqueId}),
+    {join_state4,Key,Response,Me};
+    
+on({join_response, Pred, Data},{join_state4,Id,Succ,Me}) ->
+    %io:format("STATE4~n"),
+    log:log(info,"[ Node ~w ] got pred ~w",[self(), Pred]),
+    State = case node:is_null(Pred) of
+        true ->
+            DB = ?DB:add_data(?DB:new(Id), Data),
+            %?RM:initialize(Id, Me, Pred, Succ),
+            routingtable:initialize(Id, Pred, Succ),
+            cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
+        false ->
+            cs_send:send(node:pidX(Pred), {update_succ, Me}),
+            DB = ?DB:add_data(?DB:new(Id), Data),
+            %?RM:initialize(Id, Me, Pred, Succ),
+            routingtable:initialize(Id, Pred, Succ),
+            cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id},cs_lb:new(), DB)
+    end,
+    cs_reregister:trigger_reregister(),
+    cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State)),
+    %io:format("STATE4 FERTIG~n"),
+    State;
+
+% Catch all messages untel the join protocol is finshed 
+on(Msg, State) when element(1, State) /= state ->
+  %cs_send:send_local(self() , Msg),
+  cs_send:send_after(100, self(), Msg),
+  State;  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Kill Messages
@@ -77,6 +165,10 @@ on({ping_with_cookie, Ping_PID, Cookie}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({init_rm,Pid},State) ->
+    cs_send:send_local(Pid , {init, cs_state:id(State), cs_state:me(State),cs_state:pred(State), [cs_state:succ(State)], self()}),
+    State;
+
 on({rm_update_pred_succ, Pred, Succ}, State) ->
     cs_state:update_pred_succ(State, Pred, Succ);
     
@@ -180,9 +272,13 @@ on({get_pred, Source_Pid}, State) ->
     State;
 
 on({get_succ_list, Source_Pid}, State) ->
-    cs_send:send(Source_Pid, {get_succ_list_response, cs_state:me(State), 
-			      rm_chord:get_successorlist()}),
+    rm_chord:get_successorlist(Source_Pid),
     State;
+
+on({get_successorlist_response, SuccList,Source_Pid}, State) ->
+    cs_send:send(Source_Pid, {get_succ_list_response, cs_state:me(State),SuccList}),
+    State;
+
 
 on({notify, Pred}, State) -> 
     rm_chord:notify(Pred),
@@ -301,12 +397,8 @@ on({get_middle_key_response, Source_PID, MiddleKey}, State) ->
 on({reset_loadbalance_flag}, State) ->
     cs_lb:reset_loadbalance_flag(State);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% join messages (see cs_join.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% userdevguide-begin cs_node:join_message
-on({join, Source_PID, Id, UniqueId}, State) ->
-    cs_join:join_request(State, Source_PID, Id, UniqueId);
+
+
 %% userdevguide-end cs_node:join_message
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -318,7 +410,12 @@ on({stabilize_loadbalance}, State) ->
 
 %% misc.
 on({get_node_details, Pid, Cookie}, State) ->
+   
     cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State)}),
+  
+    State;
+on({get_node_IdAndSucc, Pid, Cookie}, State) ->
+    cs_send:send_after(0,Pid, {get_node_IdAndSucc_response, Cookie, {cs_state:id(State),cs_state:succ_id(State)}}),
     State;
 
 on({dump}, State) -> 
@@ -326,11 +423,11 @@ on({dump}, State) ->
     State;
 
 on({'$gen_cast', {debug_info, Requestor}}, State) ->
-    Requestor ! {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]},
+    cs_send:send_local(Requestor , {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]}),
     State;
 
 on({reregister}, State) ->
-    cs_reregister:reregister(),
+    cs_reregister:trigger_reregister(),
     State;
 
 %% unit_tests
@@ -341,19 +438,32 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 		    lists:filter(fun ({Key, _}) ->
 					 intervals:in(Key, Range)
 				 end, ?DB:get_data(cs_state:get_db(State)))),
-    Owner ! {unit_test_bulkowner_response, Res, cs_state:id(State)},
+    cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, cs_state:id(State)}),
     State;
 
 %% @TODO buggy ...
-on({get_node_response, _, _}, State) ->
-    State;
+%on({get_node_response, _, _}, State) ->
+%    State;
 
 %% @TODO: cleanup
 on({send_to_group_member,Processname,Mesg}, State) ->
     InstanceId = erlang:get(instance_id),
     Pid = process_dictionary:lookup_process(InstanceId,Processname),
-    Pid ! Mesg,
+    case Pid of
+       failed ->
+           ok;
+       _ -> cs_send:send_local(Pid , Mesg)
+    end,
     State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% join messages (see cs_join.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% userdevguide-begin cs_node:join_message
+on({join, Source_PID, Id, UniqueId}, State) ->
+    cs_join:join_request(State, Source_PID, Id, UniqueId);
+
+
 
 on(_, _State) ->
     unknown_event.
@@ -361,24 +471,10 @@ on(_, _State) ->
 %% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
 -spec(init/1 :: ([any()]) -> cs_state:state()).
-init([_InstanceId, Options]) ->
-    case lists:member(first, Options) of
-	true ->
-	    ok;
-	false ->
-	    timer:sleep(crypto:rand_uniform(1, 100) * 10)
-    
-    end,
-    Id = cs_keyholder:get_key(),
-    {First, State} = cs_join:join(Id),
-    if
-	not First ->
-	    cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State));
-	true ->
-	    ok
-    end,
-    log:log(info,"[ Node ~w ] joined",[self()]),
-    State.
+init([_InstanceId, _Options]) ->
+    boot_server:be_the_first(),
+    {join_state1}.
+   
 %% userdevguide-end cs_node:start
 
 %% userdevguide-begin cs_node:start_link

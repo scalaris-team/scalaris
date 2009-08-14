@@ -149,7 +149,7 @@ test_and_set(Key, OldValue, NewValue) ->
 %@private
 do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
     {ok, PID} = process_dictionary:find_cs_node(),
-    PID ! {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()},
+    cs_send:send_local(PID , {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()}),
     receive
 	X ->
 	    X
@@ -163,7 +163,7 @@ range_read(From, To) ->
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval, 
 			       {bulk_read_with_version, cs_send:this()}),
-    erlang:send_after(5000, self(), {timeout}),
+    cs_send:send_after(5000, self(), {timeout}),
     range_read_loop(Interval, [], []).
 
 range_read_loop(Interval, Done, Data) ->

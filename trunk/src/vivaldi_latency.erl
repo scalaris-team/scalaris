@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %%% Created :  8 July 2009 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2009 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id$
 -module(vivaldi_latency).
 
@@ -57,10 +57,10 @@ on({pong, _}, {Owner, RemoteNode, Token, Start, Latencies}) ->
     NewLatencies = [timer:now_diff(Stop, Start)| Latencies],
     case length(NewLatencies) == config:read(vivaldi_count_measurements, 4) of
         true ->
-            Owner ! {update_vivaldi_coordinate, calc_latency(NewLatencies), Token},
+            cs_send:send_local(Owner,{update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
             exit;
         false ->
-            erlang:send_after(config:read(vivaldi_measurements_delay),
+            cs_send:send_after(config:read(vivaldi_measurements_delay),
                               self(),
                               {start_ping}),
             {Owner, RemoteNode, Token, 0, NewLatencies}
@@ -86,7 +86,7 @@ init([Owner, RemoteNode, Token]) ->
     erlang:send_after(config:read(vivaldi_latency_timeout, 60*1000),
                       self(),
                       {shutdown}),
-    self() ! {start_ping},
+    cs_send:send_local(self() , {start_ping}),
     {Owner, RemoteNode, Token, 0, []}.
 
 -spec(start/3 :: (pid(), any(), any()) -> {ok, pid()}).

@@ -25,8 +25,8 @@
 %@doc This module provides a mechanism to implement process
 %     groups. Within a process group, the names of processes have to
 %     be unique, but the same name can be used in different
-%     groups. The motivation for this module was to run several Chord#
-%     nodes in one erlang vm. But for the processes forming a Chord#
+%     groups. The motivation for this module was to run several scalaris
+%     nodes in one erlang vm. But for the processes forming a scalaris
 %     node being able to talk to each other, they have to now their
 %     names (cs_node, config, etc.). This module allows the processes
 %     to keep their names. 
@@ -47,15 +47,14 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behaviour(gen_server).
+-behaviour(gen_component).
 
 %% API
--export([start_link/0, start/0, stop/0]).
+-export([start_link/0, start/0]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3,
-
+-export([init/1,on/2,
+    
 	 register_process/3, 
 	 lookup_process/2,
 	 lookup_process/1,
@@ -66,7 +65,7 @@
 
 	 get_groups/0,
 	 get_processes_in_group/1, 
-	 get_info/2,
+	 %get_info/2,
 
 	 %for fprof
 	 get_all_pids/0]).
@@ -81,9 +80,11 @@
 %% @doc register a process with InstanceId and Name
 %% @spec register_process(term(), term(), pid()) -> ok
 register_process(InstanceId, Name, Pid) ->
+    
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
-    gen_server:call(?MODULE, {register_process, InstanceId, Name, Pid}, 20000).
+    cs_send:send_local(get_pid() , {register_process, InstanceId, Name, Pid}),
+    gen_component:wait_for_ok().
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
 %% @spec lookup_process(term(), term()) -> term()
@@ -92,6 +93,7 @@ lookup_process(InstanceId, Name) ->
         [{{InstanceId, Name}, Value}] ->
             Value;
         [] ->
+            log:log(error, "[ PD ] lookup_process faild: InstanceID:  ~p  For: ~p",[InstanceId, Name]),
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
@@ -109,7 +111,7 @@ lookup_process(Pid) ->
 %% @doc tries to find a cs_node process
 %% @spec find_cs_node() -> pid()
 find_cs_node() ->
-    gen_server:call(?MODULE, {find_process, cs_node}, 20000).
+    find_process(cs_node).
 
 %% @doc tries to find all cs_node processes
 -spec(find_all_cs_nodes/0 :: () -> list()).
@@ -118,49 +120,61 @@ find_all_cs_nodes() ->
 
 -spec(find_all_processes/1 :: (any()) -> list()).
 find_all_processes(Name) ->
-    gen_server:call(?MODULE, {find_all_processes, Name}, 20000).
+    %ct:pal("ets:info: ~p~n",[ets:info(?MODULE)]),
+    Result = ets:match(?MODULE, {{'_', Name}, '$1'}),
+    lists:flatten(Result).
 
 %% @doc tries to find a process group with a specific process inside
 %% @spec find_group(term()) -> term()
-find_group(Process) ->
-    gen_server:call(?MODULE, {find_group, Process}, 20000).
+find_group(Name) ->
+    Result = case ets:match(?MODULE, {{'$1', Name}, '_'}) of
+    [[Value] | _] ->
+        Value;
+    [] ->
+        failed
+    end,
+    Result.
 
 %% @doc find groups for web interface
 %% @spec get_groups() -> term()
 get_groups() ->
-    gen_server:call(?MODULE, {get_groups}, 20000).
+    AllGroups = find_all_groups(ets:tab2list(?MODULE), gb_sets:new()),
+    GroupsAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, El}, {text, El}, {leaf, false}]} | Rest] end, [], gb_sets:to_list(AllGroups))},
+    GroupsAsJson.
  
 %% @doc find processes in a group (for web interface)
 %% @spec get_processes_in_group(term()) -> term()
-get_processes_in_group(InstanceId) ->   
-    gen_server:call(?MODULE, {get_processes_in_group, InstanceId}, 20000).
+get_processes_in_group(Group) ->
+    AllProcesses = find_processes_in_group(ets:tab2list(?MODULE), gb_sets:new(), Group),
+    ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
+    ProcessesAsJson.
     
 %% @doc get info about process (for web interface)
 %% @spec get_info(term(), term()) -> term()
-get_info(InstanceId, Name) ->   
-    KVs = case gen_server:call(?MODULE, {lookup_process2, InstanceId, list_to_atom(Name)}, 20000) of
-	      failed ->
-		  [{"process", "unknown"}];
-	      {ok, Pid} ->
-		  Pid ! {'$gen_cast', {debug_info, self()}},
-		  {memory, Memory} = process_info(Pid, memory),
-		  {reductions, Reductions} = process_info(Pid, reductions),
-		  {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
-		  AddInfo = receive
-				{debug_info_response, LocalKVs} ->
-				    LocalKVs
-			    after 1000 ->
-				    []
-			    end,
-		  [{"memory", Memory}, {"reductions", Reductions}, {"message_queue_len", QueueLen} | AddInfo]
-	  end,
-    JsonKVs = lists:map(fun({K, V}) -> {struct, [{key, K}, {value, toString(V)}]} end, KVs),
-    {struct, [{pairs, {array, JsonKVs}}]}.
+%% get_info(InstanceId, Name) ->   
+%%     KVs = case lookup_process2(InstanceId, list_to_atom(Name)) of
+%% 	      failed ->
+%% 		  [{"process", "unknown"}];
+%% 	      {ok, Pid} ->
+%% 		  cs_send:send_local(Pid , {'$gen_cast', {debug_info, self()}}),
+%% 		  {memory, Memory} = process_info(Pid, memory),
+%% 		  {reductions, Reductions} = process_info(Pid, reductions),
+%% 		  {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
+%% 		  AddInfo = receive
+%% 				{debug_info_response, LocalKVs} ->
+%% 				    LocalKVs
+%% 			    after 1000 ->
+%% 				    []
+%% 			    end,
+%% 		  [{"memory", Memory}, {"reductions", Reductions}, {"message_queue_len", QueueLen} | AddInfo]
+%% 	  end,
+%%     JsonKVs = lists:map(fun({K, V}) -> {struct, [{key, K}, {value, toString(V)}]} end, KVs),
+%%     {struct, [{pairs, {array, JsonKVs}}]}.
 
 %% @doc get all pids (for fprof)
 %% @spec get_all_pids() -> [pid()]
 get_all_pids() ->   
-    gen_server:call(?MODULE, {get_all_pids}, 20000).
+    [X || [X]<- ets:match(?MODULE, {'_','$1'})].
     
 %%====================================================================
 %% API
@@ -171,15 +185,17 @@ get_all_pids() ->
 %%--------------------------------------------------------------------
 %@doc Starts the server
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    io:format("Start PD~n"),
+    gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
+  
 
 %@doc Starts the server for unit testing
 start_link_for_unittest() ->
     case whereis(process_dictionary) of
 	undefined ->
-	    gen_server:start({local, ?MODULE}, ?MODULE, [], []);
+	    gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]);
 	_ ->
-	    gen_server:call(?MODULE, {drop_state}, 20000),
+	    cs_send:send_local(get_pid() , {drop_state}),
 	    already_running
     end.
     
@@ -189,15 +205,10 @@ start_link_for_unittest() ->
 %%--------------------------------------------------------------------
 %@doc Starts the server; for use with the test framework
 start() ->
-    gen_server:start({local, ?MODULE}, ?MODULE, [], []).
+    
+    gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
 
-%%--------------------------------------------------------------------
-%% Function: stop() -> ok
-%% Description: Stops the server
-%%--------------------------------------------------------------------
-%@doc Stops the server
-stop() ->
-    gen_server:cast(?MODULE, stop).
+
 
 %%====================================================================
 %% gen_server callbacks
@@ -211,9 +222,10 @@ stop() ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 %@private
-init([]) ->
+init(_Args) ->
     ets:new(?MODULE, [set, protected, named_table]),
-    {ok, ok}.
+    State = null,
+    State.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -226,56 +238,39 @@ init([]) ->
 %%--------------------------------------------------------------------
 
 %@private
-handle_call({get_all_pids}, _From, State) ->
-    {reply, [X || [X]<- ets:match(?MODULE, {'_','$1'})], State};
-handle_call({register_process, InstanceId, Name, Pid}, _From, State) ->
+
+on({register_process, InstanceId, Name, Pid}, State) ->
+    %io:format("insert: ~p ~n",[{{InstanceId, Name}, Pid}]),
     ets:insert(?MODULE, {{InstanceId, Name}, Pid}),
-    {reply, ok, State};
-
-handle_call({lookup_process2, InstanceId, Name}, _From, State) ->
-    Result = case ets:lookup(?MODULE, {InstanceId, Name}) of
-        [{{InstanceId, Name}, Value}] ->
-            {ok, Value};
-        [] ->
-            failed
-    end,
-    {reply, Result, State};
-
-handle_call({find_process, Name}, _From, State) ->
-    Result = case ets:match(?MODULE, {{'_', Name}, '$1'}) of
-		 [[Value] | _] ->
-		     {ok, Value};
-		 [] ->
-		     failed
-	     end,
-    {reply, Result, State};
-
-handle_call({find_all_processes, Name}, _From, State) ->
-    Result = ets:match(?MODULE, {{'_', Name}, '$1'}),
-    {reply, lists:flatten(Result), State};
-
-handle_call({find_group, Name}, _From, State) ->
-    Result = case ets:match(?MODULE, {{'$1', Name}, '_'}) of
-	[[Value] | _] ->
-	    Value;
-	[] ->
-	    failed
-    end,
-    {reply, Result, State};
-
-handle_call({get_groups}, _From, State) ->
-    AllGroups = find_all_groups(ets:tab2list(?MODULE), gb_sets:new()),
-    GroupsAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, El}, {text, El}, {leaf, false}]} | Rest] end, [], gb_sets:to_list(AllGroups))},
-    {reply, GroupsAsJson, State};
-
-handle_call({get_processes_in_group, Group}, _From, State) ->
-    AllProcesses = find_processes_in_group(ets:tab2list(?MODULE), gb_sets:new(), Group),
-    ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
-    {reply, ProcessesAsJson, State};
-
-handle_call({drop_state}, _From, State) ->
+    cs_send:send_local(Pid , {ok}),
+    {State};
+on({drop_state}, State) ->
     ets:delete_all_objects(?MODULE),
-    {reply, ok, State}.
+    {State};
+
+on(_, _State) ->
+    unknown_event.
+
+%% lookup_process2(InstanceId, Name) ->
+%%     Result = case ets:lookup(?MODULE, {InstanceId, Name}) of
+%%         [{{InstanceId, Name}, Value}] ->
+%%             {ok, Value};
+%%         [] ->
+%%             failed
+%%     end,
+%%     Result.
+
+find_process(Name) ->
+    case ets:match(?MODULE, {{'_', Name}, '$1'}) of
+         [[Value] | _] ->
+             {ok, Value};
+         [] ->
+             failed
+         end.
+
+
+
+
 
 find_all_groups([], Set) ->
     Set;
@@ -298,47 +293,19 @@ toString(X) ->
     X.
     
 
-%%--------------------------------------------------------------------
-%% Function: handle_cast(Msg, State) -> {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, State}
-%% Description: Handling cast messages
-%%--------------------------------------------------------------------
-%@private
-handle_cast(stop, State) ->
-    {stop, normal, State};
-handle_cast(_Msg, State) ->
-    {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% Function: handle_info(Info, State) -> {noreply, State} |
-%%                                       {noreply, State, Timeout} |
-%%                                       {stop, Reason, State}
-%% Description: Handling all non call/cast messages
-%%--------------------------------------------------------------------
-%@private
-handle_info(_Info, State) ->
-    {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% Function: terminate(Reason, State) -> void()
-%% Description: This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any necessary
-%% cleaning up. When it returns, the gen_server terminates with Reason.
-%% The return value is ignored.
-%%--------------------------------------------------------------------
-%@private
-terminate(_Reason, _State) ->
-    ok.
 
-%%--------------------------------------------------------------------
-%% Func: code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% Description: Convert process state when code is changed
-%%--------------------------------------------------------------------
-%@private
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+get_pid() ->
+    case whereis(process_dictionary) of
+        undefined ->
+            log:log(error, "[ PD ] call of get_pid undefined");
+        PID ->
+            %log:log(info, "[ PD ] find right pid"),
+            PID
+    end.

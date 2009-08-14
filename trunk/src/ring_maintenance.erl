@@ -32,8 +32,7 @@ behaviour_info(callbacks) ->
     [
      % start
      {start_link, 1},
-     % initialize
-     {initialize, 4},
+    
      % succ_left (you're succ left)
      {succ_left, 1},
      % pred_left (you're pred left)
@@ -53,18 +52,18 @@ behaviour_info(_Other) ->
 %%      that his pred/succ changed
 update_succ_and_pred(Pred, Succ) ->    
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rm_update_pred_succ, Pred, Succ}.
+    cs_send:send_local(Pid , {rm_update_pred_succ, Pred, Succ}).
 
 
 %% @doc functions for rm_*.erl modules to notify the cs_node
 %%      that his pred/succ changed
 update_pred(Pred) ->    
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rm_update_pred, Pred}.
+    cs_send:send_local(Pid , {rm_update_pred, Pred}).
 
 
 %% @doc functions for rm_*.erl modules to notify the cs_node
 %%      that his pred/succ changed
 update_succ(Succ) ->    
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rm_update_succ, Succ}.
+    cs_send:send_local(Pid , {rm_update_succ, Succ}).

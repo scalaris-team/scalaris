@@ -28,7 +28,7 @@
 
 -behaviour(database).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 -include("autoconf.hrl").
 
 -type(key()::database:key()).

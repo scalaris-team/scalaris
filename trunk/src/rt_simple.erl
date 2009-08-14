@@ -71,7 +71,7 @@ hash_key(Key) ->
 -spec(getRandomNodeId/0 :: () -> key()).
 getRandomNodeId() ->
     % generates 128 bits of randomness
-    hash_key(integer_to_list(crypto:rand_uniform(1, 65536 * 65536))).
+    hash_key(randoms:getRandomId()).
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc returns the next hop to contact for a lookup

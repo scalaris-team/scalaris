@@ -23,73 +23,34 @@
 %% @version $Id$
 -module(cs_lookup).
 
+
+
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([reliable_get_node/3, reliable_get_node_service/3, unreliable_lookup/2,
-	unreliable_get_key/1]).
+-export([unreliable_lookup/2,unreliable_get_key/1]).
 
-%logging on
-%-define(LOG(S, L), io:format(S, L)).
-%logging off
--define(LOG(S, L), ok).
 
--include("chordsharp.hrl").
+
+-include("../include/scalaris.hrl").
 
 %%%-----------------------Public API----------------------------------
 
-reliable_get_node(InstanceId, Id, Timeout) ->
-    spawn(cs_lookup, reliable_get_node_service, [InstanceId, Id, cs_send:this()]),
-    receive
-	{get_node_response, Id, Node} ->
-	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node succeeded~n",[calendar:universal_time(), self()]),
-	    {ok, Node}
-    after
-	Timeout ->
-	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node failed ~p~n",[calendar:universal_time(), self(), boot_server:node_list()]),
-	    error
-    end.
+
+    
+	
 
 unreliable_lookup(Key, Msg) ->
-    get_pid(cs_node) ! {lookup_aux, Key, 0, Msg}.
+    cs_send:send_local(get_pid(cs_node) , {lookup_aux, Key, 0, Msg}).
 
 unreliable_get_key(Key) ->
     unreliable_lookup(Key, {get_key, cs_send:this(), Key}).
+
 %%%-----------------------Implementation------------------------------
 
-reliable_get_node_service(InstanceId, Id, Node) ->
-    reliable_get_node_service_using_boot(InstanceId, Id, Node).
-%    cs_send:send(cs_node, {lookup_aux, Id, 0, {get_node, self(), Id}}),
-%    receive
-%	{get_node_response, Id, Response} ->
-%	    cs_send:send(Node, {get_node_response, Id, Response})
-%    after
-%	3000 ->
-%	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node_service failed~n",[calendar:universal_time(), self()]),
-%	    reliable_get_node_service_using_boot(Id, Node)
-%    end.
 
-reliable_get_node_service_using_boot(InstanceId, Id, Node) ->
-    erlang:put(instance_id, InstanceId),
-    reliable_get_node_service_using_boot(Id, Node).
 
-reliable_get_node_service_using_boot(Id, Node) ->
-    NodeList = util:shuffle(boot_server:node_list()),
-    reliable_get_node_service_using_boot_iter(NodeList, [], Id, Node).
 
-reliable_get_node_service_using_boot_iter([First | Rest], Suspected, Id, Node) ->
-    cs_send:send(First, {lookup_aux, Id, 0, {get_node, cs_send:this(), Id}}),
-    receive
-	{get_node_response, Id, Response} ->
-	    cs_send:send(Node, {get_node_response, Id, Response})
-    after
-	3000 ->
-	    ?LOG("[ ~w | I | Node   | ~w ] reliable_get_node_using_boot failed~n",[calendar:universal_time(), self()]),
-	    reliable_get_node_service_using_boot_iter(Rest, [First | Suspected], Id, Node)
-    end;
-reliable_get_node_service_using_boot_iter([], _Suspected, Id, Node) ->
-    %Suspected, [], 
-    reliable_get_node_service_using_boot(Id, Node).
 
 get_pid(Id) ->
     InstanceId = erlang:get(instance_id),

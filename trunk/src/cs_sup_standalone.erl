@@ -65,7 +65,7 @@ start_tcerl() ->
 -endif.
 
 init([]) ->
-    crypto:start(),
+    randoms:start(),
     inets:start(),
     %util:logger(),
     start_tcerl(),

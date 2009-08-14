@@ -84,7 +84,7 @@ add_list([NodePid|T],Foo) ->
 
 get_random_element(State) ->
     L=cache:size(State),
-    P=crypto:rand_uniform(0, L)+1,
+    P=randoms:rand_uniform(0, L)+1,
     % picks nth element of state
     lists:nth(P,State).
 
@@ -121,7 +121,9 @@ get_oldest(Cache) ->
 get_youngest(X) ->
     get_youngest(1,X).
 
-%% @doc find youngest N element, List of nodes 
+%% @doc find youngest N element, List of nodes
+get_youngest(_,null) ->
+    [];
 get_youngest(_,[]) ->
     [];
 get_youngest(N,Cache) ->
@@ -174,7 +176,8 @@ size([H|T]) ->
     end.
 
 
-
+get_subset_max_age(MaxAge,null) ->
+    [];
 get_subset_max_age(MaxAge,Cache) ->
     get_list_of_nodes(lists:filter(fun ({_,Age}) -> Age < MaxAge end ,Cache)).
 

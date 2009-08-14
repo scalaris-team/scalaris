@@ -65,7 +65,7 @@ process(Parent, Key, Count) ->
     process_iter(Parent, make_tfun(Key), Count, SuccessFun, FailureFun, 0).
 
 process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
-    Parent ! {done, AbortCount};
+    cs_send:send_local(Parent , {done, AbortCount});
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
 	{success, {commit, _Y}} ->
