@@ -149,30 +149,8 @@ get_processes_in_group(Group) ->
     ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
     ProcessesAsJson.
     
-%% @doc get info about process (for web interface)
-%% @spec get_info(term(), term()) -> term()
-%% get_info(InstanceId, Name) ->   
-%%     KVs = case lookup_process2(InstanceId, list_to_atom(Name)) of
-%% 	      failed ->
-%% 		  [{"process", "unknown"}];
-%% 	      {ok, Pid} ->
-%% 		  cs_send:send_local(Pid , {'$gen_cast', {debug_info, self()}}),
-%% 		  {memory, Memory} = process_info(Pid, memory),
-%% 		  {reductions, Reductions} = process_info(Pid, reductions),
-%% 		  {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
-%% 		  AddInfo = receive
-%% 				{debug_info_response, LocalKVs} ->
-%% 				    LocalKVs
-%% 			    after 1000 ->
-%% 				    []
-%% 			    end,
-%% 		  [{"memory", Memory}, {"reductions", Reductions}, {"message_queue_len", QueueLen} | AddInfo]
-%% 	  end,
-%%     JsonKVs = lists:map(fun({K, V}) -> {struct, [{key, K}, {value, toString(V)}]} end, KVs),
-%%     {struct, [{pairs, {array, JsonKVs}}]}.
 
-%% @doc get all pids (for fprof)
-%% @spec get_all_pids() -> [pid()]
+
 get_all_pids() ->   
     [X || [X]<- ets:match(?MODULE, {'_','$1'})].
     

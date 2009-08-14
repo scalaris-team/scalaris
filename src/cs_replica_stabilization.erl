@@ -72,7 +72,7 @@ start_fetchers(Index, [Interval | Tail]) ->
     gen_component:start(?MODULE, {Me, Index, Interval},[], Me),
     start_fetchers(Index + 1, Tail).
     
-% @spec fetch_interval(pid(), int(), intervals:interval()) -> ok
+
 init({Owner, Index, Interval}) ->
     bulkowner:issue_bulk_owner(Interval,{bulk_read_with_version, cs_send:this()}),
     cs_send:send_after(5000, self(), {timeout}),
