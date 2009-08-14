@@ -29,6 +29,7 @@
 %% API Functions
 %%
 start() ->
+    
     application:start(boot_cs),
 	timer:sleep(2000),
 	erlang:spawn(?MODULE,run_2,[]).
@@ -72,15 +73,20 @@ run_1() ->
 %%
 
 wait2(Size) ->
+    io:format("G~n"),
     erlang:send_after(1000, self() ,{go}),
-    _Ende = erlang:now(),
     Res = admin:check_ring(),
     receive
         {go} ->
             ok
     end,
-    case ((Res==ok)and (boot_server:number_of_nodes() == Size+1))  of
-	        true -> ok;    	        
+    boot_server:number_of_nodes(),
+    RSize = receive
+        {get_list_length_response,L} ->
+            L
+    end,
+    case ((Res==ok)and (RSize == Size))  of
+	        true -> ok;
 	    	_ -> wait2(Size)
 	end.
     
@@ -88,7 +94,7 @@ wait2(Size) ->
     
 
 wait(F,Size,Start) ->
-    erlang:send_after(1000, self() ,{go}),
+    cs_send:send_after(1000, self() ,{go}),
     {Error,AktSize} = metric:ring_health(),
     Ende = erlang:now(),
 	io:format(F,"~p ~p ~p ~p~n",[time_diff(Start,Ende),Error,AktSize,Size]),

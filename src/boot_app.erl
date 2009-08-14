@@ -32,7 +32,10 @@
 -export([start/2, stop/1]).
 
 start(normal, _Args) ->
+   
+    randoms:start(),
     process_dictionary:start_link(),
+   
     Sup = boot_sup:start_link(),
     Sup;
     

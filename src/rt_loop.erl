@@ -32,7 +32,7 @@
 -export([start_link/1]).
 -export([init/1, on/2]).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 % state of the routing table loop
 -type(state() :: {Id::?RT:key(), 
@@ -63,17 +63,21 @@ start_link(InstanceId) ->
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
-    erlang:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    receive
-	{init, Id, Pred, Succ} ->
-	    {Id, Pred, Succ, ?RT:empty(Succ)}
-    end.
+    cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    {uninit}.
+    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Private Code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
+
+on({init, Id, Pred, Succ},{uninit}) ->
+    {Id, Pred, Succ, ?RT:empty(Succ)};
+on(Message,{uninit}) ->
+    cs_send:send_local(self() , Message),
+    {uninit};
 
 % re-initialize routing table
 on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState}) ->
@@ -83,10 +87,10 @@ on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState}) ->
 % start new periodic stabilization
 on({stabilize}, {Id, Pred, Succ, RTState}) ->
     % trigger next stabilization
-    erlang:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
     % get new pred and succ from cs_node
-    Pid ! {get_pred_succ, cs_send:this()},
+    cs_send:send_local(Pid , {get_pred_succ, cs_send:this()}),
     % start periodic stabilization
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     check(RTState, NewRTState, Pred, Succ),
@@ -116,8 +120,8 @@ on({crash, DeadPid}, {Id, Pred, Succ, RTState}) ->
 
 % debug_info for web interface
 on({'$gen_cast', {debug_info, Requestor}}, {Id, Pred, Succ, RTState}) ->
-    Requestor ! {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, 
-				       {"rt_size", ?RT:get_size(RTState)}]},
+    cs_send:send_local(Requestor , {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, 
+				       {"rt_size", ?RT:get_size(RTState)}]}),
     {Id, Pred, Succ, RTState};
 
 % unknown message
@@ -137,11 +141,11 @@ check(X, X, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Pred, Succ, true) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rt_update, ?RT:export_rt_to_cs_node(NewRT, Pred, Succ)},
+    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_cs_node(NewRT, Pred, Succ)}),
     check_fd(NewRT, OldRT);
 check(_OldRT, NewRT, Pred, Succ, false) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
-    Pid ! {rt_update, ?RT:export_rt_to_cs_node(NewRT, Pred, Succ)}.
+    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_cs_node(NewRT, Pred, Succ)}).
 
 check_fd(X, X) ->
     ok;

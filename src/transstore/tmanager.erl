@@ -27,7 +27,7 @@
 -vsn('$Id$').
 
 -include("trecords.hrl").
--include("../chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -import(boot_logger).
 -import(config).

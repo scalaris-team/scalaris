@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -export([new/6, new/7,
 	 id/1, me/1, uniqueId/1,
@@ -132,11 +132,22 @@ dump(State) ->
     ok.
 
 details(State) ->
-    %Predlist = ?RM:get_predlist(),
-    Predlist = [pred(State)],
+    ?RM:get_predlist(),
+    Predlist =  receive
+                    {get_predlist_response, X} ->      
+                        X
+                   
+                end,
+    ?RM:get_successorlist(),
+    SuccList = receive
+                   {get_successorlist_response, Y} ->
+                        Y
+                  
+               end,
+    %Predlist = [pred(State)],
     Node = me(State),
-    %SuccList = ?RM:get_as_list(),
-    SuccList = [succ(State)],
+  
+    %SuccList = [succ(State)],
     Load = ?DB:get_load(get_db(State)),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),

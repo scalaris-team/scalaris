@@ -11,12 +11,14 @@
 %% @version $Id$
 -module(gen_component).
 
+-include("../include/scalaris.hrl").
+
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -export([behaviour_info/1]).
 
--export([start_link/2, start_link/3, start/4, start/2, start/3]).
+-export([start_link/2, start_link/3, start/4, start/2, start/3,wait_for_ok/0]).
 
 %================================================================================
 % behaviour definition
@@ -49,6 +51,7 @@ start_link(Module, Args) ->
 
 -spec(start_link/3 :: (any(), list(), list()) -> {ok, pid()}).
 start_link(Module, Args, Options) ->
+    
     Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
     receive
         {started, Pid} ->
@@ -68,85 +71,61 @@ start(Module, Args, Options) ->
     end.
 
 start(Module, Args, Options, Supervisor) ->
+    %io:format("Sarting ~p~n",[Module]),
     case lists:keysearch(register, 1, Options) of
-        {value, {register, InstanceId, Name}} ->
+	{value, {register, InstanceId, Name}} ->
             process_dictionary:register_process(InstanceId, Name, self()),
-            Supervisor ! {started, self()};
-        false ->
-            Supervisor ! {started, self()}
+            register(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+	    Supervisor ! {started, self()};
+	false ->
+            
+            case lists:keysearch(register_native, 1, Options) of
+            {value, {register_native,Name}} ->
+               
+                register(Name, self()),
+                Supervisor ! {started, self()};
+            false ->
+                register(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+                Supervisor ! {started, self()},
+                ok
+            end
     end,
     try
-        register(list_to_atom(lists:flatten(io_lib:format("~p_~p",
-                                                          [Module,
-                                                           randoms:getRandomId()]))),
-                 self()),
         InitialState = Module:init(Args),
-        case lists:member(profile, Options) of
-            true ->
-                loop_profile(Module, InitialState, {Options, 0.0});
-            false ->
-                loop(Module, InitialState, {Options, 0.0})
-        end
+        loop(Module, InitialState, {Options, 0.0})
     catch
         throw:Term ->
-            io:format("exception in init of ~p: ~p~n", [Module, Term]),
+            log:log(error,"exception in init/loop of ~p: ~p~n", [Module, Term]),
             throw(Term);
         exit:Reason ->
-            io:format("exception in init of ~p: ~p~n", [Module, Reason]),
+            log:log(error,"exception in init/loop of ~p: ~p~n", [Module, Reason]),
             throw(Reason);
         error:Reason ->
-            io:format("exception in init of ~p: ~p~n", [Module, {Reason,
-                                                                 erlang:get_stacktrace()}]),
+            log:log(error,"exception in init/loop of ~p: ~p~n", [Module, {Reason,
+                                                                      erlang:get_stacktrace()}]),
             throw(Reason)
     end.
 
-
-loop_profile(Module, State, {Options, Slowest} = _ComponentState) ->
-    receive
-        Message ->
-            %io:format("~p ~p ~n", [Message, State]),
-            Start = erlang:now(),
-            case fprof:apply(Module, on, [Message, State]) of
-                unknown_event ->
-                    {NewState, NewComponentState} =
-                        handle_unknown_event(Module, Message, State,
-                                             {Options, Slowest}),
-                    loop(Module, NewState, NewComponentState);
-                kill ->
-                    ok;
-                NewState ->
-                    Stop = erlang:now(),
-                    case timer:now_diff(Stop, Start) > 30000 of
-                        true ->
-                            io:format("~p:~p~n", [timer:now_diff(Stop, Start), Message]),
-                            fprof:profile(),
-                            fprof:analyse(),
-                            ok;
-                        false ->
-                            ok
-                    end,
-                    loop_profile(Module, NewState, {Options, Slowest})
-            end
-    end.
-
+-ifndef(SIMULATION).
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive
         Message ->
             %Start = erlang:now(),
+           
             case (try Module:on(Message, State) catch
                                                     throw:Term -> {exception, Term};
                                                     exit:Reason -> {exception,Reason};
                                                     error:Reason -> {exception, {Reason,
-                                                                                 erlang:get_stacktrace()}}
+                                                    erlang:get_stacktrace()}}
                                                 end) of
                 {exception, Exception} ->
-                    io:format("Error: exception ~p during handling of ~p in module ~p~n",
+                    log:log(error,"Error: exception ~p during handling of ~p in module ~p~n",
                               [Exception, Message, Module]),
                     loop(Module, State, {Options, Slowest});
                 unknown_event ->
                     {NewState, NewComponentState} =
-                        handle_unknown_event(Module, Message, State,
-                                             {Options, Slowest}),
+                        handle_unknown_event(Message, State,
+                         {Options, Slowest},Module),
                     loop(Module, NewState, NewComponentState);
                 kill ->
                     ok;
@@ -163,6 +142,58 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
             end
     end.
 
-handle_unknown_event(Module, UnknownMessage, State, ComponentState) ->
-    io:format("unknown message in ~p: ~p~n", [Module, UnknownMessage]),
+% Waiting for finish a  RPC
+% Workaround
+wait_for_ok() ->
+    receive
+    {ok} ->
+        %io:format("ok is da~n"),
+        ok
+    end.
+ 
+-endif.
+
+-ifdef(SIMULATION).
+loop(Module, State, {Options, Slowest} = _ComponentState) ->
+    
+    receive
+    Message ->
+        %io:format("~p ~p ~n", [Message, Module]),
+        case Module:on(Message, State) of
+        unknown_event ->
+            {NewState, NewComponentState} = 
+            handle_unknown_event(Message, State, 
+                         {Options, Slowest},Module),
+            yield(),
+            loop(Module, NewState, NewComponentState);
+        kill ->
+            yield(),
+            ok;
+        NewState ->
+            yield(),
+            loop(Module, NewState, {Options, Slowest})
+        end
+    end.
+wait_for_ok() ->
+    %io:format("Warte auf ok~n"),
+    release_ok(),
+    receive
+    {ok} ->
+        %io:format("ok is da~n"),
+        ok
+    end.
+
+release_ok() ->
+    scheduler ! {release_ok}.
+
+yield() ->
+    scheduler ! {yield}.
+
+-endif.
+
+
+
+
+handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->
+   log:log(error,"unknown message: ~p in Module: ~p ~n in State ~p ~n",[UnknownMessage,Module,State]),
     {State, ComponentState}.

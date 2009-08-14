@@ -1,3 +1,4 @@
+{"src/simulation/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.
 {"src/ring_maintenance.erl",
  [debug_info,
   {outdir, "ebin"},
@@ -33,6 +34,11 @@
   @GBTREESISBUILTIN@
  ]}.
 {"src/comm_layer/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
+{"src/simulation/*",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"}

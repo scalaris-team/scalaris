@@ -38,7 +38,7 @@ pmap1(F, L) ->
     gather1(length(L), Ref, []).
 
 do_f1(Parent, Ref, F, I) ->
-    Parent ! {Ref, (catch F(I))}.
+    cs_send:send_local(Parent , {Ref, (catch F(I))}).
 
 gather1(0, _, L) -> L;
 gather1(N, Ref, L) ->
@@ -51,7 +51,7 @@ make_workers(F, N) ->
     spawn(fun () -> loop(F, N, 0) end).
 
 submit_task(Task, Pid) ->
-    Pid ! {new_task, Task}.
+    cs_send:send_local(Pid , {new_task, Task}).
 
 wait(_Pid) ->
     ok. %%FIXME
@@ -73,4 +73,4 @@ loop(F, Max, Current) ->
 
 worker(F, Task, Owner) ->
     F(Task),
-    Owner ! {task_done}.
+    cs_send:send_local(Owner , {task_done}).

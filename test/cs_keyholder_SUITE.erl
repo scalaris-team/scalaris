@@ -56,7 +56,17 @@ getset_key(_Config) ->
     util:dump2(),
     process_dictionary:register_process(foo, foo, self()),
     cs_keyholder:get_key(),
+     X = receive
+	{get_key_response_keyholder, D} ->
+	    D
+    end,
+    %ct:pal("X: ~p~n",[X]),
     cs_keyholder:set_key("getset_key"),
-    ?equals(cs_keyholder:get_key(), "getset_key"),
+    cs_keyholder:get_key(),
+    Res = receive
+	{get_key_response_keyholder, Key} ->
+	    Key
+    end,
+    ?equals(Res, "getset_key"),
     ok.
 

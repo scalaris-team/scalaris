@@ -28,7 +28,7 @@
 
 -behaviour(database).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 -import(ct).
 -import(randoms).

@@ -27,7 +27,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1]).
+-export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1 , getVivaldiMap/0]).
 
 -include("yaws_api.hrl").
 
@@ -49,11 +49,18 @@ set_key(Key, Value) ->
 %%%-----------------------------Load----------------------------------
 
 getLoad() ->
-    Nodes = boot_server:node_list(),
+    boot_server:node_list(),
+    Nodes =
+        receive
+            {get_list_response,X} ->
+                X
+        after 2000 ->
+            {failed}
+        end,
     get_load(Nodes).
     
 get_load([Head | Tail]) ->
-    Head ! {get_load, self()},
+    cs_send:send(Head , {get_load, cs_send:this()}),
     receive
 	{get_load_response, Node, Value} -> [{ok, Node, Value} | get_load(Tail)]
     after
@@ -92,6 +99,99 @@ renderLoad([{failed, Node} | Tail]) ->
       ]}, renderLoad(Tail)];
 renderLoad([]) ->
     [].
+
+%%%--------------------------Vivaldi-Map------------------------------
+getVivaldiMap() ->
+    boot_server:node_list(),
+    Nodes =
+        receive
+            {get_list_response,X} ->
+            X
+        after 2000 ->
+            {failed}
+        end,
+    CC_list = lists:map(fun (Pid) -> get_vivaldi(Pid) end, Nodes),
+    renderVivaldiMap(CC_list).
+
+get_vivaldi(Pid) ->
+    cs_send:send_to_group_member(Pid,vivaldi, {query_vivaldi,cs_send:this()}),
+    receive
+        {query_vivaldi_response,Coordinate,_Confidence} ->
+            Coordinate
+    end.
+
+renderVivaldiMap(CC_list) ->
+    {Min,Max} = get_min_max(CC_list),
+    %io:format("Min: ~p Max: ~p~n",[Min,Max]),
+    Xof=(lists:nth(1, Max)-lists:nth(1, Min))*0.1,
+    Yof=(lists:nth(2, Max)-lists:nth(2, Min))*0.1,
+    %io:format("~p ~p {~p ~p} ~n",[Min,Max,Xof,Yof]),
+    Vbx=lists:nth(1, Min)-Xof,
+    Vby=lists:nth(2, Min)-Yof,
+    Vbw=(lists:nth(1, Max)-lists:nth(1, Min))+Xof*2,
+    Vbh=(lists:nth(2, Max)-lists:nth(2, Min))+Yof*2,
+    
+    R=(Xof+Yof)*0.1,
+    Head=io_lib:format("<svg width=\"400px\" height=\"400px\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"~p,~p,~p,~p\">~n",
+                       [Vbx,Vby,Vbw,Vbh])++
+         io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
+                       [lists:nth(1, Min)-R*1.5,lists:nth(2, Min),lists:nth(1, Min)-R*1.5,lists:nth(2, Max),R*0.1])++
+        io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
+                       [lists:nth(1, Min),lists:nth(2, Max)+R*1.5,lists:nth(1, Max),lists:nth(2, Max)+R*1.5,R*0.1])++
+        io_lib:format("<text x=\"~p\" y=\"~p\" transform=\"rotate(90,~p,~p)\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
+                       [lists:nth(1, Min)-R*4,
+                        lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
+                        lists:nth(1, Min)-R*4,
+                        lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
+                        R*2,
+                        floor(lists:nth(1, Max)-lists:nth(1, Min))])++
+        io_lib:format("<text x=\"~p\" y=\"~p\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
+                       [lists:nth(1, Min)+(lists:nth(1, Max)-lists:nth(1, Min))/3,
+                        lists:nth(2, Max)+R*4,
+                         R*2,
+                        floor(lists:nth(2, Max)-lists:nth(2, Min))])                    ,
+        
+
+    Content=gen_Nodes(CC_list,R),
+    Foot="</svg>",
+    Head++Content++Foot.
+
+floor(X) ->
+    T = trunc(X),
+    case X - T == 0 of
+        true -> T;
+        false -> T - 1
+    end.
+
+
+
+gen_Nodes([],_) ->
+    "";
+gen_Nodes([H|T],R) ->
+    io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" />~n",[lists:nth(1, H),lists:nth(2, H),R])
+    ++gen_Nodes(T,R).
+
+get_min_max([]) ->
+    {[],[]};
+get_min_max([H|T]) ->
+    {lists:foldl(fun(A,B) -> min_list(A,B) end,H ,T),
+     lists:foldl(fun(A,B) -> max_list(A,B) end,H ,T)}.
+
+
+min_list(L1,L2) ->
+    lists:zipwith(fun(X,Y) ->
+                   case X < Y of
+                       true -> X;
+                       _ -> Y
+                   end
+                   end, L1, L2).
+max_list(L1,L2) ->
+    lists:zipwith(fun(X,Y) ->
+                   case X > Y of
+                       true -> X;
+                       _ -> Y
+                   end
+                   end, L1, L2).
 
 
 %%%-----------------------------Ring----------------------------------
@@ -171,11 +271,19 @@ getRingRendered() ->
 		},
 		{tr, [],
 		 [
-		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
-		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
-		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-		  {td, [], io_lib:format('~p', [boot_server:node_list()])}
-		 ]
+                               {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
+                               {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
+                               {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
+                               {td, [], io_lib:format('~p', [fun () ->
+                                                        boot_server:node_list(),
+                                                        receive
+                                                            {get_list_response,X} ->
+                                                                X
+                                                        after 2000 ->
+                                                                {failed}
+                                                        end
+                                                             end])}
+                           ]
 		}
 	       ]
 	      },
@@ -248,7 +356,16 @@ getIndexedRingRendered() ->
 		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-		  {td, [], io_lib:format('~p', [boot_server:node_list()])}
+		  {td, [], io_lib:format('~p', [fun () ->
+                                                        boot_server:node_list(),
+                                                        receive
+                                                            {get_list_response,X} ->
+                                                                X
+                                                        after 2000 ->
+                                                                {failed}
+
+                                                        end
+                                                             end])}
 		 ]
 		}
 	       ]

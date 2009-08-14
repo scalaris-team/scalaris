@@ -30,7 +30,7 @@
 -export([start_link/0, start/0, run_increment/2, run_increment_locally/2, run_read/2, run_increment/3,
 	bench_runner/3]).
 
--include("chordsharp.hrl").
+-include("../include/scalaris.hrl").
 
 %%==============================================================================
 %% public interface
@@ -145,7 +145,7 @@ bench_runner(Threads, Iterations, Bench) ->
     end.
 
 run_bench_read(Owner, _Key, 0) ->
-    Owner ! {done, ok};
+    cs_send:send_local(Owner , {done, ok});
 run_bench_read(Owner, Key, Iterations) ->
     case transaction_api:quorum_read(Key) of
 	{fail, _Reason} ->

@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %%% Created :  8 July 2009 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2009 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id$
 %% @reference Frank Dabek, Russ Cox, Frans Kaahoek, Robert Morris. <em>
 %% Vivaldi: A Decentralized Network Coordinate System</em>. SigComm 2004.
@@ -66,12 +66,13 @@ on({start_vivaldi_shuffle}, State) ->
         failed ->
             ok;
         CyclonPid ->
-            CyclonPid ! {get_subset, 1, self()}
+            cs_send:send_local(CyclonPid,{get_subset, 1, self()})
     end,
     State;
 
 % got random node from cyclon
 on({cache, Cache}, {Coordinate, Confidence} = State) ->
+    %io:format("~p~n",[Cache]),
     case Cache of
         [] ->
             State;
@@ -86,7 +87,7 @@ on({cache, Cache}, {Coordinate, Confidence} = State) ->
 %
 on({vivaldi_shuffle, RemoteNode, RemoteCoordinate, RemoteConfidence},
    {Coordinate, Confidence} = State) ->
-    %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
+   %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     cs_send:send(RemoteNode, {vivaldi_shuffle_reply,
                               cs_send:this(),
                               Coordinate,
@@ -127,7 +128,7 @@ on(_, _State) ->
 -spec(init/1 :: ([any()]) -> vivaldi:state()).
 init([_InstanceId, []]) ->
     %io:format("vivaldi start ~n"),
-    self() ! {start_vivaldi_shuffle},
+    cs_send:send_local(self(),{start_vivaldi_shuffle}),
     {random_coordinate(), 1.0}.
 
 %% @spec start_link(term()) -> {ok, pid()}

@@ -19,7 +19,7 @@
 %%% Created :  12 Jan 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2009 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id$
 -module(rm_tmansharp).
 
@@ -28,11 +28,12 @@
 
 
 
--export([start/2]).
+-export([init/1,on/2]).
 
 -behavior(ring_maintenance).
+-behavior(gen_component).
 
--export([start_link/1, initialize/4, 
+-export([start_link/1, 
 	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1, 
          update_succ/1, update_pred/1, 
 	 get_as_list/0]).
@@ -41,40 +42,33 @@
 -export([ merge/2, rank/2,get_pred/1,get_succ/1,get_preds/1,get_succs/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Public Interface
+% Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% @doc spawns a chord-like ring maintenance process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-    Link = spawn_link(?MODULE, start, [InstanceId, self()]),
-    receive
-	start_done ->
-	    ok
-    end,
-    {ok, Link}.
+    start_link(InstanceId, []).
 
-%% @doc called once by the cs_node when joining the ring
-initialize(Id, Me, Pred, Succ) ->
-    get_pid() ! {init, Id, Me, Pred, [Succ], self()},
-    receive
-	{init_done} ->
-	    ok
-    end.
+start_link(InstanceId,Options) ->
+   gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, ring_maintenance}]).
+
+init(_Args) ->
+    log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [self()]),
+    dn_cache:subscribe(),
+     cs_send:send_local(get_cs_pid(), {init_rm,self()}),
+    uninit.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Public Interface
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 get_successorlist() ->
-    get_pid() ! {get_successorlist, self()},
-    receive
-	{get_successorlist_response, SuccList} ->
-	    SuccList
-    end.
+    cs_send:send_local(get_pid() , {get_successorlist, self()}).
 
 get_predlist() ->
-    get_pid() ! {get_predlist, self()},
-    receive
-	{get_predlist_response, PredList} ->
-	    PredList
-    end.
+    cs_send:send_local(get_pid() , {get_predlist, self()}).
+    
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
@@ -108,32 +102,35 @@ get_as_list() ->
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start() ->
-    receive
-	{init, NewId, NewMe, NewPred, NewSuccList, CSNode} -> %set info for cs_node
-        %io:format("NewId ~p~n NewMe ~p~n NewPred ~p~n NewSuccList ~p~n CSNode ~p~n",[NewId, NewMe, NewPred, NewSuccList, CSNode]),
- 	    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-  	    failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
-	    CSNode ! {init_done},
-        Token = 0,
-    	erlang:send_after(0, self(), {stabilize,Token}),
-	    loop(NewId, NewMe, [NewPred] ++ NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[])
-    end.
 
+on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
+        ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
+        failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
+        Token = 0,
+        cs_send:send_after(0, self(), {stabilize,Token}),
+        {NewId, NewMe, [NewPred]++NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
+on(_,uninit) ->
+        uninit;
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
-loop(Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache) ->
-   receive
-    	{get_successorlist, Pid} ->
-            Pid ! {get_successorlist_response, get_succs(View)},
-	    	loop(Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-    	{get_predlist, Pid} ->
-			Pid ! {get_predlist_response, get_preds(View)},
-            loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-    	{stabilize,AktToken} -> % new stabilization interval
+on({get_successorlist, Pid},{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+            cs_send:send_local(Pid , {get_successorlist_response,[Me]}),
+	    	{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({get_predlist, Pid},{Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+			cs_send:send_local(Pid , {get_predlist_response, [Me]}),
+            {Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({get_successorlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+            cs_send:send_local(Pid , {get_successorlist_response, get_succs(View)}),
+            {Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({get_predlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+            cs_send:send_local(Pid , {get_predlist_response, get_preds(View)}),
+            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+
+
+on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) -> % new stabilization interval
               
             % Triger an update of the Random view
-            get_cyclon_pid() ! {get_subset_max_age,RandViewSize,self()},
+            cs_send:send_local(get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
             RndView=get_RndView(RandViewSize,RandomCache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
 			P =selectPeer(rank(View++RndView,node:id(Me)),Me),
@@ -146,14 +143,13 @@ loop(Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache) -
           		false ->
                     cs_send:send_to_group_member(node:pidX(P), ring_maintenance, {rm_buffer,Me,extractMessage(View++[Me]++RndView,P)})
         	end,
-			erlang:send_after(Interval, self(), {stabilize,AktToken}),
-            loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-		{stabilize,_} ->
-            loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-  		{cache,NewCache} ->
-            loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,NewCache);
-        {rm_buffer,Q,Buffer_q} ->
-           
+			cs_send:send_after(Interval, self(), {stabilize,AktToken}),
+            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({stabilize,_},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({cache,NewCache},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,_RandomCache}) ->
+            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,NewCache};
+on({rm_buffer,Q,Buffer_q},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             RndView=get_RndView(RandViewSize,RandomCache),
             cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,extractMessage(View++[Me]++RndView,Q)}),
             %io:format("after_send~p~n",[self()]),
@@ -164,10 +160,10 @@ loop(Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache) -
             {NewAktPred,NewAktSucc} = update_cs_node(NewView,AktPred,AktSucc),
             update_failuredetector(View,NewView),
             NewInterval = new_interval(View,NewView,Interval),
-            erlang:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
             %io:format("loop~p~n",[self()]),   
-            loop(Id, Me, NewView,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache);	
-		{rm_buffer_response,Buffer_p} ->
+            {Id, Me, NewView,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};	
+on({rm_buffer_response,Buffer_p},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache})->
             
             RndView=get_RndView(RandViewSize,RandomCache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
@@ -184,44 +180,41 @@ loop(Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache) -
                 false ->
                     RandViewSize
             end,
-            erlang:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
             
-            loop(Id, Me, NewView,RandViewSizeNew,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache);
-  		{zombie,Node} ->
+            {Id, Me, NewView,RandViewSizeNew,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};
+on({zombie,Node},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             erlang:send(self(), {stabilize,AktToken+1}),
             %Inform Cyclon !!!!
-            loop(Id, Me, View,RandViewSize,Interval,AktToken+1,AktPred,AktSucc,[Node|RandomCache]);
-        {crash, DeadPid} ->
+            {Id, Me, View,RandViewSize,Interval,AktToken+1,AktPred,AktSucc,[Node|RandomCache]};
+on({crash, DeadPid},{Id, Me, View ,_RandViewSize,_Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             NewView = filter(DeadPid, View),
             NewCache = filter(DeadPid, RandomCache),
             update_failuredetector(View,NewView),
             erlang:send(self(), {stabilize,AktToken+1}),
-		 	loop(Id, Me, NewView,0,config:stabilizationInterval_min(),AktToken+1,AktPred,AktSucc,NewCache);
-        {'$gen_cast', {debug_info, Requestor}} ->
-	    	Requestor ! {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))}, 
-					       {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]},
-	    	loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
+		 	{Id, Me, NewView,0,config:stabilizationInterval_min(),AktToken+1,AktPred,AktSucc,NewCache};
+on({'$gen_cast', {debug_info, Requestor}},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
+	    	cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))}, 
+					       {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]}),
+	    	{Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
         
-        {check_ring,0,Me} ->
+on({check_ring,0,Me},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             io:format(" [RM ] CheckRing   OK  ~n"),
-            loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-        {check_ring,Token,Me} ->
+             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({check_ring,Token,Me},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             io:format(" [RM ] Token back with Value: ~p~n",[Token]),
-            loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-        {check_ring,0,Master} ->
+            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({check_ring,0,Master},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             io:format(" [RM ] CheckRing  reach TTL in Node ~p not in ~p~n",[Master,Me]),
-            loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-        {check_ring,Token,Master} ->
+            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({check_ring,Token,Master},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
              cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Master}),
-             loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-        {init_check_ring,Token} ->
+             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({init_check_ring,Token},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
              cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Me}),
-             loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache);
-                   
-        X ->
-	   		log:log(warn,"@rm_tman unknown message ~p", [X]),
-	    	loop(Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache)
-    	end.
+             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on(_, _State) ->
+    unknown_event.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
@@ -253,10 +246,11 @@ rank(MergedList,Id) ->
     end,
     %io:format("out: ~p ~p ~n",[self(),A]),
     A.
+
 selectPeer([],Me) ->
     Me;
 selectPeer(View,_) ->
-    NTH = crypto:rand_uniform(1, 3),
+    NTH = randoms:rand_uniform(1, 3),
     case (NTH=<length(View)) of
         true -> lists:nth( NTH,View);
         false -> lists:nth(length(View),View)
@@ -277,6 +271,7 @@ merge(X,[]) ->
     X;
 merge([],[]) ->
     [].
+
 
 get_succs([T]) ->
     [T];
@@ -396,17 +391,19 @@ get_cyclon_pid() ->
 %     [io:format("~p",[node:pidX(Node)]) || Node <- View],
 %     io:format("~n").
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc starts ring maintenance
-start(InstanceId, Sup) ->
-    process_dictionary:register_process(InstanceId, ring_maintenance, self()),
-    dn_cache:subscribe(),
-   	log:log(info,"[ RM ~p ] starting ring maintainer T-MAN", [self()]),
-    Sup ! start_done,
-    start().
+
 
 % @private
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), ring_maintenance).
+
+% get Pid of assigned cs_node
+get_cs_pid() ->
+    InstanceId = erlang:get(instance_id),
+    if
+	InstanceId == undefined ->
+	   log:log(error,"[ RM | ~w ] ~p", [self(),util:get_stacktrace()]);
+	true ->
+	    ok
+    end,
+    process_dictionary:lookup_process(InstanceId, cs_node).
