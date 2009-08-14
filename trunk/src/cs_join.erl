@@ -54,12 +54,3 @@ join_first(Id) ->
     routingtable:initialize(Id, Me, Me),
     cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new(Id)).
 %% userdevguide-end cs_join:join_ring
-
-%% userdevguide-begin cs_join:join1
-%% @doc join a ring and return initial state
-%%      the boolean indicates whether it was the first 
-%%      node in the ring or not
-%% @spec join(Id) -> {true|false, state:state()}
-%%   Id = term()
-
-

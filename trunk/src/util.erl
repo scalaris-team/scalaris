@@ -253,11 +253,11 @@ sleep_for_ever() ->
 	timer:sleep(5000),
 	sleep_for_ever().
 
-%% @edoc get a random subset
+
 -spec(random_subset/2 :: (pos_integer(), list()) -> list()).
 random_subset(Size, List) -> shuffle(List, [], Size).
 
-%% @edoc Fisher-Yates shuffling for lists
+%% @doc Fisher-Yates shuffling for lists
 -spec(shuffle/1 :: (list()) -> list()).
 shuffle(List) -> shuffle(List, [], length(List)).
 

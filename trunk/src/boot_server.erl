@@ -76,8 +76,7 @@ node_list() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc the main loop of the bootstrapping server
-%% @spec loop(gb_sets:gb_set(pid())) -> gb_sets:gb_set(pid())
+
 
 
 on({crash, PID},{Nodes,First,Subscriber}) ->

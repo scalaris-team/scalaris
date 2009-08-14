@@ -31,8 +31,7 @@
 
 -export([getRandomId/0, start/0, rand_uniform/2, init/2]).
 
-%% @doc generates a random id
-%% @spec getRandomId() -> list()
+
 
 
 
