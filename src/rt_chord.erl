@@ -122,7 +122,7 @@ dump(RT) ->
 -spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(),
                       node:node_type()) -> rt()).
 stabilize(Id, Succ, RT, Index, Node) ->
-    case node:is_null(Node) orelse (node:id(Succ) == node:id(Node)) of
+    case node:is_null(Node) orelse (node:id(Succ) == node:id(Node)) orelse (Id == node:id(Node)) of
         true ->
             RT;
         false ->
