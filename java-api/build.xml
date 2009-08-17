@@ -1,11 +1,126 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <project name="Scalaris Java Interface" default="jar" basedir=".">
+
+<!--
+	Setting the following environment variables influence the build:
+	SCALARIS_JAVADOC_JINTERFACE_URL - url of the javadoc of JInterface
+	SCALARIS_JAVADOC_JINTERFACE_OFFLINE ("true"|"false") - link offline using cached package-list file
+	SCALARIS_JAVADOC_JAVASE6_URL - url of the javadoc of JavaSE 6
+	SCALARIS_JAVADOC_JAVASE6_OFFLINE ("true"|"false") - link offline using cached package-list file
+	SCALARIS_JAVADOC_APACHECOMMONSCLI_URL - url of the javadoc of Apache commons cli
+	SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE ("true"|"false") - link offline using cached package-list file
+	SCALARIS_JAVADOC_OFFLINE ("true"|"false") - link offline using cached package-list files (sets all unset offline properties mentioned above)
+	
+	defaults:
+	SCALARIS_JAVADOC_JINTERFACE_URL = http://www.erlang.org/doc/apps/jinterface/java/
+	SCALARIS_JAVADOC_JAVASE6_URL = http://java.sun.com/javase/6/docs/api/
+	SCALARIS_JAVADOC_APACHECOMMONSCLI_URL = http://commons.apache.org/cli/api-release/
+	SCALARIS_JAVADOC_OFFLINE = true
+-->
+
 	<!-- ########## Build configuration (begin) ########## -->
 	<!-- filename without file extension -->
 	<property name="scalaris.dist.filename" value="scalaris" />
 	<!-- directory where the classes are compiled to -->
 	<property name="scalaris.classes.dirname" value="classes" />
 	<!-- ########## Build configuration (end) ########## -->
+
+	<property environment="env"/>
+	<!-- set paths to documentations to link to -->
+	<condition property="javadoc.jinterface.url"
+		value="${env.SCALARIS_JAVADOC_JINTERFACE_URL}"
+		else="http://www.erlang.org/doc/apps/jinterface/java/">
+		<isset property="env.SCALARIS_JAVADOC_JINTERFACE_URL" />
+	</condition>
+	<condition property="javadoc.javase6.url"
+		value="${env.SCALARIS_JAVADOC_JAVASE6_URL}"
+		else="http://java.sun.com/javase/6/docs/api/">
+		<isset property="env.SCALARIS_JAVADOC_JAVASE6_URL" />
+	</condition>
+	<condition property="javadoc.commons-apache-cli.url"
+		value="${env.SCALARIS_JAVADOC_APACHECOMMONSCLI_URL}"
+		else="http://commons.apache.org/cli/api-release/">
+		<isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_URL" />
+	</condition>
+	
+	<!-- set whether those documentations should be linked offline with cached package-list files -->
+	<condition property="javadoc.offline" value="true" else="false">
+		<or>
+			<and>
+				<isset property="env.SCALARIS_JAVADOC_OFFLINE" />
+				<istrue value="${env.SCALARIS_JAVADOC_OFFLINE}" />
+			</and>
+			<not>
+				<isset property="env.SCALARIS_JAVADOC_OFFLINE" />
+			</not>
+		</or>
+	</condition>
+	<condition property="javadoc.jinterface.offline" value="true" else="false">
+		<or>
+			<and>
+				<isset property="env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE" />
+				<istrue value="${env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE}" />
+			</and>
+			<and>
+				<not>
+					<isset property="env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE" />
+				</not>
+				<istrue value="${javadoc.offline}" />
+			</and>
+		</or>
+	</condition>
+	<condition property="javadoc.javase6.offline" value="true" else="false">
+		<or>
+			<and>
+				<isset property="env.SCALARIS_JAVADOC_JAVASE6_OFFLINE" />
+				<istrue value="${env.SCALARIS_JAVADOC_JAVASE6_OFFLINE}" />
+			</and>
+			<and>
+				<not>
+					<isset property="env.SCALARIS_JAVADOC_JAVASE6_OFFLINE" />
+				</not>
+				<istrue value="${javadoc.offline}" />
+			</and>
+		</or>
+	</condition>
+	<condition property="javadoc.commons-apache-cli.offline" value="true" else="false">
+		<or>
+			<and>
+				<isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE" />
+				<istrue value="${env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE}" />
+			</and>
+			<and>
+				<not>
+					<isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE" />
+				</not>
+				<istrue value="${javadoc.offline}" />
+			</and>
+		</or>
+	</condition>
+	
+	<!-- set paths to package-list files of linked documentation -->
+	<condition property="javadoc.jinterface.pkglist" value="${javadoc.jinterface.url}" else="doc-contrib/jinterface">
+		<isfalse value="${javadoc.jinterface.offline}" />
+	</condition>
+	<condition property="javadoc.javase6.pkglist" value="${javadoc.javase6.url}" else="doc-contrib/javase6">
+		<isfalse value="${javadoc.javase6.offline}" />
+	</condition>
+	<condition property="javadoc.commons-apache-cli.pkglist" value="${javadoc.commons-apache-cli.url}" else="doc-contrib/apache_commons_cli">
+		<isfalse value="${javadoc.commons-apache-cli.offline}" />
+	</condition>
+	
+<!--
+	<echo message="javadoc.offline is set to = ${javadoc.offline}"/>
+	<echo message="javadoc.jinterface.url is set to = ${javadoc.jinterface.url}"/>
+	<echo message="javadoc.jinterface.offline is set to = ${javadoc.jinterface.offline}"/>
+	<echo message="javadoc.jinterface.pkglist is set to = ${javadoc.jinterface.pkglist}"/>
+	<echo message="javadoc.javase6.url is set to = ${javadoc.javase6.url}"/>
+	<echo message="javadoc.javase6.offline is set to = ${javadoc.javase6.offline}"/>
+	<echo message="javadoc.javase6.pkglist is set to = ${javadoc.javase6.pkglist}"/>
+	<echo message="javadoc.commons-apache-cli.url is set to = ${javadoc.commons-apache-cli.url}"/>
+	<echo message="javadoc.commons-apache-cli.offline is set to = ${javadoc.commons-apache-cli.offline}"/>
+	<echo message="javadoc.commons-apache-cli.pkglist is set to = ${javadoc.commons-apache-cli.pkglist}"/>
+-->
 
 	<path id="scalaris.classpath">
 		<pathelement path='lib/OtpErlang-1.4.2.jar' />
@@ -65,9 +180,10 @@
 			nodeprecated="false" nodeprecatedlist="false" noindex="false"
 			nonavbar="false" notree="false" packagenames="de.zib.scalaris.*, de.zib.chordsharp.*"
 			source="1.6" splitindex="true" use="true" version="true">
-			<link href="http://www.erlang.org/doc/apps/jinterface/java/" />
-			<link href="http://java.sun.com/javase/6/docs/api/" />
-			<link href="http://commons.apache.org/cli/api-release/" />
+			
+			<link href="${javadoc.jinterface.url}" offline="${javadoc.jinterface.offline}" packagelistLoc="${javadoc.jinterface.pkglist}" />
+			<link href="${javadoc.javase6.url}" offline="${javadoc.javase6.offline}" packagelistLoc="${javadoc.javase6.pkglist}" />
+			<link href="${javadoc.commons-apache-cli.url}" offline="${javadoc.commons-apache-cli.offline}" packagelistLoc="${javadoc.commons-apache-cli.pkglist}" />
 		</javadoc>
 	</target>
 
@@ -93,9 +209,9 @@
 			nodeprecated="false" nodeprecatedlist="false" noindex="false"
 			nonavbar="false" notree="false" packagenames="de.zib.*" source="1.6"
 			splitindex="true" use="true" version="true">
-			<link href="http://www.erlang.org/doc/apps/jinterface/java/" />
-			<link href="http://java.sun.com/javase/6/docs/api/" />
-			<link href="http://commons.apache.org/cli/api-release/" />
+			<link href="${javadoc.jinterface.url}" offline="${javadoc.jinterface.offline}" packagelistLoc="${javadoc.jinterface.pkglist}" />
+			<link href="${javadoc.javase6.url}" offline="${javadoc.javase6.offline}" packagelistLoc="${javadoc.javase6.pkglist}" />
+			<link href="${javadoc.commons-apache-cli.url}" offline="${javadoc.commons-apache-cli.offline}" packagelistLoc="${javadoc.commons-apache-cli.pkglist}" />
 		</javadoc>
 	</target>
 
