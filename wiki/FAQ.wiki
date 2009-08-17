@@ -51,8 +51,9 @@ snapshots, that can be done also without interrupting the service.
 
 == Can I store more Data in Scalaris than ram+swapspace is available in the cluster? ==
 
-Currently not, but in principle the used data store could use mnesia, Tokyo Cabinet or something similar. Note however, that this would not provide persistency.
+Yes. We have several database backends, e.g. src/db_ets.erl (ets) and src/db_tcerl (tokyocabinet). The former uses the main memory for storing data, while the latter uses tokyocabinet for storing data on disk. With tokycoabinet, only your local disks should limit the total size of your database. Note however, that this still does not provide persistency.
 
+For instructions on switching the database backend to tokyocabinet see [Tokyocabinet].
 
 = Installation =
 
