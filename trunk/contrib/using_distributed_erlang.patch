@@ -1,15 +1,43 @@
-Index: cs_send.erl
+Index: include/scalaris.hrl
 ===================================================================
---- cs_send.erl	(revision 388)
-+++ cs_send.erl	(working copy)
-@@ -32,8 +32,8 @@
- 
- -export([send/2, this/0, get/2, send_to_group_member/3]).
+--- include/scalaris.hrl	(revision 412)
++++ include/scalaris.hrl	(working copy)
+@@ -47,8 +47,8 @@
+ %% ring maintenance by T-man-Sharp
+ %-define(RM, rm_tmansharp).
  
 --define(TCP_LAYER, true). % TCP communication
 -%-define(BUILTIN, true).   % distributed Erlang native communication
 +%-define(TCP_LAYER, true). % TCP communication
 +-define(BUILTIN, true).   % distributed Erlang native communication
  
- send_to_group_member(Csnodepid,Processname,Mesg) ->
-     send(Csnodepid,{send_to_group_member,Processname,Mesg}).
+ %-define(SIMULATION, true).
+ 
+Index: contrib/using_distributed_erlang.patch
+===================================================================
+--- contrib/using_distributed_erlang.patch	(revision 411)
++++ contrib/using_distributed_erlang.patch	(working copy)
+@@ -1,15 +1,15 @@
+-Index: cs_send.erl
++Index: include/scalaris.hrl
+ ===================================================================
+---- cs_send.erl	(revision 388)
+-+++ cs_send.erl	(working copy)
+-@@ -32,8 +32,8 @@
++--- include/scalaris.hrl	(revision 412)
+++++ include/scalaris.hrl	(working copy)
++@@ -47,8 +47,8 @@
++ %% ring maintenance by T-man-Sharp
++ %-define(RM, rm_tmansharp).
+  
+- -export([send/2, this/0, get/2, send_to_group_member/3]).
+- 
+ --define(TCP_LAYER, true). % TCP communication
+ -%-define(BUILTIN, true).   % distributed Erlang native communication
+ +%-define(TCP_LAYER, true). % TCP communication
+ +-define(BUILTIN, true).   % distributed Erlang native communication
+  
+- send_to_group_member(Csnodepid,Processname,Mesg) ->
+-     send(Csnodepid,{send_to_group_member,Processname,Mesg}).
++ %-define(SIMULATION, true).
++ 
