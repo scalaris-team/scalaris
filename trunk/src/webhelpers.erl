@@ -30,6 +30,8 @@
 -export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1 , getVivaldiMap/0]).
 
 -include("yaws_api.hrl").
+-include("../include/scalaris.hrl").
+
 
 %% @doc checks whether the current request is a post operation
 %% @spec isPost(A) -> bool()
@@ -111,7 +113,7 @@ getVivaldiMap() ->
             {failed}
         end,
     CC_list = lists:map(fun (Pid) -> get_vivaldi(Pid) end, Nodes),
-    renderVivaldiMap(CC_list).
+    renderVivaldiMap(CC_list,Nodes).
 
 get_vivaldi(Pid) ->
     cs_send:send_to_group_member(Pid,vivaldi, {query_vivaldi,cs_send:this()}),
@@ -120,7 +122,7 @@ get_vivaldi(Pid) ->
             Coordinate
     end.
 
-renderVivaldiMap(CC_list) ->
+renderVivaldiMap(CC_list,Nodes) ->
     {Min,Max} = get_min_max(CC_list),
     %io:format("Min: ~p Max: ~p~n",[Min,Max]),
     Xof=(lists:nth(1, Max)-lists:nth(1, Min))*0.1,
@@ -152,7 +154,7 @@ renderVivaldiMap(CC_list) ->
                         floor(lists:nth(2, Max)-lists:nth(2, Min))])                    ,
         
 
-    Content=gen_Nodes(CC_list,R),
+    Content=gen_Nodes(CC_list,Nodes,R),
     Foot="</svg>",
     Head++Content++Foot.
 
@@ -165,11 +167,22 @@ floor(X) ->
 
 
 
-gen_Nodes([],_) ->
+gen_Nodes([],_,_) ->
     "";
-gen_Nodes([H|T],R) ->
-    io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" />~n",[lists:nth(1, H),lists:nth(2, H),R])
-    ++gen_Nodes(T,R).
+gen_Nodes([H|T],[HN|TN],R) ->
+    Hi=255,
+    Lo=0,
+
+    
+    S1 =  pid(HN),
+
+    random:seed(S1,S1,S1),
+    random:uniform(Hi-Lo)+Lo-1,
+    C1 = random:uniform(Hi-Lo)+Lo-1,
+    C2 = random:uniform(Hi-Lo)+Lo-1,
+    C3 = random:uniform(Hi-Lo)+Lo-1,
+    io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" style=\"fill:rgb( ~p, ~p ,~p) ;\" />~n",[lists:nth(1, H),lists:nth(2, H),R,C1,C2,C3])
+    ++gen_Nodes(T,TN,R).
 
 get_min_max([]) ->
     {[],[]};
@@ -192,6 +205,17 @@ max_list(L1,L2) ->
                        _ -> Y
                    end
                    end, L1, L2).
+
+-ifdef(TCP_LAYER).
+pid({{A,B,C,D},I,_}) ->
+    A+B+C+D+I.
+-endif.
+
+-ifdef(BUILTIN).
+pid(X) ->
+    list_to_integer(lists:nth(1, string:tokens(erlang:pid_to_list(X),"<>."))).
+-endif.
+
 
 
 %%%-----------------------------Ring----------------------------------
