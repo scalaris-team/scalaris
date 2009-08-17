@@ -118,9 +118,8 @@ on({connect},State) ->
 
 on(_, _State) ->
     unknown_event.
-%% @doc starts the mainloop of the boot server
-%% @spec start(term()) -> gb_sets:gb_set(pid())
-%-spec(start/1 :: (any()) -> no_return()).
+
+
 init(_Arg) ->
     log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
     {gb_sets:empty(),true,[]}.
