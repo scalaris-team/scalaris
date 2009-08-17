@@ -43,14 +43,14 @@ run_1() ->
     io:format("Start ~p Nodes with ~p Clients per VMs and ~p Iterations~n",[Size,Worker,Iterations]),
     admin:add_nodes(Size-1),
     timer:sleep(1000),
-    wait2(RingSize),
+    check_ring_size(RingSize),
+    wait_for_stable_ring(),
     timer:sleep(config:pointerStabilizationInterval()+1000),
     bench_server:run_increment(Worker, Iterations),
     timer:sleep(3000),
     bench_server:run_read(Worker, Iterations),
     io:format("~p~n",[util:get_proc_in_vms(admin_server)]),
     [cs_send:send(Pid,{halt,1}) || Pid <- util:get_proc_in_vms(admin_server)],
-
     halt(1).
     
 
@@ -60,24 +60,32 @@ run_1() ->
 %%
 
 
+wait_for_stable_ring() ->
+    R = admin:check_ring(),
+    
+    case R of
+	ok ->
+	    ok;
+	_ ->
+	    timer:sleep(1000),
+            wait_for_stable_ring()
+    end.
 
-wait2(Size) ->
-    io:format("G~n"),
-    erlang:send_after(1000, self() ,{go}),
-    Res = admin:check_ring(),
-    receive
-        {go} ->
-            ok
-    end,
+check_ring_size(Size) ->
+    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
     boot_server:number_of_nodes(),
     RSize = receive
         {get_list_length_response,L} ->
             L
     end,
-    case ((Res==ok)and (RSize == Size))  of
-	        true -> ok;    	        
-	    	_ -> wait2(Size)
-	end.
+    
+    case (RSize == Size) of
+	true ->
+	    ok;
+	_ ->
+	    timer:sleep(1000),
+	    check_ring_size(Size)
+    end.
     
     
     
