@@ -1,41 +1,18 @@
 #summary Frequently asked questions.
 #labels Featured
 
-== Questions ==
+<wiki:toc max_depth="2" />
 
-<wiki:toc max_depth="1" />
+= General = 
 
-= How can I change the web server port/yaws port? =
-
-For changing the yaws port of the boot server add "-boot_cs yaws_port XXXX" to the erl call in bin/boot.sh, where XXXX is the port. 
-
-For changing the yaws port of a normal server change in bin/cs_local?.sh "-chordsharp yaws_port XXXX", where XXXX is the port.
-
-
-= How do I delete a key? =
-
-The principle issues with deleting keys from Scalaris are described in 
-[http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799 this] thread of the mailing list.
-
-In short: deleting a key may violate one of Scalaris' fundamental assumptions - version numbers of keys never decrease. Everything is fine, as long as all replicas are deleted. If some remain, because a node was not available during the delete, you may get into trouble.
-
-Keys can be deleted outside transactions from Erlang and Java.
-
-In Erlang you call transstore.transaction_api:delete(Key, Timeout) which returns 
-{ok, pos_integer(), list()} | {fail, timeout} | 
-{fail, timeout, pos_integer(), list()} | {fail, node_not_found}).
-The pos_integer() indicates how many replicas were successfully deleted, and the list contains further details.
-
-In Java you can call delete(key) or delete(key, timeout) from the Scalaris object and get further details on the result by calling getLastDeleteResult(). 
-
-= Is the store persisted on disk? =
+== Is the store persisted on disk? ==
 
 No its not persistent on disk. Persistent storage is an often demanded feature, but it is not as easy to do as
 one might think. Lets explain why:
 
-== Why persistent storage? ==
+=== Why persistent storage? ===
 
-=== Persistent storage to overcome node failures and node resets: ===
+==== Persistent storage to overcome node failures and node resets: ====
 
 Scalaris uses quorum algorithms, that assume a crash-stop failure model for
 processes. A precondition of such systems is, that a majority of the replicas
@@ -59,7 +36,7 @@ three choices:
 So, persistent storage does not help in improving the availability or
 robustness of the system.
 
-=== Persistent storage to allow pausing the system (controlled shutdown and restart): ===
+==== Persistent storage to allow pausing the system (controlled shutdown and restart): ====
 
 This would be possible to implement by a snapshot mechanism for
 the system. To pause the system, one would cut user access, wait some time for
@@ -67,12 +44,19 @@ all ongoing transactions to finish, and then trigger a snapshot to local
 disks. On startup, the nodes would continue from the last state after reading
 the snapshot. Then user access can be restarted.
 
-=== Persistent storage to have an always up-to-date snapshot of the system: === 
+==== Persistent storage to have an always up-to-date snapshot of the system: ==== 
 Persistency as in traditional replicated databases is not intended by our
 system model and thereby not possible. The best alternative would be periodic
 snapshots, that can be done also without interrupting the service.
 
-= How to build an rpm? =
+== Can I store more Data in Scalaris than ram+swapspace is available in the cluster? ==
+
+Currently not, but in principle the used data store could use mnesia, Tokyo Cabinet or something similar. Note however, that this would not provide persistency.
+
+
+= Installation =
+
+== How to build an rpm? ==
 
 {{{
 svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
@@ -91,11 +75,7 @@ Also we build rpms using checkouts from svn trunk and the latest tagged version 
   * [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/ RHEL 5].
 Inside those repositories you will also find an erlang rpm - you don't need this if you already have a recent enough erlang version!
 
-= Can I store more Data in Scalaris than ram+swapspace is available in the cluster? =
-
-Currently not, but in principle the used data store could use mnesia, Tokyo Cabinet or something similar. Note however, that this would not provide persistency.
-
-= Does Scalaris run on Windows? =
+== Does Scalaris run on Windows? ==
 
 No. Well, maybe.
 
@@ -111,7 +91,37 @@ No. Well, maybe.
 
 Note: we do not support Scalaris on Windows at the moment.
 
-= What does the "discarded messages" error message mean? =
+
+= Configuration =
+
+== How can I change the web server port/yaws port? ==
+
+For changing the yaws port of the boot server add "-boot_cs yaws_port XXXX" to the erl call in bin/boot.sh, where XXXX is the port. 
+
+For changing the yaws port of a normal server change in bin/cs_local?.sh "-chordsharp yaws_port XXXX", where XXXX is the port.
+
+
+
+= Usage =
+
+== How do I delete a key? ==
+
+The principle issues with deleting keys from Scalaris are described in 
+[http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799 this] thread of the mailing list.
+
+In short: deleting a key may violate one of Scalaris' fundamental assumptions - version numbers of keys never decrease. Everything is fine, as long as all replicas are deleted. If some remain, because a node was not available during the delete, you may get into trouble.
+
+Keys can be deleted outside transactions from Erlang and Java.
+
+In Erlang you call transstore.transaction_api:delete(Key, Timeout) which returns 
+{ok, pos_integer(), list()} | {fail, timeout} | 
+{fail, timeout, pos_integer(), list()} | {fail, node_not_found}).
+The pos_integer() indicates how many replicas were successfully deleted, and the list contains further details.
+
+In Java you can call delete(key) or delete(key, timeout) from the Scalaris object and get further details on the result by calling getLastDeleteResult(). 
+
+
+== What does the "discarded messages" error message mean? ==
 
 When you stop an scalaris node and immediately restart it, you can get the following message:
 {{{
