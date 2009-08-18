@@ -25,9 +25,10 @@ do
         
 	NODES_VM=$((CSNODES_PER_SERVER/VMS_PER_SERVER))
 	CLIENTS_PER_VM=$((CLIENTS_PER_SERVER/VMS_PER_SERVER))
-    ITERATIONS_PER_CLIENT=$((ITERATIONS_PER_SERVER/(CLIENTS_PER_SERVER)))
+        ITERATIONS_PER_CLIENT=$((ITERATIONS_PER_SERVER/(CLIENTS_PER_SERVER)))
 	#ITERATION=$((ITERATIONS/(VMS_PER_SERVER*SERVER)))
 	if [ $NODES_VM -gt 0 ]; then
+        if [ $CLIENTS_PER_VM -gt 0 ]; then
 	        i=0
 	        RING_SIZE=$((SERVER*VMS_PER_SERVER*NODES_VM))
 	        echo "######################"
@@ -46,8 +47,8 @@ do
 	                                        echo "SV: $SERVER RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT" >> $LOG_FILE
 						                              ./bench_master.sh $NODES_VM $CLIENTS_PER_VM $ITERATIONS_PER_CLIENT $RING_SIZE >> $LOG_FILE &
 						                              BOOTPID=$! 
-						                              sleep 1;;
-	                                * )     ./bench_slave.sh  $NODES_VM $i  & ;;
+						                              ;;
+	                                * )     ./bench_slave.sh  $NODES_VM $i   >> log_$host-$i & ;;
 	                        esac
 	
 	                done
@@ -57,6 +58,7 @@ do
 		killall -9 beam.smp
 		sleep 1 
 	fi
+        fi
   done
 done
 done

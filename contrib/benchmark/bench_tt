@@ -75,7 +75,7 @@ do
 	                                        echo "SV: $SERVER RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT" >> $LOG_FILE
                               						ssh $host " cd ~/$START_TIME-$SERVER-$UUID/bin ; ./bench_master.sh $NODES_VM $CLIENTS_PER_VM $ITERATIONS_PER_CLIENT $RING_SIZE >> $LOG_FILE" &
                               						BOOTPID=$! 
-					                                sleep 1;;
+					                                ;;
 	                                * )     ssh $host "cd ~/$START_TIME-$SERVER-$UUID/bin ; ./bench_slave.sh  $NODES_VM $i >> log_$host-$i"  & ;;
 	                        esac
 	
@@ -87,13 +87,14 @@ do
 		if [ $? -eq 143 ]; then
 			echo "WARNING bench_master.sh reached  timeout of 1000 secs "
 		fi
-    killall sleep		
+                killall sleep
 		sleep 1
 		for host in $HOSTS 
 		do
 		    ssh $host "killall -9 bench_master.sh"
 		    ssh $host "killall -9 bench_slave.sh "
-		    ssh $host "killall -9 beam.smp "
+		    ssh $host "killall beam.smp "
+                    ssh $host "killall epmd"
 		done 
 		sleep 5
 	fi

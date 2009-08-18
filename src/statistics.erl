@@ -91,8 +91,15 @@ get_node_details(Pid) ->
 	    {ok, Details}
     after
         2000 ->
-           log:log(error,"[ ST ]: Timeout by waiting on get_node_details_response ~n"),
-           {failed}
+            log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response form ~p~n",[Pid]),
+            receive
+                {get_node_details_response, Pid, Details} ->
+                    {ok, Details}
+            after
+                4000 ->
+                    log:log(error,"[ ST ]: 4sec Timeout by waiting on get_node_details_response form ~p~n",[Pid]),
+                    {failed}
+            end
     end.
 
 %%%-------------------------------RT----------------------------------

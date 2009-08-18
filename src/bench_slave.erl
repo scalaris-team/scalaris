@@ -30,7 +30,6 @@
 %%
 start() ->
     application:start(chordsharp),
-	timer:sleep(1000),
 	erlang:spawn(?MODULE,run_1,[]).
 
 
@@ -39,7 +38,10 @@ run_1() ->
     Size = list_to_integer(os:getenv("NODES_VM")),
     io:format("Do ~p~n",[Size]),
     admin:add_nodes(Size-1),
-    ok.
+    receive
+        {halt} ->
+            ok
+    end.
     %halt(1).
 
 
