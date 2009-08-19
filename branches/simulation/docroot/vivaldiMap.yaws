@@ -1,5 +1,0 @@
-<?xml version="1.0" standalone="no"?>
-<erl>
-out(Arg) ->
-    {content,"image/svg+xml",webhelpers:getVivaldiMap()}.
-</erl>
