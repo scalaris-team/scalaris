@@ -55,22 +55,23 @@ number_of_nodes() ->
     cs_send:send(config:bootPid(), {get_list_length, cs_send:this()}),
     ok.
 
-
 be_the_first() ->
     cs_send:send(config:bootPid(), {be_the_first, cs_send:this()}),
     ok.
 
-
-
 connect() ->
-    cs_send:send(config:bootPid(), {connect}).
+    case cs_send:send(config:bootPid(), {connect}) of
+        fail ->
+            connect();
+        _ ->
+            ok
+    end.
 
 %% @doc trigger a message with all nodes known to the boot server
 %% @spec node_list() -> ok
 -spec(node_list/0 :: () -> ok).
 node_list() ->
     cs_send:send(config:bootPid(), {get_list, cs_send:this()}),
-   
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

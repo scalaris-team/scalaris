@@ -231,7 +231,7 @@ open_sync_connection(Address, Port, Pid, Message, State) ->
 	    {reply, ok, State};
 	fail ->
 						% drop message (remote node not reachable, failure detector will notice)
-	    {reply, ok, State};
+	    {reply, fail, State};
 	{connection, LocalPid, NewSocket} ->
 	    comm_connection:send({Address, Port, NewSocket}, Pid, Message),
 	    ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),
