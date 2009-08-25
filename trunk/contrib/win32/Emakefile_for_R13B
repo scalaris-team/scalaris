@@ -1,11 +1,75 @@
-{"src/ring_maintenance.erl", [debug_info, {outdir, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"}]}.
-{"src/routingtable.erl", [debug_info, {outdir, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"}]}.
-{"src/database.erl", [debug_info, {outdir, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"}]}.
-{"src/*", [debug_info, {outdir, "ebin"}, {i, "ebin"}, {i, "include"}, {i, "contrib/yaws/include"},{i, "contrib/log4erl/include"}, {d, types_are_builtin}]}.
-{"src/comm_layer/*", [debug_info, {outdir, "ebin/comm_layer"}, {i, "include"}]}.
-{"src/cyclon/*", [debug_info, {outdir, "ebin/cyclon"}, {i, "include"}]}.
-{"src/pubsub/*", [debug_info, {outdir, "ebin/pubsub"}, {i, "include"}]}.
-{"src/transstore/*", [debug_info, {outdir, "ebin/transstore"}, {i, "include"}]}.
-{"test/*", [debug_info, {outdir, "test"}, {i, "include"}]}.
-{"contrib/log4erl/src/*",[debug_info, {outdir, "contrib/log4erl/ebin/"},{i, "contrib/log4erl/include"}]}.
-{"contrib/yaws/src/*",[debug_info, {outdir, "contrib/yaws/ebin/"},{i, "contrib/yaws/include"}]}.
+{"src/simulation/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.
+{"src/ring_maintenance.erl",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"}
+ ]}.
+{"src/routingtable.erl",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"},
+  {i, "src"},
+  {i, "contrib/yaws/include"}
+ ]}.
+{"src/database.erl",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"}
+ ]}.
+{"src/gen_component.erl",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"}
+ ]}.
+{"src/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"},
+  {i, "contrib/log4erl/include"}
+  , {d, types_are_builtin}
+ ]}.
+{"src/comm_layer/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
+{"src/simulation/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
+{"src/cyclon/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
+{"src/pubsub/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
+{"src/transstore/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
+{"test/*",
+ [debug_info,
+  {outdir, "test"},
+  {i, "include"}
+ ]}.
+{"contrib/log4erl/src/*",
+ [debug_info,
+  {outdir, "contrib/log4erl/ebin/"},
+  {i, "contrib/log4erl/include"}
+ ]}.
+{"contrib/yaws/src/*",
+ [debug_info,
+  {outdir, "contrib/yaws/ebin/"},
+  {i, "contrib/yaws/include"}
+ ]}.
