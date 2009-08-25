@@ -31,7 +31,7 @@
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_cs_node/3]).
+         dump/1, to_dict/1, export_rt_to_cs_node/4]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -122,7 +122,7 @@ dump(RT) ->
 -spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(),
                       node:node_type()) -> rt()).
 stabilize(Id, Succ, RT, Index, Node) ->
-    case node:is_null(Node) orelse (node:id(Succ) == node:id(Node)) orelse (Id == node:id(Node)) of
+    case node:is_null(Node) orelse (node:id(Succ) == node:id(Node)) of
         true ->
             RT;
         false ->
@@ -206,15 +206,20 @@ next_hop(State, Id) ->
     end.
 %% userdevguide-end rt_chord:next_hop1
 
--spec(export_rt_to_cs_node/3 :: (rt(), node:node_type(), node:node_type())
+-spec(export_rt_to_cs_node/4 :: (rt(), key(), node:node_type(), node:node_type())
       -> external_rt()).
-export_rt_to_cs_node(RT, Pred, Succ) ->
+export_rt_to_cs_node(RT, Id, Pred, Succ) ->
     Tree = gb_trees:enter(node:id(Succ), node:pidX(Succ),
                           gb_trees:enter(node:id(Pred), node:pidX(Pred),
                                          gb_trees:empty())),
     util:gb_trees_foldl(fun (_K, V, Acc) ->
                                 % only store the ring id and pid
-                               gb_trees:enter(node:id(V), node:pidX(V), Acc)
+                                case node:id(V) == Id of
+                                    true ->
+                                        Acc;
+                                    false ->
+                                        gb_trees:enter(node:id(V), node:pidX(V), Acc)
+                                end
                         end,
                         Tree,
                         RT).
