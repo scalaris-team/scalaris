@@ -37,6 +37,9 @@ start(normal, _Args) ->
     process_dictionary:start_link(),
    
     Sup = boot_sup:start_link(),
+    Size = config:read(nodes_per_vm),
+    log:log(info,"Do ~p~n",[Size]),
+    admin:add_nodes(Size-1),
     Sup;
     
 start(_, _) ->
