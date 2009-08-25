@@ -60,7 +60,7 @@ behaviour_info(callbacks) ->
      % for bulkowner
      {to_dict, 1},
      % convert from internal representation to version for cs_node
-     {export_rt_to_cs_node, 3}
+     {export_rt_to_cs_node, 4}
     ];
 %% userdevguide-end routingtable:behaviour
 
