@@ -58,7 +58,7 @@ on({pong, _}, {Owner, RemoteNode, Token, Start, Latencies}) ->
     case length(NewLatencies) == config:read(vivaldi_count_measurements, 4) of
         true ->
             cs_send:send_local(Owner,{update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
-            exit;
+            kill;
         false ->
             cs_send:send_after(config:read(vivaldi_measurements_delay),
                               self(),
@@ -72,7 +72,7 @@ on({start_ping}, {Owner, RemoteNode, Token, _, Latencies}) ->
 
 on({shutdown}, _State) ->
     log:log(info, "shutdown vivaldi_latency", []),
-    exit;
+    kill;
 
 on(_, _State) ->
     unknown_event.
