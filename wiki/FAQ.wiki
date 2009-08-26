@@ -85,6 +85,7 @@ No. Well, maybe.
   # Checkout scalaris code from SVN
   # copy an appropriate EMakefile_for from contrib\win32 to the trunk-directory
   # Adapt the path to your Erlang installation in build.bat
+  # create an empty autoconf.hrl in include 
   # run build.bat
   # Go to the bin sub-directory
   # Adapt the path to your Erlang installation in boot.bat
