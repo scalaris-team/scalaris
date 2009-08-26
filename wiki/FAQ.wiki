@@ -7,7 +7,7 @@
 
 == Is the store persisted on disk? ==
 
-No its not persistent on disk. Persistent storage is an often demanded feature, but it is not as easy to do as
+No its not persistent on disk (see also next question). Persistent storage is an often demanded feature, but it is not as easy to do as
 one might think. Lets explain why:
 
 === Why persistent storage? ===
@@ -49,7 +49,7 @@ Persistency as in traditional replicated databases is not intended by our
 system model and thereby not possible. The best alternative would be periodic
 snapshots, that can be done also without interrupting the service.
 
-== Can I store more Data in Scalaris than ram+swapspace is available in the cluster? ==
+== Can I store more data in Scalaris than ram+swapspace is available in the cluster? ==
 
 Yes. We have several database backends, e.g. src/db_ets.erl (ets) and src/db_tcerl (tokyocabinet). The former uses the main memory for storing data, while the latter uses tokyocabinet for storing data on disk. With tokycoabinet, only your local disks should limit the total size of your database. Note however, that this still does not provide persistency.
 
