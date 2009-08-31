@@ -131,6 +131,13 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+   Ganglia =
+	{ganglia_server,
+	 {ganglia, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok,{{one_for_all,10,1}, [
 			      Config,
                               Logger,
@@ -139,6 +146,7 @@ init([]) ->
 			      AdminServer,
 			      YAWS,
 			      BenchServer,
+                              Ganglia,
 			      ChordSharp
 			     ]}}.
 
