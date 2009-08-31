@@ -261,6 +261,13 @@ init(_Args) ->
 	 brutal_kill,
 	 worker,
 	 []},
+   Ganglia =
+	{ganglia_server,
+	 {ganglia, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
 
     {ok, {{one_for_one, 10, 1},
 	    [
@@ -271,10 +278,10 @@ init(_Args) ->
      FailureDetector,
      AdminServer,
      %XMLRPC,
-
      Node,
      YAWS,
      BenchServer,
+     Ganglia,
      CSNode
      ]}}.
 
