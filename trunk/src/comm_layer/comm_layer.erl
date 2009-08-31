@@ -36,7 +36,7 @@
 -import(util).
 -import(log).
 
--include("comm_layer.hrl").
+-include("../../include/scalaris.hrl").
 
 
 % @TODO: should be ip
