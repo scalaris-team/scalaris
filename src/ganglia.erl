@@ -47,7 +47,8 @@ update(Tree) ->
   gmetric(both, "Memory used by atoms", "int32", erlang:memory(atom), "Bytes"),
   gmetric(both, "Memory used by binaries", "int32", erlang:memory(binary), "Bytes"),
   gmetric(both, "Memory used by system", "int32", erlang:memory(system), "Bytes"),
-  CSNodesMemoryUsage = lists:sum([erlang:process_info(P, [memory]) || P <- process_dictionary:find_all_cs_nodes()]),
+  CSNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
+                                  || P <- process_dictionary:find_all_cs_nodes()]),
   gmetric(both, "Memory used by cs_nodes", "int32", CSNodesMemoryUsage, "Bytes"),
   traverse(gb_trees:iterator(Tree)).
 
