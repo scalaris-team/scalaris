@@ -35,7 +35,7 @@ start_link() ->
     end.
 
 start() ->
-  {Tree, _Time} = comm_layer.comm_logger:dump(),
+  {Tree, _Time} = comm_logger:dump(),
   update(Tree),
   timer:sleep(config:read(ganglia_interval)),
   start().
