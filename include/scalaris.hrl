@@ -53,6 +53,10 @@
 %-define(SIMULATION, true).
 
 
+% enable logging of message statistics
+%-define(LOG_MESSAGE(TAG, SIZE), comm_logger:log(TAG, SIZE)).
+-define(LOG_MESSAGE(TAG, SIZE), ok).
+
 
 
 

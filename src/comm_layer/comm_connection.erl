@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id $
 -module(comm_connection).
 
@@ -35,7 +35,7 @@
 -import(log).
 -import(timer).
 
--include("comm_layer.hrl").
+-include("../../include/scalaris.hrl").
 
 %% @doc new accepted connection. called by comm_acceptor
 %% @spec new(inet:ip_address(), int(), socket()) -> pid()
