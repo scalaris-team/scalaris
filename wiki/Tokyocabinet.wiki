@@ -20,7 +20,7 @@ You will need:
 {{{
 ./configure --enable-tcerl=/home/scalaris/apps/tcerl/
 }}}
-  # Switch the database in src/chordsharp.hrl to db_tcerl
+  # Switch the database in include/scalaris.hrl to db_tcerl
 {{{
 -define(DB, db_tcerl).
 %-define(DB, db_ets).
