@@ -58,6 +58,11 @@
 -define(LOG_MESSAGE(TAG, SIZE), ok).
 
 
-
+% enable native register for all prozesses in gen_component or disable
+% usefull 4 debug (etop, appmon)
+% enable:
+%-define(DEBUG_REGISTER(PROCESS,PID),register(PROCESS,PID)).
+% disable:
+-define(DEBUG_REGISTER(PROCESS,PID),ok).
 
 

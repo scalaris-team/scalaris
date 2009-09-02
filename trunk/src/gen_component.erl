@@ -75,7 +75,7 @@ start(Module, Args, Options, Supervisor) ->
     case lists:keysearch(register, 1, Options) of
 	{value, {register, InstanceId, Name}} ->
             process_dictionary:register_process(InstanceId, Name, self()),
-            register(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+            ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
 	    Supervisor ! {started, self()};
 	false ->
             
@@ -85,7 +85,7 @@ start(Module, Args, Options, Supervisor) ->
                 register(Name, self()),
                 Supervisor ! {started, self()};
             false ->
-                register(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+                ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
                 Supervisor ! {started, self()},
                 ok
             end
