@@ -54,8 +54,8 @@
 
 
 % enable logging of message statistics
-%-define(LOG_MESSAGE(TAG, SIZE), comm_logger:log(TAG, SIZE)).
--define(LOG_MESSAGE(TAG, SIZE), ok).
+-define(LOG_MESSAGE(MESSAGE, SIZE), ok).
+%-define(LOG_MESSAGE(MESSAGE, SIZE), case MESSAGE of {send_to_group_member, _, Msg} -> comm_logger:log(erlang:element(1, Msg), SIZE); _ -> comm_logger:log(erlang:element(1, MESSAGE), SIZE) end).
 
 
 % enable native register for all prozesses in gen_component or disable

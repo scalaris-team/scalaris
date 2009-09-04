@@ -116,7 +116,7 @@ send({Address, Port, Socket}, Pid, Message) ->
     end,
     case Result of
 	ok ->
-	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(BinaryMessage)),
+	    ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
 	    ok;
 	{error, closed} ->
 	    comm_port:unregister_connection(Address, Port),
