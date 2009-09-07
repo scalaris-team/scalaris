@@ -227,13 +227,20 @@ getRingChart() ->
     if
 	RingSize == 0 ->
 	    {p, [], "empty ring"};
-	RingSize == 1 ->	    
+	RingSize == 1 ->
 	    {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
-	RingSize > 62 ->
-	    % Too many nodes for a google pie chart
-	    {p, [], "Pie Chart: Sorry, too many nodes for a pie chart."};
 	true ->
-	    {p, [], [{img, [{src, renderRingChart(Ring)}], ""}]}
+            try
+              PieURL = renderRingChart(Ring),
+              LPie = length(PieURL),
+              if LPie < 1023 ->
+                      {p, [], [{img, [{src, PieURL}], ""}]};
+                 true ->
+                      throw({urlTooLong, PieURL})
+              end
+            catch
+                _:_ -> {p, [], "Sorry, pie chart not available (too many nodes or other error)."}
+            end
     end.
 
 renderRingChart(Ring) ->
