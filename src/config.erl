@@ -40,7 +40,8 @@
 	 replicationFactor/0, quorumFactor/0, replicaPrefixes/0, 
 	 transactionLookupTimeout/0, tpFailureTimeout/0, 
 	 tmanagerTimeout/0,
-	 readTimeout/0, leaderDetectorInterval/0, 
+	 %readTimeout/0, 
+   leaderDetectorInterval/0, 
 	 testDump/0, testKeepAlive/0, register_hosts/0, listenPort/0, listenIP/0,
 	 knownHosts/0]).
 
@@ -232,8 +233,8 @@ transactionLookupTimeout()->
 
 %% @doc time out for read operations
 %% @spec readTimeout() -> integer() | failed
-readTimeout()->
-    read(read_timeout).
+%readTimeout()->
+%    read(read_timeout).
 
 tpFailureTimeout()->
     read(tp_failure_timeout).

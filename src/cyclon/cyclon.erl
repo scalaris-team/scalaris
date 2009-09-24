@@ -61,6 +61,7 @@ init(_Args) ->
     cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
     cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
     cs_send:send_after(config:read(cyclon_interval), self(), {shuffle}),
+    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,cyclon_interval,config:read(cyclon_interval),config:read(cyclon_interval),config:read(cyclon_interval)}),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
     {null,null,0}.
 

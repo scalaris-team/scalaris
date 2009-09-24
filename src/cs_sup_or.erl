@@ -117,8 +117,16 @@ init([Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    Self_Man =
+	{self_man,
+	 {self_man, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_one, 10, 1},
 	  [
+           Self_Man,
 	   KeyHolder,
            RoutingTable,
            Supervisor_AND,
