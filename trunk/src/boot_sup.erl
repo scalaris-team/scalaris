@@ -268,11 +268,19 @@ init(_Args) ->
 	 brutal_kill,
 	 worker,
 	 []},
+   MonitorTiming =
+	{monitor_timing,
+	 {monitor_timing, start_link, []},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
 
     {ok, {{one_for_one, 10, 1},
 	    [
      Config,
      Logger,
+     MonitorTiming,
      %Tracer,
      CommPort,
      FailureDetector,
