@@ -64,6 +64,7 @@ init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,pointer_stabilization_interval,config:pointerStabilizationInterval(),config:pointerStabilizationInterval(),config:pointerStabilizationInterval()}),
     {uninit}.
     
 

@@ -54,17 +54,16 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({be_the_first_response,First},{join_state1}) ->
-    %io:format("STATE1~n"),
     cs_keyholder:get_key(),
     {join_state2,First};
 
 on({get_key_response_keyholder, Key},{join_state2,First}) ->
-    %io:format("STATE2~n"),
     log:log(info,"[ Node ~w ] joining ~p ~p",[self(), Key,First]),
     case First of
         true ->
            
             S = cs_join:join_first(Key),
+            cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,reregister_interval,config:reregisterInterval(),config:reregisterInterval(),config:reregisterInterval()}),
             cs_reregister:trigger_reregister(),
             %log:log(info,"[ Node ~w ] joined",[self()]),
             S;  % JOIN Completet, alone S is the first "State"
@@ -120,6 +119,7 @@ on({join_response, Pred, Data},{join_state4,Id,Succ,Me}) ->
             routingtable:initialize(Id, Pred, Succ),
             cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id},cs_lb:new(), DB)
     end,
+    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,reregister_interval,config:reregisterInterval(),config:reregisterInterval(),config:reregisterInterval()}),
     cs_reregister:trigger_reregister(),
     cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State)),
     %io:format("STATE4 FERTIG~n"),

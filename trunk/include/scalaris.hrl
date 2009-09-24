@@ -59,7 +59,7 @@
 
 
 % enable native register for all prozesses in gen_component or disable
-% usefull 4 debug (etop, appmon)
+% usefull 4 debug (etop, appmon), but let memory usage grow over the time
 % enable:
 %-define(DEBUG_REGISTER(PROCESS,PID),register(PROCESS,PID)).
 % disable:

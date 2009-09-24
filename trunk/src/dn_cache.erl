@@ -14,12 +14,12 @@
 %%%-------------------------------------------------------------------
 %%% File    : dn_cache.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : T-Man ring maintenance
+%%% Description : Dead node Cache
 %%%
 %%% Created :  12 Jan 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2009 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
 %% @version $Id$
 -module(dn_cache).
 
@@ -67,6 +67,7 @@ unsubscribe() ->
 
 init(_ARG) ->
     cs_send:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
+    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,zombieDetectorInterval,config:read(zombieDetectorInterval),config:read(zombieDetectorInterval),config:read(zombieDetectorInterval)}),
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
 	{fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()}.
 
