@@ -55,11 +55,15 @@ on({subscribe,Pid,Module,ValueName,Min,Max,Value},{State,Start}) ->
 on({unsubscribe,Pid,Module,ValueName},{State,Start}) ->
     %io:format("[ SM ] ~p~n ",[{unsubscribe,Pid,Module,ValueName}]),
     {gb_trees:delete({Module,ValueName,Pid},State),Start};
-
-
 on({update,Module,ValueName,Pid,Value},{State,Start})->
     %io:format("[ SM ] ~p~n ",[{update,Module,ValueName,Pid,Value}]),
-    {update(Module,ValueName,Pid,Value,State),Start}.
+    {update(Module,ValueName,Pid,Value,State),Start};
+
+on({no_churn},{State,Start}) ->
+    cs_send:send_local(get_pid_rt(),{stabilize}),
+    {State,Start}.
+
+
 
 update(Module,ValueName,Pid,NewValue,State) ->
     {Min,Max,_Value} = gb_trees:get({Module,ValueName,Pid},State),
@@ -77,6 +81,9 @@ log_to_file(Module,ValueName,_Min,_Max,NewValue,Start) ->
 
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), self_man).
+
+get_pid_rt() ->
+    process_dictionary:lookup_process(erlang:get(instance_id), routing_table).
 
 time_diff({SMe,SSe,SMi},{EMe,ESe,EMi}) ->
     (EMe*1000000+ESe+EMi/1000000)-(SMe*1000000+SSe+SMi/1000000).

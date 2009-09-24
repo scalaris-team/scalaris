@@ -345,6 +345,7 @@ new_interval(Preds,Succs,PNew,SNew,Interval,Churn) ->
 %                false -> Interval + ((config:stabilizationInterval_max() - config:stabilizationInterval_min()) div 10)
 %
 %            end;
+            cs_send:send_local(self_man:get_pid(),{no_churn}),
             config:stabilizationInterval_max();
         false ->
 %					case (Interval - (config:stabilizationInterval_max()-config:stabilizationInterval_min()) div 2) =< (config:stabilizationInterval_min()  ) of
