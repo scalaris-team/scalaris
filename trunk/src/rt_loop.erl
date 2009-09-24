@@ -63,8 +63,9 @@ start_link(InstanceId) ->
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
-    cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,pointer_stabilization_interval,config:pointerStabilizationInterval(),config:pointerStabilizationInterval(),config:pointerStabilizationInterval()}),
+    %W=randoms:rand_uniform(5000,10000),
+    %cs_send:send_after(W, self(), {stabilize}),
+    %cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,pointer_stabilization_interval,config:pointerStabilizationInterval(),config:pointerStabilizationInterval(),config:pointerStabilizationInterval()}),
     {uninit}.
     
 
@@ -88,7 +89,7 @@ on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState}) ->
 % start new periodic stabilization
 on({stabilize}, {Id, Pred, Succ, RTState}) ->
     % trigger next stabilization
-    cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
     % get new pred and succ from cs_node
     cs_send:send_local(Pid , {get_pred_succ, cs_send:this()}),
