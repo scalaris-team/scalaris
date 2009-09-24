@@ -25,7 +25,6 @@
 -module(ganglia).
 -export([start_link/0, start/0]).
 
-
 start_link() ->
     case config:read(ganglia_enable) of
         true ->
@@ -35,10 +34,19 @@ start_link() ->
     end.
 
 start() ->
-  {Tree, _Time} = comm_logger:dump(),
-  update(Tree),
-  timer:sleep(config:read(ganglia_interval)),
-  start().
+    Last = erlang:now(),
+    ganglia_loop(Last).
+
+ganglia_loop(Last) ->
+    {Tree, _Time} = comm_logger:dump(),
+    update(Tree),
+    Now = erlang:now(),
+    SinceLast = timer:now_diff(Now, Last),
+    Timers = monitor_timing:get_timers(),
+    io:format("Timers: ~p~n", [Timers]),
+    [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
+    timer:sleep(config:read(ganglia_interval)),
+    ganglia_loop(Now).
 
 update(Tree) ->
   gmetric(both, "Erlang Processes", "int32", erlang:system_info(process_count), "Total Number"),
@@ -51,6 +59,12 @@ update(Tree) ->
                                   || P <- process_dictionary:find_all_cs_nodes()]),
   gmetric(both, "Memory used by cs_nodes", "int32", CSNodesMemoryUsage, "Bytes"),
   traverse(gb_trees:iterator(Tree)).
+
+update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
+  gmetric(both, io_lib:format("~p_~s", [Timer, "min"]), "float", Min, "ms"),
+  gmetric(both, io_lib:format("~p_~s", [Timer, "avg"]), "float", Avg, "ms"),
+  gmetric(both, io_lib:format("~p_~s", [Timer, "max"]), "float", Max, "ms"),
+  gmetric(both, io_lib:format("~p_~s", [Timer, "tp"]), "float", Count / SinceLast, "1/s").
 
 traverse(Iter1) ->
   case gb_trees:next(Iter1) of
