@@ -87,7 +87,7 @@ on({cache, Cache}, {Coordinate, Confidence} = State) ->
 %
 on({vivaldi_shuffle, RemoteNode, RemoteCoordinate, RemoteConfidence},
    {Coordinate, Confidence} = State) ->
-   %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
+    %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     cs_send:send(RemoteNode, {vivaldi_shuffle_reply,
                               cs_send:this(),
                               Coordinate,
