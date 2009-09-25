@@ -31,7 +31,7 @@
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_cs_node/4]).
+         dump/1, to_dict/1, export_rt_to_cs_node/4, update_pred_succ_in_cs_node/3]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -223,3 +223,10 @@ export_rt_to_cs_node(RT, Id, Pred, Succ) ->
                         end,
                         Tree,
                         RT).
+
+-spec(update_pred_succ_in_cs_node/3 :: (node:node_type(), node:node_type(), external_rt())
+      -> external_rt()).
+update_pred_succ_in_cs_node(Pred, Succ, RT) ->
+    gb_trees:enter(node:id(Succ), node:pidX(Succ),
+                   gb_trees:enter(node:id(Pred), node:pidX(Pred),
+                                  RT)).
