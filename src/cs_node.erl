@@ -170,14 +170,17 @@ on({init_rm,Pid},State) ->
     State;
 
 on({rm_update_pred_succ, Pred, Succ}, State) ->
-    cs_state:update_pred_succ(State, Pred, Succ);
-    
+    cs_state:set_rt(cs_state:update_pred_succ(State, Pred, Succ),
+                    ?RT:update_pred_succ_in_cs_node(Pred, Succ, cs_state:rt(State)));
+
 on({rm_update_pred, Pred}, State) ->
-    cs_state:update_pred(State, Pred);
+    cs_state:set_rt(cs_state:update_pred(State, Pred),
+                    ?RT:update_pred_succ_in_cs_node(Pred, cs_state:succ(State), cs_state:rt(State)));
 
 on({rm_update_succ, Succ}, State) ->
-    cs_state:update_succ(State,Succ);
-    
+    cs_state:set_rt(cs_state:update_succ(State,Succ),
+                    ?RT:update_pred_succ_in_cs_node(cs_state:pred(State), Succ, cs_state:rt(State)));
+
 on({succ_left, Succ}, State) ->
     ?RM:succ_left(Succ),
     State;
