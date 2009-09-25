@@ -55,7 +55,7 @@
 %% @doc message handler
 -spec(on/2 :: (Message::message(), State::state()) -> state()).
 on({start_clustering_shuffle}, State) ->
-    io:format("~p~n", [State]),
+    %io:format("~p~n", [State]),
     erlang:send_after(config:read(dc_clustering_interval), self(),
                       {start_clustering_shuffle}),
     case get_local_cyclon_pid() of

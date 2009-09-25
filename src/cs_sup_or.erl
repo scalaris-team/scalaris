@@ -110,6 +110,13 @@ init([Options]) ->
          brutal_kill,
          worker,
          []},
+    DC_Clustering =
+        {dc_clustering,
+         {dc_clustering, start_link, [InstanceId]},
+         permanent,
+         brutal_kill,
+         worker,
+         []},
      Cyclon =
 	{cyclon,
 	 {cyclon, start_link, [InstanceId]},
@@ -134,7 +141,7 @@ init([Options]) ->
            DeadNodeCache,
            RingMaintenance,
            Vivaldi
-           
+           %,DC_Clustering
 	  
 	   %_RSE
 	  ]}}.
