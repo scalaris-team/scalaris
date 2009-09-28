@@ -61,7 +61,8 @@
 	 find_cs_node/0, 
 	 find_all_cs_nodes/0, 
 	 find_all_processes/1, 
-	 find_group/1, 
+	 find_group/1,
+         find_all_groups/1,
 
 	 get_groups/0,
 	 get_processes_in_group/1, 
@@ -93,7 +94,7 @@ lookup_process(InstanceId, Name) ->
         [{{InstanceId, Name}, Value}] ->
             Value;
         [] ->
-            log:log(error, "[ PD ] lookup_process faild: InstanceID:  ~p  For: ~p",[InstanceId, Name]),
+            log:log(error, "[ PD ] lookup_process failed: InstanceID:  ~p  For: ~p",[InstanceId, Name]),
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
@@ -126,14 +127,21 @@ find_all_processes(Name) ->
 
 %% @doc tries to find a process group with a specific process inside
 %% @spec find_group(term()) -> term()
-find_group(Name) ->
-    Result = case ets:match(?MODULE, {{'$1', Name}, '_'}) of
-    [[Value] | _] ->
-        Value;
-    [] ->
-        failed
-    end,
-    Result.
+find_group(ProcessName) ->
+    case ets:match(?MODULE, {{'$1', ProcessName}, '_'}) of
+        [[Value] | _] ->
+            Value;
+        [] ->
+            failed
+    end.
+
+find_all_groups(ProcessName) ->
+    case ets:match(?MODULE, {{'$1', ProcessName}, '_'}) of
+        [] ->
+            failed;
+        List ->
+            lists:append(List)
+    end.
 
 %% @doc find groups for web interface
 %% @spec get_groups() -> term()
