@@ -29,6 +29,8 @@
 -export([process_request_list/2, read/1, write/2, delete/1,
          test_and_set/3, range_read/2]).
 
+-include("../include/scalaris.hrl").
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -55,24 +57,30 @@ process_request_list(TLog, ReqList) ->
 process_request(TLog, Request) ->
     case Request of
         {read, Key} ->
-            case transaction_api:read(Key, TLog) of
-                {{value, Val}, NTLog} ->
+            case timer:tc(transaction_api, read, [Key, TLog]) of
+                {Time, {{value, Val}, NTLog}} ->
+                    ?LOG_CS_API(read_success, Time / 1000.0),
                     {NTLog, {read, Key, {value, Val}}};
-                {{fail, Reason}, NTLog} ->
+                {Time, {{fail, Reason}, NTLog}} ->
+                    ?LOG_CS_API(read_fail, Time / 1000.0),
                     {NTLog, {read, Key, {fail, Reason}}}
             end;
         {write, Key, Value} ->
-            case transaction_api:write(Key, Value, TLog) of
-                {ok, NTLog} ->
+            case timer:tc(transaction_api, write, [Key, Value, TLog]) of
+                {Time, {ok, NTLog}} ->
+                    ?LOG_CS_API(write_success, Time / 1000.0),
                     {NTLog, {write, Key, {value, Value}}};
-                {{fail, Reason}, NTLog} ->
+                {Time, {{fail, Reason}, NTLog}} ->
+                    ?LOG_CS_API(write_fail, Time / 1000.0),
                     {NTLog, {write, Key, {fail, Reason}}}
             end;
         {commit} ->
-            case transaction_api:commit(TLog) of
-                {ok} ->
+            case timer:tc(transaction_api, commit, [TLog]) of
+                {Time, {ok}} ->
+                    ?LOG_CS_API(commit_success, Time / 1000.0),
                     {TLog, {commit, ok, {value, "ok"}}};
-                {fail, Reason} ->
+                {Time, {fail, Reason}} ->
+                    ?LOG_CS_API(commit_fail, Time / 1000.0),
                     {TLog, {commit, fail, {fail, Reason}}}
             end
     end.
@@ -80,20 +88,24 @@ process_request(TLog, Request) ->
 %% @doc reads the value of a key
 %% @spec read(key()) -> {failure, term()} | value()
 read(Key) ->
-    case transaction_api:quorum_read(Key) of
-        {fail, Reason} ->
-	       {fail, Reason};
-        {Value, _Version} ->
-	       Value
+    case timer:tc(transaction_api, quorum_read, [Key]) of
+        {Time, {fail, Reason}} ->
+            ?LOG_CS_API(quorum_read_fail, Time / 1000.0),
+            {fail, Reason};
+        {Time, {Value, _Version}} ->
+            ?LOG_CS_API(quorum_read_success, Time / 1000.0),
+            Value
     end.
 
 %% @doc writes the value of a key
 %% @spec write(key(), value()) -> ok | {fail, term()}
 write(Key, Value) ->
-    case transaction_api:single_write(Key, Value) of
-	commit ->
+    case timer:tc(transaction_api, single_write, [Key, Value]) of
+	{Time, commit} ->
+            ?LOG_CS_API(single_write_success, Time / 1000.0),
 	    ok;
-	{fail, Reason} ->
+	{Time, {fail, Reason}} ->
+            ?LOG_CS_API(single_write_fail, Time / 1000.0),
 	    {fail, Reason}
     end.
 
