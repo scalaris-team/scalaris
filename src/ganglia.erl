@@ -38,13 +38,16 @@ start() ->
     ganglia_loop(Last).
 
 ganglia_loop(Last) ->
+    % message statistics
     {Tree, _Time} = comm_logger:dump(),
     update(Tree),
     Now = erlang:now(),
     SinceLast = timer:now_diff(Now, Last),
+    % transaction statistics
     Timers = monitor_timing:get_timers(),
-    io:format("Timers: ~p~n", [Timers]),
     [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
+    % vivaldi statistics
+    monitor_per_cs_node(fun monitor_vivaldi_errors/2),
     timer:sleep(config:read(ganglia_interval)),
     ganglia_loop(Now).
 
@@ -76,4 +79,25 @@ traverse(Iter1) ->
   end.
 
 gmetric(Slope, Metric, Type, Value, Unit) ->
-    os:cmd(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n", [Slope, Metric, Type, Value, Unit])).
+    os:cmd(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
+                         [Slope, Metric, Type, Value, Unit])).
+
+monitor_vivaldi_errors(Group, Idx) ->
+    case process_dictionary:lookup_process(Group, vivaldi) of
+        failed ->
+            ok;
+        Vivaldi ->
+            cs_send:send_local(Vivaldi, {query_vivaldi, cs_send:this()}),
+            receive
+                {query_vivaldi_response, _, Error} ->
+                    gmetric(both, lists:flatten(io_lib:format("vivaldi_error_~p", [Idx])), "float", Error, "error")
+            end
+    end.
+
+monitor_per_cs_node(F) ->
+    CSNodes = lists:sort(process_dictionary:find_all_groups(cs_node)),
+    lists:foldl(fun (Group, Idx) ->
+                        F(Group, Idx),
+                        Idx + 1
+                end, 0, CSNodes).
+
