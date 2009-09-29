@@ -64,10 +64,10 @@ update(Tree) ->
   traverse(gb_trees:iterator(Tree)).
 
 update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
-  gmetric(both, io_lib:format("~p_~s", [Timer, "min"]), "float", Min, "ms"),
-  gmetric(both, io_lib:format("~p_~s", [Timer, "avg"]), "float", Avg, "ms"),
-  gmetric(both, io_lib:format("~p_~s", [Timer, "max"]), "float", Max, "ms"),
-  gmetric(both, io_lib:format("~p_~s", [Timer, "tp"]), "float", Count / SinceLast, "1/s").
+  gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "min"])), "float", Min, "ms"),
+  gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "avg"])), "float", Avg, "ms"),
+  gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "max"])), "float", Max, "ms"),
+  gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "tp"])), "float", Count / SinceLast, "1/s").
 
 traverse(Iter1) ->
   case gb_trees:next(Iter1) of
