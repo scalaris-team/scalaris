@@ -63,9 +63,8 @@ start_link(InstanceId) ->
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, routing_table, self()),
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
-    %W=randoms:rand_uniform(5000,10000),
-    %cs_send:send_after(W, self(), {stabilize}),
-    %cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,pointer_stabilization_interval,config:pointerStabilizationInterval(),config:pointerStabilizationInterval(),config:pointerStabilizationInterval()}),
+    %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,pointer_stabilization_interval,config:pointerStabilizationInterval(),config:pointerStabilizationInterval(),config:pointerStabilizationInterval()}),
     {uninit}.
     
 
@@ -76,55 +75,59 @@ init([InstanceId]) ->
 -spec(on/2 :: (message(), state()) -> state()).
 
 on({init, Id, Pred, Succ},{uninit}) ->
-    {Id, Pred, Succ, ?RT:empty(Succ)};
+    {Id, Pred, Succ, ?RT:empty(Succ),0};
 on(Message,{uninit}) ->
     cs_send:send_local(self() , Message),
     {uninit};
 
 % re-initialize routing table
-on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState}) ->
+on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState,Token}) ->
     check(RTState, ?RT:empty(NewSucc), Id2, NewPred, NewSucc),
-    {Id2, NewPred, NewSucc, ?RT:empty(NewSucc)};
-
+    {Id2, NewPred, NewSucc, ?RT:empty(NewSucc),Token};
+on({no_churn}, {Id, Pred, Succ, RTState,Token}) ->
+    cs_send:send_after(101, self(), {stabilize,Token+1}),
+    {Id, Pred, Succ, RTState,Token+1};
 % start new periodic stabilization
-on({stabilize}, {Id, Pred, Succ, RTState}) ->
-    % trigger next stabilization
-    %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+on({stabilize,Token}, {Id, Pred, Succ, RTState,Token}) ->
+    %io:format("[ RT ] stabilize~n"),
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
     % get new pred and succ from cs_node
     cs_send:send_local(Pid , {get_pred_succ, cs_send:this()}),
     % start periodic stabilization
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState};
-
+    % trigger next stabilization
+    %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    {Id, Pred, Succ, NewRTState,Token};
+on({stabilize,_}, {Id, Pred, Succ, RTState,Token}) ->
+    {Id, Pred, Succ, RTState,Token};
 % got new predecessor/successor
-on({get_pred_succ_response, NewPred, NewSucc}, {Id, _, _, RTState}) ->
-    {Id, NewPred, NewSucc, RTState};
+on({get_pred_succ_response, NewPred, NewSucc}, {Id, _, _, RTState,Token}) ->
+    {Id, NewPred, NewSucc, RTState,Token};
 
 %
-on({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState}) ->
+on({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState,Token}) ->
     NewRTState = ?RT:stabilize(Id, Succ, RTState, Index, Node),
     check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState};
+    {Id, Pred, Succ, NewRTState,Token};
 
 %
-on({lookup_pointer_response, Index, Node}, {Id, Pred, Succ, RTState}) ->
+on({lookup_pointer_response, Index, Node}, {Id, Pred, Succ, RTState,Token}) ->
     NewRTState = ?RT:stabilize_pointer(Id, RTState, Index, Node),
     check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState};
+    {Id, Pred, Succ, NewRTState,Token};
 
 % failure detector reported dead node
-on({crash, DeadPid}, {Id, Pred, Succ, RTState}) ->
+on({crash, DeadPid}, {Id, Pred, Succ, RTState,Token}) ->
     NewRT = ?RT:filterDeadNode(RTState, DeadPid),
     check(RTState, NewRT, Id, Pred, Succ, false),
-    {Id, Pred, Succ, NewRT};
+    {Id, Pred, Succ, NewRT,Token};
 
 % debug_info for web interface
-on({'$gen_cast', {debug_info, Requestor}}, {Id, Pred, Succ, RTState}) ->
+on({'$gen_cast', {debug_info, Requestor}}, {Id, Pred, Succ, RTState,Token}) ->
     cs_send:send_local(Requestor , {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, 
 				       {"rt_size", ?RT:get_size(RTState)}]}),
-    {Id, Pred, Succ, RTState};
+    {Id, Pred, Succ, RTState,Token};
 
 % unknown message
 on(_UnknownMessage, _State) ->
@@ -139,7 +142,7 @@ check(Old, New, Id, Pred, Succ) ->
 % OldRT, NewRT, CheckFD
 -spec(check/6 :: (Old::?RT:state(), New::?RT:state(), ?RT:key(), node:node_type(),
                   node:node_type(), ReportFD::bool()) -> any()).
-check(X, X, Id, _Pred, _Succ, _) ->
+check(X, X, _Id, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, Pred, Succ, true) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
