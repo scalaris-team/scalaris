@@ -60,7 +60,7 @@ on({update,Module,ValueName,Pid,Value},{State,Start})->
     {update(Module,ValueName,Pid,Value,State),Start};
 
 on({no_churn},{State,Start}) ->
-    cs_send:send_local(get_pid_rt(),{stabilize}),
+    cs_send:send_local(get_pid_rt(),{no_churn}),
     {State,Start}.
 
 

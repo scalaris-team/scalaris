@@ -140,7 +140,8 @@ on({get_predlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktP
     {Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache,Churn};
 
 on({stabilize,AktToken},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,AktPred,AktSucc,Cache,Churn})  -> % new stabilization interval
-            % Triger an update of the Random view
+    
+    % Triger an update of the Random view
     cs_send:send_local(get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
     RndView=get_RndView(RandViewSize,Cache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
@@ -157,10 +158,11 @@ on({stabilize,AktToken},{Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,Akt
             cs_send:send_to_group_member(node:pidX(Succ), ring_maintenance, {rm_buffer,Me,Succs++Preds++[Me]}),
             cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance, {rm_buffer,Me,Succs++Preds++[Me]}),
             NewAktSucc =AktSucc,
-            NewAktPred =AktPred
+            NewAktPred =AktPred,
+            %TODO: is this send_after necassary? Yes if all nodes in view are death
+	    cs_send:send_after(Interval, self(), {stabilize,AktToken})
     end,
-            %TODO: is this send_after necassary?
-	    %cs_send:send_after(Interval, self(), {stabilize,AktToken}),
+            
          
     cs_send:send_local(self_man:get_pid(),{update,?MODULE,stabilizationInterval,self(),Interval}),
     {Id, Me, Preds, Succs,RandViewSize,Interval,AktToken,NewAktPred,NewAktSucc,Cache,Churn};
@@ -338,15 +340,16 @@ get_safe_pred_succ(Preds,Succs,RndView,Me) ->
 % @doc adaptize the Tman-interval
 new_interval(Preds,Succs,PNew,SNew,Interval,Churn) ->
    
-    case (((Preds++Succs)=:=(PNew++SNew)) and (Churn==0)) of
+    case (((Preds++Succs)==(PNew++SNew)) and (Churn==0)) of
         true ->                 % incresing the timer
-%            case (Interval >= config:stabilizationInterval_max() ) of
-%                true -> config:stabilizationInterval_max();
-%                false -> Interval + ((config:stabilizationInterval_max() - config:stabilizationInterval_min()) div 10)
-%
-%            end;
             cs_send:send_local(self_man:get_pid(),{no_churn}),
-            config:stabilizationInterval_max();
+            case (Interval >= config:stabilizationInterval_max() ) of
+                true -> config:stabilizationInterval_max();
+                false -> Interval + ((config:stabilizationInterval_max() - config:stabilizationInterval_min()) div 10)
+
+            end;
+            
+            %config:stabilizationInterval_max();
         false ->
 %					case (Interval - (config:stabilizationInterval_max()-config:stabilizationInterval_min()) div 2) =< (config:stabilizationInterval_min()  ) of
 %						true -> config:stabilizationInterval_min() ;
