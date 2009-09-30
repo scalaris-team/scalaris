@@ -231,10 +231,6 @@ replicaPrefixes() ->
 transactionLookupTimeout()->
     read(transaction_lookup_timeout).
 
-%% @doc time out for read operations
-%% @spec readTimeout() -> integer() | failed
-%readTimeout()->
-%    read(read_timeout).
 
 tpFailureTimeout()->
     read(tp_failure_timeout).
