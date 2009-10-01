@@ -21,13 +21,13 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 %% @doc 
--module(tmanager_pac).
+-module(transstore.tmanager_pac).
 
 -author('moser@zib.de').
 -vsn('$Id$').
 
 -include("trecords.hrl").
--include("../include/scalaris.hrl").
+-include("../chordsharp.hrl").
 
 -export([process_vote/2, process_vote_ack/5, process_read_vote/2, collect_rv_ack/5, vote_for_suspected/1]).
 

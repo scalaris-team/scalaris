@@ -22,8 +22,6 @@
 
 -behaviour(supervisor).
 
--include("autoconf.hrl").
-
 %% API
 -export([start_link/0, scan_environment/0]).
 
@@ -56,19 +54,10 @@ start_link() ->
 %% to find out about restart strategy, maximum restart frequency and child 
 %% specifications.
 %%--------------------------------------------------------------------
--ifdef(HAVE_TCERL).
-start_tcerl() ->
-    tcerl:start().
--else.
-start_tcerl() ->
-    ok.
--endif.
-
 init([]) ->
-    randoms:start(),
+    crypto:start(),
     inets:start(),
     %util:logger(),
-    start_tcerl(),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     Config =
 	{config,
@@ -87,7 +76,7 @@ init([]) ->
      },
     CommunicationPort = {
       comm_port,
-      {comm_layer, start_link, []},
+      {comm_layer.comm_layer, start_link, []},
       permanent,
       brutal_kill,
       worker,
@@ -131,30 +120,14 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-   Ganglia =
-	{ganglia_server,
-	 {ganglia, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   MonitorTiming =
-	{monitor_timing,
-	 {monitor_timing, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
     {ok,{{one_for_all,10,1}, [
 			      Config,
-                              Logger,
-                              MonitorTiming,
+                  Logger,
 			      FailureDetector,
 			      CommunicationPort,
 			      AdminServer,
 			      YAWS,
 			      BenchServer,
-                              Ganglia,
 			      ChordSharp
 			     ]}}.
 

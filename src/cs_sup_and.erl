@@ -28,7 +28,7 @@
 
 -behaviour(supervisor).
 
--include("../include/scalaris.hrl").
+-include("chordsharp.hrl").
 
 -export([start_link/2, init/1]).
 
@@ -70,11 +70,18 @@ init([InstanceId, Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-   
+    Cyclon = 
+	{cyclon,
+	 {cyclon.cyclon, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     {ok, {{one_for_all, 10, 1},
 	  [
 	   DB,
-	   Node
-	   ]}}.
+	   Node,
+	   Cyclon
+	  ]}}.
 %% userdevguide-end cs_sup_and:init
 

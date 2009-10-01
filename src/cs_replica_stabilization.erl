@@ -26,14 +26,14 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("../include/scalaris.hrl").
+-include("chordsharp.hrl").
 
 -export([recreate_replicas/1, createReplicatedIntervals/2]).
 
 %% @doc recreates the replicas of the given key range
 %% @spec recreate_replicas({string(), string()}) -> pid()
-recreate_replicas({_From, _To}) ->
-%    InstanceId = erlang:get(instance_id),
+recreate_replicas({From, To}) ->
+    InstanceId = erlang:get(instance_id),
 %    spawn(fun () -> 
 %		  erlang:put(instance_id, InstanceId),
 % 		  Intervals = createReplicatedIntervals(From, To),
@@ -44,21 +44,21 @@ recreate_replicas({_From, _To}) ->
     ok.
 
 
-%% recreate_replicas_loop(Intervals, Done, Data) ->
-%%     receive
-%% 	{fetched_data, Index, FetchedData} ->
-%% 	    case gb_sets:is_member(Index, Done) of
-%% 		false ->
-%% 		    case gb_sets:size(Done) + 1 == Intervals of
-%% 			true ->
-%% 			    update_db(Data);
-%% 			false ->
-%% 			    recreate_replicas_loop(Intervals, gb_sets:add(Index, Done), [FetchedData | Data])
-%% 		    end;
-%% 		true ->
-%% 		    recreate_replicas_loop(Intervals, Done, Data)
-%% 	    end
-%%     end.
+recreate_replicas_loop(Intervals, Done, Data) ->
+    receive
+	{fetched_data, Index, FetchedData} ->
+	    case gb_sets:is_member(Index, Done) of
+		false ->
+		    case gb_sets:size(Done) + 1 == Intervals of
+			true ->
+			    update_db(Data);
+			false ->
+			    recreate_replicas_loop(Intervals, gb_sets:add(Index, Done), [FetchedData | Data])
+		    end;
+		true ->
+		    recreate_replicas_loop(Intervals, Done, Data)
+	    end
+    end.
 
 %%====================================================================
 %% fetch functions
@@ -69,31 +69,37 @@ start_fetchers(_Index, []) ->
     ok;
 start_fetchers(Index, [Interval | Tail]) ->
     Me = self(),
-    gen_component:start(?MODULE, {Me, Index, Interval},[], Me),
+    spawn(fun () ->
+		  fetch_interval(Me, Index, Interval)
+	  end),
     start_fetchers(Index + 1, Tail).
     
+% @spec fetch_interval(pid(), int(), intervals:interval()) -> ok
+fetch_interval(Owner, Index, Interval) ->
+    bulkowner:issue_bulk_owner(Interval, 
+			       {bulk_read_with_version, cs_send:this()}),
+    erlang:send_after(5000, self(), {timeout}),
+    fetch_interval_loop(Owner, Index, Interval, [], []).
 
-init({Owner, Index, Interval}) ->
-    bulkowner:issue_bulk_owner(Interval,{bulk_read_with_version, cs_send:this()}),
-    cs_send:send_after(5000, self(), {timeout}),
-    {Owner, Index, Interval, [], []}.
-
-
-
-on({timeout},{Owner, Index, Interval, Done, FetchedData}) ->
-	    cs_send:send_after(5000, self(), {timeout}),
-	    {Owner, Index, Interval, Done, FetchedData};
-on({bulk_read_with_version_response, Interval, NewData},{Owner, Index, Interval, Done, FetchedData}) ->
+fetch_interval_loop(Owner, Index, Interval, Done, FetchedData) ->
+    receive
+	{timeout} ->
+	    erlang:send_after(5000, self(), {timeout}),
+	    fetch_interval_loop(Owner, Index, Interval, Done, FetchedData);
+	{bulk_read_with_version_response, Interval, NewData} ->
 	    Done2 = [Interval | Done],
 	    case done(Interval, Done2) of
 		false ->
-		    {Owner, Index, Interval, Done2,[FetchedData| NewData]};
+		    fetch_interval_loop(Owner, Index, Interval, Done2, 
+					[FetchedData| NewData]);
 		true ->
-		    cs_send:send_local(Owner , {fetched_data, Index, FetchedData}),
-		    kill
+		    Owner ! {fetched_data, Index, FetchedData},
+		    ok
 	    end;
-on(_, _State) ->
-    unknown_event.
+	X ->
+	    io:format("unknown message ~w~n", [X]),
+	    fetch_interval_loop(Owner, Index, Interval, Done, FetchedData)
+    end.
 
 % @spec done(intervals:interval(), [intervals:interval()]) -> bool()
 done(Interval, Done) ->

@@ -57,7 +57,7 @@ add_nodes_loop(Count, Delay) ->
 				      brutal_kill,
 				      worker,
 				      []}),
-    %timer:sleep(Delay),
+    timer:sleep(Delay),
     add_nodes_loop(Count - 1, Delay).
 %% userdevguide-end admin:add_nodes
 
@@ -69,9 +69,7 @@ add_nodes_loop(Count, Delay) ->
 -spec(check_ring/0 :: () -> {error, string()} | ok).
 check_ring() ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    
     Nodes = statistics:get_ring_details(),
-    
     case lists:foldl(fun check_ring_foldl/2, first, Nodes) of
 	{error, Reason} ->
 		{error, Reason};
@@ -107,7 +105,7 @@ get_id(Node) ->
 
 
 %%===============================================================================
-%% comm_logger functions
+%% comm_layer:comm_logger functions
 %%===============================================================================
 get_dump() ->
     [cs_send:send(cs_send:get(admin_server, Server), {get_comm_layer_dump, cs_send:this()}) 
@@ -167,11 +165,9 @@ start() ->
 
 loop() ->
     receive
-    {halt,N} ->
-        halt(N);
 	{get_comm_layer_dump, Sender} ->
 	    cs_send:send(Sender, {get_comm_layer_dump_response, 
-				  comm_logger:dump()}),
+				  comm_layer.comm_logger:dump()}),
 	    loop()
     end.
 
@@ -210,5 +206,5 @@ dd_check_ring() ->
     dd_check_ring(0).    
 dd_check_ring(Token) ->
     {ok,One} = process_dictionary:find_cs_node(),
-    cs_send:send_local(One , {send_to_group_member,ring_maintenance,{init_check_ring,Token}}),
+    One ! {send_to_group_member,ring_maintenance,{init_check_ring,Token}},
     {token_on_the_way}.

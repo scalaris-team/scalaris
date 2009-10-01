@@ -63,16 +63,7 @@ get_memory({failed}) ->
     0.
 
 get_ring_details() ->
-    boot_server:node_list(),
-    Nodes = receive
-        {get_list_response,N} -> 
-            
-            N
-       after 2000 ->
-            log:log(error,"ST: Timeout~n"),
-           
-            {failed}
-    end,
+    Nodes = boot_server:node_list(),
     lists:sort(fun compare_node_details/2, lists:map(fun (Pid) -> get_node_details(Pid) end, Nodes)).
     
 
@@ -90,16 +81,8 @@ get_node_details(Pid) ->
 	{get_node_details_response, Pid, Details} -> 
 	    {ok, Details}
     after
-        2000 ->
-            log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response form ~p~n",[Pid]),
-            receive
-                {get_node_details_response, Pid, Details} ->
-                    {ok, Details}
-            after
-                4000 ->
-                    log:log(error,"[ ST ]: 4sec Timeout by waiting on get_node_details_response form ~p~n",[Pid]),
-                    {failed}
-            end
+	2000 ->
+	    {failed}
     end.
 
 %%%-------------------------------RT----------------------------------

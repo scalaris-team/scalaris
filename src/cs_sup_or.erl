@@ -28,7 +28,7 @@
 
 -behaviour(supervisor).
 
--include("../include/scalaris.hrl").
+-include("chordsharp.hrl").
 
 -export([start_link/1, start_link/0, init/1]).
 
@@ -68,7 +68,7 @@ init([Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-    _RSE =
+    RSE =
 	{rse_chord,
 	 {rse_chord, start_link, [InstanceId]},
 	 permanent,
@@ -103,46 +103,13 @@ init([Options]) ->
 	 brutal_kill,
 	 worker,
 	 []},
-    Vivaldi =
-        {vivaldi,
-         {vivaldi, start_link, [InstanceId]},
-         permanent,
-         brutal_kill,
-         worker,
-         []},
-    DC_Clustering =
-        {dc_clustering,
-         {dc_clustering, start_link, [InstanceId]},
-         permanent,
-         brutal_kill,
-         worker,
-         []},
-     Cyclon =
-	{cyclon,
-	 {cyclon, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    Self_Man =
-	{self_man,
-	 {self_man, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
     {ok, {{one_for_one, 10, 1},
 	  [
-           Self_Man,
 	   KeyHolder,
-           RoutingTable,
-           Supervisor_AND,
-           Cyclon,
-           DeadNodeCache,
-           RingMaintenance,
-           Vivaldi
-           %,DC_Clustering
-	  
-	   %_RSE
+       DeadNodeCache,
+	   RingMaintenance,
+	   RoutingTable,
+	   Supervisor_AND
+	   %RSE
 	  ]}}.
 %% userdevguide-end cs_sup_or:init

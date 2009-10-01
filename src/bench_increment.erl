@@ -23,7 +23,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--import(transaction_api, [read2/2, write2/3]).
+-import(transstore.transaction_api, [read2/2, write2/3]).
 
 -export([start/0, bench/0, bench_raw/0, process/3]).
 
@@ -65,14 +65,12 @@ process(Parent, Key, Count) ->
     process_iter(Parent, make_tfun(Key), Count, SuccessFun, FailureFun, 0).
 
 process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
-    cs_send:send_local(Parent , {done, AbortCount});
+    Parent ! {done, AbortCount};
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
-    case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
+    case transstore.transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
 	{success, {commit, _Y}} ->
 	    process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
 	{failure, abort} ->
-	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-	{failure, timeout} ->
 	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
 	X ->
 	    io:format("~p~n", [X])
@@ -117,7 +115,7 @@ bench_fprof() ->
 increment_test() ->
     % init: i = 0
     Key = "i",
-    commit = transaction_api:single_write(Key, 0),
+    commit = transstore.transaction_api:single_write(Key, 0),
 
     {Time, Value} = timer:tc(bench_increment, bench, []),
     io:format("executed ~p transactions in ~p us: ~p~n", [Value, Time, Value / Time * 1000000]),

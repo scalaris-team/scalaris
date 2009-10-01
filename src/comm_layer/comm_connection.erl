@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(comm_connection).
+-module(comm_layer.comm_connection).
 
--export([send/3, tcp_options/0, open_new/4, new/3, open_new_async/4]).
+-export([send/3, open_new/4, new/3, open_new_async/4]).
 
 -import(config).
 -import(gen_tcp).
@@ -35,15 +35,12 @@
 -import(log).
 -import(timer).
 
--include("../../include/scalaris.hrl").
+-include("comm_layer.hrl").
 
 %% @doc new accepted connection. called by comm_acceptor
 %% @spec new(inet:ip_address(), int(), socket()) -> pid()
 new(Address, Port, Socket) ->
     spawn(fun () -> loop(Socket, Address, Port) end).
-
-tcp_options() ->
-    [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}].
 
 %% @doc open new connection
 %% @spec open_new(inet:ip_address(), int(), inet:ip_address(), int()) -> 
@@ -116,7 +113,7 @@ send({Address, Port, Socket}, Pid, Message) ->
     end,
     case Result of
 	ok ->
-	    ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
+	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(BinaryMessage)),
 	    ok;
 	{error, closed} ->
 	    comm_port:unregister_connection(Address, Port),
@@ -143,7 +140,7 @@ loop(Socket, Address, Port) ->
 	{tcp, Socket, Data} ->
 	    case binary_to_term(Data) of
 	        {deliver, Process, Message} ->
-                    Process ! Message,
+		    Process ! Message,
 		    inet:setopts(Socket, [{active, once}]),
 		    loop(Socket, Address, Port);
 		{user_close} ->
@@ -171,38 +168,39 @@ loop(Socket, Address, Port) ->
 
 -spec(new_connection(inet:ip_address(), integer(), integer()) -> inet:socket() | fail).
 new_connection(Address, Port, MyPort) ->
-    case gen_tcp:connect(Address, Port, [binary, {packet, 4}] ++ comm_connection:tcp_options(),
-                         config:read(tcp_connect_timeout)) of
+    case gen_tcp:connect(Address, Port, [binary, {packet, 4}, {nodelay, true}, {active, once}, 
+					 {send_timeout, config:read(tcp_send_timeout)}], 
+			 config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
-            % send end point data
-            case inet:sockname(Socket) of
-                {ok, {MyAddress, _MyPort}} ->
-                    Message = term_to_binary({endpoint, MyAddress, MyPort}),
-                    gen_tcp:send(Socket, Message),
-                    case inet:peername(Socket) of
-                        {ok, {RemoteIP, RemotePort}} ->
-                            YouAre = term_to_binary({youare, RemoteIP, RemotePort}),
-                            gen_tcp:send(Socket, YouAre),
-                            Socket;
-                        {error, Reason} ->
-                            log:log(error,"[ CC ] reconnect to ~p because socket is ~p",
-                                    [Address, Reason]),
-                            close_connection(Socket),
-                            new_connection(Address, Port, MyPort)
-                    end;
-                {error, Reason} ->
-                    log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
-                            [Address, Reason]),
-                    close_connection(Socket),
-                    new_connection(Address, Port, MyPort)
-            end;
-        {error, Reason} ->
-            log:log(error,"[ CC ] couldn't connect to ~p:~p (~p)",
-                    [Address, Port, Reason]),
-            fail
+	    % send end point data
+	    case inet:sockname(Socket) of
+		{ok, {MyAddress, _MyPort}} ->
+		    Message = term_to_binary({endpoint, MyAddress, MyPort}),
+	            gen_tcp:send(Socket, Message),
+		    case inet:peername(Socket) of
+			{ok, {RemoteIP, RemotePort}} ->
+			    YouAre = term_to_binary({youare, RemoteIP, RemotePort}),
+		            gen_tcp:send(Socket, YouAre),
+		            Socket;
+			{error, _Reason} ->
+			    %log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
+				%    [Address, Reason]),
+			    close_connection(Socket),
+	    		    new_connection(Address, Port, MyPort)
+		    end;
+		{error, _Reason} ->
+		    %log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
+			%    [Address, Reason]),
+		    close_connection(Socket),
+	            new_connection(Address, Port, MyPort)
+	    end;
+        {error, _Reason} ->
+            %log:log(error,"[ CC ] couldn't connect to ~p:~p (~p)", 
+		    %[Address, Port, Reason]),
+	    fail
     end.
-
+    
 close_connection(Socket) ->
     spawn( fun () ->
-                   gen_tcp:close(Socket)
-           end ).
+		   gen_tcp:close(Socket)
+	   end ).

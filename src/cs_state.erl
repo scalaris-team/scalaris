@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
--include("../include/scalaris.hrl").
+-include("chordsharp.hrl").
 
 -export([new/6, new/7,
 	 id/1, me/1, uniqueId/1,
@@ -51,7 +51,7 @@
 -record(state, {routingtable, successor, predecessor, me, my_range, lb, deadnodes, join_time, trans_log, db}).
 
 new(RT, Successor, Predecessor, Me, MyRange, LB) ->
-    new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new(node:id(Me))).
+    new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new()).
 
 %% userdevguide-begin cs_state:state
 new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
@@ -132,22 +132,11 @@ dump(State) ->
     ok.
 
 details(State) ->
-    ?RM:get_predlist(),
-    Predlist =  receive
-                    {get_predlist_response, X} ->      
-                        X
-                   
-                end,
-    ?RM:get_successorlist(),
-    SuccList = receive
-                   {get_successorlist_response, Y} ->
-                        Y
-                  
-               end,
-    %Predlist = [pred(State)],
+    %Predlist = ?RM:get_predlist(),
+    Predlist = [pred(State)],
     Node = me(State),
-  
-    %SuccList = [succ(State)],
+    %SuccList = ?RM:get_as_list(),
+    SuccList = [succ(State)],
     Load = ?DB:get_load(get_db(State)),
     Hostname = net_adm:localhost(),
     RTSize = ?RT:get_size(rt(State)),

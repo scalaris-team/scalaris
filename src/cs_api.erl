@@ -26,10 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([process_request_list/2, read/1, write/2, delete/1,
-         test_and_set/3, range_read/2]).
-
--include("../include/scalaris.hrl").
+-export([process_request_list/2, read/1, write/2, delete/1, 
+	 test_and_set/3, range_read/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -40,7 +38,7 @@
 
 process_request_list(TLog, ReqList) ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    % should just call transaction_api:process_request_list
+    % should just call transstore.transaction_api:process_request_list
     % for parallel quorum reads and scan for commit request to actually do
     % the transaction
     % and there should scan for duplicate keys in ReqList
@@ -57,30 +55,24 @@ process_request_list(TLog, ReqList) ->
 process_request(TLog, Request) ->
     case Request of
         {read, Key} ->
-            case timer:tc(transaction_api, read, [Key, TLog]) of
-                {Time, {{value, Val}, NTLog}} ->
-                    ?LOG_CS_API(read_success, Time / 1000.0),
+            case transstore.transaction_api:read(Key, TLog) of
+                {{value, Val}, NTLog} ->
                     {NTLog, {read, Key, {value, Val}}};
-                {Time, {{fail, Reason}, NTLog}} ->
-                    ?LOG_CS_API(read_fail, Time / 1000.0),
+                {{fail, Reason}, NTLog} ->
                     {NTLog, {read, Key, {fail, Reason}}}
             end;
         {write, Key, Value} ->
-            case timer:tc(transaction_api, write, [Key, Value, TLog]) of
-                {Time, {ok, NTLog}} ->
-                    ?LOG_CS_API(write_success, Time / 1000.0),
+            case transstore.transaction_api:write(Key, Value, TLog) of
+                {ok, NTLog} ->
                     {NTLog, {write, Key, {value, Value}}};
-                {Time, {{fail, Reason}, NTLog}} ->
-                    ?LOG_CS_API(write_fail, Time / 1000.0),
+                {{fail, Reason}, NTLog} ->
                     {NTLog, {write, Key, {fail, Reason}}}
             end;
         {commit} ->
-            case timer:tc(transaction_api, commit, [TLog]) of
-                {Time, {ok}} ->
-                    ?LOG_CS_API(commit_success, Time / 1000.0),
+            case transstore.transaction_api:commit(TLog) of
+                {ok} ->
                     {TLog, {commit, ok, {value, "ok"}}};
-                {Time, {fail, Reason}} ->
-                    ?LOG_CS_API(commit_fail, Time / 1000.0),
+                {fail, Reason} ->
                     {TLog, {commit, fail, {fail, Reason}}}
             end
     end.
@@ -88,40 +80,36 @@ process_request(TLog, Request) ->
 %% @doc reads the value of a key
 %% @spec read(key()) -> {failure, term()} | value()
 read(Key) ->
-    case timer:tc(transaction_api, quorum_read, [Key]) of
-        {Time, {fail, Reason}} ->
-            ?LOG_CS_API(quorum_read_fail, Time / 1000.0),
-            {fail, Reason};
-        {Time, {Value, _Version}} ->
-            ?LOG_CS_API(quorum_read_success, Time / 1000.0),
-            Value
+    case transstore.transaction_api:quorum_read(Key) of
+        {fail, Reason} ->
+	       {fail, Reason};
+        {Value, _Version} ->
+	       Value
     end.
 
 %% @doc writes the value of a key
 %% @spec write(key(), value()) -> ok | {fail, term()}
 write(Key, Value) ->
-    case timer:tc(transaction_api, single_write, [Key, Value]) of
-	{Time, commit} ->
-            ?LOG_CS_API(single_write_success, Time / 1000.0),
+    case transstore.transaction_api:single_write(Key, Value) of
+	commit ->
 	    ok;
-	{Time, {fail, Reason}} ->
-            ?LOG_CS_API(single_write_fail, Time / 1000.0),
+	{fail, Reason} ->
 	    {fail, Reason}
     end.
 
 delete(Key) ->
-    transaction_api:delete(Key, 2000).
+    transstore.transaction_api:delete(Key, 2000).
 
 %% @doc atomic compare and swap
 %% @spec test_and_set(key(), value(), value()) -> {fail, Reason} | ok
 test_and_set(Key, OldValue, NewValue) ->
     TFun = fun(TransLog) ->
-                   {Result, TransLog1} = transaction_api:read(Key, TransLog),
+                   {Result, TransLog1} = transstore.transaction_api:read(Key, TransLog),
                    case Result of
                        {value, ReadValue} ->
                            if
                                ReadValue == OldValue ->
-                                   {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog1),
+                                   {Result2, TransLog2} = transstore.transaction_api:write(Key, NewValue, TransLog1),
                                    if
                                        Result2 == ok ->
                                            {{ok, done}, TransLog2};
@@ -132,15 +120,13 @@ test_and_set(Key, OldValue, NewValue) ->
                                    {{fail, {key_changed, ReadValue}}, TransLog1}
                            end;
                        {fail, not_found} ->
-                           {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog),
+                           {Result2, TransLog2} = transstore.transaction_api:write(Key, NewValue, TransLog),
                            if
                                Result2 == ok ->
                                    {{ok, done}, TransLog2};
                                true ->
                                    {{fail, write}, TransLog2}
-                           end;
-                       {fail,timeout} ->
-                           {{fail, timeout}, TransLog}
+                           end
                        end
            end,
     SuccessFun = fun(X) -> {success, X} end,
@@ -150,10 +136,9 @@ test_and_set(Key, OldValue, NewValue) ->
 	    ok;
 	{trans, {failure, Reason}} ->
 	    {fail, Reason};
- 	X ->
- 	   io:format("cs_api:test_and_set unexpected: Node ~w got ~p", [self(),X]),
- 	   log:log(warn,"[ Node ~w ] ~p", [self(),X]),
- 	    X
+	X ->
+	   log:log(warn,"[ Node ~w ] ~p", [self(),X]),
+	    X
     end.
 
 
@@ -161,7 +146,7 @@ test_and_set(Key, OldValue, NewValue) ->
 %@private
 do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
     {ok, PID} = process_dictionary:find_cs_node(),
-    cs_send:send_local(PID , {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()}),
+    PID ! {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()},
     receive
 	X ->
 	    X
@@ -175,7 +160,7 @@ range_read(From, To) ->
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval, 
 			       {bulk_read_with_version, cs_send:this()}),
-    cs_send:send_after(5000, self(), {timeout}),
+    erlang:send_after(5000, self(), {timeout}),
     range_read_loop(Interval, [], []).
 
 range_read_loop(Interval, Done, Data) ->

@@ -27,11 +27,9 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1 , getVivaldiMap/0]).
+-export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1]).
 
 -include("yaws_api.hrl").
--include("../include/scalaris.hrl").
-
 
 %% @doc checks whether the current request is a post operation
 %% @spec isPost(A) -> bool()
@@ -43,26 +41,19 @@ isPost(A) ->
 %%%-----------------------------Lookup/Put---------------------------
 
 lookup(Key) ->
-    timer:tc(transaction_api, quorum_read, [Key]).
+    timer:tc(transstore.transaction_api, quorum_read, [Key]).
 
 set_key(Key, Value) ->
-    timer:tc(transaction_api, single_write, [Key, Value]).
+    timer:tc(transstore.transaction_api, single_write, [Key, Value]).
 
 %%%-----------------------------Load----------------------------------
 
 getLoad() ->
-    boot_server:node_list(),
-    Nodes =
-        receive
-            {get_list_response,X} ->
-                X
-        after 2000 ->
-            {failed}
-        end,
+    Nodes = boot_server:node_list(),
     get_load(Nodes).
     
 get_load([Head | Tail]) ->
-    cs_send:send(Head , {get_load, cs_send:this()}),
+    Head ! {get_load, self()},
     receive
 	{get_load_response, Node, Value} -> [{ok, Node, Value} | get_load(Tail)]
     after
@@ -102,121 +93,6 @@ renderLoad([{failed, Node} | Tail]) ->
 renderLoad([]) ->
     [].
 
-%%%--------------------------Vivaldi-Map------------------------------
-getVivaldiMap() ->
-    boot_server:node_list(),
-    Nodes =
-        receive
-            {get_list_response,X} ->
-            X
-        after 2000 ->
-            {failed}
-        end,
-    CC_list = lists:map(fun (Pid) -> get_vivaldi(Pid) end, Nodes),
-    renderVivaldiMap(CC_list,Nodes).
-
-get_vivaldi(Pid) ->
-    cs_send:send_to_group_member(Pid,vivaldi, {query_vivaldi,cs_send:this()}),
-    receive
-        {query_vivaldi_response,Coordinate,_Confidence} ->
-            Coordinate
-    end.
-
-renderVivaldiMap(CC_list,Nodes) ->
-    {Min,Max} = get_min_max(CC_list),
-    %io:format("Min: ~p Max: ~p~n",[Min,Max]),
-    Xof=(lists:nth(1, Max)-lists:nth(1, Min))*0.1,
-    Yof=(lists:nth(2, Max)-lists:nth(2, Min))*0.1,
-    %io:format("~p ~p {~p ~p} ~n",[Min,Max,Xof,Yof]),
-    Vbx=lists:nth(1, Min)-Xof,
-    Vby=lists:nth(2, Min)-Yof,
-    Vbw=(lists:nth(1, Max)-lists:nth(1, Min))+Xof*2,
-    Vbh=(lists:nth(2, Max)-lists:nth(2, Min))+Yof*2,
-    
-    R=(Xof+Yof)*0.1,
-    Head=io_lib:format("<svg width=\"400px\" height=\"400px\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"~p,~p,~p,~p\">~n",
-                       [Vbx,Vby,Vbw,Vbh])++
-         io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
-                       [lists:nth(1, Min)-R*1.5,lists:nth(2, Min),lists:nth(1, Min)-R*1.5,lists:nth(2, Max),R*0.1])++
-        io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
-                       [lists:nth(1, Min),lists:nth(2, Max)+R*1.5,lists:nth(1, Max),lists:nth(2, Max)+R*1.5,R*0.1])++
-        io_lib:format("<text x=\"~p\" y=\"~p\" transform=\"rotate(90,~p,~p)\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
-                       [lists:nth(1, Min)-R*4,
-                        lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
-                        lists:nth(1, Min)-R*4,
-                        lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
-                        R*2,
-                        floor(lists:nth(1, Max)-lists:nth(1, Min))])++
-        io_lib:format("<text x=\"~p\" y=\"~p\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
-                       [lists:nth(1, Min)+(lists:nth(1, Max)-lists:nth(1, Min))/3,
-                        lists:nth(2, Max)+R*4,
-                         R*2,
-                        floor(lists:nth(2, Max)-lists:nth(2, Min))])                    ,
-        
-
-    Content=gen_Nodes(CC_list,Nodes,R),
-    Foot="</svg>",
-    Head++Content++Foot.
-
-floor(X) ->
-    T = trunc(X),
-    case X - T == 0 of
-        true -> T;
-        false -> T - 1
-    end.
-
-
-
-gen_Nodes([],_,_) ->
-    "";
-gen_Nodes([H|T],[HN|TN],R) ->
-    Hi=255,
-    Lo=0,
-
-    
-    S1 =  pid(HN),
-
-    random:seed(S1,S1,S1),
-    random:uniform(Hi-Lo)+Lo-1,
-    C1 = random:uniform(Hi-Lo)+Lo-1,
-    C2 = random:uniform(Hi-Lo)+Lo-1,
-    C3 = random:uniform(Hi-Lo)+Lo-1,
-    io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" style=\"fill:rgb( ~p, ~p ,~p) ;\" />~n",[lists:nth(1, H),lists:nth(2, H),R,C1,C2,C3])
-    ++gen_Nodes(T,TN,R).
-
-get_min_max([]) ->
-    {[],[]};
-get_min_max([H|T]) ->
-    {lists:foldl(fun(A,B) -> min_list(A,B) end,H ,T),
-     lists:foldl(fun(A,B) -> max_list(A,B) end,H ,T)}.
-
-
-min_list(L1,L2) ->
-    lists:zipwith(fun(X,Y) ->
-                   case X < Y of
-                       true -> X;
-                       _ -> Y
-                   end
-                   end, L1, L2).
-max_list(L1,L2) ->
-    lists:zipwith(fun(X,Y) ->
-                   case X > Y of
-                       true -> X;
-                       _ -> Y
-                   end
-                   end, L1, L2).
-
--ifdef(TCP_LAYER).
-pid({{A,B,C,D},I,_}) ->
-    A+B+C+D+I.
--endif.
-
--ifdef(BUILTIN).
-pid(X) ->
-    list_to_integer(lists:nth(1, string:tokens(erlang:pid_to_list(X),"<>."))).
--endif.
-
-
 
 %%%-----------------------------Ring----------------------------------
 
@@ -225,19 +101,19 @@ getRingChart() ->
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
     RingSize = length(Ring),
     if
-	RingSize == 0 ->
-	    {p, [], "empty ring"};
-	RingSize == 1 ->
-	    {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
-	true ->
+        RingSize == 0 ->
+            {p, [], "empty ring"};
+        RingSize == 1 ->
+            {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
+        true ->
             try
-              PieURL = renderRingChart(Ring),
-              LPie = length(PieURL),
-              if LPie < 1023 ->
-                      {p, [], [{img, [{src, PieURL}], ""}]};
-                 true ->
-                      throw({urlTooLong, PieURL})
-              end
+                PieURL = renderRingChart(Ring),
+                case length(PieURL) < 1023 of
+                    true ->
+                        {p, [], [{img, [{src, PieURL}], ""}]};
+                    false ->
+                        throw({urlTooLong, PieURL})
+                end
             catch
                 _:_ -> {p, [], "Sorry, pie chart not available (too many nodes or other error)."}
             end
@@ -246,7 +122,7 @@ getRingChart() ->
 renderRingChart(Ring) ->
     URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
     Sizes = lists:map(
-	      fun ({ok,Node}) -> 
+	      fun ({ok,Node}) ->
 		      Me_tmp = get_id(node_details:me(Node)),
 		      Pred_tmp = get_id(hd(node_details:predlist(Node))),
 		      if (null == Me_tmp) orelse (null == Pred_tmp)
@@ -254,8 +130,8 @@ renderRingChart(Ring) ->
 			 true ->
 			      Tmp = (Me_tmp - Pred_tmp)*100
 				  /16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
-			      if Tmp < 0.0 
-				 -> Diff = (Me_tmp 
+			      if Tmp < 0.0
+				 -> Diff = (Me_tmp
 					    + 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 					    - Pred_tmp)
 					* 100 / 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
@@ -265,7 +141,7 @@ renderRingChart(Ring) ->
 		      end
 	      end, Ring),
     Hostinfos = lists:map(
-		  fun ({ok,Node}) -> 
+		  fun ({ok,Node}) ->
 			  node_details:hostname(Node) 
 			  ++ " (" ++ 
 			  integer_to_list(node_details:load(Node)) 
@@ -302,19 +178,11 @@ getRingRendered() ->
 		},
 		{tr, [],
 		 [
-                               {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
-                               {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
-                               {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-                               {td, [], io_lib:format('~p', [fun () ->
-                                                        boot_server:node_list(),
-                                                        receive
-                                                            {get_list_response,X} ->
-                                                                X
-                                                        after 2000 ->
-                                                                {failed}
-                                                        end
-                                                             end])}
-                           ]
+		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
+		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
+		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
+		  {td, [], io_lib:format('~p', [boot_server:node_list()])}
+		 ]
 		}
 	       ]
 	      },
@@ -387,16 +255,7 @@ getIndexedRingRendered() ->
 		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-		  {td, [], io_lib:format('~p', [fun () ->
-                                                        boot_server:node_list(),
-                                                        receive
-                                                            {get_list_response,X} ->
-                                                                X
-                                                        after 2000 ->
-                                                                {failed}
-
-                                                        end
-                                                             end])}
+		  {td, [], io_lib:format('~p', [boot_server:node_list()])}
 		 ]
 		}
 	       ]
@@ -431,14 +290,17 @@ renderIndexedRing({ok, Details}, Ring) ->
     PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, Ring, MyIndex, NIndex) end, PredList),
     SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, Ring, MyIndex, NIndex) end, SuccList),
     [FirstSuccIndex|_] = SuccIndices,
-    {tr, [],
+    {tr, [], 
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
-       case hd(PredIndex) == -1 of
-           true->
-               {td, [], io_lib:format('~p', [PredIndex])};
-           false ->
-               {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
+       case is_list(PredIndex) orelse PredIndex =/= -1 of
+           true -> case hd(PredIndex) == -1 of
+                       true->
+                           {td, [], io_lib:format('~p', [PredIndex])};                                                      
+                       false ->
+                 			{td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
+                   end;
+           false -> {td, [], io_lib:format('~p', [PredIndex])}
        end,
        {td, [], io_lib:format('~p: ~p', [MyIndex, get_id(Node)])},
        case is_list(FirstSuccIndex) orelse FirstSuccIndex =/= 1 of
@@ -450,7 +312,7 @@ renderIndexedRing({ok, Details}, Ring) ->
       ]};
 
 renderIndexedRing({failed}, _Ring) ->
-    {tr, [],
+    {tr, [], 
       [
        {td, [], "-"},
        {td, [], "-"},

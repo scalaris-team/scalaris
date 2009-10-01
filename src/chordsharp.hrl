@@ -36,36 +36,11 @@
 %%Standard database backend
 %-define(DB, cs_db_otp).
 %-define(DB, db_gb_trees).
-%-define(DB, db_tcerl).
 -define(DB, db_ets).
+
 %%Standard chord ring maintenance
-%-define(RM, rm_chord).
+-define(RM, rm_chord).
 
 %% ring maintenance by T-man
--define(RM, rm_tman).
+%-define(RM, rm_tman).
 
-%% ring maintenance by T-man-Sharp
-%-define(RM, rm_tmansharp).
-
--define(TCP_LAYER, true). % TCP communication
-%-define(BUILTIN, true).   % distributed Erlang native communication
-
-%-define(SIMULATION, true).
-
-
-% enable logging of message statistics
--define(LOG_MESSAGE(MESSAGE, SIZE), ok).
-%-define(LOG_MESSAGE(MESSAGE, SIZE), case MESSAGE of {send_to_group_member, _, Msg} -> comm_logger:log(erlang:element(1, Msg), SIZE); _ -> comm_logger:log(erlang:element(1, MESSAGE), SIZE) end).
-
-
-% enable native register for all prozesses in gen_component or disable
-% usefull 4 debug (etop, appmon), but let memory usage grow over the time
-% enable:
-%-define(DEBUG_REGISTER(PROCESS,PID),register(PROCESS,PID)).
-% disable:
--define(DEBUG_REGISTER(PROCESS,PID),ok).
-
-
-% enable detailed time logging in cs_api (jsonrpc)
-%-define(LOG_CS_API(Timer, Time), monitor_timing:log(Timer, Time)).
--define(LOG_CS_API(Timer, Time), ok).

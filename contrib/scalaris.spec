@@ -49,7 +49,7 @@ implemented in Erlang.
 %package doc
 Summary:    Documentation for scalaris
 Group:      Documentation
-Requires:   %{name} == %{version}-%{release}
+Requires:   %{name} == %{version}
 
 %description doc
 Documentation for scalaris.
@@ -64,7 +64,7 @@ Requires:   erlang-jinterface >= R12B-4
 Requires:   erlang
 %endif
 Requires:   jakarta-commons-cli
-Requires:   %{name} == %{version}-%{release}
+Requires:   %{name} == %{version}
 
 %description java
 Java Bindings
@@ -72,7 +72,7 @@ Java Bindings
 %package client
 Summary:    Cli client for scalaris
 Group:      Applications/Databases
-Requires:   %{name}-java = %{version}-%{release}
+Requires:   %{name}-java = %{version}
 
 %description client
 Command line client for scalaris using the Java interface
@@ -94,7 +94,7 @@ Command line client for scalaris using the Java interface
     --sharedstatedir=%{_sharedstatedir} \
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
-    --docdir=%{_docdir}/scalaris
+    --docdir=%{_docdir}/%{name}
 make all
 make java
 make docs
@@ -112,23 +112,23 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %doc AUTHORS README LICENSE
 %{_bindir}/scalarisctl
-%{_libdir}/scalaris
-%{_localstatedir}/log/scalaris
-%{_sysconfdir}/scalaris
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
-%config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
+%{_libdir}/%{name}
+%{_localstatedir}/log/%{name}
+%{_sysconfdir}/%{name}
+%config(noreplace) %{_sysconfdir}/%{name}/scalaris.cfg
+%config %{_sysconfdir}/%{name}/scalaris.local.cfg.example
 
 %files doc
 %defattr(-,root,root)
-%doc %{_docdir}/scalaris
+%doc %{_docdir}/%{name}
 %doc user-dev-guide/main.pdf
 
 %files java
 %defattr(-,root,root)
-%{_javadir}/scalaris
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris-java.conf
-%config %{_sysconfdir}/scalaris/scalaris-java.conf.sample
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.properties
+%{_javadir}/%{name}
+%config(noreplace) %{_sysconfdir}/%{name}/scalaris-java.conf
+%config %{_sysconfdir}/%{name}/scalaris-java.conf.sample
+%config(noreplace) %{_sysconfdir}/%{name}/scalaris.properties
 
 %files client
 %defattr(-,root,root)

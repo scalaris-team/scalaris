@@ -29,7 +29,7 @@
 -export([
 	 start_link/1, start/2,
 
-	 read/1, read/2,
+	 read/1,
 
 	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
 	 pointerStabilizationInterval/0, failureDetectorInterval/0, 
@@ -40,8 +40,7 @@
 	 replicationFactor/0, quorumFactor/0, replicaPrefixes/0, 
 	 transactionLookupTimeout/0, tpFailureTimeout/0, 
 	 tmanagerTimeout/0,
-	 %readTimeout/0, 
-   leaderDetectorInterval/0, 
+	 readTimeout/0, leaderDetectorInterval/0, 
 	 testDump/0, testKeepAlive/0, register_hosts/0, listenPort/0, listenIP/0,
 	 knownHosts/0]).
 
@@ -55,20 +54,15 @@
 %%====================================================================
 
 %% @doc read config parameter
--spec(read/1 :: (atom()) -> any() | failed).
+%% @spec read(term()) -> term() | failed
 read(Key) ->
-    read(Key, failed).
-
-% @doc read with default-value
--spec(read/2 :: (atom(), any()) -> any()).
-read(Key, Default) ->
     case ets:lookup(config_ets, Key) of
 	[{Key, Value}] ->
 	    %% allow values defined as application environments to override
 	    Value;
 	[] ->
 	    case preconfig:get_env(Key, failed) of
-		failed -> Default;
+		failed -> failed;
 		X ->
 		    ets:insert(config_ets, {Key, X}),
 		    X
@@ -231,6 +225,10 @@ replicaPrefixes() ->
 transactionLookupTimeout()->
     read(transaction_lookup_timeout).
 
+%% @doc time out for read operations
+%% @spec readTimeout() -> integer() | failed
+readTimeout()->
+    read(read_timeout).
 
 tpFailureTimeout()->
     read(tp_failure_timeout).
@@ -275,15 +273,9 @@ knownHosts()->
 %%====================================================================
 
 start_link(Files) ->
-    TheFiles = case application:get_env(add_config) of
-                   {ok, ConfigFile} ->
-                       lists:append(Files, [ConfigFile]);
-                   _Else ->
-                       Files
-               end,
-    io:format("Config files: ~p~n", [TheFiles]),
+    io:format("Config files: ~p~n", [Files]),
     Owner = self(),
-    Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
+    Link = spawn_link(?MODULE, start, [Files, Owner]),
     receive
 	done ->
 	    ok;
@@ -293,9 +285,17 @@ start_link(Files) ->
     {ok, Link}.
 
 %@private
-start(Files, Owner) ->
+start([File], Owner) ->
     catch ets:new(config_ets, [set, protected, named_table]),
-    [ populate_db(File) || File <- Files],
+    populate_db(File),
+    Owner ! done,
+    loop();
+
+%@private
+start([Global, Local], Owner) ->
+    catch ets:new(config_ets, [set, protected, named_table]),
+    populate_db(Global),
+    populate_db(Local),
     Owner ! done,
     loop().
 

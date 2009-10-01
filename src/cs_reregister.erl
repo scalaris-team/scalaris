@@ -26,12 +26,12 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([trigger_reregister/0]).
+-export([reregister/0]).
 
-trigger_reregister() ->
+reregister() ->
     RegisterMessage = {register, cs_send:this()},
     reregister(config:register_hosts(), RegisterMessage),
-    cs_send:send_after(config:reregisterInterval(), self(), {reregister}).
+    erlang:send_after(config:reregisterInterval(), self(), {reregister}).
 
 reregister(failed, Message)->
     cs_send:send(config:bootPid(), Message);

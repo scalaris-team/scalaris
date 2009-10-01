@@ -38,13 +38,9 @@ Number of nodes:
 <erl> 
  out(Arg) ->
     erlang:put(instance_id, Arg#arg.opaque),
-    boot_server:number_of_nodes(),
-    receive
-        {get_list_length_response,Res} ->
-            ok
-    end,
-    {html, integer_to_list(Res)}.
+    {html, integer_to_list(boot_server:number_of_nodes())}.
 </erl>
+
 <p>
 <erl>
 out(A) ->

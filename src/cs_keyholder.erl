@@ -29,57 +29,55 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behaviour(gen_component).
+-include("chordsharp.hrl").
 
--include("../include/scalaris.hrl").
-
--export([start_link/1,init/1, on/2,set_key/1, get_key/0, reinit/0]).
+-export([start_link/1, start/1, set_key/1, get_key/0, reinit/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc sets the key of the cs_node
--spec(set_key/1 :: (?RT:key()) -> ok).
+-spec(set_key/1 :: (?RT:key()) -> any()).
 set_key(Key) ->
-    cs_send:send_local(get_pid() , {set_key_keyholder, Key}),ok.
+    get_pid() ! {set_key_keyholder, Key}.
 
 %% @doc reads the key of the cs_node
 -spec(get_key/0 :: () -> ?RT:key()).
 get_key() ->
-    cs_send:send_local(get_pid() , {get_key_keyholder, self()}),
-    %receive
-	%{get_key_response_keyholder, Key} ->
-	%    Key
-    %end.
-    ok.
+    get_pid() ! {get_key_keyholder, self()},
+    receive
+	{get_key_response_keyholder, Key} ->
+	    Key
+    end.
 
-init(_Arg) ->
-    get_initial_key(config:read(key_creator)).
-    
+start(InstanceId) ->
+    process_dictionary:register_process(InstanceId, cs_keyholder, self()),
+    Key = get_initial_key(config:read(key_creator)),
+    %@TODO reimplement
+    %error_logger:add_report_handler(cs_error_logger),
+    loop(Key).
 
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [InstanceId,[]], [{register, InstanceId, cs_keyholder}]).
-    
+    {ok, spawn_link(?MODULE, start, [InstanceId])}.
 
 reinit() ->
-    cs_send:send_local(get_pid() , {reinit}).
+    get_pid() ! {reinit}.
 
 
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Server process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-on({reinit},_Key) ->
-        get_initial_key(config:read(key_creator));
-on({set_key_keyholder, NewKey},_Key) -> 
-	    NewKey;
-on({get_key_keyholder, PID},Key) -> 
-	    cs_send:send_local(PID , {get_key_response_keyholder, Key}),
-	    Key;
-on(_, _State) ->
-    unknown_event.
+loop(Key) ->
+    receive
+    {reinit} ->
+        loop(get_initial_key(config:read(key_creator)));
+	{set_key_keyholder, NewKey} -> 
+	    loop(NewKey);
+	{get_key_keyholder, PID} -> 
+	    PID ! {get_key_response_keyholder, Key},
+	    loop(Key)
+	end.
 
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), cs_keyholder).

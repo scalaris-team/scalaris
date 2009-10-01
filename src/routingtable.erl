@@ -32,7 +32,7 @@
 % for routing table implementation
 -export([initialize/3]).
 
--include("../include/scalaris.hrl").
+-include("chordsharp.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Behaviour definition
@@ -58,11 +58,7 @@ behaviour_info(callbacks) ->
      % for debugging
      {dump, 1},
      % for bulkowner
-     {to_dict, 1},
-     % convert from internal representation to version for cs_node
-     {export_rt_to_cs_node, 4},
-     % update pred/succ in routing stored in cs_node
-     {update_pred_succ_in_cs_node, 3}
+     {to_dict, 1}
     ];
 %% userdevguide-end routingtable:behaviour
 
@@ -73,4 +69,4 @@ behaviour_info(_Other) ->
 
 initialize(Id, Pred, Succ) ->
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), routing_table),
-    cs_send:send_local(Pid , {init, Id, Pred, Succ}).
+    Pid ! {init, Id, Pred, Succ}.

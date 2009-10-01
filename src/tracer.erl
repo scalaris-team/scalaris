@@ -28,7 +28,7 @@ start_link() ->
 
 tracer(Pid) ->
     erlang:trace(all, true, [send, procs]),
-    cs_send:send_local(Pid , done),
+    Pid ! done,
     loop([]).
 
 loop(Ps) ->

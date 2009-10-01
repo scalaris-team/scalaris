@@ -38,15 +38,8 @@ Number of nodes:
 <erl> 
  out(Arg) ->
     erlang:put(instance_id, Arg#arg.opaque),
-    boot_server:number_of_nodes(),
-    receive
-        {get_list_length_response,Res} ->
-            ok
-    end,
-    {html, integer_to_list(Res)}.
+    {html, integer_to_list(boot_server:number_of_nodes())}.
 </erl>
-
-
 
 <p>
 <h3>Simple Storage </h3>
@@ -134,8 +127,7 @@ out(A) ->
 </erl>
 </p>
 
-<h3>Vivaldi Map</h3>
-<embed src="vivaldiMap.yaws"type="image/svg+xml"pluginspage="http://www.adobe.com/svg/viewer/install/" />
+
 
 <h3>Args</h3>
 <p>

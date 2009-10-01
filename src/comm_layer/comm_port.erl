@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -20,16 +20,14 @@
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fï¿½r Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(comm_port).
+-module(comm_layer.comm_port).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -behaviour(gen_server).
-
--include("../../include/scalaris.hrl").
 
 -import(ets).
 -import(gen_server).
@@ -233,7 +231,7 @@ open_sync_connection(Address, Port, Pid, Message, State) ->
 	    {reply, ok, State};
 	fail ->
 						% drop message (remote node not reachable, failure detector will notice)
-	    {reply, fail, State};
+	    {reply, ok, State};
 	{connection, LocalPid, NewSocket} ->
 	    comm_connection:send({Address, Port, NewSocket}, Pid, Message),
 	    ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),

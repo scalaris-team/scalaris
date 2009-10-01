@@ -21,19 +21,19 @@
 %% @author Monika Moser <moser@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(transaction).
+-module(transstore.transaction).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').
 
 -include("trecords.hrl").
--include("../include/scalaris.hrl").
+-include("../chordsharp.hrl").
 
 -export([do_transaction/5,
-         do_transaction_wo_readphase/6,
-         generateTID/1,
-         getRTMKeys/1,
-         initRTM/2,
+	 do_transaction_wo_readphase/6,
+	 generateTID/1,
+	 getRTMKeys/1,
+	 initRTM/2,
          write/3,
          read/2,
          delete/2,
@@ -42,9 +42,9 @@
          do_parallel_reads/4,
          parallel_quorum_reads/3,
          quorum_read/2,
-         do_quorum_read/3
-%        write_read_receive/3
-         ]).
+         do_quorum_read/3,
+%        write_read_receive/3,
+         translog_new/0]).
 
 -import(config).
 -import(cs_lookup).
@@ -57,7 +57,7 @@
 -import(node).
 -import(process_dictionary).
 -import(?RT).
--import(txlog).
+
 
 
 %%--------------------------------------------------------------------
@@ -72,7 +72,7 @@
 do_transaction(State, TransFun, SuccessMessage, FailureFun, Owner)->
     TID = transaction:generateTID(State),
     InstanceId = erlang:get(instance_id),
-    TM = spawn(tmanager, start_manager, [TransFun, SuccessMessage, FailureFun, Owner,  TID, InstanceId]),
+    TM = spawn(transstore.tmanager, start_manager, [TransFun, SuccessMessage, FailureFun, Owner,  TID, InstanceId]),
     {{tid, TID},{tm, TM}}.
 
 %%--------------------------------------------------------------------
@@ -88,7 +88,7 @@ do_transaction(State, TransFun, SuccessMessage, FailureFun, Owner)->
 do_transaction_wo_readphase(State, Items, _SuccessFunArgument, SuccessFun, FailureFun, Owner)->
     TID = transaction:generateTID(State),
     InstanceId = erlang:get(instance_id),
-    TM = spawn(tmanager, start_manager_commit, [Items, SuccessFun, FailureFun, Owner, TID, InstanceId]),
+    TM = spawn(transstore.tmanager, start_manager_commit, [Items, SuccessFun, FailureFun, Owner, TID, InstanceId]),
     {{tid, TID},{tm, TM}}.
 
 %%====================================================================
@@ -111,32 +111,42 @@ read(Key, TransLog)->
     read_or_write(Key, 0, TransLog, read).
 
 read_or_write(Key, Value, TransLog, Operation) ->
-    ElementsInTransLog = txlog:filter_by_key(TransLog, Key),
+    ElementsInTransLog = [ X || {_, ElemKey, _, _, _} = X <- TransLog,
+                                Key == ElemKey ],
+    NumInLog = length(ElementsInTransLog),
     %% check whether we have already logged the item
-    case ElementsInTransLog of
-        [Element] ->
+    if NumInLog > 1 ->
+            %% there should be only one entry per item
+            {{fail, fail}, TransLog};
+       NumInLog == 1 ->
             %% retrieve the information from the log.
             %% for a write, update the value and the version number.
-            case {txlog:get_entry_status(Element),Operation} of
-                {ok, write} ->
-                    {ok, txlog:update_entry(TransLog, Element, write, Value)};
-                {ok, read} ->
-                    {{value, txlog:get_entry_value(Element)}, TransLog};
-                _ ->
+            [Element] = ElementsInTransLog,
+            {LogOperation,LogKey,LogSuccess,LogValue,LogVersion} = Element,
+            if (LogSuccess == ok) and (Operation == write) ->
+                    NewVersion = case LogOperation of
+                                     write -> LogVersion;
+                                     read -> LogVersion + 1
+                                 end,
+                    NewElement = {write, LogKey, LogSuccess, Value, NewVersion},
+                    NewTransLog1 = lists:delete(Element, TransLog),
+                    NewTransLog2 = [NewElement | NewTransLog1],
+                    {ok, NewTransLog2};
+               (LogSuccess == ok) and (Operation == read) ->
+                    {{value, LogValue}, TransLog};
+               true ->
                     {{fail, fail}, TransLog}
             end;
-        [] ->
-            %% we do not have any information for the key in the log read the
-            %% information from remote
+       %% we do not have any information for the key in the log read the
+       %% information from remote
+       true ->
             ReplicaKeys = ?RT:get_keys_for_replicas(Key),
             [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
             erlang:send_after(config:transactionLookupTimeout(), self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
             {Flag, Result} = write_read_receive(ReplicaKeys, Operation),
             if Flag == fail ->
-                    NewTransLog =
-                        txlog:add_entry(TransLog,
-                          txlog:new_entry(Operation, Key, fail, 0, 0)),
+                    NewTransLog = [{Operation, Key, fail, 0, 0}| TransLog],
                     {{fail, Result}, NewTransLog};
                true -> %% Flag == value
                     {ReadVal, Version} = Result,
@@ -144,18 +154,12 @@ read_or_write(Key, Value, TransLog, Operation) ->
                                                write -> {Version + 1, Value};
                                                read -> {Version, ReadVal}
                                            end,
-                    NewTransLog =
-                      txlog:add_entry(TransLog,
-                        txlog:new_entry(Operation, Key, ok, NewVal, NewVersion)),
-
+                    NewTransLog = [{Operation, Key, ok, NewVal, NewVersion} | TransLog],
                     case Operation of
                         write -> {ok, NewTransLog};
                         read -> {{value, NewVal}, NewTransLog}
                     end
-            end;
-        _ ->
-            %% there should be only one entry per item
-            {{fail, fail}, TransLog}
+            end
     end.
 
 %%--------------------------------------------------------------------
@@ -166,7 +170,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
 %%--------------------------------------------------------------------
 quorum_read(Key, SourcePID)->
     InstanceId = erlang:get(instance_id),
-    spawn(transaction, do_quorum_read, [Key, SourcePID, InstanceId]).
+    spawn(transstore.transaction, do_quorum_read, [Key, SourcePID, InstanceId]).
 
 do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
@@ -245,7 +249,7 @@ write_read_receive(ReplicaKeys, Operation, State)->
 %%--------------------------------------------------------------------
 parallel_quorum_reads(Keys, TransLog, SourcePID)->
     InstanceId = erlang:get(instance_id),
-    spawn(transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
+    spawn(transstore.transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
 
 do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
     erlang:put(instance_id, InstanceId),
@@ -346,21 +350,26 @@ write_read_receive_parallel(Results, ReplicaKeys)->
         {get_key_response, Key, failed} ->
             NewResults = add_result(Results, Key, fail, Results),
             CRRes = check_results_parallel(NewResults, NewResults),
-            case CRRes of
-                continue ->
+            if
+                CRRes == continue ->
                     write_read_receive_parallel(NewResults, ReplicaKeys);
-                _ -> % {found, TLog}
+                %% should not occur? only for write operations
+                CRRes == fail ->
+                    {fail, not_found};
+                true -> % {found, TLog}
                     CRRes
             end;
         {get_key_response, Key, {ok, Value, Versionnr}} ->
-            NewResults = add_result(Results, Key, {Value, Versionnr}, Results),
-            CRRes = check_results_parallel(NewResults, NewResults),
-            case CRRes of 
-                continue ->
-                    write_read_receive_parallel(NewResults, ReplicaKeys);
-                _ -> % {found, TLog}
-                    CRRes
-            end;
+                NewResults = add_result(Results, Key, {Value, Versionnr}, Results),
+                CRRes = check_results_parallel(NewResults, NewResults),
+                if
+                    CRRes == fail ->
+                        {fail, not_found};
+                    CRRes == continue ->
+                        write_read_receive_parallel(NewResults, ReplicaKeys);
+                    true -> % {found, TLog}
+                        CRRes
+                end;
         {write_read_receive_timeout, _Key} ->
             {fail, timeout};
         Any ->
@@ -392,34 +401,34 @@ check_results_parallel([Head |Results], AllResults)->
             check_results_parallel(Results, AllResults);
         true ->
             TMPResults = [ Elem || Elem <- ResKey, Elem /= fail ],
-            TMPResultsFailed = [ Elem || Elem <- ResKey, Elem == fail ],
+            TMPResultsFailed = [ Elem || Elem <- Results, Elem == fail ],
 
             ReplFactor = config:replicationFactor(),
             QuorumFactor = config:quorumFactor(),
             NumSuccessfulResponses = length(TMPResults),
             NumFailedResponses = length(TMPResultsFailed),
 
-            if
-                NumSuccessfulResponses >= QuorumFactor ->
-                    MaxElem = get_max_element(TMPResults, {0,-1}),
-                    NewAllResults = lists:delete(Head, AllResults),
-                    NewAllResults2 = [{Key, ResKey, MaxElem} | NewAllResults],
-                    check_results_parallel(Results, NewAllResults2);
-                NumFailedResponses >= (QuorumFactor)->
-                    NewAllResults = lists:delete(Head, AllResults),
-                    NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
-                    check_results_parallel(Results, NewAllResults2);
-                true ->
-                    NumResponses = length(ResKey),
-                    if
-                        NumResponses == ReplFactor ->
-                            NewAllResults = lists:delete(Head, AllResults),
-                            NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
-                            check_results_parallel(Results, NewAllResults2);
-                        true ->
-                            continue
-                    end
-            end
+	    if
+		NumSuccessfulResponses >= QuorumFactor ->
+		    MaxElem = get_max_element(TMPResults, {0,-1}),
+		    NewAllResults = lists:delete(Head, AllResults),
+		    NewAllResults2 = [{Key, ResKey, MaxElem} | NewAllResults],
+		    check_results_parallel(Results, NewAllResults2);
+		NumFailedResponses >= (QuorumFactor)->
+		    NewAllResults = lists:delete(Head, AllResults),
+		    NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
+		    check_results_parallel(Results, NewAllResults2);
+		true ->
+		    NumResponses = length(ResKey),
+		    if
+			NumResponses == ReplFactor ->
+			    NewAllResults = lists:delete(Head, AllResults),
+			    NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
+			    check_results_parallel(Results, NewAllResults2);
+			true ->
+			    continue
+		    end
+	    end
     end.
 
 get_max_element([], {ValMaxElement, VersMaxElement})->
@@ -433,16 +442,16 @@ get_max_element([{Value, Versionnr}|Rest], {ValMaxElement, VersMaxElement})->
 build_translog(Results)->
     EndResultAccum = [],
     lists:foldl(fun(Elem, Acc)->
-                        {CurrKey, _ResultsForKey, {Value, Version}} = Elem,
-                        if
-                            Version == -1 ->
-                                [{read, CurrKey, fail, Value, Version}| Acc];
-                            true ->
-                                [{read, CurrKey, ok, Value, Version}| Acc]
-                        end
-                end,
-                EndResultAccum,
-                Results).
+			{CurrKey, _ResultsForKey, {Value, Version}} = Elem,
+			if
+			    Version == -1 ->
+				[{read, CurrKey, fail, Value, Version}| Acc];
+			    true ->
+				[{read, CurrKey, ok, Value, Version}| Acc]
+			end
+		end,
+		EndResultAccum,
+		Results).
 
 
 %%====================================================================
@@ -475,7 +484,7 @@ getRTMKeys(TID)->
 
 initRTM(State, Message)->
     TransID = Message#tm_message.transaction_id,
-    ERTMPID = spawn(tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
+    ERTMPID = spawn(transstore.tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
     RTMPID = cs_send:get(ERTMPID, cs_send:this()),
     %% update transaction log: store mapping between transaction ID and local TM
     TransLog = cs_state:get_trans_log(State),
@@ -486,11 +495,10 @@ initRTM(State, Message)->
 %% @doc deletes all replicas of an item, but respects locks
 %%      the return value is the number of successfully deleted items
 %%      WARNING: this function can lead to inconsistencies
--spec(delete/2 :: (cs_send:mypid(), any()) -> ok).
+-spec(delete/2 :: (cs_send:mypid(), any()) -> pos_integer()).
 delete(SourcePID, Key) ->
     InstanceId = erlang:get(instance_id),
-    spawn(transaction, do_delete, [Key, SourcePID, InstanceId]), 
-    ok.
+    spawn(transstore.transaction, do_delete, [Key, SourcePID, InstanceId]).
 
 do_delete(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
@@ -527,3 +535,14 @@ delete_collect_results(ReplicaKeys, Source_PID, Results) ->
 				       Results}})
     end.
 
+%%===============================================================================
+%% Functions to manipulate TransLog's
+%%===============================================================================
+
+%%-------------------------------------------------------------------------------
+%% Function: new_translog/0
+%% Purpose:  create an empty list
+%% Returns:  empty list
+%%-------------------------------------------------------------------------------
+translog_new()->
+    trecords:new_translog().

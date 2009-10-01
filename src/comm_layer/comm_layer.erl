@@ -25,7 +25,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id $
--module(comm_layer).
+-module(comm_layer.comm_layer).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -36,7 +36,7 @@
 -import(util).
 -import(log).
 
--include("../../include/scalaris.hrl").
+-include("comm_layer.hrl").
 
 
 % @TODO: should be ip
@@ -58,18 +58,18 @@ start_link() ->
 send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
     {MyIP,MyPort} = comm_port:get_local_address_port(),
     %io:format("send: ~p:~p -> ~p:~p(~p) : ~p\n", [MyIP, MyPort, _IP, _Port, _Pid, Message]),
-    IsLocal = (MyPort =:= _Port) andalso (MyIP =:= _IP),
+    IsLocal = (MyIP == _IP) and (MyPort == _Port),
     if
  	IsLocal ->        
-%	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(term_to_binary(Message))),
+	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(term_to_binary(Message))),
  	    _Pid ! Message;
  	true ->
 	    comm_port:send(Target, Message)
     end;
 
 send(Target, Message) ->
-    log:log(error,"[ CL ] wrong call to cs_send:send: ~w ! ~w", [Target, Message]),
-    log:log(error,"[ CL ] stacktrace: ~w", [util:get_stacktrace()]),
+    log:log(error,"[ CC ] wrong call to cs_send:send: ~w ! ~w", [Target, Message]),
+    log:log(error,"[ CC ] stacktrace: ~w", [util:get_stacktrace()]),
     ok.
 
 %% @doc returns process descriptor for the calling process

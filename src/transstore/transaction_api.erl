@@ -18,7 +18,7 @@
 %%%
 %%% Created : 17 Sep 2007 by Monika Moser <moser@zib.de>
 %%%-------------------------------------------------------------------
--module(transaction_api).
+-module(transstore.transaction_api).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').
@@ -34,7 +34,6 @@
 -import(cs_send).
 -import(erlang).
 -import(io).
--import(ct).
 -import(lists).
 -import(process_dictionary).
 -import(random).
@@ -77,7 +76,7 @@
 quorum_read(Key)->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
     RTO = 2000,
-    transaction:quorum_read(Key, cs_send:this()),
+    transstore.transaction:quorum_read(Key, cs_send:this()),
     receive
         {single_read_return, {value, Page, Version}}->
             ?TLOG2("read_page returned", [Page]),
@@ -119,17 +118,24 @@ parallel_quorum_reads(Keys, _Par)->
 %% * for {fail, fail} the reason is currently unknown, should 
 %%   not occur 
 single_write(Key, Value)->
-    %% ?TLOGN("starting a single write function on ~p, value ~p", [Key, Value]),
+%    ?TLOGN("starting a single write function on ~p, value ~p", [Key, Value]),
     TFun = fun(TLog)->
-                   {Result, TLog2} = write(Key, Value, TLog),
-                   case Result of
-                       ok -> {{ok, Value}, TLog2};
-                       _ -> {Result, TLog2}
-                   end
-           end,
-    SuccessFun = fun({Result, _ReadPhaseResult}) -> Result end,
-    FailureFun = fun(Reason) -> {fail, Reason} end,
-    do_transaction(TFun, SuccessFun, FailureFun).
+		   {Result, TLog2} = write(Key, Value, TLog),
+		   if
+		       Result == ok ->
+			   {{ok, Value}, TLog2};
+		       true ->
+			   {Result, TLog2}
+		   end
+	   end,
+    SuccessFun = fun({Result, _ReadPhaseResult}) ->
+			 Result
+		 end,
+    FailureFun = fun(Reason)->
+			 {fail, Reason} end,
+    do_transaction(TFun, SuccessFun, FailureFun). %% returns Messages returned by either SuccessFun or FailureFun
+    
+    
 
 %% use this function to do a full transaction including a readphase
 do_transaction(TFun, SuccessFun, FailureFun)->
@@ -138,15 +144,15 @@ do_transaction(TFun, SuccessFun, FailureFun)->
     %{_, LocalCSNode} = process_dictionary:find_cs_node(),
     LocalCSNode ! {do_transaction, TFun, SuccessFun, FailureFun, cs_send:this()},
     receive
-        {trans, Message}->
-            Message
+	{trans, Message}->
+	    Message
     end.
 
 %% Use this function to do a transaction without a read phase
 %% Thus it is necessary to provide a proper list with items for TMItems
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
     {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
-    if
+    if 
 	Flag /= ok->
 	    fail;
 	true ->
@@ -181,7 +187,7 @@ commit(TransLog)->
 %% Description: Needs a TransLog to collect all operations  
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
-write(Key, Value, TransLog) ->
+write(Key, Value, TransLog)->
     transaction:write(Key, Value, TransLog).
 
 %%--------------------------------------------------------------------
@@ -213,7 +219,7 @@ read2(TransLog, Key) ->
     case read(Key, TransLog) of
 	{{fail, _Details}, _TransLog1} = Result ->
 	    throw({abort, Result});
-	{{value, Value}, TransLog1} ->
+	{{value, Value}, TransLog1} = _Result ->
 	    {Value, TransLog1}
     end.
 

@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("../include/scalaris.hrl").
+-include("chordsharp.hrl").
 
 -export([new/0, balance_load/1, check_balance/3, get_middle_key/1, move_load/3, 
 	 get_loadbalance_flag/1, reset_loadbalance_flag/1]).
@@ -34,14 +34,14 @@
 -record(lb, {loadbalance_flag, reset_ref, last_keys}).
 
 new() ->
-    ResetRef=cs_send:send_after(config:loadBalanceInterval(), self(), {reset_loadbalance_flag}),
+    ResetRef=erlang:send_after(config:loadBalanceInterval(), self(), {reset_loadbalance_flag}),
     #lb{loadbalance_flag=true, reset_ref=ResetRef, last_keys=gb_sets:new()}.
 
 balance_load(State) ->
     RT = cs_state:rt(State),
     Fingers = ?RT:to_pid_list(RT),
     lists:foreach(fun(Node) -> cs_send:send(Node, {get_load, cs_send:this()}) end, Fingers),    
-    cs_send:send_after(config:loadBalanceInterval(), self(), {stabilize_loadbalance}).
+    erlang:send_after(config:loadBalanceInterval(), self(), {stabilize_loadbalance}).
 
 check_balance(State, Source_PID, Load) ->
     MyLoad = ?DB:get_load(cs_state:get_db(State)),
@@ -87,12 +87,12 @@ move_load(State, _, NewId) ->
     drop_data(State),
     cs_keyholder:set_key(NewId),
     PredIsNull = node:is_null(Pred),
-    cs_send:send_local(self() , {kill}),
+    self() ! {kill},
     cs_send:send(Succ, {pred_left, Pred}),
     if 
 	not PredIsNull ->
 	    PredPid = cs_state:pred_pid(State),
-	    cs_send:send(PredPid, {succ_left, cs_state:me(State)});
+	    cs_send:send(PredPid, {succ_left, cs_state:succ_list(State)});
 	true ->
 	    void
     end,
@@ -127,7 +127,7 @@ get_loadbalance_flag(State) ->
     get_loadbalance_flag(cs_state:get_lb(State)).
 
 set_loadbalance_flag(LB) ->
-    ResetRef=cs_send:send_after(config:loadBalanceFlagResetInterval(), self(), {reset_loadbalance_flag}),
+    ResetRef=erlang:send_after(config:loadBalanceFlagResetInterval(), self(), {reset_loadbalance_flag}),
     LB#lb{loadbalance_flag=true, reset_ref=ResetRef}.
 
 cancel_reset(#lb{reset_ref=ResetRef}) ->

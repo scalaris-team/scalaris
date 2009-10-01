@@ -65,7 +65,7 @@ try_port(Port) ->
 	{ok, Sock} ->
 	    gen_tcp:close(Sock),
 	    true;
-	_  ->
+	X  ->
 	    false
     end.
     

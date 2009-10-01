@@ -25,13 +25,13 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 
--module(tparticipant).
+-module(transstore.tparticipant).
 
 -author('moser@zib.de').
 -vsn('$Id$ ').
 
 -include("trecords.hrl").
--include("../include/scalaris.hrl").
+-include("../chordsharp.hrl").
 
 -export([tp_validate/3, tp_commit/2, tp_abort/2]).
 

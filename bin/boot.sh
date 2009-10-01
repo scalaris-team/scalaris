@@ -20,18 +20,5 @@ LOCAL_CFG="$DIRNAME/scalaris.local.cfg.sh"
 if [ -f "$GLOBAL_CFG" ] ; then source "$GLOBAL_CFG" ; fi
 if [ -f "$LOCAL_CFG" ] ; then source "$LOCAL_CFG" ; fi
 
-TCERLFLAGS=@ERLANG_TCERL_FLAGS@
-
-FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
-if [ "x0" = "x$FQDN_SET" ]; then
-    echo "you have to set a fully qualified domain name (FQDN)"
-    exit -1
-fi
-
-
-
-erl $TCERLFLAGS $ERL_OPTS +S 4 +A 4  -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin \
-    -yaws embedded true -connect_all false \
-    -chordsharp cs_port 14196 \
-    -chordsharp yaws_port 8001 \
-    -name node -s chordsharp
+export ERL_MAX_PORTS=16384
+erl $ERL_OPTS +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -name boot -s boot

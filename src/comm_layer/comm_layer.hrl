@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,31 +12,19 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : chordsharp_app.erl
+%%% File    : comm_layer.hrl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : chordsharp application file
+%%% Description : 
 %%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
+%%% Created : 31 Jul 2008 by Thorsten Schuett <schuett@csr-pc11.zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(chordsharp_app).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behaviour(application).
+% enable logging of message statistics
+%-define(LOG_MESSAGE(TAG, SIZE), comm_layer.comm_logger:log(TAG, SIZE)).
+-define(LOG_MESSAGE(TAG, SIZE), ok).
 
--export([start/2, stop/1]).
-
-start(normal, _Args) ->
-    process_dictionary:start_link(),
-    Sup = cs_sup_standalone:start_link(),
-    Sup;
-    
-start(_, _) ->
-    {error, badarg}.
-
-stop(_State) ->
-    ok.
