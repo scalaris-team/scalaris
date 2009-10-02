@@ -31,8 +31,10 @@
          wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0,
          find/2, logger/0, dump3/0, uniq/1, get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
-         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2]).
+         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2]).
 
+parameterized_start_link(Module, Parameters) ->
+    apply(Module, start_link, Parameters).
 
 escape_quotes(String) ->
 	lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).

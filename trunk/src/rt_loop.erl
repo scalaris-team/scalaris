@@ -21,7 +21,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(rt_loop).
+-module(rt_loop, [Trigger]).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -57,7 +57,7 @@
 %% @spec start_link(term()) -> {ok, pid()}
 -spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [InstanceId], []).
+    gen_component:start_link(?MODULE:new(Trigger), [InstanceId], []).
 
 -spec(init/1 :: ([any()]) -> state()).
 init([InstanceId]) ->

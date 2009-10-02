@@ -91,7 +91,8 @@ init([Options]) ->
 	 []},
     RoutingTable =
 	{routingtable,
-	 {rt_loop, start_link, [InstanceId]},
+	 {util, parameterized_start_link, [rt_loop:new(config:read(routingtable_trigger)),
+                                           [InstanceId]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
