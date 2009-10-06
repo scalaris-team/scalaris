@@ -88,7 +88,7 @@ init(_) ->
     ets:new(?MODULE, [set, protected, named_table]),
     {}.
 
-%% @spec start_link(term()) -> {ok, pid()}
+-spec(start_link/0 :: () -> {ok, pid()}).
 start_link() ->
     gen_component:start_link(?MODULE, [], [{register_native, ?MODULE}]).
 
