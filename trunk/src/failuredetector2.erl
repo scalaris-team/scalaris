@@ -212,7 +212,7 @@ kill_pinger(Target) ->
 subscribe(Target, Subscriber) ->
 	fd_db:add_subscription(Subscriber, Target).
 
--spec(unsubscribe/2 :: (cs_node:mypid(),pid()) -> ok).
+-spec(unsubscribe/2 :: (cs_send:mypid(),pid()) -> ok).
 unsubscribe(Target, Subscriber) ->
 	fd_db:del_subscription(Subscriber, Target),
 	case fd_db:get_subscribers(Target) of
