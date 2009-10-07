@@ -41,11 +41,15 @@
 -ifdef(types_are_builtin).
 -type(rt()::gb_tree()).
 -type(external_rt()::gb_tree()).
+-type(dict_type() :: dict()).
 -else.
 -type(rt()::gb_trees:gb_tree()).
 -type(external_rt()::gb_trees:gb_tree()).
+-type(dict_type() :: dict:dictionary()).
 -endif.
 -type(index() :: {pos_integer(), pos_integer()}).
+
+-type(state()::rt()).
 %% userdevguide-end rt_chord:types
 
 %%====================================================================
@@ -161,7 +165,7 @@ next_index({I, J}) ->
 % 2 -> next longer finger
 % 3 -> ...
 % n -> me
--spec(to_dict/1 :: (cs_state:state()) -> dict:dictionary()).
+-spec(to_dict/1 :: (cs_state:state()) -> dict_type()).
 to_dict(State) ->
     RT = cs_state:rt(State),
     Succ = cs_state:succ(State),

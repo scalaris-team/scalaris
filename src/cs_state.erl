@@ -48,7 +48,17 @@
 	 set_trans_log/2]).
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {routingtable, successor, predecessor, me, my_range, lb, deadnodes, join_time, trans_log, db}).
+-record(state, {routingtable :: ?RT:rt(), 
+		successor, 
+		predecessor, 
+		me, 
+		my_range, 
+		lb, 
+		deadnodes, 
+		join_time, 
+		trans_log, 
+		db}).
+-type(state() :: #state{}).
 
 new(RT, Successor, Predecessor, Me, MyRange, LB) ->
     new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new(node:id(Me))).
