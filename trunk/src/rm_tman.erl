@@ -94,14 +94,12 @@ on({get_predlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,
     end,
     {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
 
-
-
-on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  -> % new stabilization interval
+on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  -> 
     
     % Triger an update of the Random view
     cs_send:send_local(get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
     RndView=get_RndView(RandViewSize,Cache),
-            %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
+    %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
     {Pred,Succ} =get_safe_pred_succ(Preds,Succs,RndView,Me),
             %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
             %Test for being alone
@@ -133,7 +131,7 @@ on({rm_buffer,Q,Buffer_q},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerSta
     update_failuredetector(Preds,Succs,PredsNew,SuccsNew),
     NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval,Churn),
     NewChurn = new_churn(Preds,Succs,PredsNew,SuccsNew),
-    NewTriggerState = Trigger:trigger_next(TriggerState,2),
+    NewTriggerState = Trigger:trigger_next(TriggerState,NewInterval),
     {Id, Me, PredsNew, SuccsNew,RandViewSize,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,Cache,NewChurn};
 on({rm_buffer_response,Buffer_p},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
     RndView=get_RndView(RandViewSize,Cache),
@@ -152,10 +150,10 @@ on({rm_buffer_response,Buffer_p},{Id, Me, Preds, Succs,RandViewSize,Interval,Tri
                           false ->
             RandViewSize
                       end,
-    NewTriggerState = Trigger:trigger_next(TriggerState,1),
+    NewTriggerState = Trigger:trigger_next(TriggerState,NewInterval),
     {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,Cache,NewChurn};
 on({zombie,Node},{Id, Me, Preds, Succs,RandViewSize,_Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    NewTriggerState = Trigger:trigger_next(TriggerState,2),
+    NewTriggerState = Trigger:trigger_next(TriggerState,3),
     cs_send:send_local(self_man:get_pid(),{update,?MODULE,stabilizationInterval,self(),config:stabilizationInterval_min()}),
     {Id, Me, Preds, Succs,RandViewSize,config:stabilizationInterval_min(),NewTriggerState,AktPred,AktSucc,[Node|Cache],Churn};
 on({crash, DeadPid},{Id, Me, Preds, Succs,_RandViewSize,_Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
@@ -163,7 +161,7 @@ on({crash, DeadPid},{Id, Me, Preds, Succs,_RandViewSize,_Interval,TriggerState,A
     SuccsNew = filter(DeadPid, Succs),
     NewCache = filter(DeadPid, Cache),
     update_failuredetector(Preds,Succs,PredsNew,SuccsNew ),
-    NewTriggerState = Trigger:trigger_next(TriggerState,2),
+    NewTriggerState = Trigger:trigger_next(TriggerState,3),
     {Id, Me, PredsNew ,SuccsNew,0,config:stabilizationInterval_min(),NewTriggerState,AktPred,AktSucc ,NewCache,Churn};
 on({'$gen_cast', {debug_info, Requestor}},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
     cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Preds]))},
@@ -288,24 +286,13 @@ get_safe_pred_succ(Preds,Succs,RndView,Me) ->
             {hd(Preds), hd(Succs)}
     end.
 % @doc adaptize the Tman-interval
-new_interval(Preds,Succs,PNew,SNew,Interval,Churn) ->
+new_interval(Preds,Succs,PNew,SNew,_Interval,Churn) ->
    
-    case (((Preds++Succs)==(PNew++SNew)) and (Churn==0)) of
+    case (((Preds++Succs)=:=(PNew++SNew)) and (Churn==0)) of
         true ->                 % incresing the timer
-            cs_send:send_local(self_man:get_pid(),{no_churn}),
-            case (Interval >= config:stabilizationInterval_max() ) of
-                true -> config:stabilizationInterval_max();
-                false -> Interval + ((config:stabilizationInterval_max() - config:stabilizationInterval_min()) div 10)
-
-            end;
-            
-            %config:stabilizationInterval_max();
+           0;
         false ->
-%					case (Interval - (config:stabilizationInterval_max()-config:stabilizationInterval_min()) div 2) =< (config:stabilizationInterval_min()  ) of
-%						true -> config:stabilizationInterval_min() ;
-%						false -> Interval - (config:stabilizationInterval_max()-config:stabilizationInterval_min()) div 2
-%					end
-            config:stabilizationInterval_min()
+           2
     end.
 new_churn(Preds,Succs,PNew,SNew) ->
     case((Preds++Succs)=:=(PNew++SNew)) of
