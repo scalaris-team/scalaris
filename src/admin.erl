@@ -27,7 +27,8 @@
 -vsn('$Id$ ').
 
 -export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0, 
-	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1, dd_check_ring/1,dd_check_ring/0 ]).
+	 get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0, check_routing_tables/1,
+         dd_check_ring/1,dd_check_ring/0, number_of_nodes/0 ]).
 
 %%====================================================================
 %% API functions
@@ -105,6 +106,15 @@ get_id(Node) ->
 	    	node:id(Node)
     end.    
 
+number_of_nodes() ->
+    boot_server:number_of_nodes(),
+    receive
+        {get_list_length_response, X} ->
+            X
+    after
+        5000 ->
+            timeout
+    end.
 
 %%===============================================================================
 %% comm_logger functions
