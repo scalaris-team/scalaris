@@ -49,9 +49,9 @@ init(_Args) ->
     log:log(info,"[ SM ~p ] starting self_man", [self()]),
     {gb_trees:empty(),Start}.
 
-on({subscribe,Pid,Module,ValueName,Min,Max,Value},{State,Start}) ->
-    %io:format("[ SM ] ~p~n ",[{subscribe,Pid,Module,ValueName,Min,Max,Value}]),
-    {gb_trees:enter({Module,ValueName,Pid},{Min,Max,Value},State),Start};
+on({subscribe,Pid,Module,ValueName,Min,Max,Value,Mesg},{State,Start}) ->
+    io:format("[ SM ] ~p~n ",[{subscribe,Pid,Module,ValueName,Min,Max,Value,Mesg}]),
+    {gb_trees:enter({Module,ValueName,Pid},{Min,Max,Value,Mesg},State),Start};
 on({unsubscribe,Pid,Module,ValueName},{State,Start}) ->
     %io:format("[ SM ] ~p~n ",[{unsubscribe,Pid,Module,ValueName}]),
     {gb_trees:delete({Module,ValueName,Pid},State),Start};
@@ -60,16 +60,15 @@ on({update,Module,ValueName,Pid,Value},{State,Start})->
     {update(Module,ValueName,Pid,Value,State),Start};
 
 on({no_churn},{State,Start}) ->
-    cs_send:send_local(get_pid_rt(),{no_churn}),
+    %%cs_send:send_local(get_pid_rt(),{no_churn}),
     {State,Start}.
 
 
 
 update(Module,ValueName,Pid,NewValue,State) ->
-    {Min,Max,_Value} = gb_trees:get({Module,ValueName,Pid},State),
+    {Min,Max,_Value,Mesg} = gb_trees:get({Module,ValueName,Pid},State),
     %log_to_file(Module,ValueName,Min,Max,NewValue,Start),
-
-    gb_trees:enter({Module,ValueName,Pid},{Min,Max,NewValue},State).
+    gb_trees:enter({Module,ValueName,Pid},{Min,Max,NewValue,Mesg},State).
 
 
 log_to_file(Module,ValueName,_Min,_Max,NewValue,Start) ->

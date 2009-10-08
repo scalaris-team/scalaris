@@ -21,17 +21,39 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
--module(cs_reregister).
+-module(cs_reregister,[Trigger]).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([trigger_reregister/0]).
+-export([start_link/1,init/1,on/2, get_base_interval/0]).
+-behavior(gen_component).
+
+
+
+start_link(InstanceId) ->
+   gen_component:start_link(?MODULE:new(Trigger), [], [{register, InstanceId, cs_reregister}]).
+
+init(_Args_) ->
+    uninit.
+
+on({go},uninit) ->
+    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState2 = Trigger:trigger_first(TriggerState,1),
+    TriggerState2;
+on(_,uninit) ->
+    uninit;
+on({trigger},TriggerState) ->
+    trigger_reregister(),
+    Trigger:trigger_next(TriggerState,1);
+on(_, _State) ->
+    unknown_event.
+
 
 trigger_reregister() ->
-    RegisterMessage = {register, cs_send:this()},
-    reregister(config:register_hosts(), RegisterMessage),
-    cs_send:send_after(config:reregisterInterval(), self(), {reregister}).
+    RegisterMessage = {register,get_cs_node_this()},
+    reregister(config:register_hosts(), RegisterMessage).
+    
 
 reregister(failed, Message)->
     cs_send:send(config:bootPid(), Message);
@@ -42,3 +64,16 @@ reregister(Hosts, Message) ->
 		  Hosts).
 
 
+get_base_interval() ->
+    config:read(reregister_interval).
+
+
+get_cs_node_this() ->
+    InstanceId = erlang:get(instance_id),
+    if
+	InstanceId == undefined ->
+	   log:log(error,"[ CS_REREGISTER ] ~p", [util:get_stacktrace()]);
+	true ->
+	    ok
+    end,
+    cs_send:get(process_dictionary:lookup_process(InstanceId, cs_node),cs_send:this()) .

@@ -40,7 +40,7 @@ join_request(State, Source_PID, Id, UniqueId) ->
     Pred = node:new(Source_PID, Id, UniqueId),
     {DB, HisData} = ?DB:split_data(cs_state:get_db(State), cs_state:id(State), Id),
     cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData}),
-    ?RM:update_pred(Pred),
+    ring_maintenance:update_pred(Pred),
     cs_state:set_db(State, DB).
 %% userdevguide-end cs_join:join_request
 

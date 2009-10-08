@@ -84,7 +84,9 @@ init([Options]) ->
 	 []},
     RingMaintenance =
 	{?RM,
-	 {?RM, start_link, [InstanceId]},
+	
+         {util, parameterized_start_link, [?RM:new(config:read(ringmaintenance_trigger)),
+                                           [InstanceId]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
@@ -99,14 +101,23 @@ init([Options]) ->
 	 []},
     DeadNodeCache = 
 	{deadnodecache,
-	 {dn_cache, start_link, [InstanceId]},
+	  {util, parameterized_start_link, [dn_cache:new(config:read(dn_cache_trigger)),
+                                           [InstanceId]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
 	 []},
     Vivaldi =
         {vivaldi,
-         {vivaldi, start_link, [InstanceId]},
+          {util, parameterized_start_link, [vivaldi:new(config:read(vivaldi_trigger)),
+                                           [InstanceId]]},
+         permanent,
+         brutal_kill,
+         worker,
+         []},
+     CS_Reregister =
+        {cs_reregister,
+         {util, parameterized_start_link,[cs_reregister:new(config:read(cs_reregister_trigger)),[InstanceId]]},
          permanent,
          brutal_kill,
          worker,
@@ -120,7 +131,8 @@ init([Options]) ->
          []},
      Cyclon =
 	{cyclon,
-	 {cyclon, start_link, [InstanceId]},
+	 {util, parameterized_start_link, [cyclon:new(config:read(cyclon_trigger)),
+             [InstanceId]]},
 	 permanent,
 	 brutal_kill,
 	 worker,
@@ -135,13 +147,15 @@ init([Options]) ->
     {ok, {{one_for_one, 10, 1},
 	  [
            Self_Man,
-	   KeyHolder,
+	   CS_Reregister,
+           KeyHolder,
            RoutingTable,
            Supervisor_AND,
            Cyclon,
            DeadNodeCache,
            RingMaintenance,
            Vivaldi
+           
            %,DC_Clustering
 	  
 	   %_RSE

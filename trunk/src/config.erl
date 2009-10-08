@@ -32,7 +32,7 @@
 	 read/1, read/2,
 
 	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
-	 pointerStabilizationInterval/0, failureDetectorInterval/0, 
+	 pointerBaseStabilizationInterval/0, failureDetectorInterval/0,
 	 bootPid/0, 
 	 logPid/0, loadBalanceInterval/0, loadBalanceStartupInterval/0, loadBalanceFlagResetInterval/0, 
 	 collectorInterval/0, error_log_file/0, 
@@ -107,8 +107,8 @@ stabilizationInterval_min() ->
 
 %% @doc the interval between two finger/pointer stabilization runs
 %% @spec pointerStabilizationInterval() -> integer() | failed
-pointerStabilizationInterval() ->
-    read(pointer_stabilization_interval).
+pointerBaseStabilizationInterval() ->
+    read(pointer_base_stabilization_interval).
 
 %% @doc interval between two load balance rounds
 %% @spec loadBalanceInterval() -> integer() | failed

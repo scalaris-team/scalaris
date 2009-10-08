@@ -142,13 +142,13 @@ dump(State) ->
     ok.
 
 details(State) ->
-    ?RM:get_predlist(),
+    ring_maintenance:get_predlist(),
     Predlist =  receive
                     {get_predlist_response, X} ->      
                         X
                    
                 end,
-    ?RM:get_successorlist(),
+    ring_maintenance:get_successorlist(),
     SuccList = receive
                    {get_successorlist_response, Y} ->
                         Y
