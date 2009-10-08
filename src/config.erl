@@ -106,7 +106,7 @@ stabilizationInterval_min() ->
     read(stabilization_interval_min).
 
 %% @doc the interval between two finger/pointer stabilization runs
-%% @spec pointerStabilizationInterval() -> integer() | failed
+%% @spec pointerBaseStabilizationInterval() -> integer() | failed
 pointerBaseStabilizationInterval() ->
     read(pointer_base_stabilization_interval).
 
