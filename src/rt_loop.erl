@@ -30,12 +30,12 @@
 
 % for routing table implementation
 -export([start_link/1]).
--export([init/1, on/2]).
+-export([init/1, on/2, get_base_interval/0]).
 
 -include("../include/scalaris.hrl").
 
 % state of the routing table loop
--type(state() :: {Id::?RT:key(), 
+-type(state() :: {Id::?RT:key(),
 		  Pred::node:node_type(), 
 		  Succ::node:node_type(), 
 		  RTState::?RT:rt()}).
@@ -57,15 +57,14 @@
 %% @spec start_link(term()) -> {ok, pid()}
 -spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE:new(Trigger), [InstanceId], []).
+    gen_component:start_link(?MODULE:new(Trigger), [], [{register, InstanceId,routing_table} ]).
 
 -spec(init/1 :: ([any()]) -> state()).
-init([InstanceId]) ->
-    process_dictionary:register_process(InstanceId, routing_table, self()),
+init(_Args) ->
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,pointer_stabilization_interval,config:pointerStabilizationInterval(),config:pointerStabilizationInterval(),config:pointerStabilizationInterval()}),
-    {uninit}.
+    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    {uninit, TriggerState}.
     
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -74,21 +73,22 @@ init([InstanceId]) ->
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
 
-on({init, Id, Pred, Succ},{uninit}) ->
-    {Id, Pred, Succ, ?RT:empty(Succ),0};
-on(Message,{uninit}) ->
+on({init, Id, Pred, Succ},{uninit, TriggerState}) ->
+    
+    TriggerState2 = Trigger:trigger_next(TriggerState, make_utility(0)),
+    {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
+
+on(Message,{uninit, TriggerState}) ->
     cs_send:send_local(self() , Message),
-    {uninit};
+    {uninit, TriggerState};
 
 % re-initialize routing table
-on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState,Token}) ->
+on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState,TriggerState}) ->
     check(RTState, ?RT:empty(NewSucc), Id2, NewPred, NewSucc),
-    {Id2, NewPred, NewSucc, ?RT:empty(NewSucc),Token};
-on({no_churn}, {Id, Pred, Succ, RTState,Token}) ->
-    cs_send:send_after(101, self(), {stabilize,Token+1}),
-    {Id, Pred, Succ, RTState,Token+1};
+    {Id2, NewPred, NewSucc, ?RT:empty(NewSucc),TriggerState};
+
 % start new periodic stabilization
-on({stabilize,Token}, {Id, Pred, Succ, RTState,Token}) ->
+on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     %io:format("[ RT ] stabilize~n"),
     Pid = process_dictionary:lookup_process(erlang:get(instance_id), cs_node),
     % get new pred and succ from cs_node
@@ -98,36 +98,36 @@ on({stabilize,Token}, {Id, Pred, Succ, RTState,Token}) ->
     check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
     %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    {Id, Pred, Succ, NewRTState,Token};
-on({stabilize,_}, {Id, Pred, Succ, RTState,Token}) ->
-    {Id, Pred, Succ, RTState,Token};
+    TriggerState2 = Trigger:trigger_next(TriggerState, make_utility(?RT:get_size(RTState))),
+    {Id, Pred, Succ, NewRTState,TriggerState2};
+
 % got new predecessor/successor
-on({get_pred_succ_response, NewPred, NewSucc}, {Id, _, _, RTState,Token}) ->
-    {Id, NewPred, NewSucc, RTState,Token};
+on({get_pred_succ_response, NewPred, NewSucc}, {Id, _, _, RTState, TriggerState}) ->
+    {Id, NewPred, NewSucc, RTState, TriggerState};
 
 %
-on({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState,Token}) ->
+on({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
     NewRTState = ?RT:stabilize(Id, Succ, RTState, Index, Node),
     check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState,Token};
+    {Id, Pred, Succ, NewRTState, TriggerState};
 
 %
-on({lookup_pointer_response, Index, Node}, {Id, Pred, Succ, RTState,Token}) ->
+on({lookup_pointer_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
     NewRTState = ?RT:stabilize_pointer(Id, RTState, Index, Node),
     check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState,Token};
+    {Id, Pred, Succ, NewRTState, TriggerState};
 
 % failure detector reported dead node
-on({crash, DeadPid}, {Id, Pred, Succ, RTState,Token}) ->
+on({crash, DeadPid}, {Id, Pred, Succ, RTState, TriggerState}) ->
     NewRT = ?RT:filterDeadNode(RTState, DeadPid),
     check(RTState, NewRT, Id, Pred, Succ, false),
-    {Id, Pred, Succ, NewRT,Token};
+    {Id, Pred, Succ, NewRT, TriggerState};
 
 % debug_info for web interface
-on({'$gen_cast', {debug_info, Requestor}}, {Id, Pred, Succ, RTState,Token}) ->
+on({'$gen_cast', {debug_info, Requestor}}, {Id, Pred, Succ, RTState, TriggerState}) ->
     cs_send:send_local(Requestor , {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, 
 				       {"rt_size", ?RT:get_size(RTState)}]}),
-    {Id, Pred, Succ, RTState,Token};
+    {Id, Pred, Succ, RTState, TriggerState};
 
 % unknown message
 on(_UnknownMessage, _State) ->
@@ -161,3 +161,10 @@ check_fd(NewRT, OldRT) ->
     OldNodes = util:minus(OldView,NewView),
     failuredetector2:unsubscribe(OldNodes),
     failuredetector2:subscribe(NewNodes).
+
+get_base_interval() ->
+    config:pointerBaseStabilizationInterval().
+
+make_utility(RTSize) ->
+    Now = erlang:now(),
+    fun (T, C) -> 10 + 5 * (1 + C) * timer:now_diff(T, Now)  + RTSize / 2 end.

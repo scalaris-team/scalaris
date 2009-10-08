@@ -21,18 +21,15 @@
 %% @author Christian Hennig <hennig@zib.de>
 %% @copyright 2007-2009 Konrad-Zuse-Zentrum f�r Informationstechnik Berlin
 %% @version $Id$
--module(dn_cache).
+-module(dn_cache,[Trigger]).
 
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
--export([init/1,on/2]).
+-export([init/1,on/2, get_base_interval/0]).
 -behavior(gen_component).
 
--export([start_link/1, 
-		subscribe/0,
-		unsubscribe/0,
-	 	add_zombie_candidate/1]).
+-export([start_link/1]).
 
 
 
@@ -46,7 +43,7 @@ start_link(InstanceId) ->
     start_link(InstanceId, []).
 
 start_link(InstanceId,Options) ->
-   gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, dn_cache}]).
+   gen_component:start_link(?MODULE:new(Trigger), [InstanceId, Options], [{register, InstanceId, dn_cache}]).
 
 
 
@@ -66,28 +63,32 @@ unsubscribe() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init(_ARG) ->
-    cs_send:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
-    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,zombieDetectorInterval,config:read(zombieDetectorInterval),config:read(zombieDetectorInterval),config:read(zombieDetectorInterval)}),
+    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState2 = Trigger:trigger_first(TriggerState,1),
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
-	{fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new()}.
+	{fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new(),TriggerState2}.
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
 
-on({zombiehunter},{Queue,Subscriber}) ->
+on({trigger},{Queue,Subscriber,TriggerState}) ->
         fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this(),X}) end,Queue), 
-        cs_send:send_after(config:read(zombieDetectorInterval), self(), {zombiehunter}),
-        {Queue,Subscriber};
-on({pong,Zombie},{Queue,Subscriber}) ->
+        NewTriggerState = Trigger:trigger_next(TriggerState,1),
+        {Queue,Subscriber,NewTriggerState};
+on({pong,Zombie},{Queue,Subscriber,TriggerState}) ->
         gb_sets:fold(fun (X,_) -> cs_send:send_local(X , {zombie,Zombie}) end,0, Subscriber),
-        {Queue,Subscriber};
-on({add_zombie_candidate, Node},{Queue,Subscriber}) ->
-		{fix_queue:add(Node,Queue),Subscriber};
-on({subscribe,Node},{Queue,Subscriber}) ->
-		{Queue,gb_sets:insert(Node,Subscriber)};
-on({unsubscribe,Node},{Queue,Subscriber}) ->
-		{Queue,gb_sets:del_element(Node,Subscriber)};
+        {Queue,Subscriber,TriggerState};
+on({add_zombie_candidate, Node},{Queue,Subscriber,TriggerState}) ->
+		{fix_queue:add(Node,Queue),Subscriber,TriggerState};
+on({subscribe,Node},{Queue,Subscriber,TriggerState}) ->
+		{Queue,gb_sets:insert(Node,Subscriber),TriggerState};
+on({unsubscribe,Node},{Queue,Subscriber,TriggerState}) ->
+		{Queue,gb_sets:del_element(Node,Subscriber),TriggerState};
 on(_, _State) ->
     unknown_event.
 % @private
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), dn_cache).
+
+
+get_base_interval() ->
+    config:read(zombieDetectorInterval).

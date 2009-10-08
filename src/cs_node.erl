@@ -63,8 +63,7 @@ on({get_key_response_keyholder, Key},{join_state2,First}) ->
         true ->
            
             S = cs_join:join_first(Key),
-            cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,reregister_interval,config:reregisterInterval(),config:reregisterInterval(),config:reregisterInterval()}),
-            cs_reregister:trigger_reregister(),
+            cs_send:send_local(get_local_cs_reregister_pid(),{go}),
             %log:log(info,"[ Node ~w ] joined",[self()]),
             S;  % JOIN Completet, alone S is the first "State"
         false ->  % We are not alone, so we have to do the Join Protocoll
@@ -109,20 +108,19 @@ on({join_response, Pred, Data},{join_state4,Id,Succ,Me}) ->
     State = case node:is_null(Pred) of
         true ->
             DB = ?DB:add_data(?DB:new(Id), Data),
-            %?RM:initialize(Id, Me, Pred, Succ),
+            %ring_maintenance:initialize(Id, Me, Pred, Succ),
             routingtable:initialize(Id, Pred, Succ),
             cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {Id, Id}, cs_lb:new(), DB);
         false ->
             cs_send:send(node:pidX(Pred), {update_succ, Me}),
             DB = ?DB:add_data(?DB:new(Id), Data),
-            %?RM:initialize(Id, Me, Pred, Succ),
+            %ring_maintenance:initialize(Id, Me, Pred, Succ),
             routingtable:initialize(Id, Pred, Succ),
             cs_state:new(?RT:empty(Succ), Succ, Pred, Me, {node:id(Pred), Id},cs_lb:new(), DB)
     end,
-    cs_send:send_local(self_man:get_pid(),{subscribe,self(),?MODULE,reregister_interval,config:reregisterInterval(),config:reregisterInterval(),config:reregisterInterval()}),
-    cs_reregister:trigger_reregister(),
     cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State)),
     %io:format("STATE4 FERTIG~n"),
+    cs_send:send_local(get_local_cs_reregister_pid(),{go}),
     State;
 
 % Catch all messages untel the join protocol is finshed 
@@ -182,15 +180,15 @@ on({rm_update_succ, Succ}, State) ->
                     ?RT:update_pred_succ_in_cs_node(cs_state:pred(State), Succ, cs_state:rt(State)));
 
 on({succ_left, Succ}, State) ->
-    ?RM:succ_left(Succ),
+    ring_maintenance:succ_left(Succ),
     State;
 
 on({pred_left, Pred}, State) ->
-    ?RM:pred_left(Pred),
+    ring_maintenance:pred_left(Pred),
     State;
 
 on({update_succ, Succ}, State) -> 
-    ?RM:update_succ(Succ),
+    ring_maintenance:update_succ(Succ),
     State;
 
 on({get_pred_succ, Pid}, State) ->
@@ -429,9 +427,6 @@ on({'$gen_cast', {debug_info, Requestor}}, State) ->
     cs_send:send_local(Requestor , {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]}),
     State;
 
-on({reregister}, State) ->
-    cs_reregister:trigger_reregister(),
-    State;
 
 %% unit_tests
 on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
@@ -499,3 +494,13 @@ get_local_cyclon_pid() ->
 	    ok
     end,
     process_dictionary:lookup_process(InstanceId, cyclon).
+
+get_local_cs_reregister_pid() ->
+    InstanceId = erlang:get(instance_id),
+    if
+	InstanceId == undefined ->
+	   log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
+	true ->
+	    ok
+    end,
+    process_dictionary:lookup_process(InstanceId, cs_reregister).
