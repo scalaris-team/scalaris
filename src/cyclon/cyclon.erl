@@ -64,7 +64,7 @@ init(_Args) ->
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     TriggerState2 = Trigger:trigger_first(TriggerState,1),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
-    {null,null,0,TriggerState2}.
+    {[],null,0,TriggerState2}.
 
 
 
@@ -75,7 +75,7 @@ init(_Args) ->
 
 
 % state of cyclon 
-%-type(state() :: {null|cyclon.cache:cache(),null|cs_node(),integer()}).
+%-type(state() :: {cyclon.cache:cache(),null|cs_node(),integer()}).
 -type(state() :: {any(),any(),integer()}).
 
 % accepted messages of cs_node processes
@@ -89,7 +89,7 @@ on({get_ages,Pid},{Cache,Node,Cycles,TriggerState}) ->
 
 on({get_node_response, 2.71828183, Me},{Cache,null,Cycles,TriggerState}) ->
     {Cache,Me,Cycles,TriggerState};
-on({get_pred_succ_response, Pred, Succ},{null,Node,Cycles,TriggerState}) ->
+on({get_pred_succ_response, Pred, Succ},{[],Node,Cycles,TriggerState}) ->
     case Pred /= Node of
             true ->
                 Cache =  cache:add_list([Pred,Succ], cache:new());

@@ -168,7 +168,7 @@ new() ->
 %% @doc Amount of valid Cache entries 
 size([]) ->
 	0;
-size([null]) ->
+size(null) ->
 	0;
 size([H|T]) ->
 	{Node,_}=H,
