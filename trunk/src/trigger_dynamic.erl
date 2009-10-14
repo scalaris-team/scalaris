@@ -14,7 +14,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : trigger.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : trigger behaviour
+%%% Description : trigger 
 %%%
 %%% Created :  2 Oct 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
@@ -49,50 +49,28 @@ trigger_next({Module,ok},_U) ->
 % 1 - > base
 % 2 - > min
 % 3 - > now,min
+trigger_next({Module, TimerRef}, U) ->
+    % test ob noch einer Timer läuft
+    case erlang:read_timer(TimerRef) of
+        false ->
+            ok;
+        _ ->
+            erlang:cancel_timer(TimerRef)
+    end,
+    %io:format("[ TD ] ~p U(0,0) ~p~n",[self(),U(0,0)]),
+    NewTimerRef = case U(0,0) of
+                0 ->
+                    cs_send:send_after(Module:get_max_interval(),self(), {trigger});
+                1 ->
+                    cs_send:send_after(Module:get_base_interval(),self(), {trigger});
+                2 ->
+                    cs_send:send_after(Module:get_min_interval(),self(), {trigger});
+                3 ->
+                    cs_send:send_local(self(), {trigger}),
+                    cs_send:send_after(Module:get_min_interval(),self(), {trigger});
+                _ ->
+                    cs_send:send_after(Module:get_base_interval(),self(), {trigger})
 
-trigger_next({Module, TimerRef}, 0) ->
-    % test ob noch einer Timer läuft
-    case erlang:read_timer(TimerRef) of
-        false ->
-            %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
-            NewTimerRef = cs_send:send_after(Module:get_max_interval(),self(), {trigger});
-        T ->
-            erlang:cancel_timer(TimerRef),
-            NewTimerRef = cs_send:send_after(Module:get_max_interval(),self(), {trigger})
-    end,
-    {Module, NewTimerRef};
-trigger_next({Module, TimerRef}, 1) ->
-    % test ob noch einer Timer läuft
-    case erlang:read_timer(TimerRef) of
-        false ->
-            %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
-            NewTimerRef = cs_send:send_after(Module:get_base_interval(),self(), {trigger});
-        T ->
-            erlang:cancel_timer(TimerRef),
-            NewTimerRef = cs_send:send_after(Module:get_base_interval(),self(), {trigger})
-    end,
-    {Module, NewTimerRef};
-trigger_next({Module, TimerRef}, 2) ->
-    % test ob noch einer Timer läuft
-    case erlang:read_timer(TimerRef) of
-        false ->
-            %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
-            NewTimerRef = cs_send:send_after(Module:get_min_interval(),self(), {trigger});
-        T ->
-            erlang:cancel_timer(TimerRef),
-            NewTimerRef = cs_send:send_after(Module:get_min_interval(),self(), {trigger})
-    end,
-    {Module, NewTimerRef};
-trigger_next({Module, TimerRef}, 3) ->
-    % test ob noch einer Timer läuft
-    case erlang:read_timer(TimerRef) of
-        false ->
-            %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
-            cs_send:send_local(self(), {trigger}),
-            NewTimerRef = cs_send:send_after(Module:get_min_interval(),self(), {trigger});
-        T ->
-            erlang:cancel_timer(TimerRef),
-            cs_send:send_local(self(), {trigger}),
-            NewTimerRef = cs_send:send_after(Module:get_min_interval(),self(), {trigger})
-    end,
+            
+     end,
     {Module, NewTimerRef}.

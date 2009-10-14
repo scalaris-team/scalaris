@@ -75,7 +75,8 @@ on({get_key_response_keyholder, Key},{join_state2,First}) ->
 
 on({get_list_response,Nodes},{join_state2_b,Key}) ->
     %io:format("STATE2_b~n"),
-    [First | Rest] = util:shuffle(Nodes),
+    %[First | Rest] = util:shuffle(Nodes),
+    [First | Rest] = Nodes,
     cs_send:send(First, {lookup_aux, Key, 0, {get_node, cs_send:this(), Key}}),
     cs_send:send_after(3000, self() , {join_timeout}),
     {join_state3,Rest,[],Key};

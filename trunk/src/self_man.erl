@@ -47,42 +47,34 @@ start_link(InstanceID) ->
 init(_Args) ->
     Start = erlang:now(),
     log:log(info,"[ SM ~p ] starting self_man", [self()]),
+    cs_send:send_after(config:read(self_man_timer),self() ,{trigger}),
     {gb_trees:empty(),Start}.
 
-on({subscribe,Pid,Module,ValueName,Min,Max,Value,Mesg},{State,Start}) ->
-    io:format("[ SM ] ~p~n ",[{subscribe,Pid,Module,ValueName,Min,Max,Value,Mesg}]),
-    {gb_trees:enter({Module,ValueName,Pid},{Min,Max,Value,Mesg},State),Start};
-on({unsubscribe,Pid,Module,ValueName},{State,Start}) ->
-    %io:format("[ SM ] ~p~n ",[{unsubscribe,Pid,Module,ValueName}]),
-    {gb_trees:delete({Module,ValueName,Pid},State),Start};
-on({update,Module,ValueName,Pid,Value},{State,Start})->
-    %io:format("[ SM ] ~p~n ",[{update,Module,ValueName,Pid,Value}]),
-    {update(Module,ValueName,Pid,Value,State),Start};
+on({request_trigger,Pid,U},{State,Start}) ->
+    io:format("[ SM ] ~p~n ",[{request_trigger,Pid}]),
+    {gb_trees:enter({Pid},{U},State),Start};
 
 on({no_churn},{State,Start}) ->
     %%cs_send:send_local(get_pid_rt(),{no_churn}),
-    {State,Start}.
+    {State,Start};
+on({trigger},{State,Start}) ->
+    List = gb_trees:to_list(State),
+    R = trigger_send(lists:sort(fun help/2, List)),
+    {R,Start};
+on(_, _State) ->
+    unknown_event.
 
+trigger_send([]) ->
+    gb_trees:empty();
+trigger_send([{Pid,_}|T]) ->
+    io:format("[ SM ] ~p~n ",[{trigger,Pid}]),
+    cs_send:send_local(Pid,{trigger}),
+    
+    gb_trees:from_orddict(T).
 
+help({_,A},{_,B}) ->
+    A(0,0) > B(0,0).
 
-update(Module,ValueName,Pid,NewValue,State) ->
-    {Min,Max,_Value,Mesg} = gb_trees:get({Module,ValueName,Pid},State),
-    %log_to_file(Module,ValueName,Min,Max,NewValue,Start),
-    gb_trees:enter({Module,ValueName,Pid},{Min,Max,NewValue,Mesg},State).
-
-
-log_to_file(Module,ValueName,_Min,_Max,NewValue,Start) ->
-    Now = erlang:now(),
-    N = io_lib:format("~p_~p.log",[Module,ValueName]),
-    {ok,S} = file:open(N,[append]),
-    %io:format(S,"~p ~p~n",[time_diff(Start,Now),NewValue]),
-    file:close(S).
 
 get_pid() ->
     process_dictionary:lookup_process(erlang:get(instance_id), self_man).
-
-get_pid_rt() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), routing_table).
-
-time_diff({SMe,SSe,SMi},{EMe,ESe,EMi}) ->
-    (EMe*1000000+ESe+EMi/1000000)-(SMe*1000000+SSe+SMi/1000000).

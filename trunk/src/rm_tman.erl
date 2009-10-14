@@ -68,8 +68,9 @@ init(_Args) ->
 on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
     ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
     failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
+    cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
-    TriggerState2 = Trigger:trigger_first(TriggerState,1),
+    TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
     {NewId, NewMe, [NewPred], NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),TriggerState2,NewPred,hd(NewSuccList),[],1};
 on(_,uninit) ->
     uninit;
@@ -97,7 +98,7 @@ on({get_predlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,
 on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  -> 
     
     % Triger an update of the Random view
-    cs_send:send_local(get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
+    %
     RndView=get_RndView(RandViewSize,Cache),
     %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
     {Pred,Succ} =get_safe_pred_succ(Preds,Succs,RndView,Me),
@@ -116,11 +117,29 @@ on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,Ak
             NewAktSucc =AktSucc,
             NewAktPred =AktPred,
             %TODO: is this send_after necassary? Yes if all nodes in view are death
-	    NewTriggerState = Trigger:trigger_next(TriggerState,1)
+	    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(1))
     end,
    {Id, Me, Preds, Succs,RandViewSize,Interval,NewTriggerState,NewAktPred,NewAktSucc,Cache,Churn};
 on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,_Cache,Churn})  ->
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,NewCache,Churn};
+             %inc RandViewSize (no error detected)
+    RandViewSizeNew = case (RandViewSize < config:read(cyclon_cache_size)) of
+                          true ->
+            RandViewSize+1;
+                          false ->
+            RandViewSize
+                      end,
+    cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSizeNew,self()}),
+    RndView=get_RndView(RandViewSizeNew,NewCache),
+    %io:format("~p RndView: ~p~n",[self(),RndView]),
+    Buffer=merge(Succs++Preds,RndView,node:id(Me)),
+    SuccsNew=lists:sublist(Buffer, config:read(succ_list_length)),
+    PredsNew=lists:sublist(lists:reverse(Buffer), config:read(pred_list_length)),
+    {NewAktPred,NewAktSucc} = update_cs_node(PredsNew,SuccsNew,AktPred,AktSucc),
+    update_failuredetector(Preds,Succs,PredsNew,SuccsNew),
+    NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval,Churn),
+    NewChurn = new_churn(Preds,Succs,PredsNew,SuccsNew),
+    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
+    {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,NewCache,NewChurn};
 on({rm_buffer,Q,Buffer_q},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
     RndView=get_RndView(RandViewSize,Cache),
     cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,Succs++Preds++[Me]}),
@@ -131,7 +150,7 @@ on({rm_buffer,Q,Buffer_q},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerSta
     update_failuredetector(Preds,Succs,PredsNew,SuccsNew),
     NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval,Churn),
     NewChurn = new_churn(Preds,Succs,PredsNew,SuccsNew),
-    NewTriggerState = Trigger:trigger_next(TriggerState,NewInterval),
+    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
     {Id, Me, PredsNew, SuccsNew,RandViewSize,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,Cache,NewChurn};
 on({rm_buffer_response,Buffer_p},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
     RndView=get_RndView(RandViewSize,Cache),
@@ -150,10 +169,10 @@ on({rm_buffer_response,Buffer_p},{Id, Me, Preds, Succs,RandViewSize,Interval,Tri
                           false ->
             RandViewSize
                       end,
-    NewTriggerState = Trigger:trigger_next(TriggerState,NewInterval),
+    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
     {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,Cache,NewChurn};
 on({zombie,Node},{Id, Me, Preds, Succs,RandViewSize,_Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    NewTriggerState = Trigger:trigger_next(TriggerState,3),
+    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
     cs_send:send_local(self_man:get_pid(),{update,?MODULE,stabilizationInterval,self(),config:stabilizationInterval_min()}),
     {Id, Me, Preds, Succs,RandViewSize,config:stabilizationInterval_min(),NewTriggerState,AktPred,AktSucc,[Node|Cache],Churn};
 on({crash, DeadPid},{Id, Me, Preds, Succs,_RandViewSize,_Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
@@ -161,7 +180,7 @@ on({crash, DeadPid},{Id, Me, Preds, Succs,_RandViewSize,_Interval,TriggerState,A
     SuccsNew = filter(DeadPid, Succs),
     NewCache = filter(DeadPid, Cache),
     update_failuredetector(Preds,Succs,PredsNew,SuccsNew ),
-    NewTriggerState = Trigger:trigger_next(TriggerState,3),
+    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
     {Id, Me, PredsNew ,SuccsNew,0,config:stabilizationInterval_min(),NewTriggerState,AktPred,AktSucc ,NewCache,Churn};
 on({'$gen_cast', {debug_info, Requestor}},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
     cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Preds]))},
@@ -340,3 +359,7 @@ get_min_interval() ->
 
 get_max_interval() ->
     config:read(stabilization_interval_max).
+
+make_utility(Intervall) ->
+    %Now = erlang:now(),
+    fun (_T, _C) ->   Intervall end.

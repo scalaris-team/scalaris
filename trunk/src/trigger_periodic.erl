@@ -14,7 +14,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : trigger.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : trigger behaviour
+%%% Description : trigger 
 %%%
 %%% Created :  2 Oct 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
@@ -34,10 +34,11 @@
 
 
 init(Module) ->
+    %io:format("[ TR ~p ] ~p init ~n", [self(),Module]),
     {Module, ok}.
 
 trigger_first({Module, ok}, _U) ->
-
+    %io:format("[ TR ~p ] ~p first ~n", [self(),Module]),
     TimerRef = cs_send:send_after(0,self(), {trigger}),
     {Module, TimerRef}.
 
@@ -54,7 +55,7 @@ trigger_next({Module, TimerRef}, _U) ->
         false ->
             %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
             NewTimerRef = cs_send:send_after(Module:get_base_interval(),self(), {trigger});
-        T ->
+        _T ->
             %io:format("[ TR ~p ] ~p call next befor Timer Release ~p ms ~n", [self(),Module,T]),
             NewTimerRef = TimerRef
     end,
