@@ -89,7 +89,7 @@ on({get_ages,Pid},{Cache,Node,Cycles,TriggerState}) ->
 
 on({get_node_response, 2.71828183, Me},{Cache,null,Cycles,TriggerState}) ->
     {Cache,Me,Cycles,TriggerState};
-on({get_pred_succ_response, Pred, Succ},{[],Node,Cycles,TriggerState}) ->
+on({get_pred_succ_response, Pred, Succ},{_,Node,Cycles,TriggerState}) ->
     case Pred /= Node of
             true ->
                 Cache =  cache:add_list([Pred,Succ], cache:new());
@@ -130,9 +130,11 @@ on({'$gen_cast', {debug_info, Requestor}},{Cache,Node,Cycles,TriggerState})  ->
 	    {Cache,Node,Cycles,TriggerState};
 
 on({trigger},{Cache,null,Cycles,TriggerState}) ->
-     {Cache,null,Cycles,TriggerState};
+    %io:format("[ CY ] Trigger on null~n"),
+    TriggerState2 = Trigger:trigger_next(TriggerState,1),
+     {Cache,null,Cycles,TriggerState2};
 on({trigger},{Cache,Node,Cycles,TriggerState}) 	->
-	 NewCache =	case cache:size(Cache) of
+                NewCache =	case cache:size(Cache) of
 						0 ->
                         %log:log(warn,"[ CY | ~p] Cache is empty",[self()]),
 					  	Cache;	
