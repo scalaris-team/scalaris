@@ -52,14 +52,17 @@ init(_Args) ->
 
 on({request_trigger,Pid,U},{State,Start}) ->
     io:format("[ SM ] ~p~n ",[{request_trigger,Pid}]),
-    {gb_trees:enter({Pid},{U},State),Start};
+    {gb_trees:enter(Pid,U,State),Start};
 
 on({no_churn},{State,Start}) ->
     %%cs_send:send_local(get_pid_rt(),{no_churn}),
     {State,Start};
 on({trigger},{State,Start}) ->
+    cs_send:send_after(config:read(self_man_timer),self() ,{trigger}),
     List = gb_trees:to_list(State),
-    R = trigger_send(lists:sort(fun help/2, List)),
+    S = lists:sort(fun help/2, List),
+    %io:format("S: ~p~n",[S]),
+    R = trigger_send(S),
     {R,Start};
 on(_, _State) ->
     unknown_event.
@@ -69,7 +72,6 @@ trigger_send([]) ->
 trigger_send([{Pid,_}|T]) ->
     io:format("[ SM ] ~p~n ",[{trigger,Pid}]),
     cs_send:send_local(Pid,{trigger}),
-    
     gb_trees:from_orddict(T).
 
 help({_,A},{_,B}) ->

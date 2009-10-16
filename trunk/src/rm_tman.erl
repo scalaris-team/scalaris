@@ -138,8 +138,8 @@ on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,Akt
     update_failuredetector(Preds,Succs,PredsNew,SuccsNew),
     NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval,Churn),
     NewChurn = new_churn(Preds,Succs,PredsNew,SuccsNew),
-    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
-    {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,NewCache,NewChurn};
+    %NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
+    {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,TriggerState,NewAktPred,NewAktSucc,NewCache,NewChurn};
 on({rm_buffer,Q,Buffer_q},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
     RndView=get_RndView(RandViewSize,Cache),
     cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,Succs++Preds++[Me]}),

@@ -77,7 +77,7 @@ send_local(Pid, Message) ->
 get(Name, {_Pid,Host}) ->
     {Name, Host};
 get(Name, Pid) ->
-    {Name, node(Pid)}.
+    Name.
 
 -endif.
 
@@ -98,6 +98,6 @@ send_after(Delay,Pid, Message) ->
 get(Name, {_Pid,Host}) ->
     {Name, Host};
 get(Name, Pid) ->
-    {Name, node(Pid)}.
+    Name.
 
 -endif.
