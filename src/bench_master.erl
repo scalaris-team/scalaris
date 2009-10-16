@@ -45,7 +45,7 @@ run_1() ->
     timer:sleep(1000),
     check_ring_size(RingSize),
     wait_for_stable_ring(),
-    timer:sleep(config:pointerStabilizationInterval()+1000),
+    timer:sleep(config:pointerStabilizationInterval()+8000),
     bench_server:run_increment(Worker, Iterations),
     timer:sleep(3000),
     bench_server:run_read(Worker, Iterations),
