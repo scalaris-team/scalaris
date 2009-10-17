@@ -186,11 +186,6 @@ def pubsub()
   printf("subscribers: %s\n", subs.to_json)
 end
 
-publish =  Benchmark.realtime {
-  n.times do
-  end
-}
-
 pubsub()
 
 printf("              time[s]\t1/s\n")
@@ -199,4 +194,3 @@ printf("read         : %0.02f     %0.02f\n", read, n/read)
 printf("write        : %0.02f     %0.02f\n", write, n/write)
 printf("test_and_set : %0.02f     %0.02f\n", test_and_set, n/test_and_set)
 printf("req_list     : %0.02f     %0.02f\n", reql, n/reql)
-printf("publisht     : %0.02f     %0.02f\n", publish, n/publish)
