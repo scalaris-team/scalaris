@@ -116,6 +116,22 @@ def range_query()
   puts result.to_json
 end
 
+def publish(topic, content)
+  json_call('publish', [topic,content])
+end
+
+def subscribe(topic, url)
+  json_call('subscribe', [topic, url])
+end
+
+def unsubscribe(topic,url)
+  json_call('unsubscribe', [topic,url])
+end
+
+def get_subscribers(topic)
+  json_call('get_subscribers', [topic])
+end
+
 n = 100
 
 range_query()
@@ -154,9 +170,33 @@ reql = Benchmark.realtime {
   end
 }
 
+
+def pubsub()
+  subs = get_subscribers("Topic")
+  printf("subscribers: %s\n", subs.to_json)
+  # register scalaris boot server itself as subscriber
+  # (prints a message on the console then)
+  subscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
+  subscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
+  subs = get_subscribers("Topic")
+  printf("subscribers: %s\n", subs.to_json)
+  publish("Topic", "Value")
+  unsubscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
+  subs = get_subscribers("Topic")
+  printf("subscribers: %s\n", subs.to_json)
+end
+
+publish =  Benchmark.realtime {
+  n.times do
+  end
+}
+
+pubsub()
+
 printf("              time[s]\t1/s\n")
 printf("nop          : %0.02f     %0.02f\n", nop, n/nop)
 printf("read         : %0.02f     %0.02f\n", read, n/read)
 printf("write        : %0.02f     %0.02f\n", write, n/write)
 printf("test_and_set : %0.02f     %0.02f\n", test_and_set, n/test_and_set)
 printf("req_list     : %0.02f     %0.02f\n", reql, n/reql)
+printf("publisht     : %0.02f     %0.02f\n", publish, n/publish)

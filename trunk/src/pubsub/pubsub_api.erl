@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -55,14 +55,19 @@ publish(Topic, Content) ->
 subscribe(Topic, URL) ->
     TFun = fun(TransLog) ->
 		   {{Success, _ValueOrReason} = Result, TransLog1} = transaction_api:read(Topic, TransLog),
-		   {Result2, TransLog2} = if
-		       Success == fail ->
-			   transaction_api:write(Topic, [URL], TransLog); %obacht: muss TransLog sein!
-		       true ->
-			   {value, Subscribers} = Result,
-			   transaction_api:write(Topic, [URL | Subscribers], TransLog1)
-		   end,
-		   if
+		   {Result2, TransLog2} = 
+                       case Success of
+                           fail ->
+                               transaction_api:write(Topic, [URL], TransLog); %obacht: muss TransLog sein!
+                           Any ->
+                               {value, Subscribers} = Result,
+                               case [ X || X <- Subscribers, X =:= URL ] of
+                                   [] ->
+                                       transaction_api:write(Topic, [URL | Subscribers], TransLog1);
+                                   _ -> {ok, TransLog1}
+                               end
+                       end,
+                   if
 		       Result2 == ok ->
 			   {{ok, ok}, TransLog2};
 		       true ->
@@ -85,7 +90,7 @@ unsubscribe(Topic, URL) ->
 			   {{fail, not_found}, TransLog}
 		   end
 	   end,
-    transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).	   
+    transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).
 
 %% @doc queries the subscribers of a query
 %% @spec get_subscribers(string()) -> [string()]

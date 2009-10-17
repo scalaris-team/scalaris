@@ -26,8 +26,7 @@ handler(range_read, [From, To]) ->
 handler(test_and_set, [Key, OldValue, NewValue]) ->
     %io:format("Request = test_and_set(~p)~n", [_Request]),
     case cs_api:test_and_set(Key, OldValue, NewValue) of
-        ok ->
-            "ok";
+        ok -> "ok";
         {fail, {key_changed, Value}} ->
             {struct, [{failure, "key_changed"},
                       {value, lists:flatten(io_lib:format("~s", [Value]))}]};
@@ -50,8 +49,7 @@ handler(read, [Key]) ->
 handler(write, [Key, Value]) ->
     %io:format("Request = write(~p)~n", [_Request]),
     case cs_api:write(Key, Value) of
-        ok ->
-            "ok";
+        ok -> "ok";
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]}
     end;
@@ -87,6 +85,35 @@ handler(req_list, [TransLog, {array, ReqList}]) ->
     ErlResult = cs_api:process_request_list(json_to_translog(TransLog), CleanReqList),
     make_result_json_conforming(ErlResult);
 
+handler(publish, [Topic, Content]) ->
+    case pubsub_api:publish(Topic, Content) of
+        ok -> "ok"
+    end;
+
+handler(subscribe, [Topic, URL]) ->
+    case pubsub_api:subscribe(Topic, URL) of
+        ok -> "ok";
+        {fail, Reason} ->
+            {struct, [{failure, atom_to_list(Reason)}]}
+    end;
+
+handler(unsubscribe, [Topic, URL]) ->
+    case pubsub_api:unsubscribe(Topic, URL) of
+        ok -> "ok";
+        {fail, Reason} ->
+            {struct, [{failure, atom_to_list(Reason)}]}
+    end;
+
+handler(get_subscribers, [Topic]) ->
+    case pubsub_api:get_subscribers(Topic) of
+        [] -> {array, []};
+        Any -> {array, Any}
+    end;
+
+handler(notify, [Topic, Value]) ->
+    io:format("Got pubsub notify ~p -> ~p~n", [Topic, Value]),
+    "ok";
+
 handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~p(~p)~n", [AnyOp, AnyParams]),
     {struct, [{failure, "unknownreq"}]}.
@@ -120,7 +147,7 @@ results_to_json(Results) ->
 
 data_to_json(Data) ->
     {array, [ {struct, [{key, Key},
-	       {value, Value},
-	       {version, Version}]} || 
+                        {value, Value},
+                        {version, Version}]} || 
 		{Key, Value, Version, WriteLock, ReadLock} <- Data]}.
 </erl>
