@@ -144,6 +144,8 @@ do_transaction(TFun, SuccessFun, FailureFun)->
 
 %% Use this function to do a transaction without a read phase
 %% Thus it is necessary to provide a proper list with items for TMItems
+do_transaction_wo_rp([], SuccessFun, FailureFun)->
+    {ok};
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
     {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
     if
