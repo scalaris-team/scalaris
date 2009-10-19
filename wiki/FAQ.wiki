@@ -83,7 +83,7 @@ No. Well, maybe.
   # install Erlang (http://www.erlang.org/download.html)
   # install OpenSSL (for crypto module) (http://www.slproweb.com/products/Win32OpenSSL.html)
   # checkout scalaris code from SVN
-  # copy an appropriate EMakefile_for from contrib\win32 to the trunk-directory
+  # copy an appropriate EMakefile_for from contrib\win32 to the trunk-directory and name in EMakefile
   # adapt the path to your Erlang installation in build.bat
   # create an empty autoconf.hrl in include
   # start a cmd.exe
