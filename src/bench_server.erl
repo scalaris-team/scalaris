@@ -68,13 +68,13 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
                                  util:get_nodes()
                          end
                  end,
-    io:format("~p~n", [ServerList]),
+    %io:format("~p~n", [ServerList]),
     {BeforeDump, _} = admin:get_dump(),
     Before = erlang:now(),
     Times = case lists:member(profile, Options) of
 	false ->
     		[cs_send:send(Server, Message) || Server <- ServerList],
-    		[receive {done, Time} -> Time end || _Server <- ServerList];
+    		[receive {done, Time} -> io:format("BS: ~p~n",[Time]),Time end || _Server <- ServerList];
 	true ->
 	    	Result = fprof:apply(fun () ->
 		    		[cs_send:send(Server, Message) || Server <- ServerList],
