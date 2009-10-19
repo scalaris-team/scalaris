@@ -74,9 +74,16 @@ send(Pid, Message) ->
 send_local(Pid, Message) ->
     Pid ! Message.
 
-get(Name, {_Pid,Host}) ->
+%get(Name, {_Pid,Host}) ->
+%    {Name, Host};
+get(Name, {_, Host}) when is_atom(Name) ->
     {Name, Host};
+get(Name, Pid) when is_atom(Name) ->
+    %io:format("CS: ~p ~p ~n ",[Name,Pid]),
+    {Name, node(Pid)};
 get(Name, Pid) ->
+    A = node(Name),
+    A = node(Pid), % we assume that you only call get with local pids
     Name.
 
 -endif.
