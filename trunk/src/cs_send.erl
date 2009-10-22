@@ -31,8 +31,8 @@
 -include("transstore/trecords.hrl").
 -include("../include/scalaris.hrl").
 
--export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3, send_local/2]).
-
+-export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3,
+         send_local/2, make_global/1]).
 
 send_to_group_member(Csnodepid,Processname,Mesg) ->
     send(Csnodepid,{send_to_group_member,Processname,Mesg}).
@@ -108,3 +108,8 @@ get(Name, Pid) ->
     Name.
 
 -endif.
+
+-spec(make_global/1 :: (pid()) -> mypid()).
+make_global(Pid) ->
+    get(Pid, cs_send:this()).
+
