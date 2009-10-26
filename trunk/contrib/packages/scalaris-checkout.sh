@@ -2,12 +2,13 @@
 
 date=`date +"%Y%m%d"`
 name="scalaris" # folder base name (without version)
-tagversion="0.2.2"
+tagversion=${1:-"0.2.3"}
 url="http://scalaris.googlecode.com/svn/tags/${tagversion}"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
 
+result=1
 folder="./${name}-${tagversion}"
 
 if [ ! -d ${folder} ]; then
@@ -17,16 +18,17 @@ if [ ! -d ${folder} ]; then
 fi
 
 if [ ${result} -eq 0 ]; then
-  tarfile="${folder}.tar.bz2"
+  tarfile="${folder}.tar.gz"
   echo "making ${tarfile} ..."
-  tar -cjf ${tarfile} ${folder} --exclude-vcs
+  tar -czf ${tarfile} ${folder} --exclude-vcs
   result=$?
 fi
 
 if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
+  sourcefolder=${folder}/contrib/packages
   #cp ${name}-${revision}/contrib/scalaris.spec ./scalaris.spec.svn
-  sed -e "s/%define pkg_version .*/%define pkg_version ${tagversion}/g" < ${folder}/contrib/scalaris.spec > ./scalaris.spec
+  sed -e "s/%define pkg_version .*/%define pkg_version ${tagversion}/g" < ${sourcefolder}/scalaris.spec > ./scalaris.spec
   result=$?
 fi
 

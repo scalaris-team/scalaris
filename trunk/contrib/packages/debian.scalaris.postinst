@@ -1,0 +1,13 @@
+#! /bin/sh
+
+set -e
+
+# use automatic handling for now...
+# # Copy config file if not existing yet
+# 
+#   if [ ! -f /etc/scalaris/scalaris.cfg ]; then
+#     cp /etc/scalaris/scalaris.cfg.example /etc/scalaris/scalaris.cfg
+#   fi
+
+#DEBHELPER#
+

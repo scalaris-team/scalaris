@@ -1,0 +1,143 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# This is the debhelper compatibility version to use.
+export DH_COMPAT=4
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+
+	# Add here commands to compile the package.
+	mkdir build_dir
+	pwd
+	if cd build_dir ; then echo "Changed"; else echo "Some Errors"; fi
+	pwd
+	./configure --prefix=/usr \
+	--sysconfdir=/etc \
+	--localstatedir=/var \
+	--docdir=/usr/share/doc/scalaris
+#    --prefix=%{_prefix} \
+#    --exec-prefix=%{_exec_prefix} \
+#    --bindir=%{_bindir} \
+#    --sbindir=%{_sbindir} \
+#    --sysconfdir=%{_sysconfdir} \
+#    --datadir=%{_datadir} \
+#    --includedir=%{_includedir} \
+#    --libdir=%{_libdir} \
+#    --libexecdir=%{_libexecdir} \
+#    --localstatedir=%{_localstatedir} \
+#    --sharedstatedir=%{_sharedstatedir} \
+#    --mandir=%{_mandir} \
+#    --infodir=%{_infodir} \
+#    --docdir=%{_docdir}/scalaris
+	make all
+	make java
+	make docs
+
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+
+	# Add here commands to clean up after the build process.
+	rm -rf build_dir
+
+	dh_clean
+
+BUILD_DIR:=$(CURDIR)/debian/scalaris
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+
+	# Add here commands to install the package into debian/gentoo.
+	make install DESTDIR=$(BUILD_DIR)
+	# copy docs:
+	cp    -t $(BUILD_DIR)/usr/share/doc/scalaris/ AUTHORS README LICENSE
+	cp    -t $(BUILD_DIR)/usr/share/doc/scalaris/ user-dev-guide/main.pdf
+	
+	# handle config files:
+	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \
+	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
+	cp $(BUILD_DIR)/etc/scalaris/scalaris.properties \
+	   $(BUILD_DIR)/etc/scalaris/scalaris.properties.example
+#	rm $(BUILD_DIR)/etc/scalaris/scalaris-java.conf
+
+	# move files of the scalaris-client package
+	mkdir -p $(BUILD_DIR)-client/usr/bin
+	mv    -t $(BUILD_DIR)-client/usr/bin \
+	         $(BUILD_DIR)/usr/bin/scalaris
+
+	# move files of the scalaris-java package
+	mkdir -p $(BUILD_DIR)-java/usr/share/
+	mv    -t $(BUILD_DIR)-java/usr/share \
+	         $(BUILD_DIR)/usr/share/java
+	mkdir -p $(BUILD_DIR)-java/etc/scalaris/
+	mv    -t $(BUILD_DIR)-java/etc/scalaris/ \
+	         $(BUILD_DIR)/etc/scalaris/scalaris-java.conf \
+	         $(BUILD_DIR)/etc/scalaris/scalaris-java.conf.sample \
+	         $(BUILD_DIR)/etc/scalaris/scalaris.properties \
+	         $(BUILD_DIR)/etc/scalaris/scalaris.properties.example
+	cp    -t $(BUILD_DIR)-java/usr/share/java/scalaris/lib \
+	         $(CURDIR)/java-api/lib/jakarta-commons-cli-1.1.jar
+
+	# move files of the scalaris-doc package
+	mkdir -p $(BUILD_DIR)-doc/usr/share/doc/scalaris
+	mv    -t $(BUILD_DIR)-doc/usr/share/doc/scalaris \
+	         $(BUILD_DIR)/usr/share/doc/scalaris/erlang \
+	         $(BUILD_DIR)/usr/share/doc/scalaris/java-api
+
+# # 	for subpackage in `echo "client doc java"`
+# # 	do
+# # 	  pwd
+# # 	  ls $(BUILD_DIR)-${subpackage}.files
+# # # 	  cat $(BUILD_DIR)-${subpackage}.files | while read line; do
+# # # 		mkdir -p $(BUILD_DIR)-${subpackage}`dirname $line`
+# # # 		mv -t $(BUILD_DIR)-${subpackage}`dirname $line` $(BUILD_DIR)/$line
+# # # 	  done
+# # 	done
+
+# Build architecture-independent files here.
+binary-indep: build install
+	# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+#	dh_installdebconf
+	dh_installdocs
+	dh_installexamples
+	dh_installmenu
+#	dh_installlogrotate
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
+#	dh_installinit
+	dh_installcron
+	dh_installman
+	dh_installinfo
+#	dh_undocumented
+	dh_installchangelogs
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+#	dh_makeshlibs
+	dh_installdeb
+#	dh_perl
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
