@@ -25,10 +25,13 @@ if [ ${result} -eq 0 ]; then
 fi
 
 if [ ${result} -eq 0 ]; then
-  echo "extracting .spec file ..."
-  sourcefolder=${folder}/contrib/packages
-  #cp ${name}-${revision}/contrib/scalaris.spec ./scalaris.spec.svn
-  sed -e "s/%define pkg_version .*/%define pkg_version ${tagversion}/g" < ${sourcefolder}/scalaris.spec > ./scalaris.spec
+  echo "changing scalaris.spec and scalaris.dsc files ..."
+  cp scalaris.spec scalaris.spec.old && \
+  sed -e "s/%define pkg_version .*/%define pkg_version ${tagversion}/g" < scalaris.spec.old > scalaris.spec && \
+  rm scalaris.spec.old && \
+  cp scalaris.dsc scalaris.dsc.old && \
+  sed -e "s/0.2.3/${tagversion}/g" < scalaris.dsc.old > scalaris.dsc && \
+  rm scalaris.dsc.old
   result=$?
 fi
 
