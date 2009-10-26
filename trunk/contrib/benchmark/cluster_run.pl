@@ -8,7 +8,7 @@ $cl = $ARGV[1];
 $name = $ARGV[2]."-".$cl."-".$rev."-".`date +%m%d%y%H%M%S`; 
 chomp($name);
 use Template;
-my @Servers = (1,2,5,10,15,20);
+my @Servers = (1,2,5,10,20);
 my $resdir = `pwd`;
 chomp($resdir);
 $resdir.="/$name";
@@ -17,9 +17,9 @@ system "svn checkout -r $rev http://scalaris.googlecode.com/svn/trunk/ $resdir/s
 #build scalairs
 if($cl eq 'de') {
   # check out distributet erlang Patch
-	system "svn copy -r 389 http://scalaris.googlecode.com/svn/trunk/contrib/using_distributed_erlang.patch $resdir/scalaris-read-only/contrib";
+ #	system "svn copy -r $rev http://scalaris.googlecode.com/svn/trunk/contrib/using_distributed_erlang.patch $resdir/scalaris-read-only/contrib";
   # Patch 
-	system "patch -p1  $resdir/scalaris-read-only/src/cs_send.erl <  $resdir/scalaris-read-only/contrib/using_distributed_erlang.patch";
+	system "patch -p1  $resdir/scalaris-read-only/include/scalaris.hrl <  $resdir/scalaris-read-only/contrib/using_distributed_erlang.patch";
 }
 system "cd  $resdir/scalaris-read-only/ ; ./configure";
 system "cd  $resdir/scalaris-read-only/ ; make";
