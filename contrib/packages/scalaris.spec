@@ -8,7 +8,7 @@ Release:        1
 License:        ASL 2.0 
 Group:          Applications/Databases
 URL:            http://code.google.com/p/scalaris
-Source0:        %{name}-%{version}.tar.bz2
+Source0:        %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0

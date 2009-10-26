@@ -1,0 +1,47 @@
+Source: scalaris
+Section: unknown
+Priority: optional
+Maintainer: Nico Kruber <kruber@zib.de>
+Build-Depends: debhelper (>= 4.1.16), erlang (>= 12.b.4), ant, java6-sdk
+Homepage: http://code.google.com/p/scalaris
+
+Package: scalaris
+Architecture: any
+Depends: ${shlibs:Depends}, erlang (>= 12.b.4), erlang-base (>= 12.b.4)
+Description: Scalable Distributed key-value store
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
+
+Package: scalaris-client
+Architecture: any
+Depends: ${shlibs:Depends}, scalaris (= ${binary:Version}), scalaris-java (= ${binary:Version})
+Description: Cli client for scalaris
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
+
+Package: scalaris-java
+Architecture: any
+Depends: ${shlibs:Depends}, scalaris (= ${binary:Version}), java6-runtime
+Description: Java API for scalaris
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
+
+Package: scalaris-doc
+Architecture: any
+Depends: ${shlibs:Depends}
+Suggests: scalaris (= ${binary:Version})
+Description: Documentation for scalaris
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
