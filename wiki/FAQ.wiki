@@ -75,8 +75,8 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || SLE || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || CentOS || 5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/] ||
 || RHEL || 5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/] ||
-|| Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home://tschuett/Debian_5.0/] ||
-|| Ubuntu || 9.04 || Repository: [http://download.opensuse.org/repositories/home://tschuett/xUbuntu_9.04/] ||
+|| Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Debian_5.0/] ||
+|| Ubuntu || 9.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.04/] ||
 
 Inside those repositories you will also find erlang packages - you don't need this if you already have a recent enough erlang version (`R12B-4`)!
 
