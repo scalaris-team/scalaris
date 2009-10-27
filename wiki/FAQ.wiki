@@ -57,24 +57,38 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 
 = Installation =
 
+== Prebuild packages ==
+
+We build rpm and deb packages using checkouts from svn trunk and the latest tagged version and provide them using the openSUSE !BuildService at http://download.opensuse.org/repositories/home:/tschuett/. The available packages are listed in the following table:
+
+|| *Distribution* || *Version* || *Download* ||
+|| Fedora || 9 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_9/] ||
+|| Fedora || 10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_10/] ||
+|| Fedora || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_11/] ||
+|| Mandriva || 2008 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2008/] ||
+|| Mandriva || 2009 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009/] ||
+|| openSUSE || 11.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/scalaris-svn.ymp 1-Click Install (unstable)] ||
+|| openSUSE || 11.1 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/scalaris-svn.ymp 1-Click Install (unstable)] ||
+|| openSUSE || 11.2 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.2/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.2/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.2/scalaris-svn.ymp 1-Click Install (unstable)] ||
+|| openSUSE || Factory || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/scalaris-svn.ymp 1-Click Install (unstable)] ||
+|| SLE || 10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/scalaris-svn.ymp 1-Click Install (unstable)] ||
+|| SLE || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris-svn.ymp 1-Click Install (unstable)] ||
+|| CentOS || 5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/] ||
+|| RHEL || 5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/] ||
+|| Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home://tschuett/Debian_5.0/] ||
+|| Ubuntu || 9.04 || Repository: [http://download.opensuse.org/repositories/home://tschuett/xUbuntu_9.04/] ||
+
+Inside those repositories you will also find erlang packages - you don't need this if you already have a recent enough erlang version (`R12B-4`)!
+
 == How to build an rpm? ==
 
 {{{
 svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
-tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1 --exclude-vcs
-cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
-rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
+tar -cvzf scalaris-0.0.1.tar.gz scalaris-0.0.1 --exclude-vcs
+cp scalaris-0.0.1.tar.gz /usr/src/packages/SOURCES/
+rpmbuild -ba scalaris-0.0.1/contrib/packages/scalaris.spec
 }}}
-Your source and binary rpm will be generated in /usr/src/packages/SRPMS and RPMS.
-
-Also we build rpms using checkouts from svn trunk and the latest tagged version and provide them using the openSUSE !BuildService at http://download.opensuse.org/repositories/home:/tschuett/. Rpm packages are available for
-  * Fedora [http://download.opensuse.org/repositories/home:/tschuett/Fedora_9/ 9], [http://download.opensuse.org/repositories/home:/tschuett/Fedora_10/ 10], [http://download.opensuse.org/repositories/home:/tschuett/Fedora_11/ 11]
-  * Mandriva [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2008/ 2008], [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009/ 2009],
-  * openSUSE [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_10.3/ 10.3], [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/ 11.0], [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/ 11.1], [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/ Factory]
-  * SLE [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/ 10], [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/ 11],
-  * [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/ CentOS 5] and
-  * [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/ RHEL 5].
-Inside those repositories you will also find an erlang rpm - you don't need this if you already have a recent enough erlang version!
+Your source and binary rpm will be generated in /usr/src/packages/SRPMS and RPMS. Note however that this rpm's version will be 0.0.1, contrary to the packages in the repositories mentioned above. Different versions can be set in the given `.spec` file
 
 == Does Scalaris run on Windows? ==
 
