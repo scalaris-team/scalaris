@@ -226,6 +226,38 @@ XtreemOS. Additional information (papers, videos) can be found at
 \url{http://www.zib.de/CSR/Projects/scalaris} and
 \url{http://www.onscale.de/scalaris.html}.
 
+\section{Brewer's CAP Theorem}
+
+In distributed computing there exist the so called CAP theorem. It
+basically says that in distributed systems there are three desirable
+properties for such systems but can have only any two of them.
+
+\begin{description}
+\item {Strict Consistency.} Any read operation has to return the
+  result of the latest write operation on the same data item.
+
+\item {Availability.} Items can be read and modified at any time.
+
+\item {Partition Tolerance.} The network on which the service is
+  running may split into several partitions which cannot communicate
+  with each other. Lateron the may rejoin again.
+
+  For example, a service is hosted on one machine in Seattle and one
+  machine in Berlin. This service is partition tolerant if it can
+  tolerate that all Internet connections over the Atlantic (and
+  Pacific) are interrupted for a few hours and then get repaired
+  afterwards.
+\end{description}
+
+The goal of \scalaris is to provide strict consistency and partition
+tolerance. We are willing to sacrifice availability to make sure that
+the stored data is always consistent. I.e. when you are running
+\scalaris with a replication degree of 4 and the network splits into
+two partitions, one partition with three replicas and one partition
+with one replica, you will be able to continue to use the service only
+in the larger partition. All requests in the smaller partition will
+time out.
+
 \chapter{Download and Installation}
 
 \section{Requirements}
@@ -775,6 +807,23 @@ will print extensive error messages. These error messages do not
 indicate that tests failed! Running the complete test suite takes
 about 5 minutes. Only when the complete suite finished, it will
 present statistics on failed and successful tests.
+
+\chapter{Troubleshooting}
+
+\section{Network}
+
+\scalaris uses a couple of TCP ports for communication. It does
+not use UDP at the moment.
+
+\begin{tabular}{ll}
+8000 & HTTP Server on the boot node\\
+8001 & HTTP Server on the other nodes\\
+14195 & Port for inter-node communication (boot server)\\
+14196 & Port for inter-node communication (other nodes)\\
+\end{tabular}
+
+Please make sure that at least 14195 and 14196 are not blocked by
+firewalls.
 
 \part{Developers Guide}
 
