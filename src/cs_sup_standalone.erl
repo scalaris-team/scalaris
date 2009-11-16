@@ -51,9 +51,9 @@ start_link() ->
 %% Func: init(Args) -> {ok,  {SupFlags,  [ChildSpec]}} |
 %%                     ignore                          |
 %%                     {error, Reason}
-%% Description: Whenever a supervisor is started using 
-%% supervisor:start_link/[2,3], this function is called by the new process 
-%% to find out about restart strategy, maximum restart frequency and child 
+%% Description: Whenever a supervisor is started using
+%% supervisor:start_link/[2,3], this function is called by the new process
+%% to find out about restart strategy, maximum restart frequency and child
 %% specifications.
 %%--------------------------------------------------------------------
 -ifdef(HAVE_TCERL).
@@ -64,11 +64,22 @@ start_tcerl() ->
     ok.
 -endif.
 
+start_ssl() ->
+    case catch ssl:start() of
+        ok ->
+            ok;
+        {error,{already_started,ssl}} ->
+            ok;
+        Err ->
+            log:log(error, "Failed to start ssl: ~p~n", [Err])
+    end.
+
 init([]) ->
     randoms:start(),
     inets:start(),
     %util:logger(),
     start_tcerl(),
+    start_ssl(),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     Config =
 	{config,
