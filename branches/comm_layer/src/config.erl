@@ -29,7 +29,7 @@
 -export([
 	 start_link/1, start/2,
 
-	 read/1, read/2,
+	 read/1, read/2, read_required/1,
 
 	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
 	 pointerBaseStabilizationInterval/0, failureDetectorInterval/0,
@@ -41,7 +41,7 @@
 	 transactionLookupTimeout/0, tpFailureTimeout/0, 
 	 tmanagerTimeout/0,
 	 %readTimeout/0, 
-   leaderDetectorInterval/0, 
+         leaderDetectorInterval/0, 
 	 testDump/0, testKeepAlive/0, register_hosts/0, listenPort/0, listenIP/0,
 	 knownHosts/0]).
 
@@ -53,6 +53,18 @@
 %%====================================================================
 %% public functions
 %%====================================================================
+
+%% @doc read config parameter
+%%  crashes, when parameter not set
+-spec(read_required/1 :: (atom()) -> any()).
+read_required(Key) ->
+    case read(Key, failed) of
+        failed ->
+            log:log(error, "config parameter ~p not set", [Key]),
+            erlang:error(config_error);
+        X ->
+            X
+    end.
 
 %% @doc read config parameter
 -spec(read/1 :: (atom()) -> any() | failed).

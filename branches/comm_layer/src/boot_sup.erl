@@ -64,6 +64,16 @@ start_tcerl() ->
     ok.
 -endif.
 
+start_ssl() ->
+    case catch ssl:start() of
+        ok ->
+            ok;
+        {error,{already_started,ssl}} ->
+            ok;
+        Err ->
+            log:log(error, "Failed to start ssl: ~p~n", [Err])
+    end.
+
 -ifdef(SIMULATION).
 init(_Args) ->
     randoms:start(),
@@ -71,6 +81,7 @@ init(_Args) ->
     %error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
     start_tcerl(),
+    start_ssl(),
     _Tracer = {
       tracer,
       {tracer, start_link, []},
@@ -172,12 +183,12 @@ init(_Args) ->
 	   ]}}.
 -else.
     init(_Args) ->
-    
     randoms:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
     %error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
     start_tcerl(),
+    start_ssl(),
     _Tracer = {
       tracer,
       {tracer, start_link, []},

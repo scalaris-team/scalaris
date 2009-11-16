@@ -15,7 +15,7 @@
 %%% File    : comm_acceptor.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
 %%% Description : Acceptor
-%%%           This module accepts new connections and starts corresponding 
+%%%           This module accepts new connections and starts corresponding
 %%%           comm_connection processes.
 %%%
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
@@ -27,14 +27,8 @@
 
 -export([start_link/1, init/2]).
 
--import(comm_connection).
--import(config).
--import(gen_tcp).
--import(inet).
--import(log).
--import(lists).
--import(process_dictionary).
-
+%% @edoc start a new acceptor for TCP connections
+-spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
     Pid = spawn_link(comm_acceptor, init, [InstanceId, self()]),
     receive
@@ -42,70 +36,80 @@ start_link(InstanceId) ->
             {ok, Pid}
     end.
 
+%% @edoc opens a TCP port for listening
+-spec(init/2 :: (any(), pid()) -> fail).
 init(InstanceId, Supervisor) ->
     process_dictionary:register_process(InstanceId, acceptor, self()),
     erlang:register(comm_layer_acceptor, self()),
-   log:log(info,"[ CC ] listening on ~p:~p", [config:listenIP(), config:listenPort()]),
+    log:log(info,"[ CC ] listening on ~p:~p", [config:listenIP(), config:listenPort()]),
     LS = case config:listenIP() of
-		       undefined ->
-			   open_listen_port(config:listenPort(), first_ip());
-		       _ ->
-			   open_listen_port(config:listenPort(), config:listenIP())
-		   end,
+             undefined ->
+                 open_listen_port(config:listenPort(), first_ip());
+             _ ->
+                 open_listen_port(config:listenPort(), config:listenIP())
+         end,
     {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
     comm_port:set_local_address(undefined, LocalPort),
     %io:format("this() == ~w~n", [{LocalAddress, LocalPort}]),
     Supervisor ! {started},
     server(LS).
 
+%% @edoc main loop for accepting new TCP connections
+-spec(server/1 :: (gen_tcp:socket()) -> fail).
 server(LS) ->
     case gen_tcp:accept(LS) of
-	{ok, S} ->
-	    case comm_port:get_local_address_port() of
-		{undefined, LocalPort} ->
-		    {ok, {MyIP, _LocalPort}} = inet:sockname(S),
-		    comm_port:set_local_address(MyIP, LocalPort);
-		_ ->
-		    ok
-	    end,
-	    receive
-		{tcp, S, Msg} ->
-		    {endpoint, Address, Port} = binary_to_term(Msg),
-		    % auto determine remote address, when not sent correctly
- 		    NewAddress = if Address =:= {0,0,0,0} orelse Address =:= {127,0,0,1} ->  
- 			    case inet:peername(S) of
- 				{ok, {PeerAddress, _Port}} -> 
-				    % io:format("Sent Address ~p\n",[Address]),
-				    % io:format("Peername is ~p\n",[PeerAddress]),
-				    PeerAddress;
- 				{error, _Why} ->
- 				    % io:format("Peername error ~p\n",[Why]).
-				    Address
- 			    end;
-  			true ->
-  			    % io:format("Address is ~p\n",[Address]),
-			    Address
-		    end,
-		    NewPid = comm_connection:new(NewAddress, Port, S),
-		    gen_tcp:controlling_process(S, NewPid),
-		    inet:setopts(S, comm_connection:tcp_options()),
-		    comm_port:register_connection(NewAddress, Port, NewPid, S)
-	    end,
-	    server(LS);
-	Other ->
-            log:log(warn,"[ CC ] unknown message ~p", [Other])
+        {ok, S} ->
+            % set local ip address
+            case comm_port:get_local_address_port() of
+                {undefined, LocalPort} ->
+                    {ok, {MyIP, _LocalPort}} = inet:sockname(S),
+                    comm_port:set_local_address(MyIP, LocalPort);
+                _ ->
+                    ok
+            end,
+            receive
+                {tcp, S, Msg} ->
+                    {endpoint, Address, Port} = binary_to_term(Msg),
+                    % auto determine remote address, when not sent correctly
+                    NewAddress = if Address =:= {0,0,0,0} orelse Address =:= {127,0,0,1} ->  
+                                         case inet:peername(S) of
+                                             {ok, {PeerAddress, _Port}} -> 
+                                                 % io:format("Sent Address ~p\n",[Address]),
+                                                 % io:format("Peername is ~p\n",[PeerAddress]),
+                                                 PeerAddress;
+                                             {error, _Why} ->
+                                                 % io:format("Peername error ~p\n",[Why]).
+                                                 Address
+                                         end;
+                                    true ->
+                                         % io:format("Address is ~p\n",[Address]),
+                                         Address
+                                 end,
+                    NewPid = comm_connection:new(NewAddress, Port, S),
+                    gen_tcp:controlling_process(S, NewPid),
+                    inet:setopts(S, comm_connection:tcp_options()),
+                    comm_port:register_connection(NewAddress, Port, NewPid, S)
+            end,
+            server(LS);
+        Other ->
+            log:log(warn,"[ CC ] unknown message ~p", [Other]),
+            fail
     end.
 
+% open a port for listening
+% either fixed port, port range, or port list
+-spec(open_listen_port/2 :: (integer() | list(integer()) | {integer(), integer()},
+                             inet:ip_address()) -> abort | gen_tcp:socket()).
 open_listen_port({From, To}, IP) ->
     open_listen_port(lists:seq(From, To), IP);
 open_listen_port([Port | Rest], IP) ->
-    case gen_tcp:listen(Port, [binary, {packet, 4}, {reuseaddr, true}, 
-					      {active, once}, {ip, IP}]) of
-	{ok, Socket} ->
-	    Socket;
-	{error, Reason} ->
-	   log:log(error,"[ CC ] can't listen on ~p: ~p~n", [Port, Reason]),
-	    open_listen_port(Rest, IP)
+    case gen_tcp:listen(Port, [binary, {packet, 4}, {reuseaddr, true},
+                               {active, once}, {ip, IP}]) of
+        {ok, Socket} ->
+            Socket;
+        {error, Reason} ->
+            log:log(error,"[ CC ] can't listen on ~p: ~p~n", [Port, Reason]),
+            open_listen_port(Rest, IP)
     end;
 open_listen_port([], _) ->
     abort;

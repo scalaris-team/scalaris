@@ -73,6 +73,13 @@ init([]) ->
 	 brutal_kill,
 	 worker,
 	 []},
+    CommSSLAcceptor =
+	{comm_ssl_acceptor,
+	 {comm_ssl_acceptor, start_link, [InstanceId]},
+	 permanent,
+	 brutal_kill,
+	 worker,
+	 []},
     CommLogger =
 	{comm_logger,
 	 {comm_logger, start_link, []},
@@ -84,7 +91,8 @@ init([]) ->
 	  [
 	   CommPort,
 	   CommLogger,
-	   CommAcceptor	   
+	   CommAcceptor,
+           CommSSLAcceptor
 	  ]}}.
-    
+
 
