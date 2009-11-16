@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "purge" ]; then
+
+  rm -f /etc/scalaris/scalaris.cfg
+
+fi
+
+#DEBHELPER#
+
+exit 0
