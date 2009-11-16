@@ -256,7 +256,8 @@ the stored data is always consistent. I.e. when you are running
 two partitions, one partition with three replicas and one partition
 with one replica, you will be able to continue to use the service only
 in the larger partition. All requests in the smaller partition will
-time out.
+time out until the two networks merge again. Note, most other
+key-value stores tend to sacrifice consistency.
 
 \chapter{Download and Installation}
 
@@ -268,15 +269,15 @@ required which are not included in the \scalaris{} sources:
 \begin{itemize}
 \setlength{\itemsep}{0pt}
 \setlength{\parskip}{0pt}
-\item Erlang R12
-\item Erlang OTP (included in Erlang R12)
-\item GNU Make
+\item Erlang R12 or newer
+\item GNU-like Make
 \end{itemize}
 
 Note, the Version 12 of Erlang is required. \scalaris{} will not
 work with older versions.
 
-To build the Java API the following modules are required additionally:
+To build the Java API (and the command-line client) the following
+modules are required additionally:
 
 \begin{itemize}
 \setlength{\itemsep}{0pt}
@@ -292,7 +293,9 @@ installation.
 
 \section{Download}
 
-The sources can be obtained from \url{http://code.google.com/p/scalaris}.
+The sources can be obtained from
+\url{http://code.google.com/p/scalaris}. RPMs are available from
+\url{http://download.opensuse.org/repositories/home:/tschuett/}.
 
 \subsection{Development Branch}
 
@@ -312,14 +315,18 @@ Releases can be found under the 'Download' tab on the web-page.
 \scalaris{} reads two configuration files from the working directory:
 \code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
 (optional). The former defines default settings and is included in the
-release. The latter can be created by the user to alter settings.  A sample
-file is \code{bin/scalaris.local.cfg.example}. A local configuration file is
-necessary to run \scalaris{} on distributed nodes:
+release. The latter can be created by the user to alter settings.  A
+sample file is \code{bin/scalaris.local.cfg.example}. To run \scalaris
+distributed over several nodes, each node requires a \code{bin/scalaris.local.cfg}:
 
 \codefile{scalaris.local.cfg}{../bin/scalaris.local.cfg.example}
 
-\code{boot_host} defines the node where the boot server is running, which is
-contacted to join the system.
+\scalaris distinguishes currently two different kinds of nodes: (a)
+the boot-server and (b) regular nodes. For the moment, we limit the
+number of boot-servers to exactly one. The remaining nodes are regular
+nodes. The boot-server is contacted to join the system. On all servers,
+the \code{boot_host} option defines the server where the boot server
+is running. In the example, it is an IP address plus a TCP port.
 
 \section{Build}
 
@@ -343,17 +350,20 @@ We are currently not supporting \scalaris{} on Windows. However, we
 have two small {\tt bat} files for building and running a boot
 server. It seems to work but we make no guarantees.
 
-\begin{itemize}
-\item Install Erlang
-\item Install OpenSSL (for crypto module)
-\item Checkout scalaris code from SVN
-\item copy an appropriate EMakefile\_for from \code{contrib/win32} to the trunk-directory
-\item Adapt the path to your Erlang installation in build.bat
-\item run build.bat
-\item Go to the bin sub-directory
-\item Adapt the path to your Erlang installation in boot.bat
-\item run boot.bat
-\end{itemize}
+For the most recent description please see the FAQ at
+\url{http://code.google.com/p/scalaris/wiki/FAQ}.
+
+% \begin{itemize}
+% \item Install Erlang
+% \item Install OpenSSL (for crypto module)
+% \item Checkout scalaris code from SVN
+% \item copy an appropriate EMakefile\_for from \code{contrib/win32} to the trunk-directory
+% \item Adapt the path to your Erlang installation in build.bat
+% \item run build.bat
+% \item Go to the bin sub-directory
+% \item Adapt the path to your Erlang installation in boot.bat
+% \item run boot.bat
+% \end{itemize}
 
 \subsection{Java-API}
 
@@ -372,18 +382,19 @@ the overlay network. Optionally, the documentation can be build:
 
 \section{Running \scalaris{}}
 
-In \scalaris{} there are two kinds of processes:
+As mentioned above, in \scalaris{} there are two kinds of nodes:
 \begin{itemize}
 \setlength{\itemsep}{0pt}
 \setlength{\parskip}{0pt}
 \item boot servers
-\item regular servers
+\item regular nodes
 \end{itemize}
 
 In every \scalaris{}, at least one boot server is required. It will
 maintain a list of nodes taken part in the system and allows other
 nodes to join the ring. For redundancy, it is also possible to have
-several boot servers.
+several boot servers. In the future, we want to eliminate this
+distinction, so any node is also a boot-server.
 
 \subsection{Running on a local machine}
 \label{sec.boot}
@@ -1035,7 +1046,7 @@ predecessor, a reference to itself, its responsibility area from
 
 The macro \code{?RT} maps to the configured routing algorithm and
 \code{?RM} to the configured ring maintenance algorithm. It is defined
-in \code{chordsharp.hrl}. For further details on the routing see
+in \code{include/scalaris.hrl}. For further details on the routing see
 Chapter~\sieheref{chapter.routing}.
 
 The state is defined in
@@ -1183,9 +1194,9 @@ defined using a so called `behaviour'.  The files \code{rt_simple} and
 \code{rt_chord} implement the behaviour `routingtable'.
 
 The macro ?RT is used to select the current implementation of routing
-tables. It is defined in \code{chordsharp.hrl}.
+tables. It is defined in \code{include/scalaris.hrl}.
 
-\codesnippet{chordsharp.hrl}{chordsharp:rt}{../src/chordsharp.hrl}
+\codesnippet{scalaris.hrl}{chordsharp:rt}{../include/scalaris.hrl}
 
 The functions, that have to be implemented for a routing mechanism are
 defined in the following file:
