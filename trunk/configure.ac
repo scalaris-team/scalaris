@@ -81,6 +81,11 @@ AC_RUN_IFELSE(
        [GBTREESISBUILTIN=", {d, types_are_builtin}"; AC_MSG_NOTICE([gb_tree() is a built-in type])],
        [GBTREESISBUILTIN=""; AC_MSG_NOTICE([gb_tree() is not built-in])])
 
+AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([], [crypto:start()])],
+       [AC_MSG_NOTICE([crypto:start() is available])],
+       [AC_MSG_FAILURE([cannot start the crypto subsystem])])
+
 AC_SUBST(GBTREESISBUILTIN)
 
 ###########################################################
@@ -121,4 +126,4 @@ chmod u+x bin/cs_local2.sh
 chmod u+x bin/cs_local3.sh
 chmod u+x bin/scalarisctl
 chmod u+x bin/scalarisclient
-chmod ugo-x bin/*.in
+# chmod ugo-x bin/*.in
