@@ -20,6 +20,8 @@
 
 -export([start_link/2, start_link/3, start/4, start/2, start/3,wait_for_ok/0]).
 
+-export([kill/1, sleep/2]).
+
 %================================================================================
 % behaviour definition
 %================================================================================
@@ -38,6 +40,11 @@ behaviour_info(_Other) ->
 % API
 %================================================================================
 
+kill(Pid) ->
+    Pid ! {'$gen_component', kill}.
+
+sleep(Pid, Time) ->
+    Pid ! {'$gen_component', time, Time}.
 
 %================================================================================
 % generic framework
@@ -51,7 +58,6 @@ start_link(Module, Args) ->
 
 -spec(start_link/3 :: (any(), list(), list()) -> {ok, pid()}).
 start_link(Module, Args, Options) ->
-    
     Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
     receive
         {started, Pid} ->
@@ -109,9 +115,13 @@ start(Module, Args, Options, Supervisor) ->
 -ifndef(SIMULATION).
 loop(Module, State, {Options, Slowest} = _ComponentState) ->
     receive
+        {'$gen_compnent', sleep , Time} ->
+            timer:sleep(Time),
+            loop(Module, State, _ComponentState);
+        {'$gen_compnent', kill} ->
+            ok;
         Message ->
             %Start = erlang:now(),
-           
             case (try Module:on(Message, State) catch
                                                     throw:Term -> {exception, Term};
                                                     exit:Reason -> {exception,Reason};
