@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -443,17 +443,6 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 %% @TODO buggy ...
 %on({get_node_response, _, _}, State) ->
 %    State;
-
-%% @TODO: cleanup
-on({send_to_group_member,Processname,Mesg}, State) ->
-    InstanceId = erlang:get(instance_id),
-    Pid = process_dictionary:lookup_process(InstanceId,Processname),
-    case Pid of
-       failed ->
-           ok;
-       _ -> cs_send:send_local(Pid , Mesg)
-    end,
-    State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % join messages (see cs_join.erl)

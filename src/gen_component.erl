@@ -7,7 +7,7 @@
 %%%------------------------------------------------------------------------------
 %% @doc 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008, 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 -module(gen_component).
 
@@ -120,6 +120,17 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
             loop(Module, State, _ComponentState);
         {'$gen_compnent', kill} ->
             ok;
+        %% forward a message to group member by its process name
+        %% initiated via cs_send:send_to_group_member()
+        {send_to_group_member, Processname, Msg} ->
+            InstanceId = erlang:get(instance_id),
+            Pid = process_dictionary:lookup_process(InstanceId,Processname),
+            case Pid of
+                failed ->
+                    ok;
+                _ -> cs_send:send_local(Pid , Msg)
+            end,
+            loop(Module, State, _ComponentState);
         Message ->
             %Start = erlang:now(),
             case (try Module:on(Message, State) catch
