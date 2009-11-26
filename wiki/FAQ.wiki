@@ -65,15 +65,18 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || Fedora || 9 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_9/] ||
 || Fedora || 10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_10/] ||
 || Fedora || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_11/] ||
+|| Fedora || 12 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_12/] ||
 || Mandriva || 2008 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2008/] ||
 || Mandriva || 2009 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009/] ||
+|| Mandriva || 2009.1 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009.1/] ||
+|| Mandriva || 2010 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2010/] ||
 || openSUSE || 11.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.0/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || openSUSE || 11.1 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.1/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || openSUSE || 11.2 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.2/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.2/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_11.2/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || openSUSE || Factory || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/] ||
 || SLE || 10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || SLE || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| CentOS || 5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/] ||
+|| CentOS || 5.4 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/] ||
 || RHEL || 5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/] ||
 || Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Debian_5.0/] ||
 || Ubuntu || 9.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.04/] ||
