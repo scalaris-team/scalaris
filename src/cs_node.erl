@@ -149,10 +149,6 @@ on({die}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ping Messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({ping, Ping_PID, Cookie}, State) ->
-    cs_send:send(Ping_PID, {pong, Cookie}),
-    State;
-
 on({ping, Ping_PID}, State) ->
     cs_send:send(Ping_PID, {pong, Ping_PID}),
     State;
