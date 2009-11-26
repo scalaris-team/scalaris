@@ -120,6 +120,10 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
             loop(Module, State, _ComponentState);
         {'$gen_compnent', kill} ->
             ok;
+        % handle failure detector messages
+        {ping, Pid, Cookie} ->
+            cs_send:send(Pid, {pong, Cookie}),
+            loop(Module, State, _ComponentState);
         %% forward a message to group member by its process name
         %% initiated via cs_send:send_to_group_member()
         {send_to_group_member, Processname, Msg} ->
