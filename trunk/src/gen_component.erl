@@ -1,11 +1,24 @@
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
 %%%------------------------------------------------------------------------------
 %%% File    : gen_component.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : 
+%%% Description :
 %%%
 %%% Created : 19 Dec 2008 by Thorsten Schuett <schuett@zib.de>
 %%%------------------------------------------------------------------------------
-%% @doc 
+%% @doc
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2008, 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
@@ -18,7 +31,8 @@
 
 -export([behaviour_info/1]).
 
--export([start_link/2, start_link/3, start/4, start/2, start/3,wait_for_ok/0]).
+-export([start_link/2, start_link/3, start/4, start/2, start/3,wait_for_ok/0,
+         change_handler/2]).
 
 -export([kill/1, sleep/2]).
 
@@ -45,6 +59,10 @@ kill(Pid) ->
 
 sleep(Pid, Time) ->
     Pid ! {'$gen_component', time, Time}.
+
+%% @edoc change the handler for handling messages
+change_handler(State, Handler) when is_atom(Handler) ->
+    {'$gen_component', [{on_handler, Handler}], State}.
 
 %================================================================================
 % generic framework
@@ -84,10 +102,8 @@ start(Module, Args, Options, Supervisor) ->
             ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
 	    Supervisor ! {started, self()};
 	false ->
-            
             case lists:keysearch(register_native, 1, Options) of
             {value, {register_native,Name}} ->
-               
                 register(Name, self()),
                 Supervisor ! {started, self()};
             false ->
@@ -97,8 +113,14 @@ start(Module, Args, Options, Supervisor) ->
             end
     end,
     try
-        InitialState = Module:init(Args),
-        loop(Module, InitialState, {Options, 0.0})
+        case Module:init(Args) of
+            {'$gen_component', Config, InitialState} ->
+                {value, {on_handler, NewHandler}} =
+                    lists:keysearch(on_handler, 1, Config),
+                loop(Module, NewHandler, InitialState, {Options, 0.0});
+            InitialState ->
+                loop(Module, on, InitialState, {Options, 0.0})
+        end
     catch
         throw:Term ->
             log:log(error,"exception in init/loop of ~p: ~p~n", [Module, Term]),
@@ -112,18 +134,17 @@ start(Module, Args, Options, Supervisor) ->
             throw(Reason)
     end.
 
--ifndef(SIMULATION).
-loop(Module, State, {Options, Slowest} = _ComponentState) ->
+loop(Module, On, State, {Options, Slowest} = ComponentState) ->
     receive
-        {'$gen_compnent', sleep , Time} ->
+        {'$gen_component', sleep , Time} ->
             timer:sleep(Time),
-            loop(Module, State, _ComponentState);
-        {'$gen_compnent', kill} ->
+            loop(Module, On, State, ComponentState);
+        {'$gen_component', kill} ->
             ok;
         % handle failure detector messages
         {ping, Pid, Cookie} ->
             cs_send:send(Pid, {pong, Cookie}),
-            loop(Module, State, _ComponentState);
+            loop(Module, On, State, ComponentState);
         %% forward a message to group member by its process name
         %% initiated via cs_send:send_to_group_member()
         {send_to_group_member, Processname, Msg} ->
@@ -134,10 +155,10 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
                     ok;
                 _ -> cs_send:send_local(Pid , Msg)
             end,
-            loop(Module, State, _ComponentState);
+            loop(Module, On, State, ComponentState);
         Message ->
             %Start = erlang:now(),
-            case (try Module:on(Message, State) catch
+            case (try Module:On(Message, State) catch
                                                     throw:Term -> {exception, Term};
                                                     exit:Reason -> {exception,Reason};
                                                     error:Reason -> {exception, {Reason,
@@ -146,14 +167,18 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
                 {exception, Exception} ->
                     log:log(error,"Error: exception ~p during handling of ~p in module ~p~n",
                               [Exception, Message, Module]),
-                    loop(Module, State, {Options, Slowest});
+                    loop(Module, On, State, ComponentState);
                 unknown_event ->
                     {NewState, NewComponentState} =
                         handle_unknown_event(Message, State,
                          {Options, Slowest},Module),
-                    loop(Module, NewState, NewComponentState);
+                    loop(Module, On, NewState, NewComponentState);
                 kill ->
                     ok;
+                {'$gen_component', Config, NewState} ->
+                    {value, {on_handler, NewHandler}} =
+                        lists:keysearch(on_handler, 1, Config),
+                    loop(Module, NewHandler, NewState, ComponentState);
                 NewState ->
                     %Stop = erlang:now(),
                     %Span = timer:now_diff(Stop, Start),
@@ -162,7 +187,7 @@ loop(Module, State, {Options, Slowest} = _ComponentState) ->
                             %io:format("slow message ~p (~p)~n", [Message, Span]),
                             %loop(Module, NewState, {Options, Span});
                         %true ->
-                            loop(Module, NewState, {Options, Slowest})
+                            loop(Module, On, NewState, ComponentState)
                     %end
             end
     end.
@@ -175,49 +200,6 @@ wait_for_ok() ->
         %io:format("ok is da~n"),
         ok
     end.
- 
--endif.
-
--ifdef(SIMULATION).
-loop(Module, State, {Options, Slowest} = _ComponentState) ->
-    
-    receive
-    Message ->
-        %io:format("~p ~p ~n", [Message, Module]),
-        case Module:on(Message, State) of
-        unknown_event ->
-            {NewState, NewComponentState} = 
-            handle_unknown_event(Message, State, 
-                         {Options, Slowest},Module),
-            yield(),
-            loop(Module, NewState, NewComponentState);
-        kill ->
-            yield(),
-            ok;
-        NewState ->
-            yield(),
-            loop(Module, NewState, {Options, Slowest})
-        end
-    end.
-wait_for_ok() ->
-    %io:format("Warte auf ok~n"),
-    release_ok(),
-    receive
-    {ok} ->
-        %io:format("ok is da~n"),
-        ok
-    end.
-
-release_ok() ->
-    scheduler ! {release_ok}.
-
-yield() ->
-    scheduler ! {yield}.
-
--endif.
-
-
-
 
 handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->
    log:log(error,"unknown message: ~p in Module: ~p ~n in State ~p ~n",[UnknownMessage,Module,State]),
