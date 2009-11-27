@@ -124,7 +124,7 @@ on({join_response, Pred, Data},{join_state4,Id,Succ,Me}) ->
     cs_send:send_local(get_local_cs_reregister_pid(),{go}),
     State;
 
-% Catch all messages untel the join protocol is finshed 
+% Catch all messages until the join protocol is finshed 
 on(Msg, State) when element(1, State) /= state ->
   %cs_send:send_local(self() , Msg),
   cs_send:send_after(100, self(), Msg),
@@ -308,6 +308,13 @@ on({lookup_fin, Hops, Msg}, State) ->
 
 on({get_node, Source_PID, Key}, State) ->
     cs_send:send(Source_PID, {get_node_response, Key, cs_state:me(State)}),
+    State;
+
+on({get_process_in_group, Source_PID, Key, Process}, State) ->
+    InstanceId = erlang:get(instance_id),
+    Pid = process_dictionary:lookup_process(InstanceId, Process),
+    GPid = cs_send:make_global(Pid),
+    cs_send:send(Source_PID, {get_process_in_group_reply, Key, GPid}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
