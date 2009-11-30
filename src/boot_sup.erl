@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,43 +19,21 @@
 %%% Created : 17 Jan 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 -module(boot_sup).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -behaviour(supervisor).
-
 -include("autoconf.hrl").
-
 -export([start_link/0, init/1]).
 
-%%====================================================================
-%% API functions
-%%====================================================================
-%%--------------------------------------------------------------------
-%% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the supervisor
-%%--------------------------------------------------------------------
 start_link() ->
     Link = supervisor:start_link({local, main_sup}, ?MODULE, []),
     cs_sup_standalone:scan_environment(),
     Link.
 
-%%====================================================================
-%% Supervisor callbacks
-%%====================================================================
-%%--------------------------------------------------------------------
-%% Func: init(Args) -> {ok,  {SupFlags,  [ChildSpec]}} |
-%%                     ignore                          |
-%%                     {error, Reason}
-%% Description: Whenever a supervisor is started using 
-%% supervisor:start_link/[2,3], this function is called by the new process 
-%% to find out about restart strategy, maximum restart frequency and child 
-%% specifications.
-%%--------------------------------------------------------------------
 -ifdef(HAVE_TCERL).
 start_tcerl() ->
     tcerl:start().
@@ -68,229 +46,71 @@ start_tcerl() ->
 init(_Args) ->
     randoms:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
-    %error_logger:logfile({open, preconfig:cs_log_file()}),
+    %% error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
     start_tcerl(),
-    _Tracer = {
-      tracer,
-      {tracer, start_link, []},
-      permanent,
-      brutal_kill,
-      worker,
-      []      
-     },
-    FailureDetector = {
-      failure_detector2,
-      {failuredetector2, start_link, []},
-      permanent,
-      brutal_kill,
-      worker,
-      []      
-     },
-    Node =
-	{boot_server,
-	 {boot_server, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    Config =
-	{config,
-	 {config, start_link, [[preconfig:config(), preconfig:local_config()]]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    
-%%     XMLRPC = 
-%% 	{boot_xmlrpc,
-%% 	 {boot_xmlrpc, start_link, [InstanceId]},
-%% 	 permanent,
-%% 	 brutal_kill,
-%% 	 worker,
-%% 	 []},
-    Logger = 
-	{logger,
-	 {log, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   CSNode = 
-	{cs_node,
-	 {cs_sup_or, start_link, [[first]]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    YAWS = 
-	{yaws,
-	 {yaws_wrapper, start_link, [preconfig:docroot(), 
-				     [{port, preconfig:yaws_port()},{listen, {0,0,0,0}}, {opaque, InstanceId}], 
-				     [{max_open_conns, 800}, {access_log, false}, {logdir, preconfig:log_path()}]
-				    ]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   CommPort = 
-	{comm_port,
-	 {comm_layer, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   BenchServer = 
-	{bench_server,
-	 {bench_server, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   AdminServer = 
-	{admin_server,
-	 {admin, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-
     {ok, {{one_for_one, 10, 1},
-	  [
-	   Config,
-	   Logger,
-	   %Tracer,
-	   %CommPort,
-	   FailureDetector,
-	   AdminServer,
-	   %XMLRPC,
-	   
-	   Node,
-	   YAWS,
-	   %BenchServer,
-	   CSNode
-	   ]}}.
+          [ X || {Name, _, _, _, _, _} = X <- my_process_list(InstanceId),
+                Name =/= tracer, Name =/= boot_xmlrpc,
+                Name =/= bench_server, Name =/= comm_port]}}.
 -else.
-    init(_Args) ->
-    
+init(_Args) ->
     randoms:start(),
     InstanceId = string:concat("boot_server_", randoms:getRandomId()),
-    %error_logger:logfile({open, preconfig:cs_log_file()}),
+    %% error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
     start_tcerl(),
-    _Tracer = {
-      tracer,
-      {tracer, start_link, []},
-      permanent,
-      brutal_kill,
-      worker,
-      []
-     },
-    FailureDetector = {
-      failure_detector2,
-      {failuredetector2, start_link, []},
-      permanent,
-      brutal_kill,
-      worker,
-      []
-     },
-    Node =
-	{boot_server,
-	 {boot_server, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    Config =
-	{config,
-	 {config, start_link, [[preconfig:config(), preconfig:local_config()]]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-
-%%     XMLRPC =
-%% 	{boot_xmlrpc,
-%% 	 {boot_xmlrpc, start_link, [InstanceId]},
-%% 	 permanent,
-%% 	 brutal_kill,
-%% 	 worker,
-%% 	 []},
-    Logger =
-	{logger,
-	 {log, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   CSNode =
-	{cs_node,
-	 {cs_sup_or, start_link, [[first]]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-    YAWS =
-	{yaws,
-	 {yaws_wrapper, start_link, [preconfig:docroot(),
-				     [{port, preconfig:yaws_port()},{listen, {0,0,0,0}}, {opaque, InstanceId}],
-				     [{max_open_conns, 800}, {access_log, false}, {logdir, preconfig:log_path()}]
-				    ]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   CommPort =
-	{comm_port,
-	 {comm_layer, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   BenchServer =
-	{bench_server,
-	 {bench_server, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   AdminServer =
-	{admin_server,
-	 {admin, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   Ganglia =
-	{ganglia_server,
-	 {ganglia, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   MonitorTiming =
-	{monitor_timing,
-	 {monitor_timing, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-
     {ok, {{one_for_one, 10, 1},
-	    [
-     Config,
+          [ X || {Name, _, _, _, _, _} = X <- my_process_list(InstanceId),
+                Name =/= tracer, Name =/= boot_xmlrpc]}}.
+-endif.
+
+my_process_list(InstanceId) ->
+    Tracer =
+        util:sup_worker_desc(tracer, tracer, start_link),
+    FailureDetector =
+        util:sup_worker_desc(failuredetector2, failuredetector2, start_link),
+    Node =
+        util:sup_worker_desc(boot_server, boot_server, start_link,
+                             [InstanceId]),
+    Config =
+        util:sup_worker_desc(config, config, start_link,
+                             [[preconfig:config(), preconfig:local_config()]]),
+    XMLRPC =
+        util:sup_worker_desc(boot_xmlrpc, boot_xmlrpc, start_link,
+                             [InstanceId]),
+    Logger =
+        util:sup_worker_desc(logger, log, start_link),
+    CSNode =
+        util:sup_worker_desc(cs_node, cs_sup_or, start_link, [[first]]),
+    YAWS =
+        util:sup_worker_desc(yaws, yaws_wrapper, start_link,
+                             [ preconfig:docroot(),
+                               [{port, preconfig:yaws_port()},
+                                {listen, {0,0,0,0}}, {opaque, InstanceId}],
+                               [{max_open_conns, 800}, {access_log, false},
+                                {logdir, preconfig:log_path()}] ]),
+    CommPort =
+        util:sup_worker_desc(comm_port, comm_layer, start_link),
+    BenchServer =
+        util:sup_worker_desc(bench_server, bench_server, start_link),
+    AdminServer =
+        util:sup_worker_desc(admin_server, admin, start_link),
+    Ganglia =
+        util:sup_worker_desc(ganglia_server, ganglia, start_link),
+    MonitorTiming =
+        util:sup_worker_desc(monitor_timing, monitor_timing, start_link),
+    %% order in the following list is the start order
+    [Config,
      Logger,
      MonitorTiming,
-     %Tracer,
+     Tracer,
      CommPort,
      FailureDetector,
      AdminServer,
-     %XMLRPC,
+     XMLRPC,
      Node,
      YAWS,
      BenchServer,
      Ganglia,
-     CSNode
-     ]}}.
-
--endif.
+     CSNode].
