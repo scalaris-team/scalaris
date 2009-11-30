@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -22,59 +22,29 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %% @version $Id$
 -module(cs_sup_and).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -behaviour(supervisor).
-
 -include("../include/scalaris.hrl").
 
 -export([start_link/2, init/1]).
 
-%%====================================================================
-%% API functions
-%%====================================================================
-%%--------------------------------------------------------------------
-%% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the supervisor
-%%--------------------------------------------------------------------
 start_link(InstanceId, Options) ->
     supervisor:start_link(?MODULE, [InstanceId, Options]).
 
-%%====================================================================
-%% Supervisor callbacks
-%%====================================================================
-%%--------------------------------------------------------------------
-%% Func: init(Args) -> {ok,  {SupFlags,  [ChildSpec]}} |
-%%                     ignore                          |
-%%                     {error, Reason}
-%% Description: Whenever a supervisor is started using 
-%% supervisor:start_link/[2,3], this function is called by the new process 
-%% to find out about restart strategy, maximum restart frequency and child 
-%% specifications.
-%%--------------------------------------------------------------------
 %% userdevguide-begin cs_sup_and:init
 init([InstanceId, Options]) ->
     Node =
-	{cs_node,
-	 {cs_node, start_link, [InstanceId, Options]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
+        util:sup_worker_desc(cs_node, cs_node, start_link,
+                             [InstanceId, Options]),
     DB =
-	{?DB,
-	 {?DB, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
-   
+        util:sup_worker_desc(?DB, ?DB, start_link,
+                             [InstanceId]),
     {ok, {{one_for_all, 10, 1},
-	  [
-	   DB,
-	   Node
-	   ]}}.
+          [
+           DB,
+           Node
+          ]}}.
 %% userdevguide-end cs_sup_and:init
 
