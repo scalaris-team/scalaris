@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008, 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -35,56 +35,23 @@
 
 -export([start_link/0, init/1]).
 
-%%====================================================================
-%% API functions
-%%====================================================================
-%%--------------------------------------------------------------------
-%% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the supervisor
-%%--------------------------------------------------------------------
 start_link() ->
     supervisor:start_link(?MODULE, []).
 
-%%====================================================================
-%% Supervisor callbacks
-%%====================================================================
-%%--------------------------------------------------------------------
-%% Func: init(Args) -> {ok,  {SupFlags,  [ChildSpec]}} |
-%%                     ignore                          |
-%%                     {error, Reason}
-%% Description: Whenever a supervisor is started using 
-%% supervisor:start_link/[2,3], this function is called by the new process 
-%% to find out about restart strategy, maximum restart frequency and child 
-%% specifications.
-%%--------------------------------------------------------------------
 init([]) ->
     InstanceId = string:concat("comm_port_", randoms:getRandomId()),
     CommPort =
-	{comm_port,
-	 {comm_port, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
+        util:sup_worker_desc(comm_port, comm_port, start_link),
     CommAcceptor =
-	{comm_acceptor,
-	 {comm_acceptor, start_link, [InstanceId]},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
+        util:sup_worker_desc(comm_acceptor, comm_acceptor, start_link,
+                             [InstanceId]),
     CommLogger =
-	{comm_logger,
-	 {comm_logger, start_link, []},
-	 permanent,
-	 brutal_kill,
-	 worker,
-	 []},
+        util:sup_worker_desc(comm_logger, comm_logger, start_link),
     {ok, {{one_for_all, 10, 1},
-	  [
-	   CommPort,
-	   CommLogger,
-	   CommAcceptor	   
-	  ]}}.
-    
+          [
+           CommPort,
+           CommLogger,
+           CommAcceptor
+          ]}}.
+
 

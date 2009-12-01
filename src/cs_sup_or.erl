@@ -46,12 +46,8 @@ init([Options]) ->
         util:sup_worker_desc(rse_chord, rse_chord, start_link,
                              [InstanceId]),
     Supervisor_AND =
-        {cs_supervisor_and,
-         {cs_sup_and, start_link, [InstanceId, Options]},
-         permanent,
-         brutal_kill,
-         supervisor,
-         []},
+        util:sup_supervisor_desc(cs_supervisor_and, cs_sup_and, start_link,
+                                 [InstanceId, Options]),
     RingMaintenance =
         util:sup_worker_desc(?RM, util, parameterized_start_link,
                              [?RM:new(config:read(ringmaintenance_trigger)),
