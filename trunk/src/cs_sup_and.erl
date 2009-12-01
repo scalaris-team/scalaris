@@ -47,4 +47,3 @@ init([InstanceId, Options]) ->
            Node
           ]}}.
 %% userdevguide-end cs_sup_and:init
-
