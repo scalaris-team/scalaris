@@ -191,33 +191,50 @@ loop() ->
 %%--------------------------------------------------------------------
 % @doc contact boot server and list the known ip addresses
 % @spec nodes() -> list()
+-spec(nodes/0 :: () -> list()).
 nodes() ->
-    util:uniq([IP || {IP, _, _} <- lists:sort(boot_server:node_list())]).
+    boot_server:node_list(),
+    Nodes = receive
+                {get_list_response, List} ->
+                    util:uniq([IP || {IP, _, _} <- lists:sort(List)])
+            end,
+    Nodes.
 
 %%===============================================================================
 %% Debug functions
 %%===============================================================================
 
+-spec(print_ages/0 :: () -> ok).
 print_ages() ->
-	Nodes = boot_server:node_list(),
-	[ cs_send:send_to_group_member(Node,cyclon,{get_ages,self()}) || Node <- Nodes ],
-    worker_loop().
-		
+    boot_server:node_list(),
+    receive
+        {get_list_response, List} ->
+            [ cs_send:send_to_group_member(Node,cyclon,{get_ages,self()}) || Node <- List ]
+    end,
+    worker_loop(),
+    ok.
+
 worker_loop() ->
-	receive 
-		{ages,Ages} ->
-			io:format("~p~n",[Ages]),
-			worker_loop()
+    receive
+        {ages,Ages} ->
+            io:format("~p~n",[Ages]),
+            worker_loop()
     after 400 ->
             ok
-	end.
+    end.
 
+-spec(check_routing_tables/1 :: (any()) -> ok).
 check_routing_tables(Port) ->
-	Nodes = boot_server:node_list(),
-	[ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- Nodes ].
+    boot_server:node_list(),
+    receive
+        {get_list_response, List} ->
+            [ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- List ]
+    end,
+    ok.
 
 dd_check_ring() ->
-    dd_check_ring(0).    
+    dd_check_ring(0).
+
 dd_check_ring(Token) ->
     {ok,One} = process_dictionary:find_cs_node(),
     cs_send:send_local(One , {send_to_group_member,ring_maintenance,{init_check_ring,Token}}),
