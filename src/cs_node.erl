@@ -61,7 +61,6 @@ on({get_key_response_keyholder, Key},{join_state2,First}) ->
     log:log(info,"[ Node ~w ] joining ~p ~p",[self(), Key,First]),
     case First of
         true ->
-           
             S = cs_join:join_first(Key),
             cs_send:send_local(get_local_cs_reregister_pid(),{go}),
             %log:log(info,"[ Node ~w ] joined",[self()]),
@@ -70,7 +69,7 @@ on({get_key_response_keyholder, Key},{join_state2,First}) ->
             InstanceId = erlang:get(instance_id),
             erlang:put(instance_id, InstanceId),
             boot_server:node_list(),
-            {join_state2_b,Key}            
+            {join_state2_b,Key}
     end;
 
 on({get_list_response,Nodes},{join_state2_b,Key}) ->

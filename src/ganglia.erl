@@ -47,7 +47,7 @@ ganglia_loop(Last) ->
     Timers = monitor_timing:get_timers(),
     [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
     % vivaldi statistics
-    monitor_per_cs_node(fun monitor_vivaldi_errors/2),
+    monitor_per_cs_node(fun monitor_vivaldi_errors/2, process_dictionary:find_all_groups(cs_node)),
     timer:sleep(config:read(ganglia_interval)),
     ganglia_loop(Now).
 
@@ -94,8 +94,10 @@ monitor_vivaldi_errors(Group, Idx) ->
             end
     end.
 
-monitor_per_cs_node(F) ->
-    CSNodes = lists:sort(process_dictionary:find_all_groups(cs_node)),
+monitor_per_cs_node(_, failed) ->
+    ok;
+monitor_per_cs_node(F, Nodes) ->
+    CSNodes = lists:sort(Nodes),
     lists:foldl(fun (Group, Idx) ->
                         F(Group, Idx),
                         Idx + 1
