@@ -71,7 +71,8 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
     cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
-    {NewId, NewMe, [NewPred], NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),TriggerState2,NewPred,hd(NewSuccList),[],1};
+    {NewId, NewMe, [NewPred], NewSuccList, config:read(cyclon_cache_size),
+     config:stabilizationInterval_min(), TriggerState2, NewPred, hd(NewSuccList), [], 1};
 on(_,uninit) ->
     uninit;
 
@@ -120,13 +121,16 @@ on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,Ak
 	    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(1))
     end,
    {Id, Me, Preds, Succs,RandViewSize,Interval,NewTriggerState,NewAktPred,NewAktSucc,Cache,Churn};
+on({cache,[]}, State)  ->
+    % ignore empty cache from cyclon
+    State;
 on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,_Cache,Churn})  ->
              %inc RandViewSize (no error detected)
     RandViewSizeNew = case (RandViewSize < config:read(cyclon_cache_size)) of
                           true ->
-            RandViewSize+1;
+                              RandViewSize+1;
                           false ->
-            RandViewSize
+                              RandViewSize
                       end,
     cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSizeNew,self()}),
     RndView=get_RndView(RandViewSizeNew,NewCache),
