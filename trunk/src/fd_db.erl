@@ -27,15 +27,14 @@
 
 %% API Functions
 init() ->
-    ets:new(ts_table, [bag, protected, named_table]),
-    ets:new(st_table, [bag, protected, named_table]),
+    ets:new(ts_table, [duplicate_bag, protected, named_table]),
+    ets:new(st_table, [duplicate_bag, protected, named_table]),
     ets:new(pinger_table, [set, protected, named_table]).
 
 -spec(add_subscription/3 :: (pid(), cs_send:mypid(), any) -> true).
 add_subscription(Subscriber, Target, Cookie) ->
     ets:insert(st_table, {Subscriber, {Target, Cookie}}),
     ets:insert(ts_table, {Target, {Subscriber, Cookie}}).
-
 
 -spec(del_subscription/3 :: (pid(), cs_send:mypid(), any()) -> true).
 del_subscription(Subscriber, Target, Cookie) ->
