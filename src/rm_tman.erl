@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ init(_Args) ->
 
 on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
     ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-    failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
+    fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
     cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
@@ -258,8 +258,8 @@ update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
         true ->
 	    NewNodes = util:minus(NewView,OldView),
 	    OldNodes = util:minus(OldView,NewView),
-	    update_fd([node:pidX(Node) || Node <- OldNodes],fun failuredetector2:unsubscribe/1),
-	    update_fd([node:pidX(Node) || Node <- NewNodes],fun failuredetector2:subscribe/1);
+	    update_fd([node:pidX(Node) || Node <- OldNodes],fun fd:unsubscribe/1),
+	    update_fd([node:pidX(Node) || Node <- NewNodes],fun fd:subscribe/1);
 	false ->
 	    _NewNodes = util:minus(NewView,OldView),
 	    _OldNodes = util:minus(OldView,NewView),

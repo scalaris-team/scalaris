@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -105,7 +105,7 @@ get_as_list() ->
 
 on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-        failuredetector2:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
+        fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
         cs_send:send_after(0, self(), {stabilize,Token}),
         {NewId, NewMe, [NewPred]++NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
@@ -333,8 +333,8 @@ update_failuredetector(OldView,NewView) ->
                 NewNodes = util:minus(NewView,OldView),
                 OldNodes = util:minus(OldView,NewView),
                             
-                update_fd([node:pidX(Node) || Node <- OldNodes],fun failuredetector2:unsubscribe/1),
-           		update_fd([node:pidX(Node) || Node <- NewNodes],fun failuredetector2:subscribe/1);
+                update_fd([node:pidX(Node) || Node <- OldNodes],fun fd:unsubscribe/1),
+           		update_fd([node:pidX(Node) || Node <- NewNodes],fun fd:subscribe/1);
                 
         		
 		false ->
