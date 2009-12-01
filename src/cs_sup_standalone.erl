@@ -45,7 +45,7 @@ start_tcerl() ->
 init([]) ->
     randoms:start(),
     inets:start(),
-    %util:logger(),
+    %% util:logger(),
     start_tcerl(),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     Config =
@@ -53,32 +53,34 @@ init([]) ->
                              [[preconfig:config(), preconfig:local_config()]]),
     FailureDetector =
         util:sup_worker_desc(fd, fd, start_link),
-    CommunicationPort = {
+    CommunicationPort =
         util:sup_supervisor_desc(comm_port_sup, comm_port_sup, start_link),
-     Logger =
+    Logger =
         util:sup_worker_desc(logger, log, start_link),
     ChordSharp =
-      {chordsharp,
-       {cs_sup_or, start_link, []},
-       permanent,
-       brutal_kill,
-       supervisor,
-       [cs_sup_or]
-     },
+        {chordsharp,
+         {cs_sup_or, start_link, []},
+         permanent,
+         brutal_kill,
+         supervisor,
+         [cs_sup_or]
+        },
     YAWS =
         util:sup_worker_desc(yaws, yaws_wrapper, try_link,
                              [ preconfig:docroot(),
                                [{port, preconfig:yaws_port()},
-                                {listen, {0,0,0,0}}, {opaque, InstanceId}],
-                               [{max_open_conns, 800}, {access_log, false},
-                                {logdir, preconfig:log_path()}] ]),
-   BenchServer =
+                                {listen, {0,0,0,0}}],
+                               [{max_open_conns, 800},
+                                {access_log, false},
+                                {logdir, preconfig:log_path()}]
+                              ]),
+    BenchServer =
         util:sup_worker_desc(bench_server, bench_server, start_link),
-   AdminServer =
+    AdminServer =
         util:sup_worker_desc(admin_server, admin, start_link),
-   Ganglia =
+    Ganglia =
         util:sup_worker_desc(ganglia_server, ganglia, start_link),
-   MonitorTiming =
+    MonitorTiming =
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link),
     {ok,{{one_for_all,10,1},
          [
