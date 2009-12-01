@@ -46,14 +46,15 @@ on(_,uninit) ->
 on({trigger},TriggerState) ->
     trigger_reregister(),
     Trigger:trigger_next(TriggerState,1);
+on({go},TriggerState) ->
+    trigger_reregister(),
+    Trigger:trigger_next(TriggerState,1);
 on(_, _State) ->
     unknown_event.
-
 
 trigger_reregister() ->
     RegisterMessage = {register,get_cs_node_this()},
     reregister(config:register_hosts(), RegisterMessage).
-    
 
 reregister(failed, Message)->
     cs_send:send(config:bootPid(), Message);
