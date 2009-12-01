@@ -121,8 +121,9 @@ on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,Ak
 	    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(1))
     end,
    {Id, Me, Preds, Succs,RandViewSize,Interval,NewTriggerState,NewAktPred,NewAktSucc,Cache,Churn};
-on({cache,[]}, State)  ->
+on({cache,[]}, {_Id, _Me, _Preds, _Succs,RandViewSize,_Interval,_TriggerState,_AktPred,_AktSucc,__Cache,_Churn} = State)  ->
     % ignore empty cache from cyclon
+    cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
     State;
 on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,_Cache,Churn})  ->
              %inc RandViewSize (no error detected)
