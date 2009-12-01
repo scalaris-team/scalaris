@@ -86,11 +86,11 @@ init([]) ->
       []      
      },
     CommunicationPort = {
-      comm_port,
-      {comm_layer, start_link, []},
+      comm_port_sup,
+      {comm_port_sup, start_link, []},
       permanent,
       brutal_kill,
-      worker,
+      supervisor,
       []
      },
      Logger = 

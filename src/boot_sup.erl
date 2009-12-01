@@ -82,7 +82,7 @@ my_process_list(InstanceId) ->
     Logger =
         util:sup_worker_desc(logger, log, start_link),
     CSNode =
-        util:sup_worker_desc(cs_node, cs_sup_or, start_link, [[first]]),
+        util:sup_supervisor_desc(cs_node, cs_sup_or, start_link, [[first]]),
     YAWS =
         util:sup_worker_desc(yaws, yaws_wrapper, start_link,
                              [ preconfig:docroot(),
@@ -91,7 +91,7 @@ my_process_list(InstanceId) ->
                                [{max_open_conns, 800}, {access_log, false},
                                 {logdir, preconfig:log_path()}] ]),
     CommPort =
-        util:sup_worker_desc(comm_port, comm_layer, start_link),
+        util:sup_supervisor_desc(comm_port_sup, comm_port_sup, start_link),
     BenchServer =
         util:sup_worker_desc(bench_server, bench_server, start_link),
     AdminServer =
