@@ -69,7 +69,7 @@ my_process_list(InstanceId) ->
     Tracer =
         util:sup_worker_desc(tracer, tracer, start_link),
     FailureDetector =
-        util:sup_worker_desc(failuredetector2, failuredetector2, start_link),
+        util:sup_worker_desc(fd, fd, start_link),
     Node =
         util:sup_worker_desc(boot_server, boot_server, start_link,
                              [InstanceId]),

@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -78,8 +78,8 @@ init([]) ->
 	 worker,
 	 []},
     FailureDetector = {
-      failure_detector2,
-      {failuredetector2, start_link, []},
+      fd,
+      {fd, start_link, []},
       permanent,
       brutal_kill,
       worker,

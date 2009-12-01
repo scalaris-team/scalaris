@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -117,7 +117,7 @@ get_predlist() ->
 on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-        failuredetector2:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
+        fd:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
        
         {NewId, NewMe, NewPred, NewSuccList};
 on(_,uninit) ->
@@ -148,7 +148,7 @@ on({get_pred_response, SuccsPred},{Id, Me, Pred, Succs})  ->
 			true ->
 			    cs_send:send(node:pidX(SuccsPred), {get_succ_list, cs_send:this()}),
 			    ring_maintenance:update_succ_and_pred(Pred, SuccsPred),
-			    failuredetector2:subscribe(node:pidX(SuccsPred)),
+			    fd:subscribe(node:pidX(SuccsPred)),
 			    {Id, Me, Pred, [SuccsPred | Succs]};
 			false ->
 			    cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
@@ -163,19 +163,19 @@ on({get_succ_list_response, Succ, SuccsSuccList},{Id, Me, Pred, Succs})  ->
 	    %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
 	    cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
 	    ring_maintenance:update_succ_and_pred(Pred, hd(NewSuccs)), 
-	    failuredetector2:subscribe([node:pidX(Node) || Node <- NewSuccs]),
+	    fd:subscribe([node:pidX(Node) || Node <- NewSuccs]),
 	    {Id, Me, Pred, NewSuccs};
 on({notify, NewPred},{Id, Me, Pred, Succs})  ->
 	    case node:is_null(Pred) of
 		true ->
 		    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
-		    failuredetector2:subscribe(node:pidX(NewPred)),
+		    fd:subscribe(node:pidX(NewPred)),
 		    {Id, Me, NewPred, Succs};
 		false ->
 		    case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
 			true ->
 			    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
-			    failuredetector2:subscribe(node:pidX(NewPred)),
+			    fd:subscribe(node:pidX(NewPred)),
 			    {Id, Me, NewPred, Succs};
 			false ->
 			    {Id, Me, Pred, Succs}

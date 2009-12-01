@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -159,8 +159,8 @@ check_fd(NewRT, OldRT) ->
     OldView = ?RT:to_pid_list(OldRT),
     NewNodes = util:minus(NewView,OldView),
     OldNodes = util:minus(OldView,NewView),
-    failuredetector2:unsubscribe(OldNodes),
-    failuredetector2:subscribe(NewNodes).
+    fd:unsubscribe(OldNodes),
+    fd:subscribe(NewNodes).
 
 get_base_interval() ->
     config:pointerBaseStabilizationInterval().

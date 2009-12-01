@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@ on({get_list_length,Ping_PID},{Nodes,First,Subscriber}) ->
             cs_send:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
 	    {Nodes,First,Subscriber};
 on({register, Ping_PID},{Nodes,First,Subscriber}) ->
-            failuredetector2:subscribe(Ping_PID),
+            fd:subscribe(Ping_PID),
             NewNodes = gb_sets:add(Ping_PID, Nodes),
 	    case Subscriber of
                 [] ->
