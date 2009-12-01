@@ -60,7 +60,7 @@ kill(Pid) ->
 sleep(Pid, Time) ->
     Pid ! {'$gen_component', time, Time}.
 
-%% @edoc change the handler for handling messages
+%% @doc change the handler for handling messages
 change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 
