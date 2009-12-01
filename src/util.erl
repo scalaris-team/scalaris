@@ -32,7 +32,7 @@
          find/2, logger/0, dump3/0, uniq/1, get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2]).
--export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/4]).
+-export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4]).
 
 parameterized_start_link(Module, Parameters) ->
     apply(Module, start_link, Parameters).
@@ -337,6 +337,9 @@ sup_worker_desc(Name, Module, Function, Options) ->
       worker,
       []
      }.
+
+sup_supervisor_desc(Name, Module, Function) ->
+    sup_supervisor_desc(Name, Module, Function, []).
 
 sup_supervisor_desc(Name, Module, Function, Options) ->
     {Name, {Module, Function, Options},

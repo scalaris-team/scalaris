@@ -31,6 +31,14 @@
 
 start_link() ->
     Link = supervisor:start_link({local, main_sup}, ?MODULE, []),
+    case Link of
+        {ok, _Pid} ->
+            ok;
+        ignore ->
+            io:format("error in starting standalone supervisor: supervisor should not return ignore~n");
+        {error, Error} ->
+            io:format("error in starting standalone supervisor: ~p~n", [Error])
+    end,
     scan_environment(),
     Link.
 
