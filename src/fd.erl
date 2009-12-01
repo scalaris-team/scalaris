@@ -154,7 +154,11 @@ on({get_subscribers, Client, GlobalPid, Cookie}, State) ->
     State;
 
 on({get_subscriptions, Subscriber}, State) ->
-    Targets = fd_db:get_subscriptions(Subscriber),
+    TmpTargets = fd_db:get_subscriptions(Subscriber),
+    Targets = [ case X of
+                    {Target, '$fd_nil'} -> Target;
+                    Any -> Any
+                end || X <- TmpTargets ],
     cs_send:send_local(Subscriber, {get_subscriptions_reply, Targets}),
     State;
 
