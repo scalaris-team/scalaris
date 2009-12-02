@@ -56,6 +56,7 @@ public class PropertyLoader {
 					String path = url.getFile();
 					fis = new FileInputStream(path);
 					properties.load(fis);
+					properties.setProperty("PropertyLoader.loadedfile", path);
 					fis.close();
 					return true;
 				}
@@ -63,6 +64,7 @@ public class PropertyLoader {
 			// try default path if the file was not found
 			fis = new FileInputStream(filename);
 			properties.load(fis);
+			properties.setProperty("PropertyLoader.loadedfile", filename);
 			fis.close();
 			return true;
 		} catch (FileNotFoundException e) {

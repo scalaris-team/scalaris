@@ -15,8 +15,6 @@
  */
 package de.zib.scalaris;
 
-import java.util.Arrays;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -57,13 +55,19 @@ public class Main {
 	 *            command line arguments
 	 */
 	public static void main(String[] args) {
+		boolean verbose = false;
 		CommandLineParser parser = new GnuParser();
 		CommandLine line = null;
 		try {
 			line = parser.parse(getOptions(), args);
 		} catch (ParseException e) {
-			System.err.println("Parsing failed. Reason: " + e.getMessage());
+			printException("Parsing failed. Reason", e, true);
 			System.exit(0);
+		}
+
+		if (line.hasOption("verbose")) {
+	        verbose = true;
+	        ConnectionFactory.getInstance().printProperties();
 		}
 
 		if (line.hasOption("minibench")) {
@@ -75,16 +79,13 @@ public class Main {
 						+ ") == "
 						+ sc.read(line.getOptionValue("read")));
 			} catch (ConnectionException e) {
-				System.err.println("read failed: " + e.getMessage());
+				printException("read failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
-				System.err.println("read failed with timeout: "
-						+ e.getMessage());
+				printException("read failed with timeout", e, verbose);
 			} catch (NotFoundException e) {
-				System.err.println("read failed with not found: "
-						+ e.getMessage());
+				printException("read failed with not found", e, verbose);
 			} catch (UnknownException e) {
-				System.err.println("read failed with unknown: "
-						+ e.getMessage());
+				printException("read failed with unknown", e, verbose);
 			}
 		} else if (line.hasOption("w")) { // write
 			try {
@@ -94,14 +95,11 @@ public class Main {
 				sc.write(line.getOptionValues("write")[0], line
 						.getOptionValues("write")[1]);
 			} catch (ConnectionException e) {
-				System.err.println("write failed with connection error: "
-						+ e.getMessage());
+				printException("write failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
-				System.err.println("write failed with timeout: "
-						+ e.getMessage());
+				printException("write failed with timeout", e, verbose);
 			} catch (UnknownException e) {
-				System.err.println("write failed with unknown: "
-						+ e.getMessage());
+				printException("write failed with unknown", e, verbose);
 			}
 		} else if (line.hasOption("p")) { // publish
 			try {
@@ -112,14 +110,11 @@ public class Main {
 				sc.publish(line.getOptionValues("publish")[0], line
 						.getOptionValues("publish")[1]);
 			} catch (ConnectionException e) {
-				System.err.println("publish failed with connection error: "
-						+ e.getMessage());
+				printException("publish failed with connection error", e, verbose);
 //			} catch (TimeoutException e) {
-//				System.err.println("publish failed with timeout: "
-//						+ e.getMessage());
+//				printException("publish failed with timeout", e, verbose);
 //			} catch (UnknownException e) {
-//				System.err.println("publish failed with unknown: "
-//						+ e.getMessage());
+//				printException("write failed with unknown", e, verbose);
 			}
 		} else if (line.hasOption("s")) { // subscribe
 			try {
@@ -130,14 +125,11 @@ public class Main {
 				sc.subscribe(line.getOptionValues("subscribe")[0], line
 						.getOptionValues("subscribe")[1]);
 			} catch (ConnectionException e) {
-				System.err.println("subscribe failed with connection error: "
-						+ e.getMessage());
+				printException("subscribe failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
-				System.err.println("subscribe failed with timeout: "
-						+ e.getMessage());
+				printException("subscribe failed with timeout", e, verbose);
 			} catch (UnknownException e) {
-				System.err.println("subscribe failed with unknown: "
-						+ e.getMessage());
+				printException("subscribe failed with unknown", e, verbose);
 			}
 		} else if (line.hasOption("u")) { // unsubscribe
 			try {
@@ -148,17 +140,13 @@ public class Main {
 				sc.unsubscribe(line.getOptionValues("unsubscribe")[0], line
 						.getOptionValues("unsubscribe")[1]);
 			} catch (ConnectionException e) {
-				System.err.println("unsubscribe failed with connection error: "
-						+ e.getMessage());
+				printException("unsubscribe failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
-				System.err.println("unsubscribe failed with timeout: "
-						+ e.getMessage());
+				printException("unsubscribe failed with timeout", e, verbose);
 			} catch (NotFoundException e) {
-				System.err.println("unsubscribe failed with not found: "
-						+ e.getMessage());
+				printException("unsubscribe failed with not found", e, verbose);
 			} catch (UnknownException e) {
-				System.err.println("unsubscribe failed with unknown: "
-						+ e.getMessage());
+				printException("unsubscribe failed with unknown", e, verbose);
 			}
 		} else if (line.hasOption("g")) { // getsubscribers
 			try {
@@ -169,15 +157,11 @@ public class Main {
 						+ sc.getSubscribers(line
 								.getOptionValues("getsubscribers")[0]));
 			} catch (ConnectionException e) {
-				System.err
-						.println("getSubscribers failed with connection error: "
-								+ e.getMessage());
+				printException("getSubscribers failed with connection error", e, verbose);
 //			} catch (TimeoutException e) {
-//				System.err.println("getSubscribers failed with timeout: "
-//						+ e.getMessage());
+//				printException("getSubscribers failed with timeout", e, verbose);
 			} catch (UnknownException e) {
-				System.err.println("getSubscribers failed with unknown error: "
-						+ e.getMessage());
+				printException("getSubscribers failed with unknown error", e, verbose);
 			}
 		} else {
 			// print help if no other option was given
@@ -188,7 +172,7 @@ public class Main {
 	}
 
 	/**
-	 * creates the options the command line should understand
+	 * Creates the options the command line should understand.
 	 * 
 	 * @return the options the program understands
 	 */
@@ -196,84 +180,58 @@ public class Main {
 		Options options = new Options();
 		OptionGroup group = new OptionGroup();
 
-		options.addOption(new Option("help", "print this message"));
+		options.addOption(new Option("h", "help", false, "print this message"));
+		
+		options.addOption(new Option("v", "verbose", false, "print this message"));
 
 		Option read = new Option("r", "read", true, "read an item");
 		read.setArgName("key");
 		read.setArgs(1);
-//		Option read = OptionBuilder.create("read");
-//		read.setArgName("key");
-//		read.setArgs(1);
-//		read.setDescription("read an item");
-//		Option read = OptionBuilder.withArgName("key").hasArg()
-//				.withDescription("read an item").create("read");
 		group.addOption(read);
 
 		Option write = new Option("w", "write", true, "write an item: <key> <value>");
 		write.setArgName("params");
 		write.setArgs(2);
-//		Option write = OptionBuilder.create("write");
-//		write.setArgName("params");
-//		write.setArgs(2);
-//		write.setDescription("write an item: <key> <value>");
-//		Option write = OptionBuilder.withArgName("params").hasArgs(2)
-//				.withDescription("write an item: <key> <value>")
-//				.create("write");
 		group.addOption(write);
 
 		Option publish = new Option("p", "publish", true, "publish a new message for a topic: <topic> <message>");
 		publish.setArgName("params");
 		publish.setArgs(2);
-//		Option publish = OptionBuilder.create("publish");
-//		publish.setArgName("params");
-//		publish.setArgs(2);
-//		publish.setDescription("publish a new message for a topic: <topic> <message>");
-//		Option publish = OptionBuilder.withArgName("params").hasArgs(2)
-//				.withDescription(
-//						"publish a new message for a topic: <topic> <message>")
-//				.create("publish");
 		group.addOption(publish);
 
 		Option subscribe = new Option("s", "subscribe", true, "subscribe to a topic: <topic> <url>");
 		subscribe.setArgName("params");
 		subscribe.setArgs(2);
-//		Option subscribe = OptionBuilder.create("subscribe");
-//		subscribe.setArgName("params");
-//		subscribe.setArgs(2);
-//		subscribe.setDescription("subscribe to a topic: <topic> <url>");
-//		Option subscribe = OptionBuilder.withArgName("params").hasArgs(2)
-//				.withDescription("subscribe to a topic: <topic> <url>").create(
-//						"subscribe");
 		group.addOption(subscribe);
 		
 		Option unsubscribe = new Option("u", "unsubscribe", true, "unsubscribe from a topic: <topic> <url>");
 		unsubscribe.setArgName("params");
 		unsubscribe.setArgs(2);
-//		Option unsubscribe = OptionBuilder.create("unsubscribe");
-//		unsubscribe.setArgName("params");
-//		unsubscribe.setArgs(2);
-//		unsubscribe.setDescription("unsubscribe from a topic: <topic> <url>");
-//		Option subscribe = OptionBuilder.withArgName("params").hasArgs(2)
-//				.withDescription("unsubscribe from a topic: <topic> <url>").create(
-//						"unsubscribe");
 		group.addOption(unsubscribe);
 
 		Option getSubscribers = new Option("g", "getsubscribers", true, "get subscribers of a topic");
 		getSubscribers.setArgName("topic");
 		getSubscribers.setArgs(1);
-//		Option getSubscribers = OptionBuilder.create("getsubscribers");
-//		getSubscribers.setArgName("topic");
-//		getSubscribers.setArgs(1);
-//		getSubscribers.setDescription("get subscribers of a topic");
-//		Option getSubscribers = OptionBuilder.withArgName("topic").hasArgs(1)
-//				.withDescription("get subscribers of a topic").create(
-//						"getsubscribers");
 		group.addOption(getSubscribers);
 
-		options.addOption(new Option("minibench", "run mini benchmark"));
+		options.addOption(new Option("b", "minibench", false, "run mini benchmark"));
 
 		options.addOptionGroup(group);
 
 		return options;
+	}
+	
+	/**
+	 * Prints the given exception with the given description.
+	 * 
+	 * @param description  will be prepended to the error message
+	 * @param e            the exception to print
+	 * @param verbose      specifies whether to include the stack trace or not
+	 */
+	private static void printException(String description, Exception e, boolean verbose) {
+		System.err.println(description + ": " + e.getMessage());
+		if (verbose) {
+			e.printStackTrace();
+		}
 	}
 }

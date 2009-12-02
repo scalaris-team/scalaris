@@ -28,7 +28,7 @@ for arg in "$@" ; do
     scalaris_exec_debug=true
   elif [ my"$arg" = my"-h"  -o my"$arg" = my"--help"  ] ; then
     show_help=true
-    scalaris_exec_args="$scalaris_exec_args -help"
+    scalaris_exec_args="$scalaris_exec_args --help"
   else
     if [  my"$arg" = my"-h"  -o  my"$arg" = my"-help" ] ; then
       show_help=true
