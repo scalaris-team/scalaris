@@ -3,6 +3,7 @@
  */
 package de.zib.scalaris;
 
+import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
@@ -78,6 +79,11 @@ public class ConnectionFactory {
 	 * </p>
 	 */
 	private AtomicLong clientNameUUID = new AtomicLong(0);
+	
+	/**
+	 * Stores which config file was actually read into the object's properties.
+	 */
+	private String configFileUsed;
 
 	/**
 	 * Static instance of a connection factory.
@@ -168,6 +174,7 @@ public class ConnectionFactory {
 		} else {
 			clientNameAppendUUID = false;
 		}
+		configFileUsed = properties.getProperty("PropertyLoader.loadedfile", "");
 		
 		fixLocalhostName();
 		//System.out.println("node: " + node);
@@ -259,6 +266,27 @@ public class ConnectionFactory {
 			}
 			node = node.replaceAll("@localhost$", "@" + hostname);
 		}
+	}
+	
+	/**
+	 * Prints the object's properties to System.out.
+	 */
+	public void printProperties() {
+		printProperties(System.out);
+	}
+	
+	/**
+	 * Prints the object's properties to the given output stream.
+	 * 
+	 * @param out  the output stream to write to
+	 */
+	public void printProperties(PrintStream out) {
+		out.println("ConnectionFactory properties:");
+		out.println("  config file                = " + configFileUsed);
+		out.println("  scalaris.node              = " + node);
+		out.println("  scalaris.cookie            = " + cookie);
+		out.println("  scalaris.client.name       = " + clientName);
+		out.println("  scalaris.client.appendUUID = " + clientNameAppendUUID);
 	}
 	
 	/**
