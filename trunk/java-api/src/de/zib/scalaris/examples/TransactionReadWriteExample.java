@@ -405,17 +405,17 @@ public class TransactionReadWriteExample {
 		} catch (ConnectionException e) {
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") failed: " + e.getMessage());
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (TimeoutException e) {
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") failed with timeout: "
 					+ e.getMessage());
-			throw new TimeoutException(e.getMessage());
+			throw new TimeoutException(e);
 		} catch (UnknownException e) {
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") failed with unknown: "
 					+ e.getMessage());
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -449,15 +449,15 @@ public class TransactionReadWriteExample {
 		} catch (ConnectionException e) {
 			System.out.println("      write(" + key + ", " + value
 					+ ") failed: " + e.getMessage());
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (TimeoutException e) {
 			System.out.println("      write(" + key + ", " + value
 					+ ") failed with timeout: " + e.getMessage());
-			throw new TimeoutException(e.getMessage());
+			throw new TimeoutException(e);
 		} catch (UnknownException e) {
 			System.out.println("      write(" + key + ", " + value
 					+ ") failed with unknown: " + e.getMessage());
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -496,23 +496,23 @@ public class TransactionReadWriteExample {
 		} catch (ConnectionException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed: " + e.getMessage());
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (TimeoutException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with timeout: " + e.getMessage());
-			throw new TimeoutException(e.getMessage());
+			throw new TimeoutException(e);
 		} catch (UnknownException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with unknown: " + e.getMessage());
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		} catch (NotFoundException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with not found: " + e.getMessage());
-			throw new NotFoundException(e.getMessage());
+			throw new NotFoundException(e);
 		} catch (ClassCastException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with unknown return type: " + e.getMessage());
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -549,19 +549,19 @@ public class TransactionReadWriteExample {
 		} catch (ConnectionException e) {
 			System.out.println("      read(" + key + ") failed: "
 					+ e.getMessage());
-			throw new ConnectionException(e.getMessage());
+			throw new ConnectionException(e);
 		} catch (TimeoutException e) {
 			System.out.println("      read(" + key + ") failed with timeout: "
 					+ e.getMessage());
-			throw new TimeoutException(e.getMessage());
+			throw new TimeoutException(e);
 		} catch (UnknownException e) {
 			System.out.println("      read(" + key + ") failed with unknown: "
 					+ e.getMessage());
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		} catch (NotFoundException e) {
 			System.out.println("      read(" + key
 					+ ") failed with not found: " + e.getMessage());
-			throw new NotFoundException(e.getMessage());
+			throw new NotFoundException(e);
 		}
 	}
 }

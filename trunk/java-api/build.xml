@@ -224,13 +224,13 @@
 	<target name='tools.compile'>
 		<mkdir dir='${scalaris.classes.dirname}' />
 		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			includes="de/zib/tools/*.java" />
+			includes="de/zib/tools/*.java" debug="true" />
 	</target>
 
 	<target name="tools.test.compile" depends="tools.compile">
 		<mkdir dir="${scalaris.classes.dirname}" />
 		<javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" />
+			classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" debug="true" />
 		<copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
 			<fileset dir="test" includes="de/zib/tools/*.properties" />
 		</copy>
@@ -253,11 +253,11 @@
 	<target name='scalaris.compile' depends="tools.compile">
 		<mkdir dir='${scalaris.classes.dirname}' />
 		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" />
+			classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" />
 	</target>
 	<target name='scalaris.examples.compile' depends="scalaris.compile">
 		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" />
+			classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" />
 	</target>
 
 	<!-- package library and examples separately -->
@@ -362,7 +362,7 @@
 	<target name="scalaris.test.compile" depends="scalaris.compile">
 		<mkdir dir="${scalaris.classes.dirname}" />
 		<javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" />
+			classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" debug="true" />
 		<copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
 			<fileset dir="test" includes="**/*.properties" />
 		</copy>
@@ -387,11 +387,11 @@
 	<target name='chordsharp.compile' depends="scalaris.compile, tools.compile">
 		<mkdir dir='${scalaris.classes.dirname}' />
 		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/chordsharp/*.java" />
+			classpathref="scalaris.classpath" includes="de/zib/chordsharp/*.java" debug="true" />
 	</target>
 	<target name='chordsharp.examples.compile' depends="chordsharp.compile">
 		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/chordsharp/examples/*.java" />
+			classpathref="scalaris.classpath" includes="de/zib/chordsharp/examples/*.java" debug="true" />
 	</target>
 
 	<target name='chordsharp.jar' depends='compile'>
@@ -519,7 +519,7 @@
 	<target name="chordsharp.test.compile" depends="chordsharp.compile">
 		<mkdir dir="${scalaris.classes.dirname}" />
 		<javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.test.classpath" includes="de/zib/chordsharp/*.java" />
+			classpathref="scalaris.test.classpath" includes="de/zib/chordsharp/*.java" debug="true" />
 		<copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
 			<fileset dir="test" includes="**/*.properties" />
 		</copy>

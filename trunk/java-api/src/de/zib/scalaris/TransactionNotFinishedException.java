@@ -53,5 +53,6 @@ public class TransactionNotFinishedException extends Exception {
 	 */
 	public TransactionNotFinishedException(Throwable e) {
 		super(e.getMessage());
+		setStackTrace(e.getStackTrace());
 	}
 }

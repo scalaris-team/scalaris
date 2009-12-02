@@ -55,6 +55,7 @@ public class TimeoutException extends OtpErlangException {
 	 */
 	public TimeoutException(Throwable e) {
 		super(e.getMessage());
+		setStackTrace(e.getStackTrace());
 	}
 
 	/**
@@ -82,5 +83,6 @@ public class TimeoutException extends OtpErlangException {
 	 */
 	public TimeoutException(Throwable e, OtpErlangObject erlValue) {
 		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
+		setStackTrace(e.getStackTrace());
 	}
 }

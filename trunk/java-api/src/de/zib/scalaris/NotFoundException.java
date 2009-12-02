@@ -55,6 +55,7 @@ public class NotFoundException extends OtpErlangException {
 	 */
 	public NotFoundException(Throwable e) {
 		super(e.getMessage());
+		setStackTrace(e.getStackTrace());
 	}
 
 	/**
@@ -82,5 +83,6 @@ public class NotFoundException extends OtpErlangException {
 	 */
 	public NotFoundException(Throwable e, OtpErlangObject erlValue) {
 		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
+		setStackTrace(e.getStackTrace());
 	}
 }
