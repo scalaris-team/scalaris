@@ -44,13 +44,9 @@ set_key(Key) ->
     cs_send:send_local(get_pid() , {set_key_keyholder, Key}),ok.
 
 %% @doc reads the key of the cs_node
--spec(get_key/0 :: () -> ?RT:key()).
+-spec(get_key/0 :: () -> ok).
 get_key() ->
     cs_send:send_local(get_pid() , {get_key_keyholder, self()}),
-    %receive
-	%{get_key_response_keyholder, Key} ->
-	%    Key
-    %end.
     ok.
 
 init(_Arg) ->
