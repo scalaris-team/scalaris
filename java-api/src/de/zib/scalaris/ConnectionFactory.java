@@ -209,8 +209,8 @@ public class ConnectionFactory {
 			OtpPeer other = new OtpPeer(node);
 			return self.connect(other);
 		} catch (Exception e) {
-		        // e.printStackTrace();
-			throw new ConnectionException(e.getMessage());
+//		         e.printStackTrace();
+			throw new ConnectionException(e);
 		}
 	}
 

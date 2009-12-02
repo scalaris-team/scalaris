@@ -57,6 +57,7 @@ public class ConnectionException extends OtpErlangException {
 	 */
 	public ConnectionException(Throwable e) {
 		super(e.getMessage());
+		setStackTrace(e.getStackTrace());
 	}
 
 	/**
@@ -84,5 +85,6 @@ public class ConnectionException extends OtpErlangException {
 	 */
 	public ConnectionException(Throwable e, OtpErlangObject erlValue) {
 		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
+		setStackTrace(e.getStackTrace());
 	}
 }

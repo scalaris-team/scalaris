@@ -403,7 +403,7 @@ public class ChordSharpConnection {
 			return (OtpErlangString) read(connection, key);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 
@@ -482,7 +482,7 @@ public class ChordSharpConnection {
 			return (OtpErlangString) read(staticConnection, key);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 

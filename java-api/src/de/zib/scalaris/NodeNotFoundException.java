@@ -55,6 +55,7 @@ public class NodeNotFoundException extends OtpErlangException {
 	 */
 	public NodeNotFoundException(Throwable e) {
 		super(e.getMessage());
+		fillInStackTrace();
 	}
 
 	/**
@@ -80,5 +81,6 @@ public class NodeNotFoundException extends OtpErlangException {
 	 */
 	public NodeNotFoundException(Throwable e, OtpErlangObject erlValue) {
 		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
+		setStackTrace(e.getStackTrace());
 	}
 }

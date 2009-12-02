@@ -220,7 +220,7 @@ public class Transaction {
 			return (OtpErlangString) readObject(key);
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 	}
 	
@@ -395,16 +395,16 @@ public class Transaction {
 //			}
 //		} catch (OtpErlangExit e) {
 //			// e.printStackTrace();
-//			throw new ConnectionException(e.getMessage());
+//			throw new ConnectionException(e);
 //		} catch (OtpAuthException e) {
 //			// e.printStackTrace();
-//			throw new ConnectionException(e.getMessage());
+//			throw new ConnectionException(e);
 //		} catch (IOException e) {
 //			// e.printStackTrace();
-//			throw new ConnectionException(e.getMessage());
+//			throw new ConnectionException(e);
 //		} catch (ClassCastException e) {
 //			// e.printStackTrace();
-//			throw new UnknownException(e.getMessage());
+//			throw new UnknownException(e);
 //		}
 	}
 	
@@ -436,7 +436,7 @@ public class Transaction {
 			}
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 		return new OtpErlangList(erlangValues);
 	}
@@ -497,7 +497,7 @@ public class Transaction {
 			}
 		} catch (ClassCastException e) {
 			// e.printStackTrace();
-			throw new UnknownException(e.getMessage());
+			throw new UnknownException(e);
 		}
 		return values;
 	}

@@ -229,9 +229,12 @@ public class Main {
 	 * @param verbose      specifies whether to include the stack trace or not
 	 */
 	private static void printException(String description, Exception e, boolean verbose) {
-		System.err.println(description + ": " + e.getMessage());
+		System.err.print(description + ": ");
 		if (verbose) {
+			System.err.println();
 			e.printStackTrace();
+		} else {
+			System.err.println(e.getMessage());
 		}
 	}
 }

@@ -55,5 +55,6 @@ public class TransactionNotStartedException extends RuntimeException {
 	 */
 	public TransactionNotStartedException(Throwable e) {
 		super(e.getMessage());
+		setStackTrace(e.getStackTrace());
 	}
 }
