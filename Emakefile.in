@@ -1,3 +1,15 @@
+{"src/gen_component.erl",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"}
+ ]}.
+{"src/trigger.erl",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"}
+ ]}.
 {"src/simulation/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.
 {"src/ring_maintenance.erl",
  [debug_info,
@@ -13,12 +25,6 @@
   {i, "contrib/yaws/include"}
  ]}.
 {"src/database.erl",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"},
-  {i, "contrib/yaws/include"}
- ]}.
-{"src/gen_component.erl",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"},

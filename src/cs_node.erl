@@ -460,7 +460,7 @@ on(_, _State) ->
 
 %% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec(init/1 :: ([any()]) -> cs_state:state()).
+-spec(init/1 :: ([any()]) -> {join_state1}).
 init([_InstanceId, _Options]) ->
     boot_server:be_the_first(),
     {join_state1}.

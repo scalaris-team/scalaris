@@ -58,29 +58,29 @@ process_request(TLog, Request) ->
     case Request of
         {read, Key} ->
             case timer:tc(transaction_api, read, [Key, TLog]) of
-                {Time, {{value, Val}, NTLog}} ->
-                    ?LOG_CS_API(read_success, Time / 1000.0),
+                {_Time, {{value, Val}, NTLog}} ->
+                    ?LOG_CS_API(read_success, _Time / 1000.0),
                     {NTLog, {read, Key, {value, Val}}};
-                {Time, {{fail, Reason}, NTLog}} ->
-                    ?LOG_CS_API(read_fail, Time / 1000.0),
+                {_Time, {{fail, Reason}, NTLog}} ->
+                    ?LOG_CS_API(read_fail, _Time / 1000.0),
                     {NTLog, {read, Key, {fail, Reason}}}
             end;
         {write, Key, Value} ->
             case timer:tc(transaction_api, write, [Key, Value, TLog]) of
-                {Time, {ok, NTLog}} ->
-                    ?LOG_CS_API(write_success, Time / 1000.0),
+                {_Time, {ok, NTLog}} ->
+                    ?LOG_CS_API(write_success, _Time / 1000.0),
                     {NTLog, {write, Key, {value, Value}}};
-                {Time, {{fail, Reason}, NTLog}} ->
-                    ?LOG_CS_API(write_fail, Time / 1000.0),
+                {_Time, {{fail, Reason}, NTLog}} ->
+                    ?LOG_CS_API(write_fail, _Time / 1000.0),
                     {NTLog, {write, Key, {fail, Reason}}}
             end;
         {commit} ->
             case timer:tc(transaction_api, commit, [TLog]) of
-                {Time, {ok}} ->
-                    ?LOG_CS_API(commit_success, Time / 1000.0),
+                {_Time, {ok}} ->
+                    ?LOG_CS_API(commit_success, _Time / 1000.0),
                     {TLog, {commit, ok, {value, "ok"}}};
-                {Time, {fail, Reason}} ->
-                    ?LOG_CS_API(commit_fail, Time / 1000.0),
+                {_Time, {fail, Reason}} ->
+                    ?LOG_CS_API(commit_fail, _Time / 1000.0),
                     {TLog, {commit, fail, {fail, Reason}}}
             end
     end.
@@ -89,11 +89,11 @@ process_request(TLog, Request) ->
 %% @spec read(key()) -> {failure, term()} | value()
 read(Key) ->
     case timer:tc(transaction_api, quorum_read, [Key]) of
-        {Time, {fail, Reason}} ->
-            ?LOG_CS_API(quorum_read_fail, Time / 1000.0),
+        {_Time, {fail, Reason}} ->
+            ?LOG_CS_API(quorum_read_fail, _Time / 1000.0),
             {fail, Reason};
-        {Time, {Value, _Version}} ->
-            ?LOG_CS_API(quorum_read_success, Time / 1000.0),
+        {_Time, {Value, _Version}} ->
+            ?LOG_CS_API(quorum_read_success, _Time / 1000.0),
             Value
     end.
 
@@ -101,12 +101,12 @@ read(Key) ->
 %% @spec write(key(), value()) -> ok | {fail, term()}
 write(Key, Value) ->
     case timer:tc(transaction_api, single_write, [Key, Value]) of
-	{Time, commit} ->
-            ?LOG_CS_API(single_write_success, Time / 1000.0),
-	    ok;
-	{Time, {fail, Reason}} ->
-            ?LOG_CS_API(single_write_fail, Time / 1000.0),
-	    {fail, Reason}
+        {_Time, commit} ->
+            ?LOG_CS_API(single_write_success, _Time / 1000.0),
+            ok;
+        {_Time, {fail, Reason}} ->
+            ?LOG_CS_API(single_write_fail, _Time / 1000.0),
+            {fail, Reason}
     end.
 
 delete(Key) ->
@@ -146,14 +146,14 @@ test_and_set(Key, OldValue, NewValue) ->
     SuccessFun = fun(X) -> {success, X} end,
     FailureFun = fun(X) -> {failure, X} end,
     case do_transaction_locally(TFun, SuccessFun, FailureFun, 5000) of
-	{trans, {success, {commit, done}}} ->
-	    ok;
-	{trans, {failure, Reason}} ->
-	    {fail, Reason};
- 	X ->
- 	   io:format("cs_api:test_and_set unexpected: Node ~w got ~p", [self(),X]),
- 	   log:log(warn,"[ Node ~w ] ~p", [self(),X]),
- 	    X
+        {trans, {success, {commit, done}}} ->
+            ok;
+        {trans, {failure, Reason}} ->
+            {fail, Reason};
+        X ->
+            io:format("cs_api:test_and_set unexpected: Node ~w got ~p", [self(),X]),
+            log:log(warn,"[ Node ~w ] ~p", [self(),X]),
+            X
     end.
 
 
@@ -163,33 +163,31 @@ do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
     {ok, PID} = process_dictionary:find_cs_node(),
     cs_send:send_local(PID , {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()}),
     receive
-	X ->
-	    X
+        X ->
+            X
     after
-	Timeout ->
-	   do_transaction_locally(TransFun, SuccessFun, Failure, Timeout)
+        Timeout ->
+            do_transaction_locally(TransFun, SuccessFun, Failure, Timeout)
     end.
 
 %@doc range a range of key-value pairs
 range_read(From, To) ->
     Interval = intervals:new(From, To),
-    bulkowner:issue_bulk_owner(Interval, 
-			       {bulk_read_with_version, cs_send:this()}),
+    bulkowner:issue_bulk_owner(Interval,
+                               {bulk_read_with_version, cs_send:this()}),
     cs_send:send_after(5000, self(), {timeout}),
     range_read_loop(Interval, [], []).
 
 range_read_loop(Interval, Done, Data) ->
     receive
-	{timeout} ->
-	    {timeout, lists:flatten(Data)};
-	{bulk_read_with_version_response, {From, To}, NewData} ->
-	    Done2 = [intervals:new(From, To) | Done],
-	    case intervals:is_covered(Interval, Done2) of
-		false ->
-		    range_read_loop(Interval, Done2, [NewData | Data]);
-		true ->
-		    {ok, lists:flatten([NewData | Data])}
-	    end
+        {timeout} ->
+            {timeout, lists:flatten(Data)};
+        {bulk_read_with_version_response, {From, To}, NewData} ->
+            Done2 = [intervals:new(From, To) | Done],
+            case intervals:is_covered(Interval, Done2) of
+                false ->
+                    range_read_loop(Interval, Done2, [NewData | Data]);
+                true ->
+                    {ok, lists:flatten([NewData | Data])}
+            end
     end.
-    
-    

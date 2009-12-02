@@ -44,13 +44,12 @@ start_link(InstanceId) ->
     start_link(InstanceId, []).
 
 start_link(InstanceId,[Module,Param]) ->
-   gen_component:start_link(?MODULE,Module, [{Param},{register, InstanceId,fd_linker}]).
+    gen_component:start_link(?MODULE,Module, [{Param},{register, InstanceId,fd_linker}]).
 
 init(Module) ->
-    
     log:log(info,"[ fd_linker ~p ] starting Node", [self()]),
     {Module}.
-      
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,20 +58,16 @@ init(Module) ->
 on({'EXIT', Pid, _Reason},{Module}) ->
         remove_subscriber(Pid,Module),
         {nostate};
-on({link, Pid},{Module}) ->
+on({link, Pid},{_Module}) ->
         link(Pid),
         {nostate};
-on({unlink, Pid},{Module}) ->
+on({unlink, Pid},{_Module}) ->
         unlink(Pid),
         {nostate};
 on(_, _State) ->
     unknown_event.
+
 % @private
-
-get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id),fd_linker).
-
-
 remove_subscriber(Pid,Module) ->
  cs_send:send_local(Module , {remove_subscriber, Pid}).
 
