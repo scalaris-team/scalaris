@@ -38,6 +38,7 @@ start_link() ->
 %% userdevguide-begin cs_sup_or:init
 init([Options]) ->
     InstanceId = string:concat("cs_node_", randoms:getRandomId()),
+    process_dictionary:register_process(InstanceId, cs_sup_or, self()),
     boot_server:connect(),
     KeyHolder =
         util:sup_worker_desc(cs_keyholder, cs_keyholder, start_link,

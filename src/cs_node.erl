@@ -474,7 +474,8 @@ start_link(InstanceId) ->
     start_link(InstanceId, []).
 
 start_link(InstanceId, Options) ->
-    gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, cs_node}]).
+    gen_component:start_link(?MODULE, [InstanceId, Options],
+                             [{register, InstanceId, cs_node}]).
 %% userdevguide-end cs_node:start_link
 
 get_local_cyclon_pid() ->

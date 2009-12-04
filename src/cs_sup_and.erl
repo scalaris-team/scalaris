@@ -35,6 +35,7 @@ start_link(InstanceId, Options) ->
 
 %% userdevguide-begin cs_sup_and:init
 init([InstanceId, Options]) ->
+    process_dictionary:register_process(InstanceId, cs_sup_and, self()),
     Node =
         util:sup_worker_desc(cs_node, cs_node, start_link,
                              [InstanceId, Options]),
