@@ -25,9 +25,9 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([add_nodes/1, add_nodes/2, check_ring/0, nodes/0, start_link/0, start/0,
-         get_dump/0, get_dump_bw/0, diff_dump/3, print_ages/0,
-         check_routing_tables/1,
+-export([add_nodes/1, del_nodes/1, check_ring/0, nodes/0,
+         start_link/0, start/0, get_dump/0, get_dump_bw/0,
+         diff_dump/3, print_ages/0, check_routing_tables/1,
          dd_check_ring/1,dd_check_ring/0, number_of_nodes/0 ]).
 
 %%====================================================================
@@ -40,24 +40,36 @@
 %% Description: add new Scalaris nodes
 %%--------------------------------------------------------------------
 % @doc add new Scalaris nodes on the local node
-% @spec add_nodes(int()) -> ok
-
+-spec(add_nodes/1 :: (integer()) -> ok).
 add_nodes(Count) ->
-    add_nodes(Count, 0).
-
-% @spec add_nodes(int(), int()) -> ok
-add_nodes(Count, Delay) ->
-    add_nodes_loop(Count, Delay).
-
-add_nodes_loop(0, _) ->
-    ok;
-add_nodes_loop(Count, Delay) ->
-    Desc = util:sup_supervisor_desc(randoms:getRandomId(),
-                                    cs_sup_or, start_link),
-    supervisor:start_child(main_sup, Desc),
-    %timer:sleep(Delay),
-    add_nodes_loop(Count - 1, Delay).
+    [ begin
+          Desc = util:sup_supervisor_desc(randoms:getRandomId(),
+                                   cs_sup_or, start_link),
+          supervisor:start_child(main_sup, Desc)
+      end || _ <- lists:seq(1, Count) ],
+    ok.
 %% userdevguide-end admin:add_nodes
+
+%% deletes nodes started with add_nodes()
+%% detects them by their random names (which is a list)
+%% other processes in main_sup must not be started with
+%% a list as their name!
+-spec(del_nodes/1 :: (integer()) -> ok).
+del_nodes(Count) ->
+    [ del_single_node(supervisor:which_children(main_sup))
+      || _ <- lists:seq(1, Count) ],
+    ok.
+
+del_single_node([]) ->
+    ok;
+del_single_node([H|T]) ->
+    {Key, _, _, _} = H,
+    case is_list(Key) of
+        true ->
+            supervisor:terminate_child(main_sup,Key),
+            supervisor:delete_child(main_sup,Key);
+        false -> del_single_node(T)
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: check_ring() -> term()
