@@ -57,7 +57,7 @@ process_request_list(TLog, ReqList) ->
 process_request(TLog, Request) ->
     case Request of
         {read, Key} ->
-            case timer:tc(transaction_api, read, [Key, TLog]) of
+            case util:tc(transaction_api, read, [Key, TLog]) of
                 {_Time, {{value, Val}, NTLog}} ->
                     ?LOG_CS_API(read_success, _Time / 1000.0),
                     {NTLog, {read, Key, {value, Val}}};
@@ -66,7 +66,7 @@ process_request(TLog, Request) ->
                     {NTLog, {read, Key, {fail, Reason}}}
             end;
         {write, Key, Value} ->
-            case timer:tc(transaction_api, write, [Key, Value, TLog]) of
+            case util:tc(transaction_api, write, [Key, Value, TLog]) of
                 {_Time, {ok, NTLog}} ->
                     ?LOG_CS_API(write_success, _Time / 1000.0),
                     {NTLog, {write, Key, {value, Value}}};
@@ -75,7 +75,7 @@ process_request(TLog, Request) ->
                     {NTLog, {write, Key, {fail, Reason}}}
             end;
         {commit} ->
-            case timer:tc(transaction_api, commit, [TLog]) of
+            case util:tc(transaction_api, commit, [TLog]) of
                 {_Time, {ok}} ->
                     ?LOG_CS_API(commit_success, _Time / 1000.0),
                     {TLog, {commit, ok, {value, "ok"}}};
@@ -88,7 +88,7 @@ process_request(TLog, Request) ->
 %% @doc reads the value of a key
 %% @spec read(key()) -> {failure, term()} | value()
 read(Key) ->
-    case timer:tc(transaction_api, quorum_read, [Key]) of
+    case util:tc(transaction_api, quorum_read, [Key]) of
         {_Time, {fail, Reason}} ->
             ?LOG_CS_API(quorum_read_fail, _Time / 1000.0),
             {fail, Reason};
@@ -100,7 +100,7 @@ read(Key) ->
 %% @doc writes the value of a key
 %% @spec write(key(), value()) -> ok | {fail, term()}
 write(Key, Value) ->
-    case timer:tc(transaction_api, single_write, [Key, Value]) of
+    case util:tc(transaction_api, single_write, [Key, Value]) of
         {_Time, commit} ->
             ?LOG_CS_API(single_write_success, _Time / 1000.0),
             ok;
