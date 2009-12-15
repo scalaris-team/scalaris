@@ -1,4 +1,4 @@
-#   Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#   Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -60,6 +60,9 @@ compile:
 
 test: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
+
+%_SUITE: compile
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@
 
 test-vts: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror

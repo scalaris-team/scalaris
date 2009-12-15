@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008, 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -90,6 +90,7 @@ next_hop(_Config) ->
     ok.
 
 iter(Count, F, Tag) ->
+    F(),
     Start = erlang:now(),
     iter_inner(Count, F),
     Stop = erlang:now(),
