@@ -31,6 +31,7 @@ all() ->
     [empty,
      get_keys_for_replica_string,
      get_keys_for_replica_int,
+     md5,
      next_hop].
 
 suite() ->
@@ -58,6 +59,12 @@ get_keys_for_replica_string(_Config) ->
     iter(count(), fun () ->
                           rt_chord:get_keys_for_replicas("42")
                end, "get_keys_for_replica_string"),
+    ok.
+
+md5(_Config) ->
+    iter(count(), fun () ->
+                          crypto:md5("42")
+               end, "md5"),
     ok.
 
 get_keys_for_replica_int(_Config) ->
