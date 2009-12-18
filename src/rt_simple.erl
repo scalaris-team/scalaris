@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
-
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
@@ -61,9 +60,8 @@ empty(Succ) ->
 %% @doc hashes the key to the identifier space.
 -spec(hash_key/1 :: (any()) -> key()).
 hash_key(Key) ->
-    BitString = binary_to_list(crypto:md5(Key)),
-    % binary to integer
-    lists:foldl(fun(El, Total) -> (Total bsl 8) bor El end, 0, BitString).
+    <<N:128>> = erlang:md5(Key),
+    N.
 %% userdevguide-end rt_simple:hash_key
 
 %% @doc generates a random node id
