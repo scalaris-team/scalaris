@@ -4,7 +4,7 @@
 
 Scalaris uses so called symmetric replication ([http://www.sics.se/~ali/publications/replication.pdf Symmetric Replication]) for replicating items.
 
-Because of hashing, items are placed at random position on the ring. We are currently storing 3 additional copies of the item by adding 90°, 180°, and 270° to the original position. As nodes are also placed randomly on the ring, there is usually no control over who is responsible for which replica. In the extreme case, one server could store all four copies of one item, which makes this item vulnerable to node failures.
+Because consistent hashing is used, items are placed at random positions on the ring. Scalaris stores 3 additional copies of each item by adding 90°, 180°, and 270° to the original position. As nodes are also placed randomly on the ring, there is usually no control over what node is responsible for which replica. In the extreme case, e.g. if one server is repsonsible for more than 270° of the ring, one server could store all four copies of one item, which makes this item vulnerable to node failures.
 
 = Details =
 
@@ -19,9 +19,9 @@ The standard key creator is called "random". It just picks a random 128-bit stri
 
 == random_with_bit_mask ==
 
-For controlling the placement of replicas, you can use the "random_with_bit_mask" key creator. It also picks a random 128-bit string but applies two bitmasks as follows `(randomnumber and mask2) or mask1`. By carefully selecting the bitmask, you can control which servers are responsible for what data.
+For controlling the placement of _replicas_, you can use the "random_with_bit_mask" key creator. It also picks a random 128-bit string but applies two bitmasks as follows `(randomnumber and mask2) or mask1`. By carefully selecting the bitmask, you can control which servers are responsible for what data.
 
-For the following scenario you have to start four servers and uncomment a different key_creator_bitmask-line on each server. This will confine the nodes of each server to a different quadrant and therefore replica set.
+For the following scenario you have to start four servers and uncomment a different key_creator_bitmask-line on each server. This will confine the _nodes_ of each server to a different quadrant and therefore replica set.
 {{{
 {key_creator, random_with_bit_mask}.
 % place the nodes in the first quadrant
