@@ -72,18 +72,29 @@ Afterwards the system is built.
 Configuration
 =============
 
-Configuration is currently done with bin/scalaris.cfg and
-bin/scalaris.local.erl (optionally). bin/scalaris.cfg contains default for
-various parameters and shouldn't be changed normally.
+Out of the box, Scalaris is configured for first tests with one Erlang
+VM on one machine.
 
-bin/scalaris.local.cfg is necessary for distributed setups and contains
-parameters which have to be adapted to the local
-environment. bin/scalaris.local.cfg.example is an example file.
+Files:
+bin/scalaris.cfg  --- default parameters, usually not to be changed
+bin/scalaris.local.cfg  --- optional file, to be adapted for distributed setups.
+bin/scalaris.local.cfg.example --- example file for bin/scalaris.local.cfg.
+
+Distributed Setup
+ 
+For distributed setups, i.e. multiple servers forming one database,
+change the ip-address in the tuple {boot_host ...} to the one of the
+indiviudal server (the boot-server).
+
+Production Setup
+
+To start scalaris into the background for production, use
+bin/scalarisctl. For a self-compiled Scalaris you have to edit the
+pathes in the file to match your setup. The rpms come with a
+scalarisctl with correct paths.
 
 change the ip-address in the tuple to your own. (boot_host)
-
 log_path: the path to the log directory.
-
 
 Running
 =======
