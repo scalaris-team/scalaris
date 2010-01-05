@@ -29,10 +29,11 @@
 
 all() ->
     [empty,
-     get_keys_for_replica_string,
      get_keys_for_replica_int,
+     get_keys_for_replica_string,
      md5,
-     next_hop].
+     next_hop,
+     process_dictionary].
 
 suite() ->
     [
@@ -49,6 +50,8 @@ end_per_suite(_Config) ->
 count() ->
     1000000.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 empty(_Config) ->
     iter(count(), fun () ->
                        ok
@@ -61,16 +64,19 @@ get_keys_for_replica_string(_Config) ->
                end, "get_keys_for_replica_string"),
     ok.
 
+get_keys_for_replica_int(_Config) ->
+      iter(count(), fun () ->
+                            rt_chord:get_keys_for_replicas(42)
+                 end, "get_keys_for_replica_int"),
+      ok.
+
 md5(_Config) ->
     iter(count(), fun () ->
                           crypto:md5("42")
-               end, "md5"),
-    ok.
-
-get_keys_for_replica_int(_Config) ->
+               end, "crypto:md5"),
     iter(count(), fun () ->
-                          rt_chord:get_keys_for_replicas(42)
-               end, "get_keys_for_replica_int"),
+                          erlang:md5("42")
+               end, "erlang:md5"),
     ok.
 
 next_hop(_Config) ->
@@ -83,18 +89,33 @@ next_hop(_Config) ->
                gb_trees:enter(102, succ,
                 gb_trees:enter(103, pred,
                  rt_chord:empty(succ))))))))),
-    State = cs_state:new(RT, node:make(succ, 3), node:make(pred, 1), node:make(me, 2), my_range, lb, db),
+    State = cs_state:new(RT, node:make(succ, 3), node:make(pred, 1),
+                         node:make(me, 2), my_range, lb, db),
     iter(count(), fun () ->
                           rt_chord:next_hop(State, 42)
                end, "next_hop"),
     ok.
 
+process_dictionary(_Config) ->
+    process_dictionary:start_link_for_unittest(),
+    process_dictionary:register_process(?MODULE, "process_dictionary", self()),
+    iter(count(), fun () ->
+                          process_dictionary:lookup_process(?MODULE,
+                                                            "process_dictionary")
+                  end, "lookup_process"),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 iter(Count, F, Tag) ->
     F(),
     Start = erlang:now(),
     iter_inner(Count, F),
     Stop = erlang:now(),
-    ct:pal("~p iterations of ~p took ~ps: ~p1/s", [Count, Tag, timer:now_diff(Stop, Start) / 1000000.0, 1000000.0 / (timer:now_diff(Stop, Start) / Count)]),
+    ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
+    Frequency = 1000000.0 / (timer:now_diff(Stop, Start) / Count),
+    ct:pal("~p iterations of ~p took ~ps: ~p1/s", [Count, Tag,
+                                                   ElapsedTime,
+                                                   Frequency]),
     ok.
 
 iter_inner(0, _) ->
