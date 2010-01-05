@@ -116,9 +116,9 @@ n() ->
 -spec(get_keys_for_replicas/1 :: (key() | string()) -> [key()]).
 get_keys_for_replicas(Key) when is_integer(Key) ->
     [Key,
-     normalize(Key + 16#40000000000000000000000000000000),
-     normalize(Key + 16#80000000000000000000000000000000),
-     normalize(Key + 16#C0000000000000000000000000000000)
+     Key bxor 16#40000000000000000000000000000000,
+     Key bxor 16#80000000000000000000000000000000,
+     Key bxor 16#C0000000000000000000000000000000
     ];
 get_keys_for_replicas(Key) when is_list(Key) ->
     get_keys_for_replicas(hash_key(Key)).
