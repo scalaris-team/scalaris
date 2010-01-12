@@ -87,14 +87,23 @@ set_local_address(Address, Port) ->
     gen_server:call(?MODULE, {set_local_address, Address, Port}, 20000).
 
 
-%% @doc 
-%% @spec get_local_address_port() -> {inet:ip_address(),int()}
+%% @doc returns the local ip address and port
+-spec(get_local_address_port/0 :: () -> {inet:ip_address(),integer()} | undefined | {undefined, integer()}).
 get_local_address_port() ->
-    case ets:lookup(?MODULE, local_address_port) of
-     	[{local_address_port, Value}] ->
- 	    Value;
- 	[] ->
- 	    undefined
+    case erlang:get(local_address_port) of
+        undefined ->
+            case ets:lookup(?MODULE, local_address_port) of
+                [{local_address_port, Value = {undefined, _MyPort}}] ->
+                    Value;
+                [{local_address_port, Value}] ->
+                    io:format("put ~p~n", [Value]),
+                    erlang:put(local_address_port, Value),
+                    Value;
+                [] ->
+                    undefined
+            end;
+        Value ->
+            Value
     end.
 
 %%--------------------------------------------------------------------
