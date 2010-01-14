@@ -349,7 +349,7 @@ sup_supervisor_desc(Name, Module, Function, Options) ->
       []
      }.
 
--spec(tc/3 :: (atom(), atom(), [_]) -> {timer:time(), term()}).
+-spec(tc/3 :: (atom(), atom(), [_]) -> {timer:time(), any()}).
 tc(M, F, A) ->
     Before = erlang:now(),
     Val = apply(M, F, A),
