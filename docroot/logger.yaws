@@ -54,7 +54,7 @@ out(Arg) ->
     {Map, Start} = comm_logger:dump(),
     case gb_trees:size(Map) of
       0 ->
-        {ehtml, {p, [], "No messages logged. Enable logging in src/comm_layer/comm_layer.hrl (LOG_MESSAGE macro)."}};
+        {ehtml, {p, [], "No messages logged. Enable logging in include/scalaris.hrl (LOG_MESSAGE macro)."}};
       _ ->
         SortedTagList = lists:reverse(lists:keysort(2, get_tags(gb_trees:next(gb_trees:iterator(Map))))),
         {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),
