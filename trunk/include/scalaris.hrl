@@ -58,8 +58,8 @@
 %-define(LOG_MESSAGE(MESSAGE, SIZE), case MESSAGE of {send_to_group_member, _, Msg} -> comm_logger:log(erlang:element(1, Msg), SIZE); _ -> comm_logger:log(erlang:element(1, MESSAGE), SIZE) end).
 
 
-% enable native register for all prozesses in gen_component or disable
-% usefull 4 debug (etop, appmon), but let memory usage grow over the time
+% enable native register for all processes in gen_component or disable
+% useful 4 debug (etop, appmon), but let memory usage grow over the time
 % enable:
 %-define(DEBUG_REGISTER(PROCESS,PID),register(PROCESS,PID)).
 % disable:

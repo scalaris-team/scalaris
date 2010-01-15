@@ -50,7 +50,7 @@
 start_link() ->
     comm_port_sup:start_link().
 
-%% @doc a process descriptor has to specify the erlang vm 
+%% @doc a process descriptor has to specify the erlang vm
 %%      + the process inside. {IP address, port, pid}
 %% @type process_id() = {inet:ip_address(), int(), pid()}.
 %% @spec send(process_id(), term()) -> ok
@@ -60,11 +60,11 @@ send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
     %io:format("send: ~p:~p -> ~p:~p(~p) : ~p\n", [MyIP, MyPort, _IP, _Port, _Pid, Message]),
     IsLocal = (MyPort =:= _Port) andalso (MyIP =:= _IP),
     if
- 	IsLocal ->        
-%	    ?LOG_MESSAGE(erlang:element(1, Message), byte_size(term_to_binary(Message))),
- 	    _Pid ! Message;
- 	true ->
-	    comm_port:send(Target, Message)
+        IsLocal ->
+            ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
+            _Pid ! Message;
+        true ->
+            comm_port:send(Target, Message)
     end;
 
 send(Target, Message) ->
