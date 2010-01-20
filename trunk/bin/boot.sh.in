@@ -30,4 +30,4 @@ fi
 
 
 export ERL_MAX_PORTS=16384
-erl $ERL_OPTS $TCERLFLAGS +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -name boot -s boot
+erl $ERL_OPTS $TCERLFLAGS +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -boot_cs first true -connect_all false -name boot -s boot

@@ -27,23 +27,22 @@
 -vsn('$Id$ ').
 
 -export([
-	 start_link/1, start/2,
+         start_link/1, start/2,
 
-	 read/1, read/2,
+         read/1, read/2,
 
-	 succListLength/0, stabilizationInterval_max/0, stabilizationInterval_min/0,stabilizationInterval/0,
-	 pointerBaseStabilizationInterval/0, failureDetectorInterval/0,
-	 bootPid/0, 
-	 logPid/0, loadBalanceInterval/0, loadBalanceStartupInterval/0, loadBalanceFlagResetInterval/0, 
-	 collectorInterval/0, error_log_file/0, 
-	 debugQueueLength/0, debug_log_file/0, transaction_log_file/0, reregisterInterval/0, 
-	 replicationFactor/0, quorumFactor/0, replicaPrefixes/0, 
-	 transactionLookupTimeout/0, tpFailureTimeout/0, 
-	 tmanagerTimeout/0,
-	 %readTimeout/0, 
-   leaderDetectorInterval/0, 
-	 testDump/0, testKeepAlive/0, register_hosts/0, listenPort/0, listenIP/0,
-	 knownHosts/0]).
+         succListLength/0, stabilizationInterval_max/0,
+         stabilizationInterval_min/0,stabilizationInterval/0,
+         pointerBaseStabilizationInterval/0,
+         failureDetectorInterval/0, bootPid/0, loadBalanceInterval/0,
+         loadBalanceStartupInterval/0, loadBalanceFlagResetInterval/0,
+         collectorInterval/0, error_log_file/0, debugQueueLength/0,
+         debug_log_file/0, transaction_log_file/0,
+         reregisterInterval/0, replicationFactor/0, quorumFactor/0,
+         replicaPrefixes/0, transactionLookupTimeout/0,
+         tpFailureTimeout/0, tmanagerTimeout/0, %readTimeout/0,
+         leaderDetectorInterval/0, testDump/0, testKeepAlive/0,
+         register_hosts/0, listenPort/0, listenIP/0, knownHosts/0]).
 
 -export([log_path/0,cs_log_file/0,log_log_file/0,mem_log_file/0,docroot/0]).
 
@@ -134,12 +133,6 @@ bootHost() ->
 %% @spec bootPid() -> pid()
 bootPid() ->
     bootHost().
-    %{boot, bootHost()}.
-
-%% @doc pid of the log daemon
-%% @spec logPid() -> pid()
-logPid() ->
-    read(log_host).
 
 %% @doc interval between two collections of the message statistics
 %% @spec collectorInterval() -> integer() | failed

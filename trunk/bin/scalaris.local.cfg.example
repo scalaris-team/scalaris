@@ -3,7 +3,6 @@
 % (see cs_send.erl to switch)
 
 % {boot_host, {boot,'boot@foo.bar.com'}}.
-% {log_host, {boot_logger, 'boot@foo.bar.com'}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Settings for TCP mode.
@@ -14,7 +13,8 @@
 % IP Address, Port, and label of the boot server
 {boot_host, {{127,0,0,1},14195,boot}}.
 
-% IP Address, Port, and label of the log server
-{log_host, {{127,0,0,1},14195,boot_logger}}.
+% IP Address, Port, and label of a node which is already in the system
+{known_hosts, [{{127,0,0,1},14195, service_per_vm}]}.
+
 
 
