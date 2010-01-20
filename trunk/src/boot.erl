@@ -30,7 +30,7 @@
 -export([start/0, stop/0]).
 	
 start() ->
-  
+    %tracer:start(),
     application:start(boot_cs).
 
 stop() ->
