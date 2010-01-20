@@ -105,16 +105,7 @@ open_new_async(Address, Port, _MyAddr, MyPort) ->
 
 send({Address, Port, Socket}, Pid, Message) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message}),
-    SendTimeout    = config:read(tcp_send_timeout),
-    {Time, Result} = timer:tc(gen_tcp, send, [Socket, BinaryMessage]),
-    if
-	Time > 1200 * SendTimeout ->
-	    log:log(error,"[ CC ] send to ~p took ~p: ~p", 
-		    [Address, Time, inet:getopts(Socket, [keep_alive, send_timeout])]);
-	true ->
-	    ok
-    end,
-    case Result of
+    case gen_tcp:send(Socket, BinaryMessage) of
 	ok ->
 	    ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
 	    ok;

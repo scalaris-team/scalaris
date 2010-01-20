@@ -77,10 +77,11 @@ on({cache, Cache},{Coordinate, Confidence,TriggerState}) ->
         [] ->
             {Coordinate, Confidence,TriggerState};
         [Node] ->
-            cs_send:send_to_group_member(node:pidX(Node), vivaldi, {vivaldi_shuffle,
-                                                                    cs_send:this(),
-                                                                    Coordinate,
-                                                                    Confidence}),
+            cs_send:send_to_group_member(node:pidX(Node), vivaldi,
+                                         {vivaldi_shuffle,
+                                          cs_send:this(),
+                                          Coordinate,
+                                          Confidence}),
             {Coordinate, Confidence,TriggerState}
     end;
 
