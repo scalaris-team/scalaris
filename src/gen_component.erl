@@ -34,7 +34,7 @@
 -export([start_link/2, start_link/3, start/4, start/2, start/3,wait_for_ok/0,
          change_handler/2]).
 
--export([kill/1, sleep/2]).
+-export([kill/1, sleep/2, get_state/1]).
 
 %================================================================================
 % behaviour definition
@@ -59,6 +59,13 @@ kill(Pid) ->
 
 sleep(Pid, Time) ->
     Pid ! {'$gen_component', time, Time}.
+
+get_state(Pid) ->
+    Pid ! {'$gen_component', get_state, self()},
+    receive
+        {'$gen_component', get_state_response, State} ->
+            State
+    end.
 
 %% @doc change the handler for handling messages
 change_handler(State, Handler) when is_atom(Handler) ->
@@ -136,8 +143,11 @@ start(Module, Args, Options, Supervisor) ->
 
 loop(Module, On, State, {Options, Slowest} = ComponentState) ->
     receive
-        {'$gen_component', sleep , Time} ->
+        {'$gen_component', sleep, Time} ->
             timer:sleep(Time),
+            loop(Module, On, State, ComponentState);
+        {'$gen_component', get_state, Pid} ->
+            cs_send:send_local(Pid, {'$gen_component', get_state_response, State}),
             loop(Module, On, State, ComponentState);
         {'$gen_component', kill} ->
             ok;
@@ -165,8 +175,8 @@ loop(Module, On, State, {Options, Slowest} = ComponentState) ->
                                                     erlang:get_stacktrace()}}
                                                 end) of
                 {exception, Exception} ->
-                    log:log(error,"Error: exception ~p during handling of ~p in module ~p~n",
-                              [Exception, Message, Module]),
+                    log:log(error,"Error: exception ~p during handling of ~p in module ~p in (~p)~n",
+                              [Exception, Message, Module, State]),
                     loop(Module, On, State, ComponentState);
                 unknown_event ->
                     {NewState, NewComponentState} =

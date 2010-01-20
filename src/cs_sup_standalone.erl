@@ -59,6 +59,8 @@ init([]) ->
     Config =
         util:sup_worker_desc(config, config, start_link,
                              [[preconfig:config(), preconfig:local_config()]]),
+    Service =
+        util:sup_worker_desc(service_per_vm, service_per_vm, start_link),
     FailureDetector =
         util:sup_worker_desc(fd, fd, start_link),
     CommunicationPort =
@@ -93,6 +95,7 @@ init([]) ->
     {ok,{{one_for_all,10,1},
          [
           Config,
+          Service,
           Logger,
           MonitorTiming,
           FailureDetector,

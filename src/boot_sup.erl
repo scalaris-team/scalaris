@@ -89,6 +89,8 @@ my_process_list(InstanceId) ->
                              [InstanceId]),
     Logger =
         util:sup_worker_desc(logger, log, start_link),
+    Service =
+        util:sup_worker_desc(service_per_vm, service_per_vm, start_link),
     CSNode =
         util:sup_supervisor_desc(cs_node, cs_sup_or, start_link, [[first]]),
     YAWS =
@@ -110,6 +112,7 @@ my_process_list(InstanceId) ->
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link),
     %% order in the following list is the start order
     [Config,
+     Service,
      Logger,
      MonitorTiming,
      Tracer,
