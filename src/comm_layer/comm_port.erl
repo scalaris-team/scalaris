@@ -96,7 +96,6 @@ get_local_address_port() ->
                 [{local_address_port, Value = {undefined, _MyPort}}] ->
                     Value;
                 [{local_address_port, Value}] ->
-                    io:format("put ~p~n", [Value]),
                     erlang:put(local_address_port, Value),
                     Value;
                 [] ->
