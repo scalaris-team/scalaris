@@ -30,7 +30,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([start_link/0, send/2, this/0, here/1]).
+-export([start_link/0, send/2, this/0, here/1, is_valid/1]).
 
 -import(io).
 -import(util).
@@ -81,3 +81,8 @@ this() ->
 here(Pid) ->
     {LocalIP, LocalPort} = comm_port:get_local_address_port(),
     {LocalIP, LocalPort, Pid}.
+
+is_valid({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid}) ->
+    true;
+is_valid(_) ->
+    false.

@@ -32,7 +32,7 @@
 -include("../include/scalaris.hrl").
 
 -export([send/2,send_after/3 , this/0, get/2, send_to_group_member/3,
-         send_local/2, make_global/1]).
+         send_local/2, make_global/1, is_valid/1]).
 
 send_to_group_member(Csnodepid,Processname,Mesg) ->
     send(Csnodepid,{send_to_group_member,Processname,Mesg}).
@@ -58,6 +58,10 @@ send_after(Delay,Pid, Message) ->
 % get process Name on node Node
 get(Name, {IP, Port, _Pid}=_Node) ->
     {IP, Port, Name}.
+
+-spec(is_valid/1 :: (mypid()) -> bool()).
+is_valid(Pid) ->
+    comm_layer:is_valid(Pid).
 
 -endif.
 -ifdef(BUILTIN).
@@ -86,6 +90,9 @@ get(Name, Pid) ->
     A = node(Pid), % we assume that you only call get with local pids
     Name.
 
+is_valid(Pid) ->
+    true.
+
 -endif.
 
 -ifdef(SIMULATION).
@@ -106,6 +113,9 @@ get(Name, {_Pid,Host}) ->
     {Name, Host};
 get(Name, Pid) ->
     Name.
+
+is_valid(Pid) ->
+    true.
 
 -endif.
 
