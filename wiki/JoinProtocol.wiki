@@ -1,0 +1,22 @@
+#summary How nodes join the system.
+
+= Introduction =
+
+Starting with r529 Scalaris uses a new join protocol which does not depend on the boot-server anymore.
+
+Before r529 Scalaris, in every installation there was one special node, the so called boot-server. The boot-server is started with ./boot.sh resp. scalarisctl boot start. In its web interface it provides a global view of the installation. For this view, it maintained a list of all participating nodes. Its second task was to provide new nodes a known location which they could contact for joining the system.
+
+Starting with r529, a joining node can contact any Scalaris node. In scalaris.cfg there is a list of known hosts which joining nodes will try for contacting existing nodes:
+{{{
+{known_hosts, [{{127,0,0,1},14195, service_per_vm}, {{127,0,0,1},14196, service_per_vm},
+              {{127,0,0,1},14197, service_per_vm}, {{127,0,0,1},14198, service_per_vm}]}.
+}}}
+It will try to contact them until it manages to get an answer.
+
+= Limits =
+
+The boot-server guaranteed that the Scalaris nodes will form exactly one ring. A protocol which uses just the known_hosts could end up forming several independent rings. Therefore we have to mark one Scalaris node as being the first one. All other nodes will only join existing rings but will not form new rings.
+
+The specially marked node is only needed for the second node to join. From there on, it is not required anymore. So it is not a single point of failure. For the moment, we mark the boot-server as being the first node in the system. It gets a special parameter "-boot_cs first true". Note, that all other nodes will have to wait until the boot-server is up and running.
+
+*If you want to reboot the node on which the boot-server was started*, you have to restart him without the special mark. You are only allowed to start "normal" nodes after the boot-server was started. If you would restart the boot-server, it would form a new ring.
