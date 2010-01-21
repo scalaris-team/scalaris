@@ -52,9 +52,14 @@ init(_Arg) ->
     ok.
 
 on({get_cs_nodes, Pid}, ok) ->
-    Nodes = [cs_send:make_global(Node)
-             || Node <- process_dictionary:find_all_cs_nodes()],
-    cs_send:send(Pid, {get_cs_nodes_response, Nodes}),
+    case cs_send:is_valid(Pid) of
+        true ->
+            Nodes = [cs_send:make_global(Node)
+                     || Node <- process_dictionary:find_all_cs_nodes()],
+            cs_send:send(Pid, {get_cs_nodes_response, Nodes});
+        false ->
+            ok
+    end,
     ok;
 
 on(_, _State) ->
