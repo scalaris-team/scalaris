@@ -55,6 +55,7 @@ start_link(InstanceId, _Options) ->
     end.
 
 init(_Args) ->
+    wait_for_valid_pid(),
     cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
     cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
@@ -217,3 +218,15 @@ get_pid() ->
 
 get_base_interval() ->
     config:read(cyclon_interval).
+
+%% @doc wait until our pid is valid
+%% our cs_node will eventually provide one
+wait_for_valid_pid() ->
+    case cs_send:is_valid(cs_send:this()) of
+        true ->
+            ok;
+        false ->
+            timer:sleep(100),
+            wait_for_valid_pid()
+    end.
+
