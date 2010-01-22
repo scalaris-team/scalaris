@@ -32,13 +32,49 @@ start() ->
     end,
     ok.
 
-tracer(Pid) ->
+tracer_perf(Pid) ->
     erlang:trace(all, true, [running, timestamp]),
     cs_send:send_local(Pid , done),
     ets:new(?MODULE, [set, public, named_table]),
     loop([]).
 
+tracer(Pid) ->
+    erlang:trace(all, true, [send, procs]),
+    cs_send:send_local(Pid , done),
+    loop([]).
+
 loop(Ps) ->
+    receive
+        {trace, Pid, send_to_non_existing_process, Msg, To} ->
+
+            log:log(error,"send_to_non_existing_process: ~p -> ~p (~p)", [Pid, To, Msg]),
+
+            loop(Ps);
+        {trace, Pid, exit, Reason} ->
+            case Reason of
+                normal ->
+                    loop(Ps);
+                {ok, _Stack,_Num} ->
+                    io:format(" EXIT: ~p | ~p~n", [Pid,Reason]),
+                    loop(Ps);
+                _ ->
+                    io:format(" EXIT: ~p | ~p~n", [Pid,Reason]),
+                    %io:format("~p~n",Ps),
+                    %log:log(warn,"EXIT: ~p | ~p", [Pid,Reason]),
+                    loop(Ps)
+
+            end;
+        {trace, Pid, spawn, Pid2, {M, F, Args}} ->
+            %io:format(" SPAWN: ~p -> ~p in ~p~n", [Pid,Pid2,{M, F, Args}]),
+            %log:log2file("TRACER",lists:flatten(io_lib:format(" SPAWN: ~p -> ~p in ~p~n", [Pid,Pid2,{M, F, Args}]))),
+            loop([{Pid,Pid2,{M, F, Args}}|Ps]);
+        _X ->
+            loop(Ps)
+    end.
+
+
+
+loop_perf(Ps) ->
     receive
         {trace_ts, Pid, in, _, TS} ->
             case ets:lookup(?MODULE, Pid) of
@@ -47,7 +83,7 @@ loop(Ps) ->
                 [{Pid, _, Sum}] ->
                     ets:insert(?MODULE, {Pid, TS, Sum})
             end,
-            loop(Ps);
+            loop_perf(Ps);
         {trace_ts, Pid, out, _, TS} ->
             case ets:lookup(?MODULE, Pid) of
                 [] ->
@@ -55,10 +91,10 @@ loop(Ps) ->
                 [{Pid, In, Sum}] ->
                     ets:insert(?MODULE, {Pid, ok, timer:now_diff(TS, In) + Sum})
             end,
-            loop(Ps);
+            loop_perf(Ps);
         _X ->
             io:format("unknown message: ~p~n", [_X]),
-            loop(Ps)
+            loop_perf(Ps)
     end.
 
 dump() ->
