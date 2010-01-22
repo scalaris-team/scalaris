@@ -20,4 +20,4 @@ In the new "boot.sh", we mark the boot-server as being the first node in the sys
 
 == Former behaviour ==
 
-Before r529 every Scalaris deployment had a special node, the so called boot-server. The boot-server was started with "./boot.sh" resp. "scalarisctl boot start". In its web interface it provides a global view of the installation. For this view, it maintained a list of all participating nodes. It also was mandatory for new nodes to join the system.
+Before r529 every Scalaris deployment had a special node, the so called boot-server. The boot-server was started with "./boot.sh" resp. "scalarisctl boot start". In its web interface it provides a global view of the installation. For this view, it maintained a list of all participating nodes. The boot-server was also mandatory for new nodes to join the system.
