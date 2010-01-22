@@ -110,10 +110,9 @@ on({lookup_timeout}, {join_phase3, [], Key}) ->
 on({get_node_response, Key, Succ}, {join_phase3, _, Key}) ->
     %io:format("p3: lookup success~n"),
     % got my successor
-    Me = node:make(cs_send:this(), Key),
-    UniqueId = node:uniqueId(Me),
+    Me = node:new(cs_send:this(), Key),
     % announce join request
-    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Key, UniqueId}),
+    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Key}),
     {join_phase4, Key, Succ, Me};
 
 % 4. joining my neighbors
@@ -463,8 +462,8 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 % join messages (see cs_join.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% userdevguide-begin cs_node:join_message
-on({join, Source_PID, Id, UniqueId}, State) ->
-    cs_join:join_request(State, Source_PID, Id, UniqueId);
+on({join, Source_PID, Id}, State) ->
+    cs_join:join_request(State, Source_PID, Id);
 
 on({get_cs_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
