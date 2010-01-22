@@ -26,31 +26,22 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([id/1, pidX/1, 
-	 new/3, make/2,
-	 uniqueId/1,
-	 is_null/1, null/0]).
+-export([id/1, pidX/1,
+         new/2,
+         is_null/1, null/0]).
 
--type(node_type() :: {node, cs_send:mypid(), any(), any()}).
+-type(node_type() :: {node, cs_send:mypid(), any()}).
 -record(node, {pid, id, uniqueId}).
 
--spec(new/3 :: (cs_send:mypid(), any(), any()) -> node_type()).
-new(PID, Id, UniqueId) ->
+-spec(new/2 :: (cs_send:mypid(), any()) -> node_type()).
+new(PID, Id) ->
     #node{
-     pid = PID, 
-     id = Id,
-    uniqueId = UniqueId}.
-
-make(PID, Id) ->
-    UniqueId = randoms:getRandomId(),
-    new(PID, Id, UniqueId).
+     pid = PID,
+     id = Id}.
 
 null() ->
     null.
 
-uniqueId(#node{uniqueId=A}) ->
-    A.
-    
 -spec(pidX/1 :: (node_type()) -> cs_send:mypid()).
 pidX(#node{pid=PID}) ->
     PID.

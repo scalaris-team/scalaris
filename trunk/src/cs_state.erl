@@ -30,7 +30,7 @@
 -include("../include/scalaris.hrl").
 
 -export([new/6, new/7,
-	 id/1, me/1, uniqueId/1,
+	 id/1, me/1,
 	 succ/1, succ_pid/1, succ_id/1,
 	 pred_pid/1, pred_id/1, pred/1, 
 	 update_pred_succ/3,
@@ -105,11 +105,8 @@ set_lb(State, LB) ->
 me(#state{me=Me}) ->
     Me.
 
-id(#state{me=Me}) -> 
+id(#state{me=Me}) ->
     node:id(Me).
-
-uniqueId(#state{me=Me}) -> 
-    node:uniqueId(Me).
 
 %%% Successor
 succ(#state{successor=Succ}) -> Succ.
@@ -144,7 +141,7 @@ dump(State) ->
 details(State) ->
     ring_maintenance:get_predlist(),
     Predlist =  receive
-                    {get_predlist_response, X} ->      
+                    {get_predlist_response, X} ->
                         X
                    
                 end,
