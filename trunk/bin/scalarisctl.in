@@ -42,7 +42,31 @@ usage(){
     echo "  scalarisctl node stop"
     echo "  scalarisctl node restart"
     echo "  scalarisctl debug"
+    echo "  scalarisctl checkinstallation"
     exit
+}
+
+checkinstallation() {
+    erl -noinput -eval 'halt(0).'
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erl could not be run"
+        echo "erl -noinput -eval 'halt(0).'"
+        exit 1
+    fi
+    if [ ! -s `which erl` ]; then
+        echo "ERROR: your erl executable is of size zero bytes: `which erl`"
+        echo "ls -l `which erl`"
+        exit 1
+    fi
+    erl -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erlang could not start the crypto module"
+        echo "erl -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
+        exit 1
+    fi
+    exit 0
 }
 
 bootstart(){
@@ -114,6 +138,8 @@ if [ "x0" = "x$FQDN_SET" ]; then
 fi
 
 case $1 in
+    checkinstallation)
+        checkinstallation;;
     boot)
 	[ 2 -eq $# ] || usage;
 	if [ $2 == "start" ]; then
