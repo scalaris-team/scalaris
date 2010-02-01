@@ -74,7 +74,6 @@ init(_Args) ->
 -spec(on/2 :: (message(), state()) -> state()).
 
 on({init, Id, Pred, Succ},{uninit, TriggerState}) ->
-    
     TriggerState2 = Trigger:trigger_next(TriggerState, make_utility(0)),
     {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
 
@@ -126,14 +125,18 @@ on({crash, DeadPid}, {Id, Pred, Succ, RTState, TriggerState}) ->
 % debug_info for web interface
 on({'$gen_cast', {debug_info, Requestor}}, {Id, Pred, Succ, RTState, TriggerState}) ->
     cs_send:send_local(Requestor , {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, 
-				       {"rt_size", ?RT:get_size(RTState)}]}),
+                                                          {"rt_size", ?RT:get_size(RTState)}]}),
+    {Id, Pred, Succ, RTState, TriggerState};
+
+on({dump, Pid}, {Id, Pred, Succ, RTState, TriggerState}) ->
+    cs_send:send_local(Pid , {dump_response, RTState}),
     {Id, Pred, Succ, RTState, TriggerState};
 
 % unknown message
 on(_UnknownMessage, _State) ->
     unknown_event.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec(check/5 :: (Old::?RT:state(), New::?RT:state(), ?RT:key(), node:node_type(),
                   node:node_type()) -> any()).
 check(Old, New, Id, Pred, Succ) ->
