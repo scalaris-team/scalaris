@@ -205,9 +205,8 @@ get_range(DB, From, To) ->
 -spec(get_range_with_version/2 :: (db(), intervals:interval()) -> [{Key::key(),
        Value::value(), Version::version(), WriteLock::bool(), ReadLock::integer()}]).
 get_range_with_version(DB, Interval) ->
-    {From, To} = intervals:unpack(Interval),
     F = fun ({Key, {Value, WriteLock, ReadLock, Version}}, Data) ->
-                case util:is_between(From, Key, To) andalso Value =/= empty_val of
+                case intervals:in(Key, Interval) andalso Value =/= empty_val of
                     true ->
                         [{Key, Value, Version, WriteLock, ReadLock} | Data];
                     false ->
@@ -220,9 +219,8 @@ get_range_with_version(DB, Interval) ->
 %@private
 
 get_range_only_with_version(DB, Interval) ->
-    {From, To} = intervals:unpack(Interval),
     F = fun ({Key, {Value, WLock, _, Version}}, Data) ->
-                case WLock == false andalso util:is_between(From, Key, To) andalso Value =/= empty_val of
+                case WLock == false andalso intervals:in(Key, Interval) andalso Value =/= empty_val of
                     true ->
                         [{Key, Value, Version} | Data];
                     false ->
