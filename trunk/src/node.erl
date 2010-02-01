@@ -30,8 +30,8 @@
          new/2,
          is_null/1, null/0]).
 
--type(node_type() :: {node, cs_send:mypid(), any()}).
--record(node, {pid, id, uniqueId}).
+-type(node_type() :: {node, cs_send:mypid()}).
+-record(node, {pid, id}).
 
 -spec(new/2 :: (cs_send:mypid(), any()) -> node_type()).
 new(PID, Id) ->

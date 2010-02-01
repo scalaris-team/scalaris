@@ -37,7 +37,7 @@ start_link() ->
     application:start(log4erl),
     log4erl:add_console_appender(stdout,{info, config:read(log_format)}), 
     log4erl:change_log_level(config:read(log_level)),
-   	log(info, "Log4erl started"),
+    log(info, "Log4erl started"),
     ignore.
 
 log(Level,Log) ->
