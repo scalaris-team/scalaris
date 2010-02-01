@@ -31,7 +31,8 @@
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_cs_node/4, update_pred_succ_in_cs_node/3]).
+         dump/1, to_dict/1, export_rt_to_cs_node/4,
+         update_pred_succ_in_cs_node/3, to_html/1]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -236,3 +237,9 @@ update_pred_succ_in_cs_node(Pred, Succ, RT) ->
     gb_trees:enter(node:id(Succ), node:pidX(Succ),
                    gb_trees:enter(node:id(Pred), node:pidX(Pred),
                                   RT)).
+
+%% @doc prepare routing table for printing in web interface
+-spec(to_html/1 :: (rt()) -> list()).
+to_html(RT) ->
+    List = [ {1, Value} || {Key, Value} <- gb_trees:to_list(RT)],
+    io_lib:format("~p", [List]).

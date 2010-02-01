@@ -28,7 +28,8 @@
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_cs_node/3, n/0]).
+         dump/1, to_dict/1, export_rt_to_cs_node/4, n/0, to_html/1,
+         update_pred_succ_in_cs_node/3]).
 
 -export([normalize/1]).
 
@@ -59,6 +60,9 @@ empty(Succ) ->
 %% userdevguide-begin rt_simple:hash_key
 %% @doc hashes the key to the identifier space.
 -spec(hash_key/1 :: (any()) -> key()).
+hash_key(Key) when is_integer(Key) ->
+    <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
+    N;
 hash_key(Key) ->
     <<N:128>> = erlang:md5(Key),
     N.
@@ -114,14 +118,13 @@ n() ->
 
 %% @doc returns the replicas of the given key
 -spec(get_keys_for_replicas/1 :: (key() | string()) -> [key()]).
-get_keys_for_replicas(Key) when is_integer(Key) ->
-    [Key,
-     Key bxor 16#40000000000000000000000000000000,
-     Key bxor 16#80000000000000000000000000000000,
-     Key bxor 16#C0000000000000000000000000000000
-    ];
-get_keys_for_replicas(Key) when is_list(Key) ->
-    get_keys_for_replicas(hash_key(Key)).
+get_keys_for_replicas(Key) ->
+    HashedKey = hash_key(Key),
+    [HashedKey,
+     HashedKey bxor 16#40000000000000000000000000000000,
+     HashedKey bxor 16#80000000000000000000000000000000,
+     HashedKey bxor 16#C0000000000000000000000000000000
+    ].
 %% userdevguide-end rt_simple:get_keys_for_replicas
 
 
@@ -142,6 +145,16 @@ to_dict(State) ->
     Succ = cs_state:succ(State),
     dict:store(0, Succ, dict:store(1, cs_state:me(State), dict:new())).
 
--spec(export_rt_to_cs_node/3 :: (rt(), node:node_type(), node:node_type()) -> external_rt()).
-export_rt_to_cs_node(RT, _Pred, _Succ) ->
+-spec(export_rt_to_cs_node/4 :: (rt(), key(), node:node_type(), node:node_type()) -> external_rt()).
+export_rt_to_cs_node(RT, _Id, _Pred, _Succ) ->
     RT.
+
+%% @doc prepare routing table for printing in web interface
+-spec(to_html/1 :: (rt()) -> list()).
+to_html({Succ, _}) ->
+    io_lib:format("succ: ~p", [Succ]).
+
+-spec(update_pred_succ_in_cs_node/3 :: (node:node_type(), node:node_type(), external_rt())
+      -> external_rt()).
+update_pred_succ_in_cs_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
+    {Succ, Tree}.
