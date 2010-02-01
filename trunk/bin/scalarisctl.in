@@ -66,6 +66,26 @@ checkinstallation() {
         echo "erl -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
         exit 1
     fi
+    if [ -e $ETCDIR/scalaris.cfg ]; then
+        erl -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        FAILED=$?
+        if [ $FAILED -ne 0 ]; then
+            echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.cfg"
+            echo "erl -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            exit 1
+        fi
+    else
+        echo "ERROR: there is no config file: $ETCDIR/scalaris.cfg"
+    fi
+    if [ -e $ETCDIR/scalaris.local.cfg ]; then
+        erl -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        FAILED=$?
+        if [ $FAILED -ne 0 ]; then
+            echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.local.cfg"
+            echo "erl -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.local.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            exit 1
+        fi
+    fi
     exit 0
 }
 
