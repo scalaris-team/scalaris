@@ -170,14 +170,14 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
     % sample weight balances local and remote error
     W = Error/(Error + RemoteError),
     % relative error of sample
-    Es = abs(mathlib:euclideanDist(RemoteCoordinate, Coordinate) - Latency) / Latency,
+    Es = abs(mathlib:euclideanDistance(RemoteCoordinate, Coordinate) - Latency) / Latency,
     % update weighted moving average of local error
     Error1 = Es * Ce * W + Error * (1 - Ce * W),
     % update local coordinates
     Delta = Cc * W,
     %io:format('expected latency: ~p~n', [mathlib:euclideanDist(Coordinate, _RemoteCoordinate)]),
     C1 = mathlib:u(Coordinate, RemoteCoordinate),
-    C2 = mathlib:euclideanDist(Coordinate, RemoteCoordinate),
+    C2 = mathlib:euclideanDistance(Coordinate, RemoteCoordinate),
     C3 = Latency - C2,
     C4 = C3 * Delta,
     Coordinate1 = mathlib:vecAdd(Coordinate, mathlib:vecMult(C1, C4)),

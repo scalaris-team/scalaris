@@ -37,8 +37,9 @@
 -export([on/2, init/1]).
 
 -type(relative_size() :: float()).
--type(centroid() :: {vivaldi:network_coordinate(), relative_size()}).
+-type(centroid() :: vivaldi:network_coordinate()).
 -type(centroids() :: [centroid()]).
+-type(sizes() :: [relative_size()]).
 
 % state of the clustering loop
 -type(state() :: {centroids()}).
@@ -74,10 +75,10 @@ on({reset_clustering}, State) ->
 
 % reset the local state
 on({query_vivaldi_response, Coordinate, _Confidence}, _State) ->
-    {[Coordinate, 1.0]};
+    {[Coordinate], [1.0]};
 
 % got random node from cyclon
-on({cache, Cache}, {Centroids} = State) ->
+on({cache, Cache}, {Centroids, Sizes} = State) ->
     %io:format("~p~n",[Cache]),
     case Cache of
         [] ->
@@ -85,32 +86,31 @@ on({cache, Cache}, {Centroids} = State) ->
         [Node] ->
             cs_send:send_to_group_member(node:pidX(Node), dc_clustering, {clustering_shuffle,
                                                                           cs_send:this(),
-                                                                          Centroids}),
+                                                                          Centroids, Sizes}),
             State
     end;
 
 % have been ask to shuffle
-on({clustering_shuffle, RemoteNode, RemoteCentroids},
-   {Centroids}) ->
+on({clustering_shuffle, RemoteNode, RemoteCentroids, RemoteSizes},
+   {Centroids, Sizes}) ->
    %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     cs_send:send(RemoteNode, {clustering_shuffle_reply,
                               cs_send:this(),
-                              Centroids}),
-    NewCentroids = cluster(Centroids, RemoteCentroids),
-    {NewCentroids};
+                              Centroids, Sizes}),
+    NewState = cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes),
+    NewState;
 
 % got shuffle response
-on({clustering_shuffle_reply, _RemoteNode, RemoteCentroids},
-   {Centroids}) ->
+on({clustering_shuffle_reply, _RemoteNode, RemoteCentroids, RemoteSizes},
+   {Centroids, Sizes}) ->
     %io:format("{shuffle_reply, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     %vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
-    NewCentroids = cluster(Centroids, RemoteCentroids),
-    {NewCentroids};
+    NewState = cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes),
+    NewState;
 
 % return my clusters
-on({query_clustering, Pid},
-   {Centroids} = State) ->
-    cs_send:send(Pid,{query_clustering_response, Centroids}),
+on({query_clustering, Pid}, State) ->
+    cs_send:send(Pid,{query_clustering_response, State}),
     State;
 
 on(_, _State) ->
@@ -124,7 +124,7 @@ init([_InstanceId, []]) ->
     erlang:send_after(config:read(dc_clustering_reset_interval), self(), {reset_clustering}),
     cs_send:send_local(self(),{reset_clustering}),
     cs_send:send_local(self(),{start_clustering_shuffle}),
-    {[]}.
+    {[], []}.
 
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
@@ -153,6 +153,10 @@ get_local_vivaldi_pid() ->
     end,
     process_dictionary:lookup_process(InstanceId, vivaldi).
 
--spec(cluster/2 :: (centroids(), centroids()) -> centroids()).
-cluster(Centroids, RemoteCentroids) ->
-    Centroids ++ RemoteCentroids.
+-spec(cluster/4 :: (centroids(), sizes(), centroids(), sizes()) -> {centroids(), sizes()}).
+cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes) ->
+    Radius = config:read(dc_clustering_radius),
+    {NewCentroids, NewSizes} = mathlib:aggloClustering(Centroids ++ RemoteCentroids, 
+						       Sizes ++ RemoteSizes, Radius),
+    NormalizedSizes = lists:map(fun (S) -> 0.5*S end, Sizes),
+    {Centroids, NormalizedSizes}.
