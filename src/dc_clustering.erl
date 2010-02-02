@@ -126,9 +126,14 @@ init([_InstanceId, []]) ->
     cs_send:send_local(self(),{start_clustering_shuffle}),
     {[], []}.
 
-%% @spec start_link(term()) -> {ok, pid()}
+-spec(start_link(term()) -> {ok, pid()} | ignore).
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [InstanceId, []], [{register, InstanceId, dc_clustering}]).
+    case config:read(dc_clustering_enable) of
+        true ->
+            gen_component:start_link(?MODULE, [InstanceId, []], [{register, InstanceId, dc_clustering}]);
+        false ->
+            ignore
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
@@ -156,7 +161,7 @@ get_local_vivaldi_pid() ->
 -spec(cluster/4 :: (centroids(), sizes(), centroids(), sizes()) -> {centroids(), sizes()}).
 cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes) ->
     Radius = config:read(dc_clustering_radius),
-    {NewCentroids, NewSizes} = mathlib:aggloClustering(Centroids ++ RemoteCentroids, 
-						       Sizes ++ RemoteSizes, Radius),
-    NormalizedSizes = lists:map(fun (S) -> 0.5*S end, Sizes),
-    {Centroids, NormalizedSizes}.
+    {NewCentroids, NewSizes} = mathlib:aggloClustering(Centroids ++ RemoteCentroids,
+                                                       Sizes ++ RemoteSizes, Radius),
+    NormalizedSizes = lists:map(fun (S) -> 0.5*S end, NewSizes),
+    {NewCentroids, NormalizedSizes}.
