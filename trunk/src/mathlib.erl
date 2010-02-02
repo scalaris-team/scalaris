@@ -23,13 +23,19 @@
 
 -module(mathlib).
 
--export([closestPoints/1, euclideanDistance/1, euclideanDistance/2, max/2, u/1, vecAdd/2, vecSub/2, vecMult/2, vecWeightedAvg/4, zeros/1, median/1]).
+-export([closestPoints/1, euclideanDistance/1, euclideanDistance/2, max/2, u/1,
+         vecAdd/2, vecSub/2, vecMult/2, vecWeightedAvg/4, zeros/1, median/1,
+        aggloClustering/3]).
+
+-type(vector() :: [float()]).
+-type(centroid() :: vector()).
 
 % get maximum of two values
 max(V1, V2) ->
     T1 = V1, T2 = V2, if T1 > T2 -> T1 ; true -> T2 end.
 
 % median of an unsorted list
+-spec(median/1 :: (vector()) -> float()).
 median(L) ->
      L1 = lists:sort(L),
      N = length(L1),
@@ -40,21 +46,26 @@ median(L) ->
 
 
 % add two vectors X,Y
+-spec(vecAdd/2 :: (vector(), vector()) -> vector()).
 vecAdd(L1, L2) ->
     lists:zipwith(fun(X, Y) -> X+Y end, L1, L2).
 
 % substract two vectors X,Y
+-spec(vecSub/2 :: (vector(), vector()) -> vector()).
 vecSub(L1, L2) ->
     lists:zipwith(fun(X, Y) -> X - Y end, L1, L2).
 
 % multiply Vector V with a scalar S
+-spec(vecMult/2 :: (vector(), float()) -> vector()).
 vecMult(V, S) ->
     lists:map(fun(X) -> S*X end, V).
 
+-spec(vecWeightedAvg/4 :: (vector(), vector(), float(), float()) -> vector()).
 vecWeightedAvg(L1, L2, W1, W2) ->
     vecMult(vecAdd(vecMult(L1, W1), vecMult(L2, W2)), 1/(W1+W2)).
 
 % euclidean distance between origin and V
+-spec(euclideanDistance/1 :: (vector()) -> float()).
 euclideanDistance(V) ->
     euclidDistToZero(V, 0).
 
@@ -65,6 +76,7 @@ euclidDistToZero([], Acc) ->
     math:sqrt(Acc).
 
 % euclidean distance between two vectors
+-spec(euclideanDistance/2 :: (vector(), vector()) -> float()).
 euclideanDistance(V, W) ->
     euclidDist(V, W, 0).
 
@@ -76,7 +88,8 @@ euclidDist([], [], Acc) ->
 
 
 % unit vector u(v) = v/||v||
-u(V) -> 
+-spec(u/1 :: (vector()) -> vector()).
+u(V) ->
     vecMult(V, 1/euclideanDistance(V)).
 
 % find indices of closest centroids
@@ -88,7 +101,7 @@ closestPoints(_) ->
 
 closestPointsForI([First | Rest], I, J, Min, MinI, MinJ) ->
   {Min1, MinI1, MinJ1} = closestPointsForJ(First, Rest, I, J, Min, MinI, MinJ),
-    I1 = I + 1, 
+    I1 = I + 1,
     J1 = J + 1,
   closestPointsForI(Rest, I1, J1, Min1, MinI1, MinJ1);
 
@@ -122,13 +135,14 @@ zerosRec(_, L) ->
     L.
 
 % get closest centroids and melt them if their distance is within radius()
+-spec(aggloClustering/3 :: ([centroid()], vector(), float()) -> {centroid(), vector()}).
 aggloClustering(Centroids, Sizes, Radius) ->
     {Min, I, J} = mathlib:closestPoints(Centroids),
     aggloClusteringHelper(Centroids, Sizes, Radius, Min, I, J).
 
 aggloClusteringHelper(Centroids, Sizes, Radius, Min, I, J) when Min =< Radius, length(Centroids) > 1 ->
-    C1 = lists:nth(I, Centroids), 
-    C2 = lists:nth(J, Centroids), 
+    C1 = lists:nth(I, Centroids),
+    C2 = lists:nth(J, Centroids),
     S1 = lists:nth(I, Sizes),
     S2 = lists:nth(J, Sizes),
     Centroids1 = [mathlib:vecWeightedAvg(C1, C2, S1, S2)| tools:rmvTwo(Centroids, I, J)],

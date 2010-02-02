@@ -89,8 +89,8 @@ init([Options]) ->
            Cyclon,
            DeadNodeCache,
            RingMaintenance,
-           Vivaldi
-           %% ,DC_Clustering
+           Vivaldi,
+           DC_Clustering
            %% _RSE
           ]}}.
 %% userdevguide-end cs_sup_or:init
