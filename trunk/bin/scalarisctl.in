@@ -36,7 +36,7 @@ TCERLFLAGS=@ERLANG_TCERL_FLAGS@
 interactive=0
 
 usage(){
-    echo "scalarisctl: "
+    echo "usage: scalarisctl [options] <cmd>"
     echo "    -h                   help"
     echo "    -i                   interactive"
     echo "    boot start           start boot server"
@@ -71,6 +71,11 @@ fix_paths() {
 }
 
 checkinstallation() {
+    FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
+    if [ "x0" = "x$FQDN_SET" ]; then
+        echo "you have to set a fully qualified domain name (FQDN)"
+        exit -1
+    fi
     erl -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -110,6 +115,13 @@ checkinstallation() {
             exit 1
         fi
     fi
+    erl -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not find Scalaris' beam files"
+        echo "erl -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'"
+        exit 1
+    fi
     exit 0
 }
 
@@ -130,6 +142,12 @@ bootstart(){
         -boot_cs first true \
         -connect_all false -hidden -name boot \
         -s boot;
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not start scalaris"
+        echo "  consider running scalarisctl checkinstallation"
+        exit 1
+    fi
     popd > /dev/null
 }
 
@@ -164,6 +182,12 @@ nodestart(){
         -chordsharp local_config "\"$ETCDIR/scalaris.local.cfg\"" \
         -connect_all false -hidden -name node \
         -s chordsharp;
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not start scalaris"
+        echo "  consider running scalarisctl checkinstallation"
+        exit 1
+    fi
     popd > /dev/null
 }
 
@@ -179,12 +203,6 @@ nodestop(){
 }
 
 fix_paths
-
-FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
-if [ "x0" = "x$FQDN_SET" ]; then
-    echo "you have to set a fully qualified domain name (FQDN)"
-    exit -1
-fi
 
 while getopts "hi" optionName; do
     case "$optionName" in
