@@ -29,7 +29,7 @@
 
 -behaviour(gen_component).
 
--export([dump_node_states/0]).
+-export([dump_node_states/0, kill_nodes/1]).
 
 -export([start_link/0, init/1, on/2]).
 
@@ -39,7 +39,13 @@
 % @doc ask all local nodes for their state
 dump_node_states() ->
     [gen_component:get_state(Pid)
-     || Pid <-  process_dictionary:find_all_cs_nodes()].
+     || Pid <- process_dictionary:find_all_cs_nodes()].
+
+kill_nodes(No) ->
+    Childs = lists:sublist([X || X <- supervisor:which_children(main_sup),
+                                 is_list(element(1, X))], No),
+    [supervisor:terminate_child(main_sup, element(1, Child)) || Child <- Childs],
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Server process
@@ -54,8 +60,7 @@ init(_Arg) ->
 on({get_cs_nodes, Pid}, ok) ->
     case cs_send:is_valid(Pid) of
         true ->
-            Nodes = [cs_send:make_global(Node)
-                     || Node <- process_dictionary:find_all_cs_nodes()],
+            Nodes = get_live_cs_nodes(),
             cs_send:send(Pid, {get_cs_nodes_response, Nodes});
         false ->
             ok
@@ -64,3 +69,6 @@ on({get_cs_nodes, Pid}, ok) ->
 
 on(_, _State) ->
     unknown_event.
+
+get_live_cs_nodes() ->
+    [cs_send:make_global(Pid) || Pid <- process_dictionary:find_all_cs_nodes(), element(1, gen_component:get_state(Pid)) == state].
