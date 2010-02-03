@@ -176,7 +176,7 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
     % update local coordinates
     Delta = Cc * W,
     %io:format('expected latency: ~p~n', [mathlib:euclideanDist(Coordinate, _RemoteCoordinate)]),
-    C1 = mathlib:u(Coordinate, RemoteCoordinate),
+    C1 = mathlib:u(mathlib:vecSub(Coordinate, RemoteCoordinate)),
     C2 = mathlib:euclideanDistance(Coordinate, RemoteCoordinate),
     C3 = Latency - C2,
     C4 = C3 * Delta,
