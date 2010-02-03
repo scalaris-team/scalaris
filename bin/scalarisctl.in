@@ -14,7 +14,7 @@
 #    limitations under the License.
 
 prefix=@prefix@
-exec_prefix=@exec_prefix@
+exec_prefix=@exec_prefix@/bin
 
 # /etc/scalaris/
 ETCDIR=@sysconfdir@/scalaris
@@ -33,17 +33,41 @@ SCALARIS_COOKIE="chocolate chip cookie"
 
 TCERLFLAGS=@ERLANG_TCERL_FLAGS@
 
+interactive=0
+
 usage(){
     echo "scalarisctl: "
-    echo "  scalarisctl boot start"
-    echo "  scalarisctl boot stop"
-    echo "  scalarisctl boot restart"
-    echo "  scalarisctl node start"
-    echo "  scalarisctl node stop"
-    echo "  scalarisctl node restart"
-    echo "  scalarisctl debug"
-    echo "  scalarisctl checkinstallation"
-    exit
+    echo "    -h                   help"
+    echo "    -i                   interactive"
+    echo "    boot start           start boot server"
+    echo "    boot stop            stop boot server"
+    echo "    boot restart         restart boot server"
+    echo "    node start           start normal node"
+    echo "    node stop            stop normal node"
+    echo "    node restart         restart normal node"
+    echo "    debug                connect to boot server"
+    echo "    checkinstallation    test installation"
+    exit 0
+}
+
+fix_paths() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    # is this a svn checkout or an rpm installation?
+    if [ $DIRNAME != $exec_prefix ]; then
+        # scalaris
+        SCALARISDIR=`dirname $DIRNAME`
+        # /etc/scalaris/
+        ETCDIR=$SCALARISDIR/bin
+        # scalaris/ebin
+        BEAMDIR=$SCALARISDIR/ebin
+        # scalaris/docroot
+        DOCROOTDIR=$SCALARISDIR/docroot
+        # scalaris/docroot_node
+        NODEDOCROOTDIR=$SCALARISDIR/docroot_node
+        # scalaris/log
+        LOGDIR=$SCALARISDIR/log
+    fi
 }
 
 checkinstallation() {
@@ -90,21 +114,23 @@ checkinstallation() {
 }
 
 bootstart(){
+    if [ $interactive -eq 0 ]; then
+        BACKGROUND="-noinput -detached"
+    fi
     pushd $BEAMDIR > /dev/null
-	erl -setcookie "$SCALARIS_COOKIE" \
-	    -pa $SCALARISDIR/contrib/yaws/ebin \
-	    -pa $SCALARISDIR/contrib/log4erl/ebin \
-	    -pa $BEAMDIR $TCERLFLAGS \
-	    -noinput \
-	    -detached \
-	    -yaws embedded true \
-	    -boot_cs log_path "\"$LOGDIR\"" \
-	    -boot_cs docroot "\"$DOCROOTDIR\"" \
-	    -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
-	    -boot_cs local_config "\"$ETCDIR/scalaris.local.cfg\"" \
-	    -connect_all false -hidden -name boot \
-	    -s boot;
-	popd > /dev/null
+    erl -setcookie "$SCALARIS_COOKIE" \
+        -pa $SCALARISDIR/contrib/yaws/ebin \
+        -pa $SCALARISDIR/contrib/log4erl/ebin \
+        -pa $BEAMDIR $TCERLFLAGS $BACKGROUND \
+        -yaws embedded true \
+        -boot_cs log_path "\"$LOGDIR\"" \
+        -boot_cs docroot "\"$DOCROOTDIR\"" \
+        -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
+        -boot_cs local_config "\"$ETCDIR/scalaris.local.cfg\"" \
+        -boot_cs first true \
+        -connect_all false -hidden -name boot \
+        -s boot;
+    popd > /dev/null
 }
 
 debug(){
@@ -115,41 +141,44 @@ debug(){
 bootstop(){
     pushd $BEAMDIR > /dev/null
     erl -setcookie "$SCALARIS_COOKIE" \
-	-name ctl \
-	-pa $BEAMDIR \
-	-noinput \
-	-s scalaris_ctl -extra boot@`hostname -f` stop
+        -name ctl \
+        -pa $BEAMDIR \
+        -noinput \
+        -s scalaris_ctl -extra boot@`hostname -f` stop
     popd > /dev/null
 }
 
 nodestart(){
+    if [ $interactive -eq 0 ]; then
+        BACKGROUND="-noinput -detached"
+    fi
     pushd $BEAMDIR > /dev/null
-	erl -setcookie "$SCALARIS_COOKIE" \
-	    -pa $SCALARISDIR/contrib/yaws/ebin \
-	    -pa $SCALARISDIR/contrib/log4erl/ebin \
-	    -pa $BEAMDIR $TCERLFLAGS\
-	    -yaws embedded true \
-	    -chordsharp log_path "\"$LOGDIR\"" \
-	    -chordsharp docroot "\"$NODEDOCROOTDIR\"" \
-	    -chordsharp config "\"$ETCDIR/scalaris.cfg\"" \
-	    -chordsharp local_config "\"$ETCDIR/scalaris.local.cfg\"" \
-	    -connect_all false -hidden -name node \
-	    -noinput \
-	    -detached \
-	    -s chordsharp;
-	popd > /dev/null
+    erl -setcookie "$SCALARIS_COOKIE" \
+        -pa $SCALARISDIR/contrib/yaws/ebin \
+        -pa $SCALARISDIR/contrib/log4erl/ebin \
+        -pa $BEAMDIR $TCERLFLAGS $BACKGROUND \
+        -yaws embedded true \
+        -chordsharp log_path "\"$LOGDIR\"" \
+        -chordsharp docroot "\"$NODEDOCROOTDIR\"" \
+        -chordsharp config "\"$ETCDIR/scalaris.cfg\"" \
+        -chordsharp local_config "\"$ETCDIR/scalaris.local.cfg\"" \
+        -connect_all false -hidden -name node \
+        -s chordsharp;
+    popd > /dev/null
 }
 
 
 nodestop(){
     pushd $BEAMDIR > /dev/null
     erl -setcookie "$SCALARIS_COOKIE" \
-	-name ctl \
-	-pa $BEAMDIR \
-	-noinput \
-	-s scalaris_ctl -extra node@`hostname -f` stop
+        -name ctl \
+        -pa $BEAMDIR \
+        -noinput \
+        -s scalaris_ctl -extra node@`hostname -f` stop
     popd > /dev/null
 }
+
+fix_paths
 
 FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
 if [ "x0" = "x$FQDN_SET" ]; then
@@ -157,31 +186,41 @@ if [ "x0" = "x$FQDN_SET" ]; then
     exit -1
 fi
 
+while getopts "hi" optionName; do
+    case "$optionName" in
+        h) usage 0;;
+        i) interactive=1;;
+        [?]) usage "$badOptionHelp";;
+    esac
+done
+
+shift $(($OPTIND-1))
+
 case $1 in
     checkinstallation)
         checkinstallation;;
     boot)
-	[ 2 -eq $# ] || usage;
-	if [ $2 == "start" ]; then
-	    bootstart;
-	  elif [ $2 == "stop" ]; then
-	    bootstop;
-	  elif [ $2 == "restart" ]; then
-	    bootstop;
-	    bootstart;
-	  fi;;
+        [ 2 -eq $# ] || usage;
+        if [ $2 == "start" ]; then
+            bootstart;
+        elif [ $2 == "stop" ]; then
+            bootstop;
+        elif [ $2 == "restart" ]; then
+            bootstop;
+            bootstart;
+        fi;;
     debug)
-	debug;;
+        debug;;
     node)
-	[ 2 -eq $# ] || usage;
-	if [ $2 == "start" ]; then
-	    nodestart;
-	  elif [ $2 == "stop" ]; then
-	    nodestop;
-	  elif [ $2 == "restart" ]; then
-	    nodestop;
-	    nodestart;
-	  fi;;
+        [ 2 -eq $# ] || usage;
+        if [ $2 == "start" ]; then
+            nodestart;
+        elif [ $2 == "stop" ]; then
+            nodestop;
+        elif [ $2 == "restart" ]; then
+            nodestop;
+            nodestart;
+        fi;;
     *) usage;;
 esac
 
