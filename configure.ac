@@ -12,8 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-AC_PREREQ(2.53)
-AC_INIT(chordsharp, 0.0.1, schuett@zib.de)
+AC_PREREQ(2.65)
+AC_INIT(scalaris, 0.0.1, schuett@zib.de)
 
 ###########################################################
 #

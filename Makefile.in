@@ -21,15 +21,15 @@ MAKE = make
 VERSION=0.0.1
 
 
-
 YAWS_PATH= /usr/local/lib/yaws
 
-APP_NAME = chordsharp
-
+APP_NAME = @PACKAGE_TARNAME@
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
 VSN = $Id$
 
 prefix = @prefix@
 exec_prefix = @exec_prefix@
+datarootdir = @datarootdir@
 
 # /bin
 BINDIR = $(DESTDIR)@bindir@
@@ -44,7 +44,7 @@ DOCROOTDIR=$(SCALARISDIR)/docroot
 # /lib/scalaris/docroot_node
 NODEDOCROOTDIR=$(SCALARISDIR)/docroot_node
 # /share/doc/scalaris
-DOCDIR=$(DESTDIR)@docdir@/
+DOCDIR=$(DESTDIR)@docdir@
 # /share/java
 JAVADIR=$(DESTDIR)@datarootdir@/java
 # /var/log/scalaris
@@ -99,9 +99,7 @@ dialyzer:
 rrd-init:
 	@echo This target is deprecated
 
-install: all java
-	@echo $(DESTDIR)
-	@echo @prefix@
+install: all java docs
 	mkdir -p $(BEAMDIR)
 	install -m 644 bin/*.app $(BEAMDIR)
 	install -m 644 ebin/*.beam $(BEAMDIR)
@@ -125,7 +123,7 @@ install: all java
 	install -m 644 docroot/images/default/tree/*.gif $(DOCROOTDIR)/images/default/tree
 	install -m 644 docroot/images/default/grid/*.gif $(DOCROOTDIR)/images/default/grid
 	install -m 644 docroot/images/default/grid/*.png $(DOCROOTDIR)/images/default/grid
-	mkdir $(NODEDOCROOTDIR)
+	mkdir -p $(NODEDOCROOTDIR)
 	install docroot_node/*.yaws $(NODEDOCROOTDIR)
 	mkdir -p $(SCALARISDIR)/contrib/yaws/ebin
 	install contrib/yaws/ebin/*.beam $(SCALARISDIR)/contrib/yaws/ebin
