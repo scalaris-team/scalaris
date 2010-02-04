@@ -14,20 +14,27 @@
 #    limitations under the License.
 
 prefix=@prefix@
-exec_prefix=@exec_prefix@/bin
+exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
 
+# /bin
+BINDIR=$DESTDIR@bindir@
 # /etc/scalaris/
-ETCDIR=@sysconfdir@/scalaris
+ETCDIR=$DESTDIR@sysconfdir@/scalaris
 # /lib/scalaris/
-SCALARISDIR=@libdir@/scalaris
+SCALARISDIR=$DESTDIR@libdir@/scalaris
 # /lib/scalaris/ebin
-BEAMDIR=$SCALARISDIR/ebin
+BEAMDIR=$DESTDIR@libdir@/scalaris/ebin
 # /lib/scalaris/docroot
 DOCROOTDIR=$SCALARISDIR/docroot
 # /lib/scalaris/docroot_node
 NODEDOCROOTDIR=$SCALARISDIR/docroot_node
+# /share/doc/scalaris
+DOCDIR=$DESTDIR@docdir@
+# /share/java
+JAVADIR=$DESTDIR@datarootdir@/java
 # /var/log/scalaris
-LOGDIR=@localstatedir@/log/scalaris
+LOGDIR=$DESTDIR@localstatedir@/log/scalaris
 
 SCALARIS_COOKIE="chocolate chip cookie"
 
@@ -54,7 +61,7 @@ fix_paths() {
     ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
     DIRNAME=`dirname $ABSPATH`
     # is this a svn checkout or an rpm installation?
-    if [ $DIRNAME != $exec_prefix ]; then
+    if [ $DIRNAME != $BINDIR ]; then
         # scalaris
         SCALARISDIR=`dirname $DIRNAME`
         # /etc/scalaris/
