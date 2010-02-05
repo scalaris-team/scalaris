@@ -132,6 +132,11 @@ on({dump, Pid}, {Id, Pred, Succ, RTState, TriggerState}) ->
     cs_send:send_local(Pid , {dump_response, RTState}),
     {Id, Pred, Succ, RTState, TriggerState};
 
+on({lookup_pointer, Source_Pid, Index}, {Id, Pred, Succ, RTState, TriggerState}) ->
+    cs_send:send(Source_Pid, {lookup_pointer_response, Index,
+                              ?RT:lookup(RTState, Index)}),
+    {Id, Pred, Succ, RTState, TriggerState};
+
 % unknown message
 on(_UnknownMessage, _State) ->
     unknown_event.

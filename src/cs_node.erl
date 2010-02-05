@@ -297,7 +297,9 @@ on({notify, Pred}, State) ->
 % Finger Maintenance 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({lookup_pointer, Source_Pid, Index}, State) ->
-    cs_send:send(Source_Pid, {lookup_pointer_response, Index, ?RT:lookup(cs_state:rt(State), Index)}),
+    InstanceId = erlang:get(instance_id),
+    RT = process_dictionary:lookup_process(InstanceId, routing_table),
+    cs_send:send_local(RT, {lookup_pointer, Source_Pid, Index}),
     State;
 
 %% userdevguide-begin cs_node:rt_get_node
