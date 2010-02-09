@@ -2678,7 +2678,7 @@ mkdir -p ~/.yaws 2> /dev/null
 #SCALARIS_ROOT=`pwd`
 #AC_SUBST(SCALARIS_ROOT)
 
-ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl bin/boot.sh bin/cs_local.sh bin/cs_local2.sh bin/cs_local3.sh bin/scalarisclient include/autoconf.hrl"
+ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl bin/boot.sh bin/cs_local.sh bin/cs_local2.sh bin/cs_local3.sh include/autoconf.hrl"
 
 
 cat >confcache <<\_ACEOF
@@ -3386,7 +3386,6 @@ do
     "bin/cs_local.sh") CONFIG_FILES="$CONFIG_FILES bin/cs_local.sh" ;;
     "bin/cs_local2.sh") CONFIG_FILES="$CONFIG_FILES bin/cs_local2.sh" ;;
     "bin/cs_local3.sh") CONFIG_FILES="$CONFIG_FILES bin/cs_local3.sh" ;;
-    "bin/scalarisclient") CONFIG_FILES="$CONFIG_FILES bin/scalarisclient" ;;
     "include/autoconf.hrl") CONFIG_FILES="$CONFIG_FILES include/autoconf.hrl" ;;
 
   *) as_fn_error "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
@@ -3832,5 +3831,4 @@ chmod u+x bin/cs_local.sh
 chmod u+x bin/cs_local2.sh
 chmod u+x bin/cs_local3.sh
 chmod u+x bin/scalarisctl
-chmod u+x bin/scalarisclient
 # chmod ugo-x bin/*.in
