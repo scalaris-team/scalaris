@@ -1,28 +1,22 @@
 #!/bin/bash
-# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
-# 
+# Copyright 2007-2010 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
 #    You may obtain a copy of the License at
-# 
+#
 #        http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 #    Unless required by applicable law or agreed to in writing, software
 #    distributed under the License is distributed on an "AS IS" BASIS,
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-TCERLFLAGS=@ERLANG_TCERL_FLAGS@
+export SCALARIS_NODE_NAME="node3"
+export SCALARIS_ADDITIONAL_PARAMETERS="-chordsharp cs_port 14198"
 
-FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
-if [ "x0" = "x$FQDN_SET" ]; then
-    echo "you have to set a fully qualified domain name (FQDN)"
-    exit -1
-fi
+ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+DIRNAME=`dirname $ABSPATH`
 
-erl $TCERLFLAGS +S 4 +A 4 -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin  -pa ../contrib/yaws/ebin -pa ../ebin \
-    -yaws embedded true -connect_all false \
-    -chordsharp cs_port 14198 \
-    -chordsharp yaws_port 8003 \
-    -name node3 -s chordsharp
+$DIRNAME/scalarisctl -i node start $*

@@ -13,16 +13,10 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-TCERLFLAGS=@ERLANG_TCERL_FLAGS@
+export SCALARIS_NODE_NAME="node2"
+export SCALARIS_ADDITIONAL_PARAMETERS="-chordsharp cs_port 14197"
 
-FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
-if [ "x0" = "x$FQDN_SET" ]; then
-    echo "you have to set a fully qualified domain name (FQDN)"
-    exit -1
-fi
+ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+DIRNAME=`dirname $ABSPATH`
 
-erl $TCERLFLAGS +S 4 +A 4  -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin  -pa ../contrib/yaws/ebin -pa ../ebin \
-    -yaws embedded true -connect_all false \
-    -chordsharp cs_port 14197 \
-    -chordsharp yaws_port 8002 \
-    -name node2 -s chordsharp
+$DIRNAME/scalarisctl -i node start $*
