@@ -116,7 +116,7 @@ mkdir -p ~/.yaws 2> /dev/null
 #SCALARIS_ROOT=`pwd`
 #AC_SUBST(SCALARIS_ROOT)
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl bin/boot.sh bin/cs_local.sh bin/cs_local2.sh bin/cs_local3.sh bin/scalarisclient include/autoconf.hrl])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl bin/boot.sh bin/cs_local.sh bin/cs_local2.sh bin/cs_local3.sh include/autoconf.hrl])
 
 AC_OUTPUT
 
@@ -125,5 +125,4 @@ chmod u+x bin/cs_local.sh
 chmod u+x bin/cs_local2.sh
 chmod u+x bin/cs_local3.sh
 chmod u+x bin/scalarisctl
-chmod u+x bin/scalarisclient
 # chmod ugo-x bin/*.in
