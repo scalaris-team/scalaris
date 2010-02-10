@@ -114,5 +114,7 @@ AC_SUBST(DRIVER_OS)
 mkdir -p ~/.yaws 2> /dev/null
 
 AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/autoconf.hrl])
-
 AC_OUTPUT
+
+chmod u+x bin/scalarisctl
+
