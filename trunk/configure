@@ -2677,7 +2677,6 @@ mkdir -p ~/.yaws 2> /dev/null
 
 ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl include/autoconf.hrl"
 
-
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -3817,4 +3816,7 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
+
+
+chmod u+x bin/scalarisctl
 
