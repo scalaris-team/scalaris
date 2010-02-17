@@ -13,6 +13,14 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
+ID=1
+NAME="node$ID"
+CSPORT=$((14195+$ID))
+YAWSPORT=$((8000+$ID))
+
+export SCALARIS_NODE_NAME="$NAME"
+export SCALARIS_ADDITIONAL_PARAMETERS="-chordsharp cs_port $CSPORT -chordsharp yaws_port $YAWSPORT"
+
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
