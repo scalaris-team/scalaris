@@ -18,7 +18,6 @@ package de.zib.scalaris;
 import java.io.IOException;
 
 import com.ericsson.otp.erlang.OtpAuthException;
-import com.ericsson.otp.erlang.OtpConnection;
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangList;
@@ -31,7 +30,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * 
  * <p>
  * Instances of this class can be generated using a given connection to a
- * scalaris node using {@link #Transaction(OtpConnection)} or without a
+ * scalaris node using {@link #Transaction(Connection)} or without a
  * connection ({@link #Transaction()}) in which case a new connection is
  * created using {@link ConnectionFactory#createConnection()}.
  * </p>
@@ -115,7 +114,7 @@ public class Transaction {
 	/**
 	 * connection to a scalaris node
 	 */
-	private OtpConnection connection;
+	private Connection connection;
 	
 	/**
 	 * Constructor, uses the default connection returned by
@@ -137,7 +136,7 @@ public class Transaction {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	public Transaction(OtpConnection conn) throws ConnectionException {
+	public Transaction(Connection conn) throws ConnectionException {
 		connection = conn;
 	}
 
@@ -172,10 +171,9 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("txlog", "new",
-					new OtpErlangList());
 			// return value: []
-			received_raw = connection.receiveRPC();
+			received_raw = connection
+					.doRPC("txlog", "new", new OtpErlangList());
 			OtpErlangList received = (OtpErlangList) received_raw;
 			transLog = received;
 		} catch (OtpErlangExit e) {
@@ -222,14 +220,13 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transaction_api", "commit",
-					new OtpErlangList(transLog));
 			/*
 			 * possible return values:
 			 *  - {ok}
 			 *  - {fail, Reason}
 			 */
-			received_raw = connection.receiveRPC();
+			received_raw = connection.doRPC("transaction_api", "commit",
+					new OtpErlangList(transLog));
 			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 			if(received.elementAt(0).equals(new OtpErlangAtom("ok"))) {
 				// transaction was successful: reset transaction log
@@ -300,8 +297,6 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transaction_api", "jRead",
-					new OtpErlangList(new OtpErlangObject[] {key, transLog}));
 			/*
 			 * possible return values:
 			 *  - {{fail, not_found}, TransLog}
@@ -309,7 +304,8 @@ public class Transaction {
 			 *  - {{fail, fail}, TransLog}
 			 *  - {{value, Value}, NewTransLog}
 			 */
-			received_raw = connection.receiveRPC();
+			received_raw = connection.doRPC("transaction_api", "jRead",
+					new OtpErlangList(new OtpErlangObject[] {key, transLog}));
 			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 			transLog_old = transLog;
 			transLog = (OtpErlangList) received.elementAt(1);
@@ -434,8 +430,6 @@ public class Transaction {
 		}
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transaction_api", "jWrite",
-					new OtpErlangList(new OtpErlangObject[] {key, value, transLog}));
 			/*
 			 * possible return values:
 			 *  - {{fail, not_found}, TransLog}
@@ -443,7 +437,8 @@ public class Transaction {
 			 *  - {{fail, fail}, TransLog}
 			 *  - {ok, NewTransLog}
 			 */
-			received_raw = connection.receiveRPC();
+			received_raw = connection.doRPC("transaction_api", "jWrite",
+					new OtpErlangList(new OtpErlangObject[] {key, value, transLog}));
 			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 			transLog_old = transLog;
 			transLog = (OtpErlangList) received.elementAt(1);

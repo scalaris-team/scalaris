@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.ericsson.otp.erlang.OtpConnection;
 import com.ericsson.otp.erlang.OtpPeer;
 import com.ericsson.otp.erlang.OtpSelf;
 
@@ -68,7 +67,7 @@ public class ConnectionFactory {
 	/**
 	 * The name of the node to connect to.
 	 */
-	private ArrayList<OtpPeer> nodes = new ArrayList<OtpPeer>();
+	private ArrayList<PeerNode> nodes = new ArrayList<PeerNode>();
 	/**
 	 * The cookie name to use for connections.
 	 */
@@ -193,7 +192,7 @@ public class ConnectionFactory {
 		nodes.clear();
 		
 		for (int i = 0; i < nodesTemp.length; ++i) {
-			nodes.add(new OtpPeer(fixLocalhostName(nodesTemp[i])));
+			nodes.add(new PeerNode(fixLocalhostName(nodesTemp[i])));
 		}
 		cookie = properties.getProperty("scalaris.cookie", "chocolate chip cookie");
 		clientName = properties.getProperty("scalaris.client.name", "java_client");
@@ -226,15 +225,15 @@ public class ConnectionFactory {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	public OtpConnection createConnection(String clientName, boolean clientNameAppendUUID)
+	public Connection createConnection(String clientName, boolean clientNameAppendUUID)
 			throws ConnectionException {
 		try {
 			if (clientNameAppendUUID) {
 				clientName = clientName + "_" + clientNameUUID.getAndIncrement();
 			}
 			OtpSelf self = new OtpSelf(clientName, cookie);
-			OtpPeer other = nodeSelection.selectNode(nodes);
-			return self.connect(other);
+			PeerNode other = nodeSelection.selectNode(nodes);
+			return new Connection(self, other);
 		} catch (Exception e) {
 //		         e.printStackTrace();
 			throw new ConnectionException(e);
@@ -257,7 +256,7 @@ public class ConnectionFactory {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	public OtpConnection createConnection(String clientName)
+	public Connection createConnection(String clientName)
 			throws ConnectionException {
 		return createConnection(clientName, clientNameAppendUUID);
 	}
@@ -271,7 +270,7 @@ public class ConnectionFactory {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	public OtpConnection createConnection() throws ConnectionException {
+	public Connection createConnection() throws ConnectionException {
 		return createConnection(clientName);
 	}
 
@@ -330,7 +329,7 @@ public class ConnectionFactory {
 	 * 
 	 * @since 2.3
 	 */
-	public List<OtpPeer> getNodes() {
+	public List<PeerNode> getNodes() {
 		return nodes;
 	}
 
@@ -351,7 +350,7 @@ public class ConnectionFactory {
 	@Deprecated
 	public String getNode() {
 		if (nodes.size() > 0) {
-			return nodes.get(0).node();
+			return nodes.get(0).getNode().node();
 		} else {
 			return "";
 		}
@@ -386,7 +385,7 @@ public class ConnectionFactory {
 	 * @since 2.3
 	 */
 	public void addNode(String node) {
-		this.nodes.add(new OtpPeer(node));
+		this.nodes.add(new PeerNode(node));
 	}
 
 	/**
@@ -418,9 +417,10 @@ public class ConnectionFactory {
 	 * @see OtpPeer#alive()
 	 */
 	public void removeNode(String node) {
-		for (Iterator<OtpPeer> i = nodes.iterator(); i.hasNext();) {
-			OtpPeer n = (OtpPeer) i.next();
-			if (n.alive().equals(node) || n.node().equals(node)) {
+		for (Iterator<PeerNode> i = nodes.iterator(); i.hasNext();) {
+			PeerNode n = (PeerNode) i.next();
+			if (n.getNode().alive().equals(node)
+					|| n.getNode().node().equals(node)) {
 				i.remove();
 			}
 		}

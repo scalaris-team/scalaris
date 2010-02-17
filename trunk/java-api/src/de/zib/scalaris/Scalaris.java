@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import com.ericsson.otp.erlang.OtpAuthException;
-import com.ericsson.otp.erlang.OtpConnection;
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangInt;
@@ -39,7 +38,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * 
  * <p>
  * Instances of this class can be generated using a given connection to a
- * scalaris node using {@link #Scalaris(OtpConnection)} or without a
+ * scalaris node using {@link #Scalaris(Connection)} or without a
  * connection ({@link #Scalaris()}) in which case a new connection is
  * created using {@link ConnectionFactory#createConnection()}.
  * </p>
@@ -182,7 +181,7 @@ public class Scalaris {
 	/**
 	 * the connection to a chorsharp node
 	 */
-	private OtpConnection connection;
+	private Connection connection;
 	
 	/**
 	 * Stores the result list returned by erlang during a delete operation.
@@ -211,7 +210,7 @@ public class Scalaris {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	public Scalaris(OtpConnection conn) throws ConnectionException {
+	public Scalaris(Connection conn) throws ConnectionException {
 		connection = conn;
 	}
 	
@@ -243,9 +242,8 @@ public class Scalaris {
 			NotFoundException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transaction_api", "quorum_read",
+			received_raw = connection.doRPC("transaction_api", "quorum_read",
 					new OtpErlangList(key));
-			received_raw = connection.receiveRPC();
 			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 
 			/*
@@ -378,9 +376,8 @@ public class Scalaris {
 			throws ConnectionException, TimeoutException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("transaction_api", "single_write",
+			received_raw = connection.doRPC("transaction_api", "single_write",
 					new OtpErlangList(new OtpErlangObject[] { key, value }));
-			received_raw = connection.receiveRPC();
 			OtpErlangObject received = received_raw;
 			
 			/*
@@ -493,16 +490,14 @@ public class Scalaris {
 	public void publish(OtpErlangString topic, OtpErlangString content)
 			throws ConnectionException {
 		try {
-			connection
-					.sendRPC("pubsub_api", "publish", new OtpErlangList(
-							new OtpErlangObject[] { topic, content }));
 			/**
              * The specification of <tt>pubsub_api:publish/2</tt> states
              * that the only returned value is <tt>ok</tt>, so no further evaluation is
              * necessary.
 			 */
-			connection.receiveRPC();
-			// OtpErlangObject received = connection.receiveRPC();
+			connection
+					.doRPC("pubsub_api", "publish", new OtpErlangList(
+							new OtpErlangObject[] { topic, content }));
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
 			throw new ConnectionException(e);
@@ -559,9 +554,8 @@ public class Scalaris {
 			TimeoutException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("pubsub_api", "subscribe",
+			received_raw = connection.doRPC("pubsub_api", "subscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			received_raw = connection.receiveRPC();
 			OtpErlangObject received = received_raw;
 
 			/*
@@ -648,9 +642,8 @@ public class Scalaris {
 			UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("pubsub_api", "unsubscribe",
+			received_raw = connection.doRPC("pubsub_api", "unsubscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
-			received_raw = connection.receiveRPC();
 			OtpErlangObject received = received_raw;
 
 			/*
@@ -753,10 +746,9 @@ public class Scalaris {
 			OtpErlangString topic) throws ConnectionException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			connection.sendRPC("pubsub_api", "get_subscribers",
-					new OtpErlangList(topic));
 			// return value: [string,...]
-			received_raw = connection.receiveRPC();
+			received_raw = connection.doRPC("pubsub_api", "get_subscribers",
+					new OtpErlangList(topic));
 			OtpErlangList received = (OtpErlangList) received_raw;
 			return received;
 		} catch (OtpErlangExit e) {
@@ -862,11 +854,10 @@ public class Scalaris {
 		OtpErlangObject received_raw = null;
 		lastDeleteResult = null;
 		try {
-			connection.sendRPC("transaction_api", "delete",
+			received_raw = connection.doRPC("transaction_api", "delete",
 					new OtpErlangList( new OtpErlangObject[] {
 							new OtpErlangString(key),
 							new OtpErlangInt(timeout) }));
-			received_raw = connection.receiveRPC();
 			OtpErlangTuple received = (OtpErlangTuple) received_raw;
 
 			/*

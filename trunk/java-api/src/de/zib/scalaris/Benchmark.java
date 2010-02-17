@@ -17,7 +17,6 @@ package de.zib.scalaris;
 
 import java.util.Random;
 
-import com.ericsson.otp.erlang.OtpConnection;
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangString;
 
@@ -66,7 +65,7 @@ public class Benchmark {
 	 * <ul>
 	 * <li>first using a new {@link Transaction} for each test,</li>
 	 * <li>then using a new {@link Transaction} but re-using a single
-	 * {@link OtpConnection},</li>
+	 * {@link Connection},</li>
 	 * <li>and finally re-using a single {@link Transaction} object.</li>
 	 * </ul>
 	 */
@@ -231,7 +230,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link OtpErlangBinary} objects (random
 	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link Transaction}
-	 * but re-using a single {@link OtpConnection} for each test.
+	 * but re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -242,7 +241,7 @@ public class Benchmark {
 	 */
 	protected static long transBench2(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Transaction(OtpConnection).writeObject(OtpErlangString, OtpErlangBinary) "
+			// System.out.println("Testing Transaction(Connection).writeObject(OtpErlangString, OtpErlangBinary) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -254,7 +253,7 @@ public class Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance()
+			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
@@ -360,7 +359,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link OtpErlangString} objects (random
 	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link Transaction}
-	 * but re-using a single {@link OtpConnection} for each test.
+	 * but re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -371,7 +370,7 @@ public class Benchmark {
 	 */
 	protected static long transBench5(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Transaction(OtpConnection).writeObject(OtpErlangString, OtpErlangString) "
+			// System.out.println("Testing Transaction(Connection).writeObject(OtpErlangString, OtpErlangString) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -383,7 +382,7 @@ public class Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance()
+			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
@@ -488,7 +487,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link String} objects (random data, size =
 	 * {@link #BENCH_DATA_SIZE}) using a new {@link Transaction} but re-using a
-	 * single {@link OtpConnection} for each test.
+	 * single {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -499,7 +498,7 @@ public class Benchmark {
 	 */
 	protected static long transBench8(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Transaction(OtpConnection).write(String, String) "
+			// System.out.println("Testing Transaction(Connection).write(String, String) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -511,7 +510,7 @@ public class Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance()
+			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
@@ -615,7 +614,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link OtpErlangBinary} objects (random
 	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris}
-	 * object but re-using a single {@link OtpConnection} for each test.
+	 * object but re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -626,7 +625,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench2(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris(OtpConnection).writeObject(OtpErlangString, OtpErlangBinary) "
+			// System.out.println("Testing Scalaris(Connection).writeObject(OtpErlangString, OtpErlangBinary) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -638,7 +637,7 @@ public class Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance()
+			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Scalaris sc = new Scalaris(connection);
@@ -737,7 +736,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link OtpErlangString} objects (random
 	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris}
-	 * object but re-using a single {@link OtpConnection} for each test.
+	 * object but re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -748,7 +747,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench5(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris(OtpConnection).writeObject(OtpErlangString, OtpErlangString) "
+			// System.out.println("Testing Scalaris(Connection).writeObject(OtpErlangString, OtpErlangString) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -760,7 +759,7 @@ public class Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance()
+			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Scalaris sc = new Scalaris(connection);
@@ -859,7 +858,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link String} objects (random data, size =
 	 * {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris} object but
-	 * re-using a single {@link OtpConnection} for each test.
+	 * re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -870,7 +869,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench8(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris(OtpConnection).write(String, String) "
+			// System.out.println("Testing Scalaris(Connection).write(String, String) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -882,7 +881,7 @@ public class Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance()
+			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Scalaris sc = new Scalaris(connection);

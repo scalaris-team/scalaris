@@ -17,11 +17,11 @@ package de.zib.scalaris.examples;
 
 import java.util.Random;
 
-import com.ericsson.otp.erlang.OtpConnection;
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.Benchmark;
+import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.Scalaris;
 import de.zib.scalaris.Transaction;
@@ -61,7 +61,7 @@ public class FastStringBenchmark extends Benchmark {
 	 * each {@link #BENCH_TEST_RUNS} times
 	 * <ul>
 	 *  <li>first using a new {@link Transaction} for each test,</li> 
-	 *  <li>then using a new {@link Transaction} but re-using a single {@link OtpConnection},</li>
+	 *  <li>then using a new {@link Transaction} but re-using a single {@link Connection},</li>
 	 *  <li>and finally re-using a single {@link Transaction} object.</li>
 	 * </ul>
 	 */
@@ -171,7 +171,7 @@ public class FastStringBenchmark extends Benchmark {
 	 * Performs a benchmark writing {@link String} objects by converting them to
 	 * {@link OtpErlangBinary}s (random data, size = {@link #BENCH_DATA_SIZE})
 	 * using a new {@link Transaction} but re-using a single
-	 * {@link OtpConnection} for each test.
+	 * {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -182,7 +182,7 @@ public class FastStringBenchmark extends Benchmark {
 	 */
     protected static long fastTransBench2(int size, int testRuns) {
 		try {
-//			System.out.println("Testing FastStringTransaction(OtpConnection).write(String, String) " +
+//			System.out.println("Testing FastStringTransaction(Connection).write(String, String) " +
 //					"re-using a single connection...");
 			byte[] data = new byte[size];
 			Random r = new Random();
@@ -193,7 +193,7 @@ public class FastStringBenchmark extends Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance().createConnection();
+			Connection connection = ConnectionFactory.getInstance().createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
 				transaction.start();
@@ -295,7 +295,7 @@ public class FastStringBenchmark extends Benchmark {
 	 * Performs a benchmark writing {@link String} objects by converting them to
 	 * {@link OtpErlangBinary}s (random data, size = {@link #BENCH_DATA_SIZE})
 	 * using a new {@link Scalaris} object but re-using a single
-	 * {@link OtpConnection} for each test.
+	 * {@link Connection} for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -306,7 +306,7 @@ public class FastStringBenchmark extends Benchmark {
 	 */
     protected static long fastScalarisBench2(int size, int testRuns) {
 		try {
-//			System.out.println("Testing FastStringTransaction(OtpConnection).write(String, String) " +
+//			System.out.println("Testing FastStringTransaction(Connection).write(String, String) " +
 //					"re-using a single connection...");
 			byte[] data = new byte[size];
 			Random r = new Random();
@@ -317,7 +317,7 @@ public class FastStringBenchmark extends Benchmark {
 
 			testBegin();
 
-			OtpConnection connection = ConnectionFactory.getInstance().createConnection();
+			Connection connection = ConnectionFactory.getInstance().createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Scalaris sc = new Scalaris(connection);
 				sc.writeCustom(key + i, new CustomOtpFastStringObject(value));
