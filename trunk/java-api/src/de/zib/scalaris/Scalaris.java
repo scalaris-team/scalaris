@@ -860,6 +860,7 @@ public class Scalaris {
 	public long delete(String key, int timeout) throws ConnectionException,
 	TimeoutException, UnknownException, NodeNotFoundException {
 		OtpErlangObject received_raw = null;
+		lastDeleteResult = null;
 		try {
 			connection.sendRPC("transaction_api", "delete",
 					new OtpErlangList( new OtpErlangObject[] {
@@ -880,15 +881,11 @@ public class Scalaris {
 				if (reason.equals(new OtpErlangAtom("timeout"))) {
 					if (received.arity() > 2) {
 						lastDeleteResult = (OtpErlangList) received.elementAt(3);
-					} else {
-						lastDeleteResult = null;
 					}
 					throw new TimeoutException(received_raw);
 				} else if (reason.equals(new OtpErlangAtom("node_not_found"))) {
-					lastDeleteResult = null;
 					throw new NodeNotFoundException(received_raw);
 				} else {
-					lastDeleteResult = null;
 					throw new UnknownException(received_raw);
 				}
 			} else {

@@ -18,6 +18,9 @@ package de.zib.scalaris;
 import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -65,7 +68,7 @@ public class ConnectionFactory {
 	/**
 	 * The name of the node to connect to.
 	 */
-	private String node;
+	private ArrayList<OtpPeer> nodes = new ArrayList<OtpPeer>();
 	/**
 	 * The cookie name to use for connections.
 	 */
@@ -101,6 +104,14 @@ public class ConnectionFactory {
 	 * Static instance of a connection factory.
 	 */
 	private static ConnectionFactory instance = new ConnectionFactory();
+	
+	/**
+	 * Contains the node selection policy, i.e. how to select a single node to
+	 * connect with from a set of available nodes.
+	 * 
+	 * @since 2.3
+	 */
+	private NodeSelectionPolicy nodeSelection = new RandomNodeSelection();
 
 	/**
 	 * Returns the static instance of a connection factory.
@@ -178,7 +189,12 @@ public class ConnectionFactory {
 	 *            the object to get the connection parameters from
 	 */
 	public void setProperties(Properties properties) {
-		node = properties.getProperty("scalaris.node", "boot@localhost");
+		String[] nodesTemp = properties.getProperty("scalaris.node", "boot@localhost").split("[\\s,;]");
+		nodes.clear();
+		
+		for (int i = 0; i < nodesTemp.length; ++i) {
+			nodes.add(new OtpPeer(fixLocalhostName(nodesTemp[i])));
+		}
 		cookie = properties.getProperty("scalaris.cookie", "chocolate chip cookie");
 		clientName = properties.getProperty("scalaris.client.name", "java_client");
 		if (properties.getProperty("scalaris.client.appendUUID", "true").equals("true")) {
@@ -188,7 +204,6 @@ public class ConnectionFactory {
 		}
 		configFileUsed = properties.getProperty("PropertyLoader.loadedfile", "");
 		
-		fixLocalhostName();
 		//System.out.println("node: " + node);
 	}
 
@@ -218,7 +233,7 @@ public class ConnectionFactory {
 				clientName = clientName + "_" + clientNameUUID.getAndIncrement();
 			}
 			OtpSelf self = new OtpSelf(clientName, cookie);
-			OtpPeer other = new OtpPeer(node);
+			OtpPeer other = nodeSelection.selectNode(nodes);
 			return self.connect(other);
 		} catch (Exception e) {
 //		         e.printStackTrace();
@@ -261,14 +276,20 @@ public class ConnectionFactory {
 	}
 
 	/**
-	 * Replaces <tt>localhost</tt> in the node's name to the machine's real
-	 * host name.
+	 * Replaces <tt>localhost</tt> in the node's name to the machine's real host
+	 * name.
 	 * 
 	 * Due to a "feature" of OtpErlang >= 1.4.1 erlang nodes are now only
 	 * reachable by their official host name - so <tt>...@localhost</tt> does
 	 * not work anymore if there is a real host name.
+	 * 
+	 * @param node
+	 *            the name of the node to use
+	 * 
+	 * @return the node's official host name as returned by
+	 *         {@link InetAddress#getCanonicalHostName()}
 	 */
-	private void fixLocalhostName() {
+	public static String fixLocalhostName(String node) {
 		if (node.endsWith("@localhost")) {
 			String hostname = "localhost";
 			try {
@@ -276,8 +297,9 @@ public class ConnectionFactory {
 				hostname = addr.getCanonicalHostName();
 			} catch (UnknownHostException e) {
 			}
-			node = node.replaceAll("@localhost$", "@" + hostname);
+			return node.replaceAll("@localhost$", "@" + hostname);
 		}
+		return node;
 	}
 	
 	/**
@@ -295,29 +317,112 @@ public class ConnectionFactory {
 	public void printProperties(PrintStream out) {
 		out.println("ConnectionFactory properties:");
 		out.println("  config file                = " + configFileUsed);
-		out.println("  scalaris.node              = " + node);
+		out.println("  scalaris.node              = " + nodes.toString());
 		out.println("  scalaris.cookie            = " + cookie);
 		out.println("  scalaris.client.name       = " + clientName);
 		out.println("  scalaris.client.appendUUID = " + clientNameAppendUUID);
 	}
-	
+
 	/**
-	 * Returns the name of the node to connect to.
+	 * Gets the list of nodes available for connections.
 	 * 
-	 * @return the name of the node
+	 * @return a set of nodes
+	 * 
+	 * @since 2.3
+	 */
+	public List<OtpPeer> getNodes() {
+		return nodes;
+	}
+
+	/**
+	 * Returns the name of the first node available for connection.
+	 * 
+	 * WARNING: If {@link #nodes} contains multiple nodes, only the first of
+	 * them will be returned. This is not necessarily the one the class will set
+	 * up connections with!
+	 * 
+	 * @return the name of the first node or an empty string if the list is
+	 *         empty
+	 * 
+	 * @deprecated This method returns the names of all nodes available for
+	 *             connection as a String (as previously when only one node was
+	 *             used), use the new {@link #getNodes()} method instead.
 	 */
 	public String getNode() {
-		return node;
+		if (nodes.size() > 0) {
+			return nodes.get(0).node();
+		} else {
+			return "";
+		}
 	}
 
 	/**
 	 * Sets the name of the node to connect to.
 	 * 
+	 * The list of nodes available for connection will be cleared at first, the
+	 * node will then be added.
+	 * 
 	 * @param node
-	 *            the node to set
+	 *            the node to set (will not be mangled by
+	 *            {@link #fixLocalhostName(String)}!)
+	 * 
+	 * @see ConnectionFactory#addNode(String)
 	 */
 	public void setNode(String node) {
-		this.node = node;
+		this.nodes.clear();
+		addNode(node);
+	}
+
+	/**
+	 * Adds a node to the set of nodes available for connections.
+	 * 
+	 * @param node
+	 *            the node to add (will not be mangled by
+	 *            {@link #fixLocalhostName(String)}!)
+	 * 
+	 * @see ConnectionFactory#setNode(String)
+	 * 
+	 * @since 2.3
+	 */
+	public void addNode(String node) {
+		this.nodes.add(new OtpPeer(node));
+	}
+
+	/**
+	 * Removes a node from the set of nodes available for connections.
+	 * 
+	 * @param node
+	 *            the node to remove
+	 * 
+	 * @see ConnectionFactory#getNodes()
+	 * 
+	 * @since 2.3
+	 */
+	public void removeNode(OtpPeer node) {
+		this.nodes.remove(node);
+	}
+
+	/**
+	 * Removes all nodes from the set of nodes available for connections that
+	 * match the given node name.
+	 * 
+	 * @param node
+	 *            the name of the nodes to remove (full name or alivename, i.e.
+	 *            "<node>@...")
+	 * 
+	 * @see ConnectionFactory#getNodes()
+	 * 
+	 * @since 2.3
+	 * 
+	 * @see OtpPeer#alive()
+	 */
+	public void removeNode(String node) {
+		for (Iterator<OtpPeer> i = nodes.iterator(); i.hasNext();) {
+			OtpPeer n = (OtpPeer) i.next();
+			if (n.alive().equals(node) || n.node().equals(node)) {
+				i.remove();
+			}
+		}
 	}
 
 	/**
@@ -377,5 +482,27 @@ public class ConnectionFactory {
 	 */
 	public void setClientNameAppendUUID(boolean clientNameAppendUUID) {
 		this.clientNameAppendUUID = clientNameAppendUUID;
+	}
+
+	/**
+	 * Sets the node selection policy.
+	 * 
+	 * @param nodeSelection the node selection policy to set
+	 * 
+	 * @since 2.3
+	 */
+	public void setNodeSelectionPolicy(NodeSelectionPolicy nodeSelection) {
+		this.nodeSelection = nodeSelection;
+	}
+
+	/**
+	 * Gets the current node selection policy.
+	 * 
+	 * @return the currently used node selection policy
+	 * 
+	 * @since 2.3
+	 */
+	public NodeSelectionPolicy getNodeSelectionPolicy() {
+		return nodeSelection;
 	}
 }

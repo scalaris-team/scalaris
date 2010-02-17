@@ -182,7 +182,7 @@ public class Main {
 
 		options.addOption(new Option("h", "help", false, "print this message"));
 		
-		options.addOption(new Option("v", "verbose", false, "print this message"));
+		options.addOption(new Option("v", "verbose", false, "print verbose information, e.g. the properties read"));
 
 		Option read = new Option("r", "read", true, "read an item");
 		read.setArgName("key");
