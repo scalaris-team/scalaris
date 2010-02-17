@@ -37,8 +37,10 @@ public class RandomNodeSelection implements NodeSelectionPolicy {
 	 * 
 	 * @see de.zib.scalaris.NodeSelectionPolicy#selectNode(java.util.List)
 	 */
-	@Override
-	public OtpPeer selectNode(List<OtpPeer> nodes) {
+	// override tag does not seem to work with Java 1.5
+//	@Override
+	public OtpPeer selectNode(List<OtpPeer> nodes)
+			throws UnsupportedOperationException {
 		if (nodes.size() < 1) {
 			throw new UnsupportedOperationException(
 					"Can not choose a node from an empty list.");
