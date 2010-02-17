@@ -136,7 +136,7 @@
 	</path>
 
 	<!-- ########## Public targets (begin) ########## -->
-	<target name='compile' depends="scalaris.compile, chordsharp.compile"
+	<target name='compile' depends="scalaris.compile"
 		description="Compiles all source files for the library and the default Main class." />
 
 	<target name="jar" depends="scalaris.jar"
@@ -148,14 +148,14 @@
 		<delete dir="${scalaris.classes.dirname}" />
 	</target>
 
-	<target name="dist" depends="chordsharp.dist, scalaris.dist"
+	<target name="dist" depends="scalaris.dist"
 		description="Creates archives with source, docs and jar files." />
 
-	<target name="test" depends="tools.test, scalaris.test, chordsharp.test"
+	<target name="test" depends="tools.test, scalaris.test"
 		description="Runs all unit tests in non-graphical mode." />
 
 	<target name="examples"
-		depends="jar, scalaris.examples.jar, chordsharp.examples.jar" />
+		depends="jar, scalaris.examples.jar" />
 	<!-- ########## Public targets (end) ########## -->
 
 	<!-- ########## Common targets (begin) ########## -->
@@ -164,8 +164,8 @@
 			<fileset dir='${scalaris.classes.dirname}' includes='**/*.class' />
 		</delete>
 	</target>
-	<target name="jar.clean" depends="scalaris.jar.clean, chordsharp.jar.clean" />
-	<target name="dist.clean" depends="chordsharp.dist.clean, scalaris.dist.clean" />
+	<target name="jar.clean" depends="scalaris.jar.clean" />
+	<target name="dist.clean" depends="scalaris.dist.clean" />
 	<target name="test.clean">
 		<delete includeemptydirs="true" failonerror="false">
 			<fileset dir='${scalaris.classes.dirname}' includes='**/*Test.class, **/*.properties' />
@@ -178,7 +178,7 @@
 			sourcepath="src" destdir="doc" classpathref="scalaris.classpath"
 			access="public" author="true" doctitle="Scalaris Java API"
 			nodeprecated="false" nodeprecatedlist="false" noindex="false"
-			nonavbar="false" notree="false" packagenames="de.zib.scalaris.*, de.zib.chordsharp.*"
+			nonavbar="false" notree="false" packagenames="de.zib.scalaris.*"
 			source="1.6" splitindex="true" use="true" version="true">
 			
 			<link href="${javadoc.jinterface.url}" offline="${javadoc.jinterface.offline}" packagelistLoc="${javadoc.jinterface.pkglist}" />
@@ -380,161 +380,4 @@
 		</junit>
 	</target>
 	<!-- ########## Scalaris targets (end) ########## -->
-
-	<!-- ########## Chordsharp legacy targets (begin) ########## -->
-	<property name="chordsharp.dist.filename" value="chordsharp4j" />
-
-	<target name='chordsharp.compile' depends="scalaris.compile, tools.compile">
-		<mkdir dir='${scalaris.classes.dirname}' />
-		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/chordsharp/*.java" debug="true" />
-	</target>
-	<target name='chordsharp.examples.compile' depends="chordsharp.compile">
-		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/chordsharp/examples/*.java" debug="true" />
-	</target>
-
-	<target name='chordsharp.jar' depends='compile'>
-		<!-- package library and examples separately -->
-		<jar destfile="${chordsharp.dist.filename}-lib.jar" basedir="${scalaris.classes.dirname}"
-			excludes="**/examples** de/zib/chordsharp/Main.class **/*Test.class **/*Test$*.class">
-			<manifest>
-				<attribute name="Built-By" value="${user.name}" />
-				<attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />
-				<attribute name="Bundle-Name" value="Chord# Java Interface" />
-				<attribute name="Bundle-Version" value="1.0.1" />
-				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
-				<!--
-					<attribute name="Class-Path" value=".
-					lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
-				-->
-			</manifest>
-		</jar>
-		<!--
-			copy the connection settings file to the folder where the jar files
-			resist so that the main program given in
-			${chordsharp.dist.filename}.jar can access it
-		-->
-		<copy file="src/ChordSharpConnection.properties" todir="." />
-		<jar destfile="${chordsharp.dist.filename}.jar" basedir="${scalaris.classes.dirname}"
-			includes="de/zib/chordsharp/Main.class">
-			<manifest>
-				<attribute name="Built-By" value="${user.name}" />
-				<attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />
-				<attribute name="Bundle-Name" value="Chord# Java Interface" />
-				<attribute name="Bundle-Version" value="1.0.1" />
-				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
-				<attribute name="Main-Class" value="de.zib.chordsharp.Main" />
-				<attribute name="Class-Path"
-					value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
-			</manifest>
-		</jar>
-	</target>
-	<target name='chordsharp.examples.jar' depends="chordsharp.examples.compile">
-		<jar destfile="${chordsharp.dist.filename}-examples.jar" basedir="${scalaris.classes.dirname}"
-			includes="**/examples/**/*"
-			excludes="de/zib/scalaris/examples/*.class **/*Test.class **/*Test$*.class">
-			<manifest>
-				<attribute name="Built-By" value="${user.name}" />
-				<attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />
-				<attribute name="Bundle-Name" value="Chord# Java Interface" />
-				<attribute name="Bundle-Version" value="1.0.1" />
-				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
-				<!-- <attribute name="Main-Class" value="de.zib.chordsharp.Main" /> -->
-				<attribute name="Class-Path"
-					value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
-			</manifest>
-		</jar>
-	</target>
-
-	<target name="chordsharp.jar.clean">
-		<delete file="${chordsharp.dist.filename}-lib.jar" />
-		<delete file="ChordSharpConnection.properties" />
-		<delete file="${chordsharp.dist.filename}.jar" />
-		<delete file="${chordsharp.dist.filename}-examples.jar" />
-	</target>
-
-	<target name="chordsharp.dist" depends="chordsharp.jar, doc">
-		<fileset dir="src" id="src">
-			<include name="**/*" />
-		</fileset>
-		<fileset dir="test" id="src-test">
-			<include name="**/*" />
-		</fileset>
-		<fileset dir="lib" id="lib">
-			<include name="**/*.jar" />
-		</fileset>
-		<fileset dir="test-lib" id="test-lib">
-			<include name="**/*.jar" />
-		</fileset>
-		<fileset dir="doc" id="doc">
-			<include name="**/*" />
-		</fileset>
-		<fileset dir="." id="files">
-			<include name="build.xml" />
-			<include name="ChordSharpConnection.properties" />
-			<include name="${chordsharp.dist.filename}-lib.jar" />
-			<include name="${chordsharp.dist.filename}.jar" />
-			<include name="${chordsharp.dist.filename}-examples.jar" />
-			<include name="LICENSE" />
-			<include name="README" />
-		</fileset>
-
-		<zip destfile="${chordsharp.dist.filename}.zip">
-			<zipfileset refid="src" prefix="${chordsharp.dist.filename}/src" />
-			<zipfileset refid="src-test" prefix="${chordsharp.dist.filename}/test" />
-			<zipfileset refid="lib" prefix="${chordsharp.dist.filename}/lib" />
-			<zipfileset refid="test-lib" prefix="${chordsharp.dist.filename}/test-lib" />
-			<zipfileset refid="doc" prefix="${chordsharp.dist.filename}/doc" />
-			<zipfileset refid="files" prefix="${chordsharp.dist.filename}/" />
-		</zip>
-
-		<tar destfile="${chordsharp.dist.filename}.tar">
-			<tarfileset refid="src" prefix="${chordsharp.dist.filename}/src"
-				preserveLeadingSlashes="true" />
-			<tarfileset refid="src-test" prefix="${chordsharp.dist.filename}/test"
-				preserveLeadingSlashes="true" />
-			<tarfileset refid="doc" prefix="${chordsharp.dist.filename}/doc"
-				preserveLeadingSlashes="true" />
-			<tarfileset refid="lib" prefix="${chordsharp.dist.filename}/lib"
-				preserveLeadingSlashes="true" />
-			<tarfileset refid="test-lib" prefix="${chordsharp.dist.filename}/test-lib"
-				preserveLeadingSlashes="true" />
-			<tarfileset refid="files" prefix="${chordsharp.dist.filename}/"
-				preserveLeadingSlashes="true" />
-		</tar>
-
-		<gzip src="${chordsharp.dist.filename}.tar" destfile="${chordsharp.dist.filename}.tar.gz" />
-		<bzip2 src="${chordsharp.dist.filename}.tar" destfile="${chordsharp.dist.filename}.tar.bz2" />
-
-		<delete file="${chordsharp.dist.filename}.tar" />
-	</target>
-
-	<target name="chordsharp.dist.clean">
-		<delete file="${chordsharp.dist.filename}.zip" />
-		<delete file="${chordsharp.dist.filename}.tar.gz" />
-		<delete file="${chordsharp.dist.filename}.tar.bz2" />
-	</target>
-
-	<target name="chordsharp.test.compile" depends="chordsharp.compile">
-		<mkdir dir="${scalaris.classes.dirname}" />
-		<javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.test.classpath" includes="de/zib/chordsharp/*.java" debug="true" />
-		<copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
-			<fileset dir="test" includes="**/*.properties" />
-		</copy>
-	</target>
-
-	<target name="chordsharp.test" depends="chordsharp.test.compile">
-		<junit dir="${scalaris.classes.dirname}" printsummary="true"
-			haltonfailure="true" fork="yes">
-			<formatter type="brief" usefile="false" />
-			<classpath refid="scalaris.test.classpath" />
-			<batchtest>
-				<fileset dir="${scalaris.classes.dirname}" includes="de/zib/chordsharp**/*Test.class" />
-			</batchtest>
-		</junit>
-	</target>
-	<!-- ########## Chordsharp legacy targets (end) ########## -->
-
 </project>
