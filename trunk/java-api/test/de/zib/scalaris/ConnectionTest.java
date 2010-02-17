@@ -87,9 +87,9 @@ public class ConnectionTest {
 			OtpErlangExit, OtpAuthException, IOException {
 		OtpSelf self = new OtpSelf("testConnection", ConnectionFactory
 				.getInstance().getCookie());
-		PeerNode other = new PeerNode(ConnectionFactory.getInstance()
+		PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
 				.getNodes().get(0).getNode().node());
-		Connection c = new Connection(self, other);
+		Connection c = new Connection(self, remote);
 		c.close();
 	}
 
@@ -109,57 +109,64 @@ public class ConnectionTest {
 		OtpSelf self;
 		PeerNode remote;
 		Connection c;
+		DefaultConnectionPolicy connectionPolicy;
 
 		// wrong cookie:
 		self = new OtpSelf("testFailedConnection",
 				ConnectionFactory.getInstance().getCookie() + "someWrongCookieValue");
 		remote = new PeerNode(ConnectionFactory.getInstance().getNodes().get(0).getNode().node());
+		connectionPolicy = new DefaultConnectionPolicy(remote);
+		connectionPolicy.setMaxRetries(0);
 		try {
-			c = new Connection(self, remote);
+			c = new Connection(self, connectionPolicy);
 			c.close();
 		} catch (Exception e) {
 		}
-		assertEquals(1, remote.getFailedConnectionsCount());
+		assertEquals(1, remote.getFailureCount());
 		try {
-			c = new Connection(self, remote);
+			c = new Connection(self, connectionPolicy);
 			c.close();
 		} catch (Exception e) {
 		}
-		assertEquals(2, remote.getFailedConnectionsCount());
+		assertEquals(2, remote.getFailureCount());
 
 		// unknown host name:
 		self = new OtpSelf("testFailedConnection",
 				ConnectionFactory.getInstance().getCookie());
 		remote = new PeerNode(ConnectionFactory.getInstance().getNodes().get(0).getNode().node() + "noneExistingHost");
+		connectionPolicy = new DefaultConnectionPolicy(remote);
+		connectionPolicy.setMaxRetries(0);
 		try {
-			c = new Connection(self, remote);
+			c = new Connection(self, connectionPolicy);
 			c.close();
 		} catch (Exception e) {
 		}
-		assertEquals(1, remote.getFailedConnectionsCount());
+		assertEquals(1, remote.getFailureCount());
 		try {
-			c = new Connection(self, remote);
+			c = new Connection(self, connectionPolicy);
 			c.close();
 		} catch (Exception e) {
 		}
-		assertEquals(2, remote.getFailedConnectionsCount());
+		assertEquals(2, remote.getFailureCount());
 
 		// non-existing node name:
 		self = new OtpSelf("testFailedConnection",
 				ConnectionFactory.getInstance().getCookie());
 		remote = new PeerNode("noneExistingNode" + ConnectionFactory.getInstance().getNodes().get(0).getNode().node());
+		connectionPolicy = new DefaultConnectionPolicy(remote);
+		connectionPolicy.setMaxRetries(0);
 		try {
-			c = new Connection(self, remote);
+			c = new Connection(self, connectionPolicy);
 			c.close();
 		} catch (Exception e) {
 		}
-		assertEquals(1, remote.getFailedConnectionsCount());
+		assertEquals(1, remote.getFailureCount());
 		try {
-			c = new Connection(self, remote);
+			c = new Connection(self, connectionPolicy);
 			c.close();
 		} catch (Exception e) {
 		}
-		assertEquals(2, remote.getFailedConnectionsCount());
+		assertEquals(2, remote.getFailureCount());
 	}
 
 	/**
@@ -224,7 +231,9 @@ public class ConnectionTest {
 				ConnectionFactory.getInstance().getCookie());
 		PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
 				.getNodes().get(0).getNode().node());
-		Connection c = new Connection(self, remote);
+		DefaultConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(remote);
+		connectionPolicy.setMaxRetries(0);
+		Connection c = new Connection(self, connectionPolicy);
 
 		c.close();
 
@@ -238,7 +247,7 @@ public class ConnectionTest {
 			c.close();
 		} catch (Exception e) {
 		}
-		assertEquals(1, remote.getFailedConnectionsCount());
+		assertEquals(1, remote.getFailureCount());
 	}
 
 	/**

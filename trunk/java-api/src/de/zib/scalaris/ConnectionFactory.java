@@ -19,12 +19,11 @@ import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.ericsson.otp.erlang.OtpPeer;
 import com.ericsson.otp.erlang.OtpSelf;
 
 import de.zib.scalaris.ConnectionException;
@@ -67,7 +66,7 @@ public class ConnectionFactory {
 	/**
 	 * The name of the node to connect to.
 	 */
-	private ArrayList<PeerNode> nodes = new ArrayList<PeerNode>();
+	private List<PeerNode> nodes = Collections.synchronizedList(new ArrayList<PeerNode>());
 	/**
 	 * The cookie name to use for connections.
 	 */
@@ -103,14 +102,14 @@ public class ConnectionFactory {
 	 * Static instance of a connection factory.
 	 */
 	private static ConnectionFactory instance = new ConnectionFactory();
-	
+
 	/**
-	 * Contains the node selection policy, i.e. how to select a single node to
-	 * connect with from a set of available nodes.
+	 * Contains the default node selection policy a copy of which will be set
+	 * for each created connection.
 	 * 
 	 * @since 2.3
 	 */
-	private NodeSelectionPolicy nodeSelection = new RandomNodeSelection();
+	private ConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(nodes);
 
 	/**
 	 * Returns the static instance of a connection factory.
@@ -232,8 +231,7 @@ public class ConnectionFactory {
 				clientName = clientName + "_" + clientNameUUID.getAndIncrement();
 			}
 			OtpSelf self = new OtpSelf(clientName, cookie);
-			PeerNode other = nodeSelection.selectNode(nodes);
-			return new Connection(self, other);
+			return new Connection(self, connectionPolicy);
 		} catch (Exception e) {
 //		         e.printStackTrace();
 			throw new ConnectionException(e);
@@ -323,14 +321,16 @@ public class ConnectionFactory {
 	}
 
 	/**
-	 * Gets the list of nodes available for connections.
+	 * Gets a copy of the list of nodes available for connections.
+	 * 
+	 * The {@link PeerNode} elements of the list will not be copied!
 	 * 
 	 * @return a set of nodes
 	 * 
 	 * @since 2.3
 	 */
 	public List<PeerNode> getNodes() {
-		return nodes;
+		return new ArrayList<PeerNode>(nodes);
 	}
 
 	/**
@@ -370,6 +370,7 @@ public class ConnectionFactory {
 	 */
 	public void setNode(String node) {
 		this.nodes.clear();
+		connectionPolicy.availableNodesReset();
 		addNode(node);
 	}
 
@@ -385,7 +386,9 @@ public class ConnectionFactory {
 	 * @since 2.3
 	 */
 	public void addNode(String node) {
-		this.nodes.add(new PeerNode(node));
+		PeerNode p = new PeerNode(node);
+		this.nodes.add(p);
+		connectionPolicy.availableNodeAdded(p);
 	}
 
 	/**
@@ -398,32 +401,9 @@ public class ConnectionFactory {
 	 * 
 	 * @since 2.3
 	 */
-	public void removeNode(OtpPeer node) {
+	public void removeNode(PeerNode node) {
 		this.nodes.remove(node);
-	}
-
-	/**
-	 * Removes all nodes from the set of nodes available for connections that
-	 * match the given node name.
-	 * 
-	 * @param node
-	 *            the name of the nodes to remove (full name or alivename, i.e.
-	 *            "<node>@...")
-	 * 
-	 * @see ConnectionFactory#getNodes()
-	 * 
-	 * @since 2.3
-	 * 
-	 * @see OtpPeer#alive()
-	 */
-	public void removeNode(String node) {
-		for (Iterator<PeerNode> i = nodes.iterator(); i.hasNext();) {
-			PeerNode n = (PeerNode) i.next();
-			if (n.getNode().alive().equals(node)
-					|| n.getNode().node().equals(node)) {
-				i.remove();
-			}
-		}
+		connectionPolicy.availableNodeRemoved(node);
 	}
 
 	/**
@@ -486,24 +466,24 @@ public class ConnectionFactory {
 	}
 
 	/**
-	 * Sets the node selection policy.
+	 * Sets the connection policy to use for new connections.
 	 * 
-	 * @param nodeSelection the node selection policy to set
+	 * @param connectionPolicy the connection policy to set
 	 * 
 	 * @since 2.3
 	 */
-	public void setNodeSelectionPolicy(NodeSelectionPolicy nodeSelection) {
-		this.nodeSelection = nodeSelection;
+	public void setConnectionPolicy(ConnectionPolicy connectionPolicy) {
+		this.connectionPolicy = connectionPolicy;
 	}
 
 	/**
-	 * Gets the current node selection policy.
+	 * Gets the current connection policy.
 	 * 
-	 * @return the currently used node selection policy
+	 * @return the currently used connection policy
 	 * 
 	 * @since 2.3
 	 */
-	public NodeSelectionPolicy getNodeSelectionPolicy() {
-		return nodeSelection;
+	public ConnectionPolicy getConnectionPolicy() {
+		return connectionPolicy;
 	}
 }
