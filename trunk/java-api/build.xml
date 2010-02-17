@@ -123,7 +123,7 @@
 -->
 
 	<path id="scalaris.classpath">
-		<pathelement path='lib/OtpErlang-1.4.2.jar' />
+		<pathelement path='lib/OtpErlang-1.5.2.jar' />
 		<pathelement path='lib/jakarta-commons-cli-1.1.jar' />
 	</path>
 	<path id="scalaris.test.classpath">
@@ -278,7 +278,7 @@
 				<attribute name="Main-Class" value="de.zib.scalaris.Main" />
 				<!--
 					<attribute name="Class-Path" value=".
-					lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
+					lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
 				-->
 			</manifest>
 		</jar>
@@ -293,7 +293,7 @@
 				<attribute name="Bundle-Version" value="2.0.0" />
 				<attribute name="Export-Package" value="de.zib.scalaris.*" />
 				<attribute name="Class-Path"
-					value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
+					value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
 			</manifest>
 		</jar>
 	</target>
@@ -406,7 +406,7 @@
 				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
 				<!--
 					<attribute name="Class-Path" value=".
-					lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
+					lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
 				-->
 			</manifest>
 		</jar>
@@ -426,7 +426,7 @@
 				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
 				<attribute name="Main-Class" value="de.zib.chordsharp.Main" />
 				<attribute name="Class-Path"
-					value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
+					value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
 			</manifest>
 		</jar>
 	</target>
@@ -442,7 +442,7 @@
 				<attribute name="Export-Package" value="de.zib.chordsharp.*" />
 				<!-- <attribute name="Main-Class" value="de.zib.chordsharp.Main" /> -->
 				<attribute name="Class-Path"
-					value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.4.2.jar" />
+					value=". ${chordsharp.dist.filename}-lib.jar lib/jakarta-commons-cli-1.1.jar lib/OtpErlang-1.5.2.jar" />
 			</manifest>
 		</jar>
 	</target>

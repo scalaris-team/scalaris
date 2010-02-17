@@ -184,9 +184,9 @@ if $rpm_mode && [ -x /usr/bin/build-classpath ] ; then
 else
   # not using rpm_mode
   if [ -z "$LOCALCLASSPATH" ] ; then
-      LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-1.1.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-1.4.2.jar
+      LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-1.1.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-1.5.2.jar
   else
-      LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-1.1.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-1.4.2.jar:$LOCALCLASSPATH
+      LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-1.1.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-1.5.2.jar:$LOCALCLASSPATH
   fi
 fi
 
