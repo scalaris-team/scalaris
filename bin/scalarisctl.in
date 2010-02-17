@@ -133,6 +133,7 @@ checkinstallation() {
 }
 
 bootstart(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
     if [ $interactive -eq 0 ]; then
         BACKGROUND="-noinput -detached"
     fi
@@ -147,7 +148,8 @@ bootstart(){
         -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
         -boot_cs local_config "\"$ETCDIR/scalaris.local.cfg\"" \
         -boot_cs first true \
-        -connect_all false -hidden -name boot \
+        -connect_all false -hidden -name $NODE_NAME \
+        $SCALARIS_ADDITIONAL_PARAMETERS \
         -s boot $*;
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
