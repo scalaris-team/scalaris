@@ -98,7 +98,7 @@ public class TransactionTest {
 	}
 	
 	/**
-	 * Test method for {@link Transaction#Transaction(com.ericsson.otp.erlang.OtpConnection)}.
+	 * Test method for {@link Transaction#Transaction(Connection)}.
 	 * @throws ConnectionException 
 	 */
 	@Test

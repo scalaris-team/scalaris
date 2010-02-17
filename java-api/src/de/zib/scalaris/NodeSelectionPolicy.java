@@ -17,8 +17,6 @@ package de.zib.scalaris;
 
 import java.util.List;
 
-import com.ericsson.otp.erlang.OtpPeer;
-
 /**
  * Defines a policy on how to select a node to connect with from a set of
  * possible nodes.
@@ -45,6 +43,6 @@ public interface NodeSelectionPolicy {
 	 * 
 	 * @see ConnectionFactory
 	 */
-	public OtpPeer selectNode(List<OtpPeer> nodes)
+	public PeerNode selectNode(List<PeerNode> nodes)
 			throws UnsupportedOperationException;
 }

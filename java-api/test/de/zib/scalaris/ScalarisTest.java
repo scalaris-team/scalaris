@@ -133,7 +133,7 @@ public class ScalarisTest {
 	
 	/**
 	 * Test method for
-	 * {@link Scalaris#Scalaris(com.ericsson.otp.erlang.OtpConnection)}.
+	 * {@link Scalaris#Scalaris(Connection)}.
 	 * @throws ConnectionException 
 	 */
 	@Test
@@ -1901,7 +1901,7 @@ public class ScalarisTest {
 			 */
 
 			Object json = JSON.parse(reader);
-			if (json instanceof Map) {
+			if (json instanceof Map<?, ?>) {
 				@SuppressWarnings("unchecked")
 				Map<String, Object> json_object = (Map<String, Object>) json;
 				result = new String[json_object.size()];

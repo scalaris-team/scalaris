@@ -18,8 +18,6 @@ package de.zib.scalaris;
 import java.util.List;
 import java.util.Random;
 
-import com.ericsson.otp.erlang.OtpPeer;
-
 /**
  * Implements a {@link NodeSelectionPolicy} by choosing nodes randomly.
  * 
@@ -39,7 +37,7 @@ public class RandomNodeSelection implements NodeSelectionPolicy {
 	 */
 	// override tag does not seem to work with Java 1.5
 //	@Override
-	public OtpPeer selectNode(List<OtpPeer> nodes)
+	public PeerNode selectNode(List<PeerNode> nodes)
 			throws UnsupportedOperationException {
 		if (nodes.size() < 1) {
 			throw new UnsupportedOperationException(
