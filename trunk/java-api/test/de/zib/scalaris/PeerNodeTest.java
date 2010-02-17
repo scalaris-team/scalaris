@@ -28,6 +28,9 @@ import com.ericsson.otp.erlang.OtpPeer;
  * Test cases for the {@link PeerNode} class.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * 
+ * @version 2.3
+ * @since 2.3
  */
 public class PeerNodeTest {
 

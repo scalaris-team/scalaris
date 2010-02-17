@@ -36,6 +36,9 @@ import com.ericsson.otp.erlang.OtpSelf;
  * Test cases for the {@link Connection} class.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * 
+ * @version 2.3
+ * @since 2.3
  */
 public class ConnectionTest {
 
