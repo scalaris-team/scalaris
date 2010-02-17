@@ -18,50 +18,21 @@ package de.zib.scalaris;
 import static org.junit.Assert.*;
 
 import java.util.Date;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
+import java.util.concurrent.TimeUnit;
+
 import org.junit.Test;
 
 import com.ericsson.otp.erlang.OtpPeer;
 
 /**
+ * Test cases for the {@link PeerNode} class.
+ * 
  * @author Nico Kruber, kruber@zib.de
- *
  */
 public class PeerNodeTest {
 
 	/**
-	 * @throws java.lang.Exception
-	 */
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception {
-	}
-
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@AfterClass
-	public static void tearDownAfterClass() throws Exception {
-	}
-
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@Before
-	public void setUp() throws Exception {
-	}
-
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@After
-	public void tearDown() throws Exception {
-	}
-
-	/**
-	 * Test method for {@link de.zib.scalaris.PeerNode#PeerNode(com.ericsson.otp.erlang.OtpPeer)}.
+	 * Test method for {@link PeerNode#PeerNode(OtpPeer)}.
 	 */
 	@Test
 	public final void testPeerNodeOtpPeer() {
@@ -70,7 +41,7 @@ public class PeerNodeTest {
 	}
 
 	/**
-	 * Test method for {@link de.zib.scalaris.PeerNode#PeerNode(java.lang.String)}.
+	 * Test method for {@link PeerNode#PeerNode(String)}.
 	 */
 	@Test
 	public final void testPeerNodeString() {
@@ -79,17 +50,88 @@ public class PeerNodeTest {
 	}
 
 	/**
-	 * Test method for {@link de.zib.scalaris.PeerNode#getLastFailedConnect()}.
+	 * Test method for {@link PeerNode#getLastFailedConnect()},
+	 * {@link PeerNode#setLastFailedConnect()} and
+	 * {@link PeerNode#getFailureCount()}.
+	 * 
+	 * @throws InterruptedException
+	 *             if the sleep is interrupted
 	 */
 	@Test
-	public final void testGetLastFailedConnect() {
+	public final void testGetSetLastFailedConnect() throws InterruptedException {
 		PeerNode p = new PeerNode("test");
+		Date d0 = new Date();
+
+		assertEquals(0, p.getFailureCount());
+		assertEquals(null, p.getLastFailedConnect());
+		TimeUnit.MILLISECONDS.sleep(10);
+
 		p.setLastFailedConnect();
 		Date d1 = p.getLastFailedConnect();
+		assertEquals(1, p.getFailureCount());
+		assertNotNull(d1);
+		assertTrue(d0.getTime() < d1.getTime());
+		TimeUnit.MILLISECONDS.sleep(10);
+
 		p.setLastFailedConnect();
 		Date d2 = p.getLastFailedConnect();
-		
 		assertEquals(2, p.getFailureCount());
+		assertNotNull(d2);
+		assertTrue(d0.getTime() < d2.getTime());
+		assertTrue(d1.getTime() < d2.getTime());
+	}
+
+	/**
+	 * Test method for {@link PeerNode#resetFailureCount()}.
+	 */
+	@Test
+	public final void testResetFailureCount() {
+		PeerNode p = new PeerNode("test");
+
+		p.resetFailureCount();
+		assertEquals(0, p.getFailureCount());
+		assertEquals(null, p.getLastFailedConnect());
+
+		p.setLastFailedConnect();
+
+		p.resetFailureCount();
+		assertEquals(0, p.getFailureCount());
+		assertEquals(null, p.getLastFailedConnect());
+
+		p.setLastFailedConnect();
+		p.setLastFailedConnect();
+
+		p.resetFailureCount();
+		assertEquals(0, p.getFailureCount());
+		assertEquals(null, p.getLastFailedConnect());
+	}
+
+	/**
+	 * Test method for {@link PeerNode#getLastConnectSuccess()} and
+	 * {@link PeerNode#setLastConnectSuccess()}.
+	 * 
+	 * @throws InterruptedException
+	 *             if the sleep is interrupted
+	 */
+	@Test
+	public final void testGetSetLastConnectSuccess()
+			throws InterruptedException {
+		PeerNode p = new PeerNode("test");
+		Date d0 = new Date();
+
+		assertEquals(null, p.getLastConnectSuccess());
+
+		TimeUnit.MILLISECONDS.sleep(10);
+		p.setLastConnectSuccess();
+		Date d1 = p.getLastConnectSuccess();
+		assertNotNull(d1);
+		assertTrue(d0.getTime() < d1.getTime());
+
+		TimeUnit.MILLISECONDS.sleep(10);
+		p.setLastConnectSuccess();
+		Date d2 = p.getLastConnectSuccess();
+		assertNotNull(d2);
+		assertTrue(d0.getTime() < d2.getTime());
 		assertTrue(d1.getTime() < d2.getTime());
 	}
 

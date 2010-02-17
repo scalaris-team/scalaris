@@ -25,7 +25,8 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpSelf;
 
 /**
- * Wraps an {@link OtpConnection} and allows automatic re-connects.
+ * Wraps an {@link OtpConnection} and allows automatic re-connects using a
+ * {@link ConnectionPolicy} object.
  * 
  * @author Nico Kruber, kruber@zib.de
  * 
@@ -33,9 +34,22 @@ import com.ericsson.otp.erlang.OtpSelf;
  * @since 2.3
  */
 public class Connection {
+	/**
+	 * The connection this object wraps.
+	 */
 	OtpConnection connection;
+	/**
+	 * The local node used for the connection to a remote node.
+	 */
 	OtpSelf self;
+	/**
+	 * The remote node connected to.
+	 */
 	PeerNode remote;
+	/**
+	 * The connection policy object that sets how and whether to automatically
+	 * reconnect on failures.
+	 */
 	ConnectionPolicy connectionPolicy;
 
 	/**
@@ -240,6 +254,15 @@ public class Connection {
 	 */
 	public PeerNode getRemote() {
 		return remote;
+	}
+
+	/**
+	 * Gets the encapsulated OTP connection object.
+	 * 
+	 * @return the connection object
+	 */
+	public OtpConnection getConnection() {
+		return connection;
 	}
 
 	/**

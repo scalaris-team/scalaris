@@ -30,7 +30,9 @@ import java.util.List;
  * @since 2.3
  */
 public abstract class ConnectionPolicy {
-
+	/**
+	 * A reference to the list of available nodes
+	 */
 	protected List<PeerNode> availableRemoteNodes;
 	
 	/**
@@ -90,6 +92,19 @@ public abstract class ConnectionPolicy {
 	public void nodeFailed(PeerNode node) {
 		synchronized (node) {
 			node.setLastFailedConnect();
+		}
+	}
+	
+	/**
+	 * Acts upon a failure reset of the given node.
+	 * 
+	 * Resets the node's last failure state.
+	 * 
+	 * @param node the node
+	 */
+	public void nodeFailReset(PeerNode node) {
+		synchronized (node) {
+			node.resetFailureCount();
 		}
 	}
 	
