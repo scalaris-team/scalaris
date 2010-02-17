@@ -348,6 +348,7 @@ public class ConnectionFactory {
 	 *             connection as a String (as previously when only one node was
 	 *             used), use the new {@link #getNodes()} method instead.
 	 */
+	@Deprecated
 	public String getNode() {
 		if (nodes.size() > 0) {
 			return nodes.get(0).node();
