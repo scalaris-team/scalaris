@@ -29,7 +29,7 @@ make_ring(Size) ->
     Owner = self(),
     Pid = spawn(fun () ->
                         %timer:sleep(1000),
-                        ct:pal("Try to build Scalaris~n"),
+                        ct:pal("Trying to build Scalaris~n"),
                         randoms:start(),
                         process_dictionary:start_link_for_unittest(),
                         %timer:sleep(1000),
@@ -54,7 +54,7 @@ make_ring(Size) ->
     check_ring_size(Size),
     wait_for_stable_ring(),
     check_ring_size(Size),
-    ct:pal("Scalaris is bootup~n"),
+    ct:pal("Scalaris has booted~n"),
 %    timer:sleep(30000),
     Pid.
 

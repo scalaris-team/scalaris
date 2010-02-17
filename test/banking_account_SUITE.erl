@@ -51,9 +51,9 @@ end_per_suite(Config) ->
 make_tfun(MyAccount, OtherAccount) ->
     fun (TransLog)->
 	    {MyBalance, TransLog1}    = read2(TransLog,  MyAccount),
-            ct:pal("~p ~p~n", [MyAccount, MyBalance]),
+            %ct:pal("~p ~p~n", [MyAccount, MyBalance]),
 	    {OtherBalance, TransLog2} = read2(TransLog1, OtherAccount),
-            ct:pal("~p ~p~n", [OtherAccount, OtherBalance]),
+            %ct:pal("~p ~p~n", [OtherAccount, OtherBalance]),
 	    if
 		OtherBalance > 500 ->
 		    TransLog3 = write2(TransLog2, MyAccount,    MyBalance + 400),
