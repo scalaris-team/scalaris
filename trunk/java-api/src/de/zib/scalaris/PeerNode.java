@@ -82,8 +82,11 @@ public class PeerNode {
 	/**
 	 * Sets the last failed connection (attempt or broken connection) with the
 	 * current date and time.
+	 * 
+	 * Note: Only call this from a connection policy since it might set up
+	 * additional data structures based on this time.
 	 */
-	public synchronized void setLastFailedConnect() {
+	synchronized void setLastFailedConnect() {
 		lastFailedConnection = new Date();
 		++failureCount;
 	}
@@ -111,8 +114,11 @@ public class PeerNode {
 	
 	/**
 	 * Resets the failed connections statistics.
+	 * 
+	 * Note: Only call this from a connection policy since it might set up
+	 * additional data structures based on this time.
 	 */
-	public synchronized void resetFailureCount() {
+	synchronized void resetFailureCount() {
 		failureCount = 0;
 		lastFailedConnection = null;
 	}
@@ -128,8 +134,11 @@ public class PeerNode {
 
 	/**
 	 * Adds a connection success with the current date.
+	 * 
+	 * Note: Only call this from a connection policy since it might set up
+	 * additional data structures based on this time.
 	 */
-	public synchronized void setLastConnectSuccess() {
+	synchronized void setLastConnectSuccess() {
 		this.lastConnectSuccess = new Date();
 	}
 }

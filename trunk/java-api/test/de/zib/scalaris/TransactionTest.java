@@ -17,10 +17,6 @@ package de.zib.scalaris;
 
 import static org.junit.Assert.*;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.ericsson.otp.erlang.OtpErlangObject;
@@ -59,34 +55,6 @@ public class TransactionTest {
 		"Uquoo0Il", "eiGh4Oop", "ooMa0ufe", "zee6Zooc", "ohhao4Ah", "Uweekek5", "aePoos9I", "eiJ9noor", 
 		"phoong1E", "ianieL2h", "An7ohs4T", "Eiwoeku3", "sheiS3ao", "nei5Thiw", "uL5iewai", "ohFoh9Ae"};
 	
-	/**
-	 * @throws Exception
-	 */
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception {
-	}
-
-	/**
-	 * @throws Exception
-	 */
-	@AfterClass
-	public static void tearDownAfterClass() throws Exception {
-	}
-	
-	/**
-	 * @throws Exception
-	 */
-	@Before
-	public void setUp() throws Exception {
-	}
-
-	/**
-	 * @throws Exception
-	 */
-	@After
-	public void tearDown() throws Exception {
-	}
-
 	/**
 	 * Test method for {@link Transaction#Transaction()}.
 	 * @throws ConnectionException 
