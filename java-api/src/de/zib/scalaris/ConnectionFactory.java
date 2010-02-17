@@ -53,8 +53,17 @@ import de.zib.tools.PropertyLoader;
  * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
  * </ul>
  * 
+ * Note: {@code scalaris.node} can be a whitespace, ',' or ';' separated list of
+ * available nodes. See {@link DefaultConnectionPolicy} about how this list is
+ * used when connections are setup or when existing connections fail.
+ * 
+ * The {@link #connectionPolicy} set will be passed on to created connections.
+ * Changing it through {@link #setConnectionPolicy(ConnectionPolicy)} will leave
+ * previously created connections with the old policy. By default,
+ * {@link DefaultConnectionPolicy} is used.
+ * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.1
+ * @version 2.3
  * @since 2.0
  */
 public class ConnectionFactory {
@@ -209,6 +218,45 @@ public class ConnectionFactory {
 	 * Creates a connection to a scalaris erlang node specified by the given
 	 * parameters. Uses the given client name.
 	 * 
+	 * If <tt>clientNameAppendUUID</tt> is specified a pseudo UUID is appended
+	 * to the given name. BEWARE that scalaris nodes accept only one connection
+	 * per client name!
+	 * 
+	 * @param clientName
+	 *            the name that identifies the java client
+	 * @param clientNameAppendUUID
+	 *            override the object's setting for
+	 *            {@link #clientNameAppendUUID}
+	 * @param connectionPolicy
+	 *            override the connection policy that will be used for the new
+	 *            connection
+	 * 
+	 * @return the created connection
+	 * 
+	 * @throws ConnectionException
+	 *             if the connection fails
+	 *
+	 * @since 2.3
+	 */
+	public Connection createConnection(String clientName,
+			boolean clientNameAppendUUID, ConnectionPolicy connectionPolicy)
+			throws ConnectionException {
+		try {
+			if (clientNameAppendUUID) {
+				clientName = clientName + "_" + clientNameUUID.getAndIncrement();
+			}
+			OtpSelf self = new OtpSelf(clientName, cookie);
+			return new Connection(self, connectionPolicy);
+		} catch (Exception e) {
+//		         e.printStackTrace();
+			throw new ConnectionException(e);
+		}
+	}
+
+	/**
+	 * Creates a connection to a scalaris erlang node specified by the given
+	 * parameters. Uses the given client name.
+	 * 
 	 * If <tt>clientNameAppendUUID</tt> is specified a pseudo UUID is appended to
 	 * the given name. BEWARE that scalaris nodes accept only one connection per
 	 * client name!
@@ -226,16 +274,7 @@ public class ConnectionFactory {
 	 */
 	public Connection createConnection(String clientName, boolean clientNameAppendUUID)
 			throws ConnectionException {
-		try {
-			if (clientNameAppendUUID) {
-				clientName = clientName + "_" + clientNameUUID.getAndIncrement();
-			}
-			OtpSelf self = new OtpSelf(clientName, cookie);
-			return new Connection(self, connectionPolicy);
-		} catch (Exception e) {
-//		         e.printStackTrace();
-			throw new ConnectionException(e);
-		}
+		return createConnection(clientName, clientNameAppendUUID, connectionPolicy);
 	}
 
 	/**
@@ -468,7 +507,13 @@ public class ConnectionFactory {
 	/**
 	 * Sets the connection policy to use for new connections.
 	 * 
-	 * @param connectionPolicy the connection policy to set
+	 * Warning: this will effectively disconnect the previous connection policy
+	 * from any updates to the list of available nodes (they will still use the
+	 * same list but will not be able to react on changes). Prefer not to change
+	 * the default policy after connections have been created.
+	 * 
+	 * @param connectionPolicy
+	 *            the connection policy to set
 	 * 
 	 * @since 2.3
 	 */

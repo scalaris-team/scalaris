@@ -32,6 +32,9 @@ import org.junit.Test;
  * Test cases for the {@link DefaultConnectionPolicy} class.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * 
+ * @version 2.3
+ * @since 2.3
  */
 public class DefaultConnectionPolicyTest {
 
