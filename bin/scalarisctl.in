@@ -135,7 +135,7 @@ checkinstallation() {
 bootstart(){
     NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
     if [ $interactive -eq 0 ]; then
-        BACKGROUND="-noinput -detached"
+        BACKGROUND="-detached"
     fi
     pushd $BEAMDIR > /dev/null
     erl -setcookie "$SCALARIS_COOKIE" \
@@ -178,7 +178,7 @@ bootstop(){
 nodestart(){
     NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
     if [ $interactive -eq 0 ]; then
-        BACKGROUND="-noinput -detached"
+        BACKGROUND="-detached"
     fi
     pushd $BEAMDIR > /dev/null
     erl -setcookie "$SCALARIS_COOKIE" \
