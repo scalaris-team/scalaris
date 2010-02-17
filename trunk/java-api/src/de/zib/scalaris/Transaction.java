@@ -94,6 +94,15 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * shows such a use case.
  * </p>
  * 
+ * <h3>Connection errors</h3>
+ * 
+ * Errors when setting up connections or trying to send/receive RPCs will be
+ * handed to the {@link ConnectionPolicy} that has been set when the connection
+ * was created. By default, {@link ConnectionFactory} uses
+ * {@link DefaultConnectionPolicy} which implements automatic connection-retries
+ * by classifying nodes as good or bad depending on their previous state. The
+ * number of automatic retries is adjustable (default: 3).
+ * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.2
  * @since 2.0
