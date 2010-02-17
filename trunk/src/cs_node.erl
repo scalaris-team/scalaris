@@ -488,8 +488,11 @@ on(_, _State) ->
 init([_InstanceId, Options]) ->
     %io:format("~p~n", [Options]),
     % first node in this vm and also vm is marked as first
-    case {lists:member(first, Options), application:get_env(boot_cs, first)} of
-        {true, {ok, true}} ->
+    % or unit-test
+    case lists:member(first, Options) andalso
+          (is_unittest() orelse
+          application:get_env(boot_cs, first) == {ok, true}) of
+        true ->
             trigger_known_nodes(),
             cs_keyholder:get_key(),
             {join_as_first};
@@ -544,3 +547,8 @@ trigger_known_nodes() ->
         false ->
             trigger_known_nodes()
     end.
+
+% @doc try to check whether common-test is running
+is_unittest() ->
+    code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
+    lists:member(ct_logs, registered()).
