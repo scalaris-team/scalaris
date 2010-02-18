@@ -135,7 +135,7 @@ renderVivaldiMap(CC_list,Nodes) ->
     Vbh=(lists:nth(2, Max)-lists:nth(2, Min))+Yof*2,
     
     R=(Xof+Yof)*0.1,
-    Head=io_lib:format("<svg width=\"400px\" height=\"400px\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"~p,~p,~p,~p\">~n",
+    Head=io_lib:format("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"~p,~p,~p,~p\">~n",
                        [Vbx,Vby,Vbw,Vbh])++
          io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
                        [lists:nth(1, Min)-R*1.5,lists:nth(2, Min),lists:nth(1, Min)-R*1.5,lists:nth(2, Max),R*0.1])++
