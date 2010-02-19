@@ -110,6 +110,8 @@ get_app_args() ->
     Id = case application:get_env(yaws, id) of
              undefined ->
                  "default";
+             {ok, Id0} when is_atom(Id0) ->
+                 atom_to_list(Id0);
              {ok, Id0} ->
                  Id0
          end,
@@ -138,5 +140,5 @@ find_runmod([]) ->
 
 %%----------------------------------------------------------------------
 %%----------------------------------------------------------------------
-l2a(L) when list(L) -> list_to_atom(L);
-l2a(A) when atom(A) -> A.
+l2a(L) when is_list(L) -> list_to_atom(L);
+l2a(A) when is_atom(A) -> A.

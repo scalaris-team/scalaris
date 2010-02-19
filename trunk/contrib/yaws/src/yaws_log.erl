@@ -383,7 +383,7 @@ handle_info(secs3, State) ->
 
 handle_info({notify,{yaws_hupped,_}}, State) ->
     handle_info(minute10,State);
-%% once every 10  minute, check log sizes
+%% once every 10 minutes, check log sizes
 handle_info(minute10, State) ->
     L = lists:map(
           fun(AL) ->
@@ -407,7 +407,7 @@ handle_info(minute10, State) ->
 
 
 
-wrap_p(AL, State) when record(AL, alog) ->
+wrap_p(AL, State) when is_record(AL, alog) ->
     case file:read_file_info(AL#alog.filename) of
         {ok, FI} when FI#file_info.size > State#state.log_wrap_size,
         State#state.log_wrap_size > 0 ->
@@ -437,8 +437,8 @@ wrap(AL, State) ->
         false ->
             AL;
         enoent ->
-            %% Logfile disapeared, 
-            error_logger:format("Logfile ~p disapeared - we reopen it",
+            %% Logfile disappeared, 
+            error_logger:format("Logfile ~p disappeared - we reopen it",
                                 [AL#alog.filename]),
 	    file:close(AL#alog.fd),
             {ok, Fd2} = file:open(AL#alog.filename, [write, raw]),
@@ -463,11 +463,22 @@ terminate(_Reason, _State) ->
 
 
 fmt_alog(Time, Ip, User, Req, Status,  Length, Referrer, UserAgent) ->
-    [fmt_ip(Ip), " - ", User, [$\s], Time, [$\s, $"], Req, [$",$\s], 
+    [fmt_ip(Ip), " - ", User, [$\s], Time, [$\s, $"], no_ctl(Req), [$",$\s], 
      Status, [$\s], Length, [$\s,$"], Referrer, [$",$\s,$"], UserAgent, [$",$\n]].
 
 
-fmt_ip(IP) when tuple(IP) ->
+%% Odd security advisory that only affects webservers where users are 
+%% somehow allowed to upload files that later can be downloaded.
+
+no_ctl([H|T]) when H < 32 ->
+    no_ctl(T);
+no_ctl([H|T]) ->
+    [H|no_ctl(T)];
+no_ctl([]) ->
+    [].
+
+
+fmt_ip(IP) when is_tuple(IP) ->
     inet_parse:ntoa(IP);
 fmt_ip(undefined) ->
     "0.0.0.0";
@@ -476,20 +487,32 @@ fmt_ip(HostName) ->
 
 
 fmtnow() ->
-    {{Year, Month, Date}, {Hour, Min, Sec}} = calendar:local_time(),
-    io_lib:format("[~2..0w/~s/~4..0w:~2..0w:~2..0w:~2..0w ~s]",
-                  [Date,yaws:month(Month),Year, Hour, Min, Sec, zone()]).
+    {{Year, Month, Day}, {Hour, Min, Sec}} = 
+        calendar:now_to_local_time(now()),
+    [fill_zero(Day,2),"/",yaws:month(Month),"/",integer_to_list(Year),":",
+     fill_zero(Hour,2),":",fill_zero(Min,2),":",fill_zero(Sec,2)," ",zone()].
+    
 
 zone() ->
     Time = erlang:universaltime(),
     LocalTime = calendar:universal_time_to_local_time(Time),
     DiffSecs = calendar:datetime_to_gregorian_seconds(LocalTime) - 
         calendar:datetime_to_gregorian_seconds(Time),
-    zone((DiffSecs/3600)*100).
+    zone(DiffSecs div 3600, (DiffSecs rem 3600) div 60).
 
-%% Ugly reformatting code to get times like +0000 and -1300
 
-zone(Val) when Val < 0 ->
-    io_lib:format("-~4..0w", [trunc(abs(Val))]);
-zone(Val) when Val >= 0 ->
-    io_lib:format("+~4..0w", [trunc(abs(Val))]).
+
+zone(Hr, Min) when Hr < 0; Min < 0 ->
+    [$-, fill_zero(abs(Hr), 2), fill_zero(abs(Min), 2)];
+zone(Hr, Min) when Hr >= 0, Min >= 0 ->
+    [$+, fill_zero(abs(Hr), 2), fill_zero(abs(Min), 2)].
+
+fill_zero(N, Width) ->
+    left_fill(N, Width, $0).
+
+left_fill(N, Width, Fill) when is_integer(N) ->
+    left_fill(integer_to_list(N), Width, Fill);
+left_fill(N, Width, _Fill) when length(N) >= Width ->
+    N;
+left_fill(N, Width, Fill) ->
+    left_fill([Fill|N], Width, Fill).

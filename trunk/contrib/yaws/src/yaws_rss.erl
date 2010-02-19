@@ -100,11 +100,14 @@ open(App) ->
 %%%      <dd>Specifies the maximum number of items that should
 %%%      be stored in the database. The default in <em>infinite</em></dd>
 %%%      </dl></p>
-%%%      <p>If no database exist, a new will be created.
+%%%      <p>If no database exist, a new one will be created.
 %%%      The returned database handle is to be used with {@link close/1}.</p>
 %%% @end
 %%%
 open(App, Opts) ->
+    %% This is called during read of yaws.conf during startup, so make sure this
+    %% server is up and running before invoking it
+    ok = wait_for_server(?SERVER),
     gen_server:call(?SERVER, {open, App, Opts}, infinity).
 
 %%%
@@ -430,9 +433,9 @@ w3cdtf_diff(Y, Mo, D, H, Mi, S, _DiffD, DiffH, _DiffMi) when DiffH == 0 ->
         add_zero(H) ++ ":" ++ add_zero(Mi) ++ ":"  ++
         add_zero(S) ++ "Z".
 
-add_zero(I) when integer(I) -> add_zero(i2l(I));
+add_zero(I) when is_integer(I) -> add_zero(i2l(I));
 add_zero([A])               -> [$0,A];
-add_zero(L) when list(L)    -> L. 
+add_zero(L) when is_list(L)    -> L. 
 
 
 
@@ -455,11 +458,11 @@ u_insert(E, [H|T]) -> [H|u_insert(E,T)];
 u_insert(E, [])    -> [E].
 
 
-i2l(I) when integer(I) -> integer_to_list(I);
-i2l(L) when list(L)    -> L.
+i2l(I) when is_integer(I) -> integer_to_list(I);
+i2l(L) when is_list(L)    -> L.
 
-a2l(A) when atom(A) -> atom_to_list(A);
-a2l(L) when list(L) -> L.
+a2l(A) when is_atom(A) -> atom_to_list(A);
+a2l(L) when is_list(L) -> L.
 
      
     
@@ -498,3 +501,17 @@ t_xopen() ->
     open([{db_file, "yaws_rss.dets"}, 
           {expire,days},
           {days, 20}]).
+
+wait_for_server(Server) ->
+    wait_for_server(Server, 20).
+
+wait_for_server(_Server, 0) ->
+    {error, timeout};
+wait_for_server(Server, N) ->
+    case erlang:whereis(Server) of
+        undefined ->
+            receive after 500 -> ok end,
+            wait_for_server(Server, N-1);
+        _ ->
+            ok
+    end.

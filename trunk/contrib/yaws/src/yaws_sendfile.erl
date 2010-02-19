@@ -13,7 +13,7 @@ start_link() ->
     Dir = case yaws_generated:is_local_install() of
 	      true ->
 		  filename:dirname(code:which(?MODULE)) ++ "/../priv/lib";
-	       false ->
+              false ->
 		  %% ignore dialyzer on this one
 		  PrivDir = code:priv_dir(yaws),
 		  filename:join(PrivDir,"lib")
@@ -61,8 +61,8 @@ send(Out, Filename, Offset, Count) ->
                     call_port(
                       Socket_fd,
                       list_to_binary(
-                        [<<Offset:64/native, Count2:64/native,
-                          Socket_fd:32/native>>, Filename, <<0:8>>]));
+                        [<<Offset:64, Count2:64, Socket_fd:32>>,
+                         Filename, <<0:8>>]));
                 Error3 ->
                     Error3
             end
@@ -81,7 +81,7 @@ loop(Port) ->
             put(Id, Caller),
             erlang:port_command(Port, Msg),
             loop(Port);
-        {Port, {data, <<Cnt:64/native, Id:32/native, Res:8, Err/binary>>}} ->
+        {Port, {data, <<Cnt:64, Id:32, Res:8, Err/binary>>}} ->
             Response = case Res of
                            1 ->
                                {ok, Cnt};
@@ -99,10 +99,16 @@ loop(Port) ->
             receive {'EXIT', Port, _Reason} -> ok
             after 0 -> ok
             end;
+        {'EXIT', _, shutdown} ->
+            erlang:port_close(Port),
+            unregister(?MODULE),
+            exit(shutdown);
         {'EXIT', Port, Posix_error} ->
-            error_logger:format("Fatal error: sendfile port died, error ~p~n", [Posix_error]),
-            exit(sendfile);
+            error_logger:format("Fatal error: sendfile port died, error ~p~n",
+                                [Posix_error]),
+            exit(Posix_error);
         {'EXIT', error, Reason} ->
-            error_logger:format("Fatal error: sendfile driver failure: ~p~n", [Reason]),
-            exit(sendfile)
+            error_logger:format("Fatal error: sendfile driver failure: ~p~n",
+                                [Reason]),
+            exit(Reason)
     end.

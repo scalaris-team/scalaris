@@ -12,12 +12,12 @@
 
 -compile(export_all).
 
-version() -> "1.87".
+version() -> "%VSN%".
 
-vardir() ->  "/usr/local/var".
+vardir() ->  "%VARDIR%".
 
-etcdir() -> "/usr/local/etc".
+etcdir() -> "%ETCDIR%".
 
-is_local_install() -> true.
+is_local_install() -> %localinstall%.
                    
 
