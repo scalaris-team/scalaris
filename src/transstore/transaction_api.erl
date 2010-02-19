@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -144,7 +144,7 @@ do_transaction(TFun, SuccessFun, FailureFun)->
 
 %% Use this function to do a transaction without a read phase
 %% Thus it is necessary to provide a proper list with items for TMItems
-do_transaction_wo_rp([], SuccessFun, FailureFun)->
+do_transaction_wo_rp([], _SuccessFun, _FailureFun)->
     {ok};
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
     {Flag, LocalCSNode} = process_dictionary:find_cs_node(),

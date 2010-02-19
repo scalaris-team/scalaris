@@ -6,7 +6,7 @@
 %%% Created :  1 Dec 2008 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id $
 -module(cache).
 -author('hennig@zib.de').
@@ -178,7 +178,7 @@ size([H|T]) ->
     end.
 
 
-get_subset_max_age(MaxAge,null) ->
+get_subset_max_age(_MaxAge,null) ->
     [];
 get_subset_max_age(MaxAge,Cache) ->
     get_list_of_nodes(lists:filter(fun ({_,Age}) -> Age < MaxAge end ,Cache)).

@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %%% Created :  12 Jan 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 -module(simu_slave).
 
@@ -80,7 +80,7 @@ on({get_list_response,N},_) ->
     [cs_send:send_after(0,Pid, {get_node_IdAndSucc, cs_send:this(), Pid}) ||  Pid <-N],
     %io:format("C~n"),
     {length(N),[]};
-on({get_node_IdAndSucc_response, Pid, Details},{1,Responses}) ->
+on({get_node_IdAndSucc_response, _Pid, Details},{1,Responses}) ->
     %io:format("E~n"),
     Sort = lists:sort(fun compare_node_details/2,[Details|Responses]),   
    %io:format("F~n"),
@@ -94,8 +94,8 @@ on({get_node_IdAndSucc_response, Pid, Details},{1,Responses}) ->
     %io:format("G ~p~n",[Res]),
     case Res of
         ok -> scheduler:stop();
-         X ->   
-                %io:format("~p~n",[X]),
+        _Y ->   
+                %io:format("~p~n",[_Y]),
                 cs_send:send_after(1000, self(), {check_ring})
     end,
      %io:format("K~n"),
@@ -103,7 +103,7 @@ on({get_node_IdAndSucc_response, Pid, Details},{1,Responses}) ->
     %io:format("Ring~n"),
     {state_2};
 
-on({get_node_IdAndSucc_response, Pid, Details},{Counter,Responses}) ->
+on({get_node_IdAndSucc_response, _Pid, Details},{Counter,Responses}) ->
     %io:format("D~n"),
     {Counter-1,[Details|Responses]};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

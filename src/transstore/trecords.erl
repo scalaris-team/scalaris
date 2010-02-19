@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -92,10 +92,10 @@ new_tm_state(TransID, Items, Leader, Self)->
     {NewVotes,
      NewVoteAcks,
      NewRVAcks,
-     NewDecisions} = lists:foldl(fun(Entry, {MyVotes, MyAcks, MyRVAcks, MyDec}) ->
+     _NewDecisions} = lists:foldl(fun(Entry, {MyVotes, MyAcks, MyRVAcks, MyDec}) ->
                                          Key = Entry#tm_item.key,
                                          RKeys = ?RT:get_keys_for_replicas(Key),
-                                         {VotesReplica, AcksReplica, RVAcksReplica} =
+                                         {VotesReplica, AcksReplica, _RVAcksReplica} =
                                              lists:foldl(fun(Elem, {Acc1,Acc2,Acc3})->
                                                                  {dict:store(Elem, {bottom, 0, 0}, Acc1),
                                                                   dict:store(Elem, [], Acc2),
@@ -105,7 +105,7 @@ new_tm_state(TransID, Items, Leader, Self)->
                                                          RKeys),
                                          {VotesReplica,%dict:store(Key, VotesReplica, MyVotes),
                                           dict:store(Key, AcksReplica, MyAcks),
-                                          MyRVAcks,%dict:store(Key, RVAcksReplica, MyRVAcks),
+                                          MyRVAcks,%dict:store(Key, _RVAcksReplica, MyRVAcks),
                                           MyDec %dict:store(Key, DecReplica, MyDec)
                                          }
                                  end,
@@ -121,7 +121,7 @@ new_tm_state(TransID, Items, Leader, Self)->
               votes = NewVotes,
               vote_acks = NewVoteAcks,
               read_vote_acks = NewRVAcks,
-              %% decisions = NewDecisions,
+              %% decisions = _NewDecisions,
               tps_found = 0,
               status = collecting,
               decision = undecided
@@ -133,7 +133,7 @@ new_tm_state(TransID, Items, Leader, Self)->
 %%       ReadTS = integer()
 %%       WriteTS = integer()
 
-get_vote(TMState, Key, RKey)->
+get_vote(TMState, _Key, RKey)->
     Votes = TMState#tm_state.votes,
     dict:fetch(RKey, Votes).
 
@@ -146,7 +146,7 @@ get_vote(TMState, Key, RKey)->
 %% @doc Store a specific vote for a certain replica, identified by a key and a replicakey,
 %% in the state of the transaction manager.
 
-store_vote(TMState, Key, RKey, Vote)->
+store_vote(TMState, _Key, RKey, Vote)->
     Votes = TMState#tm_state.votes,
     NewVotes = dict:store(RKey, Vote, Votes),
     TMState#tm_state{votes = NewVotes}.
@@ -194,9 +194,9 @@ store_vote_acks(TMState, Key, RKey, Ack)->
 %% get_read_vote_acks(TMState)->
 %%     TMState#tm_state.read_vote_acks.
 
-get_read_vote_acks(TMState, Key, RKey)->
+get_read_vote_acks(TMState, _Key, RKey)->
     VoteAcks = TMState#tm_state.read_vote_acks,
-    %dict:fetch(RKey, dict:fetch(Key, VoteAcks)).
+    %dict:fetch(RKey, dict:fetch(_Key, VoteAcks)).
     dict:fetch(RKey, VoteAcks).
 
 %%--------------------------------------------------------------------
@@ -207,7 +207,7 @@ get_read_vote_acks(TMState, Key, RKey)->
 %%       NewTS = integer()
 
 %% Ack := {{AcceptedVote, AcceptedVoteTimestamp}, Timestamp}
-store_read_vote_acks(TMState, Key, RKey, Ack)->
+store_read_vote_acks(TMState, _Key, RKey, Ack)->
     RVAcks = TMState#tm_state.read_vote_acks,
     RKeyAcks = dict:fetch(RKey, RVAcks),
 

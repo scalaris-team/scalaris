@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -56,11 +56,11 @@ getset_key(_Config) ->
     util:dump2(),
     process_dictionary:register_process(foo, foo, self()),
     cs_keyholder:get_key(),
-     X = receive
+    _X = receive
 	{get_key_response_keyholder, D} ->
 	    D
     end,
-    %ct:pal("X: ~p~n",[X]),
+    %ct:pal("X: ~p~n",[_X]),
     cs_keyholder:set_key("getset_key"),
     cs_keyholder:get_key(),
     Res = receive
