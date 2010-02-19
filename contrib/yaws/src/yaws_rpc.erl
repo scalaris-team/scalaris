@@ -237,7 +237,7 @@ handle_cookie(Cookie, CookieName, SessionValue, NewSessionValue, M, F) ->
 %%% Make it possible for callback module to set Cookie Expire string!
 get_expire(M, F) -> 
     case catch M:F(cookie_expire) of
-        Expire when list(Expire) -> Expire;
+        Expire when is_list(Expire) -> Expire;
         _                        -> false
     end.
 
@@ -305,16 +305,32 @@ encode_handler_payload({Xml,As}, _ID, soap) ->   % {{{
 encode_handler_payload(Xml, _ID, soap) ->   % {{{
     {ok, Xml};
 
+encode_handler_payload({error, [ErlStruct]}, ID, RpcType) ->   % {{{
+    encode_handler_payload({error, ErlStruct}, ID, RpcType);
+    
+
+encode_handler_payload({error, ErlStruct}, ID, RpcType) ->
+    StructStr =
+        case RpcType of
+            json -> json:encode({struct, [ {result, null}, {id, ID}, 
+                                           {error, ErlStruct}]});
+            haxe -> [$h, $x, $r | haxe:encode({exception, ErlStruct})]
+        end,
+    {ok, StructStr};
+
 encode_handler_payload({response, [ErlStruct]}, ID, RpcType) ->   % {{{
     encode_handler_payload({response, ErlStruct}, ID, RpcType);
     
+
 encode_handler_payload({response, ErlStruct}, ID, RpcType) ->
     StructStr =
         case RpcType of
-            json -> json:encode({struct, [ {result, ErlStruct}, {id, ID}]});
+            json -> json:encode({struct, [ {result, ErlStruct}, {id, ID}, 
+                                           {error, null}]});
             haxe -> [$h, $x, $r | haxe:encode(ErlStruct)]
         end,
-    {ok, StructStr}.  % }}}
+    {ok, StructStr}.
+
 
 decode_handler_payload(json, JSonStr) -> %{{{
     try 

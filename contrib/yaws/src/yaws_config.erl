@@ -1,6 +1,6 @@
-%%----------------------------------------------------------------------
+%%%----------------------------------------------------------------------
 %%% File    : yaws_config.erl
-%% Author  : Claes Wikstrom <klacke@bluetail.com>
+%%% Author  : Claes Wikstrom <klacke@bluetail.com>
 %%% Purpose : 
 %%% Created : 16 Jan 2002 by Claes Wikstrom <klacke@bluetail.com>
 %%%----------------------------------------------------------------------
@@ -32,11 +32,11 @@
 paths() ->
     case yaws:getuid() of
         {ok, "0"} ->    %% root 
-            [yaws_generated:etcdir() ++ "/yaws.conf"];
+            [yaws_generated:etcdir() ++ "/yaws/yaws.conf"];
         _ -> %% developer
             [filename:join([yaws:home(), "yaws.conf"]),
              "./yaws.conf", 
-             yaws_generated:etcdir() ++ "/yaws.conf"]
+             yaws_generated:etcdir() ++ "/yaws/yaws.conf"]
     end.
 
 
@@ -83,7 +83,7 @@ load(E) ->
 add_yaws_soap_srv(GC) when GC#gconf.enable_soap == true ->
     SoapStarted = (whereis(yaws_soap_srv) /= undefined),
     if (SoapStarted == false) ->
-            Spec = {yaws_soap_srv, {yaws_soap_srv, start_link, []},
+            Spec = {yaws_soap_srv, {yaws_soap_srv, start_link, [GC#gconf.soap_srv_mods] },
                     permanent, 5000, worker, [yaws_soap_srv]},
             spawn(fun() -> supervisor:start_child(yaws_sup, Spec) end);
        true ->
@@ -94,58 +94,142 @@ add_yaws_soap_srv(_GC) ->
 
 
 add_yaws_auth(SCs) ->
-    lists:map(
-      fun(SC) ->
-              SC#sconf{authdirs = setup_auth(SC)}
-      end, SCs).
+    [SC#sconf{authdirs = setup_auth(SC)} || SC <- SCs].
 
 
-%% we search and setup www authenticate for each directory
-%% specified as an auth directory. These are merged with server conf.
+%% We search and setup www authenticate for each directory
+%% specified as an auth directory or containing a .yaws_auth file. 
+%% These are merged with server conf.
+setup_auth(#sconf{docroot = Docroot, authdirs = Authdirs}) ->
+    Authdirs1 = load_yaws_auth_from_docroot(Docroot),
+    Authdirs2 = load_yaws_auth_from_authdirs(Authdirs, Docroot, Authdirs1),
+    Authdirs3 = ensure_auth_headers(Authdirs2),
+    Authdirs4 = [{Dir, A} || A = #auth{dir = [Dir]} <- Authdirs3], % A->{Dir, A}
+    start_pam(Authdirs4),
+    Authdirs4.
 
-setup_auth(SC) ->
-    lists:flatten(
-      lists:map(fun(Auth) ->
-                        add_yaws_auth(SC, Auth#auth.dir, Auth)
-                end, SC#sconf.authdirs)).
+    
+load_yaws_auth_from_docroot(undefined) ->
+    [];
+load_yaws_auth_from_docroot(Docroot) ->
+    Fun = fun (Path, Acc) ->
+		  %% Strip Docroot and then filename
+		  SP  = string:sub_string(Path, length(Docroot)+1),
+		  Dir = filename:dirname(SP),
+		  case load_yaws_auth_file(Path, #auth{dir = [Dir]}) of
+		      {ok, Auth} -> [Auth| Acc];
+		      _          -> Acc
+		  end
+	  end,
+    filelib:fold_files(Docroot, "^.yaws_auth$", true, Fun, []).
 
-add_yaws_auth(SC, Dirs, A) ->
-    PamStarted = whereis(yaws_pam) /= undefined,
-    if
-        A#auth.pam == false ->
-            ok;
-        PamStarted == false ->
+
+load_yaws_auth_from_authdirs([], _, Acc) ->
+    lists:reverse(Acc);
+load_yaws_auth_from_authdirs([Auth = #auth{dir = [D]}| Rest], Docroot, Acc) ->
+    Dir     = case D of
+		  "/" ++ Rest -> Rest;	% strip leading slash
+		  _           -> D
+	      end,
+    Path    = filename:join([Docroot, Dir, ".yaws_auth"]),
+    NewAuth = case catch load_yaws_auth_file(Path, Auth) of
+		  {ok, A} -> A;
+		  _       -> Auth
+	      end,
+    load_yaws_auth_from_authdirs(Rest, Docroot, [NewAuth| Acc]);
+load_yaws_auth_from_authdirs([{_Dir, Auth}| Rest], Docroot, Acc) ->
+    %% handle {Dir, A} by stripping it
+    load_yaws_auth_from_authdirs([Auth| Rest], Docroot, Acc);
+load_yaws_auth_from_authdirs([_| Rest], Docroot, Acc) ->
+    load_yaws_auth_from_authdirs(Rest, Docroot, Acc).
+    
+
+load_yaws_auth_file(Path, Auth) ->
+    case file:consult(Path) of
+	{ok, TermList} ->
+	    error_logger:info_msg("Reading .yaws_auth ~s~n", [Path]),
+	    parse_yaws_auth_file(TermList, Auth);
+	{error, enoent} ->
+	    {error, enoent};
+	Error ->
+	    error_logger:format("Bad .yaws_auth file ~s ~p~n", [Path, Error]),
+	    Error
+    end.
+    
+
+ensure_auth_headers(Authdirs) ->
+    [add_auth_headers(Auth) || Auth <- Authdirs].
+
+add_auth_headers(Auth = #auth{headers = []}) ->
+    %% Headers needs to be set
+    Realm   = Auth#auth.realm,
+    Headers = yaws:make_www_authenticate_header({realm, Realm}),
+    Auth#auth{headers = Headers};
+add_auth_headers(Auth) ->
+    Auth.
+
+
+start_pam([]) ->
+    ok;
+start_pam([{_Dir, #auth{pam = false}}|T]) ->
+    start_pam(T);
+start_pam([{_Dir, A}|T]) ->
+    case whereis(yaws_pam) of
+	undefined ->	% pam not started
             Spec = {yaws_pam, {yaws_pam, start_link, 
                                [yaws:to_list(A#auth.pam),undefined,undefined]},
                     permanent, 5000, worker, [yaws_pam]},
-            spawn(fun() ->
-                          supervisor:start_child(yaws_sup, Spec)
-                  end);
-        true ->
-            ok
-    end,
-
-    lists:map(
-      fun(Dir) ->
-              FN=[SC#sconf.docroot , [$/|Dir], [$/|".yaws_auth"]],
-              case file:consult(FN) of
-                  {ok, [{realm, Realm} |TermList]} ->
-                      error_logger:info_msg("Reading .yaws_auth ~s~n",[FN]),
-                      {Dir, A#auth{realm = Realm,
-                                   users = TermList++A#auth.users}};
-                  {ok, TermList} ->
-                      error_logger:info_msg("Reading .yaws_auth ~s~n",[FN]),
-                      {Dir, A#auth{users = TermList++A#auth.users}};
-                  {error, enoent} ->
-                      {Dir, A};
-                  _Err ->
-                      error_logger:format("Bad .yaws_auth file in dir ~p~n", 
-                                          [Dir]),
-                      {Dir, A}
-              end
-      end, Dirs).
+	    spawn(fun() -> supervisor:start_child(yaws_sup, Spec) end);
+	_ ->
+	    start_pam(T)
+    end.
 
 
+parse_yaws_auth_file([], Auth) ->
+    Auth;
+
+parse_yaws_auth_file([{realm, Realm}|T], Auth0) ->
+    parse_yaws_auth_file(T, Auth0#auth{realm = Realm});
+
+parse_yaws_auth_file([{pam, Pam}|T], Auth0) 
+  when is_atom(Pam) ->
+    parse_yaws_auth_file(T, Auth0#auth{pam = Pam});
+
+parse_yaws_auth_file([{authmod, Authmod0}|T], Auth0) 
+  when is_atom(Authmod0)->
+    Headers = try
+                  Authmod0:get_header() ++ Auth0#auth.headers
+              catch 
+                  _:_ ->
+                      error_logger:format("Failed to ~p:get_header() \n",
+                                          [Authmod0]),
+                      Auth0#auth.headers
+              end,
+    parse_yaws_auth_file(T, Auth0#auth{mod = Authmod0, headers = Headers});
+
+parse_yaws_auth_file([{file, File}|T], Auth0) ->
+    [Dir] = Auth0#auth.dir,
+    New_dir = [Dir ++ File],
+    parse_yaws_auth_file(T, Auth0#auth{dir = New_dir});
+
+parse_yaws_auth_file([{User, Password}|T], Auth0) 
+  when is_list(User), is_list(Password) ->
+    Users = [{User, Password}|Auth0#auth.users],
+    parse_yaws_auth_file(T, Auth0#auth{users = Users}).
+
+
+%% Not used anymore
+%% Replace all "//" and "///" with "/"
+%% Might be a better way to do this
+%% remove_multiple_slash(L) ->
+%%     remove_multiple_slash(L, []).
+
+%% remove_multiple_slash([], Acc)->
+%%     lists:reverse(Acc);
+%% remove_multiple_slash("//" ++ T, Acc) ->
+%%     remove_multiple_slash([$/|T], Acc);
+%% remove_multiple_slash([H|T], Acc) ->
+%%     remove_multiple_slash(T, [H|Acc]).
 
 %% This is the function that arranges sconfs into
 %% different server groups
@@ -172,14 +256,22 @@ validate_groups([H|T]) ->
     end.
 
 validate_group(List) ->
-    %% first, max one ssl per group
-    case lists:filter(fun(SC) -> 
-                              SC#sconf.ssl /= undefined 
-                      end, List) of
-        L when length(L) > 1 ->
-            throw({error, ?F("Max one ssl server per IP: ~p", 
-                             [(hd(L))#sconf.servername])});
-        _ ->
+    %% all ssl servers with the same IP must share the same ssl  configuration
+    %% check if one ssl server in the group
+    case lists:any(fun(SC) -> SC#sconf.ssl  /= undefined end,List) of 
+	true ->
+            [SC0|SCs] = List,
+            %% check if all servers in the group have the same ssl configuration
+            case lists:filter(
+                   fun(SC) -> SC#sconf.ssl /= SC0#sconf.ssl end,SCs) of
+                L when length(L) > 1 ->
+                    throw({error, ?F("SSL server per IP must share the "
+                                     "same certificate : ~p", 
+                                     [(hd(L))#sconf.servername])});
+                _ ->
+                    ok
+            end;
+	_ -> 
             ok
     end,
     %% second all servernames in a group must be unique
@@ -301,6 +393,23 @@ del_tail2([_X, _Y], Acc) ->
     lists:reverse(Acc);
 del_tail2([H|T], Acc) ->
     del_tail2(T, [H|Acc]).
+
+
+
+string_to_host_and_port(String) ->
+    case string:rchr(String, $:) of
+        0 ->
+            {error, "missing colon (:) character."};
+        ColonPos ->
+            Host = string:left(String, ColonPos - 1),
+            PortStr = string:sub_string(String, ColonPos + 1),
+            case (catch list_to_integer(PortStr)) of
+                Port when is_integer(Port) and (Port >= 0) and (Port =< 65535) ->
+                    {ok, Host, Port};
+                _ ->
+                    {error, ?F("~p is not a valid port number.", [PortStr])}
+            end
+    end.
 
 
 
@@ -437,7 +546,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                           C, Cs, Lno+1, Next);
                 false ->
                     fload(FD, globals, GC, C, Cs, Lno+1, Next)
-	    
+
             end;
 
         ["runmod", '=', Mod0] ->
@@ -452,11 +561,31 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                true ->
                     fload(FD, globals, GC#gconf{enable_soap = false},
                           C, Cs, Lno+1, Next)
+            end;		
+
+        ["soap_srv_mods", '=' | SoapSrvMods] ->
+            case parse_soap_srv_mods(SoapSrvMods, []) of
+                {ok, L} ->
+                    fload(FD, globals, GC#gconf{soap_srv_mods = L}, 
+						  C, Cs, Lno+1, Next);
+                {error, Str} ->
+                    {error, ?F("~s at line ~w", [Str, Lno])}
+            end;
+
+        ["max_connections", '=', Int] ->
+            case (catch list_to_integer(Int)) of
+                I when is_integer(I) ->
+                    fload(FD, globals, GC#gconf{max_connections = I},
+                          C, Cs, Lno+1, Next);
+                _ when Int == "nolimit" ->
+                    fload(FD, globals, GC, C, Cs, Lno+1, Next);
+                _ ->
+                    {error, ?F("Expect integer at line ~w", [Lno])}
             end;
 
         ["log_wrap_size", '=', Int] ->
             case (catch list_to_integer(Int)) of
-                I when integer(I) ->
+                I when is_integer(I) ->
                     fload(FD, globals, GC#gconf{log_wrap_size = I},
                           C, Cs, Lno+1, Next);
                 _ ->
@@ -514,7 +643,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
         %% keep this bugger for backward compat for a while
         ["keepalive_timeout", '=', Val] ->
             case (catch list_to_integer(Val)) of
-                I when integer(I) ->
+                I when is_integer(I) ->
                     fload(FD, globals, GC#gconf{keepalive_timeout = I},
                           C, Cs, Lno+1, Next);
                 _ ->
@@ -536,7 +665,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
 
         ["max_num_cached_files", '=', Val] ->
             case (catch list_to_integer(Val)) of
-                I when integer(I) ->
+                I when is_integer(I) ->
                     fload(FD, globals, GC#gconf{max_num_cached_files = I},
                           C, Cs, Lno+1, Next);
                 _ ->
@@ -546,7 +675,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
 
         ["max_num_cached_bytes", '=', Val] ->
             case (catch list_to_integer(Val)) of
-                I when integer(I) ->
+                I when is_integer(I) ->
                     fload(FD, globals, GC#gconf{max_num_cached_bytes = I},
                           C, Cs, Lno+1, Next);
                 _ ->
@@ -556,7 +685,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
 
         ["max_size_cached_file", '=', Val] ->
             case (catch list_to_integer(Val)) of
-                I when integer(I) ->
+                I when is_integer(I) ->
                     fload(FD, globals, GC#gconf{max_size_cached_file = I},
                           C, Cs, Lno+1, Next);
                 _ ->
@@ -565,7 +694,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
 
         ["cache_refresh_secs", '=', Val] ->
             case (catch list_to_integer(Val)) of
-                I when integer(I), I >= 0 ->
+                I when is_integer(I), I >= 0 ->
                     fload(FD, globals, GC#gconf{cache_refresh_secs = I},
                           C, Cs, Lno+1, Next);
                 _ ->
@@ -584,14 +713,6 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
 
-        ["backwards_compat_parse", '=', Bool] ->
-            case is_bool(Bool) of
-                {true, Val} ->
-                    fload(FD, globals, ?gc_set_backwards_compat_parse(GC, Val),
-                          C, Cs, Lno+1, Next);
-                false ->
-                    {error, ?F("Expect true|false at line ~w", [Lno])}
-            end;
 
         ["auth_log", '=', Bool] ->
             case is_bool(Bool) of
@@ -602,7 +723,7 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
         ["id", '=', String] when GC#gconf.id == undefined;  
-                                 GC#gconf.id == default ->
+                                 GC#gconf.id == "default" ->
             fload(FD, globals, GC#gconf{id=String},C, Cs, Lno+1, Next);
         ["id", '=', String]  ->
             error_logger:format("Ignoring 'id = ~p' setting at line ~p~n", 
@@ -700,7 +821,7 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
             end;
         ["port", '=', Val] ->
             case (catch list_to_integer(Val)) of
-                I when integer(I) ->
+                I when is_integer(I) ->
                     C2 = C#sconf{port = I},
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
                 _ ->
@@ -730,14 +851,17 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
             end;
         ["listen_backlog", '=', Val] ->
             case (catch list_to_integer(Val)) of
-                B when integer(B) ->
-                    C2 = case proplists:get_value(listen_opts, C#sconf.soptions) of
+                B when is_integer(B) ->
+                    C2 = case proplists:get_value(listen_opts, 
+                                                  C#sconf.soptions) of
                              undefined ->
-                                 C#sconf{soptions = [{listen_opts, [{backlog, B}]} |
-                                                     C#sconf.soptions]};
+                                 C#sconf{soptions = 
+                                         [{listen_opts, [{backlog, B}]} |
+                                          C#sconf.soptions]};
                              Opts ->
-                                 C#sconf{soptions = [{listen_opts, [{backlog, B} | Opts]} |
-                                                     C#sconf.soptions]}
+                                 C#sconf{soptions = 
+                                         [{listen_opts, [{backlog, B} | Opts]} |
+                                          C#sconf.soptions]}
                          end,
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
                 _ ->
@@ -759,17 +883,17 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
                 _ ->
                     {error, ?F("Expect directory at line ~w (docroot: ~s)", 
-			       [Lno, hd(RootDirs)])}
+                               [Lno, hd(RootDirs)])}
             end;
 
         ["partial_post_size",'=',Size] ->
             case Size of
-                nolimit ->
+                "nolimit" ->
                     C2 = C#sconf{partial_post_size = nolimit},
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
                 Val ->
                     case (catch list_to_integer(Val)) of
-                        I when integer(I) ->
+                        I when is_integer(I) ->
                             C2 = C#sconf{partial_post_size = I},
                             fload(FD, server, GC, C2, Cs, Lno+1, Next);
                         _ ->
@@ -808,6 +932,10 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
             C2 = C#sconf{errormod_crash = list_to_atom(Module)},
             fload(FD, server, GC, C2, Cs, Lno+1, Next);
 
+        ["errormod_401", '=' , Module] ->
+            C2 = C#sconf{errormod_401 = list_to_atom(Module)},
+            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+
         ["arg_rewrite_mod", '=', Module] ->
             C2 = C#sconf{arg_rewrite_mod = list_to_atom(Module)},
             fload(FD, server, GC, C2, Cs, Lno+1, Next);
@@ -820,6 +948,7 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ['<', "/server", '>'] ->
             fload(FD, globals, GC, undefined, [C|Cs], Lno+1, Next);
 
@@ -863,6 +992,56 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                 _URL ->
                     {error, "Can't revproxy to an URL with a path "}
             end;
+
+        ["fwdproxy", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C2 = ?sc_set_forward_proxy(C, Val),
+                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+
+        ['<', "extra_cgi_vars", "dir", '=', Dir, '>'] ->
+            fload(FD, extra_cgi_vars, GC, C, Cs, Lno+1, Next, {Dir, []});
+
+        ["statistics", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C2 = ?sc_set_statistics(C, Val),
+                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+        ["fcgi_app_server", '=', Val] ->
+            case string_to_host_and_port(Val) of
+                {ok, Host, Port} ->
+                    C2 = C#sconf{fcgi_app_server_host = Host, fcgi_app_server_port = Port},
+                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                {error, Reason} ->
+                    {error, ?F("Invalid fcgi_app_server ~p at line ~w: ~s", [Val, Lno, Reason])}
+            end;
+
+                
+
+        ["fcgi_trace_protocol", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C2 = ?sc_set_fcgi_trace_protocol(C, Val),
+                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+
+        ["fcgi_log_app_error", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    C2 = ?sc_set_fcgi_log_app_error(C, Val),
+                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])}
     end;
@@ -879,7 +1058,7 @@ fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
 
         ["keyfile", '=', Val] ->
             case is_file(Val) of
-                true when  record(C#sconf.ssl, ssl) ->
+                true when  is_record(C#sconf.ssl, ssl) ->
                     C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{keyfile = Val}},
                     fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
@@ -890,7 +1069,7 @@ fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
             end;
         ["certfile", '=', Val] ->
             case is_file(Val) of
-                true when  record(C#sconf.ssl, ssl) ->
+                true when  is_record(C#sconf.ssl, ssl) ->
                     C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{certfile = Val}},
                     fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
@@ -901,7 +1080,7 @@ fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
             end;
         ["cacertfile", '=', Val] ->
             case is_file(Val) of
-                true when  record(C#sconf.ssl, ssl) ->
+                true when  is_record(C#sconf.ssl, ssl) ->
                     C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{cacertfile = Val}},
                     fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
@@ -913,7 +1092,7 @@ fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
         ["verify", '=', Val0] ->
             Val = (catch list_to_integer(Val0)),
             case lists:member(Val, [1,2,3]) of
-                true when  record(C#sconf.ssl, ssl) ->
+                true when  is_record(C#sconf.ssl, ssl) ->
                     C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{verify = Val}},
                     fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
@@ -925,7 +1104,7 @@ fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
         ["depth", '=', Val0] ->
             Val = (catch list_to_integer(Val0)),
             case lists:member(Val, [1,2,3,4,5,6,7]) of
-                true when  record(C#sconf.ssl, ssl) ->
+                true when  is_record(C#sconf.ssl, ssl) ->
                     C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{depth = Val}},
                     fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
@@ -936,7 +1115,7 @@ fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
             end;
         ["password", '=', Val] ->
             if 
-                record(C#sconf.ssl, ssl) ->
+                is_record(C#sconf.ssl, ssl) ->
                     C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{password = Val}},
                     fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
@@ -945,7 +1124,7 @@ fload(FD, ssl, GC, C, Cs, Lno, Chars) ->
             end;
         ["ciphers", '=', Val] ->
             if 
-                record(C#sconf.ssl, ssl) ->
+                is_record(C#sconf.ssl, ssl) ->
                     C2 = C#sconf{ssl = (C#sconf.ssl)#ssl{ciphers = Val}},
                     fload(FD, ssl, GC, C2, Cs, Lno+1, Next);
                 true ->
@@ -1054,7 +1233,17 @@ fload(FD, server_auth, GC, C, Cs, Lno, Chars, Auth) ->
             A2 = Auth#auth{realm = Realm},
             fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
         ["authmod", '=', Mod] ->
-            A2 = Auth#auth{mod = list_to_atom(Mod)},
+            Mod2 = list_to_atom(Mod),
+            code:ensure_loaded(Mod2),
+            %% Add the auth header for the mod
+	    H = try 
+                    Mod2:get_header() ++ Auth#auth.headers
+                catch _:_ ->
+                        error_logger:format("Failed to ~p:get_header() \n",
+                                            [Mod2]),
+                        Auth#auth.headers
+                end,
+            A2 = Auth#auth{mod = Mod2, headers = H},
             fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
         ["user", '=', User] ->
             case (catch string:tokens(User, ":")) of
@@ -1068,7 +1257,17 @@ fload(FD, server_auth, GC, C, Cs, Lno, Chars, Auth) ->
             A2 = Auth#auth{pam=Serv},
             fload(FD, server_auth, GC, C, Cs, Lno+1, Next, A2);
         ['<', "/auth", '>'] ->
-            C2 = C#sconf{authdirs = [Auth|C#sconf.authdirs]},
+            Pam = Auth#auth.pam,
+            Users = Auth#auth.users,
+            Realm = Auth#auth.realm,
+            A2 =  case {Pam, Users} of
+                    {false, []} ->
+                          Auth;
+                      _ ->
+                          H = Auth#auth.headers ++ yaws:make_www_authenticate_header({realm, Realm}),
+                          Auth#auth{headers = H}
+                  end,
+            C2 = C#sconf{authdirs = [A2|C#sconf.authdirs]},
             fload(FD, server, GC, C2, Cs, Lno+1, Next);
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])}
@@ -1088,7 +1287,7 @@ fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
         [Path, '=', URL] ->
             io:format(" = ~p ~p~n", [URL, Toks]),
             try yaws_api:parse_url(URL, sloppy) of
-                U when record(U, url) ->
+                U when is_record(U, url) ->
                      fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
                            [{Path, U, append}|RedirMap])
             catch _:_ ->
@@ -1097,7 +1296,7 @@ fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
         [Path, '=', '=', URL] ->
             io:format(" == ~p~n", [URL]),
             try yaws_api:parse_url(URL, sloppy) of
-                U when record(U, url) ->
+                U when is_record(U, url) ->
                      fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
                            [{Path, U, noappend}|RedirMap])
             catch _:_ ->
@@ -1105,6 +1304,24 @@ fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
             end;
         ['<', "/redirect", '>'] ->
             C2 = C#sconf{redirect_map = lists:reverse(RedirMap)},
+            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+        [H|T] ->
+            {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])}
+    end;
+
+fload(FD, extra_cgi_vars, _GC, _C, _Cs, Lno, eof, _EVars) ->
+    file:close(FD),
+    {error, ?F("Unexpected end of file at line ~w", [Lno])};
+
+fload(FD, extra_cgi_vars, GC, C, Cs, Lno, Chars, EVars = {Dir, Vars}) ->
+    Next = io:get_line(FD, ''),
+    case toks(Chars) of
+        [] ->
+            fload(FD, extra_cgi_vars, GC, C, Cs, Lno+1, Next, EVars);
+        [Var, '=', Val] ->
+	    fload(FD, extra_cgi_vars, GC, C, Cs, Lno+1, Next, {Dir, [{Var, Val} | Vars]});
+        ['<', "/extra_cgi_vars", '>'] ->
+            C2 = C#sconf{extra_cgi_vars = [EVars | C#sconf.extra_cgi_vars]},
             fload(FD, server, GC, C2, Cs, Lno+1, Next);
         [H|T] ->
             {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])}
@@ -1121,12 +1338,12 @@ is_bool(_) ->
 
 warn_dir(Type, Dir) ->
     case is_dir(Dir) of
-	true ->
-	    true;
-	false ->
-	    error_logger:format("Config Warning: Directory ~s for ~s doesn't exist~n",
-				[Dir, Type]),
-	    false
+        true ->
+            true;
+        false ->
+            error_logger:format("Config Warning: Directory ~s for ~s doesn't exist~n",
+                                [Dir, Type]),
+            false
     end.
 
 is_dir(Val) ->
@@ -1226,10 +1443,47 @@ is_special(C) ->
     lists:member(C, [$=, $<, $>, $,]).
 
 
+parse_soap_srv_mods(['<', Module, ',' , Handler, ',', WsdlFile, '>' | Tail], Ack) ->
+	case is_file(WsdlFile) of
+		true ->
+			S = { {list_to_atom(Module), list_to_atom(Handler)}, WsdlFile},
+			parse_soap_srv_mods(Tail, [S |Ack]);
+		false ->
+			{error, ?F("Bad wsdl file ~p", [WsdlFile])}
+	end;
+
+parse_soap_srv_mods(['<', Module, ',' , Handler, ',', WsdlFile, ',', Prefix, '>' | Tail], Ack) ->
+	case is_file(WsdlFile) of
+		true ->
+			S = { {list_to_atom(Module), list_to_atom(Handler)}, WsdlFile, Prefix},
+			parse_soap_srv_mods(Tail, [S |Ack]);
+		false ->
+			{error, ?F("Bad wsdl file ~p", [WsdlFile])}
+	end;
+
+parse_soap_srv_mods([ SoapSrvMod | _Tail], _Ack) ->
+	{error, ?F("Bad soap_srv_mods syntax: ~p", [SoapSrvMod])};
+
+parse_soap_srv_mods([], Ack) ->
+    {ok, Ack}.
 
 parse_appmods(['<', PathElem, ',' , AppMod, '>' | Tail], Ack) ->
     S = {PathElem , list_to_atom(AppMod)},
     parse_appmods(Tail, [S |Ack]);
+
+parse_appmods(['<', PathElem, ',' , AppMod, "exclude_paths" |Tail], Ack)->
+    Paths = lists:takewhile(fun(X) -> X /= '>' end, 
+                            Tail),
+    Tail2 = lists:dropwhile(fun(X) -> X /= '>' end, 
+                            Tail),
+    Tail3 = tl(Tail2),
+
+    S = {PathElem , list_to_atom(AppMod), lists:map(
+                                            fun(Str) ->
+                                                    string:tokens(Str, "/")
+                                            end, Paths)},
+    parse_appmods(Tail3, [S |Ack]);
+
 
 parse_appmods([AppMod | Tail], Ack) ->
     %% just some simpleminded test to catch syntax errors in the config
@@ -1377,7 +1631,9 @@ eq_sconfs(S1,S2) ->
      S1#sconf.start_mod == S2#sconf.start_mod andalso
      S1#sconf.allowed_scripts == S2#sconf.allowed_scripts andalso
      S1#sconf.revproxy == S2#sconf.revproxy andalso
-     S1#sconf.soptions == S2#sconf.soptions).
+     S1#sconf.soptions == S2#sconf.soptions andalso
+     S1#sconf.fcgi_app_server_host == S2#sconf.fcgi_app_server_host andalso
+     S1#sconf.fcgi_app_server_port == S2#sconf.fcgi_app_server_port).
 
 
 
@@ -1522,24 +1778,24 @@ find_sc(_SC,[]) ->
     false.
 
 
-
-
-
-verify_upgrade_args(GC, Groups0) when record(GC, gconf) ->
+verify_upgrade_args(GC, Groups0) when is_record(GC, gconf) ->
     case is_groups(Groups0) of
         true ->
-            %% embeded code may give appmods as a list of strings
-            %% So the above is for backwards compatibility
-            %% appmods should be {StringPathElem, ModAtom} tuples
+            %% Embedded code may give appmods as a list of strings, or
+            %% appmods can be {StringPathElem,ModAtom} or
+            %% {StringPathElem,ModAtom,ExcludePathsList} tuples. Handle
+            %% all possible variants here.
             Groups = yaws:deepmap(
                        fun(SC) ->
                                SC#sconf{appmods =
                                         lists:map(
                                           fun({PE, Mod}) ->
                                                   {PE, Mod};
-                                             (AM) when list(AM) ->
+                                             ({PE,Mod,Ex}) ->
+                                                  {PE,Mod,Ex};
+                                             (AM) when is_list(AM) ->
                                                   {AM,list_to_atom(AM)};
-                                             (AM) when atom(AM) ->
+                                             (AM) when is_atom(AM) ->
                                                   {atom_to_list(AM), AM}
                                           end,
                                           SC#sconf.appmods)}
@@ -1561,7 +1817,7 @@ is_groups([H|T]) ->
 is_groups([]) ->
     true.
 
-is_list_of_scs([H|T]) when record(H, sconf) ->
+is_list_of_scs([H|T]) when is_record(H, sconf) ->
     is_list_of_scs(T);
 is_list_of_scs([]) ->
     true;
@@ -1581,4 +1837,3 @@ delete_sconf(SC) ->
 
 update_gconf(GC) ->
     ok = gen_server:call(yaws_server, {update_gconf, GC}, infinity).
-

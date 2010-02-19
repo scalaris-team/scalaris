@@ -18,7 +18,8 @@
 -export([start/0, stop/0, hup/1, restart/0, modules/0, load/0]).
 -export([start_embedded/1, start_embedded/2, start_embedded/3,
          start_embedded/4,
-         add_server/2]). 
+	 add_server/2,
+	 create_gconf/2, create_sconf/2]).
 -export([new_ssl/0,
          ssl_keyfile/1, ssl_keyfile/2,
          ssl_certfile/1, ssl_certfile/2,
@@ -39,7 +40,8 @@
          strip_spaces/1, strip_spaces/2,
          month/1, mk2/1, home/0,
          arg_rewrite/1, to_lowerchar/1, to_lower/1, funreverse/2, is_prefix/2,
-         split_sep/2, accepts_gzip/2, upto_char/2, deepmap/2,
+         split_sep/2, join_sep/2,
+         accepts_gzip/2, upto_char/2, deepmap/2,
          ticker/2, ticker/3]).
 
 -export([outh_set_status_code/1,
@@ -55,6 +57,7 @@
          outh_set_content_length/1,
          outh_set_dcc/2,
          outh_set_transfer_encoding_off/0,
+	 outh_set_auth/1,
          outh_fix_doclose/0,
          dcc/2]).
 
@@ -99,11 +102,10 @@
 -export([sconf_to_srvstr/1, 
          redirect_host/2, redirect_port/1,
          redirect_scheme_port/1, redirect_scheme/1,
-         tmpdir/0, split_at/2,
+         tmpdir/0, tmpdir/1, split_at/2,
          id_dir/1, ctl_file/1]).
          
-% TS: added export
--export([setup_gconf/2, setup_sconf/3]).        
+         
          
 
 -import(lists, [reverse/1, reverse/2]).
@@ -123,12 +125,12 @@ stop() ->
 start_embedded(DocRoot) ->
     start_embedded(DocRoot, []).
 
-start_embedded(DocRoot, SL) when list(DocRoot),list(SL) ->
+start_embedded(DocRoot, SL) when is_list(DocRoot),is_list(SL) ->
     start_embedded(DocRoot, SL, []).
 
-start_embedded(DocRoot, SL, GL) when list(DocRoot),list(SL),list(GL) ->
+start_embedded(DocRoot, SL, GL) when is_list(DocRoot),is_list(SL),is_list(GL) ->
     start_embedded(DocRoot, SL, GL, "default").
-start_embedded(DocRoot, SL, GL, Id) when list(DocRoot),list(SL),list(GL) ->
+start_embedded(DocRoot, SL, GL, Id) when is_list(DocRoot),is_list(SL),is_list(GL) ->
     case application:load(yaws) of
         ok -> ok;
         {error, {already_loaded,yaws}} -> ok;
@@ -137,15 +139,27 @@ start_embedded(DocRoot, SL, GL, Id) when list(DocRoot),list(SL),list(GL) ->
     ok = application:set_env(yaws, embedded, true),
     ok = application:set_env(yaws, id, Id),
     application:start(yaws),
-    GC = setup_gconf(GL, yaws_config:make_default_gconf(false, Id)),
-    SC = setup_sconf(DocRoot, #sconf{}, SL),
+    GC = create_gconf(GL, Id),
+    SC = create_sconf(DocRoot, SL),
     yaws_config:add_yaws_soap_srv(GC),
-    SCs = yaws_config:add_yaws_auth([SC]),
-    yaws_api:setconf(GC, [SCs]).
+    yaws_api:setconf(GC, [[SC]]).
 
-add_server(DocRoot, SL) when list(DocRoot),list(SL) ->
-    SC = setup_sconf(DocRoot, #sconf{}, SL),
-    yaws_config:add_sconf(SC).
+add_server(DocRoot, SL) when is_list(DocRoot),is_list(SL) ->
+    SC  = create_sconf(DocRoot, SL),
+    %% Change #auth in authdirs to {Dir, #auth} if needed
+    Fun = fun
+	      (A = #auth{dir = [Dir]}, Acc) -> [{Dir, A}| Acc];
+	      (A, Acc)                      -> [A| Acc]
+	  end,
+    Authdirs = lists:foldr(Fun, [], SC#sconf.authdirs),
+    yaws_config:add_sconf(SC#sconf{authdirs = Authdirs}).
+
+create_gconf(GL, Id) when is_list(GL) ->
+    setup_gconf(GL, yaws_config:make_default_gconf(false, Id)).
+
+create_sconf(DocRoot, SL) when is_list(DocRoot), is_list(SL) ->
+    setup_sconf(DocRoot, #sconf{}, SL).
+
 
 %%% Access functions for the SSL record.
 new_ssl()             -> #ssl{}.
@@ -197,8 +211,8 @@ setup_gconf(GL, GC) ->
                                 GC#gconf.log_wrap_size),
            cache_refresh_secs = lkup(cache_refresh_secs, GL, 
                                      GC#gconf.cache_refresh_secs),
-            mnesia_dir = lkup(mnesia_dir, GL,
-			      GC#gconf.mnesia_dir),
+           mnesia_dir = lkup(mnesia_dir, GL,
+                             GC#gconf.mnesia_dir),
            include_dir = lkup(include_dir, GL, 
                               GC#gconf.include_dir),
            phpexe = lkup(phpexe, GL, 
@@ -218,6 +232,8 @@ set_gc_flags([{debug, Bool}|T], Flags) ->
 set_gc_flags([{auth_log, Bool}|T], Flags) -> 
     set_gc_flags(T, flag(Flags, ?GC_AUTH_LOG, Bool));
 set_gc_flags([{copy_errlog, Bool}|T], Flags) -> 
+    set_gc_flags(T, flag(Flags, ?GC_COPY_ERRLOG, Bool));
+set_gc_flags([{copy_error_log, Bool}|T], Flags) ->
     set_gc_flags(T, flag(Flags, ?GC_COPY_ERRLOG, Bool));
 set_gc_flags([{backwards_compat_parse, Bool}|T], Flags) -> 
     set_gc_flags(T, flag(Flags, ?GC_BACKWARDS_COMPAT_PARSE, Bool));
@@ -255,14 +271,15 @@ setup_sconf(DocRoot, D, SL) ->
                              D#sconf.servername),
            ets = lkup(ets, SL, 
                       D#sconf.ets),
-           ssl = lkup(ssl, SL, 
-                      D#sconf.ssl),
+           ssl = setup_sconf_ssl(SL, D#sconf.ssl),
            authdirs = lkup(authdirs, SL, 
                            D#sconf.authdirs),
            partial_post_size = lkup(partial_post_size, SL, 
                                     D#sconf.partial_post_size),
            appmods = lkup(appmods, SL, 
                           D#sconf.appmods),
+           errormod_401 = lkup(errormod_401, SL,
+                               D#sconf.errormod_401),
            errormod_404 = lkup(errormod_404, SL, 
                                D#sconf.errormod_404),
            errormod_crash = lkup(errormod_crash, SL, 
@@ -278,12 +295,46 @@ setup_sconf(DocRoot, D, SL) ->
            revproxy = lkup(revproxy, SL, 
                            D#sconf.revproxy),
            soptions = lkup(soptions, SL,
-                           D#sconf.soptions)}.
+                           D#sconf.soptions),
+           stats = lkup(stats, SL, D#sconf.stats),
+           fcgi_app_server_host = lkup(fcgi_app_server_host, SL, 
+                                       D#sconf.fcgi_app_server_host),
+           fcgi_app_server_port = lkup(fcgi_app_server_port, SL, 
+                                       D#sconf.fcgi_app_server_port)}.
+
+setup_sconf_ssl(SL, DefaultSSL) ->
+    case lkup(ssl, SL, undefined) of
+	undefined ->
+	    DefaultSSL;
+	SSL when is_record(SSL, ssl) ->
+	    SSL;
+	SSLProps when is_list(SSLProps) ->
+	    SSL1 = #ssl{
+	      keyfile = proplists:get_value(keyfile, SSLProps),
+	      certfile = proplists:get_value(certfile, SSLProps),
+	      password = proplists:get_value(password, SSLProps),
+	      cacertfile = proplists:get_value(cacertfile, SSLProps),
+	      ciphers = proplists:get_value(ciphers, SSLProps),
+	      cachetimeout = proplists:get_value(cachetimeout, SSLProps)
+	     },
+	    %% Prevent overriding the ssl record's default values!
+	    SSL2 =
+		case proplists:get_value(verify, SSLProps) of
+		    undefined -> SSL1;
+		    Verify -> SSL1#ssl{verify=Verify}
+		end,
+	    case proplists:get_value(depth, SSLProps) of
+		undefined -> SSL2;
+		Depth -> SSL2#ssl{depth=Depth}
+	    end
+    end.
 
 set_sc_flags([{access_log, Bool}|T], Flags) ->
     set_sc_flags(T, flag(Flags, ?SC_ACCESS_LOG, Bool));
 set_sc_flags([{add_port, Bool}|T], Flags) ->
     set_sc_flags(T, flag(Flags, ?SC_ADD_PORT, Bool));
+set_sc_flags([{statistics, Bool}|T], Flags) ->
+    set_sc_flags(T, flag(Flags, ?SC_STATISTICS, Bool));
 set_sc_flags([{tilde_expand, Bool}|T], Flags) ->
     set_sc_flags(T, flag(Flags, ?SC_TILDE_EXPAND, Bool));
 set_sc_flags([{dir_listings, Bool}|T], Flags) ->
@@ -294,7 +345,12 @@ set_sc_flags([{dir_all_zip, Bool}|T], Flags) ->
     set_sc_flags(T, flag(Flags, ?SC_DIR_ALL_ZIP, Bool));
 set_sc_flags([{dav, Bool}|T], Flags) ->
     set_sc_flags(T, flag(Flags, ?SC_DAV, Bool));
-set_sc_flags([_|T], Flags) ->
+set_sc_flags([{fcgi_trace_protocol, Bool}|T], Flags) ->
+    set_sc_flags(T, flag(Flags, ?SC_FCGI_TRACE_PROTOCOL, Bool));
+set_sc_flags([{forward_proxy, Bool}|T], Flags) ->
+    set_sc_flags(T, flag(Flags, ?SC_FORWARD_PROXY, Bool));
+set_sc_flags([_Unknown|T], Flags) ->
+    error_logger:format("Unknown and unhandled flag ~p~n", [_Unknown]),
     set_sc_flags(T, Flags);
 set_sc_flags([], Flags) ->
     Flags.
@@ -387,11 +443,11 @@ int_to_wd(7) ->
     "Sun".
 
 
-to_string(X) when float(X) ->
+to_string(X) when is_float(X) ->
     io_lib:format("~.2.0f",[X]);
-to_string(X) when integer(X) ->
+to_string(X) when is_integer(X) ->
     integer_to_list(X);
-to_string(X) when atom(X) ->
+to_string(X) when is_atom(X) ->
     atom_to_list(X);
 to_string(X) ->
     lists:concat([X]).
@@ -399,9 +455,9 @@ to_string(X) ->
 %%
 
 
-to_list(L) when list(L) ->
+to_list(L) when is_list(L) ->
     L;
-to_list(A) when atom(A) ->
+to_list(A) when is_atom(A) ->
     atom_to_list(A).
 
 
@@ -464,11 +520,10 @@ local_time_as_gmt_string(LocalTime) ->
     time_to_string(erlang:localtime_to_universaltime(LocalTime),"GMT").
 
 
-time_to_string( {{Year, Month, Day}, {Hour, Min, Sec}}, Zone) ->
-    io_lib:format("~s, ~s ~s ~w ~s:~s:~s ~s",
-                  [day(Year, Month, Day),
-                   mk2(Day), month(Month), Year,
-                   mk2(Hour), mk2(Min), mk2(Sec), Zone]).
+time_to_string({{Year, Month, Day}, {Hour, Min, Sec}}, Zone) ->
+    [day(Year, Month, Day), ", ",
+     mk2(Day), " ", month(Month), " ", integer_to_list(Year), " ",
+     mk2(Hour), ":", mk2(Min), ":", mk2(Sec), " ", Zone].
 
 
 
@@ -703,13 +758,13 @@ printversion() ->
     io:format("Yaws ~s~n", [yaws_generated:version()]),
     init:stop().
 
-%% our default arg rewriteer does's of cource nothing
+%% our default arg rewriter does of course nothing
 arg_rewrite(A) ->
     A.
 
 is_ssl(#sconf{ssl = undefined}) ->
     nossl;
-is_ssl(#sconf{ssl = S}) when record(S, ssl) ->
+is_ssl(#sconf{ssl = S}) when is_record(S, ssl) ->
     ssl.
 
 
@@ -755,7 +810,7 @@ is_prefix(_,_) ->
     false.
 
 
-%% Split a string of words seperated by Sep into a list of words and
+%% Split a string of words separated by Sep into a list of words and
 %% strip off white space.
 %%
 %% HTML semantics are used, such that empty words are omitted.
@@ -785,6 +840,15 @@ split_sep([Sep|Tail], Sep, AccW, AccL) ->
               [lists:reverse(drop_spaces(AccW))|AccL]);
 split_sep([C|Tail], Sep, AccW, AccL) ->
     split_sep(Tail, Sep, [C|AccW], AccL).
+
+
+%% Join strings with separator. Same as string:join in later
+%% versions of Erlang. Separator is expected to be a list.
+
+join_sep([], Sep) when is_list(Sep) ->
+    [];
+join_sep([H|T], Sep) ->
+    H ++ lists:append([Sep ++ X || X <- T]).
 
 
 %% header parsing
@@ -1089,7 +1153,7 @@ outh_set_static_headers(Req, UT, Headers, Range) ->
         = case Range of 
               all ->
                   case UT#urltype.deflate of
-                      DB when binary(DB) -> % cached
+                      DB when is_binary(DB) -> % cached
                           case accepts_gzip(Headers, UT#urltype.mime) of
                               true -> {true, size(DB)};
                               false -> {false, FIL}
@@ -1222,6 +1286,19 @@ outh_set_transfer_encoding_off() ->
                 make_transfer_encoding_chunked_header(false)},
     put(outh, H2).
 
+outh_set_auth([]) ->
+    ok;
+
+outh_set_auth(Headers) ->
+    H = get(outh),
+    L = H#outh.www_authenticate,
+    H2 = case L of
+	     undefined ->
+		 H#outh{www_authenticate = Headers};
+	     _ ->
+		 H#outh{www_authenticate = H#outh.www_authenticate ++ Headers}
+	 end,
+    put(outh, H2).
 
 outh_fix_doclose() ->
     H = get(outh),
@@ -1331,22 +1408,21 @@ pack_bin(<<_:6,A:6,B:6,C:6,D:6,E:6,F:6,G:6,H:6,I:6,J:6,K:6>>) ->
 
 %% Like Base64 for no particular reason.
 pc(X) when X >= 0, X < 26 -> 
-            X + $A;
-     pc(X) when X >= 26, X < 52 -> 
-            X - 26 + $a;
-     pc(X) when X >= 52, X < 62 ->
-            X - 52 + $0;
-     pc(62) ->
-            $+;
-                pc(63) ->
-                    $/.
+    X + $A;
+pc(X) when X >= 26, X < 52 -> 
+    X - 26 + $a;
+pc(X) when X >= 52, X < 62 ->
+    X - 52 + $0;
+pc(62) ->
+    $+;
+pc(63) ->
+    $/.
 
 
-
-                        make_content_type_header(no_content_type) ->
-                               undefined;
-                        make_content_type_header(MimeType) ->
-                               ["Content-Type: ", MimeType, "\r\n"].
+make_content_type_header(no_content_type) ->
+    undefined;
+make_content_type_header(MimeType) ->
+    ["Content-Type: ", MimeType, "\r\n"].
 
 
 make_content_range_header(all) ->
@@ -1356,9 +1432,9 @@ make_content_range_header({fromto, From, To, Tot}) ->
      integer_to_list(From), $-, integer_to_list(To),
      $/, integer_to_list(Tot), $\r, $\n].
 
-make_content_length_header(Size) when integer(Size) ->
+make_content_length_header(Size) when is_integer(Size) ->
     ["Content-Length: ", integer_to_list(Size), "\r\n"];
-make_content_length_header(FI) when record(FI, file_info) ->
+make_content_length_header(FI) when is_record(FI, file_info) ->
     Size = FI#file_info.size,
     ["Content-Length: ", integer_to_list(Size), "\r\n"];
 make_content_length_header(_) ->
@@ -1381,9 +1457,11 @@ make_transfer_encoding_chunked_header(true) ->
 make_transfer_encoding_chunked_header(false) ->
     undefined.
 
-make_www_authenticate_header(Realm) ->
-    ["WWW-Authenticate: Basic realm=\"", Realm, ["\"\r\n"]].
+make_www_authenticate_header({realm, Realm}) ->
+    ["WWW-Authenticate: Basic realm=\"", Realm, ["\"\r\n"]];
 
+make_www_authenticate_header(Method) ->
+    ["WWW-Authenticate: ", Method, ["\r\n"]].
 
 make_date_header() ->
     N = element(2, now()),
@@ -1489,7 +1567,7 @@ noundef(Str) ->
 
 
 
-accumulate_header({X, erase}) when atom(X) ->
+accumulate_header({X, erase}) when is_atom(X) ->
     erase_header(X);
 
 %% special headers
@@ -1540,7 +1618,7 @@ accumulate_header({content_encoding, What}) ->
 accumulate_header({"Content-Encoding", What}) ->
     accumulate_header({content_encoding, What});
 
-accumulate_header({content_length, Len}) when integer(Len) ->
+accumulate_header({content_length, Len}) when is_integer(Len) ->
     H = get(outh),
     put(outh, H#outh{
                 chunked = false,
@@ -1549,15 +1627,15 @@ accumulate_header({content_length, Len}) when integer(Len) ->
                 content_length = make_content_length_header(Len)});
 accumulate_header({"Content-Length", Len}) ->
     case Len of
-        I when integer(I) ->
+        I when is_integer(I) ->
             accumulate_header({content_length, I});
-        L when list(L) ->
+        L when is_list(L) ->
             accumulate_header({content_length, list_to_integer(L)})
     end;
 
 %% non-special headers (which may be special in a future Yaws version)
 
-accumulate_header({Name, What}) when list(Name) ->
+accumulate_header({Name, What}) when is_list(Name) ->
     H = get(outh),
     Old = case H#outh.other of
               undefined ->
@@ -1571,7 +1649,7 @@ accumulate_header({Name, What}) when list(Name) ->
 
 
 %% backwards compatible clause
-accumulate_header(Data) when list(Data) ->
+accumulate_header(Data) when is_list(Data) ->
     Str = lists:flatten(Data),
     accumulate_header(split_header(Str)).
 
@@ -1588,7 +1666,7 @@ split_header([C|S], A) ->
 
 
 erase_header(connection) ->
-    put(outh, (get(outh))#outh{connection = undefined});
+    put(outh, (get(outh))#outh{connection = undefined, doclose = false});
 erase_header(cache_control) ->
     put(outh, (get(outh))#outh{cache_control = undefined});
 erase_header(set_cookie) ->
@@ -1705,7 +1783,7 @@ cli_recv(S, Num, SslBool) ->
 cli_recv_trace(false, _) -> ok;
 cli_recv_trace(Trace, Res) ->
     case Res of
-        {ok, Val} when tuple(Val) ->
+        {ok, Val} when is_tuple(Val) ->
             yaws_log:trace_traffic(from_client, ?F("~p~n", [Val]));
         {error, What} ->
             yaws_log:trace_traffic(from_client, ?F("~n~p~n", [What]));
@@ -1726,10 +1804,12 @@ gen_tcp_send(S, Data) ->
               _SSL ->
                   ssl:send(S, Data)
           end,
+    Size = iolist_size(Data),
     case ?gc_has_debug((get(gc))) of
         false ->
             case Res of
                 ok ->
+		    yaws_stats:sent(Size),
                     ok;
                 _Err ->
                     exit(normal)   %% keep quiet
@@ -1737,6 +1817,7 @@ gen_tcp_send(S, Data) ->
         true ->
             case Res of
                 ok ->
+		    yaws_stats:sent(Size),
                     ?Debug("Sent ~p~n", [yaws_debug:nobin(Data)]),
                     ok;
                 Err ->
@@ -1771,12 +1852,18 @@ http_get_headers(CliSock, SSL) ->
     if
         GC#gconf.trace == false ->
             Res;
-        tuple(Res) ->
-            {Request, Headers} = Res,
-            ReqStr = yaws_api:reformat_request(Request),
+        is_tuple(Res) ->
+            {RoR, Headers} = Res,
+            {RoRStr, From} = case element(1, RoR) of
+                                 http_request ->
+                                     {yaws_api:reformat_request(RoR),
+                                      from_client};
+                                 http_response ->
+                                     {yaws_api:reformat_response(RoR),
+                                      from_server}
+                             end,
             HStr = headers_to_str(Headers),
-            yaws_log:trace_traffic(from_client, 
-                                   ?F("~n~s~n~s~n",[ReqStr, HStr])),
+            yaws_log:trace_traffic(From, ?F("~n~s~n~s~n",[RoRStr, HStr])),
             Res;
         Res == closed ->
             yaws_log:trace_traffic(from_client, "closed\n"),
@@ -1811,9 +1898,9 @@ do_http_get_headers(CliSock, SSL) ->
 
 http_recv_request(CliSock, SSL) ->
     case do_recv(CliSock, 0,  SSL) of
-        {ok, R} when record(R, http_request) ->
+        {ok, R} when is_record(R, http_request) ->
             R;
-        {ok, R} when record(R, http_response) ->
+        {ok, R} when is_record(R, http_response) ->
             R;
         {error, {http_error, "\r\n"}} ->
             http_recv_request(CliSock, SSL);
@@ -1942,24 +2029,27 @@ parse_auth(_) ->
     undefined.
 
 
-
 decode_base64([]) ->
     [];
-decode_base64([Sextet1,Sextet2,$=,$=|Rest]) ->
+decode_base64(Auth64) ->
+    decode_base64(Auth64, []).
+decode_base64([], Acc) ->
+    lists:reverse(Acc);
+decode_base64([Sextet1,Sextet2,$=,$=|Rest], Acc) ->
     Bits2x6=
         (d(Sextet1) bsl 18) bor
         (d(Sextet2) bsl 12),
     Octet1=Bits2x6 bsr 16,
-    [Octet1|decode_base64(Rest)];
-decode_base64([Sextet1,Sextet2,Sextet3,$=|Rest]) ->
+    decode_base64(Rest, [Octet1|Acc]);
+decode_base64([Sextet1,Sextet2,Sextet3,$=|Rest], Acc) ->
     Bits3x6=
         (d(Sextet1) bsl 18) bor
         (d(Sextet2) bsl 12) bor
         (d(Sextet3) bsl 6),
     Octet1=Bits3x6 bsr 16,
     Octet2=(Bits3x6 bsr 8) band 16#ff,
-    [Octet1,Octet2|decode_base64(Rest)];
-decode_base64([Sextet1,Sextet2,Sextet3,Sextet4|Rest]) ->
+    decode_base64(Rest, [Octet2,Octet1|Acc]);
+decode_base64([Sextet1,Sextet2,Sextet3,Sextet4|Rest], Acc) ->
     Bits4x6=
         (d(Sextet1) bsl 18) bor
         (d(Sextet2) bsl 12) bor
@@ -1968,8 +2058,8 @@ decode_base64([Sextet1,Sextet2,Sextet3,Sextet4|Rest]) ->
     Octet1=Bits4x6 bsr 16,
     Octet2=(Bits4x6 bsr 8) band 16#ff,
     Octet3=Bits4x6 band 16#ff,
-    [Octet1,Octet2,Octet3|decode_base64(Rest)];
-decode_base64(_CatchAll) ->
+    decode_base64(Rest, [Octet3,Octet2,Octet1|Acc]);
+decode_base64(_CatchAll, _Acc) ->
     {error, bad_base64}.
 
 d(X) when X >= $A, X =<$Z ->
@@ -2025,12 +2115,12 @@ load(M) ->
 
 upto_char(Char, [Char|_]) ->
     [];
-upto_char(Char, [H|T]) when integer(H) ->
+upto_char(Char, [H|T]) when is_integer(H) ->
     [H|upto_char(Char, T)];
 upto_char(_, []) ->
     [];
 %% deep lists
-upto_char(Char, [H|T]) when list(H) ->
+upto_char(Char, [H|T]) when is_list(H) ->
     case lists:member(Char ,H) of
         true ->
             upto_char(Char, H);
@@ -2042,7 +2132,7 @@ upto_char(Char, [H|T]) when list(H) ->
 %% map over deep list and maintain
 %% list structure as is
 
-deepmap(Fun, [H|T]) when list(H) ->
+deepmap(Fun, [H|T]) when is_list(H) ->
     [deepmap(Fun, H) | deepmap(Fun, T)];
 deepmap(Fun, [H|T]) ->
     [Fun(H) | deepmap(Fun,T)];
@@ -2056,7 +2146,7 @@ sconf_to_srvstr(SC) ->
 
 redirect_scheme(SC) ->
     case {SC#sconf.ssl,SC#sconf.rmethod} of
-        {_, Method} when list(Method) ->
+        {_, Method} when is_list(Method) ->
             Method++"://";
         {undefined,_} ->
             "http://";
@@ -2103,6 +2193,8 @@ redirect_scheme_port(SC) ->
     {Scheme, PortPart}.
 
 tmpdir() ->
+    tmpdir(filename:join([home(), ".yaws"])).
+tmpdir(DefaultTmpDir) ->
     case os:type() of
         {win32,_} ->
             case os:getenv("TEMP") of
@@ -2126,10 +2218,10 @@ tmpdir() ->
                     PathTEMP
             end;
         _ ->
-	    filename:join([home(), ".yaws"])
+	    DefaultTmpDir
     end.
 
-%% This feature is useable together with 
+%% This feature is usable together with 
 %% privbind and authbind on linux
 
 home() ->
@@ -2166,11 +2258,13 @@ get_chunk_num(Fd,SSL) ->
             exit(normal)
     end.
 
-nonl(B) when binary(B) ->
+nonl(B) when is_binary(B) ->
     nonl(binary_to_list(B));
 nonl([10|T]) ->
     nonl(T);
 nonl([13|T]) ->
+    nonl(T);
+nonl([32|T]) ->
     nonl(T);
 nonl([H|T]) ->
     [H|nonl(T)];

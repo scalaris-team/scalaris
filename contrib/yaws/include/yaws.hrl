@@ -32,8 +32,6 @@
         ((GC#gconf.flags band ?GC_AUTH_LOG) /= 0)).
 -define(gc_has_copy_errlog(GC), 
         ((GC#gconf.flags band ?GC_COPY_ERRLOG) /= 0)).
--define(gc_has_backwards_compat_parse(GC), 
-        ((GC#gconf.flags band ?GC_BACKWARDS_COMPAT_PARSE) /= 0)).
 -define(gc_log_has_resolve_hostname(GC), 
         ((GC#gconf.flags band ?GC_LOG_RESOLVE_HOSTNAME) /= 0)).
 -define(gc_fail_on_bind_err(GC), 
@@ -53,9 +51,6 @@
         GC#gconf{flags = yaws:flag(GC#gconf.flags, ?GC_AUTH_LOG, Bool)}).
 -define(gc_set_copy_errlog(GC, Bool), 
         GC#gconf{flags = yaws:flag(GC#gconf.flags, ?GC_COPY_ERRLOG, Bool)}).
--define(gc_set_backwards_compat_parse(GC, Bool), 
-        GC#gconf{flags = yaws:flag(GC#gconf.flags, 
-                                   ?GC_BACKWARDS_COMPAT_PARSE, Bool)}).
 -define(gc_log_set_resolve_hostname(GC, Bool), 
         GC#gconf{flags = yaws:flag(GC#gconf.flags, 
                                    ?GC_LOG_RESOLVE_HOSTNAME, Bool)}).
@@ -82,15 +77,20 @@
                max_num_cached_files = 400,
                max_num_cached_bytes = 1000000,  %% 1 MEG
                max_size_cached_file = 8000,
+	       max_connections = nolimit, %% max number of TCP connections 
                large_file_chunk_size = 10240,
-	       mnesia_dir = [],
+               mnesia_dir = [],
                log_wrap_size = 10000000,  % wrap logs after 10M
                cache_refresh_secs = 30,  % seconds  (auto zero when debug)
                include_dir = [],    %% list of inc dirs for .yaws files 
                phpexe = "/usr/bin/php-cgi",  %% cgi capable php executable
                yaws,                %% server string
                id = "default",      %% string identifying this instance of yaws
-               enable_soap = false  %% start yaws_soap_srv iff true
+               enable_soap = false, %% start yaws_soap_srv iff true
+               soap_srv_mods = []   %% a list of 
+                                    %% {{Mod, Func}, WsdlFile, Prefix } |
+                                    %%        {{Mod, Func}, WsdlFile}
+                                    %% automatically setup in yaws_soap_srv init.
               }).  
 
 
@@ -108,13 +108,18 @@
 
 
 %% flags for sconfs
--define(SC_ACCESS_LOG,   1).
--define(SC_ADD_PORT,     2).
--define(SC_TILDE_EXPAND, 8).
--define(SC_DIR_LISTINGS, 16).
--define(SC_DEFLATE,      32).
--define(SC_DIR_ALL_ZIP,  64).
--define(SC_DAV,         128).
+-define(SC_ACCESS_LOG,          1).
+-define(SC_ADD_PORT,            2).
+-define(SC_STATISTICS,   4).
+-define(SC_TILDE_EXPAND,        8).
+-define(SC_DIR_LISTINGS,        16).
+-define(SC_DEFLATE,             32).
+-define(SC_DIR_ALL_ZIP,         64).
+-define(SC_DAV,                 128).
+-define(SC_FCGI_TRACE_PROTOCOL, 512).
+-define(SC_FCGI_LOG_APP_ERROR,  1024).
+-define(SC_FORWARD_PROXY,       2048).
+
 
 -define(SC_DEF, ?SC_ACCESS_LOG bor ?SC_ADD_PORT).
 
@@ -122,6 +127,8 @@
         (((SC)#sconf.flags band ?SC_ACCESS_LOG) /= 0)).
 -define(sc_has_add_port(SC), 
         (((SC)#sconf.flags band ?SC_ADD_PORT) /= 0)).
+-define(sc_has_statistics(SC),
+        (((SC)#sconf.flags band ?SC_STATISTICS) /= 0)).
 -define(sc_has_tilde_expand(SC),
         (((SC)#sconf.flags band ?SC_TILDE_EXPAND) /= 0)).
 -define(sc_has_dir_listings(SC),
@@ -132,14 +139,22 @@
         (((SC)#sconf.flags band ?SC_DIR_ALL_ZIP) /= 0)).
 -define(sc_has_dav(SC),
         (((SC)#sconf.flags band ?SC_DAV) /= 0)).
+-define(sc_fcgi_trace_protocol(SC),
+        (((SC)#sconf.flags band ?SC_FCGI_TRACE_PROTOCOL) /= 0)).
+-define(sc_fcgi_log_app_error(SC),
+        (((SC)#sconf.flags band ?SC_FCGI_LOG_APP_ERROR) /= 0)).
+-define(sc_forward_proxy(SC),
+        (((SC)#sconf.flags band ?SC_FORWARD_PROXY) /= 0)).
 
 
 -define(sc_set_access_log(SC, Bool), 
         SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_ACCESS_LOG, Bool)}).
 -define(sc_set_add_port(SC, Bool), 
         SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_ADD_PORT, Bool)}).
+-define(sc_set_statistics(SC, Bool),
+        SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_STATISTICS, Bool)}).
 -define(sc_set_ssl(SC, Bool), 
-        SC#sconf{flags = yaws:flag(SC#sconf.flags , ?SC_SSL, Bool)}).
+        SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_SSL, Bool)}).
 -define(sc_set_tilde_expand(SC, Bool), 
         SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_TILDE_EXPAND, Bool)}).
 -define(sc_set_dir_listings(SC, Bool), 
@@ -150,6 +165,14 @@
         SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_DIR_ALL_ZIP, Bool)}).
 -define(sc_set_dav(SC, Bool), 
         SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_DAV, Bool)}).
+-define(sc_set_fcgi_trace_protocol(SC, Bool), 
+        SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_FCGI_TRACE_PROTOCOL, 
+                                   Bool)}).
+-define(sc_set_fcgi_log_app_error(SC, Bool), 
+        SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_FCGI_LOG_APP_ERROR, 
+                                   Bool)}).
+-define(sc_set_forward_proxy(SC, Bool), 
+        SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_FORWARD_PROXY, Bool)}).
 
 
 
@@ -171,21 +194,30 @@
          ssl,                        %% undefined | #ssl{}
          authdirs = [],
          partial_post_size = nolimit,
-         appmods = [],                %% list of modules for this app
-         errormod_404 = yaws_404,     %% the default 404 error module 
-         errormod_crash = yaws_404,   %% use the same module for crashes
+         appmods = [], 
+         %%  An item in the appmods list  can be either of the
+         %% following, this is all due to backwards compat issues.
+         %% 1.  an atom - this is the equivalent to {atom, atom}
+         %% 2 . A two tuple {Path, Mod}
+         %% 3 A three tuple {Path, Mod, [ExcludeDir ....]}
+
+         errormod_401 = yaws_outmod,     %% the default 401 error module
+         errormod_404 = yaws_outmod,     %% the default 404 error module 
+         errormod_crash = yaws_outmod,   %% use the same module for crashes
          arg_rewrite_mod = yaws,
-         opaque = [],                 %% useful in embedded mode
-         start_mod,                   %% user provided module to be started
-         allowed_scripts = [yaws,php,cgi],
+         opaque = [],                    %% useful in embedded mode
+         start_mod,                      %% user provided module to be started
+         allowed_scripts = [yaws,php,cgi,fcgi],
          tilde_allowed_scripts = [],
          revproxy = [],
          soptions = [],
+         extra_cgi_vars = [],
+	 stats,                       %% raw traffic statistics
+	 fcgi_app_server_host,        %% FastCGI application server host 
+                                      %% name or IP address
 
-         %% [{Extension:string(), Mod:atom()]
-         %% work in progress .....
-         extension_mods = [{"yxxxxxx", yaws_ext_handler_yaws}] 
-
+         fcgi_app_server_port         %% FastCGI application server port number
+         
         }).
 
 %% we cannot compare sconfs directly due to the ets
@@ -197,7 +229,8 @@
          {dir = [],
           realm = "",
           type = "Basic",
-          users = [],
+          headers = [],  %% headers to send on 401
+          users = [],   %% list of {User, Password} tuples
           mod = [],     %% authentication module callback
           pam = false   %% should we use pam to auth a user
          }).
@@ -265,12 +298,6 @@
 
 
 
-
--record(appmodspec, {
-          type,  %% atom, pair or absolute
-          data}).
-
-
 %% as read by application:get_env()
 -record(env, {debug,  
               trace,
@@ -281,3 +308,6 @@
               id
              }).
 
+%% Typically used in error printouts as in:
+%% error_logger:format("Err ~p at ~p~n", [Reason, ?stack()])
+-define(stack(), try throw(1) catch _:_ -> erlang:get_stacktrace() end).

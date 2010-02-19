@@ -8,7 +8,7 @@
 -module(yaws_api).
 -author('klacke@hyber.org').
 
-%% -compile(expot_all).
+%% -compile(export_all).
 
 
 -include("../include/yaws.hrl").
@@ -34,6 +34,10 @@
 -export([get_line/1, mime_type/1]).
 -export([stream_chunk_deliver/2, stream_chunk_deliver_blocking/2,
          stream_chunk_end/1]).
+-export([stream_process_deliver/2, stream_process_deliver_chunk/2,
+         stream_process_deliver_final_chunk/2, stream_process_end/2]).
+-export([websocket_send/2, websocket_receive/1,
+         websocket_unframe_data/1, websocket_setopts/2]).
 -export([new_cookie_session/1, new_cookie_session/2, new_cookie_session/3, 
          cookieval_to_opaque/1, request_url/1,
          print_cookie_sessions/0,
@@ -50,6 +54,9 @@
          set_access_log/1]).
 
 -export([call_cgi/2, call_cgi/3]).
+
+-export([call_fcgi_responder/1, call_fcgi_responder/2,
+         call_fcgi_authorizer/1, call_fcgi_authorizer/2]).
 
 -export([ehtml_expand/1, ehtml_expander/1, ehtml_apply/2,
          ehtml_expander_test/0]).
@@ -344,14 +351,14 @@ parse_multi(is_end, "\r", Boundary, Acc, Res, Tmp) ->
 
 do_header([]) -> {[]};
 do_header(Head) ->
-    {ok, Fields} = regexp:split(Head, "\r\n"),
+    Fields = string:tokens(Head, "\r\n"),
     MFields = merge_lines_822(Fields),
     Header = lists:map(fun isolate_arg/1, MFields),
     case lists:keysearch("content-disposition", 1, Header) of
         {value, {_,"form-data"++Line}} ->
             Parameters = parse_arg_line(Line),
             {value, {_,Name}} = lists:keysearch(name, 1, Parameters),
-            {mkkey(Name), Parameters};
+            {Name, Parameters};
         _ ->
             {Header}
     end.
@@ -408,7 +415,7 @@ do_parse_spec(<<$%, Hi:8, Lo:8, Tail/binary>>, Spec, Last, Cur, State)
     do_parse_spec(Tail, Spec, Last, [ Hex | Cur],  State);
                
 do_parse_spec(<<$&, Tail/binary>>, Spec, _Last , Cur,  key) ->
-    [{mkkey_reverse(Cur), undefined} |
+    [{lists:reverse(Cur), undefined} |
      do_parse_spec(Tail, Spec, nokey, [], key)];  %% cont keymode
 
 do_parse_spec(<<$&, Tail/binary>>, Spec, Last, Cur, value) ->
@@ -420,7 +427,7 @@ do_parse_spec(<<$+, Tail/binary>>, Spec, Last, Cur,  State) ->
     do_parse_spec(Tail, Spec, Last, [$\s|Cur], State);
 
 do_parse_spec(<<$=, Tail/binary>>, Spec, _Last, Cur, key) ->
-    do_parse_spec(Tail, Spec, mkkey_reverse(Cur), [], value); %% change mode
+    do_parse_spec(Tail, Spec, lists:reverse(Cur), [], value); %% change mode
 
 do_parse_spec(<<$%, $u, A:8, B:8,C:8,D:8, Tail/binary>>, 
 	       Spec, Last, Cur, State) ->
@@ -431,13 +438,13 @@ do_parse_spec(<<$%, $u, A:8, B:8,C:8,D:8, Tail/binary>>,
 do_parse_spec(<<H:8, Tail/binary>>, Spec, Last, Cur, State) ->
     do_parse_spec(Tail, Spec, Last, [H|Cur], State);
 do_parse_spec(<<>>, _Spec, nokey, Cur, _State) ->
-    [{mkkey_reverse(Cur), undefined}];
+    [{lists:reverse(Cur), undefined}];
 do_parse_spec(<<>>, Spec, Last, Cur, _State) ->
     [S|_Ss] = tail_spec(Spec),
     [{Last, coerce_type(S, Cur)}];
 do_parse_spec(undefined,_,_,_,_) ->
     [];
-do_parse_spec(QueryList, Spec, Last, Cur, State) when list(QueryList) ->
+do_parse_spec(QueryList, Spec, Last, Cur, State) when is_list(QueryList) ->
     do_parse_spec(list_to_binary(QueryList), Spec, Last, Cur, State).
 
 
@@ -462,19 +469,6 @@ coerce_type(ip, _Str) ->
     erlang:error(nyi_ip);
 coerce_type(binary, Str) ->
     list_to_binary(lists:reverse(Str)).
-
-mkkey_reverse(S) ->
-    mkkey(lists:reverse(S)).
-mkkey(S) ->
-    GC=get(gc),
-    if
-        ?gc_has_backwards_compat_parse(GC) ->
-            list_to_atom(S);
-        true ->
-            S
-    end.
-
-
 
 
 code_to_phrase(100) -> "Continue";
@@ -518,7 +512,17 @@ code_to_phrase(501) -> "Not Implemented";
 code_to_phrase(502) -> "Bad Gateway";
 code_to_phrase(503) -> "Service Unavailable";
 code_to_phrase(504) -> "Gateway Timeout";
-code_to_phrase(505) -> "HTTP Version Not Supported".
+code_to_phrase(505) -> "HTTP Version Not Supported";
+
+%% Below are some non-HTTP status codes from other protocol standards that
+%% we've seen used with HTTP in the wild, so we include them here. HTTP 1.1
+%% section 6.1.1 allows for this sort of extensibility, but we recommend
+%% sticking with the HTTP status codes above for maximal portability and
+%% interoperability.
+%%
+code_to_phrase(451) -> "Requested Action Aborted";   % from FTP (RFC 959)
+code_to_phrase(452) -> "Insufficient Storage Space"; % from FTP (RFC 959)
+code_to_phrase(453) -> "Not Enough Bandwidth".       % from RTSP (RFC 2326)
 
 
 
@@ -565,9 +569,9 @@ fl([]) ->
     [].
 
 %% htmlize
-htmlize(Bin) when binary(Bin) ->
+htmlize(Bin) when is_binary(Bin) ->
     list_to_binary(htmlize_l(binary_to_list(Bin)));
-htmlize(List) when list(List) ->
+htmlize(List) when is_list(List) ->
     htmlize_l(List).
 
 
@@ -580,8 +584,8 @@ htmlize_char($&) ->
     <<"&amp;">>;
 htmlize_char($") ->
     <<"&quot;">>;
-             htmlize_char(X) ->
-                    X.
+htmlize_char(X) ->
+    X.
 
 
 %% htmlize list (usually much more efficient than above)
@@ -597,14 +601,15 @@ htmlize_l([$&|Tail], Acc) ->
     htmlize_l(Tail, [$;,$p,$m,$a,$&|Acc]);
 htmlize_l([$"|Tail], Acc) ->
     htmlize_l(Tail, [$; , $t, $o,  $u,  $q  ,$&|Acc]);
-           htmlize_l([X|Tail], Acc) when integer(X) ->
-                  htmlize_l(Tail, [X|Acc]);
-           htmlize_l([X|Tail], Acc) when binary(X) ->
-                  X2 = htmlize_l(binary_to_list(X)),
-                  htmlize_l(Tail, [X2|Acc]);
-           htmlize_l([X|Tail], Ack) when list(X) ->
-                  X2 = htmlize_l(X),
-                  htmlize_l(Tail, [X2|Ack]).
+           
+htmlize_l([X|Tail], Acc) when is_integer(X) ->
+    htmlize_l(Tail, [X|Acc]);
+htmlize_l([X|Tail], Acc) when is_binary(X) ->
+    X2 = htmlize_l(binary_to_list(X)),
+    htmlize_l(Tail, [X2|Acc]);
+htmlize_l([X|Tail], Ack) when is_list(X) ->
+    X2 = htmlize_l(X),
+    htmlize_l(Tail, [X2|Ack]).
 
 
 
@@ -652,7 +657,7 @@ setcookie(Name, Value, Path, Expire, Domain, Secure) ->
 %% only the first match is returned
 
 
-find_cookie_val(Cookie, A) when record(A, arg) ->
+find_cookie_val(Cookie, A) when is_record(A, arg) ->
     find_cookie_val(Cookie,  (A#arg.headers)#headers.cookie);
 %%
 find_cookie_val(_Cookie, []) ->
@@ -670,7 +675,7 @@ eat_cookie([], _)           -> [];
 eat_cookie([$\s|T], Str)    -> eat_cookie(T, Str);
 eat_cookie(_, [])           -> [];
 eat_cookie(Cookie, [$\s|T]) -> eat_cookie(Cookie, T);
-eat_cookie(Cookie, Str) when list(Cookie),list(Str) ->
+eat_cookie(Cookie, Str) when is_list(Cookie),is_list(Str) ->
     try
         eat_cookie2(Cookie++"=", Str, Cookie)
     catch
@@ -702,14 +707,15 @@ url_decode([$%, Hi, Lo | Tail]) ->
             Hex = yaws:hex_to_integer([Hi, Lo]),
             [Hex | url_decode(Tail)];
             url_decode([$?|T]) ->
-                   %% Don't decode the query string here, that is parsed separately.
+                   %% Don't decode the query string here, that is 
+                   %% parsed separately.
                    [$?|T];
-            url_decode([H|T]) when integer(H) ->
+            url_decode([H|T]) when is_integer(H) ->
                    [H |url_decode(T)];
             url_decode([]) ->
                    [];
             %% deep lists
-            url_decode([H|T]) when list(H) ->
+            url_decode([H|T]) when is_list(H) ->
                    [url_decode(H) | url_decode(T)].
 
 
@@ -842,6 +848,68 @@ stream_chunk_deliver_blocking(YawsPid, Data) ->
 stream_chunk_end(YawsPid) ->
     YawsPid ! endofstreamcontent.
 
+stream_process_deliver(Sock={sslsocket,_,_}, IoList) ->
+    ssl:send(Sock, IoList);
+stream_process_deliver(Sock, IoList) ->
+    gen_tcp:send(Sock, IoList).
+
+stream_process_deliver_chunk(Sock, IoList) ->
+    Chunk = case erlang:iolist_size(IoList) of
+                0 ->
+                    stream_process_deliver_final_chunk(Sock, IoList);
+                S ->
+                    [yaws:integer_to_hex(S), "\r\n", IoList, "\r\n"]
+            end,
+    stream_process_deliver(Sock, Chunk).
+
+stream_process_deliver_final_chunk(Sock, IoList) ->
+    Chunk = case erlang:iolist_size(IoList) of
+                0 ->
+                    <<"0\r\n\r\n">>;
+                S ->
+                    [yaws:integer_to_hex(S), "\r\n", IoList, "\r\n0\r\n\r\n"]
+            end,
+    stream_process_deliver(Sock, Chunk).
+
+stream_process_end(Sock={sslsocket,_,_}, YawsPid) ->
+    ssl:controlling_process(Sock, YawsPid),
+    YawsPid ! endofstreamcontent;
+stream_process_end(Sock, YawsPid) ->
+    gen_tcp:controlling_process(Sock, YawsPid),
+    YawsPid ! endofstreamcontent.
+
+
+websocket_send(Socket, IoList) ->
+    DataFrame = [0, IoList, 255],
+    case Socket of
+	{sslsocket,_,_} ->
+	    ssl:send(Socket, DataFrame);
+	_ ->
+	    gen_tcp:send(Socket, DataFrame)
+    end.
+
+websocket_receive(Socket) ->
+    R = case Socket of
+	    {sslsocket,_,_} ->
+		ssl:recv(Socket, 0);
+	    _ ->
+		gen_tcp:recv(Socket, 0)
+	end,
+    case R of
+	{ok, DataFrames} ->
+	    ReceivedMsgs = yaws_websockets:unframe_all(DataFrames, []),
+	    {ok, ReceivedMsgs};
+	_ -> R
+    end.
+
+websocket_unframe_data(DataFrameBin) ->
+    {ok, Msg, <<>>} = yaws_websockets:unframe_one(DataFrameBin),
+    Msg.
+
+websocket_setopts({sslsocket,_,_}=Socket, Opts) ->
+    ssl:setopts(Socket, Opts);
+websocket_setopts(Socket, Opts) ->
+    inet:setopts(Socket, Opts).
 
 
 %% Return new cookie string
@@ -1020,14 +1088,16 @@ reformat_header(H) ->
 
 
 
+reformat_request(#http_request{method = bad_request}) ->
+    ["Bad request"];
 reformat_request(Req) ->
     Path = case Req#http_request.path of
-	       {abs_path, AbsPath} ->
-		   AbsPath;
-	       {absoluteURI, _Scheme, _Host0, _Port, RawPath} ->
-		   RawPath
-	   end,
-    {Maj,Min} = Req#http_request.version,
+               {abs_path, AbsPath} ->
+                   AbsPath;
+               {absoluteURI, _Scheme, _Host0, _Port, RawPath} ->
+                   RawPath
+           end,
+    {Maj, Min} = Req#http_request.version,
     [yaws:to_list(Req#http_request.method), " ", Path," HTTP/",
      integer_to_list(Maj),".", integer_to_list(Min)].
 
@@ -1145,7 +1215,7 @@ format_partial_url(Url, SC) ->
     ].
 
 
-format_url(Url) when record(Url, url) ->
+format_url(Url) when is_record(Url, url) ->
     [
      if 
          Url#url.scheme == undefined ->
@@ -1197,7 +1267,7 @@ is_abs_URI1(_) ->
 %% Body  = EHTML
 
 ehtml_expand(Ch) when Ch >= 0, Ch =< 255 -> Ch; %yaws_api:htmlize_char(Ch);
-ehtml_expand(Bin) when binary(Bin) -> Bin; % yaws_api:htmlize(Bin);
+ehtml_expand(Bin) when is_binary(Bin) -> Bin; % yaws_api:htmlize(Bin);
 
 ehtml_expand({ssi,File, Del, Bs}) ->
     case yaws_server:ssi(File, Del, Bs) of
@@ -1220,7 +1290,7 @@ ehtml_expand({Tag, Attrs}) ->
     NL = ehtml_nl(Tag),
     [NL, "<", atom_to_list(Tag), ehtml_attrs(Attrs), "></",
      atom_to_list(Tag), ">"];
-ehtml_expand({Tag, Attrs, Body}) when atom(Tag) ->
+ehtml_expand({Tag, Attrs, Body}) when is_atom(Tag) ->
     Ts = atom_to_list(Tag),
     NL = ehtml_nl(Tag),
     [NL, "<", Ts, ehtml_attrs(Attrs), ">", ehtml_expand(Body), "</", Ts, ">"];
@@ -1230,27 +1300,27 @@ ehtml_expand([]) -> [].
 
 
 ehtml_attrs([]) -> [];
-ehtml_attrs([Attribute|Tail]) when atom(Attribute) ->
+ehtml_attrs([Attribute|Tail]) when is_atom(Attribute) ->
     [[$ |atom_to_list(Attribute)]|ehtml_attrs(Tail)];
-ehtml_attrs([Attribute|Tail]) when list(Attribute) ->
+ehtml_attrs([Attribute|Tail]) when is_list(Attribute) ->
     [" ", Attribute|ehtml_attrs(Tail)];
 ehtml_attrs([{Name, Value} | Tail]) ->
-    ValueString = if atom(Value) -> [$",atom_to_list(Value),$"];
-                     list(Value) -> [$",Value,$"];
-                     integer(Value) -> [$",integer_to_list(Value),$"];
-                     float(Value) -> [$",float_to_list(Value),$"]
+    ValueString = if is_atom(Value) -> [$",atom_to_list(Value),$"];
+                     is_list(Value) -> [$",Value,$"];
+                     is_integer(Value) -> [$",integer_to_list(Value),$"];
+                     is_float(Value) -> [$",float_to_list(Value),$"]
                   end,
     [[$ |atom_to_list(Name)], [$=|ValueString]|ehtml_attrs(Tail)];
 ehtml_attrs([{check, Name, Value} | Tail]) ->
-    ValueString = if atom(Value) -> [$",atom_to_list(Value),$"];
-                     list(Value) ->
+    ValueString = if is_atom(Value) -> [$",atom_to_list(Value),$"];
+                     is_list(Value) ->
                           Q = case deepmember($", Value) of
                                   true -> $';
                                   false -> $"
                               end,
                           [Q,Value,Q];
-                      integer(Value) -> [$",integer_to_list(Value),$"];
-                      float(Value) -> [$",float_to_list(Value),$"]
+                     is_integer(Value) -> [$",integer_to_list(Value),$"];
+                     is_float(Value) -> [$",float_to_list(Value),$"]
                    end,
                    [[$ |atom_to_list(Name)], 
                     [$=|ValueString]|ehtml_attrs(Tail)].
@@ -1335,7 +1405,7 @@ ehtml_expander(X) ->
 %% Text
 ehtml_expander(Ch, Before, After) when Ch >= 0, Ch =< 255 ->
     ehtml_expander_done(yaws_api:htmlize_char(Ch), Before, After);
-ehtml_expander(Bin, Before, After) when binary(Bin) ->
+ehtml_expander(Bin, Before, After) when is_binary(Bin) ->
     ehtml_expander_done(yaws_api:htmlize(Bin), Before, After);
 
 ehtml_expander({ssi,File, Del, Bs}, Before, After) ->
@@ -1365,7 +1435,7 @@ ehtml_expander({Tag, Attrs, Body}, Before, After) ->
                     Before],
                    ["</", atom_to_list(Tag), ">"|After]);
 %% Variable references
-ehtml_expander(Var, Before, After) when atom(Var) ->
+ehtml_expander(Var, Before, After) when is_atom(Var) ->
     [reverse(Before), {ehtml, ehtml_var_name(Var)}, After];
 %% Lists
 ehtml_expander([H|T], Before, After) ->
@@ -1386,17 +1456,17 @@ ehtml_attrs_expander([Var|T]) ->
     [[" ",
       ehtml_attr_part_expander(Var)]|
      ehtml_attrs_expander(T)];
-ehtml_attrs_expander(Var) when atom(Var) ->
+ehtml_attrs_expander(Var) when is_atom(Var) ->
     %% Var in the cdr of an attribute list
     [{ehtml_attrs, ehtml_var_name(Var)}].
 
-ehtml_attr_part_expander(A) when atom(A) ->
+ehtml_attr_part_expander(A) when is_atom(A) ->
     case ehtml_var_p(A) of
         true  -> {preformatted, ehtml_var_name(A)};
         false -> atom_to_list(A)
     end;
-ehtml_attr_part_expander(I) when integer(I) -> integer_to_list(I);
-ehtml_attr_part_expander(S) when list(S) -> S.
+ehtml_attr_part_expander(I) when is_integer(I) -> integer_to_list(I);
+ehtml_attr_part_expander(S) when is_list(S) -> S.
 
 ehtml_expander_done(X, Before, After) -> [reverse([X|Before]), After].
 
@@ -1404,10 +1474,10 @@ ehtml_expander_done(X, Before, After) -> [reverse([X|Before]), After].
 %% binaries.
 %% Returns: [binary() | {ehtml, Var} | {preformatted, Var}, {ehtml_attrs, Var}]
 %% Var = atom()
-ehtml_expander_compress([Tag|T], Acc) when tuple(Tag) ->
+ehtml_expander_compress([Tag|T], Acc) when is_tuple(Tag) ->
     [list_to_binary(reverse(Acc)), Tag | ehtml_expander_compress(T, [])];
 ehtml_expander_compress([], Acc) -> [list_to_binary(reverse(Acc))];
-ehtml_expander_compress([H|T], Acc) when integer(H) ->
+ehtml_expander_compress([H|T], Acc) when is_integer(H) ->
     ehtml_expander_compress(T, [H|Acc]).
 
 %% Apply an expander with the variable bindings in Env.  Env is a list of
@@ -1415,7 +1485,7 @@ ehtml_expander_compress([H|T], Acc) when integer(H) ->
 %% term.
 ehtml_apply(Expander, Env) -> [ehtml_eval(X, Env) || X <- Expander].
 
-ehtml_eval(Bin, _Env) when binary(Bin) -> Bin;
+ehtml_eval(Bin, _Env) when is_binary(Bin) -> Bin;
 ehtml_eval({Type, Var}, Env) ->
     case lists:keysearch(Var, 1, Env) of
         false -> erlang:error({ehtml_unbound, Var});
@@ -1429,14 +1499,14 @@ ehtml_eval({Type, Var}, Env) ->
 
 %% Get the name part of a variable reference.
 %% e.g. ehtml_var_name('$foo') -> foo.
-ehtml_var_name(A) when atom(A) ->
+ehtml_var_name(A) when is_atom(A) ->
     case ehtml_var_p(A) of
         true -> list_to_atom(tl(atom_to_list(A)));
         false -> erlang:error({bad_ehtml_var_name, A})
     end.
 
 %% Is X a variable reference? Variable references are atoms starting with $.
-ehtml_var_p(X) when atom(X) -> hd(atom_to_list(X)) == $$;
+ehtml_var_p(X) when is_atom(X) -> hd(atom_to_list(X)) == $$;
 ehtml_var_p(_) -> false.
 
 ehtml_expander_test() ->
@@ -1485,13 +1555,65 @@ call_cgi(Arg, Scriptfilename) ->
 call_cgi(Arg, Exefilename, Scriptfilename) -> 
     yaws_cgi:call_cgi(Arg, Exefilename, Scriptfilename).
 
+%% call_fci_responder issues a responder role call to the FastCGI 
+%% application server. It returns the same return value as out/1.
+%%
+%% call_fci_authorizer issues a authorizer role call to the FastCGI 
+%% application server. It returns:
+%%
+%% {denied, Out} : Access is denied. Out is the same return value as 
+%% out/1.
+%%
+%% {allowed, Variables} : Access is allowed. Variables is a list of
+%% environment variables returned by the authorization server using
+%% Variable-XXX: YYY headers.
+%%
+%% Note: the FastCGI filter role is not yet supported. 
+%%
+%% The following information is taken from the server configuration:
+%% - The hostname (or address) and port number of the application server.
+%% - Extra CGI variables.
+%% - Trace FastCGI protocol messages?
+%% - Log application server error messages?
+%%
+%% The caller can optionally provide an Options argument which supports
+%% the following options. These override the defaults taken from the
+%% server config.
+%%
+%% {app_server_host, string() | ip_address()} : The hostname or IP address
+%% of the application server.
+%%
+%% {app_server_port, int()} : The TCP port number of the application server.
+%%
+%% {path_info, string()} : Override the patinfo string from Arg.
+%%
+%% {extra_env, [{string(), string()}]} : Extra environment variables to be
+%% passed to the application server, as a list of name-value pairs.
+%%
+%% trace_protocol : Trace FastCGI protocol messages.
+%%
+%% log_app_error : Log application errors (output to stderr and non-zero
+%% exit value).
+%%
+call_fcgi_responder(Arg) ->
+    yaws_cgi:call_fcgi_responder(Arg).
+
+call_fcgi_responder(Arg, Options) ->
+    yaws_cgi:call_fcgi_responder(Arg, Options).
+
+call_fcgi_authorizer(Arg) ->
+    yaws_cgi:call_fcgi_authorizer(Arg).
+
+call_fcgi_authorizer(Arg, Options) ->
+    yaws_cgi:call_fcgi_authorizer(Arg, Options).
+
 %%
 
 deepmember(_C,[]) ->
     false;
 deepmember(C,[C|_Cs]) ->
     true;
-deepmember(C,[L|Cs]) when list(L) ->
+deepmember(C,[L|Cs]) when is_list(L) ->
     case deepmember(C,L) of
         true  -> true;
         false -> deepmember(C,Cs)
@@ -1642,7 +1764,7 @@ skip_space(T) -> T.
 %%
 
 
-getvar(ARG,Key) when atom(Key) ->
+getvar(ARG,Key) when is_atom(Key) ->
     getvar(ARG, atom_to_list(Key));
 getvar(ARG,Key) ->
     case (ARG#arg.req)#http_request.method of
@@ -1652,7 +1774,7 @@ getvar(ARG,Key) ->
     end.
 
 
-queryvar(ARG,Key) when atom(Key) ->
+queryvar(ARG,Key) when is_atom(Key) ->
     queryvar(ARG, atom_to_list(Key));
 queryvar(ARG, Key) ->
     Parse = case get(query_parse) of
@@ -1665,7 +1787,7 @@ queryvar(ARG, Key) ->
             end,
     filter_parse(Key, Parse).
 
-postvar(ARG, Key) when atom(Key) ->
+postvar(ARG, Key) when is_atom(Key) ->
     postvar(ARG, atom_to_list(Key));
 postvar(ARG, Key) ->
     Parse = case get(post_parse) of
@@ -1759,7 +1881,7 @@ sanitize_file_name([]) ->
 
 %% to be used in embedded mode, make it possible
 %% to pass a config to yaws from another data source
-%% than /etc/yaws.conf, for example from a database
+%% than /etc/yaws/yaws.conf, for example from a database
 %% this code is also called by the server -h hup code
 setconf(GC0, Groups0) ->
     setconf(GC0, Groups0, true).
@@ -1778,14 +1900,16 @@ setconf(GC0, Groups0, CheckCertsChanged) ->
         true ->
             ok
     end,
-    {GC, Groups} = yaws_config:verify_upgrade_args(GC0, Groups0),
+    
+    {GC, Groups1} = yaws_config:verify_upgrade_args(GC0, Groups0),
+    Groups2 = lists:map(fun(X) -> yaws_config:add_yaws_auth(X) end, Groups1),
     {ok, OLDGC, OldGroups} = yaws_api:getconf(),
     case {yaws_config:can_hard_gc(GC, OLDGC),
-          yaws_config:can_soft_setconf(GC, Groups, OLDGC, OldGroups)} of
+          yaws_config:can_soft_setconf(GC, Groups2, OLDGC, OldGroups)} of
         {true, true} ->
-            yaws_config:soft_setconf(GC, Groups, OLDGC, OldGroups);
+            yaws_config:soft_setconf(GC, Groups2, OLDGC, OldGroups);
         {true, false} when OLDGC == undefined -> 
-            yaws_config:hard_setconf(GC, Groups);
+            yaws_config:hard_setconf(GC, Groups2);
         _ ->
             {error, need_restart}
     end.
@@ -1838,10 +1962,15 @@ redirect_self(A) ->
                 {Port2, [$:|integer_to_list(Port2)]}
         end,
     H = A#arg.headers,
-    Host = yaws:redirect_host(get(sc), H#headers.host),
+    Host0 = yaws:redirect_host(get(sc), H#headers.host),
+    %% redirect host contains the port number - for mysterious reasons
+    Host = case string:tokens(Host0, ":") of
+               [H0, _] -> H0;
+               [H1] -> H1
+           end,
     {Scheme, SchemeStr} = 
         case {SC#sconf.ssl,SC#sconf.rmethod} of
-            {_, Method} when list(Method) ->
+            {_, Method} when is_list(Method) ->
                 {list_to_atom(Method), Method++"://"};
             {undefined,_} ->
                 {http, "http://"};
