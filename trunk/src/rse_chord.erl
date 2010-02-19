@@ -7,7 +7,7 @@
 %%%------------------------------------------------------------------------------
 %% @doc implements a ring size estimator (RSE) for Chord-like overlays
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 %% @reference Tallat Shafaat, Ali Ghodsi, Seif Haridi. <em>A Practical
 %% Approach to Network Size Estimation for Structured
