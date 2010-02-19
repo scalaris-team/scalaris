@@ -7,7 +7,7 @@
 %%%------------------------------------------------------------------------------
 %% @doc Simple Profiler for Scalaris
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(tracer).
 

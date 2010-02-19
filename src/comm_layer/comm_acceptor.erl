@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id $
 -module(comm_acceptor).
 

@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %%% Created : 3. Sep 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Chrsitian Hennig <hennig@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(self_man).
 -include("../include/scalaris.hrl").

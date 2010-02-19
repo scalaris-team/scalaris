@@ -22,7 +22,7 @@
 %% @author Marie Hoffmann <hoffmann@zib.de>
 %% @copyright 2009 Konrad-Zuse-Zentrum f�r Informationstechnik Berlin
 %% @version $Id$
-%% @reference T. Schütt, A. Reinefeld,F. Schintke, M. Hoffmann.
+%% @reference T. Schuett, A. Reinefeld,F. Schintke, M. Hoffmann.
 %% Gossip-based Topology Inference for Efficient Overlay Mapping on Data Centers.
 %% 9th Int. Conf. on Peer-to-Peer Computing Seattle, Sept. 2009.
 -module(dc_clustering).

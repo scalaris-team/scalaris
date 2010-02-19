@@ -1,4 +1,4 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %            2009 onScale solutions GmbH
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,7 @@
 %%% Created :  25 Nov 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin, 2009 onScale solutions
+%% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin, 2009 onScale solutions
 %% @version $Id$
 -module(fd).
 -author('schuett@zib.de').

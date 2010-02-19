@@ -1,4 +1,4 @@
-%  Copyright 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  Copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %%% Created :  2 Oct 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 
 -module(trigger_periodic).
@@ -50,7 +50,7 @@ trigger_next({Module,ok},_U) ->
 
 trigger_next({Module, TimerRef}, _U) ->
 
-    % test ob noch einer Timer läuft
+    % test ob noch einer Timer laeuft
     case erlang:read_timer(TimerRef) of
         false ->
             %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
