@@ -6,7 +6,7 @@
 %%% Created :  1 Dec 2008 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum f�r Informationstechnik Berlin
+%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id $
 %% @reference S. Voulgaris, D. Gavidia, M. van Steen. CYCLON:
 %% Inexpensive Membership Management for Unstructured P2P Overlays.
