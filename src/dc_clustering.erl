@@ -1,4 +1,4 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum f�r Informationstechnik Berlin
+%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Marie Hoffmann <hoffmann@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum f�r Informationstechnik Berlin
+%% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 %% @reference T. Schuett, A. Reinefeld,F. Schintke, M. Hoffmann.
 %% Gossip-based Topology Inference for Efficient Overlay Mapping on Data Centers.
