@@ -43,9 +43,6 @@ init([Options]) ->
     KeyHolder =
         util:sup_worker_desc(cs_keyholder, cs_keyholder, start_link,
                              [InstanceId]),
-    _RSE =
-        util:sup_worker_desc(rse_chord, rse_chord, start_link,
-                             [InstanceId]),
     Supervisor_AND =
         util:sup_supervisor_desc(cs_supervisor_and, cs_sup_and, start_link,
                                  [InstanceId, Options]),
