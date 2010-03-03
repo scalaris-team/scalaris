@@ -65,6 +65,7 @@
 
          get_groups/0,
          get_processes_in_group/1,
+		 get_group_member/1,
          %get_info/2,
 
          %for fprof
@@ -78,7 +79,7 @@
 %%====================================================================
 
 %% @doc register a process with InstanceId and Name
-%% @spec register_process(term(), term(), pid()) -> ok
+-spec(register_process/3 :: (term(), term(), pid()) -> ok).
 register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
@@ -86,7 +87,7 @@ register_process(InstanceId, Name, Pid) ->
     gen_component:wait_for_ok().
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
-%% @spec lookup_process(term(), term()) -> term()
+-spec(lookup_process/2 :: (term(), term()) -> pid() | failed).
 lookup_process(InstanceId, Name) ->
     case ets:lookup(?MODULE, {InstanceId, Name}) of
         [{{InstanceId, Name}, Value}] ->
@@ -108,7 +109,7 @@ lookup_process(Pid) ->
     end.
 
 %% @doc tries to find a cs_node process
-%% @spec find_cs_node() -> pid()
+-spec(find_cs_node/0 :: () -> pid()).
 find_cs_node() ->
     find_process(cs_node).
 
@@ -154,6 +155,24 @@ get_processes_in_group(Group) ->
     AllProcesses = find_processes_in_group(ets:tab2list(?MODULE), gb_sets:new(), Group),
     ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
     ProcessesAsJson.
+
+%% @doc Get Pid of the group member (process) with the given name.
+-spec(get_group_member/1 :: (atom()) -> pid() | failed).
+get_group_member(Name) ->
+    InstanceId = erlang:get(instance_id),
+    if
+        InstanceId =:= undefined ->
+            log:log(error,"[ Node | ~w ] instance ID undefined: ~p", [self(),util:get_stacktrace()]);
+        true ->
+            ok
+    end,
+    Pid = process_dictionary:lookup_process(InstanceId, Name),
+    case Pid of
+        failed ->
+            log:log(error,"[ Node | ~w ] process ~w not found: ~p", [self(),Name,util:get_stacktrace()]),
+            failed;
+        _ -> Pid
+    end.
 
 get_all_pids() ->
     [X || [X]<- ets:match(?MODULE, {'_','$1'})].

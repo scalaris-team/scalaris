@@ -169,7 +169,7 @@ on({ping_with_cookie, Ping_PID, Cookie}, State) ->
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Ring Maintenance
+% Ring Maintenance (see ring_maintenance.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({init_rm,Pid},State) ->
     cs_send:send_local(Pid , {init, cs_state:id(State), cs_state:me(State),cs_state:pred(State), [cs_state:succ(State)], self()}),
@@ -187,21 +187,58 @@ on({rm_update_succ, Succ}, State) ->
     cs_state:set_rt(cs_state:update_succ(State,Succ),
                     ?RT:update_pred_succ_in_cs_node(cs_state:pred(State), Succ, cs_state:rt(State)));
 
+%% @doc notification that my successor left
 on({succ_left, Succ}, State) ->
     ring_maintenance:succ_left(Succ),
     State;
 
+%% @doc notification that my predecessor left
 on({pred_left, Pred}, State) ->
     ring_maintenance:pred_left(Pred),
     State;
 
+%% @doc notify the cs_node his successor changed
 on({update_succ, Succ}, State) -> 
     ring_maintenance:update_succ(Succ),
     State;
 
+%% @doc request for the predecessor and successor to be send to Pid
 on({get_pred_succ, Pid}, State) ->
     cs_send:send(Pid, {get_pred_succ_response, cs_state:pred(State), 
 		       cs_state:succ(State)}),
+    State;
+
+%% @doc request (with Cookie) for the predecessor and successor to be send to
+%%      Pid
+on({get_pred_succ, Pid, Cookie}, State) ->
+    cs_send:send(Pid, {get_pred_succ_response, cs_state:pred(State), 
+		       cs_state:succ(State), Cookie}),
+    State;
+
+%% @doc request for the predecessor and my own node to be send to Pid
+on({get_pred_me, Pid}, State) ->
+    cs_send:send(Pid, {get_pred_me_response, cs_state:pred(State), 
+		       cs_state:me(State)}),
+    State;
+
+%% @doc request (with Cookie) for the predecessor and my own node to be send to
+%%      Pid
+on({get_pred_me, Pid, Cookie}, State) ->
+    cs_send:send(Pid, {get_pred_me_response, cs_state:pred(State), 
+		       cs_state:me(State), Cookie}),
+    State;
+
+%% @doc request for the predecessor, successor and my own node to be send to Pid
+on({get_pred_succ_me, Pid}, State) ->
+    cs_send:send(Pid, {get_pred_succ_me_response, cs_state:pred(State), 
+		       cs_state:succ(State), cs_state:me(State)}),
+    State;
+
+%% @doc request (with Cookie) for the predecessor, successor and my own node to
+%%      be send to Pid
+on({get_pred_succ_me, Pid, Cookie}, State) ->
+    cs_send:send(Pid, {get_pred_succ_me_response, cs_state:pred(State), 
+		       cs_state:succ(State), cs_state:me(State), Cookie}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

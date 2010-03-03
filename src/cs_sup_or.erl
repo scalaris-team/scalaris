@@ -76,6 +76,10 @@ init([Options]) ->
         util:sup_worker_desc(cyclon, util, parameterized_start_link,
                              [cyclon:new(config:read(cyclon_trigger)),
                               [InstanceId]]),
+    Gossip =
+        util:sup_worker_desc(gossip, util, parameterized_start_link,
+                             [gossip:new(config:read(gossip_trigger)),
+                              [InstanceId]]),
     Self_Man =
         util:sup_worker_desc(self_man, self_man, start_link,
                              [InstanceId]),
@@ -90,7 +94,8 @@ init([Options]) ->
            DeadNodeCache,
            RingMaintenance,
            Vivaldi,
-           DC_Clustering
+           DC_Clustering,
+		   Gossip
            %% _RSE
           ]}}.
 %% userdevguide-end cs_sup_or:init
