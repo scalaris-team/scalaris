@@ -46,12 +46,15 @@
 		 get_all/0
 ]).
 
--include("gossip_state.hrl").
-
 -type(load() :: integer()).
 
-% {PreviousState, CurrentState, TriggerState}
--type(full_state() :: {state(), state(), any()}).
+-type(state() :: gossip_state:state()).
+-type(values_internal() :: gossip_state:values_internal()).
+%% -type(values() :: gossip_state:values()).
+-type(size_kr() :: gossip_state:size_kr()).
+
+% {PreviousState, CurrentState, QueuedMessages, TriggerState}
+-type(full_state() :: {state(), state(), list(), any()}).
 
 % accepted messages of gossip processes
 -type(message() ::
@@ -70,13 +73,32 @@
 	{get_stddev, cs_send:mypid()} |
 	{get_all, cs_send:mypid()}).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Startup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc initialises the module
+-spec init([any()]) -> full_state().
+init([_InstanceId, []]) ->
+%%     io:format("gossip start ~n"),
+    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState2 = Trigger:trigger_first(TriggerState,1),
+	PreviousState = gossip_state:new_state(),
+	State = gossip_state:new_state(),
+    {PreviousState, State, [], TriggerState2}.
+
+%% @doc starts the gossip module and returns its pid for use by a supervisor
+-spec start_link(term()) -> {ok, pid()}.
+start_link(InstanceId) ->
+    gen_component:start_link(?MODULE:new(Trigger), [InstanceId, []], [{register, InstanceId, gossip}]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc message handler
 -spec on(message(), full_state()) -> full_state().
-on({trigger}, {PreviousState, State, TriggerState}) ->
+on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received continuously when the Trigger calls
 	% see gossip_trigger and gossip_interval in the scalaris.cfg file
 %% 	io:format("{trigger_gossip}: ~p~n", [State]),
@@ -86,63 +108,45 @@ on({trigger}, {PreviousState, State, TriggerState}) ->
 	% start a new round
     request_new_round_if_leader(NewState),
 	Round = gossip_state:get_round(NewState),
-	HaveLoad = gossip_state:get_have_load(NewState),
-	HaveKeyRange = gossip_state:get_have_kr(NewState),
+	Initialized = gossip_state:is_initialized(State),
 	% only participate in (active) gossiping if we entered some valid round and
 	% we have information about our node's load and key range
-    case (Round > 0) andalso (HaveLoad) andalso (HaveKeyRange) of
+    case (Round > 0) andalso (Initialized) of
         true -> request_random_node();
         false -> ok
     end,
-    {PreviousState, NewState, NewTriggerState};
+    {PreviousState, NewState, QueuedMessages, NewTriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Responses to requests for information about the local node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_load_response, _Source_PID, Load},
-   {PreviousState, State, TriggerState}) ->
+on({get_node_details_response, local_info, NodeDetails},
+   {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received when the (local) node was asked to tell us its
-	% load -> it will set all fields in the State record accordingly
-%%     io:format("gossip: got get_load_response: ~p~n",[Load]),
-	HaveLoad = gossip_state:get_have_load(State),
-	% integrate new value only if we haven't received a value yet:
-	NewState = case HaveLoad of
-					true -> State;
-					false -> integrate_load(State, Load)
-				end,
-    {PreviousState, NewState, TriggerState};
-
-on({get_pred_succ_me_response, Pred, Succ, Me, size_kr},
-   {PreviousState, State, TriggerState}) ->
-	% this message can only be received after being requested by
-	% request_keyrange/1 which only asks for this if the the key range has been
-    % unknown
-%%     io:format("gossip: get_pred_me_response: ~p~n",[{Pred, Me, key_range}]),
-	HaveKeyRange = gossip_state:get_have_kr(State),
-	% integrate new value only if we haven't received a value yet:
-	NewState =
-		case HaveKeyRange of
-			true -> State;
-			false -> 
-				Size_kr =
-					calc_initial_size_kr(node:id(Pred), node:id(Me), node:id(Succ)),
-				integrate_size_kr(State, Size_kr)
-		end,
-    {PreviousState, NewState, TriggerState};
+	% load and key range
+%%     io:format("gossip: got get_node_details_response: ~p~n",[NodeDetails]),
+	Initialized = gossip_state:is_initialized(State),
+	{NewQueuedMessages, NewState} =
+		case Initialized of
+			true -> {QueuedMessages, State};
+			false ->
+				[cs_send:send_local(self(), Message) || Message <- QueuedMessages],
+				{[], integrate_local_info(State, node_details:load(NodeDetails), calc_initial_size_kr(node_details:my_range(NodeDetails)))}
+			end,
+    {PreviousState, NewState, NewQueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Leader election
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_pred_me_response, Pred, Me, leader_start_new_round},
-   {PreviousState, State, TriggerState}) ->
+on({get_node_details_response, leader_start_new_round, NodeDetails},
+   {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_new_round_if_leader/1 which only asks for this if the condition to
-    % start a new round has already been met
-%%     io:format("gossip: get_pred_me_response: ~p~n",[{Pred, Me}]),
-	PredId = node:id(Pred),
-	MyId = node:id(Me),
+	% start a new round has already been met
+%%     io:format("gossip: got get_node_details_response, leader_start_new_round: ~p~n",[NodeDetails]),
+	{PredId, MyId} = node_details:my_range(NodeDetails),
 	{NewPreviousState, NewState} = 
 		case intervals:is_between(PredId, 0, MyId) of
 	        % not the leader -> continue as normal with the old state
@@ -150,17 +154,15 @@ on({get_pred_me_response, Pred, Me, leader_start_new_round},
 			% leader -> start a new round
 			true -> new_round(State)
 	end,
-    {NewPreviousState, NewState, TriggerState};
-
+    {NewPreviousState, NewState, QueuedMessages, TriggerState};
 
 %% Prints some debug information if the current node is the leader.
-on({get_pred_me_response, Pred, Me, leader_debug_output},
-   {PreviousState, State, TriggerState}) ->
+on({get_node_details_response, leader_debug_output, NodeDetails},
+   {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_leader_debug_output/0
-%%     io:format("gossip: get_pred_me_response: ~p~n",[{Pred, Me}]),
-	PredId = node:id(Pred),
-	MyId = node:id(Me),
+%%     io:format("gossip: got get_node_details_response, leader_debug_output: ~p~n",[NodeDetails]),
+	{PredId, MyId} = node_details:my_range(NodeDetails),
 	case intervals:is_between(PredId, 0, MyId) of
         % not the leader
 		false -> ok;
@@ -176,7 +178,7 @@ on({get_pred_me_response, Pred, Me, leader_debug_output},
 				 {max,gossip_state:get_maxLoad(PreviousState)},
 				 {stddev,gossip_state:calc_stddev(PreviousState)},
 				 {size,gossip_state:calc_size(PreviousState)},
-				 {size_kr,gossip_state:get_size_kr(PreviousState)},
+				 {size_kr,gossip_state:calc_size_kr(PreviousState)},
 				 
 				 {round,gossip_state:get_round(State)},
 				 {triggered,gossip_state:get_triggered(State)},
@@ -187,52 +189,57 @@ on({get_pred_me_response, Pred, Me, leader_debug_output},
 				 {max,gossip_state:get_maxLoad(State)},
 				 {stddev,gossip_state:calc_stddev(State)},
 				 {size,gossip_state:calc_size(State)},
-				 {size_kr,gossip_state:get_size_kr(State)},
+				 {size_kr,gossip_state:calc_size_kr(State)},
 				 
 				 {avg,previous_or_current(PreviousState, State,
-				     fun(SomeState) -> gossip_state:get_avgLoad(SomeState) end)},
+				     fun gossip_state:get_avgLoad/1)},
 				 {min,previous_or_current(PreviousState, State,
-				     fun(SomeState) -> gossip_state:get_minLoad(SomeState) end)},
+				     fun gossip_state:get_minLoad/1)},
 				 {max,previous_or_current(PreviousState, State,
-				     fun(SomeState) -> gossip_state:get_maxLoad(SomeState) end)},
+				     fun gossip_state:get_maxLoad/1)},
 				 {stddev,previous_or_current(PreviousState, State,
-				     fun(SomeState) -> gossip_state:calc_stddev(SomeState) end)},
+				     fun gossip_state:calc_stddev/1)},
 				 {size,previous_or_current(PreviousState, State,
-				     fun(SomeState) -> gossip_state:calc_size(SomeState) end)},
+				     fun gossip_state:calc_size/1)},
 				 {size_kr,previous_or_current(PreviousState, State,
-				     fun(SomeState) -> gossip_state:get_size_kr(SomeState) end)}]),
+				     fun gossip_state:calc_size_kr/1)}]),
 			ok
 	end,
-    {PreviousState, State, TriggerState};
+    {PreviousState, State, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State exchange
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_state, Source_PID, OtherState},
-   {MyPreviousState, MyState, TriggerState}) ->
+on({get_state, Source_PID, OtherValues} = Msg,
+   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
 	% This message is received when a node asked our node for its state.
 	% The piggy-backed other node's state will be used to update our own state
-	% if both are valid. We will also send a get_state_response message with
-	% our state.
-	{MyNewPreviousState, MyNewState} =
-		integrate_state(OtherState, MyPreviousState, MyState, true, Source_PID),
-    {MyNewPreviousState, MyNewState, TriggerState};
+	% if we have already initialized it (otherwise postpone the message). A
+	% get_state_response message is sent with our state in the first case.
+	Initialized = gossip_state:is_initialized(MyState),
+	{NewQueuesMessages, {MyNewPreviousState, MyNewState}} =
+		case Initialized of
+			true -> {QueuedMessages, integrate_state(OtherValues, MyPreviousState, MyState, true, Source_PID)};
+			false ->
+				{[Msg | QueuedMessages], enter_round(MyPreviousState, MyState, OtherValues)}
+			end,
+    {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState};
 
 on({get_state_response, OtherState},
-   {MyPreviousState, MyState, TriggerState}) ->
+   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
 	% This message is received as a response to a get_state message and contains
     % another node's state. We will use it to update our own state
 	% if both are valid.
 	{MyNewPreviousState, MyNewState} =
 		integrate_state(OtherState, MyPreviousState, MyState, false, none),
-    {MyNewPreviousState, MyNewState, TriggerState};
+    {MyNewPreviousState, MyNewState, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contacting random nodes (response from cyclon)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({cache, Cache}, {_PreviousState, State, _TriggerState} = FullState) ->
+on({cache, Cache}, {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	% This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node. We will then contact this
     % random node and ask for a state exchange.
@@ -262,43 +269,43 @@ on({cache, Cache}, {_PreviousState, State, _TriggerState} = FullState) ->
 % Getter messages (need to update!)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_avgLoad, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
+on({get_avgLoad, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	Avg = previous_or_current(PreviousState, State,
-		fun(SomeState) -> gossip_state:get_avgLoad(SomeState) end),
+		fun gossip_state:get_avgLoad/1),
     cs_send:send(SourcePid, {gossip_get_avgLoad_response, Avg}),
     FullState;
 
-on({get_minLoad, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
+on({get_minLoad, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	Min = previous_or_current(PreviousState, State,
-		fun(SomeState) -> gossip_state:get_minLoad(SomeState) end),
+		fun gossip_state:get_minLoad/1),
     cs_send:send(SourcePid, {gossip_get_minLoad_response, Min}),
     FullState;
 
-on({get_maxLoad, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
+on({get_maxLoad, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	Max = previous_or_current(PreviousState, State,
-		fun(SomeState) -> gossip_state:get_maxLoad(SomeState) end),
+		fun gossip_state:get_maxLoad/1),
     cs_send:send(SourcePid, {gossip_get_maxLoad_response, Max}),
     FullState;
 
-on({get_size, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
+on({get_size, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	Size = previous_or_current(PreviousState, State,
-		fun(SomeState) -> gossip_state:calc_size(SomeState) end),
+		fun gossip_state:calc_size/1),
     cs_send:send(SourcePid, {gossip_get_size_response, Size}),
     FullState;
 
-on({get_size_kr, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
+on({get_size_kr, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	Size_kr = previous_or_current(PreviousState, State,
-		fun(SomeState) -> gossip_state:get_size_kr(SomeState) end),
+		fun gossip_state:calc_size_kr/1),
     cs_send:send(SourcePid, {gossip_get_size_kr_response, Size_kr}),
     FullState;
 
-on({get_stddev, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
+on({get_stddev, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	Stddev = previous_or_current(PreviousState, State,
-		fun(SomeState) -> gossip_state:calc_stddev(SomeState) end),
+		fun gossip_state:calc_stddev/1),
     cs_send:send(SourcePid, {gossip_get_stddev_response, Stddev}),
     FullState;
 
-on({get_all, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
+on({get_all, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	PreviousStateConverted = gossip_state:conv_state_to_extval(PreviousState),
 	StateConverted = gossip_state:conv_state_to_extval(State),
     cs_send:send(SourcePid, {gossip_get_all_response, PreviousStateConverted, StateConverted}),
@@ -306,24 +313,6 @@ on({get_all, SourcePid}, {PreviousState, State, _TriggerState} = FullState) ->
 
 %on(_Message, _State) ->
 %    unknown_event.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Init
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc initialises the module
--spec init([any()]) -> full_state().
-init([_InstanceId, []]) ->
-%%     io:format("gossip start ~n"),
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
-    TriggerState2 = Trigger:trigger_first(TriggerState,1),
-	PreviousState = gossip_state:new_state(),
-	State = gossip_state:new_state(),
-    {PreviousState, State,TriggerState2}.
-
-%% @doc starts the gossip module and returns its pid for use by a supervisor
--spec start_link(term()) -> {ok, pid()}.
-start_link(InstanceId) ->
-    gen_component:start_link(?MODULE:new(Trigger), [InstanceId, []], [{register, InstanceId, gossip}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
@@ -340,8 +329,7 @@ start_link(InstanceId) ->
 integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 %%     io:format("gossip:integrate_state: ~p~n",[{OtherValues, MyState}]),
 	MyValues = gossip_state:get_values(MyState),
-	HaveLoad = gossip_state:get_have_load(MyState),
-	HaveKeyRange = gossip_state:get_have_kr(MyState),
+	Initialized = gossip_state:is_initialized(MyState),
 	MyRound = gossip_state:get_round(MyValues),
 	OtherRound = gossip_state:get_round(OtherValues),
 	{MyNewPreviousState, MyNewState} =
@@ -351,20 +339,20 @@ integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 			% received).
 		    (OtherRound > MyRound) ->
 				ShouldSend = false,
-    			enter_round(MyState, OtherValues);
+    			enter_round(MyPreviousState, MyState, OtherValues);
 		    
 		    % We are in a higher round than the requesting node -> send it our
 		    % values if we have information about our own node. Do not update
 			% using the other node's state! 
 		    OtherRound < MyRound ->
 				% only send if we have full information!
-				ShouldSend = HaveLoad and HaveKeyRange,
+				ShouldSend = Initialized,
 			    {MyPreviousState, MyState};
 
 		    % Same rounds but we haven't got any load information yet ->
 		    % update estimates with the other values but do not send them until
 			% the own load and key range are received).
-		    (not HaveLoad) orelse (not HaveKeyRange) ->
+		    (not Initialized) ->
 				ShouldSend = false,
 				MyTempState1 = update(MyState, OtherValues),
 				MyTempState2 = gossip_state:inc_msg_exch(MyTempState1),
@@ -513,40 +501,29 @@ calc_avg(MyValue, OtherValue) ->
 				end
 		end.
 
-%% @doc Creates a (temporary) state a node would have by knowing only its own
-%%      load and updates the according fields (avg, avg2, min, max) in its real
-%%      state. This should (only) be called when a load information message
-%%      from the local node has been received for the first time in a round.
--spec integrate_load(state(), load()) -> state().
-integrate_load(MyState, NewLoad) ->
+%% @doc Creates a (temporary) state a node would have by knowing its own load
+%%      and key range and updates the according fields (avg, avg2, min, max,
+%%      size_kr) in its real state. This should (only) be called when a load
+%%      and key range information message from the local node has been received
+%%      for the first time in a round.
+-spec integrate_local_info(state(), load(), size_kr()) -> state().
+integrate_local_info(MyState, Load, Size_kr) ->
 	MyValues = gossip_state:get_values(MyState),
-	ValuesWithLoad =
-		gossip_state:new_internal(NewLoad, % Avg
-								  NewLoad*NewLoad, % Avg2
+	ValuesWithNewInfo =
+		gossip_state:new_internal(Load, % Avg
+								  Load*Load, % Avg2
 								  unknown, % Size_n (will be set when entering/creating a round)
-								  unknown, % Size_kr (see integrate_size_kr/2)
-								  NewLoad, % Min
-								  NewLoad, % Max
+								  Size_kr, % Size_kr (see integrate_size_kr/2)
+								  Load, % Min
+								  Load, % Max
 								  gossip_state:get_round(MyValues)),
-	V1 = update_avg(MyValues, ValuesWithLoad),
-	V2 = update_avg2(V1, ValuesWithLoad),
-	V3 = update_min(V2, ValuesWithLoad),
-	MyNewValues = update_max(V3, ValuesWithLoad),
+	V1 = update_avg(MyValues, ValuesWithNewInfo),
+	V2 = update_avg2(V1, ValuesWithNewInfo),
+	V3 = update_min(V2, ValuesWithNewInfo),
+	V4 = update_max(V3, ValuesWithNewInfo),
+	MyNewValues = update_size_kr(V4, ValuesWithNewInfo),
 	S1 = gossip_state:set_values(MyState, MyNewValues),
-	_MyNewState = gossip_state:set_have_load(S1, true).
-
-%% @doc Creates a (temporary) state a node would have by knowing an initial
-%%      estimate of the ring size based on the differences from itself to its
-%%      predecessor and successor and updates the according field (size_kr) in
-%%      its real state. This should (only) be called when information about the
-%%      nodes neighbours has been received for the first time in a round.
--spec integrate_size_kr(state(), size_kr()) -> state().
-integrate_size_kr(MyState, Size_kr) ->
-	MyValues = gossip_state:get_values(MyState),
-	ValuesWithSizeKr = gossip_state:set_size_kr(gossip_state:new_internal(), Size_kr),
-	MyNewValues = update_size_kr(MyValues, ValuesWithSizeKr),
-	S1 = gossip_state:set_values(MyState, MyNewValues),
-	_MyNewState = gossip_state:set_have_kr(S1, true).
+	_MyNewState = gossip_state:set_initialized(S1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Round handling
@@ -561,21 +538,29 @@ new_round(OldState) ->
 	OldRound = gossip_state:get_round(OldState),
 	NewState =
 		gossip_state:new_state(
-		  gossip_state:set_round(NewValues1, (OldRound+1)), false, false),
-    request_local_info(NewState),
+		  gossip_state:set_round(NewValues1, (OldRound+1))),
+    request_local_info(),
 	{OldState, NewState}.
 
 %% @doc Enters the given round and thus resets the current state with
 %%      information from another node's state. Also requests the own node's
 %%      load and key range to integrate into its own state.
--spec enter_round(state(), values_internal()) -> {state(), state()}.
-enter_round(OldState, OtherValues) ->
-	% never copy the size_n value!
-	S1 = gossip_state:new_state(
-		gossip_state:set_size_n(OtherValues, 0.0), false, false),
-	NewState = gossip_state:inc_msg_exch(S1),
-    request_local_info(NewState),
-	{OldState, NewState}.
+-spec enter_round(state(), state(), values_internal()) -> {state(), state()}.
+enter_round(OldPreviousState, OldState, OtherValues) ->
+	MyRound = gossip_state:get_round(OldState),
+	OtherRound = gossip_state:get_round(OtherValues),
+	case (MyRound =:= OtherRound) of 
+		true -> {OldPreviousState, OldState};
+		false ->
+			% never copy the size_n value!
+%% 			S1 = gossip_state:new_state(gossip_state:set_size_n(OtherValues, 0.0)),
+%% 			NewState = gossip_state:inc_msg_exch(S1),
+			S1 = gossip_state:new_state(),
+			NewState = gossip_state:set_size_n(
+						 gossip_state:set_round(S1, OtherRound), 0),
+    		request_local_info(),
+			{OldState, NewState}
+	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getters
@@ -585,21 +570,21 @@ enter_round(OldState, OtherValues) ->
 %%      asking for the average load.
 %%      see on({get_avgLoad, SourcePid}, FullState)
 get_avgLoad() ->
-	cs_send:send(process_dictionary:get_group_member(gossip),
+	cs_send:send_local(process_dictionary:get_group_member(gossip),
 		{get_avgLoad, cs_send:this()}).
 
 %% @doc Sends a message to the gossip process of the requesting process' group
 %%      asking for the minimum load.
 %%      see on({get_minLoad, SourcePid}, FullState)
 get_minLoad() ->
-	cs_send:send(process_dictionary:get_group_member(gossip),
+	cs_send:send_local(process_dictionary:get_group_member(gossip),
 		{get_minLoad, cs_send:this()}).
 
 %% @doc Sends a message to the gossip process of the requesting process' group
 %%      asking for the maximum load.
 %%      see on({get_maxLoad, SourcePid}, FullState)
 get_maxLoad() ->
-	cs_send:send(process_dictionary:get_group_member(gossip),
+	cs_send:send_local(process_dictionary:get_group_member(gossip),
 		{get_maxLoad, cs_send:this()}).
 
 %% @doc Sends a message to the gossip process of the requesting process' group
@@ -608,42 +593,41 @@ get_maxLoad() ->
 %%      (leads to 1/size - the response will contain the actual size though).
 %%      see on({get_size, SourcePid}, FullState)
 get_size() ->
-	cs_send:send(process_dictionary:get_group_member(gossip),
+	cs_send:send_local(process_dictionary:get_group_member(gossip),
 		{get_size, cs_send:this()}).
 
 %% @doc Sends a message to the gossip process of the requesting process' group
 %%      asking for the size estimated by using the key ranges of the nodes.
 %%      see on({get_size_kr, SourcePid}, FullState)
 get_size_kr() ->
-	cs_send:send(process_dictionary:get_group_member(gossip),
+	cs_send:send_local(process_dictionary:get_group_member(gossip),
 		{get_size_kr, cs_send:this()}).
 
 %% @doc Sends a message to the gossip process of the requesting process' group
 %%      asking for the standard deviation of the load.
 %%      see on({get_stddev, SourcePid}, FullState)
 get_stddev() ->
-	cs_send:send(process_dictionary:get_group_member(gossip),
+	cs_send:send_local(process_dictionary:get_group_member(gossip),
 		{get_stddev, cs_send:this()}).
 
 %% @doc Sends a message to the gossip process of the requesting process' group
 %%      asking for all stored information.
 %%      see on({get_all, SourcePid}, FullState)
 get_all() ->
-	cs_send:send(process_dictionary:get_group_member(gossip),
+	cs_send:send_local(process_dictionary:get_group_member(gossip),
 		{get_all, cs_send:this()}).
 
 %% @doc Returns the value from the previous state if the current state has not
 %%      sufficiently converged yet.
 -spec previous_or_current(any(), any(), fun((state()) -> any())) -> any().
 previous_or_current(PreviousState, CurrentState, GetFun) ->
-	PreviousValue = GetFun(PreviousState),
-	CurrentValue = GetFun(CurrentState),
+	CurrentInitialized = gossip_state:is_initialized(CurrentState),
 	MinConvergeAvgCount = get_converge_avg_count(),
 	CurrentEpsilonCount_Avg = gossip_state:get_converge_avg_count(CurrentState),
 	_BestValue =
-		case CurrentEpsilonCount_Avg < MinConvergeAvgCount of
-			true -> PreviousValue;
-			false -> CurrentValue
+		case (not CurrentInitialized) or (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
+			true -> GetFun(PreviousState);
+			false -> GetFun(CurrentState)
 		end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -671,8 +655,8 @@ request_new_round_if_leader(State) ->
              (ConvAvgCount >= ConvAvgCountNewRound)))
 		of
 		true ->
-			cs_send:send_local(process_dictionary:get_group_member(cs_node),
-							   {get_pred_me, cs_send:this(), leader_start_new_round}),
+			CS_Node = process_dictionary:get_group_member(cs_node),
+    		cs_send:send_local(CS_Node, {get_node_details, cs_send:this(), [my_range], leader_start_new_round}),
 			ok;
 		false ->
 			ok
@@ -683,40 +667,18 @@ request_new_round_if_leader(State) ->
 %%      The node will respond with a get_pred_me_response message.
 -spec request_leader_debug_output() -> ok.
 request_leader_debug_output() ->
-	cs_send:send_local(process_dictionary:get_group_member(cs_node),
-					   {get_pred_me, cs_send:this(), leader_debug_output}).
+	CS_Node = process_dictionary:get_group_member(cs_node),
+	cs_send:send_local(CS_Node, {get_node_details, cs_send:this(), [my_range], leader_debug_output}).
 
 %% @doc Sends the local node's cs_node a request to tell us some information
-%%      about itself. See request_local_load/0 and request_size_kr/1.
--spec request_local_info(state()) -> ok.
-request_local_info(State) ->
-    request_local_load(),
-    request_size_kr(State).
-
-%% @doc Sends the local node's cs_node a request to tell us the current load.
--spec request_local_load() -> ok.
-request_local_load() ->
-    cs_send:send_local(process_dictionary:get_group_member(cs_node),
-					   {get_load, cs_send:this()}),
-	ok.
-
-%% @doc Sends the local node's cs_node a request to tell us its predecessor,
-%%      successor and our own node for an initial size estimation using the
-%%      distance between the nodes. It will respond with a
-%%      get_pred_succ_me_response message.
--spec request_size_kr(state()) -> ok.
-request_size_kr(State) ->
-	HaveKeyRange = gossip_state:get_have_kr(State),
-	% only ask for the key range if we haven't gotten any yet
-	case (HaveKeyRange) of
-		true -> ok;
-		false ->
-			% on({get_pred_succ_me_response, Pred, Me, size_kr}, State) will handle
-			% the response
-			cs_send:send_local(process_dictionary:get_group_member(cs_node),
-							   {get_pred_succ_me, cs_send:this(), size_kr}),
-			ok
-	end.
+%%      about itself.
+-spec request_local_info() -> ok.
+request_local_info() ->
+	% ask for local load and key range:
+	% on({get_node_details_response, local_info, NodeDetails}, State) will handle
+	% the response
+	CS_Node = process_dictionary:get_group_member(cs_node),
+    cs_send:send_local(CS_Node, {get_node_details, cs_send:this(), [my_range, load], local_info}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
 %%      on({cache, Cache},State) will handle the response
@@ -730,38 +692,36 @@ request_random_node() ->
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Gets the total number of keys available.
+-spec get_addr_size() -> number().
 get_addr_size() ->
-	16#100000000000000000000000000000000.
+	rt_simple:n().
 
 %% @doc Calculates the initial estimate of the ring size based on distance to 
 %%      predecessor and successor.
--spec(calc_initial_size_kr/3 :: (any(), any(), any()) -> float()).
-calc_initial_size_kr(PredKey, MyKey, SuccKey) ->
+-spec calc_initial_size_kr({any(), any()}) -> number().
+calc_initial_size_kr({PredKey, MyKey} = _Range) ->
     if
-		PredKey =:= MyKey andalso MyKey =:= SuccKey ->
+		PredKey =:= MyKey ->
 	    	% I am the only node
-	    	1.0;
+	    	get_addr_size();
 		true ->
-			try ((normalize(MyKey - PredKey) + normalize(SuccKey - MyKey)) / 2) of
-				AvgDist -> get_addr_size() / AvgDist
+			try calc_dist(MyKey, PredKey)
 			catch
 				error:_ -> unknown
 			end
 	end.
 
-
-%% @doc normalize Chord identifier (0 <= normalized key < 2^33)
--spec(normalize/1 :: (rt_simple:key()) -> rt_simple:key()).
-normalize(Key) ->
-	AddrSize = get_addr_size(),
-    if
-		Key < 0 ->
-	    	normalize(Key + AddrSize);
-		Key >= AddrSize ->
-		    normalize(Key - AddrSize);
-		true ->
-	    	Key
-    end.
+%% @doc Calculates the difference between the keys of a node and its
+%%      predecessor. If the second is larger than the first it wraps around and
+%%      thus the difference is the number of keys from the predecessor to the
+%%      end (of the ring) and from the start to the current node.
+-spec calc_dist(any(), any()) -> number().
+calc_dist(MyKey, PredKey) ->
+	case MyKey >= PredKey of
+		true  -> MyKey - PredKey;
+		false -> (get_addr_size() - PredKey - 1) + MyKey
+	end.
 
 %% @doc Gets the gossip interval set in scalaris.cfg.
 -spec get_base_interval() -> non_neg_integer().

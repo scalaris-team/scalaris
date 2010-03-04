@@ -26,8 +26,6 @@
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
--include("gossip_state.hrl").
-
 %%
 %% Exported Functions
 %%
@@ -43,6 +41,7 @@
 -export([get_avgLoad/1,
 		 get_stddev/1,
 		 get_size/1,
+		 get_size_kr/1,
 		 get_minLoad/1,
 		 get_maxLoad/1,
 		 get_triggered/1,
@@ -59,17 +58,15 @@
 %% Exports only meant for use by gossip.erl
 %%
 % constructors
--export([new_state/0, new_state/3,
+-export([new_state/0, new_state/1,
 		 new_internal/0, new_internal/7]).
 
 % getters
 -export([get_avgLoad2/1,
 		 get_size_n/1,
-		 get_size_kr/1,
 		 get_round/1,
 		 get_values/1,
-		 get_have_load/1,
-		 get_have_kr/1,
+		 is_initialized/1,
 		 get_converge_avg_count/1]).
 
 % setters
@@ -78,8 +75,7 @@
 		 set_size_kr/2,
 		 set_round/2,
 		 set_values/2,
-		 set_have_load/2,
-		 set_have_kr/2,
+		 set_initialized/1,
 		 reset_triggered/1,
 		 inc_triggered/1,
 		 reset_msg_exch/1,
@@ -89,7 +85,56 @@
 
 -export([conv_state_to_extval/1,
 		 calc_size/1,
+		 calc_size_kr/1,
 		 calc_stddev/1]).
+
+%%
+%% Gossip types
+%%
+-type(avg() :: number() | unknown).
+-type(avg2() :: number() | unknown).
+-type(stddev() :: float() | unknown).
+-type(size_n() :: float() | unknown).
+-type(size() :: number() | unknown).
+-type(size_kr() :: number() | unknown).
+-type(min() :: non_neg_integer() | unknown).
+-type(max() :: non_neg_integer() | unknown).
+-type(round() :: non_neg_integer()).
+-type(triggered() :: non_neg_integer()).
+-type(msg_exch() :: non_neg_integer()).
+-type(converge_avg_count() :: non_neg_integer()).
+
+% record of gossip values for use by other modules
+-record(values, {avg       = unknown :: avg(),  % average load
+                 stddev    = unknown :: stddev(), % standard deviation of the load
+                 size      = unknown :: size(), % estimated ring size
+                 size_kr   = unknown :: size_kr(), % estimated ring size
+                 min       = unknown :: min(), % minimum load
+                 max       = unknown :: max(), % maximum load
+                 triggered = 0 :: triggered(), % how often the trigger called since the node entered/created the round
+                 msg_exch  = 0 :: msg_exch() % how often messages have been exchanged with other nodes
+}).
+-type(values() :: #values{}).
+
+% internal record of gossip values used for the state
+-record(values_internal, {avg       = unknown :: avg(), % average load
+                          avg2      = unknown :: avg2(), % average of load^2
+                          size_n    = unknown :: size_n(), % 1 / size
+                          size_kr   = unknown :: size_kr(), % size based on key range (distance between nodes) in the address space
+                          min       = unknown :: min(),
+                          max       = unknown :: max(),
+						  round     = 0 :: round()
+}).
+-type(values_internal() :: #values_internal{}).
+
+% state of the gossip process
+-record(state, {values             = #values_internal{} :: values_internal(),  % stored (internal) values
+                initialized        = false :: bool(), % load and range information from the local node have been integrated?
+                triggered          = 0 :: triggered(), % how often the trigger called since the node entered/created the round
+                msg_exch           = 0 :: msg_exch(), % how often messages have been exchanged with other nodes
+                converge_avg_count = 0 :: converge_avg_count() % how often all values based on averages have changed less than epsilon percent
+}).
+-type(state() :: #state{}).
 
 %%
 %% Constructors
@@ -123,10 +168,9 @@ new_state() -> #state{}.
 
 %% @doc creates a new record holding the (internal) state of the gossip module
 %%      (only use in gossip.erl!)
--spec new_state(values_internal(), bool(), bool()) -> state().
-new_state(Values, HaveLoad, HaveKeyRange)
-  when is_record(Values, values_internal) ->
-	#state{values=Values, have_load=HaveLoad, have_kr=HaveKeyRange}.
+-spec new_state(values_internal()) -> state().
+new_state(Values) when is_record(Values, values_internal) ->
+	#state{values=Values, initialized=false}.
 
 %%
 %% Getters
@@ -193,15 +237,10 @@ get_msg_exch(#state{msg_exch=MessageExchanges}) -> MessageExchanges.
 -spec get_values(state()) -> values_internal().
 get_values(#state{values=Values}) -> Values.
 
-%$ @doc Gets whether local load information has been integrated into the values
-%%      of a gossip state.
--spec get_have_load(state()) -> bool().
-get_have_load(#state{have_load=HaveLoad}) -> HaveLoad.
-
-%$ @doc Gets whether local key range information has been integrated into the
-%%      values of a gossip state.
--spec get_have_kr(state()) -> bool().
-get_have_kr(#state{have_kr=HaveKeyRange}) -> HaveKeyRange.
+%$ @doc Checks whether local load and key range information have been integrated
+%%      into the values of a gossip state.
+-spec is_initialized(state()) -> bool().
+is_initialized(#state{initialized=Initialized}) -> Initialized.
 
 %$ @doc Returns how often the changes in all average-based values have been less
 %%      than epsilon percent in the given gossip state.
@@ -274,17 +313,11 @@ set_values(State, Values)
   when (is_record(State, state) and is_record(Values, values_internal)) ->
 	State#state{values=Values}.
 
-%$ @doc Sets whether local load information has been integrated into the values
-%%      of a gossip state.
--spec set_have_load(state(), bool()) -> state().
-set_have_load(State, HaveLoad) when is_record(State, state) ->
-	State#state{have_load=HaveLoad}.
-
-%$ @doc Sets whether local key range information has been integrated into the
-%%      values of a gossip state.
--spec set_have_kr(state(), bool()) -> state().
-set_have_kr(State, HaveKeyRange) when is_record(State, state) ->
-	State#state{have_kr=HaveKeyRange}.
+%$ @doc Sets that local load and key range information have been integrated into
+%%      the values of a gossip state.
+-spec set_initialized(state()) -> state().
+set_initialized(State) when is_record(State, state) ->
+	State#state{initialized=true}.
 
 %% @doc Resets how often the trigger called the module to 0.
 -spec reset_triggered(state()) -> state().
@@ -333,6 +366,22 @@ calc_size(State) when is_record(State, values_internal) ->
 calc_size(State) when is_record(State, state) ->
 	calc_size(get_values(State)).
 
+get_addr_size() ->
+	rt_simple:n().
+
+%% @doc extracts and calculates the size_kr field from the internal record of
+%%      values
+-spec calc_size_kr(values_internal() | state) -> size().
+calc_size_kr(State) when is_record(State, values_internal) ->
+	Size_kr = gossip_state:get_size_kr(State),
+	if
+		Size_kr =< 0        -> 1.0;
+		Size_kr =:= unknown -> unknown;
+		true                -> get_addr_size() / Size_kr
+	end;
+calc_size_kr(State) when is_record(State, state) ->
+	calc_size_kr(get_values(State)).
+
 %% @doc extracts and calculates the standard deviation from the internal record
 %%      of values
 -spec calc_stddev(values_internal()) -> avg().
@@ -352,7 +401,7 @@ conv_state_to_extval(State) when is_record(State, state) ->
 	#values{avg       = get_avgLoad(State),
             stddev    = calc_stddev(State),
             size      = calc_size(State),
-            size_kr   = get_size_kr(State),
+            size_kr   = calc_size_kr(State),
             min       = get_minLoad(State),
             max       = get_maxLoad(State),
             triggered = get_triggered(State),
