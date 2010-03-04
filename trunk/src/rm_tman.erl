@@ -76,25 +76,19 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
 on(_,uninit) ->
     uninit;
 
-on({get_successorlist, Pid},{Id, Me, Preds, [],RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
+on({get_successorlist, Pid},{Id, Me, Preds, [] = Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
     cs_send:send_local(Pid , {get_successorlist_response, [Me]}),
-    {Id, Me, Preds, [],RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({get_successorlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
+    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
+on({get_successorlist, Pid},{Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
+    cs_send:send_local(Pid , {get_successorlist_response, Succs}),
+    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
 
-    case Succs of
-        []  ->  cs_send:send_local(Pid , {get_successorlist_response, [Me]});
-        _   ->  cs_send:send_local(Pid , {get_successorlist_response, Succs})
-    end,
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({get_predlist, Pid},{Id, Me, [], Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
+on({get_predlist, Pid},{Id, Me, [] = Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
     cs_send:send_local(Pid , {get_predlist_response, [Me]}),
-    {Id, Me, [], Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({get_predlist, Pid},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    case Preds of
-        []  -> cs_send:send_local(Pid , {get_predlist_response, [Me]});
-        _   -> cs_send:send_local(Pid , {get_predlist_response, Preds})
-    end,
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
+    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
+on({get_predlist, Pid},{Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
+    cs_send:send_local(Pid , {get_predlist_response, Preds}),
+    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
 
 on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  -> 
     
