@@ -44,7 +44,7 @@ balance_load(State) ->
     cs_send:send_after(config:loadBalanceInterval(), self(), {stabilize_loadbalance}).
 
 check_balance(State, Source_PID, Load) ->
-    MyLoad = ?DB:get_load(cs_state:get_db(State)),
+    MyLoad = cs_state:load(State),
     if
 	(MyLoad * 2 < Load) and (Load > 1) ->
 	    cs_send:send(Source_PID, {get_middle_key, cs_send:this()}),
@@ -57,7 +57,7 @@ get_middle_key(State) ->
     LB = cs_state:get_lb(State),
     AmLoadbalancing = get_loadbalance_flag(LB),
     LastKeys = last_keys(LB),
-    Load = ?DB:get_load(cs_state:get_db(State)),
+    Load = cs_state:load(State),
     if
 	AmLoadbalancing or (Load < 20) ->
 	    {nil, State};

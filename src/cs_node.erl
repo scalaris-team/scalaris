@@ -434,7 +434,7 @@ on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
 % load balancing messages (see cs_lb.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_load, Source_PID}, State) ->
-    cs_send:send(Source_PID, {get_load_response, cs_send:this(), ?DB:get_load(cs_state:get_db(State))}),
+    cs_send:send(Source_PID, {get_load_response, cs_send:this(), cs_state:load(State)}),
     State;
 
 on({get_load_response, Source_PID, Load}, State) ->
@@ -465,10 +465,12 @@ on({stabilize_loadbalance}, State) ->
 
 %% misc.
 on({get_node_details, Pid, Cookie}, State) ->
-   
     cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State)}),
-  
     State;
+on({get_node_details, Pid, Which, Cookie}, State) ->
+    cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State, Which)}),
+    State;
+
 on({get_node_IdAndSucc, Pid, Cookie}, State) ->
     cs_send:send_after(0,Pid, {get_node_IdAndSucc_response, Cookie, {cs_state:id(State),cs_state:succ_id(State)}}),
     State;

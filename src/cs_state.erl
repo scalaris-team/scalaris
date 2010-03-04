@@ -32,7 +32,8 @@
 -export([new/6, new/7,
 	 id/1, me/1,
 	 succ/1, succ_pid/1, succ_id/1,
-	 pred_pid/1, pred_id/1, pred/1, 
+	 pred_pid/1, pred_id/1, pred/1,
+	 load/1,
 	 update_pred_succ/3,
      update_succ/2,
      update_pred/2,
@@ -40,7 +41,7 @@
 	 set_rt/2, rt/1,
 	 get_db/1, set_db/2,
 	 get_lb/1, set_lb/2,
-	 details/1,
+	 details/1, details/2,
 	 get_my_range/1, 
 	 next_interval/1,
 	 %%transactions
@@ -123,6 +124,10 @@ pred_id(#state{predecessor=Pred}) -> node:id(Pred).
 
 pred(#state{predecessor=Pred}) -> Pred.
 
+%%% Load
+
+load(State) -> ?DB:get_load(get_db(State)).
+
 %%% Routing Table
 
 rt(#state{routingtable=RT}) ->
@@ -131,6 +136,8 @@ rt(#state{routingtable=RT}) ->
 set_rt(State, RT) ->
     State#state{routingtable=RT}.
 
+rt_size(State) -> ?RT:get_size(rt(State)).
+
 %%% util
 
 dump(State) ->
@@ -138,28 +145,58 @@ dump(State) ->
 						 , pred_id(State), pred_pid(State), succ_id(State), succ_pid(State)]),
     ok.
 
+%% @doc Gets the requested details about the current node.
+-spec details(state(), [predlist | pred | me | my_range | succ | succlist | load | hostname | rt_size | message_log | memory]) -> node_details:node_details().
+details(State, Which) ->
+	ExtractValues =
+		fun(Elem, NodeDetails) ->
+				case Elem of
+					predlist    -> ring_maintenance:get_predlist(),
+    				               PredList = 
+    				                   receive
+    				                       {get_predlist_response, X} -> X
+    				                   end,
+    				               node_details:set_predlist(NodeDetails, PredList);
+					pred        -> node_details:set_pred(NodeDetails, pred(State));
+					me          -> node_details:set_me(NodeDetails, me(State));
+					my_range    -> node_details:set_my_range(NodeDetails, get_my_range(State));
+					succ        -> node_details:set_succ(NodeDetails, succ(State));
+					succlist    -> ring_maintenance:get_successorlist(),
+    				               SuccList = 
+    				                   receive
+    				                       {get_successorlist_response, Y} -> Y
+    				                   end,
+    				               node_details:set_succlist(NodeDetails, SuccList);
+					load        -> node_details:set_load(NodeDetails, load(State));
+					hostname    -> node_details:set_hostname(NodeDetails, net_adm:localhost());
+					rt_size     -> node_details:set_rt_size(NodeDetails, rt_size(State));
+					message_log -> node_details:set_message_log(NodeDetails, ok);
+					memory      -> node_details:set_memory(NodeDetails, erlang:memory(total))
+				end
+		end,
+	lists:foldl(ExtractValues, node_details:new(), Which).
+
+%% @doc Gets the following details about the current node:
+%%      predecessor and successor lists, the node itself, its load, hostname and
+%%      routing table size
+-spec details(state()) -> node_details:node_details().
 details(State) ->
     ring_maintenance:get_predlist(),
-    Predlist =  receive
-                    {get_predlist_response, X} ->
-                        X
-                   
+    PredList =  receive
+                    {get_predlist_response, X} -> X
                 end,
     ring_maintenance:get_successorlist(),
     SuccList = receive
-                   {get_successorlist_response, Y} ->
-                        Y
-                  
+                   {get_successorlist_response, Y} -> Y
                end,
     %Predlist = [pred(State)],
     Node = me(State),
   
     %SuccList = [succ(State)],
-    Load = ?DB:get_load(get_db(State)),
+    Load = load(State),
     Hostname = net_adm:localhost(),
-    RTSize = ?RT:get_size(rt(State)),
-    %node_details:new(Pred, Node, SuccList, Load, FD_Size, Hostname, RTSize, cs_message:get_details(), erlang:memory(total)).
-    node_details:new(Predlist, Node, SuccList, Load, Hostname, RTSize, ok, erlang:memory(total)).
+    RTSize = rt_size(State),
+    node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, erlang:memory(total)).
 
 %%% Transactions
 %%% Information on transactions that all possible TMs and TPs share
