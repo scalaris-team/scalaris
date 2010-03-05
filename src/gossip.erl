@@ -16,7 +16,7 @@
 %%% @author Nico Kruber <kruber@zib.de>
 %%% @doc    Framework for estimating aggregated global properties using
 %%%         gossip techniques.
-%%%
+%%% @end
 %%% Created : 19 Feb 2010 by Nico Kruber <kruber@zib.de>
 %%%-------------------------------------------------------------------
 %% @version $Id$
