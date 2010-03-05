@@ -1,4 +1,4 @@
-%  Copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,15 +12,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : gossip.erl
-%%% Author  : Nico Kruber <kruber@zib.de>
-%%% Description : Framework for estimating aggregated global properties using
-%%%               gossip techniques.
+%%% File    gossip.erl
+%%% @author Nico Kruber <kruber@zib.de>
+%%% @doc    Framework for estimating aggregated global properties using
+%%%         gossip techniques.
 %%%
 %%% Created : 19 Feb 2010 by Nico Kruber <kruber@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Nico Kruber <kruber@zib.de>
-%% @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(gossip,[Trigger]).
 
@@ -29,29 +27,25 @@
 
 -behaviour(gen_component).
 
-%% -define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), request_leader_debug_output()).
--define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), ok).
+-define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), request_leader_debug_output()).
+%% -define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), ok).
 
 -export([start_link/1]).
 
 -export([on/2, init/1, get_base_interval/0]).
 
 % helpers for creating getter messages:
--export([get_avgLoad/0,
-		 get_minLoad/0,
-		 get_maxLoad/0,
-		 get_size/0,
-		 get_size_kr/0,
-		 get_stddev/0,
-		 get_all/0
+-export([get_values_best/0,
+		 get_values_all/0
 ]).
 
 -type(load() :: integer()).
 
 -type(state() :: gossip_state:state()).
+-type(values() :: gossip_state:values()).
 -type(values_internal() :: gossip_state:values_internal()).
 %% -type(values() :: gossip_state:values()).
--type(size_kr() :: gossip_state:size_kr()).
+-type(avg_kr() :: gossip_state:avg_kr()).
 
 % {PreviousState, CurrentState, QueuedMessages, TriggerState}
 -type(full_state() :: {state(), state(), list(), any()}).
@@ -59,9 +53,9 @@
 % accepted messages of gossip processes
 -type(message() ::
 	{trigger} |
-	{get_load_response, cs_send:mypid(), load()} |
-	{get_pred_succ_me_response, node:node_type(), node:node_type(), node:node_type(), size_kr} |
-	{get_pred_me_response, node:node_type(), node:node_type(), leader_start_new_round} |
+	{get_node_details_response, local_info, node_details:node_details()} |
+	{get_node_details_response, leader_start_new_round, node_details:node_details()} |
+	{get_node_details_response, leader_debug_output, node_details:node_details()} |
 	{get_state, cs_send:mypid(), values_internal()} |
 	{get_state_response, values_internal()} |
 	{cache, [node:node_type()]} |
@@ -69,9 +63,18 @@
 	{get_minLoad, cs_send:mypid()} |
 	{get_maxLoad, cs_send:mypid()} |
 	{get_size, cs_send:mypid()} |
-	{get_size_kr, cs_send:mypid()} |
 	{get_stddev, cs_send:mypid()} |
 	{get_all, cs_send:mypid()}).
+
+%% @doc Sends a response message to a request for the best stored values.
+-spec msg_get_values_best_response(cs_send:mypid(), values()) -> ok.
+msg_get_values_best_response(Pid, BestValues) ->
+    cs_send:send(Pid, {get_values_all_response, BestValues}).
+
+%% @doc Sends a response message to a request for all stored values.
+-spec msg_get_values_all_response(cs_send:mypid(), values(), values(), values()) -> ok.
+msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
+    cs_send:send(Pid, {get_values_all_response, PreviousValues, CurrentValues, BestValues}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -132,7 +135,7 @@ on({get_node_details_response, local_info, NodeDetails},
 			true -> {QueuedMessages, State};
 			false ->
 				[cs_send:send_local(self(), Message) || Message <- QueuedMessages],
-				{[], integrate_local_info(State, node_details:load(NodeDetails), calc_initial_size_kr(node_details:my_range(NodeDetails)))}
+				{[], integrate_local_info(State, node_details:load(NodeDetails), calc_initial_avg_kr(node_details:my_range(NodeDetails)))}
 			end,
     {PreviousState, NewState, NewQueuedMessages, TriggerState};
 
@@ -168,6 +171,7 @@ on({get_node_details_response, leader_debug_output, NodeDetails},
 		false -> ok;
 		% leader -> provide debug information
 		true ->
+			BestState = previous_or_current(PreviousState, State),
 			io:format("gossip:~n    prv: ~p, ~p, ~p, ~p:~n         ~p, ~p, ~p, ~p,~n         ~p, ~p~n    cur: ~p, ~p, ~p, ~p:~n         ~p, ~p, ~p, ~p,~n         ~p, ~p~n    usr: ~p, ~p, ~p, ~p,~n         ~p, ~p~n",
 				[{round,gossip_state:get_round(PreviousState)},
 				 {triggered,gossip_state:get_triggered(PreviousState)},
@@ -177,7 +181,7 @@ on({get_node_details_response, leader_debug_output, NodeDetails},
 				 {min,gossip_state:get_minLoad(PreviousState)},
 				 {max,gossip_state:get_maxLoad(PreviousState)},
 				 {stddev,gossip_state:calc_stddev(PreviousState)},
-				 {size,gossip_state:calc_size(PreviousState)},
+				 {size_ldr,gossip_state:calc_size_ldr(PreviousState)},
 				 {size_kr,gossip_state:calc_size_kr(PreviousState)},
 				 
 				 {round,gossip_state:get_round(State)},
@@ -188,21 +192,15 @@ on({get_node_details_response, leader_debug_output, NodeDetails},
 				 {min,gossip_state:get_minLoad(State)},
 				 {max,gossip_state:get_maxLoad(State)},
 				 {stddev,gossip_state:calc_stddev(State)},
-				 {size,gossip_state:calc_size(State)},
+				 {size_ldr,gossip_state:calc_size_ldr(State)},
 				 {size_kr,gossip_state:calc_size_kr(State)},
 				 
-				 {avg,previous_or_current(PreviousState, State,
-				     fun gossip_state:get_avgLoad/1)},
-				 {min,previous_or_current(PreviousState, State,
-				     fun gossip_state:get_minLoad/1)},
-				 {max,previous_or_current(PreviousState, State,
-				     fun gossip_state:get_maxLoad/1)},
-				 {stddev,previous_or_current(PreviousState, State,
-				     fun gossip_state:calc_stddev/1)},
-				 {size,previous_or_current(PreviousState, State,
-				     fun gossip_state:calc_size/1)},
-				 {size_kr,previous_or_current(PreviousState, State,
-				     fun gossip_state:calc_size_kr/1)}]),
+				 {avg,gossip_state:get_avgLoad(BestState)},
+				 {min,gossip_state:get_minLoad(BestState)},
+				 {max,gossip_state:get_maxLoad(BestState)},
+				 {stddev,gossip_state:calc_stddev(BestState)},
+				 {size_ldr,gossip_state:calc_size_ldr(BestState)},
+				 {size_kr,gossip_state:calc_size_kr(BestState)}]),
 			ok
 	end,
     {PreviousState, State, QueuedMessages, TriggerState};
@@ -269,47 +267,19 @@ on({cache, Cache}, {_PreviousState, State, _QueuedMessages, _TriggerState} = Ful
 % Getter messages (need to update!)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_avgLoad, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	Avg = previous_or_current(PreviousState, State,
-		fun gossip_state:get_avgLoad/1),
-    cs_send:send(SourcePid, {gossip_get_avgLoad_response, Avg}),
-    FullState;
+on({get_values_best, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+	BestState = previous_or_current(PreviousState, State),
+	BestValues = gossip_state:conv_state_to_extval(BestState),
+	msg_get_values_best_response(SourcePid, BestValues),
+	FullState;
 
-on({get_minLoad, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	Min = previous_or_current(PreviousState, State,
-		fun gossip_state:get_minLoad/1),
-    cs_send:send(SourcePid, {gossip_get_minLoad_response, Min}),
-    FullState;
-
-on({get_maxLoad, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	Max = previous_or_current(PreviousState, State,
-		fun gossip_state:get_maxLoad/1),
-    cs_send:send(SourcePid, {gossip_get_maxLoad_response, Max}),
-    FullState;
-
-on({get_size, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	Size = previous_or_current(PreviousState, State,
-		fun gossip_state:calc_size/1),
-    cs_send:send(SourcePid, {gossip_get_size_response, Size}),
-    FullState;
-
-on({get_size_kr, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	Size_kr = previous_or_current(PreviousState, State,
-		fun gossip_state:calc_size_kr/1),
-    cs_send:send(SourcePid, {gossip_get_size_kr_response, Size_kr}),
-    FullState;
-
-on({get_stddev, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	Stddev = previous_or_current(PreviousState, State,
-		fun gossip_state:calc_stddev/1),
-    cs_send:send(SourcePid, {gossip_get_stddev_response, Stddev}),
-    FullState;
-
-on({get_all, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	PreviousStateConverted = gossip_state:conv_state_to_extval(PreviousState),
-	StateConverted = gossip_state:conv_state_to_extval(State),
-    cs_send:send(SourcePid, {gossip_get_all_response, PreviousStateConverted, StateConverted}),
-    FullState.
+on({get_values_all, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+	PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
+	CurrentValues = gossip_state:conv_state_to_extval(State),
+	BestState = previous_or_current(PreviousState, State),
+	BestValues = gossip_state:conv_state_to_extval(BestState),
+	msg_get_values_all_response(SourcePid, PreviousValues, CurrentValues, BestValues),
+	FullState.
 
 %on(_Message, _State) ->
 %    unknown_event.
@@ -386,9 +356,9 @@ update(MyState, OtherValues) ->
 				V1 = update_avg(MyValues, OtherValues),
 				V2 = update_min(V1, OtherValues),
 				V3 = update_max(V2, OtherValues),
-				V4 = update_size_n(V3, OtherValues),
+				V4 = update_size_inv(V3, OtherValues),
 				V5 = update_avg2(V4, OtherValues),
-				_V6 = update_size_kr(V5, OtherValues);
+				_V6 = update_avg_kr(V5, OtherValues);
 			false ->
 				% this case should not happen since the on/2 handlers should only
 				% call update/2 if the rounds match
@@ -398,14 +368,14 @@ update(MyState, OtherValues) ->
 	% now check whether all average-based values changed less than epsilon percent:
 	Epsilon_Avg = get_converge_avg_epsilon(),
 	AvgChanged = calc_change(gossip_state:get_avgLoad(MyValues), gossip_state:get_avgLoad(MyNewValues)),
-	SizeNChanged = calc_change(gossip_state:get_size_n(MyValues), gossip_state:get_size_n(MyNewValues)),
+	SizeNChanged = calc_change(gossip_state:get_size_inv(MyValues), gossip_state:get_size_inv(MyNewValues)),
 	Avg2Changed = calc_change(gossip_state:get_avgLoad2(MyValues), gossip_state:get_avgLoad2(MyNewValues)),
-	SizeKRChanged = calc_change(gossip_state:get_size_kr(MyValues), gossip_state:get_size_kr(MyNewValues)),
+	AvgKRChanged = calc_change(gossip_state:get_avg_kr(MyValues), gossip_state:get_avg_kr(MyNewValues)),
 	MyNewState =
 		case (AvgChanged < Epsilon_Avg) and
              (SizeNChanged < Epsilon_Avg) and
              (Avg2Changed < Epsilon_Avg) and
-             (SizeKRChanged < Epsilon_Avg) of
+             (AvgKRChanged < Epsilon_Avg) of
 			true -> gossip_state:inc_converge_avg_count(MyState); 
 			false -> gossip_state:reset_converge_avg_count(MyState)
 		end,
@@ -463,21 +433,21 @@ update_avg(MyValues, OtherValues) ->
 	OtherAvg = gossip_state:get_avgLoad(OtherValues),
 	gossip_state:set_avgLoad(MyValues, calc_avg(MyAvg, OtherAvg)).
 
-%% @doc Updates the size_n field of the state record with the size_n field of an
-%%      other node's state.
--spec update_size_n(values_internal(), values_internal()) -> values_internal().
-update_size_n(MyValues, OtherValues) ->
-	MySize_n = gossip_state:get_size_n(MyValues), 
-	OtherSize_n = gossip_state:get_size_n(OtherValues),
-	gossip_state:set_size_n(MyValues, calc_avg(MySize_n, OtherSize_n)).
+%% @doc Updates the size_inv field of the state record with the size_inv field
+%%      of an other node's state.
+-spec update_size_inv(values_internal(), values_internal()) -> values_internal().
+update_size_inv(MyValues, OtherValues) ->
+	MySize_inv = gossip_state:get_size_inv(MyValues), 
+	OtherSize_inv = gossip_state:get_size_inv(OtherValues),
+	gossip_state:set_size_inv(MyValues, calc_avg(MySize_inv, OtherSize_inv)).
 
-%% @doc Updates the size_kr field of the state record with the size_kr field of
+%% @doc Updates the avg_kr field of the state record with the avg_kr field of
 %%      an other node's state.
--spec update_size_kr(values_internal(), values_internal()) -> values_internal().
-update_size_kr(MyValues, OtherValues) ->
-	MySize_kr = gossip_state:get_size_kr(MyValues), 
-	OtherSize_kr = gossip_state:get_size_kr(OtherValues),
-	gossip_state:set_size_kr(MyValues, calc_avg(MySize_kr, OtherSize_kr)).
+-spec update_avg_kr(values_internal(), values_internal()) -> values_internal().
+update_avg_kr(MyValues, OtherValues) ->
+	MyAvg_kr = gossip_state:get_avg_kr(MyValues), 
+	OtherAvg_kr = gossip_state:get_avg_kr(OtherValues),
+	gossip_state:set_avg_kr(MyValues, calc_avg(MyAvg_kr, OtherAvg_kr)).
 
 %% @doc Updates the avg2 field of the state record with the avg2 field of an
 %%      other node's state.
@@ -503,17 +473,17 @@ calc_avg(MyValue, OtherValue) ->
 
 %% @doc Creates a (temporary) state a node would have by knowing its own load
 %%      and key range and updates the according fields (avg, avg2, min, max,
-%%      size_kr) in its real state. This should (only) be called when a load
+%%      avg_kr) in its real state. This should (only) be called when a load
 %%      and key range information message from the local node has been received
 %%      for the first time in a round.
--spec integrate_local_info(state(), load(), size_kr()) -> state().
-integrate_local_info(MyState, Load, Size_kr) ->
+-spec integrate_local_info(state(), load(), avg_kr()) -> state().
+integrate_local_info(MyState, Load, Avg_kr) ->
 	MyValues = gossip_state:get_values(MyState),
 	ValuesWithNewInfo =
 		gossip_state:new_internal(Load, % Avg
 								  Load*Load, % Avg2
-								  unknown, % Size_n (will be set when entering/creating a round)
-								  Size_kr, % Size_kr (see integrate_size_kr/2)
+								  unknown, % 1/size (will be set when entering/creating a round)
+								  Avg_kr, % average key range
 								  Load, % Min
 								  Load, % Max
 								  gossip_state:get_round(MyValues)),
@@ -521,7 +491,7 @@ integrate_local_info(MyState, Load, Size_kr) ->
 	V2 = update_avg2(V1, ValuesWithNewInfo),
 	V3 = update_min(V2, ValuesWithNewInfo),
 	V4 = update_max(V3, ValuesWithNewInfo),
-	MyNewValues = update_size_kr(V4, ValuesWithNewInfo),
+	MyNewValues = update_avg_kr(V4, ValuesWithNewInfo),
 	S1 = gossip_state:set_values(MyState, MyNewValues),
 	_MyNewState = gossip_state:set_initialized(S1).
 
@@ -533,8 +503,8 @@ integrate_local_info(MyState, Load, Size_kr) ->
 -spec new_round(state()) -> {state(), state()}.
 new_round(OldState) ->
 %%     io:format("gossip: start new round, I am the leader ~n"),
-	% the leader must set the size_n to 1 (and only the leader)
-	NewValues1 = gossip_state:set_size_n(gossip_state:new_internal(), 1.0),
+	% the leader must set the size_inv to 1 (and only the leader)
+	NewValues1 = gossip_state:set_size_inv(gossip_state:new_internal(), 1.0),
 	OldRound = gossip_state:get_round(OldState),
 	NewState =
 		gossip_state:new_state(
@@ -552,11 +522,9 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 	case (MyRound =:= OtherRound) of 
 		true -> {OldPreviousState, OldState};
 		false ->
-			% never copy the size_n value!
-%% 			S1 = gossip_state:new_state(gossip_state:set_size_n(OtherValues, 0.0)),
-%% 			NewState = gossip_state:inc_msg_exch(S1),
+			% set a size_inv value of 0 (only the leader sets 1)
 			S1 = gossip_state:new_state(),
-			NewState = gossip_state:set_size_n(
+			NewState = gossip_state:set_size_inv(
 						 gossip_state:set_round(S1, OtherRound), 0),
     		request_local_info(),
 			{OldState, NewState}
@@ -566,68 +534,35 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 % Getters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Sends a message to the gossip process of the requesting process' group
-%%      asking for the average load.
-%%      see on({get_avgLoad, SourcePid}, FullState)
-get_avgLoad() ->
+%% @doc Sends a message to the gossip process of the requesting processes group
+%%      asking for the best values of the stored information.
+%%      see on({get_values_best, SourcePid}, FullState) and
+%%      msg_get_values_best_response/2
+-spec get_values_best() -> ok.
+get_values_best() ->
 	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_avgLoad, cs_send:this()}).
+		{get_values_best, cs_send:this()}).
 
-%% @doc Sends a message to the gossip process of the requesting process' group
-%%      asking for the minimum load.
-%%      see on({get_minLoad, SourcePid}, FullState)
-get_minLoad() ->
-	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_minLoad, cs_send:this()}).
-
-%% @doc Sends a message to the gossip process of the requesting process' group
-%%      asking for the maximum load.
-%%      see on({get_maxLoad, SourcePid}, FullState)
-get_maxLoad() ->
-	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_maxLoad, cs_send:this()}).
-
-%% @doc Sends a message to the gossip process of the requesting process' group
-%%      asking for the size estimated by the leader adding a value of 1 and all
-%%      other nodes adding a value of 0 and calculating the average over it
-%%      (leads to 1/size - the response will contain the actual size though).
-%%      see on({get_size, SourcePid}, FullState)
-get_size() ->
-	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_size, cs_send:this()}).
-
-%% @doc Sends a message to the gossip process of the requesting process' group
-%%      asking for the size estimated by using the key ranges of the nodes.
-%%      see on({get_size_kr, SourcePid}, FullState)
-get_size_kr() ->
-	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_size_kr, cs_send:this()}).
-
-%% @doc Sends a message to the gossip process of the requesting process' group
-%%      asking for the standard deviation of the load.
-%%      see on({get_stddev, SourcePid}, FullState)
-get_stddev() ->
-	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_stddev, cs_send:this()}).
-
-%% @doc Sends a message to the gossip process of the requesting process' group
+%% @doc Sends a message to the gossip process of the requesting processes group
 %%      asking for all stored information.
-%%      see on({get_all, SourcePid}, FullState)
-get_all() ->
+%%      see on({get_values_all, SourcePid}, FullState) and
+%%      msg_get_values_all_response/4
+-spec get_values_all() -> ok.
+get_values_all() ->
 	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_all, cs_send:this()}).
+		{get_values_all, cs_send:this()}).
 
-%% @doc Returns the value from the previous state if the current state has not
-%%      sufficiently converged yet.
--spec previous_or_current(any(), any(), fun((state()) -> any())) -> any().
-previous_or_current(PreviousState, CurrentState, GetFun) ->
+%% @doc Returns the previous state if the current state has not sufficiently
+%%      converged yet otherwise returns the current state.
+-spec previous_or_current(state(), state()) -> state().
+previous_or_current(PreviousState, CurrentState) ->
 	CurrentInitialized = gossip_state:is_initialized(CurrentState),
 	MinConvergeAvgCount = get_converge_avg_count(),
 	CurrentEpsilonCount_Avg = gossip_state:get_converge_avg_count(CurrentState),
 	_BestValue =
 		case (not CurrentInitialized) or (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
-			true -> GetFun(PreviousState);
-			false -> GetFun(CurrentState)
+			true -> PreviousState;
+			false -> CurrentState
 		end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -697,30 +632,20 @@ request_random_node() ->
 get_addr_size() ->
 	rt_simple:n().
 
-%% @doc Calculates the initial estimate of the ring size based on distance to 
-%%      predecessor and successor.
--spec calc_initial_size_kr({any(), any()}) -> number().
-calc_initial_size_kr({PredKey, MyKey} = _Range) ->
-    if
-		PredKey =:= MyKey ->
-	    	% I am the only node
-	    	get_addr_size();
-		true ->
-			try calc_dist(MyKey, PredKey)
-			catch
-				error:_ -> unknown
-			end
-	end.
-
-%% @doc Calculates the difference between the keys of a node and its
+%% @doc Calculates the difference between the key of a node and its
 %%      predecessor. If the second is larger than the first it wraps around and
 %%      thus the difference is the number of keys from the predecessor to the
 %%      end (of the ring) and from the start to the current node.
--spec calc_dist(any(), any()) -> number().
-calc_dist(MyKey, PredKey) ->
-	case MyKey >= PredKey of
-		true  -> MyKey - PredKey;
-		false -> (get_addr_size() - PredKey - 1) + MyKey
+-spec calc_initial_avg_kr({any(), any()}) -> number().
+calc_initial_avg_kr({PredKey, MyKey} = _Range) ->
+    try
+		if
+			PredKey =:= MyKey -> get_addr_size(); % I am the only node
+			MyKey >= PredKey  -> MyKey - PredKey;
+			MyKey < PredKey   -> (get_addr_size() - PredKey - 1) + MyKey
+		end
+	catch
+		error:_ -> unknown
 	end.
 
 %% @doc Gets the gossip interval set in scalaris.cfg.

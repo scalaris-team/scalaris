@@ -35,12 +35,13 @@
 %%
 
 % constructors
--export([new/0, new/7]).
+-export([]).
 
 % getters
 -export([get_avgLoad/1,
 		 get_stddev/1,
 		 get_size/1,
+		 get_size_ldr/1,
 		 get_size_kr/1,
 		 get_minLoad/1,
 		 get_maxLoad/1,
@@ -48,11 +49,7 @@
 		 get_msg_exch/1]).
 
 % setters
--export([set_avgLoad/2,
-		 set_stddev/2,
-		 set_size/2,
-		 set_minLoad/2,
-		 set_maxLoad/2]).
+-export([]).
 
 %%
 %% Exports only meant for use by gossip.erl
@@ -63,16 +60,20 @@
 
 % getters
 -export([get_avgLoad2/1,
-		 get_size_n/1,
+		 get_size_inv/1,
+		 get_avg_kr/1,
 		 get_round/1,
 		 get_values/1,
 		 is_initialized/1,
 		 get_converge_avg_count/1]).
 
 % setters
--export([set_avgLoad2/2,
-		 set_size_n/2,
-		 set_size_kr/2,
+-export([set_avgLoad/2,
+		 set_avgLoad2/2,
+		 set_avg_kr/2,
+		 set_size_inv/2,
+		 set_minLoad/2,
+		 set_maxLoad/2,
 		 set_round/2,
 		 set_values/2,
 		 set_initialized/1,
@@ -84,7 +85,7 @@
 		 inc_converge_avg_count/1]).
 
 -export([conv_state_to_extval/1,
-		 calc_size/1,
+		 calc_size_ldr/1,
 		 calc_size_kr/1,
 		 calc_stddev/1]).
 
@@ -94,9 +95,9 @@
 -type(avg() :: number() | unknown).
 -type(avg2() :: number() | unknown).
 -type(stddev() :: float() | unknown).
--type(size_n() :: float() | unknown).
+-type(size_inv() :: float() | unknown).
 -type(size() :: number() | unknown).
--type(size_kr() :: number() | unknown).
+-type(avg_kr() :: number() | unknown).
 -type(min() :: non_neg_integer() | unknown).
 -type(max() :: non_neg_integer() | unknown).
 -type(round() :: non_neg_integer()).
@@ -107,8 +108,8 @@
 % record of gossip values for use by other modules
 -record(values, {avg       = unknown :: avg(),  % average load
                  stddev    = unknown :: stddev(), % standard deviation of the load
-                 size      = unknown :: size(), % estimated ring size
-                 size_kr   = unknown :: size_kr(), % estimated ring size
+                 size_ldr  = unknown :: size(), % estimated ring size: 1/(average of leader=1, others=0)
+                 size_kr   = unknown :: size(), % estimated ring size based on average key ranges
                  min       = unknown :: min(), % minimum load
                  max       = unknown :: max(), % maximum load
                  triggered = 0 :: triggered(), % how often the trigger called since the node entered/created the round
@@ -119,8 +120,8 @@
 % internal record of gossip values used for the state
 -record(values_internal, {avg       = unknown :: avg(), % average load
                           avg2      = unknown :: avg2(), % average of load^2
-                          size_n    = unknown :: size_n(), % 1 / size
-                          size_kr   = unknown :: size_kr(), % size based on key range (distance between nodes) in the address space
+                          size_inv  = unknown :: size_inv(), % 1 / size
+                          avg_kr    = unknown :: avg_kr(), % average key range (distance between nodes in the address space)
                           min       = unknown :: min(),
                           max       = unknown :: max(),
 						  round     = 0 :: round()
@@ -140,25 +141,15 @@
 %% Constructors
 %%
 
-%% @doc creates a new record holding values for use by external modules
--spec new() -> values().
-new() -> #values{}.
-
-%% @doc creates a new record holding values for use by external modules
--spec new(avg(), stddev(), size(), min(), max(), triggered(), msg_exch()) -> values().
-new(Avg, Stddev, Size, Min, Max, Triggered, MessageExchanges) ->
-	#values{avg=Avg, stddev=Stddev, size=Size, min=Min, max=Max,
-            triggered=Triggered, msg_exch=MessageExchanges}.
-
 %% @doc creates a new record holding values for (internal) use by gossip.erl
 -spec new_internal() -> values_internal().
 new_internal() -> #values_internal{}.
 
 %% @doc creates a new record holding values for (internal) use by gossip.erl
--spec new_internal(avg(), avg2(), size_n(), size_kr(), min(), max(), round())
+-spec new_internal(avg(), avg2(), size_inv(), avg_kr(), min(), max(), round())
                     -> values_internal().
-new_internal(Avg, Avg2, Size_n, Size_kr, Min, Max, Round) ->
-	#values_internal{avg=Avg, avg2=Avg2, size_n=Size_n, size_kr=Size_kr,
+new_internal(Avg, Avg2, Size_inv, AvgKR, Min, Max, Round) ->
+	#values_internal{avg=Avg, avg2=Avg2, size_inv=Size_inv, avg_kr=AvgKR,
 					 min=Min, max=Max, round=Round}.
 
 %% @doc creates a new record holding the (internal) state of the gossip module
@@ -186,9 +177,25 @@ get_avgLoad(#state{values=Values}) -> get_avgLoad(Values).
 -spec get_stddev(values()) -> stddev().
 get_stddev(#values{stddev=Stddev}) -> Stddev.
 
-%% @doc Gets the size from a gossip state's values.
+%% @doc Gets the best of the two different size values from a gossip state's
+%%      values (favour key range based calculations over leader-based).
 -spec get_size(values()) -> size().
-get_size(#values{size=Size}) -> Size.
+get_size(Values) when is_record(Values, values) ->
+	Size_kr = get_size_kr(Values),
+	case Size_kr of
+		unknown -> get_size_ldr(Values);
+		X       -> X
+	end.
+
+%% @doc Gets the size (based on average with leader=1, others=0) from a gossip
+%%      state's values.
+-spec get_size_ldr(values()) -> size().
+get_size_ldr(#values{size_ldr=Size_ldr}) -> Size_ldr.
+
+%% @doc Gets the size (based on average key range calculation) from a gossip
+%%      state's values.
+-spec get_size_kr(values()) -> size().
+get_size_kr(#values{size_kr=Size_kr}) -> Size_kr.
 
 %% @doc Gets the minimum load from a gossip state's values.
 -spec get_minLoad(values() | values_internal() | state) -> min().
@@ -208,14 +215,14 @@ get_avgLoad2(#values_internal{avg2=Avg2}) -> Avg2;
 get_avgLoad2(#state{values=Values}) -> get_avgLoad2(Values).
 
 %% @doc Gets the 1/size value from a gossip state's values.
--spec get_size_n(values_internal() | state) -> size_n().
-get_size_n(#values_internal{size_n=Size_n}) -> Size_n;
-get_size_n(#state{values=Values}) -> get_size_n(Values).
+-spec get_size_inv(values_internal() | state) -> size_inv().
+get_size_inv(#values_internal{size_inv=Size_inv}) -> Size_inv;
+get_size_inv(#state{values=Values}) -> get_size_inv(Values).
 
-%% @doc Gets the size based on key range from a gossip state's values.
--spec get_size_kr(values_internal() | state) -> size_kr().
-get_size_kr(#values_internal{size_kr=Size_kr}) -> Size_kr;
-get_size_kr(#state{values=Values}) -> get_size_kr(Values).
+%% @doc Gets the average key range from a gossip state's values.
+-spec get_avg_kr(values_internal() | state) -> avg_kr().
+get_avg_kr(#values_internal{avg_kr=AvgKR}) -> AvgKR;
+get_avg_kr(#state{values=Values}) -> get_avg_kr(Values).
 
 %% @doc Gets the round from a gossip state's values.
 -spec get_round(values_internal() | state) -> round().
@@ -252,34 +259,20 @@ get_converge_avg_count(#state{converge_avg_count=ConvergeAvgCount}) -> ConvergeA
 %%
 
 %% @doc Sets the average load field of a values or state type.
--spec set_avgLoad(values(), avg()) -> values()
-                ; (values_internal(), avg()) -> values_internal()
+-spec set_avgLoad(values_internal(), avg()) -> values_internal()
                 ; (state(), avg()) -> state().
-set_avgLoad(Values, Avg) when is_record(Values, values) -> Values#values{avg=Avg};
 set_avgLoad(Values, Avg) when is_record(Values, values_internal) -> Values#values_internal{avg=Avg};
 set_avgLoad(State, Avg) when is_record(State, state) -> State#state{values=set_avgLoad(State#state.values, Avg)}.
 
-%% @doc Sets the standard deviation field of a values type.
--spec set_stddev(values(), stddev()) -> values().
-set_stddev(Values, Stddev) when is_record(Values, values) -> Values#values{stddev=Stddev}.
-
-%% @doc Sets the size field of a values type.
--spec set_size(values(), size()) -> values().
-set_size(Values, Size) when is_record(Values, values) -> Values#values{size=Size}.
-
 %% @doc Sets the minimum load field of a values or state type.
--spec set_minLoad(values(), min()) -> values()
-                ; (values_internal(), min()) -> values_internal()
+-spec set_minLoad(values_internal(), min()) -> values_internal()
                 ; (state(), min()) -> state().
-set_minLoad(Values, Min) when is_record(Values, values) -> Values#values{min=Min};
 set_minLoad(Values, Min) when is_record(Values, values_internal) -> Values#values_internal{min=Min};
 set_minLoad(State, Min) when is_record(State, state) -> State#state{values=set_minLoad(State#state.values, Min)}.
 
 %% @doc Sets the maximum load field of a values or state type.
--spec set_maxLoad(values(), max()) -> values()
-                ; (values_internal(), max()) -> values_internal()
+-spec set_maxLoad(values_internal(), max()) -> values_internal()
                 ; (state(), max()) -> state().
-set_maxLoad(Values, Max) when is_record(Values, values) -> Values#values{max=Max};
 set_maxLoad(Values, Max) when is_record(Values, values_internal) -> Values#values_internal{max=Max};
 set_maxLoad(State, Max) when is_record(State, state) -> State#state{values=set_maxLoad(State#state.values, Max)}.
 
@@ -289,17 +282,17 @@ set_maxLoad(State, Max) when is_record(State, state) -> State#state{values=set_m
 set_avgLoad2(Values, Avg2) when is_record(Values, values_internal) -> Values#values_internal{avg2=Avg2};
 set_avgLoad2(State, Avg2) when is_record(State, state) -> State#state{values=set_avgLoad2(State#state.values, Avg2)}.
 
-%% @doc Sets the average size_n (1/size) field of a values or state type.
--spec set_size_n(values_internal(), size_n()) -> values_internal()
-               ; (state(), size_n()) -> state().
-set_size_n(Values, Size_n) when is_record(Values, values_internal) -> Values#values_internal{size_n=Size_n};
-set_size_n(State, Size_n) when is_record(State, state) -> State#state{values=set_size_n(State#state.values, Size_n)}.
+%% @doc Sets the average size_inv (1/size) field of a values or state type.
+-spec set_size_inv(values_internal(), size_inv()) -> values_internal()
+                 ; (state(), size_inv()) -> state().
+set_size_inv(Values, Size_inv) when is_record(Values, values_internal) -> Values#values_internal{size_inv=Size_inv};
+set_size_inv(State, Size_inv) when is_record(State, state) -> State#state{values=set_size_inv(State#state.values, Size_inv)}.
 
 %% @doc Sets the average size (based on key ranges) field of a values or state type.
--spec set_size_kr(values_internal(), size_kr()) -> values_internal()
-               ; (state(), size_kr()) -> state().
-set_size_kr(Values, Size_kr) when is_record(Values, values_internal) -> Values#values_internal{size_kr=Size_kr};
-set_size_kr(State, Size_kr) when is_record(State, state) -> State#state{values=set_size_kr(State#state.values, Size_kr)}.
+-spec set_avg_kr(values_internal(), avg_kr()) -> values_internal()
+               ; (state(), avg_kr()) -> state().
+set_avg_kr(Values, AvgKR) when is_record(Values, values_internal) -> Values#values_internal{avg_kr=AvgKR};
+set_avg_kr(State, AvgKR) when is_record(State, state) -> State#state{values=set_avg_kr(State#state.values, AvgKR)}.
 
 %% @doc Sets the round field of a values or state type.
 -spec set_round(values_internal(), round()) -> values_internal()
@@ -355,17 +348,18 @@ inc_converge_avg_count(State) when is_record(State, state) ->
 
 %% @doc extracts and calculates the size field from the internal record of
 %%      values
--spec calc_size(values_internal() | state) -> size().
-calc_size(State) when is_record(State, values_internal) ->
-	Size_n = gossip_state:get_size_n(State),
+-spec calc_size_ldr(values_internal() | state) -> size().
+calc_size_ldr(State) when is_record(State, values_internal) ->
+	Size_inv = gossip_state:get_size_inv(State),
 	if
-		Size_n =< 0        -> 1.0;
-		Size_n =:= unknown -> unknown;
-		true               -> 1.0 / Size_n
+		Size_inv =< 0        -> 1.0;
+		Size_inv =:= unknown -> unknown;
+		true                 -> 1.0 / Size_inv
 	end;
-calc_size(State) when is_record(State, state) ->
-	calc_size(get_values(State)).
+calc_size_ldr(State) when is_record(State, state) ->
+	calc_size_ldr(get_values(State)).
 
+-spec get_addr_size() -> number().
 get_addr_size() ->
 	rt_simple:n().
 
@@ -373,11 +367,11 @@ get_addr_size() ->
 %%      values
 -spec calc_size_kr(values_internal() | state) -> size().
 calc_size_kr(State) when is_record(State, values_internal) ->
-	Size_kr = gossip_state:get_size_kr(State),
+	AvgKR = gossip_state:get_avg_kr(State),
 	if
-		Size_kr =< 0        -> 1.0;
-		Size_kr =:= unknown -> unknown;
-		true                -> get_addr_size() / Size_kr
+		AvgKR =< 0        -> 1.0;
+		AvgKR =:= unknown -> unknown;
+		true                -> get_addr_size() / AvgKR
 	end;
 calc_size_kr(State) when is_record(State, state) ->
 	calc_size_kr(get_values(State)).
@@ -400,7 +394,7 @@ calc_stddev(State) when is_record(State, state) ->
 conv_state_to_extval(State) when is_record(State, state) ->
 	#values{avg       = get_avgLoad(State),
             stddev    = calc_stddev(State),
-            size      = calc_size(State),
+            size_ldr  = calc_size_ldr(State),
             size_kr   = calc_size_kr(State),
             min       = get_minLoad(State),
             max       = get_maxLoad(State),
