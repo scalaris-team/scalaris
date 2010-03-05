@@ -54,11 +54,11 @@ get_load_std_deviation(Ring) ->
 			  0, lists:map(fun get_load/1, FilteredRing)) / length(FilteredRing)).
     
 get_load({ok, Details}) ->
-    node_details:load(Details);
+    node_details:get(Details, load);
 get_load({failed}) ->
     0.
 get_memory({ok, Details}) ->
-    node_details:memory(Details);
+    node_details:get(Details, memory);
 get_memory({failed}) ->
     0.
 
@@ -78,7 +78,7 @@ get_ring_details() ->
 
 
 compare_node_details({ok, X}, {ok, Y}) ->
-    node:id(node_details:me(X)) < node:id(node_details:me(Y));
+    node:id(node_details:get(X, node)) < node:id(node_details:get(Y, node));
 compare_node_details({failed}, _) ->
     true;
 compare_node_details({ok, _}, _) ->
@@ -121,7 +121,7 @@ get_rt_size_std_deviation(Ring) ->
 			  0, lists:map(fun get_rt/1, FilteredRing)) / length(FilteredRing)).
     
 get_rt({ok, Details}) ->
-    node_details:rt_size(Details);
+    node_details:get(Details, rt_size);
 get_rt({failed}) ->
     0.
 

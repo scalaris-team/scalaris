@@ -156,22 +156,22 @@ details(State, Which) ->
     				                   receive
     				                       {get_predlist_response, X} -> X
     				                   end,
-    				               node_details:set_predlist(NodeDetails, PredList);
-					pred        -> node_details:set_pred(NodeDetails, pred(State));
-					me          -> node_details:set_me(NodeDetails, me(State));
-					my_range    -> node_details:set_my_range(NodeDetails, get_my_range(State));
-					succ        -> node_details:set_succ(NodeDetails, succ(State));
+    				               node_details:set(NodeDetails, predlist, PredList);
+					pred        -> node_details:set(NodeDetails, pred, pred(State));
+					me          -> node_details:set(NodeDetails, node, me(State));
+					my_range    -> node_details:set(NodeDetails, my_range, get_my_range(State));
+					succ        -> node_details:set(NodeDetails, succ, succ(State));
 					succlist    -> ring_maintenance:get_successorlist(),
     				               SuccList = 
     				                   receive
     				                       {get_successorlist_response, Y} -> Y
     				                   end,
-    				               node_details:set_succlist(NodeDetails, SuccList);
-					load        -> node_details:set_load(NodeDetails, load(State));
-					hostname    -> node_details:set_hostname(NodeDetails, net_adm:localhost());
-					rt_size     -> node_details:set_rt_size(NodeDetails, rt_size(State));
-					message_log -> node_details:set_message_log(NodeDetails, ok);
-					memory      -> node_details:set_memory(NodeDetails, erlang:memory(total))
+    				               node_details:set(NodeDetails, succlist, SuccList);
+					load        -> node_details:set(NodeDetails, load, load(State));
+					hostname    -> node_details:set(NodeDetails, hostname, net_adm:localhost());
+					rt_size     -> node_details:set(NodeDetails, rt_size, rt_size(State));
+					message_log -> node_details:set(NodeDetails, message_log, ok);
+					memory      -> node_details:set(NodeDetails, memory, erlang:memory(total))
 				end
 		end,
 	lists:foldl(ExtractValues, node_details:new(), Which).

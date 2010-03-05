@@ -47,12 +47,11 @@ ring_health() ->
 
 
 node_health(Details,Ring) ->
-	Node = node_details:me(Details),
+	Node = node_details:get(Details, node),
 	MyIndex = get_indexed_id(Node, Ring),
     NIndex = length(Ring),
-	PredList = node_details:predlist(Details),
-    Node = node_details:me(Details),
-    SuccList = node_details:succlist(Details),
+	PredList = node_details:get(Details, predlist),
+    SuccList = node_details:get(Details, succlist),
 	
     PredIndices = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, Ring, MyIndex, NIndex) end, PredList),
     SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, Ring, MyIndex, NIndex) end, SuccList),
@@ -105,7 +104,7 @@ get_indexed_id(Node, Ring) ->
         false -> get_indexed_id(Node, Ring, 0)
     end.
 get_indexed_id(Node, [Details|Ring], Index) ->
-    case node:id(Node) =:= node:id(node_details:me(Details)) of
+    case node:id(Node) =:= node:id(node_details:get(Details, node)) of
         true -> Index;
         false -> get_indexed_id(Node, Ring, Index+1)
     end;
@@ -160,4 +159,4 @@ receive_get_node_details(List) ->
     end.
 
 compare_node_details( X,  Y) ->
-    node:id(node_details:me(X)) < node:id(node_details:me(Y)).
+    node:id(node_details:get(X, node)) < node:id(node_details:get(Y, node)).

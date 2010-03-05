@@ -135,7 +135,7 @@ on({get_node_details_response, local_info, NodeDetails},
 			true -> {QueuedMessages, State};
 			false ->
 				[cs_send:send_local(self(), Message) || Message <- QueuedMessages],
-				{[], integrate_local_info(State, node_details:load(NodeDetails), calc_initial_avg_kr(node_details:my_range(NodeDetails)))}
+				{[], integrate_local_info(State, node_details:get(NodeDetails, load), calc_initial_avg_kr(node_details:get(NodeDetails, my_range)))}
 			end,
     {PreviousState, NewState, NewQueuedMessages, TriggerState};
 
@@ -149,7 +149,7 @@ on({get_node_details_response, leader_start_new_round, NodeDetails},
 	% request_new_round_if_leader/1 which only asks for this if the condition to
 	% start a new round has already been met
 %%     io:format("gossip: got get_node_details_response, leader_start_new_round: ~p~n",[NodeDetails]),
-	{PredId, MyId} = node_details:my_range(NodeDetails),
+	{PredId, MyId} = node_details:get(NodeDetails, my_range),
 	{NewPreviousState, NewState} = 
 		case intervals:is_between(PredId, 0, MyId) of
 	        % not the leader -> continue as normal with the old state
@@ -165,7 +165,7 @@ on({get_node_details_response, leader_debug_output, NodeDetails},
 	% this message can only be received after being requested by
 	% request_leader_debug_output/0
 %%     io:format("gossip: got get_node_details_response, leader_debug_output: ~p~n",[NodeDetails]),
-	{PredId, MyId} = node_details:my_range(NodeDetails),
+	{PredId, MyId} = node_details:get(NodeDetails, my_range),
 	case intervals:is_between(PredId, 0, MyId) of
         % not the leader
 		false -> ok;
@@ -636,7 +636,7 @@ get_addr_size() ->
 %%      predecessor. If the second is larger than the first it wraps around and
 %%      thus the difference is the number of keys from the predecessor to the
 %%      end (of the ring) and from the start to the current node.
--spec calc_initial_avg_kr({any(), any()}) -> number().
+-spec calc_initial_avg_kr({T, T}) -> avg_kr().
 calc_initial_avg_kr({PredKey, MyKey} = _Range) ->
     try
 		if
