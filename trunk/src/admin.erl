@@ -88,16 +88,16 @@ check_ring() ->
     end.
 
 check_ring_foldl({ok, Node}, first) ->
-    get_id(hd(node_details:succlist(Node)));
+    get_id(hd(node_details:get(Node, succlist)));
 check_ring_foldl({failed}, Last) ->
     Last;
 check_ring_foldl(_, {error, Message}) ->
     {error, Message};
 check_ring_foldl({ok, Node}, PredsSucc) ->
-    MyId = get_id(node_details:me(Node)),
+    MyId = get_id(node_details:get(Node, node)),
     if
         MyId == PredsSucc ->
-            get_id(hd(node_details:succlist(Node)));
+            get_id(hd(node_details:get(Node, succlist)));
         true ->
             {error, lists:flatten(io_lib:format("~p didn't match ~p", [MyId, PredsSucc]))}
     end.

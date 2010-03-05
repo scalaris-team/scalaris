@@ -248,8 +248,8 @@ renderRingChart(Ring) ->
     URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
     Sizes = lists:map(
 	      fun ({ok,Node}) -> 
-		      Me_tmp = get_id(node_details:me(Node)),
-		      Pred_tmp = get_id(hd(node_details:predlist(Node))),
+		      Me_tmp = get_id(node_details:get(Node, node)),
+		      Pred_tmp = get_id(hd(node_details:get(Node, predlist))),
 		      if (null == Me_tmp) orelse (null == Pred_tmp)
 			 -> io_lib:format("1.0", []); % guess the size
 			 true ->
@@ -267,9 +267,9 @@ renderRingChart(Ring) ->
 	      end, Ring),
     Hostinfos = lists:map(
 		  fun ({ok,Node}) -> 
-			  node_details:hostname(Node) 
+			  node_details:get(Node, hostname) 
 			  ++ " (" ++ 
-			  integer_to_list(node_details:load(Node)) 
+			  integer_to_list(node_details:get(Node, load)) 
 			  ++ ")" 
 		  end,
 		  Ring),
@@ -338,12 +338,12 @@ getRingRendered() ->
     end.
 
 renderRing({ok, Details}) ->
-    Hostname = node_details:hostname(Details),
-    PredList = node_details:predlist(Details),
-    Node = node_details:me(Details),
-    SuccList = node_details:succlist(Details),
-    RTSize = node_details:rt_size(Details),
-    Load = node_details:load(Details),
+    Hostname = node_details:get(Details, hostname),
+    PredList = node_details:get(Details, predlist),
+    Node = node_details:get(Details, node),
+    SuccList = node_details:get(Details, succlist),
+    RTSize = node_details:get(Details, rt_size),
+    Load = node_details:get(Details, load),
     {tr, [], 
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
@@ -421,12 +421,12 @@ getIndexedRingRendered() ->
     end.
 
 renderIndexedRing({ok, Details}, Ring) ->
-    Hostname = node_details:hostname(Details),
-    PredList = node_details:predlist(Details),
-    Node = node_details:me(Details),
-    SuccList = node_details:succlist(Details),
-    RTSize = node_details:rt_size(Details),
-    Load = node_details:load(Details),
+    Hostname = node_details:get(Details, hostname),
+    PredList = node_details:get(Details, predlist),
+    Node = node_details:get(Details, node),
+    SuccList = node_details:get(Details, succlist),
+    RTSize = node_details:get(Details, rt_size),
+    Load = node_details:get(Details, load),
     MyIndex = get_indexed_id(Node, Ring),
     NIndex = length(Ring),
     PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, Ring, MyIndex, NIndex) end, PredList),
@@ -492,7 +492,7 @@ get_indexed_id(Node, Ring) ->
     end.
 
 get_indexed_id(Node, [{ok, Details}|Ring], Index) ->
-    case node:id(Node) =:= node:id(node_details:me(Details)) of
+    case node:id(Node) =:= node:id(node_details:get(Details, node)) of
         true -> Index;
         false -> get_indexed_id(Node, Ring, Index+1)
     end;
