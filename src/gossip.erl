@@ -1,4 +1,5 @@
 %  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -16,6 +17,42 @@
 %%% @author Nico Kruber <kruber@zib.de>
 %%% @doc    Framework for estimating aggregated global properties using
 %%%         gossip techniques.
+%%%  
+%%%  Gossiping is organized in rounds. At the start of each round, a node's
+%%%  gossip process has to ask its cs_node for information about its state,
+%%%  i.e. its load and the IDs of itself and its predecessor. It will not
+%%%  participate in any message exchanges until this information has been
+%%%  received and postpone any other received messages.
+%%%  
+%%%  When these values are successfully integrated into the process state,
+%%%  and the node entered some round, it will continuously ask the cyclon
+%%%  process for a random node to exchange its state with and update the local
+%%%  estimates (the interval is defined in gossip_interval given by
+%%%  scalaris.cfg).
+%%%  
+%%%  New rounds are started by the leader which is identified as the node for
+%%%  which intervals:is_between(PredId, 0, MyId) is true. It will propagate its
+%%%  round with its state so that gossip processes of other nodes can join this
+%%%  round. Several parameters (added to scalaris.cfg) influence the decision
+%%%  about when to start a new round:
+%%%  <ul>
+%%%   <li>gossip_max_triggers_per_round: a new round is started if this many
+%%%       triggers have been received during the round</li>
+%%%   <li>gossip_min_triggers_per_round: a new round is NOT started until this
+%%%       many triggers have been received during the round</li>
+%%%   <li>gossip_converge_avg_count_start_new_round: if the estimated values
+%%%       did not change by more than gossip_converge_avg_epsilon percent this
+%%%       many times, assume the values have converged and start a new round
+%%%   </li>
+%%%   <li>gossip_converge_avg_epsilon: (see
+%%%       gossip_converge_avg_count_start_new_round)</li>
+%%%  </ul>
+%%%  
+%%%  Each process stores the estimates of the current round (which might not
+%%%  have been converged yet) and the previous estimates. If another process
+%%%  asks for gossip's best values it will favor the previous values but return
+%%%  the current ones if they have not changes by more than
+%%%  gossip_converge_avg_epsilon percent gossip_converge_avg_count times.
 %%% @end
 %%% Created : 19 Feb 2010 by Nico Kruber <kruber@zib.de>
 %%%-------------------------------------------------------------------
@@ -27,8 +64,8 @@
 
 -behaviour(gen_component).
 
--define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), request_leader_debug_output()).
-%% -define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), ok).
+%% -define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), request_leader_debug_output()).
+-define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), ok).
 
 -export([start_link/1]).
 
