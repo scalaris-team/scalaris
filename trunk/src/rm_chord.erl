@@ -224,15 +224,8 @@ filter(Pid, [Succ | Rest]) ->
 
 % @private
 get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), ring_maintenance).
+    process_dictionary:get_group_member(ring_maintenance).
 
 % get Pid of assigned cs_node
 get_cs_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-	InstanceId == undefined ->
-	   log:log(error,"[ RM | ~w ] ~p", [self(),util:get_stacktrace()]);
-	true ->
-	    ok
-    end,
-    process_dictionary:lookup_process(InstanceId, cs_node).
+    process_dictionary:get_group_member(cs_node).

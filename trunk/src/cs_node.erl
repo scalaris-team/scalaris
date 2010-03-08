@@ -334,8 +334,7 @@ on({notify, Pred}, State) ->
 % Finger Maintenance 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({lookup_pointer, Source_Pid, Index}, State) ->
-    InstanceId = erlang:get(instance_id),
-    RT = process_dictionary:lookup_process(InstanceId, routing_table),
+    RT = process_dictionary:get_group_member(routing_table),
     cs_send:send_local(RT, {lookup_pointer, Source_Pid, Index}),
     State;
 
@@ -361,8 +360,7 @@ on({get_node, Source_PID, Key}, State) ->
     State;
 
 on({get_process_in_group, Source_PID, Key, Process}, State) ->
-    InstanceId = erlang:get(instance_id),
-    Pid = process_dictionary:lookup_process(InstanceId, Process),
+    Pid = process_dictionary:get_group_member(Process),
     GPid = cs_send:make_global(Pid),
     cs_send:send(Source_PID, {get_process_in_group_reply, Key, GPid}),
     State;
@@ -554,24 +552,10 @@ start_link(InstanceId, Options) ->
 %% userdevguide-end cs_node:start_link
 
 get_local_cyclon_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-        InstanceId == undefined ->
-            log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
-        true ->
-            ok
-    end,
-    process_dictionary:lookup_process(InstanceId, cyclon).
+    process_dictionary:get_group_member(cyclon).
 
 get_local_cs_reregister_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-        InstanceId == undefined ->
-            log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
-        true ->
-            ok
-    end,
-    process_dictionary:lookup_process(InstanceId, cs_reregister).
+    process_dictionary:get_group_member(cs_reregister).
 
 % @doc find existing nodes and initialize the comm_layer
 trigger_known_nodes() ->

@@ -158,8 +158,7 @@ loop(Module, On, State, {Options, Slowest} = ComponentState) ->
         %% forward a message to group member by its process name
         %% initiated via cs_send:send_to_group_member()
         {send_to_group_member, Processname, Msg} ->
-            InstanceId = erlang:get(instance_id),
-            Pid = process_dictionary:lookup_process(InstanceId,Processname),
+            Pid = process_dictionary:get_group_member(Processname),
             case Pid of
                 failed ->
                     ok;

@@ -74,7 +74,7 @@ behaviour_info(_Other) ->
 %% see rt_simple.erl for simple standard implementation
 
 initialize(Id, Pred, Succ) ->
-    Pid = process_dictionary:lookup_process(erlang:get(instance_id), routing_table),
+    Pid = process_dictionary:get_group_member(routing_table),
     cs_send:send_local(Pid , {init, Id, Pred, Succ}).
 
 to_html(RT) ->

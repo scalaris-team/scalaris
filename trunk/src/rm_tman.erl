@@ -330,25 +330,14 @@ has_changed([X | _], _) ->
 
 
 get_cyclon_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), cyclon).
-
-
-
+    process_dictionary:get_group_member(cyclon).
 
 get_pid_dnc() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), dn_cache).
-
+    process_dictionary:get_group_member(dn_cache).
 
 % get Pid of assigned cs_node
 get_cs_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-	InstanceId == undefined ->
-            log:log(error,"[ RM | ~w ] ~p", [self(),util:get_stacktrace()]);
-	true ->
-	    ok
-    end,
-    process_dictionary:lookup_process(InstanceId, cs_node).
+    process_dictionary:get_group_member(cs_node).
 
 get_base_interval() ->
     config:read(stabilization_interval_base).
