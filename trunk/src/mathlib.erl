@@ -27,7 +27,7 @@
          vecAdd/2, vecSub/2, vecMult/2, vecWeightedAvg/4, zeros/1, median/1,
         aggloClustering/3]).
 
--type(vector() :: [float()]).
+-type(vector() :: [number()]).
 -type(centroid() :: vector()).
 
 % get maximum of two values
@@ -35,7 +35,7 @@ max(V1, V2) ->
     T1 = V1, T2 = V2, if T1 > T2 -> T1 ; true -> T2 end.
 
 % median of an unsorted list
--spec(median/1 :: (vector()) -> float()).
+-spec(median/1 :: (vector()) -> number()).
 median(L) ->
      L1 = lists:sort(L),
      N = length(L1),

@@ -42,7 +42,7 @@
 -type(error() :: float()).
 
 
--type(latency() :: float()).
+-type(latency() :: number()).
 
 % state of the vivaldi loop
 -type(state() :: {network_coordinate(), error()}).
@@ -104,12 +104,17 @@ on({vivaldi_shuffle_reply, _RemoteNode, _RemoteCoordinate, _RemoteConfidence}, S
 on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
    {Coordinate, Confidence,TriggerState}) ->
     %io:format("latency is ~pus~n", [Latency]),
-    {NewCoordinate, NewConfidence } = update_coordinate(RemoteCoordinate,
+    {NewCoordinate, NewConfidence } = try
+        update_coordinate(RemoteCoordinate,
                       RemoteConfidence,
                       Latency,
                       Coordinate,
-                      Confidence),
-     {NewCoordinate, NewConfidence,TriggerState};
+                      Confidence)
+    catch
+        % ignore any exceptions, e.g. badarith
+        error:_ -> {Coordinate, Confidence }
+    end,
+    {NewCoordinate, NewConfidence,TriggerState};
 
 on({ping, Pid}, State) ->
     %log:log(info, "ping ~p", [Pid]),
@@ -146,17 +151,14 @@ get_local_cyclon_pid() ->
 
 -spec(random_coordinate/0 :: () -> network_coordinate()).
 random_coordinate() ->
-    % @TODO
     Dim = config:read(vivaldi_dimensions, 2),
-    lists:map(fun(_) -> crypto:rand_uniform(1, 10) end, lists:seq(1, Dim)).
+    % note: network coordinates are float vectors!
+    [ float(crypto:rand_uniform(1, 10)) || _ <- lists:seq(1, Dim) ].
 
 -spec(update_coordinate/5 :: (network_coordinate(), error(), latency(),
                               network_coordinate(), error()) -> vivaldi:state()).
 update_coordinate(Coordinate, _RemoteError, _Latency, Coordinate, Error) ->
-    %@TODO same coordinate
-    {Coordinate, Error};
-update_coordinate(Coordinate, _RemoteError, 0, Coordinate, Error) ->
-    %@TODO latency is 0
+    % same coordinate
     {Coordinate, Error};
 update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
     Cc = 0.5, Ce = 0.5,
