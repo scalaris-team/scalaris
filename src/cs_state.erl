@@ -179,7 +179,7 @@ details(State, Which) ->
 %% @doc Gets the following details about the current node:
 %%      predecessor and successor lists, the node itself, its load, hostname and
 %%      routing table size
--spec details(state()) -> node_details:node_details().
+-spec details(state()) -> node_details:node_details_record().
 details(State) ->
     ring_maintenance:get_predlist(),
     PredList =  receive

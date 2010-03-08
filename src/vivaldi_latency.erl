@@ -80,7 +80,7 @@ on(_, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(init/1 :: ([any()]) -> vivaldi:state()).
+-spec(init/1 :: ([any(), ...]) -> state()).
 init([Owner, RemoteNode, Token]) ->
     %io:format("vivaldi_latency start ~n"),
     erlang:send_after(config:read(vivaldi_latency_timeout, 60*1000),

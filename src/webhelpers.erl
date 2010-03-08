@@ -247,39 +247,38 @@ getRingChart() ->
 renderRingChart(Ring) ->
     URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
     Sizes = lists:map(
-	      fun ({ok,Node}) -> 
-		      Me_tmp = get_id(node_details:get(Node, node)),
-		      Pred_tmp = get_id(hd(node_details:get(Node, predlist))),
-		      if (null == Me_tmp) orelse (null == Pred_tmp)
-			 -> io_lib:format("1.0", []); % guess the size
-			 true ->
-			      Tmp = (Me_tmp - Pred_tmp)*100
-				  /16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
-			      if Tmp < 0.0 
-				 -> Diff = (Me_tmp 
-					    + 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-					    - Pred_tmp)
-					* 100 / 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-				 true -> Diff = Tmp
-			      end,
-			      io_lib:format("~f", [Diff])
-		      end
-	      end, Ring),
+              fun ({ok,Node}) ->
+                       Me_tmp = get_id(node_details:get(Node, node)),
+                       Pred_tmp = get_id(hd(node_details:get(Node, predlist))),
+                       if
+                           (null == Me_tmp) orelse (null == Pred_tmp) ->
+                               io_lib:format("1.0", []); % guess the size
+                           true ->
+                               Tmp = (Me_tmp - Pred_tmp) * 100 /
+                                         16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+                               Diff = if
+                                          Tmp < 0.0 ->
+                                              (Me_tmp +
+                                                   16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+                                              - Pred_tmp) * 100 /
+                                                  16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+                                          true -> Tmp
+                                      end,
+                               io_lib:format("~f", [Diff])
+                       end
+              end, Ring),
     Hostinfos = lists:map(
-		  fun ({ok,Node}) -> 
-			  node_details:get(Node, hostname) 
-			  ++ " (" ++ 
-			  integer_to_list(node_details:get(Node, load)) 
-			  ++ ")" 
-		  end,
-		  Ring),
+                  fun ({ok,Node}) ->
+                           node_details:get(Node, hostname) ++ " (" ++
+                               integer_to_list(node_details:get(Node, load)) ++
+                               ")"
+                  end, Ring),
     CHD = "chd=t:" ++ tl(
-      lists:foldl(fun(X,S) -> S ++ "," ++ X end, "", Sizes)),
+            lists:foldl(fun(X,S) -> S ++ "," ++ X end, "", Sizes)),
     CHS = "chs=600x350",
     CHL = "chl=" ++ tl(
-      lists:foldl(fun(X,S) -> S ++ "|" ++ X end, "", Hostinfos)),
-    URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL
-.
+            lists:foldl(fun(X,S) -> S ++ "|" ++ X end, "", Hostinfos)),
+    URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL.
 
 getRingRendered() ->
     RealRing = statistics:get_ring_details(),
@@ -466,7 +465,7 @@ get_id(Node) ->
     IsNull = node:is_null(Node),
     if
 	IsNull ->
-	    "null";
+	    null;
 	true ->
 	    node:id(Node)
     end.

@@ -149,7 +149,7 @@ check(Old, New, Id, Pred, Succ) ->
 
 % OldRT, NewRT, CheckFD
 -spec(check/6 :: (Old::?RT:state(), New::?RT:state(), ?RT:key(), node:node_type(),
-                  node:node_type(), ReportFD::bool()) -> any()).
+                  node:node_type(), ReportFD::bool() | any()) -> any()).
 check(X, X, _Id, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, Pred, Succ, true) ->
