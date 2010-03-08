@@ -168,7 +168,7 @@ new_state(Values) when is_record(Values, values_internal) ->
 %%
 
 %% @doc Gets the average load from a gossip state's values.
--spec get_avgLoad(values() | values_internal() | state) -> avg().
+-spec get_avgLoad(values() | values_internal() | state()) -> avg().
 get_avgLoad(#values{avg=Avg}) -> Avg;
 get_avgLoad(#values_internal{avg=Avg}) -> Avg;
 get_avgLoad(#state{values=Values}) -> get_avgLoad(Values).
@@ -198,34 +198,34 @@ get_size_ldr(#values{size_ldr=Size_ldr}) -> Size_ldr.
 get_size_kr(#values{size_kr=Size_kr}) -> Size_kr.
 
 %% @doc Gets the minimum load from a gossip state's values.
--spec get_minLoad(values() | values_internal() | state) -> min().
+-spec get_minLoad(values() | values_internal() | state()) -> min().
 get_minLoad(#values{min=Min}) -> Min;
 get_minLoad(#values_internal{min=Min}) -> Min;
 get_minLoad(#state{values=Values}) -> get_minLoad(Values).
 
 %% @doc Gets the maximum load from a gossip state's values.
--spec get_maxLoad(values() | values_internal() | state) -> max().
+-spec get_maxLoad(values() | values_internal() | state()) -> max().
 get_maxLoad(#values{max=Max}) -> Max;
 get_maxLoad(#values_internal{max=Max}) -> Max;
 get_maxLoad(#state{values=Values}) -> get_maxLoad(Values).
 
 %% @doc Gets the average load from a gossip state's values.
--spec get_avgLoad2(values_internal() | state) -> avg2().
+-spec get_avgLoad2(values_internal() | state()) -> avg2().
 get_avgLoad2(#values_internal{avg2=Avg2}) -> Avg2;
 get_avgLoad2(#state{values=Values}) -> get_avgLoad2(Values).
 
 %% @doc Gets the 1/size value from a gossip state's values.
--spec get_size_inv(values_internal() | state) -> size_inv().
+-spec get_size_inv(values_internal() | state()) -> size_inv().
 get_size_inv(#values_internal{size_inv=Size_inv}) -> Size_inv;
 get_size_inv(#state{values=Values}) -> get_size_inv(Values).
 
 %% @doc Gets the average key range from a gossip state's values.
--spec get_avg_kr(values_internal() | state) -> avg_kr().
+-spec get_avg_kr(values_internal() | state()) -> avg_kr().
 get_avg_kr(#values_internal{avg_kr=AvgKR}) -> AvgKR;
 get_avg_kr(#state{values=Values}) -> get_avg_kr(Values).
 
 %% @doc Gets the round from a gossip state's values.
--spec get_round(values_internal() | state) -> round().
+-spec get_round(values_internal() | state()) -> round().
 get_round(#values_internal{round=Round}) -> Round;
 get_round(#state{values=Values}) -> get_round(Values).
 
@@ -348,7 +348,7 @@ inc_converge_avg_count(State) when is_record(State, state) ->
 
 %% @doc extracts and calculates the size field from the internal record of
 %%      values
--spec calc_size_ldr(values_internal() | state) -> size().
+-spec calc_size_ldr(values_internal() | state()) -> size().
 calc_size_ldr(State) when is_record(State, values_internal) ->
 	Size_inv = gossip_state:get_size_inv(State),
 	if
@@ -365,7 +365,7 @@ get_addr_size() ->
 
 %% @doc extracts and calculates the size_kr field from the internal record of
 %%      values
--spec calc_size_kr(values_internal() | state) -> size().
+-spec calc_size_kr(values_internal() | state()) -> size().
 calc_size_kr(State) when is_record(State, values_internal) ->
 	AvgKR = gossip_state:get_avg_kr(State),
 	if
@@ -378,7 +378,7 @@ calc_size_kr(State) when is_record(State, state) ->
 
 %% @doc extracts and calculates the standard deviation from the internal record
 %%      of values
--spec calc_stddev(values_internal()) -> avg().
+-spec calc_stddev(values_internal() | state()) -> avg().
 calc_stddev(State) when is_record(State, values_internal) ->
 	Avg = gossip_state:get_avgLoad(State),
 	Avg2 = gossip_state:get_avgLoad2(State),

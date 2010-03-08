@@ -459,7 +459,7 @@ update_avg2(MyValues, OtherValues) ->
 
 %% @doc Calculates the average of the two given values. If MyValue is unknown,
 %%      OtherValue will be returned.
--spec calc_avg(number() | unknown, number()) -> number().
+-spec calc_avg(number() | unknown, number() | unknown) -> number() | unknown.
 calc_avg(MyValue, OtherValue) -> 
 	_MyNewValue =
 		case MyValue of
@@ -525,7 +525,7 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 			% set a size_inv value of 0 (only the leader sets 1)
 			S1 = gossip_state:new_state(),
 			NewState = gossip_state:set_size_inv(
-						 gossip_state:set_round(S1, OtherRound), 0),
+						 gossip_state:set_round(S1, OtherRound), 0.0),
     		request_local_info(),
 			{OldState, NewState}
 	end.
