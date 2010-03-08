@@ -39,7 +39,7 @@
 -type(state() :: {cs_send:mypid(),
                   cs_send:mypid(),
                   any(),
-                  {integer(), integer(), integer()},
+                  {integer(), integer(), integer()} | unknown,
                   [latency()]}).
 
 
@@ -63,7 +63,7 @@ on({pong, _}, {Owner, RemoteNode, Token, Start, Latencies}) ->
             cs_send:send_after(config:read(vivaldi_measurements_delay),
                               self(),
                               {start_ping}),
-            {Owner, RemoteNode, Token, 0, NewLatencies}
+            {Owner, RemoteNode, Token, unknown, NewLatencies}
     end;
 
 on({start_ping}, {Owner, RemoteNode, Token, _, Latencies}) ->
@@ -87,7 +87,7 @@ init([Owner, RemoteNode, Token]) ->
                       self(),
                       {shutdown}),
     cs_send:send_local(self() , {start_ping}),
-    {Owner, RemoteNode, Token, 0, []}.
+    {Owner, RemoteNode, Token, unknown, []}.
 
 -spec(start/3 :: (pid(), any(), any()) -> {ok, pid()}).
 start(Owner, RemoteNode, Token) ->
@@ -99,5 +99,6 @@ measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec(calc_latency/1 :: ([latency()]) -> number()).
 calc_latency(Latencies) ->
     mathlib:median(Latencies).
