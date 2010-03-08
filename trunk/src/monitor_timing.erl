@@ -33,7 +33,7 @@
 -export([on/2, init/1]).
 
 % state of the vivaldi loop
--type(state() :: {any()}).
+-type(state() :: {}).
 
 % accepted messages of vivaldi processes
 -type(message() :: any()).
@@ -83,7 +83,7 @@ on(_, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(init/1 :: (any()) -> monitor_timing:state()).
+-spec(init/1 :: (any()) -> state()).
 init(_) ->
     ets:new(?MODULE, [set, protected, named_table]),
     {}.

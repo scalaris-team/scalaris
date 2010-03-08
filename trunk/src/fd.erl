@@ -54,12 +54,14 @@ subscribe(GlobalPid, Cookie) ->
     subscribe([GlobalPid], Cookie).
 
 %% @doc deletes the failure detector for the given pid.
--spec(unsubscribe/1 :: (cs_send:mypid()) -> ok).
+-spec(unsubscribe/1 :: (cs_send:mypid() | [cs_send:mypid()]) -> ok).
 unsubscribe(GlobalPids) when is_list(GlobalPids) ->
     unsubscribe(GlobalPids, '$fd_nil');
 unsubscribe(GlobalPid) ->
     unsubscribe([GlobalPid], '$fd_nil').
+
 %% @doc deletes the failure detector for the given pid and cookie.
+-spec(unsubscribe/2 :: (cs_send:mypid() | [cs_send:mypid()], any()) -> ok).
 unsubscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
     cs_send:send_local(my_fd_pid(),
                        {unsubscribe_list, self(), GlobalPids, Cookie}),
@@ -68,17 +70,20 @@ unsubscribe(GlobalPid, Cookie) ->
     unsubscribe([GlobalPid], Cookie).
 
 %% @doc who is informed on events on a given Pid?
+-spec(get_subscribers/1 :: (cs_send:mypid()) -> ok).
 get_subscribers(GlobalPid) ->
     cs_send:send_local(my_fd_pid(),
                        {get_subscribers, self(), GlobalPid}),
     ok.
 %% @doc who is informed on events on a given Pid and Cookie?
+-spec(get_subscribers/2 :: (cs_send:mypid(), any()) -> ok).
 get_subscribers(GlobalPid, Cookie) ->
     cs_send:send_local(my_fd_pid(),
                        {get_subscribers, self(), GlobalPid, Cookie}),
     ok.
 
 %% @doc on what am I informed?
+-spec(get_subscriptions/0 :: () -> ok).
 get_subscriptions() ->
     cs_send:send_local(my_fd_pid() , {get_subscriptions, self()}),
     ok.

@@ -77,7 +77,7 @@ getRandomNodeId() ->
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc returns the next hop to contact for a lookup
--spec(next_hop/2 :: (cs_state:state(), key()) -> pid()).
+-spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
 next_hop(State, _Key) ->
     cs_state:succ_pid(State).
 %% userdevguide-end rt_simple:next_hop

@@ -84,7 +84,7 @@ unset_read_lock(DB, Key) ->
     end.
 
 %% @doc get the locks and version of a key
--spec(get_locks/2 :: (db(), key()) -> {bool(), integer(), version()}| failed).
+-spec(get_locks/2 :: (db(), key()) -> {db(), {bool(), integer(), version()} | failed}).
 get_locks(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, WriteLock, ReadLock, Version}}] ->

@@ -42,7 +42,7 @@
 -type(sizes() :: [relative_size()]).
 
 % state of the clustering loop
--type(state() :: {centroids()}).
+-type(state() :: {centroids(), sizes()}).
 
 % accepted messages of cluistering process
 -type(message() :: any()).

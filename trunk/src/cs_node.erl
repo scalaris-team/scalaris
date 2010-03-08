@@ -523,7 +523,7 @@ on(_, _State) ->
 
 %% userdevguide-begin cs_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec(init/1 :: ([any()]) -> {join_state1}).
+-spec(init/1 :: ([any()]) -> {join_as_first, join_phase1}).
 init([_InstanceId, Options]) ->
     %io:format("~p~n", [Options]),
     % first node in this vm and also vm is marked as first

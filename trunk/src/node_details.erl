@@ -71,10 +71,10 @@
 
 -type(node_details() :: node_details_record() | node_details_list()).
 
--spec new() -> node_details().
+-spec new() -> node_details_list().
 new() -> [].
 
--spec new(predlist(), node_type(), succlist(), load(), hostname(), rt_size(), memory()) -> node_details().
+-spec new(predlist(), node_type(), succlist(), load(), hostname(), rt_size(), memory()) -> node_details_record().
 new(Pred, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     #node_details{
      predlist = Pred,

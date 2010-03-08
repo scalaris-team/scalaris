@@ -109,7 +109,7 @@ lookup_process(Pid) ->
     end.
 
 %% @doc tries to find a cs_node process
--spec(find_cs_node/0 :: () -> pid()).
+-spec(find_cs_node/0 :: () -> {ok, pid()} | failed).
 find_cs_node() ->
     find_process(cs_node).
 

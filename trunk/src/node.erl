@@ -30,8 +30,10 @@
          new/2,
          is_null/1, null/0]).
 
--type(node_type() :: {node, cs_send:mypid()}).
--record(node, {pid, id}).
+-include("../include/scalaris.hrl").
+
+-record(node, {pid :: cs_send:mypid(), id :: ?RT:key()}).
+-type(node_type() :: #node{}).
 
 -spec(new/2 :: (cs_send:mypid(), any()) -> node_type()).
 new(PID, Id) ->
@@ -46,9 +48,12 @@ null() ->
 pidX(#node{pid=PID}) ->
     PID.
 
+-spec(id/1 :: (node_type()) -> ?RT:key()).
 id(#node{id=Id}) ->
     Id.
 
+-spec(is_null/1 :: (null) -> true
+                  ; (node_type()) -> false).
 is_null(null) ->
     true;
 is_null(#node{id=_}) ->
