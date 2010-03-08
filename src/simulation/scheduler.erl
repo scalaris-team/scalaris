@@ -53,7 +53,7 @@ init(Sup) ->
 %% Local Functions
 %%
 
--spec scheduler_loop(message_queue:queue(), bool(), message_queue:time(), non_neg_integer())
+-spec scheduler_loop(message_queue:message_queue(), bool(), message_queue:msg_time(), non_neg_integer()) -> any().
 scheduler_loop(Q,Once,AkkTime,Ins) ->
     receive 
         %{halt_simulation} ->
