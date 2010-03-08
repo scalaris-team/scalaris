@@ -87,7 +87,7 @@ on(_, _State) ->
     unknown_event.
 % @private
 get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), dn_cache).
+    process_dictionary:get_group_member(dn_cache).
 
 
 get_base_interval() ->

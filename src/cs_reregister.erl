@@ -70,11 +70,4 @@ get_base_interval() ->
 
 
 get_cs_node_this() ->
-    InstanceId = erlang:get(instance_id),
-    if
-	InstanceId == undefined ->
-	   log:log(error,"[ CS_REREGISTER ] ~p", [util:get_stacktrace()]);
-	true ->
-	    ok
-    end,
-    cs_send:get(process_dictionary:lookup_process(InstanceId, cs_node),cs_send:this()) .
+    cs_send:get(process_dictionary:get_group_member(cs_node),cs_send:this()).

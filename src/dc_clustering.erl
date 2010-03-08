@@ -139,24 +139,10 @@ start_link(InstanceId) ->
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_local_cyclon_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-        InstanceId == undefined ->
-            log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
-        true ->
-            ok
-    end,
-    process_dictionary:lookup_process(InstanceId, cyclon).
+    process_dictionary:get_group_member(cyclon).
 
 get_local_vivaldi_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-        InstanceId == undefined ->
-            log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
-        true ->
-            ok
-    end,
-    process_dictionary:lookup_process(InstanceId, vivaldi).
+    process_dictionary:get_group_member(vivaldi).
 
 -spec(cluster/4 :: (centroids(), sizes(), centroids(), sizes()) -> {centroids(), sizes()}).
 cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes) ->

@@ -79,4 +79,4 @@ help({_,A},{_,B}) ->
 
 
 get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), self_man).
+    process_dictionary:get_group_member(self_man).

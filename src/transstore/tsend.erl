@@ -98,17 +98,6 @@ send_to_tp(Item, Message)->
         end,
     [ F(RKey, TP) || {RKey, TP} <- Item#tm_item.tps ].
 
-%@private
-%% get_pid(Id) ->
-%%     InstanceId = erlang:get(instance_id),
-%%     if
-%%       InstanceId == undefined ->
-%%       io:format("~p~n", [util:get_stacktrace()]);
-%%     true ->
-%%       ok
-%%     end,
-%%     process_dictionary:lookup_process(InstanceId, Id).
-
 tell_rtms(TMState)->
     [ cs_send:send(Address, {rtms, TMState#tm_state.rtms, Ballot})
       ||  {_Key, Address, Ballot} <- TMState#tm_state.rtms ].

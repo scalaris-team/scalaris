@@ -156,7 +156,7 @@ get_processes_in_group(Group) ->
     ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
     ProcessesAsJson.
 
-%% @doc Get Pid of the group member (process) with the given name.
+%% @doc Gets the Pid of the current process' group member with the given name.
 -spec(get_group_member/1 :: (atom()) -> pid() | failed).
 get_group_member(Name) ->
     InstanceId = erlang:get(instance_id),

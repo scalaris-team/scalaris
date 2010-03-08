@@ -138,4 +138,4 @@ id({X,_}) -> X.
 succ({_,X}) -> X.
 
 get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id),simu_slave).
+    process_dictionary:get_group_member(simu_slave).

@@ -142,14 +142,7 @@ start_link(InstanceId) ->
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_local_cyclon_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-        InstanceId == undefined ->
-            log:log(error,"[ Node ] ~p", [util:get_stacktrace()]);
-        true ->
-            ok
-    end,
-    process_dictionary:lookup_process(InstanceId, cyclon).
+    process_dictionary:get_group_member(cyclon).
 
 -spec(random_coordinate/0 :: () -> network_coordinate()).
 random_coordinate() ->

@@ -41,23 +41,9 @@
 	
 
 unreliable_lookup(Key, Msg) ->
-    cs_send:send_local(get_pid(cs_node) , {lookup_aux, Key, 0, Msg}).
+    cs_send:send_local(process_dictionary:get_group_member(cs_node), {lookup_aux, Key, 0, Msg}).
 
 unreliable_get_key(Key) ->
     unreliable_lookup(Key, {get_key, cs_send:this(), Key}).
 
 %%%-----------------------Implementation------------------------------
-
-
-
-
-
-get_pid(Id) ->
-    InstanceId = erlang:get(instance_id),
-%     if
-%   	InstanceId == undefined ->
-%   	    io:format("~p~n", [util:get_stacktrace()]);
-%   	true ->
-%   	    ok
-%     end,
-    process_dictionary:lookup_process(InstanceId, Id).

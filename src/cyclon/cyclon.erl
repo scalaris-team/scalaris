@@ -207,14 +207,7 @@ get_L(Cache) ->
 
 % get Pid of assigned cs_node
 get_pid() ->
-    InstanceId = erlang:get(instance_id),
-    if
-        InstanceId == undefined ->
-            log:log(error,"[ CY | ~w ] ~p", [self(),util:get_stacktrace()]);
-        true ->
-            ok
-    end,
-    process_dictionary:lookup_process(InstanceId, cs_node).
+    process_dictionary:get_group_member(cs_node).
 
 get_base_interval() ->
     config:read(cyclon_interval).

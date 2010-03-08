@@ -78,7 +78,7 @@ on(_, _State) ->
     unknown_event.
 
 get_pid() ->
-    process_dictionary:lookup_process(erlang:get(instance_id), cs_keyholder).
+    process_dictionary:get_group_member(cs_keyholder).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Key creation algorithms
