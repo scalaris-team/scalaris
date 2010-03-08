@@ -143,15 +143,17 @@ install: all java docs
 	mkdir -p $(DOCDIR)/erlang/transstore
 	install -m 644 doc/transstore/*.html $(DOCDIR)/erlang/transstore
 	mkdir -p $(DOCDIR)/java-api
+	mkdir -p $(DOCDIR)/java-api/index-files
 	mkdir -p $(DOCDIR)/java-api/resources
-	mkdir -p $(DOCDIR)/java-api/de/zib/chordsharp/class-use
-	mkdir -p $(DOCDIR)/java-api/de/zib/chordsharp/examples/class-use
+	mkdir -p $(DOCDIR)/java-api/de/zib/scalaris/class-use
+	mkdir -p $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use
 	install -m 644 java-api/doc/*.html $(DOCDIR)/java-api
+	install -m 644 java-api/doc/index-files/*.html $(DOCDIR)/java-api/index-files
 	install -m 644 java-api/doc/resources/*.gif $(DOCDIR)/java-api/resources
-	install -m 644 java-api/doc/de/zib/chordsharp/*.html $(DOCDIR)/java-api/de/zib/chordsharp
-	install -m 644 java-api/doc/de/zib/chordsharp/class-use/*.html $(DOCDIR)/java-api/de/zib/chordsharp/class-use
-	install -m 644 java-api/doc/de/zib/chordsharp/examples/*.html $(DOCDIR)/java-api/de/zib/chordsharp/examples
-	install -m 644 java-api/doc/de/zib/chordsharp/class-use/*.html $(DOCDIR)/java-api/de/zib/chordsharp/class-use
+	install -m 644 java-api/doc/de/zib/scalaris/*.html $(DOCDIR)/java-api/de/zib/scalaris
+	install -m 644 java-api/doc/de/zib/scalaris/class-use/*.html $(DOCDIR)/java-api/de/zib/scalaris/class-use
+	install -m 644 java-api/doc/de/zib/scalaris/examples/*.html $(DOCDIR)/java-api/de/zib/scalaris/examples
+	install -m 644 java-api/doc/de/zib/scalaris/examples/class-use/*.html $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use
 	mkdir -p $(JAVADIR)/scalaris
 	install java-api/scalaris.jar $(JAVADIR)/scalaris/
 	mkdir -p $(JAVADIR)/scalaris/lib
