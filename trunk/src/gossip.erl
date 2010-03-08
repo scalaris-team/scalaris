@@ -100,7 +100,7 @@ start_link(InstanceId) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc message handler
--spec on(message(), full_state()) -> full_state().
+-spec on(message(), full_state()) -> full_state() | unknown_event.
 on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received continuously when the Trigger calls
 	% see gossip_trigger and gossip_interval in the scalaris.cfg file
@@ -279,10 +279,10 @@ on({get_values_all, SourcePid}, {PreviousState, State, _QueuedMessages, _Trigger
 	BestState = previous_or_current(PreviousState, State),
 	BestValues = gossip_state:conv_state_to_extval(BestState),
 	msg_get_values_all_response(SourcePid, PreviousValues, CurrentValues, BestValues),
-	FullState.
+	FullState;
 
-%on(_Message, _State) ->
-%    unknown_event.
+on(_Message, _State) ->
+    unknown_event.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
