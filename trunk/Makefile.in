@@ -19,7 +19,9 @@ SVN = svn
 CD = cd
 MAKE = make
 VERSION=0.0.1
+OTP_ERLANG_VERSION=1.5.2
 
+.PHONY: all compile test test-vts java clean docs svn dialyzer rrd-init install install-erlang install-java install-docs
 
 YAWS_PATH= /usr/local/lib/yaws
 
@@ -99,68 +101,108 @@ dialyzer:
 rrd-init:
 	@echo This target is deprecated
 
-install: all java docs
-	mkdir -p $(BEAMDIR)
-	install -m 644 bin/*.app $(BEAMDIR)
-	install -m 644 ebin/*.beam $(BEAMDIR)
-	mkdir -p $(ETCDIR)
-	install bin/scalaris.cfg bin/scalaris.local.cfg.example $(ETCDIR)
-	mkdir -p $(DOCROOTDIR)
-	install -m 644 docroot/*.yaws $(DOCROOTDIR)
-	install -m 644 docroot/*.css $(DOCROOTDIR)
-	install -m 644 docroot/*.js $(DOCROOTDIR)
-	install -m 644 docroot/*.gif $(DOCROOTDIR)
-	mkdir -p $(DOCROOTDIR)/icons
-	install -m 644 docroot/icons/*.gif $(DOCROOTDIR)/icons
-	mkdir -p $(DOCROOTDIR)/images/default
-	mkdir -p $(DOCROOTDIR)/images/default/dd
-	mkdir -p $(DOCROOTDIR)/images/default/panel
-	mkdir -p $(DOCROOTDIR)/images/default/tree
-	mkdir -p $(DOCROOTDIR)/images/default/grid
-	install -m 644 docroot/images/default/dd/*.gif $(DOCROOTDIR)/images/default/dd
-	install -m 644 docroot/images/default/panel/*.gif $(DOCROOTDIR)/images/default/panel
-	install -m 644 docroot/images/default/panel/*.png $(DOCROOTDIR)/images/default/panel
-	install -m 644 docroot/images/default/tree/*.gif $(DOCROOTDIR)/images/default/tree
-	install -m 644 docroot/images/default/grid/*.gif $(DOCROOTDIR)/images/default/grid
-	install -m 644 docroot/images/default/grid/*.png $(DOCROOTDIR)/images/default/grid
-	mkdir -p $(NODEDOCROOTDIR)
-	install docroot_node/*.yaws $(NODEDOCROOTDIR)
-	mkdir -p $(SCALARISDIR)/contrib/yaws/ebin
-	install contrib/yaws/ebin/*.beam $(SCALARISDIR)/contrib/yaws/ebin
-	mkdir -p $(SCALARISDIR)/contrib/yaws/include
-	install contrib/yaws/include/yaws_api.hrl $(SCALARISDIR)/contrib/yaws/include
-	mkdir -p $(SCALARISDIR)/contrib/log4erl/ebin
-	install contrib/log4erl/ebin/*.beam $(SCALARISDIR)/contrib/log4erl/ebin
-	install contrib/log4erl/ebin/*.app $(SCALARISDIR)/contrib/log4erl/ebin
-	mkdir -p $(LOGDIR)
-	mkdir -p $(DOCDIR)/erlang
-	install -m 644 doc/*.html $(DOCDIR)/erlang
-	install -m 644 doc/*.png $(DOCDIR)/erlang
-	mkdir -p $(DOCDIR)/erlang/comm_layer
-	install -m 644 doc/comm_layer/*.html $(DOCDIR)/erlang/comm_layer
-	mkdir -p $(DOCDIR)/erlang/pubsub
-	install -m 644 doc/pubsub/*.html $(DOCDIR)/erlang/pubsub
-	mkdir -p $(DOCDIR)/erlang/transstore
-	install -m 644 doc/transstore/*.html $(DOCDIR)/erlang/transstore
-	mkdir -p $(DOCDIR)/java-api
-	mkdir -p $(DOCDIR)/java-api/index-files
-	mkdir -p $(DOCDIR)/java-api/resources
-	mkdir -p $(DOCDIR)/java-api/de/zib/scalaris/class-use
-	mkdir -p $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use
-	install -m 644 java-api/doc/*.html $(DOCDIR)/java-api
-	install -m 644 java-api/doc/index-files/*.html $(DOCDIR)/java-api/index-files
-	install -m 644 java-api/doc/resources/*.gif $(DOCDIR)/java-api/resources
-	install -m 644 java-api/doc/de/zib/scalaris/*.html $(DOCDIR)/java-api/de/zib/scalaris
-	install -m 644 java-api/doc/de/zib/scalaris/class-use/*.html $(DOCDIR)/java-api/de/zib/scalaris/class-use
-	install -m 644 java-api/doc/de/zib/scalaris/examples/*.html $(DOCDIR)/java-api/de/zib/scalaris/examples
-	install -m 644 java-api/doc/de/zib/scalaris/examples/class-use/*.html $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use
-	mkdir -p $(JAVADIR)/scalaris
-	install java-api/scalaris.jar $(JAVADIR)/scalaris/
-	mkdir -p $(JAVADIR)/scalaris/lib
-	install java-api/lib/OtpErlang-1.4.2.jar $(JAVADIR)/scalaris/lib/
-	install java-api/scalaris-java.conf.sample $(ETCDIR)/scalaris-java.conf
-	install java-api/scalaris-java.conf.sample $(ETCDIR)/
-	install java-api/scalaris.properties $(ETCDIR)/
-	mkdir -p $(BINDIR)
-	install -m 755 bin/scalarisctl $(BINDIR)
-	install -m 755 java-api/scalaris $(BINDIR)
+install-docs: docs
+	install -d $(DOCDIR)/erlang
+	install -d $(DOCDIR)/erlang/comm_layer
+	install -d $(DOCDIR)/erlang/pubsub
+	install -d $(DOCDIR)/erlang/transstore
+	install -m 644 -t $(DOCDIR)/erlang \
+	           doc/*.html \
+	           doc/*.png
+	install -m 644 -t $(DOCDIR)/erlang/comm_layer \
+	           doc/comm_layer/*.html
+	install -m 644 -t $(DOCDIR)/erlang/pubsub \
+	           doc/pubsub/*.html 
+	install -m 644 -t $(DOCDIR)/erlang/transstore \
+	           doc/transstore/*.html
+	install -d $(DOCDIR)/java-api
+	install -d $(DOCDIR)/java-api/index-files
+	install -d $(DOCDIR)/java-api/resources
+	install -d $(DOCDIR)/java-api/de/zib/scalaris/class-use
+	install -d $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use
+	install -m 644 -t $(DOCDIR)/java-api \
+	           java-api/doc/*.html
+	install -m 644 -t $(DOCDIR)/java-api/index-files \
+	           java-api/doc/index-files/*.html
+	install -m 644 -t $(DOCDIR)/java-api/resources \
+	           java-api/doc/resources/*.gif
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris \
+	           java-api/doc/de/zib/scalaris/*.html
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/class-use \
+	           java-api/doc/de/zib/scalaris/class-use/*.html
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/examples \
+	           java-api/doc/de/zib/scalaris/examples/*.html
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use \
+	           java-api/doc/de/zib/scalaris/examples/class-use/*.html
+
+install-java: java
+	install -d $(JAVADIR)/scalaris
+	install -d $(JAVADIR)/scalaris/lib
+	install -m 644 -t $(JAVADIR)/scalaris \
+	           java-api/scalaris.jar
+	install -m 644 -t $(JAVADIR)/scalaris/lib \
+	           java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar
+	install -m 644 java-api/scalaris-java.conf.sample \
+	           $(ETCDIR)/scalaris-java.conf
+	install -m 644 -t $(ETCDIR) \
+	           java-api/scalaris-java.conf.sample
+	install -m 644 -t $(ETCDIR) \
+	           java-api/scalaris.properties 
+	install -d $(BINDIR)
+	install -m 755 -t $(BINDIR) \
+	           java-api/scalaris
+
+install-erlang: all
+	install -d $(BEAMDIR)
+	install -m 644 -t $(BEAMDIR) \
+	           bin/*.app \
+	           ebin/*.beam
+	install -d $(ETCDIR)
+	install -m 644 -t $(ETCDIR) \
+	           bin/scalaris.cfg \
+	           bin/scalaris.local.cfg.example
+	install -d $(DOCROOTDIR) \
+	           $(DOCROOTDIR)/icons \
+	           $(DOCROOTDIR)/images/default \
+	           $(DOCROOTDIR)/images/default/dd \
+	           $(DOCROOTDIR)/images/default/panel \
+	           $(DOCROOTDIR)/images/default/tree \
+	           $(DOCROOTDIR)/images/default/grid
+	install -m 644 -t $(DOCROOTDIR) \
+	           docroot/*.yaws \
+	           docroot/*.css \
+	           docroot/*.js \
+	           docroot/*.gif
+	install -m 644 -t $(DOCROOTDIR)/icons \
+	           docroot/icons/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/dd \
+	           docroot/images/default/dd/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/panel \
+	           docroot/images/default/panel/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/panel \
+	           docroot/images/default/panel/*.png
+	install -m 644 -t $(DOCROOTDIR)/images/default/tree \
+	           docroot/images/default/tree/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/grid \
+	           docroot/images/default/grid/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/grid \
+	           docroot/images/default/grid/*.png
+	install -d $(NODEDOCROOTDIR)
+	install -m 644 -t $(NODEDOCROOTDIR) \
+	           docroot_node/*.yaws
+	install -d $(SCALARISDIR)/contrib/yaws/ebin
+	install -d $(SCALARISDIR)/contrib/yaws/include
+	install -m 644 -t $(SCALARISDIR)/contrib/yaws/ebin \
+	           contrib/yaws/ebin/*.beam
+	install -m 644 -t $(SCALARISDIR)/contrib/yaws/include \
+	           contrib/yaws/include/yaws_api.hrl
+	install -d $(SCALARISDIR)/contrib/log4erl/ebin
+	install -m 644 -t $(SCALARISDIR)/contrib/log4erl/ebin \
+	           contrib/log4erl/ebin/*.beam \
+	           contrib/log4erl/ebin/*.app
+	install -d $(LOGDIR)
+	install -d $(BINDIR)
+	install -m 755 -t $(BINDIR) \
+	           bin/scalarisctl
+
+install: install-erlang install-java install-docs
