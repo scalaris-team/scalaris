@@ -56,6 +56,7 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/scalaris.dsc > ./scalaris-svn.dsc && \
   sed -e "s/scalaris/scalaris-svn/g" \
       -e "s/stable/unstable/g" \
+      -e "s/(0.2.3-/(${revision}-/g" \
       < ${sourcefolder}/debian.changelog > ./debian.changelog && \
   sed -e "s/Source: scalaris/Source: scalaris-svn/g" \
       -e "s/Package: scalaris\$/Package: scalaris-svn\nConflicts: scalaris/g" \
