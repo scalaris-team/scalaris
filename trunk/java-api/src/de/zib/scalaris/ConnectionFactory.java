@@ -200,7 +200,7 @@ public class ConnectionFactory {
 		nodes.clear();
 		
 		for (int i = 0; i < nodesTemp.length; ++i) {
-			nodes.add(new PeerNode(fixLocalhostName(nodesTemp[i])));
+			addNode(fixLocalhostName(nodesTemp[i]));
 		}
 		cookie = properties.getProperty("scalaris.cookie", "chocolate chip cookie");
 		clientName = properties.getProperty("scalaris.client.name", "java_client");
