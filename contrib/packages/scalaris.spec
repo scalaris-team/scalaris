@@ -14,6 +14,7 @@ BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
 BuildRequires:  erlang >= R12B-4
 Requires:       erlang >= R12B-4
+BuildArch:      noarch 
 
 ##########################################################################################  
 ## Fedora, RHEL or CentOS  
@@ -88,7 +89,7 @@ Command line client for scalaris using the Java interface
     --sysconfdir=%{_sysconfdir} \
     --datadir=%{_datadir} \
     --includedir=%{_includedir} \
-    --libdir=%{_libdir} \
+    --libdir=%{_prefix}/lib \
     --libexecdir=%{_libexecdir} \
     --localstatedir=%{_localstatedir} \
     --sharedstatedir=%{_sharedstatedir} \
@@ -112,7 +113,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %doc AUTHORS README LICENSE
 %{_bindir}/scalarisctl
-%{_libdir}/scalaris
+%{_prefix}/lib/scalaris
 %{_localstatedir}/log/scalaris
 %{_sysconfdir}/scalaris
 %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
