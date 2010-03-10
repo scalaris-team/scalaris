@@ -36,7 +36,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @type key() = term(). Key
+-type(key() :: term()).
 %% @type value() = term(). Value
+-type(value() :: term()).
 
 process_request_list(TLog, ReqList) ->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
@@ -86,7 +88,8 @@ process_request(TLog, Request) ->
     end.
 
 %% @doc reads the value of a key
-%% @spec read(key()) -> {failure, term()} | value()
+%% @spec read(key()) -> value() | {fail, term()} 
+-spec read(key()) -> value() | {fail, term()}.
 read(Key) ->
     case util:tc(transaction_api, quorum_read, [Key]) of
         {_Time, {fail, Reason}} ->
@@ -99,6 +102,7 @@ read(Key) ->
 
 %% @doc writes the value of a key
 %% @spec write(key(), value()) -> ok | {fail, term()}
+-spec write(key(), value()) -> ok | {fail, term()}.
 write(Key, Value) ->
     case util:tc(transaction_api, single_write, [Key, Value]) of
         {_Time, commit} ->
@@ -113,7 +117,8 @@ delete(Key) ->
     transaction_api:delete(Key, 2000).
 
 %% @doc atomic compare and swap
-%% @spec test_and_set(key(), value(), value()) -> {fail, Reason} | ok
+%% @spec test_and_set(key(), value(), value()) -> ok | {fail, term()}
+-spec test_and_set(key(), value(), value()) -> ok | {fail, Reason::term()}.
 test_and_set(Key, OldValue, NewValue) ->
     TFun = fun(TransLog) ->
                    {Result, TransLog1} = transaction_api:read(Key, TransLog),
@@ -126,7 +131,7 @@ test_and_set(Key, OldValue, NewValue) ->
                                        Result2 == ok ->
                                            {{ok, done}, TransLog2};
                                        true ->
-                                           {{fail, notfound}, TransLog2}
+                                           {{fail, write}, TransLog2}
                                    end;
                                true ->
                                    {{fail, {key_changed, ReadValue}}, TransLog1}
