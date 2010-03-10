@@ -55,6 +55,11 @@ public class TransactionTest {
 		"Uquoo0Il", "eiGh4Oop", "ooMa0ufe", "zee6Zooc", "ohhao4Ah", "Uweekek5", "aePoos9I", "eiJ9noor", 
 		"phoong1E", "ianieL2h", "An7ohs4T", "Eiwoeku3", "sheiS3ao", "nei5Thiw", "uL5iewai", "ohFoh9Ae"};
 	
+	static {
+		// set not to automatically try reconnects (auto-retries prevent ConnectionException tests from working): 
+		((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy()).setMaxRetries(0);
+	}
+	
 	/**
 	 * Test method for {@link Transaction#Transaction()}.
 	 * @throws ConnectionException 

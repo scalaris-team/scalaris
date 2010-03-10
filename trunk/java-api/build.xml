@@ -130,9 +130,9 @@
 		<path refid="scalaris.classpath" />
 		<pathelement path="${scalaris.classes.dirname}" />
 		<pathelement path="test-lib/junit-4.4.jar" />
-		<pathelement path="test-lib/jetty-6.1.14.jar" />
-		<pathelement path="test-lib/jetty-util-6.1.14.jar" />
-		<pathelement path="test-lib/servlet-api-2.5-6.1.14.jar" />
+		<pathelement path="test-lib/jetty-6.1.22.jar" />
+		<pathelement path="test-lib/jetty-util-6.1.22.jar" />
+		<pathelement path="test-lib/servlet-api-2.5-20081211.jar" />
 	</path>
 
 	<!-- ########## Public targets (begin) ########## -->
