@@ -76,7 +76,7 @@
 %%   not occur 
 quorum_read(Key)->
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    RTO = 2000,
+    RTO = config:read(quorum_read_timeout),
     transaction:quorum_read(Key, cs_send:this()),
     receive
         {single_read_return, {value, Page, Version}}->
@@ -97,7 +97,7 @@ quorum_read(Key)->
 parallel_quorum_reads(Keys, _Par)->
 %    ?TLOGN("starting quorum reads on ~p", [Keys]),
     {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
-    RTO = 2000,
+    RTO = config:read(parallel_quorum_read_timeout),
     if 
 	Flag /= ok->
 	    fail;
