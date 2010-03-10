@@ -57,16 +57,16 @@
 %% @spec send({inet:ip_address(), int(), pid()}, term()) -> ok
 -ifdef(ASYNC).
 send({Address, Port, Pid}, Message) ->
-    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, 20000).
+    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, config:read(comm_layer_send_timeout)).
 -endif.
 -ifdef(SYNC).
 send({Address, Port, Pid}, Message) ->
     case ets:lookup(?MODULE, {Address, Port}) of
 	[{{Address, Port}, {_LPid, Socket}}] ->
-	    comm_connection:send({Address, Port, Socket}, Pid, Message), 
+	    comm_connection:send({Address, Port, Socket}, Pid, Message),
 	    ok;
 	[] ->
-	    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, 20000)
+	    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, config:read(comm_layer_send_timeout))
     end.
 -endif.
 
@@ -74,17 +74,17 @@ send({Address, Port, Pid}, Message) ->
 %% @doc 
 %% @spec unregister_connection(inet:ip_address(), int()) -> ok
 unregister_connection(Adress, Port) ->
-    gen_server:call(?MODULE, {unregister_conn, Adress, Port}, 20000).
+    gen_server:call(?MODULE, {unregister_conn, Adress, Port}, config:read(comm_layer_send_timeout)).
 
 %% @doc 
 %% @spec register_connection(inet:ip_address(), int(), pid(), gen_tcp:socket()) -> ok | duplicate
 register_connection(Adress, Port, Pid, Socket) ->
-    gen_server:call(?MODULE, {register_conn, Adress, Port, Pid, Socket}, 20000).
+    gen_server:call(?MODULE, {register_conn, Adress, Port, Pid, Socket}, config:read(comm_layer_send_timeout)).
 
 %% @doc 
 %% @spec set_local_address(inet:ip_address(), int()) -> ok
 set_local_address(Address, Port) ->
-    gen_server:call(?MODULE, {set_local_address, Address, Port}, 20000).
+    gen_server:call(?MODULE, {set_local_address, Address, Port}, config:read(comm_layer_send_timeout)).
 
 
 %% @doc returns the local ip address and port

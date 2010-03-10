@@ -145,7 +145,7 @@ test_and_set(Key, OldValue, NewValue) ->
            end,
     SuccessFun = fun(X) -> {success, X} end,
     FailureFun = fun(X) -> {failure, X} end,
-    case do_transaction_locally(TFun, SuccessFun, FailureFun, 5000) of
+    case do_transaction_locally(TFun, SuccessFun, FailureFun, config:read(test_and_set_timeout)) of
         {trans, {success, {commit, done}}} ->
             ok;
         {trans, {failure, Reason}} ->
@@ -175,7 +175,7 @@ range_read(From, To) ->
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, cs_send:this()}),
-    cs_send:send_after(5000, self(), {timeout}),
+    cs_send:send_after(config:read(range_read_timeout), self(), {timeout}),
     range_read_loop(Interval, [], []).
 
 range_read_loop(Interval, Done, Data) ->
