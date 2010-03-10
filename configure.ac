@@ -74,7 +74,7 @@ AS_IF([test "x$HAVETCERL" != x],
 
 AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([you won't be able to run the unit tests without common_test]))
 
-AC_CHECK_FILE($erlang_cv_lib_dir_common_test/priv/bin/run_test, , AC_MSG_NOTICE([please consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests]))
+AC_CHECK_FILE($ac_cv_erlang_lib_dir_common_test/priv/bin/run_test, , AC_MSG_NOTICE([please consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests]))
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
