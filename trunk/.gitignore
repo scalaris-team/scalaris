@@ -1,0 +1,13 @@
+/Makefile
+/Emakefile
+/config.status
+/ct_run.ct@*
+/all_runs.html
+/index.html
+/.project
+/.settings
+/.externalToolBuilders
+/.Makefile.swp
+/config.log
+/variables-ct@*
+/erl_crash.dump
