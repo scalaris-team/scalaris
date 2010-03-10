@@ -56,7 +56,7 @@ init_per_suite(Config) ->
     case ?DB of
 	cs_db_otp ->
 	    Pid = spawn(fun () ->
-				process_dictionary:start_link_for_unittest(),
+				process_dictionary:start_link(),
 				?DB:start_link("db_SUITE.erl"),
 				timer:sleep(30000)
 			end),
@@ -76,8 +76,14 @@ init_per_suite(Config) ->
 	    [{wrapper_pid, Pid} | Config]
     end.
 
-end_per_suite(_Config) ->
-    crypto:stop(),
+end_per_suite(Config) ->
+    case lists:keyfind(wrapper_pid, 1, Config) of
+        false ->
+            ok;
+        {wrapper_pid, Pid} ->
+            unregister(process_dictionary),
+            exit(Pid, kill)
+    end,
     ok.
 
 read(_Config) ->

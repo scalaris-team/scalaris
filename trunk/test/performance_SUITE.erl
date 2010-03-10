@@ -97,12 +97,14 @@ next_hop(_Config) ->
     ok.
 
 process_dictionary(_Config) ->
-    process_dictionary:start_link_for_unittest(),
+    {ok, Pid} = process_dictionary:start_link(),
     process_dictionary:register_process(?MODULE, "process_dictionary", self()),
     iter(count(), fun () ->
                           process_dictionary:lookup_process(?MODULE,
                                                             "process_dictionary")
                   end, "lookup_process"),
+    %exit(Pid, kill),
+    unregister(process_dictionary),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

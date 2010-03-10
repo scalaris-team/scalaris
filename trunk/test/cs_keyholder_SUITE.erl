@@ -37,19 +37,20 @@ suite() ->
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
-    Pid = spawn(fun () -> 
+    Pid = spawn(fun () ->
 			config:start_link(["scalaris.cfg"]),
 			crypto:start(),
-			process_dictionary:start_link_for_unittest(), 
-			cs_keyholder:start_link(foo), 
-			timer:sleep(5000) 
+			process_dictionary:start_link(),
+			cs_keyholder:start_link(foo),
+			timer:sleep(5000)
 		end),
     timer:sleep(1000),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    exit(Pid, normal),
+    %unregister(process_dictionary),
+    exit(Pid, kill),
     ok.
 
 getset_key(_Config) ->

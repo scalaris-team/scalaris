@@ -27,11 +27,12 @@
 make_ring(Size) ->
     error_logger:tty(true),
     Owner = self(),
+    undefined = ets:info(config_ets),
     Pid = spawn(fun () ->
                         %timer:sleep(1000),
                         ct:pal("Trying to build Scalaris~n"),
                         randoms:start(),
-                        process_dictionary:start_link_for_unittest(),
+                        process_dictionary:start_link(),
                         %timer:sleep(1000),
                         boot_sup:start_link(),
                         %timer:sleep(1000),
@@ -59,8 +60,45 @@ make_ring(Size) ->
     Pid.
 
 stop_ring(Pid) ->
-    error_logger:tty(false),
-    exit(Pid, kill).
+    try
+        begin
+            error_logger:tty(false),
+            exit(Pid, kill),
+            timer:sleep(1000),
+            wait_for_process_to_die(Pid),
+            wait_for_table_to_disappear(process_dictionary),
+            timer:sleep(10000),
+            ok
+        end
+    catch
+        throw:Term ->
+            ct:pal("exception in stop_ring: ~p~n", [Term]),
+            throw(Term);
+        exit:Reason ->
+            ct:pal("exception in stop_ring: ~p~n", [Reason]),
+            throw(Reason);
+        error:Reason ->
+            ct:pal("exception in stop_ring: ~p~n", [Reason]),
+            throw(Reason)
+    end.
+
+wait_for_process_to_die(Pid) ->
+    case is_process_alive(Pid) of
+        true ->
+            timer:sleep(500),
+            wait_for_process_to_die(Pid);
+        false ->
+            ok
+    end.
+
+wait_for_table_to_disappear(Table) ->
+    case ets:info(Table) of
+        undefined ->
+            ok;
+        _ ->
+            timer:sleep(500),
+            wait_for_table_to_disappear(Table)
+    end.
 
 wait_for_stable_ring() ->
     R = admin:check_ring(),
