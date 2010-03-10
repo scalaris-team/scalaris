@@ -21,8 +21,11 @@
 %%%  Gossiping is organized in rounds. At the start of each round, a node's
 %%%  gossip process has to ask its cs_node for information about its state,
 %%%  i.e. its load and the IDs of itself and its predecessor. It will not
-%%%  participate in any message exchanges until this information has been
-%%%  received and postpone any other received messages.
+%%%  participate in any state exchanges until this information has been
+%%%  received and postpone such messages, i.e. 'get_state', if received. All
+%%%  other messages, e.g. requests for estimated values, are either ignored
+%%%  (only applies to "trigger") or answered with information from the previous
+%%%  round, e.g. requests for (estimated) system properties.
 %%%  
 %%%  When these values are successfully integrated into the process state,
 %%%  and the node entered some round, it will continuously ask the cyclon
