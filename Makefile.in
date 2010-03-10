@@ -21,7 +21,7 @@ MAKE = make
 VERSION=0.0.1
 OTP_ERLANG_VERSION=1.5.2
 
-.PHONY: all compile test test-vts java clean docs svn dialyzer rrd-init install install-erlang install-java install-docs
+.PHONY: all compile test test-vts java clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test
 
 YAWS_PATH= /usr/local/lib/yaws
 
@@ -70,7 +70,18 @@ test-vts: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
 
 java:
-	$(CD) java-api && ant jar
+	ant -buildfile java-api/build.xml jar
+
+java-test: compile java
+	./bin/scalarisctl boot start ; \
+	ant -buildfile java-api/build.xml test ; \
+	FAILED=$$? ; \
+	./bin/scalarisctl boot stop ; \
+	if [ $$FAILED -ne 0 ]; then \
+	  false ; \
+	else \
+	  true ; \
+	fi
 
 clean:
 	-rm -rf bin/*.beam
@@ -90,7 +101,7 @@ clean:
 docs:
 	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
 	'"."' '[{def,{vsn,"$(VSN)"}}]'
-	$(CD) java-api && ant doc
+	ant -buildfile java-api/build.xml doc
 
 svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/cyclon/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg

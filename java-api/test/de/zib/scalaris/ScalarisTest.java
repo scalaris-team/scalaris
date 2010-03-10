@@ -87,6 +87,11 @@ public class ScalarisTest {
 	 * wait that long for notifications to arrive
 	 */
 	private static final int notifications_timeout = 60;
+	
+	static {
+		// set not to automatically try reconnects (auto-retries prevent ConnectionException tests from working): 
+		((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy()).setMaxRetries(0);
+	}
 
 	/**
 	 * Test method for
