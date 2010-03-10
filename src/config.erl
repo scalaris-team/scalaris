@@ -287,7 +287,7 @@ start_link(Files) ->
 
 %@private
 start(Files, Owner) ->
-    catch ets:new(config_ets, [set, protected, named_table]),
+    ets:new(config_ets, [set, protected, named_table]),
     [ populate_db(File) || File <- Files],
     Owner ! done,
     loop().

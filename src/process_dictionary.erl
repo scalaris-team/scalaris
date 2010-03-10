@@ -71,9 +71,6 @@
          %for fprof
          get_all_pids/0]).
 
-%% for unit testing
--export([start_link_for_unittest/0]).
-
 %%====================================================================
 %% public functions
 %%====================================================================
@@ -186,18 +183,7 @@ get_all_pids() ->
 %%--------------------------------------------------------------------
 %@doc Starts the server
 start_link() ->
-    io:format("Start PD~n"),
     gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
-
-%@doc Starts the server for unit testing
-start_link_for_unittest() ->
-    case whereis(process_dictionary) of
-        undefined ->
-            gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]);
-        _ ->
-            cs_send:send_local(get_pid() , {drop_state}),
-            already_running
-    end.
 
 %%--------------------------------------------------------------------
 %% Function: start() -> {ok,Pid} | ignore | {error,Error}
@@ -223,7 +209,7 @@ start() ->
 %@private
 init(_Args) ->
     ets:new(?MODULE, [set, protected, named_table]),
-    process_flag(trap_exit, true),
+    %process_flag(trap_exit, true),
     State = null,
     State.
 

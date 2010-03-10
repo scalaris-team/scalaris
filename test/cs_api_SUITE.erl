@@ -37,12 +37,7 @@ suite() ->
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
-    Pid = spawn(fun () ->
-			process_dictionary:start_link_for_unittest(), 
-			boot_sup:start_link(), 
-			timer:sleep(120000) 
-		end),
-    timer:sleep(15000),
+    Pid = unittest_helper:make_ring(4),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->

@@ -30,7 +30,7 @@ init_per_suite(Config) ->
     Owner = self(),
     Pid = spawn(fun () ->
                         crypto:start(),
-                        process_dictionary:start_link_for_unittest(),
+                        process_dictionary:start_link(),
                         config:start_link(["scalaris.cfg"]),
                         comm_port:start_link(),
                         timer:sleep(1000),
