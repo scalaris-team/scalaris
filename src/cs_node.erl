@@ -158,17 +158,6 @@ on({die}, _State) ->
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Ping Messages
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({ping, Ping_PID}, State) ->
-    cs_send:send(Ping_PID, {pong, Ping_PID}),
-    State;
-
-on({ping_with_cookie, Ping_PID, Cookie}, State) ->
-    cs_send:send(Ping_PID, {pong_with_cookie, Cookie}),
-    State;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance (see ring_maintenance.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({init_rm,Pid},State) ->
@@ -200,45 +189,6 @@ on({pred_left, Pred}, State) ->
 %% @doc notify the cs_node his successor changed
 on({update_succ, Succ}, State) -> 
     ring_maintenance:update_succ(Succ),
-    State;
-
-%% @doc request for the predecessor and successor to be send to Pid
-on({get_pred_succ, Pid}, State) ->
-    cs_send:send(Pid, {get_pred_succ_response, cs_state:pred(State), 
-		       cs_state:succ(State)}),
-    State;
-
-%% @doc request (with Cookie) for the predecessor and successor to be send to
-%%      Pid
-on({get_pred_succ, Pid, Cookie}, State) ->
-    cs_send:send(Pid, {get_pred_succ_response, cs_state:pred(State), 
-		       cs_state:succ(State), Cookie}),
-    State;
-
-%% @doc request for the predecessor and my own node to be send to Pid
-on({get_pred_me, Pid}, State) ->
-    cs_send:send(Pid, {get_pred_me_response, cs_state:pred(State), 
-		       cs_state:me(State)}),
-    State;
-
-%% @doc request (with Cookie) for the predecessor and my own node to be send to
-%%      Pid
-on({get_pred_me, Pid, Cookie}, State) ->
-    cs_send:send(Pid, {get_pred_me_response, cs_state:pred(State), 
-		       cs_state:me(State), Cookie}),
-    State;
-
-%% @doc request for the predecessor, successor and my own node to be send to Pid
-on({get_pred_succ_me, Pid}, State) ->
-    cs_send:send(Pid, {get_pred_succ_me_response, cs_state:pred(State), 
-		       cs_state:succ(State), cs_state:me(State)}),
-    State;
-
-%% @doc request (with Cookie) for the predecessor, successor and my own node to
-%%      be send to Pid
-on({get_pred_succ_me, Pid, Cookie}, State) ->
-    cs_send:send(Pid, {get_pred_succ_me_response, cs_state:pred(State), 
-		       cs_state:succ(State), cs_state:me(State), Cookie}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -339,8 +289,8 @@ on({lookup_pointer, Source_Pid, Index}, State) ->
     State;
 
 %% userdevguide-begin cs_node:rt_get_node
-on({rt_get_node, Source_PID, Cookie}, State) ->
-    cs_send:send(Source_PID, {rt_get_node_response, Cookie, cs_state:me(State)}),
+on({rt_get_node, Source_PID, Index}, State) ->
+    cs_send:send(Source_PID, {rt_get_node_response, Index, cs_state:me(State)}),
     State;
 %% userdevguide-end cs_node:rt_get_node
 
@@ -462,15 +412,11 @@ on({stabilize_loadbalance}, State) ->
     State;
 
 %% misc.
-on({get_node_details, Pid, Cookie}, State) ->
-    cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State)}),
+on({get_node_details, Pid}, State) ->
+    cs_send:send(Pid, {get_node_details_response, cs_state:details(State)}),
     State;
-on({get_node_details, Pid, Which, Cookie}, State) ->
-    cs_send:send(Pid, {get_node_details_response, Cookie, cs_state:details(State, Which)}),
-    State;
-
-on({get_node_IdAndSucc, Pid, Cookie}, State) ->
-    cs_send:send_local_after(0,Pid, {get_node_IdAndSucc_response, Cookie, {cs_state:id(State),cs_state:succ_id(State)}}),
+on({get_node_details, Pid, Which}, State) ->
+    cs_send:send(Pid, {get_node_details_response, cs_state:details(State, Which)}),
     State;
 
 on({dump}, State) -> 

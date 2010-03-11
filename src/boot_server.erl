@@ -79,12 +79,6 @@ node_list() ->
 on({crash, PID},{Nodes,First,Subscriber}) ->
     NewNodes = gb_sets:delete_any(PID, Nodes),
     {NewNodes,First,Subscriber};
-on({ping, Ping_PID, Cookie},{Nodes,First,Subscriber}) ->
-    cs_send:send(Ping_PID, {pong, Cookie}),
-    {Nodes,First,Subscriber};
-on({ping, Ping_PID},{Nodes,First,Subscriber}) ->
-    cs_send:send(Ping_PID, {pong, Ping_PID}),
-    {Nodes,First,Subscriber};
 on({get_list, Ping_PID},{Nodes,First,Subscriber}) ->
     case gb_sets:is_empty(Nodes) of
         true ->

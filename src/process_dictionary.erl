@@ -66,7 +66,7 @@
          get_groups/0,
          get_processes_in_group/1,
 		 get_group_member/1,
-         %get_info/2,
+         get_info/2,
 
          %for fprof
          get_all_pids/0]).
@@ -152,6 +152,29 @@ get_processes_in_group(Group) ->
     AllProcesses = find_processes_in_group(ets:tab2list(?MODULE), gb_sets:new(), Group),
     ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
     ProcessesAsJson.
+
+%% @doc get info about process (for web interface)
+%% @spec get_info(term(), term()) -> term()
+get_info(InstanceId, Name) ->
+    KVs =
+        case lookup_process(InstanceId, list_to_atom(Name)) of
+            failed ->
+                [{"process", "unknown"}];
+            Pid ->
+                cs_send:send_local(Pid , {'$gen_cast', {debug_info, self()}}),
+                {memory, Memory} = process_info(Pid, memory),
+                {reductions, Reductions} = process_info(Pid, reductions),
+                {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
+                AddInfo =
+                    receive
+                        {debug_info_response, LocalKVs} -> LocalKVs
+                    after 1000 ->
+                        []
+                    end,
+                [{"memory", Memory}, {"reductions", Reductions}, {"message_queue_len", QueueLen} | AddInfo]
+        end,
+    JsonKVs = lists:map(fun({K, V}) -> {struct, [{key, K}, {value, toString(V)}]} end, KVs),
+    {struct, [{pairs, {array, JsonKVs}}]}.
 
 %% @doc Gets the Pid of the current process' group member with the given name.
 -spec(get_group_member/1 :: (atom()) -> pid() | failed).

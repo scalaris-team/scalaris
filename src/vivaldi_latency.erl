@@ -52,7 +52,7 @@
 
 %% @doc message handler
 -spec(on/2 :: (Message::message(), State::state()) -> state()).
-on({pong, _}, {Owner, RemoteNode, Token, Start, Latencies}) ->
+on({pong}, {Owner, RemoteNode, Token, Start, Latencies}) ->
     Stop = erlang:now(),
     NewLatencies = [timer:now_diff(Stop, Start)| Latencies],
     case length(NewLatencies) == config:read(vivaldi_count_measurements, 4) of

@@ -73,15 +73,16 @@ on({check_ring},_) ->
     %scheduler ! {halt_simulation},
     %Implement a Noneblocking CheckRing 
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    cs_send:send_local_after(0,config:bootPid(), {get_list, cs_send:this()}),
+    cs_send:send_local(config:bootPid(), {get_list, cs_send:this()}),
     %io:format("A~n"),
     {check_ring_p1};
-on({get_list_response,N},_) ->
-    [cs_send:send_local_after(0,Pid, {get_node_IdAndSucc, cs_send:this(), Pid}) ||  Pid <-N],
+on({get_list_response, N}, _) ->
+    [cs_send:send_local(Pid, {get_node_details, cs_send:this(), [node, succ]}) ||  Pid <-N],
     %io:format("C~n"),
     {length(N),[]};
-on({get_node_IdAndSucc_response, _Pid, Details},{1,Responses}) ->
+on({get_node_details_response, NodeDetails}, {1, Responses}) ->
     %io:format("E~n"),
+    Details = {node:id(node_details:get(NodeDetails, node)), node:id(node_details:get(NodeDetails, succ))},
     Sort = lists:sort(fun compare_node_details/2,[Details|Responses]),   
    %io:format("F~n"),
    Res = case lists:foldl(fun check_ring_foldl/2, first, Sort) of
@@ -103,9 +104,10 @@ on({get_node_IdAndSucc_response, _Pid, Details},{1,Responses}) ->
     %io:format("Ring~n"),
     {state_2};
 
-on({get_node_IdAndSucc_response, _Pid, Details},{Counter,Responses}) ->
+on({get_node_details_response, NodeDetails}, {Counter, Responses}) ->
     %io:format("D~n"),
-    {Counter-1,[Details|Responses]};
+    Details = {node:id(node_details:get(NodeDetails, node)), node:id(node_details:get(NodeDetails, succ))},
+    {Counter - 1, [Details | Responses]};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Catch unknown Events
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

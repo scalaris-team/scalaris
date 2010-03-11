@@ -71,10 +71,10 @@ init(_ARG) ->
 % @doc the Token takes care, that there is only one timermessage for stabilize 
 
 on({trigger},{Queue,Subscriber,TriggerState}) ->
-        fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this(),X}) end,Queue), 
+        fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this_with_cookie(X)}) end,Queue), 
         NewTriggerState = Trigger:trigger_next(TriggerState,1),
         {Queue,Subscriber,NewTriggerState};
-on({pong,Zombie},{Queue,Subscriber,TriggerState}) ->
+on({{pong},Zombie},{Queue,Subscriber,TriggerState}) ->
         gb_sets:fold(fun (X,_) -> cs_send:send_local(X , {zombie,Zombie}) end,0, Subscriber),
         {Queue,Subscriber,TriggerState};
 on({add_zombie_candidate, Node},{Queue,Subscriber,TriggerState}) ->

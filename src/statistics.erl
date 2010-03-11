@@ -85,15 +85,15 @@ compare_node_details({ok, _}, _) ->
     false.
 
 get_node_details(Pid) ->
-    cs_send:send(Pid, {get_node_details, cs_send:this(), Pid}),
+    cs_send:send(Pid, {get_node_details, cs_send:this_with_cookie(Pid)}),
     receive
-	{get_node_details_response, Pid, Details} -> 
+	{{get_node_details_response, Details}, Pid} -> 
 	    {ok, Details}
     after
         2000 ->
             log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response form ~p~n",[Pid]),
             receive
-                {get_node_details_response, Pid, Details} ->
+                {{get_node_details_response, Details}, Pid} ->
                     {ok, Details}
             after
                 4000 ->

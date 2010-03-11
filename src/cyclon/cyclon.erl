@@ -57,7 +57,7 @@ start_link(InstanceId, _Options) ->
 init(_Args) ->
     wait_for_valid_pid(),
     cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
-    cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
+    cs_send:send_local(get_pid() , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     TriggerState2 = Trigger:trigger_first(TriggerState,1),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
@@ -84,7 +84,9 @@ on({get_ages,Pid},{Cache,Node,Cycles,TriggerState}) ->
 
 on({get_node_response, 2.71828183, Me},{Cache,null,Cycles,TriggerState}) ->
     {Cache,Me,Cycles,TriggerState};
-on({get_pred_succ_response, Pred, Succ},{_,Node,Cycles,TriggerState}) ->
+on({{get_node_details_response, NodeDetails}, pred_succ},{_,Node,Cycles,TriggerState}) ->
+    Pred = node_details:get(NodeDetails, pred),
+    Succ = node_details:get(NodeDetails, succ),
     case Pred /= Node of
             true ->
                 Cache =  cache:add_list([Pred,Succ], cache:new());
@@ -110,7 +112,7 @@ on({get_cache,Pid},{Cache,Node,Cycles,TriggerState}) ->
     {Cache,Node,Cycles,TriggerState};
 
 on({flush_cache},{_Cache,Node,_Cycles,TriggerState}) ->
-    cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
+    cs_send:send_local(get_pid() , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
     {cache:new(),Node,0,TriggerState};
 on({start_shuffling},{Cache,Node,Cycles,TriggerState}) ->
     cs_send:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
