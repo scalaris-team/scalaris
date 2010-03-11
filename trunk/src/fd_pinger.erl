@@ -46,7 +46,7 @@ start_link([Module,Pid]) ->
 
 init([Module,Pid]) ->
     log:log(info,"[ fd_pinger ~p ] starting Node", [self()]),
-    cs_send:send(Pid, {ping, cs_send:this(), 0}),
+    cs_send:send(Pid, {ping, cs_send:this()}),
     cs_send:send_local_after(config:failureDetectorInterval(), self(), {timeout,0}), 
     {Module,Pid,0}.
       
@@ -57,12 +57,12 @@ init([Module,Pid]) ->
 
 on({stop},{_Module,_Pid,_Count}) ->
     kill;
-on({pong,_},{Module,Pid,Count}) ->
+on({pong},{Module,Pid,Count}) ->
     {Module,Pid,Count+1};
 on({timeout,OldCount},{Module,Pid,Count}) ->
     case OldCount < Count of 
         true -> 
-            cs_send:send(Pid, {ping, cs_send:this(), Count}),
+            cs_send:send(Pid, {ping, cs_send:this()}),
             cs_send:send_local_after(config:failureDetectorInterval(), self(), {timeout,Count}),
             {Module,Pid,Count};
         false ->    

@@ -44,7 +44,7 @@
 -type(message() :: 
       {init, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()}
      | {stabilize}
-     | {get_pred_succ_response, NewPred::node:node_type(), NewSucc::node:node_type()}
+     | {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ}
      | {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}
      | {lookup_pointer_response, Index::pos_integer(), Node::node:node_type()} 
      | {crash, DeadPid::cs_send:mypid()}).
@@ -91,7 +91,7 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     %io:format("[ RT ] stabilize~n"),
     Pid = process_dictionary:get_group_member(cs_node),
     % get new pred and succ from cs_node
-    cs_send:send_local(Pid , {get_pred_succ, cs_send:this()}),
+    cs_send:send_local(Pid , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
     % start periodic stabilization
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     check(RTState, NewRTState, Id, Pred, Succ),
@@ -101,7 +101,9 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     {Id, Pred, Succ, NewRTState,TriggerState2};
 
 % got new predecessor/successor
-on({get_pred_succ_response, NewPred, NewSucc}, {Id, _, _, RTState, TriggerState}) ->
+on({{get_node_details_response, NewNodeDetails}, pred_succ}, {Id, _, _, RTState, TriggerState}) ->
+    NewPred = node_details:get(NewNodeDetails, pred),
+    NewSucc = node_details:get(NewNodeDetails, succ),
     {Id, NewPred, NewSucc, RTState, TriggerState};
 
 %

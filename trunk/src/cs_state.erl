@@ -146,7 +146,7 @@ dump(State) ->
     ok.
 
 %% @doc Gets the requested details about the current node.
--spec details(state(), [predlist | pred | me | my_range | succ | succlist | load | hostname | rt_size | message_log | memory]) -> node_details:node_details().
+-spec details(state(), [predlist | pred | node | my_range | succ | succlist | load | hostname | rt_size | message_log | memory]) -> node_details:node_details().
 details(State, Which) ->
 	ExtractValues =
 		fun(Elem, NodeDetails) ->
@@ -158,7 +158,7 @@ details(State, Which) ->
     				                   end,
     				               node_details:set(NodeDetails, predlist, PredList);
 					pred        -> node_details:set(NodeDetails, pred, pred(State));
-					me          -> node_details:set(NodeDetails, node, me(State));
+					node        -> node_details:set(NodeDetails, node, me(State));
 					my_range    -> node_details:set(NodeDetails, my_range, get_my_range(State));
 					succ        -> node_details:set(NodeDetails, succ, succ(State));
 					succlist    -> ring_maintenance:get_successorlist(),

@@ -116,11 +116,6 @@ on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
     end,
     {NewCoordinate, NewConfidence,TriggerState};
 
-on({ping, Pid}, State) ->
-    %log:log(info, "ping ~p", [Pid]),
-    cs_send:send(Pid, {pong, cs_send:this()}),
-    State;
-
 on({query_vivaldi, Pid},
    {Coordinate, Confidence,TriggerState}) ->
     cs_send:send(Pid,{query_vivaldi_response,Coordinate,Confidence}),

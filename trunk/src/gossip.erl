@@ -93,9 +93,9 @@
 % accepted messages of gossip processes
 -type(message() ::
 	{trigger} |
-	{get_node_details_response, local_info, node_details:node_details()} |
-	{get_node_details_response, leader_start_new_round, node_details:node_details()} |
-	{get_node_details_response, leader_debug_output, node_details:node_details()} |
+	{{get_node_details_response, node_details:node_details()}, local_info} |
+	{{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
+	{{get_node_details_response, node_details:node_details()}, leader_debug_output} |
 	{get_state, cs_send:mypid(), values_internal()} |
 	{get_state_response, values_internal()} |
 	{cache, [node:node_type()]} |
@@ -164,7 +164,7 @@ on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 % Responses to requests for information about the local node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_node_details_response, local_info, NodeDetails},
+on({{get_node_details_response, NodeDetails}, local_info},
    {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received when the (local) node was asked to tell us its
 	% load and key range
@@ -183,7 +183,7 @@ on({get_node_details_response, local_info, NodeDetails},
 % Leader election
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_node_details_response, leader_start_new_round, NodeDetails},
+on({{get_node_details_response, NodeDetails}, leader_start_new_round},
    {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_new_round_if_leader/1 which only asks for this if the condition to
@@ -200,7 +200,7 @@ on({get_node_details_response, leader_start_new_round, NodeDetails},
     {NewPreviousState, NewState, QueuedMessages, TriggerState};
 
 %% Prints some debug information if the current node is the leader.
-on({get_node_details_response, leader_debug_output, NodeDetails},
+on({{get_node_details_response, NodeDetails}, leader_debug_output},
    {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_leader_debug_output/0
@@ -277,7 +277,8 @@ on({get_state_response, OtherState},
 % Contacting random nodes (response from cyclon)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({cache, Cache}, {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+on({cache, Cache},
+    {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	% This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node. We will then contact this
     % random node and ask for a state exchange.
@@ -297,29 +298,69 @@ on({cache, Cache}, {_PreviousState, State, _QueuedMessages, _TriggerState} = Ful
         [] -> FullState
     end;
 
-% responds to ping messages with a pong message
-%on({ping, Pid}, State) ->
-%    %log:log(info, "ping ~p", [Pid]),
-%    cs_send:send(Pid, {pong, cs_send:this()}),
-%    State;
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Getter messages (need to update!)
+% Getter messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_values_best, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+on({get_values_best, SourcePid},
+    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	BestState = previous_or_current(PreviousState, State),
 	BestValues = gossip_state:conv_state_to_extval(BestState),
 	msg_get_values_best_response(SourcePid, BestValues),
 	FullState;
 
-on({get_values_all, SourcePid}, {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+on({get_values_all, SourcePid},
+    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
 	CurrentValues = gossip_state:conv_state_to_extval(State),
 	BestState = previous_or_current(PreviousState, State),
 	BestValues = gossip_state:conv_state_to_extval(BestState),
 	msg_get_values_all_response(SourcePid, PreviousValues, CurrentValues, BestValues),
 	FullState;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Web interface
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({'$gen_cast', {debug_info, Requestor}},
+   {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+    BestState = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
+    KeyValueList =
+        [{"prev_round",          gossip_state:get_round(PreviousState)},
+         {"prev_triggered",      gossip_state:get_triggered(PreviousState)},
+         {"prev_msg_exch",       gossip_state:get_msg_exch(PreviousState)},
+         {"prev_conv_avg_count", gossip_state:get_converge_avg_count(PreviousState)},
+         {"prev_avg",            gossip_state:get_avgLoad(PreviousState)},
+         {"prev_min",            gossip_state:get_minLoad(PreviousState)},
+         {"prev_max",            gossip_state:get_maxLoad(PreviousState)},
+         {"prev_stddev",         gossip_state:calc_stddev(PreviousState)},
+         {"prev_size_ldr",       gossip_state:calc_size_ldr(PreviousState)},
+         {"prev_size_kr",        gossip_state:calc_size_kr(PreviousState)},
+         
+         {"cur_round",           gossip_state:get_round(State)},
+         {"cur_triggered",       gossip_state:get_triggered(State)},
+         {"cur_msg_exch",        gossip_state:get_msg_exch(State)},
+         {"cur_conv_avg_count",  gossip_state:get_converge_avg_count(State)},
+         {"cur_avg",             gossip_state:get_avgLoad(State)},
+         {"cur_min",             gossip_state:get_minLoad(State)},
+         {"cur_max",             gossip_state:get_maxLoad(State)},
+         {"cur_stddev",          gossip_state:calc_stddev(State)},
+         {"cur_size_ldr",        gossip_state:calc_size_ldr(State)},
+         {"cur_size_kr",         gossip_state:calc_size_kr(State)},
+         
+         {"best_avg",             gossip_state:get_avgLoad(BestState)},
+         {"best_min",             gossip_state:get_minLoad(BestState)},
+         {"best_max",             gossip_state:get_maxLoad(BestState)},
+         {"best_stddev",          gossip_state:get_stddev(BestState)},
+         {"best_size",            gossip_state:get_size(BestState)},
+         {"best_size_ldr",        gossip_state:get_size_ldr(BestState)},
+         {"best_size_kr",         gossip_state:get_size_kr(BestState)}],
+    cs_send:send_local(Requestor , {debug_info_response, KeyValueList}),
+    FullState;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Unknown events
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on(_Message, _State) ->
     unknown_event.
@@ -612,7 +653,9 @@ previous_or_current(PreviousState, CurrentState) ->
 %% @doc Sends the local node's cs_node a request to tell us its successor and
 %%      predecessor if a new round should be started. A new round will then only
 %%      be started if we are the leader, i.e. we are responsible for key 0.
-%%      The node will respond with a get_pred_me_response message.
+%%      The node will respond with a
+%%      {{get_node_details_response, NodeDetails}, leader_start_new_round}
+%%      message.
 -spec request_new_round_if_leader(state()) -> ok.
 request_new_round_if_leader(State) ->
 	Round = gossip_state:get_round(State),
@@ -622,8 +665,6 @@ request_new_round_if_leader(State) ->
 	TPR_min = get_min_tpr(), % min triggers per round
 	ConvAvgCountNewRound = get_converge_avg_count_start_new_round(),
 	% decides when to ask whether we are the leader
-	% on({get_pred_me_response, Pred, Me, leader_start_new_round}, State) will then handle the
-	% response
 	case (Round =:= 0) orelse
          ((TriggerCount > TPR_min) andalso (
              (TriggerCount > TPR_max) orelse
@@ -631,7 +672,7 @@ request_new_round_if_leader(State) ->
 		of
 		true ->
 			CS_Node = process_dictionary:get_group_member(cs_node),
-    		cs_send:send_local(CS_Node, {get_node_details, cs_send:this(), [my_range], leader_start_new_round}),
+    		cs_send:send_local(CS_Node, {get_node_details, cs_send:this_with_cookie(leader_start_new_round), [my_range]}),
 			ok;
 		false ->
 			ok
@@ -639,21 +680,23 @@ request_new_round_if_leader(State) ->
 
 %% @doc Sends the local node's cs_node a request to tell us its successor and
 %%      predecessor in order to allow debug output at the leader only.
-%%      The node will respond with a get_pred_me_response message.
+%%      The node will respond with a
+%%      {{get_node_details_response, NodeDetails}, leader_debug_output}
+%%      message.
 -spec request_leader_debug_output() -> ok.
 request_leader_debug_output() ->
 	CS_Node = process_dictionary:get_group_member(cs_node),
-	cs_send:send_local(CS_Node, {get_node_details, cs_send:this(), [my_range], leader_debug_output}).
+	cs_send:send_local(CS_Node, {get_node_details, cs_send:this_with_cookie(leader_debug_output), [my_range]}).
 
 %% @doc Sends the local node's cs_node a request to tell us some information
 %%      about itself.
+%%      The node will respond with a
+%%      {{get_node_details_response, NodeDetails}, local_info} message.
 -spec request_local_info() -> ok.
 request_local_info() ->
 	% ask for local load and key range:
-	% on({get_node_details_response, local_info, NodeDetails}, State) will handle
-	% the response
 	CS_Node = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(CS_Node, {get_node_details, cs_send:this(), [my_range, load], local_info}).
+    cs_send:send_local(CS_Node, {get_node_details, cs_send:this_with_cookie(local_info), [my_range, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
 %%      on({cache, Cache},State) will handle the response
