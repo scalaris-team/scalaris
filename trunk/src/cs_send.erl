@@ -49,6 +49,18 @@
          send_to_group_member/3, send_local/2, make_global/1, is_valid/1,
          get_msg_tag/1]).
 
+
+-ifdef(TCP_LAYER).
+-type mypid_plain() :: {inet:ip_address(), integer(), erl_pid_plain()}.
+-endif.
+-ifdef(BUILTIN).
+-type mypid_plain() :: erl_pid_plain().
+-endif.
+-ifdef(SIMULATION).
+-type mypid_plain() :: erl_pid_plain().
+-endif.
+
+
 -type cookie() :: any().
 -type reg_name() :: atom().
 -type erl_local_pid_plain() :: pid() | reg_name().
@@ -113,7 +125,6 @@ get_msg_tag(Message) when is_tuple(Message) and is_atom(erlang:element(1, Messag
 
 -ifdef(TCP_LAYER).
 
--type mypid_plain() :: {inet:ip_address(), integer(), erl_pid_plain()}.
 %% @doc TCP_LAYER: Returns the pid of the current process.
 -spec this() -> mypid_plain().
 this() ->
@@ -157,7 +168,6 @@ is_valid(Pid) ->
 -endif.
 -ifdef(BUILTIN).
 
--type mypid_plain() :: erl_pid_plain().
 %% @doc BUILTIN: Returns the pid of the current process.
 -spec this() -> pid().
 this() ->
@@ -213,7 +223,6 @@ is_valid(_) ->
 -endif.
 -ifdef(SIMULATION).
 
--type mypid_plain() :: erl_pid_plain().
 %% @doc SIMULATION: Returns the pid of the current process.
 -spec this() -> pid().
 this() ->
