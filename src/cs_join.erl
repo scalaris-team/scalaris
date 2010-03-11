@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ join_request(State, Source_PID, Id) ->
     Pred = node:new(Source_PID, Id),
     {DB, HisData} = ?DB:split_data(cs_state:get_db(State), cs_state:id(State), Id),
     cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData}),
-    ring_maintenance:update_pred(Pred),
+    ring_maintenance:update_preds([Pred]),
     cs_state:set_db(State, DB).
 %% userdevguide-end cs_join:join_request
 
