@@ -106,7 +106,7 @@ docs:
 svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/cyclon/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
 
-dialyzer:
+dialyzer: compile
 	$(DIALYZER) -Werror_handling -c ebin contrib/log4erl/ebin/ contrib/yaws/ebin/
 
 rrd-init:
