@@ -38,9 +38,9 @@
 
 -include("../../include/scalaris.hrl").
 
+%% @type process_id() = {inet:ip_address(), int(), pid()}.
+-type(process_id() :: {inet:ip_address(), integer(), pid()}).
 
-% @TODO: should be ip
--type(process_id() :: {any(), integer(), pid()}).
 %%====================================================================
 %% public functions
 %%====================================================================
@@ -52,17 +52,16 @@ start_link() ->
 
 %% @doc a process descriptor has to specify the erlang vm
 %%      + the process inside. {IP address, port, pid}
-%% @type process_id() = {inet:ip_address(), int(), pid()}.
 %% @spec send(process_id(), term()) -> ok
-
-send({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} = Target, Message) ->
+-spec send(process_id(), term()) -> ok.
+send({{_IP1, _IP2, _IP3, _IP4} = IP, Port, Pid} = Target, Message) ->
     {MyIP,MyPort} = comm_port:get_local_address_port(),
     %io:format("send: ~p:~p -> ~p:~p(~p) : ~p\n", [MyIP, MyPort, _IP, _Port, _Pid, Message]),
-    IsLocal = (MyPort =:= _Port) andalso (MyIP =:= _IP),
+    IsLocal = (MyPort =:= Port) andalso (MyIP =:= IP),
     if
         IsLocal ->
             ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
-            _Pid ! Message;
+            Pid ! Message;
         true ->
             comm_port:send(Target, Message)
     end;

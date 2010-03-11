@@ -68,7 +68,7 @@ init(_Args) ->
 on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
     ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
     fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
-    cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
+    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
     {NewId, NewMe, [NewPred], NewSuccList, config:read(cyclon_cache_size),
@@ -117,7 +117,7 @@ on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,Ak
    {Id, Me, Preds, Succs,RandViewSize,Interval,NewTriggerState,NewAktPred,NewAktSucc,Cache,Churn};
 on({cache,[]}, {_Id, _Me, _Preds, _Succs,RandViewSize,_Interval,_TriggerState,_AktPred,_AktSucc,__Cache,_Churn} = State)  ->
     % ignore empty cache from cyclon
-    cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
+    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
     State;
 on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,_Cache,Churn})  ->
              %inc RandViewSize (no error detected)
@@ -127,7 +127,7 @@ on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,Akt
                           false ->
                               RandViewSize
                       end,
-    cs_send:send_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSizeNew,self()}),
+    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSizeNew,self()}),
     RndView=get_RndView(RandViewSizeNew,NewCache),
     %io:format("~p RndView: ~p~n",[self(),RndView]),
     Buffer=merge(Succs++Preds,RndView,node:id(Me)),

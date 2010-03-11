@@ -34,14 +34,14 @@
 -record(lb, {loadbalance_flag, reset_ref, last_keys}).
 
 new() ->
-    ResetRef=cs_send:send_after(config:loadBalanceInterval(), self(), {reset_loadbalance_flag}),
+    ResetRef=cs_send:send_local_after(config:loadBalanceInterval(), self(), {reset_loadbalance_flag}),
     #lb{loadbalance_flag=true, reset_ref=ResetRef, last_keys=gb_sets:new()}.
 
 balance_load(State) ->
     RT = cs_state:rt(State),
     Fingers = ?RT:to_pid_list(RT),
     lists:foreach(fun(Node) -> cs_send:send(Node, {get_load, cs_send:this()}) end, Fingers),    
-    cs_send:send_after(config:loadBalanceInterval(), self(), {stabilize_loadbalance}).
+    cs_send:send_local_after(config:loadBalanceInterval(), self(), {stabilize_loadbalance}).
 
 check_balance(State, Source_PID, Load) ->
     MyLoad = cs_state:load(State),
@@ -127,7 +127,7 @@ get_loadbalance_flag(State) ->
     get_loadbalance_flag(cs_state:get_lb(State)).
 
 set_loadbalance_flag(LB) ->
-    ResetRef=cs_send:send_after(config:loadBalanceFlagResetInterval(), self(), {reset_loadbalance_flag}),
+    ResetRef=cs_send:send_local_after(config:loadBalanceFlagResetInterval(), self(), {reset_loadbalance_flag}),
     LB#lb{loadbalance_flag=true, reset_ref=ResetRef}.
 
 cancel_reset(#lb{reset_ref=ResetRef}) ->

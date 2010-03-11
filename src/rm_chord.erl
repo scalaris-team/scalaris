@@ -64,7 +64,7 @@ start_link(InstanceId,Options) ->
 init(_Args) ->
     log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
     cs_send:send_local(get_cs_pid(), {init_rm,self()}),
-    cs_send:send_after(config:stabilizationInterval(), self(), {stabilize}),
+    cs_send:send_local_after(config:stabilizationInterval(), self(), {stabilize}),
     uninit.
     
 
@@ -139,7 +139,7 @@ on({stabilize},{Id, Me, Pred, Succs})  -> % new stabilization interval
             _  -> 
                 cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
         end,
-        cs_send:send_after(config:stabilizationInterval(), self(), {stabilize}),
+        cs_send:send_local_after(config:stabilizationInterval(), self(), {stabilize}),
 	    {Id, Me, Pred, Succs};
 on({get_pred_response, SuccsPred},{Id, Me, Pred, Succs})  ->
 	    case node:is_null(SuccsPred) of

@@ -39,11 +39,11 @@ init(Module) ->
 
 trigger_first({Module, ok}, _U) ->
     %io:format("[ TR ~p ] ~p first ~n", [self(),Module]),
-    TimerRef = cs_send:send_after(0,self(), {trigger}),
+    TimerRef = cs_send:send_local_after(0,self(), {trigger}),
     {Module, TimerRef}.
 
 trigger_next({Module,ok},_U) ->
-    NewTimerRef = cs_send:send_after(Module:get_base_interval(),self(), {trigger}),
+    NewTimerRef = cs_send:send_local_after(Module:get_base_interval(),self(), {trigger}),
     {Module,NewTimerRef};
 
 
@@ -54,7 +54,7 @@ trigger_next({Module, TimerRef}, _U) ->
     case erlang:read_timer(TimerRef) of
         false ->
             %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
-            NewTimerRef = cs_send:send_after(Module:get_base_interval(),self(), {trigger});
+            NewTimerRef = cs_send:send_local_after(Module:get_base_interval(),self(), {trigger});
         _T ->
             %io:format("[ TR ~p ] ~p call next befor Timer Release ~p ms ~n", [self(),Module,T]),
             NewTimerRef = TimerRef

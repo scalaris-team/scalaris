@@ -38,11 +38,11 @@ init(Module) ->
 
 trigger_first({Module, ok}, _U) ->
 
-    TimerRef = cs_send:send_after(0,self(), {trigger}),
+    TimerRef = cs_send:send_local_after(0,self(), {trigger}),
     {Module, TimerRef}.
 
 trigger_next({Module,ok},_U) ->
-    NewTimerRef = cs_send:send_after(Module:get_base_interval(),self(), {trigger}),
+    NewTimerRef = cs_send:send_local_after(Module:get_base_interval(),self(), {trigger}),
     {Module,NewTimerRef};
 
 % 0 - > max
@@ -60,16 +60,16 @@ trigger_next({Module, TimerRef}, U) ->
     %io:format("[ TD ] ~p U(0,0) ~p~n",[self(),U(0,0)]),
     NewTimerRef = case U(0,0) of
                 0 ->
-                    cs_send:send_after(Module:get_max_interval(),self(), {trigger});
+                    cs_send:send_local_after(Module:get_max_interval(),self(), {trigger});
                 1 ->
-                    cs_send:send_after(Module:get_base_interval(),self(), {trigger});
+                    cs_send:send_local_after(Module:get_base_interval(),self(), {trigger});
                 2 ->
-                    cs_send:send_after(Module:get_min_interval(),self(), {trigger});
+                    cs_send:send_local_after(Module:get_min_interval(),self(), {trigger});
                 3 ->
                     cs_send:send_local(self(), {trigger}),
-                    cs_send:send_after(Module:get_min_interval(),self(), {trigger});
+                    cs_send:send_local_after(Module:get_min_interval(),self(), {trigger});
                 _ ->
-                    cs_send:send_after(Module:get_base_interval(),self(), {trigger})
+                    cs_send:send_local_after(Module:get_base_interval(),self(), {trigger})
 
             
      end,
