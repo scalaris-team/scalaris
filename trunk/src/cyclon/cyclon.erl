@@ -113,7 +113,7 @@ on({flush_cache},{_Cache,Node,_Cycles,TriggerState}) ->
     cs_send:send_local(get_pid() , {get_pred_succ, cs_send:this()}),
     {cache:new(),Node,0,TriggerState};
 on({start_shuffling},{Cache,Node,Cycles,TriggerState}) ->
-    cs_send:send_after(config:read(cyclon_interval), self(), {shuffle}),
+    cs_send:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
     {Cache,Node,Cycles,TriggerState};
 on({'$gen_cast', {debug_info, Requestor}},{Cache,Node,Cycles,TriggerState})  ->
     cs_send:send_local(Requestor , {debug_info_response, [

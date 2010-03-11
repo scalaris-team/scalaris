@@ -27,20 +27,20 @@
 start() ->
     spawn(?MODULE, tracer, [self()]),
     receive
-	done ->
+	{done} ->
 	    ok
     end,
     ok.
 
 tracer_perf(Pid) ->
     erlang:trace(all, true, [running, timestamp]),
-    cs_send:send_local(Pid , done),
+    cs_send:send_local(Pid , {done}),
     ets:new(?MODULE, [set, public, named_table]),
     loop([]).
 
 tracer(Pid) ->
     erlang:trace(all, true, [send, procs]),
-    cs_send:send_local(Pid , done),
+    cs_send:send_local(Pid , {done}),
     loop([]).
 
 loop(Ps) ->

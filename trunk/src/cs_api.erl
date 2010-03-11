@@ -180,7 +180,7 @@ range_read(From, To) ->
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, cs_send:this()}),
-    cs_send:send_after(config:read(range_read_timeout), self(), {timeout}),
+    cs_send:send_local_after(config:read(range_read_timeout), self(), {timeout}),
     range_read_loop(Interval, [], []).
 
 range_read_loop(Interval, Done, Data) ->

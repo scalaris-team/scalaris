@@ -107,7 +107,7 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
-        cs_send:send_after(0, self(), {stabilize,Token}),
+        cs_send:send_local_after(0, self(), {stabilize,Token}),
         {NewId, NewMe, [NewPred]++NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
 on(_,uninit) ->
         uninit;
@@ -143,7 +143,7 @@ on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,Ak
           		false ->
                     cs_send:send_to_group_member(node:pidX(P), ring_maintenance, {rm_buffer,Me,extractMessage(View++[Me]++RndView,P)})
         	end,
-			cs_send:send_after(Interval, self(), {stabilize,AktToken}),
+			cs_send:send_local_after(Interval, self(), {stabilize,AktToken}),
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({stabilize,_},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
@@ -160,7 +160,7 @@ on({rm_buffer,Q,Buffer_q},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,
             {NewAktPred,NewAktSucc} = update_cs_node(NewView,AktPred,AktSucc),
             update_failuredetector(View,NewView),
             NewInterval = new_interval(View,NewView,Interval),
-            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_local_after(NewInterval , self(), {stabilize,AktToken+1}),
             %io:format("loop~p~n",[self()]),   
             {Id, Me, NewView,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};	
 on({rm_buffer_response,Buffer_p},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache})->
@@ -180,7 +180,7 @@ on({rm_buffer_response,Buffer_p},{Id, Me, View ,RandViewSize,Interval,AktToken,A
                 false ->
                     RandViewSize
             end,
-            cs_send:send_after(NewInterval , self(), {stabilize,AktToken+1}),
+            cs_send:send_local_after(NewInterval , self(), {stabilize,AktToken+1}),
             
             {Id, Me, NewView,RandViewSizeNew,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};
 on({zombie,Node},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->

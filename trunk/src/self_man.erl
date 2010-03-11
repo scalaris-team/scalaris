@@ -47,7 +47,7 @@ start_link(InstanceID) ->
 init(_Args) ->
     Start = erlang:now(),
     log:log(info,"[ SM ~p ] starting self_man", [self()]),
-    cs_send:send_after(config:read(self_man_timer),self() ,{trigger}),
+    cs_send:send_local_after(config:read(self_man_timer),self() ,{trigger}),
     {gb_trees:empty(),Start}.
 
 on({request_trigger,Pid,U},{State,Start}) ->
@@ -58,7 +58,7 @@ on({no_churn},{State,Start}) ->
     %%cs_send:send_local(get_pid_rt(),{no_churn}),
     {State,Start};
 on({trigger},{State,Start}) ->
-    cs_send:send_after(config:read(self_man_timer),self() ,{trigger}),
+    cs_send:send_local_after(config:read(self_man_timer),self() ,{trigger}),
     List = gb_trees:to_list(State),
     S = lists:sort(fun help/2, List),
     %io:format("S: ~p~n",[S]),

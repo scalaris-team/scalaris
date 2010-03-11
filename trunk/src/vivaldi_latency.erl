@@ -60,7 +60,7 @@ on({pong, _}, {Owner, RemoteNode, Token, Start, Latencies}) ->
             cs_send:send_local(Owner,{update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
             kill;
         false ->
-            cs_send:send_after(config:read(vivaldi_measurements_delay),
+            cs_send:send_local_after(config:read(vivaldi_measurements_delay),
                               self(),
                               {start_ping}),
             {Owner, RemoteNode, Token, unknown, NewLatencies}

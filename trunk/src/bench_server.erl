@@ -59,7 +59,7 @@ run_read(ThreadsPerVM, Iterations) ->
 runner(ThreadsPerVM, Iterations, Options, Message) ->
     ServerList = case lists:member(locally, Options) of
                      true ->
-                         [cs_send:get(bench_server, cs_send:this())];
+                         [cs_send:make_global(bench_server)];
                      false ->
                          case lists:keysearch(copies, 1, Options) of
                              {value, {copies, Copies}} ->

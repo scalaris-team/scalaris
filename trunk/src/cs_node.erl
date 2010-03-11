@@ -81,7 +81,7 @@ on({known_hosts_timeout}, {join_phase2, Key}) ->
            || KnownHost <- KnownHosts],
     %io:format("~p~n", [Res]),
     % timeout just in case
-    cs_send:send_after(1000, self() , {known_hosts_timeout}),
+    cs_send:send_local_after(1000, self() , {known_hosts_timeout}),
     {join_phase2, Key};
 
 on({get_cs_nodes_response, []}, {join_phase2, Key}) ->
@@ -96,7 +96,7 @@ on({get_cs_nodes_response, Nodes}, {join_phase2, Key}) ->
             {join_phase2, Key};
         [First | Rest] ->
             cs_send:send(First, {lookup_aux, Key, 0, {get_node, cs_send:this(), Key}}),
-            cs_send:send_after(3000, self(), {lookup_timeout}),
+            cs_send:send_local_after(3000, self(), {lookup_timeout}),
             {join_phase3, Rest, Key}
     end;
 
@@ -138,7 +138,7 @@ on({join_response, Pred, Data}, {join_phase4, Id, Succ, Me}) ->
 % Catch all messages until the join protocol is finshed
 on(Msg, State) when element(1, State) /= state ->
     %io:format("[~p] postponed delivery of ~p~n", [self(), Msg]),
-    cs_send:send_after(100, self(), Msg),
+    cs_send:send_local_after(100, self(), Msg),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -369,8 +369,8 @@ on({get_process_in_group, Source_PID, Key, Process}, State) ->
 % Cyclon (see cyclon/*.erl) 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_cyclon_pid, Pid,Me}, State) ->
-    CyclonPid = cs_send:get(get_local_cyclon_pid(), cs_send:this()),
-    cs_send:send(Pid,{cyclon_pid,Me,CyclonPid}),
+    CyclonPid = cs_send:make_global(get_local_cyclon_pid()),
+    cs_send:send(Pid,{cyclon_pid, Me, CyclonPid}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -470,7 +470,7 @@ on({get_node_details, Pid, Which, Cookie}, State) ->
     State;
 
 on({get_node_IdAndSucc, Pid, Cookie}, State) ->
-    cs_send:send_after(0,Pid, {get_node_IdAndSucc_response, Cookie, {cs_state:id(State),cs_state:succ_id(State)}}),
+    cs_send:send_local_after(0,Pid, {get_node_IdAndSucc_response, Cookie, {cs_state:id(State),cs_state:succ_id(State)}}),
     State;
 
 on({dump}, State) -> 

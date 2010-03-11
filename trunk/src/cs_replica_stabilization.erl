@@ -75,13 +75,13 @@ start_fetchers(Index, [Interval | Tail]) ->
 
 init({Owner, Index, Interval}) ->
     bulkowner:issue_bulk_owner(Interval,{bulk_read_with_version, cs_send:this()}),
-    cs_send:send_after(5000, self(), {timeout}),
+    cs_send:send_local_after(5000, self(), {timeout}),
     {Owner, Index, Interval, [], []}.
 
 
 
 on({timeout},{Owner, Index, Interval, Done, FetchedData}) ->
-	    cs_send:send_after(5000, self(), {timeout}),
+	    cs_send:send_local_after(5000, self(), {timeout}),
 	    {Owner, Index, Interval, Done, FetchedData};
 on({bulk_read_with_version_response, Interval, NewData},{Owner, Index, Interval, Done, FetchedData}) ->
 	    Done2 = [Interval | Done],

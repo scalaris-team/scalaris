@@ -62,7 +62,7 @@ start_link(InstanceId) ->
 -spec(init/1 :: ([any()]) -> state()).
 init(_Args) ->
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
-    %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     {uninit, TriggerState}.
     
@@ -96,7 +96,7 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
-    %cs_send:send_after(config:pointerStabilizationInterval(), self(), {stabilize}),
+    %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
     TriggerState2 = Trigger:trigger_next(TriggerState, make_utility(?RT:get_size(RTState))),
     {Id, Pred, Succ, NewRTState,TriggerState2};
 

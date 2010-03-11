@@ -43,9 +43,9 @@ start() ->
    gen_component:start_link(?MODULE, [], [{register_native, simu_slave}]).
 
 init(_ARG) ->
-    cs_send:send_after(2000, self(), {addnodes,1000}),
-    cs_send:send_after(10000, self(), {check_ring}),
-    cs_send:send_after(1000*60*60, self(), {simu_stop}),
+    cs_send:send_local_after(2000, self(), {addnodes,1000}),
+    cs_send:send_local_after(10000, self(), {check_ring}),
+    cs_send:send_local_after(1000*60*60, self(), {simu_stop}),
     {initState}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -58,7 +58,7 @@ on({addnodes,1},_) ->
     {state_1};
 on({addnodes,N},_) ->
     admin:add_nodes(1),
-    cs_send:send_after(1, self(), {addnodes,N-1}),
+    cs_send:send_local_after(1, self(), {addnodes,N-1}),
     {state_1}; 
 on({simu_stop},_) ->
     scheduler:stop();
@@ -73,11 +73,11 @@ on({check_ring},_) ->
     %scheduler ! {halt_simulation},
     %Implement a Noneblocking CheckRing 
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    cs_send:send_after(0,config:bootPid(), {get_list, cs_send:this()}),
+    cs_send:send_local_after(0,config:bootPid(), {get_list, cs_send:this()}),
     %io:format("A~n"),
     {check_ring_p1};
 on({get_list_response,N},_) ->
-    [cs_send:send_after(0,Pid, {get_node_IdAndSucc, cs_send:this(), Pid}) ||  Pid <-N],
+    [cs_send:send_local_after(0,Pid, {get_node_IdAndSucc, cs_send:this(), Pid}) ||  Pid <-N],
     %io:format("C~n"),
     {length(N),[]};
 on({get_node_IdAndSucc_response, _Pid, Details},{1,Responses}) ->
@@ -96,7 +96,7 @@ on({get_node_IdAndSucc_response, _Pid, Details},{1,Responses}) ->
         ok -> scheduler:stop();
         _Y ->   
                 %io:format("~p~n",[_Y]),
-                cs_send:send_after(1000, self(), {check_ring})
+                cs_send:send_local_after(1000, self(), {check_ring})
     end,
      %io:format("K~n"),
     %scheduler ! {continue},
