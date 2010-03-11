@@ -161,20 +161,20 @@ on({die}, _State) ->
 % Ring Maintenance (see ring_maintenance.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({init_rm,Pid},State) ->
-    cs_send:send_local(Pid , {init, cs_state:id(State), cs_state:me(State),cs_state:pred(State), [cs_state:succ(State)], self()}),
+    cs_send:send_local(Pid , {init, cs_state:id(State), cs_state:me(State),cs_state:pred(State), [cs_state:succ(State)]}),
     State;
 
-on({rm_update_pred_succ, Pred, Succ}, State) ->
-    cs_state:set_rt(cs_state:update_pred_succ(State, Pred, Succ),
-                    ?RT:update_pred_succ_in_cs_node(Pred, Succ, cs_state:rt(State)));
+on({rm_update_preds_succs, Preds, Succs}, State) ->
+    cs_state:set_rt(cs_state:update_preds_succs(State, Preds, Succs),
+                    ?RT:update_pred_succ_in_cs_node(hd(Preds), hd(Succs), cs_state:rt(State)));
 
-on({rm_update_pred, Pred}, State) ->
-    cs_state:set_rt(cs_state:update_pred(State, Pred),
-                    ?RT:update_pred_succ_in_cs_node(Pred, cs_state:succ(State), cs_state:rt(State)));
+on({rm_update_preds, Preds}, State) ->
+    cs_state:set_rt(cs_state:update_preds(State, Preds),
+                    ?RT:update_pred_succ_in_cs_node(hd(Preds), cs_state:succ(State), cs_state:rt(State)));
 
-on({rm_update_succ, Succ}, State) ->
-    cs_state:set_rt(cs_state:update_succ(State,Succ),
-                    ?RT:update_pred_succ_in_cs_node(cs_state:pred(State), Succ, cs_state:rt(State)));
+on({rm_update_succs, Succs}, State) ->
+    cs_state:set_rt(cs_state:update_succs(State, Succs),
+                    ?RT:update_pred_succ_in_cs_node(cs_state:pred(State), hd(Succs), cs_state:rt(State)));
 
 %% @doc notification that my successor left
 on({succ_left, Succ}, State) ->
@@ -187,8 +187,8 @@ on({pred_left, Pred}, State) ->
     State;
 
 %% @doc notify the cs_node his successor changed
-on({update_succ, Succ}, State) -> 
-    ring_maintenance:update_succ(Succ),
+on({update_succ, Succ}, State) ->
+    ring_maintenance:notify_new_succ(Succ),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

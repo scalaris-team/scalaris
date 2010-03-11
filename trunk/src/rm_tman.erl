@@ -26,17 +26,14 @@
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
-
-
-
+-include("../include/scalaris.hrl").
 
 -export([init/1,on/2]).
 -behavior(gen_component).
 -behavior(ring_maintenance).
 -behavior(self_man).
 -export([start_link/1, 
-	 get_base_interval/0,get_min_interval/0,get_max_interval/0
-	]).
+         get_base_interval/0,get_min_interval/0,get_max_interval/0]).
 
 % unit testing
 -export([merge/3]).
@@ -57,69 +54,90 @@ init(_Args) ->
     cs_send:send_local(get_pid_dnc() , {subscribe, self()}),
     cs_send:send_local(get_cs_pid(), {init_rm,self()}),
     uninit.
-    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-type(state() :: {Id             :: ?RT:key(),
+                  Me             :: node:node_type(),
+                  Preds          :: list(node:node_type()),
+                  Succs          :: list(node:node_type()),
+                  RandomViewSize :: pos_integer(),
+                  Interval       :: pos_integer(),
+                  TriggerState   :: any(),
+                  Cache          :: list(node:node_type()), % random cyclon nodes
+                  Churn          :: bool()}
+     | uninit).
 
-% @doc the Token takes care, that there is only one timermessage for stabilize 
-
-on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
-    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-    fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
+% @doc the Token takes care, that there is only one timermessage for stabilize
+-spec(on/2 :: (any(), state()) -> state()).
+on({init, Id, Me, Predecessor, SuccList}, uninit) ->
+    ring_maintenance:update_preds_and_succs([Predecessor], SuccList),
+    fd:subscribe(lists:usort([node:pidX(Node) || Node <- [Predecessor | SuccList]])),
     cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
-    {NewId, NewMe, [NewPred], NewSuccList, config:read(cyclon_cache_size),
-     config:stabilizationInterval_min(), TriggerState2, NewPred, hd(NewSuccList), [], 1};
-on(_,uninit) ->
+    {Id, Me, [Predecessor], SuccList, config:read(cyclon_cache_size),
+     config:stabilizationInterval_min(), TriggerState2, [], true};
+on(Msg, uninit) ->
+    cs_send:send_local_after(100, self(), Msg),
     uninit;
 
-on({get_successorlist, Pid},{Id, Me, Preds, [] = Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
+on({get_successorlist, Pid}, {_Id, Me, _Preds, [], _RandViewSize, _Interval,
+                              _TriggerState, _Cache, _Churn} = State)  ->
     cs_send:send_local(Pid , {get_successorlist_response, [Me]}),
-    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
-on({get_successorlist, Pid},{Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
-    cs_send:send_local(Pid , {get_successorlist_response, Succs}),
-    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
+    State;
+on({get_successorlist, Pid}, {_Id, _Me, _Preds, Succs, _RandViewSize, _Interval,
+                              _TriggerState, _Cache, _Churn} = State)  ->
+    cs_send:send_local(Pid, {get_successorlist_response, Succs}),
+    State;
 
-on({get_predlist, Pid},{Id, Me, [] = Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
+on({get_predlist, Pid}, {_Id, Me, [], _Succs, _RandViewSize, _Interval,
+                         _TriggerState, _Cache, _Churn} = State)  ->
     cs_send:send_local(Pid , {get_predlist_response, [Me]}),
-    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
-on({get_predlist, Pid},{Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn})  ->
+    State;
+on({get_predlist, Pid},{_Id, _Me, Preds, _Succs, _RandViewSize, _Interval,
+                        _TriggerState, _Cache, _Churn} = State)  ->
     cs_send:send_local(Pid , {get_predlist_response, Preds}),
-    {Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, AktPred, AktSucc, Cache, Churn};
+    State;
 
-on({trigger},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  -> 
-    
+% start gossip
+on({trigger},{Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, Cache,
+              Churn})  ->
     % Triger an update of the Random view
     %
-    RndView=get_RndView(RandViewSize,Cache),
+    RndView= get_RndView(RandViewSize, Cache),
     %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-    {Pred,Succ} =get_safe_pred_succ(Preds,Succs,RndView,Me),
+    {Pred,Succ} = get_safe_pred_succ(Preds,Succs,RndView,Me),
             %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
             %Test for being alone
-    case ((Pred == Me) and (Succ == Me)) of
-        true ->
-            ring_maintenance:update_pred(Me),
-            ring_maintenance:update_succ(Me),
-            NewAktSucc =Me,
-            NewAktPred =Me,
-            NewTriggerState=TriggerState;
-        false ->
-            cs_send:send_to_group_member(node:pidX(Succ), ring_maintenance, {rm_buffer,Me,Succs++Preds++[Me]}),
-            cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance, {rm_buffer,Me,Succs++Preds++[Me]}),
-            NewAktSucc =AktSucc,
-            NewAktPred =AktPred,
-            %TODO: is this send_after necassary? Yes if all nodes in view are death
-	    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(1))
-    end,
-   {Id, Me, Preds, Succs,RandViewSize,Interval,NewTriggerState,NewAktPred,NewAktSucc,Cache,Churn};
-on({cache,[]}, {_Id, _Me, _Preds, _Succs,RandViewSize,_Interval,_TriggerState,_AktPred,_AktSucc,__Cache,_Churn} = State)  ->
+    NewTriggerState =
+        case ((Pred == Me) and (Succ == Me)) of
+            true ->
+                ring_maintenance:update_preds([Me]),
+                ring_maintenance:update_succs([Me]),
+                TriggerState;
+            false ->
+                Message = {rm_buffer, Me, Succs++Preds++[Me]},
+                cs_send:send_to_group_member(node:pidX(Succ), ring_maintenance,
+                                                 Message),
+                cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance,
+                                             Message),
+                Trigger:trigger_next(TriggerState,make_utility(1))
+        end,
+   {Id, Me, Preds, Succs, RandViewSize, Interval, NewTriggerState, Cache, Churn};
+% got empty cyclon cache
+on({cache, []}, {_Id, _Me, _Preds, _Succs, RandViewSize, _Interval,
+                 _TriggerState, _Cache, _Churn} = State)  ->
     % ignore empty cache from cyclon
-    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
+    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid(),
+                        {get_subset_max_age, RandViewSize, self()}),
     State;
-on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,_Cache,Churn})  ->
+
+% got cyclon cache
+on({cache, NewCache},{Id, Me, OldPreds, OldSuccs, RandViewSize, Interval,
+                     TriggerState, _Cache, Churn})  ->
              %inc RandViewSize (no error detected)
     RandViewSizeNew = case (RandViewSize < config:read(cyclon_cache_size)) of
                           true ->
@@ -127,79 +145,93 @@ on({cache,NewCache},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,Akt
                           false ->
                               RandViewSize
                       end,
-    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,RandViewSizeNew,self()}),
-    RndView=get_RndView(RandViewSizeNew,NewCache),
-    %io:format("~p RndView: ~p~n",[self(),RndView]),
-    Buffer=merge(Succs++Preds,RndView,node:id(Me)),
-    SuccsNew=lists:sublist(Buffer, config:read(succ_list_length)),
-    PredsNew=lists:sublist(lists:reverse(Buffer), config:read(pred_list_length)),
-    {NewAktPred,NewAktSucc} = update_cs_node(PredsNew,SuccsNew,AktPred,AktSucc),
-    update_failuredetector(Preds,Succs,PredsNew,SuccsNew),
-    NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval,Churn),
-    NewChurn = new_churn(Preds,Succs,PredsNew,SuccsNew),
-    %NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
-    {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,TriggerState,NewAktPred,NewAktSucc,NewCache,NewChurn};
-on({rm_buffer,Q,Buffer_q},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    RndView=get_RndView(RandViewSize,Cache),
-    cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,Succs++Preds++[Me]}),
-    Buffer=merge(Succs++Preds,Buffer_q++RndView,node:id(Me)),
-    SuccsNew=lists:sublist(Buffer, config:read(succ_list_length)),
-    PredsNew=lists:sublist(lists:reverse(Buffer), config:read(pred_list_length)),
-    {NewAktPred,NewAktSucc} = update_cs_node(PredsNew,SuccsNew,AktPred,AktSucc),
-    update_failuredetector(Preds,Succs,PredsNew,SuccsNew),
-    NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval,Churn),
-    NewChurn = new_churn(Preds,Succs,PredsNew,SuccsNew),
-    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
-    {Id, Me, PredsNew, SuccsNew,RandViewSize,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,Cache,NewChurn};
-on({rm_buffer_response,Buffer_p},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    RndView=get_RndView(RandViewSize,Cache),
-            %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-    Buffer=merge(Succs++Preds,Buffer_p++RndView,node:id(Me)),
-    SuccsNew=lists:sublist(Buffer, 1, config:read(succ_list_length)),
-    PredsNew=lists:sublist(lists:reverse(Buffer), 1, config:read(pred_list_length)),
-    {NewAktPred,NewAktSucc} = update_cs_node(PredsNew,SuccsNew,AktPred,AktSucc),
-    update_failuredetector(Preds,Succs,PredsNew,SuccsNew ),
-    NewInterval = new_interval(Preds,Succs,PredsNew,SuccsNew,Interval,Churn),
-    NewChurn = new_churn(Preds,Succs,PredsNew,SuccsNew),
-            %inc RandViewSize (no error detected)
-    RandViewSizeNew = case RandViewSize < config:read(cyclon_cache_size) of
+    % trigger new cyclon cache request
+    cs_send:send_local_after(config:read(cyclon_interval), get_cyclon_pid(),
+                       {get_subset_max_age, RandViewSizeNew, self()}),
+    RndView = get_RndView(RandViewSizeNew, NewCache),
+    {NewPreds, NewSuccs, NewInterval, NewChurn} =
+        update_view(OldPreds, OldSuccs, NewCache, RndView,
+                    Me, Interval, Churn),
+    {Id, Me, NewPreds, NewSuccs, RandViewSizeNew, NewInterval, TriggerState,
+     NewCache, NewChurn};
+% got shuffle request
+on({rm_buffer, OtherNode, OtherBuffer}, {Id, Me, OldPreds, OldSuccs, RandViewSize, Interval,
+                                         TriggerState ,Cache, Churn})  ->
+    RndView=get_RndView(RandViewSize, Cache),
+    cs_send:send_to_group_member(node:pidX(OtherNode), ring_maintenance,
+                                 {rm_buffer_response, OldSuccs++OldPreds++[Me]}),
+    {NewPreds, NewSuccs, NewInterval, NewChurn} =
+        update_view(OldPreds, OldSuccs, OtherBuffer, RndView,
+                    Me, Interval, Churn),
+        NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
+    {Id, Me, NewPreds, NewSuccs, RandViewSize, NewInterval, NewTriggerState, Cache, NewChurn};
+on({rm_buffer_response, OtherBuffer}, {Id, Me, OldPreds, OldSuccs, RandViewSize, Interval,
+                                        TriggerState, Cache, Churn})  ->
+    RndView=get_RndView(RandViewSize, Cache),
+    {NewPreds, NewSuccs, NewInterval, NewChurn} =
+        update_view(OldPreds, OldSuccs, OtherBuffer, RndView,
+                    Me, Interval, Churn),
+    %inc RandViewSize (no error detected)
+    NewRandViewSize = case RandViewSize < config:read(cyclon_cache_size) of
                           true ->
-            RandViewSize+1;
+                              RandViewSize+1;
                           false ->
-            RandViewSize
+                              RandViewSize
                       end,
     NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
-    {Id, Me, PredsNew, SuccsNew,RandViewSizeNew,NewInterval,NewTriggerState,NewAktPred,NewAktSucc,Cache,NewChurn};
-on({zombie,Node},{Id, Me, Preds, Succs,RandViewSize,_Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
+    {Id, Me, NewPreds, NewSuccs, NewRandViewSize, NewInterval, NewTriggerState, Cache, NewChurn};
+% dead-node-cache reported dead node to be alive again
+on({zombie, Node}, {Id, Me, Preds, Succs, RandViewSize, _Interval, TriggerState, Cache, Churn})  ->
     NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
-    cs_send:send_local(self_man:get_pid(),{update,?MODULE,stabilizationInterval,self(),config:stabilizationInterval_min()}),
-    {Id, Me, Preds, Succs,RandViewSize,config:stabilizationInterval_min(),NewTriggerState,AktPred,AktSucc,[Node|Cache],Churn};
-on({crash, DeadPid},{Id, Me, Preds, Succs,_RandViewSize,_Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    PredsNew = filter(DeadPid, Preds),
-    SuccsNew = filter(DeadPid, Succs),
+    cs_send:send_local(self_man:get_pid(), {update, ?MODULE, stabilizationInterval,
+                                            self(), config:stabilizationInterval_min()}),
+    {Id, Me, Preds, Succs, RandViewSize, config:stabilizationInterval_min(), NewTriggerState,
+     [Node|Cache], Churn};
+% failure detector reported dead node
+on({crash, DeadPid},{Id, Me, OldPreds, OldSuccs, _RandViewSize, _Interval, TriggerState, Cache, Churn})  ->
+    NewPreds = filter(DeadPid, OldPreds),
+    NewSuccs = filter(DeadPid, OldSuccs),
     NewCache = filter(DeadPid, Cache),
-    update_failuredetector(Preds,Succs,PredsNew,SuccsNew ),
+    update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
+    update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs),
     NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
-    {Id, Me, PredsNew ,SuccsNew,0,config:stabilizationInterval_min(),NewTriggerState,AktPred,AktSucc ,NewCache,Churn};
-on({'$gen_cast', {debug_info, Requestor}},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
+    {Id, Me, NewPreds, NewSuccs, 0, config:stabilizationInterval_min(), NewTriggerState,
+     NewCache,Churn};
+on({'$gen_cast', {debug_info, Requestor}},{_Id, _Me, Preds, Succs, _RandViewSize, _Interval,
+                                           _TriggerState, _Cache, _Churn} = State)  ->
     cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Preds]))},
                                                           {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]}),
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({check_ring,0,Me},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    io:format(" [RM ] CheckRing   OK  ~n"),
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({check_ring,Token,Me},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    io:format(" [RM ] Token back with Value: ~p~n",[Token]),
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({check_ring,0,Master},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    io:format(" [RM ] CheckRing  reach TTL in Node ~p not in ~p~n",[Master,Me]),
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({check_ring,Token,Master},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Master}),
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
-on({init_check_ring,Token},{Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn})  ->
-    cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Me}),
-    {Id, Me, Preds, Succs,RandViewSize,Interval,TriggerState,AktPred,AktSucc,Cache,Churn};
+    State;
+% trigger by admin:dd_check_ring
+on({check_ring, Token, Master}, {_Id,  Me, Preds, Succs, _RandViewSize, _Interval,
+                            _TriggerState, _Cache, _Churn} = State)  ->
+    case {Token, Master} of
+        {0, Me} ->
+            io:format(" [RM ] CheckRing   OK  ~n");
+        {0, _} ->
+            io:format(" [RM ] CheckRing  reach TTL in Node ~p not in ~p~n",[Master, Me]);
+        {Token, Me} ->
+            io:format(" [RM ] Token back with Value: ~p~n",[Token]);
+        {Token, _} ->
+            {Pred, _Succ} = get_safe_pred_succ(Preds, Succs, [], Me),
+            cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance,
+                                         {check_ring, Token-1, Master})
+    end,
+    State;
+
+% trigger by admin:dd_check_ring
+on({init_check_ring,Token}, {_Id, Me, Preds, Succs, _RandViewSize, _Interval,
+                            _TriggerState, _Cache, _Churn} = State)  ->
+    {Pred, _Succ} = get_safe_pred_succ(Preds, Succs, [], Me),
+    cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance,
+                                 {check_ring, Token - 1, Me}),
+    State;
+
+% @TODO: handle information properly
+on({notify_new_pred, _Pred}, State) ->
+    State;
+on({notify_new_succ, _Succ}, State) ->
+    State;
 on(_, _State) ->
     unknown_event.
 
@@ -211,15 +243,15 @@ on(_, _State) ->
 merge(L1, L2, Id) ->
     MergedList = lists:append(L1, L2),
     Order = fun(A, B) ->
-            node:id(A) =< node:id(B)
-	    end,
+                    node:id(A) =< node:id(B)
+            end,
     Larger  = lists:usort(Order, [X || X <- MergedList, node:id(X) >  Id]),
     Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) == Id]),
     Smaller = lists:usort(Order, [X || X <- MergedList, node:id(X) <  Id]),
     A = lists:append([Larger, Smaller]),
     case A of
-        []	-> Equal;
-        _	-> A
+        [] -> Equal;
+        _  -> A
     end.
 
 %-spec(filter/2 :: (cs_send:mypid(), list(node:node_type()) -> list(node:node_type()).
@@ -227,75 +259,57 @@ filter(_Pid, []) ->
     [];
 filter(Pid, [Succ | Rest]) ->
     case Pid == node:pidX(Succ) of
-	true ->
-        
-        %Hook for DeadNodeCache
+        true ->
+            %Hook for DeadNodeCache
             cs_send:send_local(get_pid_dnc() , {add_zombie_candidate, Succ}),
-
-	    filter(Pid, Rest);
-	false ->
-	    [Succ | filter(Pid, Rest)]
+            filter(Pid, Rest);
+        false ->
+            [Succ | filter(Pid, Rest)]
     end.
 
-%% @doc get a peer form the cycloncache which is alive 
+%% @doc get a peer form the cycloncache which is alive
 get_RndView(N,Cache) ->
     lists:sublist(Cache, N).
-     
-     
-     
 
 % @doc Check if change of failuredetector is necessary
-update_failuredetector(Preds,Succs,PredsNew,SuccsNew) ->
-    OldView=lists:usort(Preds++Succs),
-    NewView=lists:usort(PredsNew++SuccsNew),
+-spec(update_failuredetector/4 :: (list(), list(), list(), list()) ->
+              ok).
+update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
+    OldView=lists:usort(OldPreds++OldSuccs),
+    NewView=lists:usort(NewPreds++NewSuccs),
     case (NewView /= OldView) of
         true ->
-	    NewNodes = util:minus(NewView,OldView),
-	    OldNodes = util:minus(OldView,NewView),
-	    update_fd([node:pidX(Node) || Node <- OldNodes],fun fd:unsubscribe/1),
-	    update_fd([node:pidX(Node) || Node <- NewNodes],fun fd:subscribe/1);
-	false ->
-	    _NewNodes = util:minus(NewView,OldView),
-	    _OldNodes = util:minus(OldView,NewView),
-	    ok
-    end,
-    ok.
-             
-             
-    
+            NewNodes = util:minus(NewView,OldView),
+            OldNodes = util:minus(OldView,NewView),
+            fd:unsubscribe([node:pidX(Node) || Node <- OldNodes]),
+            fd:subscribe([node:pidX(Node) || Node <- NewNodes]),
+            ok;
+        false ->
+            ok
+    end.
 
-update_fd([], _) ->
-    ok;
-update_fd(Nodes, F) ->
-    F(Nodes).             
-           
-	
-% @doc informed the cs_node for new [succ|pred] if necessary
-update_cs_node(PredsNew,SuccsNew,AktPred,AktSucc) ->
+% @doc inform the cs_node of new [succ|pred] if necessary
+update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
     %io:format("UCN: ~p ~n",[{PredsNew,SuccsNew,ShuffelBuddy,AktPred,AktSucc}]),
-    case has_changed(PredsNew,AktPred) of
-    	false ->
-            NewAktPred = AktPred;
-        {ok, NewAktPred} ->
-            ring_maintenance:update_pred(NewAktPred)
+    case OldPreds == NewPreds of
+        true -> ok;
+        false -> ring_maintenance:update_preds(NewPreds)
     end,
-    case has_changed(SuccsNew,AktSucc) of
-    	false ->
-            NewAktSucc = AktSucc;
-        {ok, NewAktSucc} ->
-            ring_maintenance:update_succ(NewAktSucc)
+    case OldSuccs == NewSuccs of
+        true -> ok;
+        false -> ring_maintenance:update_succs(NewSuccs)
     end,
-    {NewAktPred,NewAktSucc}.
+    {NewPreds,NewSuccs}.
 
-get_safe_pred_succ(Preds,Succs,RndView,Me) ->
+get_safe_pred_succ(Preds, Succs, RndView, Me) ->
     case (Preds == []) or (Succs == []) of
         true ->
             Buffer = merge(Preds ++ Succs, RndView,node:id(Me)),
             %io:format("Buffer: ~p~n",[Buffer]),
             case Buffer == [] of
                 false ->
-                    SuccsNew=lists:sublist(Buffer, 1,  config:read(succ_list_length)),
-                    PredsNew=lists:sublist(lists:reverse(Buffer), 1,  config:read(pred_list_length)),
+                    SuccsNew = lists:sublist(Buffer, 1,  config:read(succ_list_length)),
+                    PredsNew = lists:sublist(lists:reverse(Buffer), 1,  config:read(pred_list_length)),
                     {hd(PredsNew), hd(SuccsNew)};
                 true ->
                     {Me, Me}
@@ -303,31 +317,19 @@ get_safe_pred_succ(Preds,Succs,RndView,Me) ->
         false ->
             {hd(Preds), hd(Succs)}
     end.
+
 % @doc adaptize the Tman-interval
-new_interval(Preds,Succs,PNew,SNew,_Interval,Churn) ->
-   
-    case (((Preds++Succs)=:=(PNew++SNew)) and (Churn==0)) of
-        true ->                 % incresing the timer
-           0;
+new_interval(OldPreds, NewPreds, OldSuccs, NewSuccs,_Interval,Churn) ->
+    case (((OldPreds++OldSuccs)=:=(NewPreds++NewSuccs)) andalso (Churn==0)) of
+        true ->                 % increasing the timer
+            0;
         false ->
-           2
-    end.
-new_churn(Preds,Succs,PNew,SNew) ->
-    case((Preds++Succs)=:=(PNew++SNew)) of
-        true  -> 0;
-        false -> 1
+            2
     end.
 
-
-
-
-%% @doc has_changed(NewView, AktNode)
--spec(has_changed/2 :: (list(), node:node_type()) -> {ok, node:node_type()} | false).
-has_changed([X | _], X) ->
-    false;
-has_changed([X | _], _) ->
-    {ok, X}.
-
+% @doc is there churn in the system
+has_churn(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
+    OldPreds =:= NewPreds andalso OldSuccs =:= NewSuccs.
 
 get_cyclon_pid() ->
     process_dictionary:get_group_member(cyclon).
@@ -351,3 +353,13 @@ get_max_interval() ->
 make_utility(Intervall) ->
     %Now = erlang:now(),
     fun (_T, _C) ->   Intervall end.
+
+update_view(OldPreds, OldSuccs, OtherBuffer, RndView, Me, Interval, Churn) ->
+    Buffer=merge(OldSuccs++OldPreds, OtherBuffer++RndView, node:id(Me)),
+    NewSuccs=lists:sublist(Buffer, config:read(succ_list_length)),
+    NewPreds=lists:sublist(lists:reverse(Buffer), config:read(pred_list_length)),
+    update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
+    update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs),
+    NewInterval = new_interval(OldPreds, NewPreds, OldSuccs, NewSuccs, Interval, Churn),
+    NewChurn = has_churn(OldPreds, NewPreds, OldSuccs, NewSuccs),
+    {NewPreds, NewSuccs, NewInterval, NewChurn}.

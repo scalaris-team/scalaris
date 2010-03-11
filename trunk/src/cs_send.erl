@@ -49,6 +49,13 @@
          send_to_group_member/3, send_local/2, make_global/1, is_valid/1,
          get_msg_tag/1]).
 
+-type cookie() :: any().
+-type reg_name() :: atom().
+-type erl_local_pid_plain() :: pid() | reg_name().
+-type erl_local_pid_with_cookie() :: {erl_local_pid_plain(), c, cookie()}.
+-type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_cookie().
+-type erl_pid_plain() :: erl_local_pid_plain() | port() | {reg_name(), node()}.
+
 
 -ifdef(TCP_LAYER).
 -type mypid_plain() :: {inet:ip_address(), integer(), erl_pid_plain()}.
@@ -61,12 +68,6 @@
 -endif.
 
 
--type cookie() :: any().
--type reg_name() :: atom().
--type erl_local_pid_plain() :: pid() | reg_name().
--type erl_local_pid_with_cookie() :: {erl_local_pid_plain(), c, cookie()}.
--type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_cookie().
--type erl_pid_plain() :: erl_local_pid_plain() | port() | {reg_name(), node()}.
 %% -type erl_pid_with_cookie() :: {erl_pid_plain(), c, cookie()}.
 %% -type erl_pid() :: erl_pid_plain() | erl_pid_with_cookie().
 -type mypid_with_cookie() :: {mypid_plain(), c, cookie()}.
