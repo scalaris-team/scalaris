@@ -55,9 +55,9 @@ start_link(InstanceId, _Options) ->
     end.
 
 init(_Args) ->
-    wait_for_valid_pid(),
     cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
     cs_send:send_local(get_pid() , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
+    cs_send:send_local_after(100, self(), {init_timeout}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
     TriggerState2 = Trigger:trigger_first(TriggerState,1),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
@@ -78,6 +78,33 @@ init(_Args) ->
 
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
+on({init_timeout}, {Cache, Node, _Cycles, _TriggerState} = State)->
+    NeedsTimeout = case Cache of
+                       [] ->
+                           cs_send:send_local(get_pid(),
+                                              {get_node_details,
+                                               cs_send:this_with_cookie(pred_succ),
+                                               [pred, succ]}),
+                           true;
+                       _ ->
+                           false
+                   end,
+    NeedsTimeout2 = case Node of
+                        null ->
+                            cs_send:send_local(get_pid(), {get_node_details,
+                                                           cs_send:this_with_cookie(pred_succ),
+                                                           [pred, succ]}),
+                            true;
+                        _ ->
+                            false
+                    end,
+    case NeedsTimeout orelse NeedsTimeout2 of
+        true ->
+            cs_send:send_local_after(100, self(), {init_timeout});
+        false ->
+            ok
+    end,
+    State;
 on({get_ages,Pid},{Cache,Node,Cycles,TriggerState}) ->
     cs_send:send_local(Pid , {ages,cache:ages(Cache)}),
     {Cache,Node,Cycles,TriggerState};
@@ -213,15 +240,4 @@ get_pid() ->
 
 get_base_interval() ->
     config:read(cyclon_interval).
-
-%% @doc wait until our pid is valid
-%% our cs_node will eventually provide one
-wait_for_valid_pid() ->
-    case cs_send:is_valid(cs_send:this()) of
-        true ->
-            ok;
-        false ->
-            timer:sleep(100),
-            wait_for_valid_pid()
-    end.
 
