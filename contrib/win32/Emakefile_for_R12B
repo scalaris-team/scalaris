@@ -30,8 +30,8 @@
   {i, "ebin"},
   {i, "include"},
   {i, "contrib/yaws/include"},
-  {i, "contrib/log4erl/include"}
-
+  {i, "contrib/log4erl/include"},
+  {d, types_not_builtin}
  ]}.
 {"src/comm_layer/*",
  [debug_info,
