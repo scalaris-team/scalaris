@@ -40,7 +40,9 @@
 %% Description: add new Scalaris nodes
 %%--------------------------------------------------------------------
 % @doc add new Scalaris nodes on the local node
--spec(add_nodes/1 :: (integer()) -> ok).
+-spec(add_nodes/1 :: (non_neg_integer()) -> ok).
+add_nodes(0) ->
+    ok;
 add_nodes(Count) ->
     [ begin
           Desc = util:sup_supervisor_desc(randoms:getRandomId(),
