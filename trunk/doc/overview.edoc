@@ -1,74 +1,10 @@
-@author Thorsten Schuett <schuett@zib.de>
-@copyright 2007 Thorsten Schuett
+@copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 @version $Id$
-@title Chord# Implementation
+@title Scalaris
 
 @doc
 == Introduction ==
 
-This is an implementation of Chord#.
-
-== Bootstrapping server ==
-
-The bootstrapping server is used to give new nodes a starting
-point. In maintains a list of nodes which are already a member of the
-overlay.
-
-Processes:
-<ul>
-	<li> {@link boot_server. Bootstrap Server}</li>
-	<li> {@link failuredetector. Failure Detector}</li>
-	<li> {@link boot_logger. Global Logger}</li>
-	<li> {@link boot_collector. Node Statistics Collector}</li>
-	<li> {@link cs_message. Message Statistics Collector}</li>
-	<li> {@link config. Config}</li>
-	<li> YAWS</li>
-</ul>
-
-=== YAWS Server ===
-
-Listens on port 8000 and provides statistics of the running system and exports this documentation.
-
-=== API ===
-
-== Chord# Node ==
-
-The chord# node uses a list of processes supervised by the {@link
-cs_sup. chord# node supervisor}. Currently a chord# node consists of the
-{@link cs_node. chord# main loop} and a {@link
-failuredetector. failure detector}. In the future an {@link
-cs_xmlrpc. xmlrpc interface} will be added.
-
-Processes:
-<ul>
-	<li> {@link cs_node. Chord# Node}(cs_node)
-	<ul>
-		<li>{@link cs_lb. Load Balancing}</li>
-		<li>{@link cs_rt. Routing Table}</li>
-	</ul>
-	</li>
-	<li> {@link failuredetector. Failure Detector}(failure_detector)</li>
-	<li> {@link cs_keyholder. Node Id Holder}(cs_keyholder)</li>
-	<li> {@link cs_message. Message Statistics Collector}(cs_message)</li>
-	<li> {@link config. Config}(config)</li>
-	<li> {@link cs_db_otp. Database}(cs_db)</li>
-</ul>
-
-=== Architecture ===
-
-<img src="architecture.png" alt="architecture.png"></img>
-
-== Environment Variables ==
-
-<ul>
-	<li>CS_PORT</li>
-	<li>CS_INSTANCES</li>
-</ul>
-
-== TODO ==
-
-<ul>
-	<li> drop node needs to be reliable</li>
-	<li> crash node storms need to be investigated</li>
-</ul>
+Scalaris is a distributed key-value store with support for
+transactions.
 
