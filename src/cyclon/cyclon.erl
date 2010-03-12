@@ -55,11 +55,10 @@ start_link(InstanceId, _Options) ->
     end.
 
 init(_Args) ->
-    cs_send:send_local(get_pid() , {get_node, cs_send:this(),2.71828183}),
-    cs_send:send_local(get_pid() , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
+    cs_send:send_local(get_pid() , {get_node_details, cs_send:this(), [node, pred, succ]}),
     cs_send:send_local_after(100, self(), {init_timeout}),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
-    TriggerState2 = Trigger:trigger_first(TriggerState,1),
+    TriggerState2 = Trigger:trigger_first(TriggerState, 1),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
     {[],null,0,TriggerState2}.
 
@@ -71,7 +70,7 @@ init(_Args) ->
 
 % state of cyclon
 %-type(state() :: {cyclon.cache:cache(),null|cs_node(),integer()}).
--type(state() :: {any(),any(),integer()}).
+-type(state() :: {cache:cache(), node:node_type() | null, integer(), any()}).
 
 % accepted messages of cs_node processes
 -type(message() :: any()).
@@ -79,27 +78,13 @@ init(_Args) ->
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
 on({init_timeout}, {Cache, Node, _Cycles, _TriggerState} = State)->
-    NeedsTimeout = case Cache of
-                       [] ->
-                           cs_send:send_local(get_pid(),
-                                              {get_node_details,
-                                               cs_send:this_with_cookie(pred_succ),
-                                               [pred, succ]}),
-                           true;
-                       _ ->
-                           false
-                   end,
-    NeedsTimeout2 = case Node of
-                        null ->
-                            cs_send:send_local(get_pid(), {get_node_details,
-                                                           cs_send:this_with_cookie(pred_succ),
-                                                           [pred, succ]}),
-                            true;
-                        _ ->
-                            false
-                    end,
+    NeedsTimeout = (Cache =:= []),
+    NeedsTimeout2 = (Node =:= null),
     case NeedsTimeout orelse NeedsTimeout2 of
         true ->
+            cs_send:send_local(get_pid(), {get_node_details,
+                                           cs_send:this(),
+                                           [node, pred, succ]}),
             cs_send:send_local_after(100, self(), {init_timeout});
         false ->
             ok
@@ -109,18 +94,20 @@ on({get_ages,Pid},{Cache,Node,Cycles,TriggerState}) ->
     cs_send:send_local(Pid , {ages,cache:ages(Cache)}),
     {Cache,Node,Cycles,TriggerState};
 
-on({get_node_response, 2.71828183, Me},{Cache,null,Cycles,TriggerState}) ->
-    {Cache,Me,Cycles,TriggerState};
-on({{get_node_details_response, NodeDetails}, pred_succ},{_,Node,Cycles,TriggerState}) ->
+on({get_node_details_response, NodeDetails},{_, Node, Cycles, TriggerState}) ->
     Pred = node_details:get(NodeDetails, pred),
     Succ = node_details:get(NodeDetails, succ),
+    Me = case node_details:get(NodeDetails, node) of
+             unknown -> Node;
+             X -> X
+         end,
     case Pred /= Node of
             true ->
-                Cache =  cache:add_list([Pred,Succ], cache:new());
+                Cache =  cache:add_list([Pred, Succ], cache:new());
             false ->
                 Cache =  cache:new()
     end,
-    {Cache,Node,Cycles,TriggerState};
+    {Cache,Me,Cycles,TriggerState};
 
 on({get_subset,all,Pid},{Cache,Node,Cycles,TriggerState}) ->
     cs_send:send_local(Pid , {cache,cache:get_youngest(config:read(cyclon_cache_size),Cache)}),
@@ -139,7 +126,7 @@ on({get_cache,Pid},{Cache,Node,Cycles,TriggerState}) ->
     {Cache,Node,Cycles,TriggerState};
 
 on({flush_cache},{_Cache,Node,_Cycles,TriggerState}) ->
-    cs_send:send_local(get_pid() , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
+    cs_send:send_local(get_pid() , {get_node_details, cs_send:this(), [pred, succ]}),
     {cache:new(),Node,0,TriggerState};
 on({start_shuffling},{Cache,Node,Cycles,TriggerState}) ->
     cs_send:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
@@ -154,8 +141,8 @@ on({'$gen_cast', {debug_info, Requestor}},{Cache,Node,Cycles,TriggerState})  ->
 
 on({trigger},{Cache,null,Cycles,TriggerState}) ->
     %io:format("[ CY ] Trigger on null~n"),
-    TriggerState2 = Trigger:trigger_next(TriggerState,1),
-     {Cache,null,Cycles,TriggerState2};
+    TriggerState2 = Trigger:trigger_next(TriggerState, 1),
+    {Cache,null,Cycles,TriggerState2};
 on({trigger},{Cache,Node,Cycles,TriggerState}) 	->
     NewCache =	case cache:size(Cache) of
                     0 ->
