@@ -81,7 +81,7 @@ end_per_suite(Config) ->
         false ->
             ok;
         {wrapper_pid, Pid} ->
-            unregister(process_dictionary),
+            gen_component:kill(process_dictionary),
             exit(Pid, kill)
     end,
     ok.

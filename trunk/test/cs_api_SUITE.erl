@@ -42,7 +42,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    exit(Pid, kill),
+    unittest_helper:stop_ring(Pid),
     ok.
 
 read(_Config) ->
@@ -53,7 +53,7 @@ read(_Config) ->
 
 write(_Config) ->
     ?equals(cs_api:write("WriteKey", "IsSet"), ok),
-    ?equals(cs_api:read("WriteKey"), "IsSet"), 
+    ?equals(cs_api:read("WriteKey"), "IsSet"),
     ?equals(cs_api:write("WriteKey", "IsSet2"), ok),
     ?equals(cs_api:read("WriteKey"), "IsSet2"),
     ok.

@@ -294,8 +294,8 @@ start(Files, Owner) ->
 
 loop() ->
     receive
-	_ ->
-	    loop()
+        _ ->
+            loop()
     end.
 
 %@private

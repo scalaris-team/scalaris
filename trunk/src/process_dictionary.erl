@@ -232,7 +232,9 @@ start() ->
 %@private
 init(_Args) ->
     ets:new(?MODULE, [set, protected, named_table]),
-    %process_flag(trap_exit, true),
+    % required to gracefully eliminate dead, but registered processes from
+    % the ets-table
+    process_flag(trap_exit, true),
     State = null,
     State.
 

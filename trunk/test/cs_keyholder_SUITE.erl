@@ -49,7 +49,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    %unregister(process_dictionary),
+    gen_component:kill(process_dictionary),
     exit(Pid, kill),
     ok.
 

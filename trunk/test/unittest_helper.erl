@@ -66,6 +66,7 @@ stop_ring(Pid) ->
             exit(Pid, kill),
             timer:sleep(1000),
             wait_for_process_to_die(Pid),
+            gen_component:kill(process_dictionary),
             wait_for_table_to_disappear(process_dictionary),
             timer:sleep(10000),
             ok
