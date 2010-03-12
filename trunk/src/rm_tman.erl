@@ -47,7 +47,7 @@ start_link(InstanceId) ->
     start_link(InstanceId, []).
 
 start_link(InstanceId,Options) ->
-    gen_component:start_link(?MODULE:new(Trigger), [InstanceId, Options], [{register, InstanceId, ring_maintenance}]).
+    gen_component:start_link(THIS, [InstanceId, Options], [{register, InstanceId, ring_maintenance}]).
 
 init(_Args) ->
     log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [self()]),
@@ -76,7 +76,7 @@ on({init, Id, Me, Predecessor, SuccList}, uninit) ->
     ring_maintenance:update_preds_and_succs([Predecessor], SuccList),
     fd:subscribe(lists:usort([node:pidX(Node) || Node <- [Predecessor | SuccList]])),
     cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
     {Id, Me, [Predecessor], SuccList, config:read(cyclon_cache_size),
      config:stabilizationInterval_min(), TriggerState2, [], true};

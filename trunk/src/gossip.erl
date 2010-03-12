@@ -124,7 +124,7 @@ msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
 -spec init([any()]) -> full_state().
 init([_InstanceId, []]) ->
 %%     io:format("gossip start ~n"),
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState, 1),
 	PreviousState = gossip_state:new_state(),
 	State = gossip_state:new_state(),
@@ -133,7 +133,7 @@ init([_InstanceId, []]) ->
 %% @doc starts the gossip module and returns its pid for use by a supervisor
 -spec start_link(term()) -> {ok, pid()}.
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE:new(Trigger), [InstanceId, []], [{register, InstanceId, gossip}]).
+    gen_component:start_link(THIS, [InstanceId, []], [{register, InstanceId, gossip}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop

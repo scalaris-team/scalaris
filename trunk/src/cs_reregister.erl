@@ -32,13 +32,13 @@
 
 
 start_link(InstanceId) ->
-   gen_component:start_link(?MODULE:new(Trigger), [], [{register, InstanceId, cs_reregister}]).
+   gen_component:start_link(THIS, [], [{register, InstanceId, cs_reregister}]).
 
 init(_Args_) ->
     uninit.
 
 on({go},uninit) ->
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState,1),
     TriggerState2;
 on(_,uninit) ->
