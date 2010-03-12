@@ -130,13 +130,13 @@ on(_, _State) ->
 -spec(init/1 :: ([any()]) -> vivaldi:state()).
 init([_InstanceId, []]) ->
     %io:format("vivaldi start ~n"),
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState,1),
     {random_coordinate(), 1.0,TriggerState2}.
 
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE:new(Trigger), [InstanceId, []], [{register, InstanceId, vivaldi}]).
+    gen_component:start_link(THIS, [InstanceId, []], [{register, InstanceId, vivaldi}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers

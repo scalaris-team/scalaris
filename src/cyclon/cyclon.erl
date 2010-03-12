@@ -49,7 +49,7 @@ start_link(InstanceId) ->
 start_link(InstanceId, _Options) ->
     case config:read(cyclon_enable) of
         true ->
-             gen_component:start_link(?MODULE:new(Trigger), [InstanceId], [{register, InstanceId, cyclon}]);
+             gen_component:start_link(THIS, [InstanceId], [{register, InstanceId, cyclon}]);
         _ ->
             ignore
     end.
@@ -57,7 +57,7 @@ start_link(InstanceId, _Options) ->
 init(_Args) ->
     cs_send:send_local(get_pid() , {get_node_details, cs_send:this(), [node, pred, succ]}),
     cs_send:send_local_after(100, self(), {init_timeout}),
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState, 1),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
     {[],null,0,TriggerState2}.

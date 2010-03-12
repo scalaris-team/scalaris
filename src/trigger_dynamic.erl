@@ -28,7 +28,7 @@
 %%% of itself (including the trigger) and tell it to send the first message,
 %%% e.g. by calling this (and storing the TriggerState2 for later use):
 %%% <p><code>
-%%%  TriggerState = Trigger:init(?MODULE:new(Trigger)),<br />
+%%%  TriggerState = Trigger:init(THIS),<br />
 %%%  TriggerState2 = Trigger:trigger_first(TriggerState, TriggerFun)
 %%% </code></p>
 %%% Then on each received <code>{trigger}</code> message, the trigger needs to

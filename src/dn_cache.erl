@@ -43,7 +43,7 @@ start_link(InstanceId) ->
     start_link(InstanceId, []).
 
 start_link(InstanceId,Options) ->
-   gen_component:start_link(?MODULE:new(Trigger), [InstanceId, Options], [{register, InstanceId, dn_cache}]).
+   gen_component:start_link(THIS, [InstanceId, Options], [{register, InstanceId, dn_cache}]).
 
 
 
@@ -63,7 +63,7 @@ unsubscribe() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init(_ARG) ->
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState,1),
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
 	{fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new(),TriggerState2}.

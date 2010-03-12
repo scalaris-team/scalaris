@@ -57,13 +57,13 @@
 %% @spec start_link(term()) -> {ok, pid()}
 -spec(start_link/1 :: (any()) -> {ok, pid()}).
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE:new(Trigger), [], [{register, InstanceId,routing_table} ]).
+    gen_component:start_link(THIS, [], [{register, InstanceId,routing_table} ]).
 
 -spec(init/1 :: ([any()]) -> state()).
 init(_Args) ->
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    TriggerState = Trigger:init(?MODULE:new(Trigger)),
+    TriggerState = Trigger:init(THIS),
     {uninit, TriggerState}.
     
 
