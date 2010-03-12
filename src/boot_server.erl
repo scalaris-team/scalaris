@@ -37,12 +37,11 @@
 
 -export([init/1, on/2]).
 
--ifdef(types_are_builtin).
--type(boot_node_list()::gb_set()).
--else.
--type(boot_node_list()::gb_sets:gb_set()).
+-ifdef(types_not_builtin).
+-type gb_set() :: gb_sets:gb_set().
 -endif.
 
+-type(boot_node_list()::gb_set()).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

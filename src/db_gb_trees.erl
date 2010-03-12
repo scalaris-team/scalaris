@@ -32,13 +32,12 @@
 
 -import(ct).
 
--type(key()::database:key()).
-
--ifdef(types_are_builtin).
--type(db()::gb_tree()).
--else.
--type(db()::gb_trees:gb_tree()).
+-ifdef(types_not_builtin).
+-type gb_tree() :: gb_trees:gb_tree().
 -endif.
+
+-type(key()::database:key()).
+-type(db()::gb_tree()).
 
 -export([start_link/1,
 	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 
