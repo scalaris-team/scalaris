@@ -49,6 +49,10 @@
          send_to_group_member/3, send_local/2, make_global/1, is_valid/1,
          get_msg_tag/1]).
 
+-ifdef(types_not_builtin).
+-type reference() :: erlang:reference().
+-endif.
+
 -type cookie() :: any().
 -type reg_name() :: atom().
 -type erl_local_pid_plain() :: pid() | reg_name().

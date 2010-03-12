@@ -37,17 +37,16 @@
 % stabilize for Chord
 -export([stabilize/5]).
 
+-ifdef(types_not_builtin).
+-type gb_tree() :: gb_trees:gb_tree().
+-type dict() :: dict:dictionary()).
+-endif.
+
 %% userdevguide-begin rt_chord:types
 -type(key()::pos_integer()).
--ifdef(types_are_builtin).
 -type(rt()::gb_tree()).
 -type(external_rt()::gb_tree()).
 -type(dict_type() :: dict()).
--else.
--type(rt()::gb_trees:gb_tree()).
--type(external_rt()::gb_trees:gb_tree()).
--type(dict_type() :: dict:dictionary()).
--endif.
 -type(index() :: {pos_integer(), pos_integer()}).
 
 -type(state()::rt()).

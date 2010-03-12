@@ -2608,10 +2608,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  GBTREESISBUILTIN=", {d, types_are_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is a built-in type" >&5
+  GBTREESISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is a built-in type" >&5
 $as_echo "$as_me: gb_tree() is a built-in type" >&6;}
 else
-  GBTREESISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is not built-in" >&5
+  GBTREESISBUILTIN=", {d, types_not_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is not built-in" >&5
 $as_echo "$as_me: gb_tree() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \

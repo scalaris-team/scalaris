@@ -78,8 +78,8 @@ AC_CHECK_FILE($ac_cv_erlang_lib_dir_common_test/priv/bin/run_test, , AC_MSG_NOTI
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
-       [GBTREESISBUILTIN=", {d, types_are_builtin}"; AC_MSG_NOTICE([gb_tree() is a built-in type])],
-       [GBTREESISBUILTIN=""; AC_MSG_NOTICE([gb_tree() is not built-in])])
+       [GBTREESISBUILTIN=""; AC_MSG_NOTICE([gb_tree() is a built-in type])],
+       [GBTREESISBUILTIN=", {d, types_not_builtin}"; AC_MSG_NOTICE([gb_tree() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [crypto:start()])],

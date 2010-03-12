@@ -35,17 +35,16 @@
 
 -behaviour(routingtable).
 
+-ifdef(types_not_builtin).
+-type gb_tree() :: gb_trees:gb_tree().
+-endif.
+
 %% userdevguide-begin rt_simple:types
 % @type key(). Identifier.
 -type(key()::pos_integer()).
 % @type rt(). Routing Table.
--ifdef(types_are_builtin).
 -type(rt()::{node:node_type(), gb_tree()}).
 -type(external_rt()::{node:node_type(), gb_tree()}).
--else.
--type(rt()::{node:node_type(), gb_trees:gb_tree()}).
--type(external_rt()::{node:node_type(), gb_trees:gb_tree()}).
--endif.
 %% userdevguide-end rt_simple:types
 
 %% userdevguide-begin rt_simple:empty

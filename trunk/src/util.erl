@@ -34,6 +34,10 @@
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 
+-ifdef(types_not_builtin).
+-type gb_tree() :: gb_trees:gb_tree().
+-endif.
+
 parameterized_start_link(Module, Parameters) ->
     apply(Module, start_link, Parameters).
 
@@ -260,11 +264,7 @@ shuffle(List, Acc, Size) ->
     {Leading, [H | T]} = lists:split(random:uniform(length(List)) - 1, List),
     shuffle(Leading ++ T, [H | Acc], Size - 1).
 
--ifdef(types_are_builtin).
 -spec(gb_trees_largest_smaller_than/2 :: (any(), gb_tree()) -> {value, any(), any()} | nil).
--else.
--spec(gb_trees_largest_smaller_than/2 :: (any(), gb_trees:gb_tree()) -> {value, any(), any()} | nil).
--endif.
 gb_trees_largest_smaller_than(_Key, {0, _Tree}) ->
     nil;
 gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree} = Tree) ->
@@ -292,11 +292,7 @@ largest_smaller_than_iter(MyKey, {Key, Value, Smaller, Bigger}) ->
             largest_smaller_than_iter(MyKey, Smaller)
     end.
 
--ifdef(types_are_builtin).
 -spec(gb_trees_foldl/3 :: (any(), any(), gb_tree()) -> any()).
--else.
--spec(gb_trees_foldl/3 :: (any(), any(), gb_trees:gb_tree()) -> any()).
--endif.
 gb_trees_foldl(_F, Accu, {0, _Tree}) ->
     Accu;
 gb_trees_foldl(F, Accu, {_, Tree}) ->
