@@ -31,7 +31,6 @@
   {i, "include"},
   {i, "contrib/yaws/include"},
   {i, "contrib/log4erl/include"}
-  , {d, types_are_builtin}
  ]}.
 {"src/comm_layer/*",
  [debug_info,
