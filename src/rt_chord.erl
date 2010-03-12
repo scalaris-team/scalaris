@@ -39,7 +39,7 @@
 
 -ifdef(types_not_builtin).
 -type gb_tree() :: gb_trees:gb_tree().
--type dict() :: dict:dictionary()).
+-type dict() :: dict:dictionary().
 -endif.
 
 %% userdevguide-begin rt_chord:types
