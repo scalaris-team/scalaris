@@ -125,7 +125,7 @@ msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
 init([_InstanceId, []]) ->
 %%     io:format("gossip start ~n"),
     TriggerState = Trigger:init(?MODULE:new(Trigger)),
-    TriggerState2 = Trigger:trigger_first(TriggerState,1),
+    TriggerState2 = Trigger:trigger_first(TriggerState, 1),
 	PreviousState = gossip_state:new_state(),
 	State = gossip_state:new_state(),
     {PreviousState, State, [], TriggerState2}.
@@ -145,7 +145,7 @@ on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received continuously when the Trigger calls
 	% see gossip_trigger and gossip_interval in the scalaris.cfg file
 %% 	io:format("{trigger_gossip}: ~p~n", [State]),
-    NewTriggerState = Trigger:trigger_next(TriggerState,1),
+    NewTriggerState = Trigger:trigger_next(TriggerState, 1),
 	NewState = gossip_state:inc_triggered(State),
 	% request a check whether we are the leader and can thus decide whether to
 	% start a new round
