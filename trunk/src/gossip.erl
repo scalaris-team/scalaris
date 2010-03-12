@@ -75,8 +75,8 @@
 -export([on/2, init/1, get_base_interval/0]).
 
 % helpers for creating getter messages:
--export([get_values_best/0,
-		 get_values_all/0
+-export([get_values_best/0, get_values_best/1,
+		 get_values_all/0, get_values_all/1
 ]).
 
 -type(load() :: integer()).
@@ -615,23 +615,40 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 % Getters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Sends a message to the gossip process of the requesting processes group
-%%      asking for the best values of the stored information.
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for the best values of the stored information.
 %%      see on({get_values_best, SourcePid}, FullState) and
 %%      msg_get_values_best_response/2
 -spec get_values_best() -> ok.
 get_values_best() ->
-	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_values_best, cs_send:this()}).
+    get_values_best(cs_send:this()).
 
-%% @doc Sends a message to the gossip process of the requesting processes group
-%%      asking for all stored information.
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for the best values of the stored information to
+%%      be send to Pid.
+%%      see on({get_values_best, SourcePid}, FullState) and
+%%      msg_get_values_best_response/2
+-spec get_values_best(cs_send:erl_local_pid()) -> ok.
+get_values_best((Pid)) ->
+    cs_send:send_local(process_dictionary:get_group_member(gossip),
+        {get_values_best, (Pid)}).
+
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for all stored information.
 %%      see on({get_values_all, SourcePid}, FullState) and
 %%      msg_get_values_all_response/4
 -spec get_values_all() -> ok.
 get_values_all() ->
-	cs_send:send_local(process_dictionary:get_group_member(gossip),
-		{get_values_all, cs_send:this()}).
+    get_values_all(cs_send:this()).
+
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for all stored information to be send to Pid.
+%%      see on({get_values_all, SourcePid}, FullState) and
+%%      msg_get_values_all_response/4
+-spec get_values_all(cs_send:erl_local_pid()) -> ok.
+get_values_all(Pid) ->
+    cs_send:send_local(process_dictionary:get_group_member(gossip),
+        {get_values_all, Pid}).
 
 %% @doc Returns the previous state if the current state has not sufficiently
 %%      converged yet otherwise returns the current state.

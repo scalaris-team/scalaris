@@ -45,9 +45,9 @@
 -include("transstore/trecords.hrl").
 -include("../include/scalaris.hrl").
 
--export([send/2, send_local_after/3 , this/0, this_with_cookie/1, get/2,
-         send_to_group_member/3, send_local/2, make_global/1, is_valid/1,
-         get_msg_tag/1]).
+-export([send/2, send_local_after/3 , this/0, get/2, send_to_group_member/3,
+         send_local/2, make_global/1, is_valid/1, get_msg_tag/1,
+         this_with_cookie/1, self_with_cookie/1]).
 
 -ifdef(types_not_builtin).
 -type reference() :: erlang:reference().
@@ -98,11 +98,18 @@
 send_to_group_member(DestNode, Processname, Mesg) ->
     send(DestNode, {send_to_group_member, Processname, Mesg}).
 
-%% @doc Encapsulates the current process' pid (as returned by this/1) and the
-%%      the given cookie for seamless use of cookies.
+%% @doc Encapsulates the current process' pid (as returned by this/0) and the
+%%      given cookie for seamless use of cookies with send/2.
 -spec this_with_cookie(any()) -> mypid_with_cookie().
 this_with_cookie(Cookie) ->
     {this(), c, Cookie}.
+
+%% @doc Encapsulates the current process' pid (as returned by self/0) and the
+%%      given cookie for seamless use of cookies with send_local/2 and
+%%      send_local_after/3.
+-spec self_with_cookie(any()) -> erl_local_pid_with_cookie().
+self_with_cookie(Cookie) ->
+    {self(), c, Cookie}.
 
 %% @doc Converts a local erlang pid to a global pid of type mypid() for use in
 %%      send/2.
