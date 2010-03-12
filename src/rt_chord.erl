@@ -241,4 +241,4 @@ update_pred_succ_in_cs_node(Pred, Succ, RT) ->
 -spec(to_html/1 :: (rt()) -> list()).
 to_html(RT) ->
     List = [ {1, Value} || {Key, Value} <- gb_trees:to_list(RT)],
-    io_lib:format("~p", [List]).
+    List.

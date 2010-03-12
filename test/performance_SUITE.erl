@@ -103,7 +103,7 @@ process_dictionary(_Config) ->
                           process_dictionary:lookup_process(?MODULE,
                                                             "process_dictionary")
                   end, "lookup_process"),
-    %exit(Pid, kill),
+    gen_component:kill(process_dictionary),
     unregister(process_dictionary),
     ok.
 
