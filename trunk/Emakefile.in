@@ -39,6 +39,7 @@
   {i, "contrib/log4erl/include"}
   @GBTREESISBUILTIN@
   @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/comm_layer/*",
  [debug_info,

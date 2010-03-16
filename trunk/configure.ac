@@ -87,6 +87,11 @@ AC_RUN_IFELSE(
        [TERMISBUILTIN=", {d, term_not_builtin}"; AC_MSG_NOTICE([term() is not built-in])])
 
 AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::node()).], [ok])],
+       [NODEISBUILTIN=""; AC_MSG_NOTICE([node() is a built-in type])],
+       [NODEISBUILTIN=", {d, node_not_builtin}"; AC_MSG_NOTICE([node() is not built-in])])
+
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [crypto:start()])],
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])

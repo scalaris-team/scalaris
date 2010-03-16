@@ -73,3 +73,7 @@
 -ifdef(term_not_builtin).
 -type term() :: any().
 -endif.
+
+-ifdef(node_not_builtin).
+-type node() :: atom().
+-endif.
