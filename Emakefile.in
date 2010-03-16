@@ -3,19 +3,35 @@
   {outdir, "ebin"},
   {i, "include"},
   {i, "contrib/yaws/include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/trigger.erl",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"},
   {i, "contrib/yaws/include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
-{"src/simulation/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.
+{"src/simulation/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
+ ]}.
 {"src/ring_maintenance.erl",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"},
   {i, "contrib/yaws/include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/routingtable.erl",
  [debug_info,
@@ -23,12 +39,18 @@
   {i, "include"},
   {i, "src"},
   {i, "contrib/yaws/include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/database.erl",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"},
   {i, "contrib/yaws/include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/*",
  [debug_info,
@@ -45,31 +67,49 @@
  [debug_info,
   {outdir, "ebin"},
   {i, "include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/simulation/*",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/cyclon/*",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/pubsub/*",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"src/transstore/*",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"test/*",
  [debug_info,
   {outdir, "test"},
   {i, "include"}
+  @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
+  @NODEISBUILTIN@
  ]}.
 {"contrib/log4erl/src/*",
  [debug_info,
