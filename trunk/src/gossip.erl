@@ -67,6 +67,8 @@
 
 -behaviour(gen_component).
 
+-include("../include/scalaris.hrl").
+
 %% -define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), request_leader_debug_output()).
 -define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), ok).
 

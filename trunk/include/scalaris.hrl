@@ -69,3 +69,7 @@
 % enable detailed time logging in cs_api (jsonrpc)
 %-define(LOG_CS_API(Timer, Time), monitor_timing:log(Timer, Time)).
 -define(LOG_CS_API(Timer, Time), ok).
+
+-ifdef(term_not_builtin).
+-type term() :: any().
+-endif.
