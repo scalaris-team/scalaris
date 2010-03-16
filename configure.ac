@@ -98,6 +98,7 @@ AC_RUN_IFELSE(
 
 AC_SUBST(GBTREESISBUILTIN)
 AC_SUBST(TERMISBUILTIN)
+AC_SUBST(NODEISBUILTIN)
 
 ###########################################################
 #
