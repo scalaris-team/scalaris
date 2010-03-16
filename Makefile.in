@@ -61,7 +61,7 @@ compile:
 
 
 test: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test $(UNITTESTARGS) @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec
 
 %_SUITE: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@
