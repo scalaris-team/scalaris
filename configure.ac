@@ -82,11 +82,17 @@ AC_RUN_IFELSE(
        [GBTREESISBUILTIN=", {d, types_not_builtin}"; AC_MSG_NOTICE([gb_tree() is not built-in])])
 
 AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::term()).], [ok])],
+       [TERMISBUILTIN=""; AC_MSG_NOTICE([term() is a built-in type])],
+       [TERMISBUILTIN=", {d, term_not_builtin}"; AC_MSG_NOTICE([term() is not built-in])])
+
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [crypto:start()])],
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
 AC_SUBST(GBTREESISBUILTIN)
+AC_SUBST(TERMISBUILTIN)
 
 ###########################################################
 #

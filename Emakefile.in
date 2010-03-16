@@ -38,6 +38,7 @@
   {i, "contrib/yaws/include"},
   {i, "contrib/log4erl/include"}
   @GBTREESISBUILTIN@
+  @TERMISBUILTIN@
  ]}.
 {"src/comm_layer/*",
  [debug_info,
