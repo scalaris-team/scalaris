@@ -48,14 +48,14 @@
 %% {Cache, Node, Cycles, Trigger, TriggerState}
 %% Node: the scalaris node of this cyclon-task
 %% Cycles: the amount of shuffle-cycles
--type(state() :: {cache:cache(), node:node_type() | null, integer(), module(), any()}).
+-type(state() :: {cyclon_cache:cache(), node:node_type() | null, integer(), module(), any()}).
 
 % accepted messages of cs_node processes
 -type(message() ::
     {trigger} |
     {check_state} |
-    {cy_subset, cs_send:mypid(), cache:cache()} |
-    {cy_subset_response, cache:cache(), cache:cache()} |
+    {cy_subset, cs_send:mypid(), cyclon_cache:cache()} |
+    {cy_subset_response, cyclon_cache:cache(), cyclon_cache:cache()} |
     {get_node_details_response, node_details:node_details_record() |
         [{pred, node_details:node_type()} |
          {node, node_details:node_type()} |
@@ -69,12 +69,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends a response message to a request for the ages in the cache.
--spec msg_get_ages_response(cs_send:erl_local_pid(), [cache:age()]) -> ok.
+-spec msg_get_ages_response(cs_send:erl_local_pid(), [cyclon_cache:age()]) -> ok.
 msg_get_ages_response(Pid, Ages) ->
     cs_send:send_local(Pid, {cy_ages, Ages}).
 
 %% @doc Sends a response message to a request for (a subset of) the cache.
--spec msg_get_subset_response(cs_send:erl_local_pid(), [cache:age()]) -> ok.
+-spec msg_get_subset_response(cs_send:erl_local_pid(), [cyclon_cache:age()]) -> ok.
 msg_get_subset_response(Pid, Cache) ->
     cs_send:send_local(Pid, {cy_cache, Cache}).
 
@@ -159,7 +159,7 @@ init([Trigger]) ->
     TriggerState = Trigger:init(?MODULE),
     TriggerState2 = Trigger:trigger_first(TriggerState, 1),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
-    {cache:new(), null, 0, Trigger, TriggerState2}.
+    {cyclon_cache:new(), null, 0, Trigger, TriggerState2}.
 
 %% @doc message handler
 -spec(on/2 :: (message(), state()) -> state()).
@@ -179,15 +179,15 @@ on({check_state}, State) ->
 on({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, Trigger, TriggerState}) ->
     %io:format("subset~n", []),
     % this is received at node Q -> integrate results of node P
-    ForSend = cache:get_random_subset(get_shuffle_length(), Cache),
+    ForSend = cyclon_cache:get_random_subset(get_shuffle_length(), Cache),
     cs_send:send(SourcePid, {cy_subset_response, ForSend, PSubset}),
-    NewCache = cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
+    NewCache = cyclon_cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
     {NewCache, Node, Cycles, Trigger, TriggerState};
 
 on({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, Trigger, TriggerState}) ->
     %io:format("subset_response~n", []),
     % this is received at node P -> integrate results of node Q
-    NewCache = cache:merge(Cache, Node, QSubset, PSubset, get_cache_size()),
+    NewCache = cyclon_cache:merge(Cache, Node, QSubset, PSubset, get_cache_size()),
     {NewCache, Node, Cycles, Trigger, TriggerState};
 
 on({get_node_details_response, NodeDetails}, {_, Node, Cycles, Trigger, TriggerState}) ->
@@ -198,30 +198,30 @@ on({get_node_details_response, NodeDetails}, {_, Node, Cycles, Trigger, TriggerS
              X -> X
          end,
     Cache = case Pred =/= Node of
-            true  -> cache:new(Pred, Succ);
-            false -> cache:new()
+            true  -> cyclon_cache:new(Pred, Succ);
+            false -> cyclon_cache:new()
     end,
     {Cache, Me, Cycles, Trigger, TriggerState};
 
 on({get_ages, Pid}, {Cache, _Node, _Cycles, _Trigger, _TriggerState} = State) ->
-    msg_get_ages_response(Pid, cache:get_ages(Cache)),
+    msg_get_ages_response(Pid, cyclon_cache:get_ages(Cache)),
     State;
 
 on({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _Trigger, _TriggerState} = State) ->
-    msg_get_subset_response(Pid, cache:get_random_nodes(N, Cache)),
+    msg_get_subset_response(Pid, cyclon_cache:get_random_nodes(N, Cache)),
     State;
 
 %% on({flush_cache}, {_Cache, Node, _Cycles, Trigger, TriggerState}) ->
 %%     request_node_details([pred, succ]),
-%%     {cache:new(), Node, 0, Trigger, TriggerState};
+%%     {cyclon_cache:new(), Node, 0, Trigger, TriggerState};
 %% on({start_shuffling}, {Cache, _Node, _Cycles, _Trigger, _TriggerState} = State) ->
 %%     cs_send:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
 %%     State;
 
 on({'$gen_cast', {debug_info, Requestor}}, {Cache, _Node, _Cycles, _Trigger, _TriggerState} = State)  ->
-    DebugCache = cache:debug_format_by_age(Cache),
+    DebugCache = cyclon_cache:debug_format_by_age(Cache),
     KeyValueList =
-        [{"cache_size",          cache:size(Cache)},
+        [{"cache_size",          cyclon_cache:size(Cache)},
          {"cache (age, node):",              ""} | DebugCache],
     cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
@@ -231,19 +231,19 @@ on(_, _State) ->
 
 %% @doc enhanced shuffle with age
 enhanced_shuffle(Cache, Node) ->
-    Cache_1 = cache:inc_age(Cache),
-    {NewCache, NodeQ} = cache:pop_oldest_node(Cache_1),
-    Subset = cache:get_random_subset(get_shuffle_length() - 1, NewCache),
-    ForSend = cache:add_node(Node, 0, Subset),
+    Cache_1 = cyclon_cache:inc_age(Cache),
+    {NewCache, NodeQ} = cyclon_cache:pop_oldest_node(Cache_1),
+    Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
+    ForSend = cyclon_cache:add_node(Node, 0, Subset),
     %io:format("~p",[length(ForSend)]),
     cs_send:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, cs_send:this(), ForSend}),
     NewCache.
 
 %% @doc simple shuffle without age
 simple_shuffle(Cache, Node) ->
-    {NewCache, NodeQ} = cache:pop_random_node(Cache),
-    Subset = cache:get_random_subset(get_shuffle_length() - 1, NewCache),
-    ForSend = cache:add_node(Node, 0, Subset),
+    {NewCache, NodeQ} = cyclon_cache:pop_random_node(Cache),
+    Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
+    ForSend = cyclon_cache:add_node(Node, 0, Subset),
     %io:format("~p",[length(ForSend)]),
     cs_send:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, cs_send:this(), ForSend}),
     NewCache.
@@ -265,7 +265,7 @@ check_state({Cache, Node, _Cycles, _Trigger, _TriggerState} = _State) ->
     % if the own node is unknown or the cache is empty (it should at least
     % contain the nodes predecessor and successor), request this information
     % from the local cs_node
-    NeedsInfo1 = case cache:size(Cache) of
+    NeedsInfo1 = case cyclon_cache:size(Cache) of
                      0 -> [pred, succ];
                      _ -> []
                  end,
