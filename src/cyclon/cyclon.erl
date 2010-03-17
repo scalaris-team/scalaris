@@ -144,18 +144,12 @@ get_subset_rand_next_interval(N, Pid) ->
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Starts the cyclon process if enabled (see cyclon_enable in
-%%      scalaris.cfg), registers it with the process dictionary and returns its
-%%      pid for use by a supervisor.
+%% @doc Starts the cyclon process, registers it with the process dictionary and
+%%      returns its pid for use by a supervisor.
 -spec start_link(term()) -> {ok, pid()} | ignore.
 start_link(InstanceId) ->
-    case config:read(cyclon_enable) of
-        true ->
-            Trigger = config:read(cyclon_trigger),
-            gen_component:start_link(?MODULE, [Trigger], [{register, InstanceId, cyclon}]);
-        _ ->
-            ignore
-    end.
+    Trigger = config:read(cyclon_trigger),
+    gen_component:start_link(?MODULE, [Trigger], [{register, InstanceId, cyclon}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init([module(),...]) -> state().
