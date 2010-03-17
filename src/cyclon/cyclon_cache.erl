@@ -13,7 +13,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    cache.erl
+%%% File    cyclon_cache.erl
 %%% @author Christian Hennig <hennig@zib.de>
 %%% @doc    Cyclon node cache implementation using a list.
 %%% @end
@@ -21,7 +21,7 @@
 %%%-------------------------------------------------------------------
 %% @version $Id$
 
--module(cache).
+-module(cyclon_cache).
 -author('hennig@zib.de').
 -vsn('$Id $ ').
 
@@ -66,7 +66,7 @@ get_random_node(Cache) ->
 %% @doc Returns a random element (node and age) from the cache.
 -spec get_random_element(cache()) -> element().
 get_random_element(Cache) ->
-    Size = cache:size(Cache),
+    Size = cyclon_cache:size(Cache),
     N = randoms:rand_uniform(0, Size) + 1,
     % picks nth element of state
     lists:nth(N, Cache).
@@ -75,7 +75,7 @@ get_random_element(Cache) ->
 %%      resulting cache and the removed node.
 -spec pop_random_node([Cache::element(),...]) -> {NewCache::cache(), PoppedNode::node_details:node_type()}.
 pop_random_node(Cache) ->
-    pop_random_node(Cache, cache:size(Cache)).
+    pop_random_node(Cache, cyclon_cache:size(Cache)).
 
 %% @doc Removes a random element from the (non-empty!) cache and returns the
 %%      resulting cache and the removed node.
@@ -97,18 +97,18 @@ pop_random_element(Cache, CacheSize) ->
 %% @doc Returns a random subset of size N elements from the cache.
 -spec get_random_subset(N::non_neg_integer(), Cache::cache()) -> RandomSubset::cache().
 get_random_subset(0, _Cache) ->
-    % having this special case here prevents unnecessary calls to cache:size()
+    % having this special case here prevents unnecessary calls to cyclon_cache:size()
     new();
 get_random_subset(N, Cache) ->
-    get_random_subset_helper(N, new(), Cache, cache:size(Cache), fun pop_random_element/2).
+    get_random_subset_helper(N, new(), Cache, cyclon_cache:size(Cache), fun pop_random_element/2).
 
 %% @doc Returns a random subset of size N nodes from the cache.
 -spec get_random_nodes(N::non_neg_integer(), Cache::cache()) -> Nodes::[node_details:node_type()].
 get_random_nodes(0, _Cache) ->
-    % having this special case here prevents unnecessary calls to cache:size()
+    % having this special case here prevents unnecessary calls to cyclon_cache:size()
     [];
 get_random_nodes(N, Cache) ->
-    get_random_subset_helper(N, new(), Cache, cache:size(Cache), fun pop_random_node/2).
+    get_random_subset_helper(N, new(), Cache, cyclon_cache:size(Cache), fun pop_random_node/2).
 
 %% @doc Extracts a random element one-by-one from the Cache until a Subset of
 %%      size N is created or all elements of the cache have been taken.
@@ -171,7 +171,7 @@ get_nodes(Cache) ->
 %%      replace/5.
 -spec merge(MyCache::cache(), MyNode::node_details:node_type(), ReceivedCache::cache(), SendCache::cache(), TargetSize::pos_integer()) -> NewCache::cache().
 merge(MyCache, MyNode, ReceivedCache, SendCache, TargetSize) ->
-    MyCacheSize = cache:size(MyCache),
+    MyCacheSize = cyclon_cache:size(MyCache),
     ReceivedCache_Filtered =
         [Elem || {Node, _Age} = Elem <- ReceivedCache,
                  not contains_node(Node, MyCache),
@@ -224,14 +224,14 @@ fillup(MyCache, [Elem | Rest] = _ReceivedCache, ToAddCount, AddedElements) ->
 replace([] = _MyCache, MyCacheSize, ReceivedCache, _SendCache, TargetSize) ->
     % the cache size (although otherwise not needed) should still be correct:
     0 = MyCacheSize,
-    trim(ReceivedCache, cache:size(ReceivedCache), TargetSize);
+    trim(ReceivedCache, cyclon_cache:size(ReceivedCache), TargetSize);
 
 replace(MyCache, _MyCacheSize, [], _SendCache, _TargetSize) ->
     MyCache;
 replace(MyCache, MyCacheSize, ReceivedCache, [] = _SendCache, TargetSize) ->
     % trim MyCache so it has enough space for all elements of ReceivedCache
     % and add all received elements
-    ReceivedCacheSize = cache:size(ReceivedCache),
+    ReceivedCacheSize = cyclon_cache:size(ReceivedCache),
     MyC1 = trim(MyCache, MyCacheSize, TargetSize - ReceivedCacheSize),
     MyC2 = MyC1 ++ ReceivedCache,
     MyC2;
@@ -243,9 +243,9 @@ replace(MyCache, _MyCacheSize, ReceivedCache, SendCache, TargetSize) ->
         lists:partition(
           fun({Node, _Age}) -> not contains_node(Node, SendCache) end,
           MyCache),
-    MyC1Size = cache:size(MyC1),
+    MyC1Size = cyclon_cache:size(MyC1),
     % trim MyC1 so it has enough space for all elements of ReceivedCache
-    ReceivedCacheSize = cache:size(ReceivedCache),
+    ReceivedCacheSize = cyclon_cache:size(ReceivedCache),
     MyC2 = trim(MyC1, MyC1Size, TargetSize - ReceivedCacheSize),
     MyC2Size = util:min(MyC1Size, TargetSize - ReceivedCacheSize),
     % add all received elements to MyC2
@@ -284,7 +284,7 @@ remove_node(Node, Cache) ->
 %%      entries as long as the cache is larger than the given TargetSize.
 -spec trim(Cache::cache(), TargetSize::pos_integer()) -> NewCache::cache().
 trim(Cache, TargetSize) ->
-    trim(Cache, cache:size(Cache), TargetSize).
+    trim(Cache, cyclon_cache:size(Cache), TargetSize).
 
 %% @doc Returns a list of keys (ages) and string values (nodes) for debug output
 %%      used in the web interface.
