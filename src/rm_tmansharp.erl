@@ -130,7 +130,7 @@ on({get_predlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,Akt
 on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) -> % new stabilization interval
               
             % Triger an update of the Random view
-            cs_send:send_local(get_cyclon_pid() , {get_subset_max_age,RandViewSize,self()}),
+            cyclon:get_subset_rand(RandViewSize),
             RndView=get_RndView(RandViewSize,RandomCache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
 			P =selectPeer(rank(View++RndView,node:id(Me)),Me),
@@ -147,7 +147,7 @@ on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,Ak
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
 on({stabilize,_},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({cache,NewCache},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,_RandomCache}) ->
+on({cy_cache,NewCache},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,_RandomCache}) ->
             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,NewCache};
 on({rm_buffer,Q,Buffer_q},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
             RndView=get_RndView(RandViewSize,RandomCache),

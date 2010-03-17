@@ -62,10 +62,8 @@ on({start_clustering_shuffle}, State) ->
     erlang:send_after(config:read(dc_clustering_interval), self(),
                       {start_clustering_shuffle}),
     case get_local_cyclon_pid() of
-        failed ->
-            ok;
-        CyclonPid ->
-            cs_send:send_local(CyclonPid,{get_subset, 1, self()})
+        failed    -> ok;
+        CyclonPid -> cyclon:get_subset_rand(1)
     end,
     State;
 
@@ -79,20 +77,19 @@ on({reset_clustering}, State) ->
 on({query_vivaldi_response, Coordinate, _Confidence}, _State) ->
     {[Coordinate], [1.0]};
 
-% got random node from cyclon
-on({cache, Cache}, {Centroids, Sizes} = State) ->
-    %io:format("~p~n",[Cache]),
-    case Cache of
-        [] ->
-            State;
-        [Node] ->
-            cs_send:send_to_group_member(node:pidX(Node), dc_clustering, {clustering_shuffle,
-                                                                          cs_send:this(),
-                                                                          Centroids, Sizes}),
-            State
-    end;
+on({cy_cache, []}, State)  ->
+    % ignore empty cache from cyclon
+    State;
 
-% have been ask to shuffle
+% got random node from cyclon
+on({cy_cache, [Node] = _Cache}, {Centroids, Sizes} = State) ->
+    %io:format("~p~n",[_Cache]),
+    cs_send:send_to_group_member(node:pidX(Node), dc_clustering,
+                                 {clustering_shuffle, cs_send:this(),
+                                  Centroids, Sizes}),
+    State;
+
+% have been asked to shuffle
 on({clustering_shuffle, RemoteNode, RemoteCentroids, RemoteSizes},
    {Centroids, Sizes}) ->
    %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),

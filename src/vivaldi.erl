@@ -38,19 +38,14 @@
 
 % vivaldi types
 -type(network_coordinate() :: [float()]).
-
 -type(error() :: float()).
-
-
 -type(latency() :: number()).
 
 % state of the vivaldi loop
 -type(state() :: {network_coordinate(), error()}).
 
-
 % accepted messages of vivaldi processes
 -type(message() :: any()).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -62,39 +57,29 @@
 on({trigger},{Coordinate, Confidence,TriggerState} ) ->
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
     NewTriggerState = Trigger:trigger_next(TriggerState,1),
-    case get_local_cyclon_pid() of
-        failed ->
-            ok;
-        CyclonPid ->
-            cs_send:send_local(CyclonPid,{get_subset, 1, self()})
-    end,
-    {Coordinate, Confidence,NewTriggerState};
+    cyclon:get_subset_rand(1),
+    {Coordinate, Confidence, NewTriggerState};
+
+on({cy_cache, []}, State)  ->
+    % ignore empty cache from cyclon
+    State;
 
 % got random node from cyclon
-on({cache, Cache},{Coordinate, Confidence,TriggerState}) ->
-    %io:format("~p~n",[Cache]),
-    case Cache of
-        [] ->
-            {Coordinate, Confidence,TriggerState};
-        [Node] ->
-            cs_send:send_to_group_member(node:pidX(Node), vivaldi,
-                                         {vivaldi_shuffle,
-                                          cs_send:this(),
-                                          Coordinate,
-                                          Confidence}),
-            {Coordinate, Confidence,TriggerState}
-    end;
+on({cy_cache, [Node] = _Cache}, {Coordinate, Confidence, _TriggerState} = State) ->
+    %io:format("~p~n",[_Cache]),
+    cs_send:send_to_group_member(node:pidX(Node), vivaldi,
+                                 {vivaldi_shuffle, cs_send:this(),
+                                  Coordinate, Confidence}),
+    State;
 
 %
 on({vivaldi_shuffle, RemoteNode, RemoteCoordinate, RemoteConfidence},
-   {Coordinate, Confidence,TriggerState}) ->
+   {Coordinate, Confidence, _TriggerState} = State) ->
     %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    cs_send:send(RemoteNode, {vivaldi_shuffle_reply,
-                              cs_send:this(),
-                              Coordinate,
-                              Confidence}),
+    cs_send:send(RemoteNode, {vivaldi_shuffle_reply, cs_send:this(),
+                              Coordinate, Confidence}),
     vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
-    {Coordinate, Confidence,TriggerState};
+    State;
 
 on({vivaldi_shuffle_reply, _RemoteNode, _RemoteCoordinate, _RemoteConfidence}, State) ->
     %io:format("{shuffle_reply, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
@@ -104,22 +89,19 @@ on({vivaldi_shuffle_reply, _RemoteNode, _RemoteCoordinate, _RemoteConfidence}, S
 on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
    {Coordinate, Confidence,TriggerState}) ->
     %io:format("latency is ~pus~n", [Latency]),
-    {NewCoordinate, NewConfidence } = try
-        update_coordinate(RemoteCoordinate,
-                      RemoteConfidence,
-                      Latency,
-                      Coordinate,
-                      Confidence)
-    catch
-        % ignore any exceptions, e.g. badarith
-        error:_ -> {Coordinate, Confidence }
-    end,
-    {NewCoordinate, NewConfidence,TriggerState};
+    {NewCoordinate, NewConfidence } =
+        try
+            update_coordinate(RemoteCoordinate, RemoteConfidence,
+                              Latency, Coordinate, Confidence)
+        catch
+            % ignore any exceptions, e.g. badarith
+            error:_ -> {Coordinate, Confidence }
+        end,
+    {NewCoordinate, NewConfidence, TriggerState};
 
-on({query_vivaldi, Pid},
-   {Coordinate, Confidence,TriggerState}) ->
+on({query_vivaldi, Pid}, {Coordinate, Confidence, _TriggerState} = State) ->
     cs_send:send(Pid,{query_vivaldi_response,Coordinate,Confidence}),
-    {Coordinate, Confidence,TriggerState};
+    State;
 
 on(_, _State) ->
     unknown_event.
@@ -141,8 +123,6 @@ start_link(InstanceId) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_local_cyclon_pid() ->
-    process_dictionary:get_group_member(cyclon).
 
 -spec(random_coordinate/0 :: () -> network_coordinate()).
 random_coordinate() ->

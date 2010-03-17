@@ -106,7 +106,7 @@ to_pid_list(RT) ->
 
 %% @doc returns the size of the routing table.
 %%      inefficient standard implementation
--spec(get_size/1 :: (rt()) -> pos_integer()).
+-spec(get_size/1 :: (rt()) -> non_neg_integer()).
 get_size(RT) ->
     gb_trees:size(RT).
 

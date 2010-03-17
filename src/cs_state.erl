@@ -48,23 +48,32 @@
 	 get_trans_log/1,
 	 set_trans_log/2]).
 
-%% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {routingtable :: ?RT:rt(), 
-		successors, 
-		predecessors, 
-		me, 
-		my_range, 
-		lb, 
-		deadnodes, 
-		join_time, 
-		trans_log, 
-		db}).
--type(state() :: #state{}).
+-ifdef(types_not_builtin).
+-type gb_set() :: gb_sets:gb_set().
+-endif.
 
+-type my_range() :: {?RT:key(), ?RT:key()}.
+-type join_time() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}. % {MegaSecs, Secs, MicroSecs}
+
+%% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
+-record(state, {routingtable :: ?RT:rt(),
+                successors   :: [node:node_type(),...], 
+		        predecessors :: [node:node_type(),...], 
+		        me           :: node:node_type(),
+		        my_range     :: my_range(), 
+		        lb           :: cs_lb:lb(),
+		        deadnodes    :: gb_set(),
+		        join_time    :: join_time(),
+		        trans_log    :: #translog{},
+		        db           :: ?DB:db()}).
+-type state() :: #state{}.
+
+-spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), cs_lb:lb()) -> state().
 new(RT, Successor, Predecessor, Me, MyRange, LB) ->
     new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new(node:id(Me))).
 
 %% userdevguide-begin cs_state:state
+-spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), cs_lb:lb(), ?DB:db()) -> state().
 new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
     #state{
      routingtable = RT, 
@@ -72,85 +81,91 @@ new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
      predecessors = [Predecessor],
      me = Me,
      my_range = MyRange,
-     lb=LB,
-     join_time=now(),
+     lb = LB,
+     join_time = now(),
      deadnodes = gb_sets:new(),
      trans_log = #translog{
        tid_tm_mapping = dict:new(),
-       decided = gb_trees:empty(),
-       undecided = gb_trees:empty()
+       decided        = gb_trees:empty(),
+       undecided      = gb_trees:empty()
       },
      db = DB
     }.
 %% userdevguide-end cs_state:state
 
-% @spec next_interval(state()) -> intervals:interval()
-next_interval(State) ->
-    intervals:new(id(State), succ_id(State)).
+-spec next_interval(state()) -> intervals:interval().
+next_interval(State) -> intervals:new(id(State), succ_id(State)).
 
-get_my_range(#state{my_range=MyRange}) ->
-    MyRange.
+-spec get_my_range(state()) -> my_range().
+get_my_range(#state{my_range=MyRange}) -> MyRange.
 
-get_db(#state{db=DB}) ->
-    DB.
+-spec get_db(state()) -> ?DB:db().
+get_db(#state{db=DB}) -> DB.
 
-set_db(State, DB) ->
-    State#state{db=DB}.
+-spec set_db(state(), ?DB:db()) -> state().
+set_db(State, DB) -> State#state{db=DB}.
 
-get_lb(#state{lb=LB}) ->
-    LB.
+-spec get_lb(state()) -> cs_lb:lb().
+get_lb(#state{lb=LB}) -> LB.
 
-set_lb(State, LB) ->
-    State#state{lb=LB}.
+-spec set_lb(state(), cs_lb:lb()) -> state().
+set_lb(State, LB) -> State#state{lb=LB}.
 
-me(#state{me=Me}) ->
-    Me.
+-spec me(state()) -> node_details:node_type().
+me(#state{me=Me}) -> Me.
 
-id(#state{me=Me}) ->
-    node:id(Me).
+-spec id(state()) -> ?RT:key().
+id(#state{me=Me}) -> node:id(Me).
 
 %%% Successor
+-spec succs(state()) -> [node:node_type(),...].
 succs(#state{successors=Succs}) -> Succs.
 
+-spec succ(state()) -> node:node_type().
 succ(State) -> hd(succs(State)).
 
+-spec succ_pid(state()) -> cs_send:mypid().
 succ_pid(State) -> node:pidX(succ(State)).
 
+-spec succ_id(state()) -> ?RT:key().
 succ_id(State) -> node:id(succ(State)).
 
 %%% Predecessor
-
-pred_pid(State) -> node:pidX(pred(State)).
-
-pred_id(State) -> node:id(pred(State)).
-
-pred(State) -> hd(preds(State)).
-
+-spec preds(state()) -> [node:node_type(),...].
 preds(#state{predecessors=Preds}) -> Preds.
 
-%%% Load
+-spec pred(state()) -> node:node_type().
+pred(State) -> hd(preds(State)).
 
+-spec pred_pid(state()) -> cs_send:mypid().
+pred_pid(State) -> node:pidX(pred(State)).
+
+-spec pred_id(state()) -> ?RT:key().
+pred_id(State) -> node:id(pred(State)).
+
+%%% Load
+-spec load(state()) -> integer().
 load(State) -> ?DB:get_load(get_db(State)).
 
 %%% Routing Table
+-spec rt(state()) -> ?RT:rt().
+rt(#state{routingtable=RT}) -> RT.
 
-rt(#state{routingtable=RT}) ->
-    RT.
+-spec set_rt(state(), ?RT:rt()) -> state().
+set_rt(State, RT) -> State#state{routingtable=RT}.
 
-set_rt(State, RT) ->
-    State#state{routingtable=RT}.
-
+-spec rt_size(state()) -> integer().
 rt_size(State) -> ?RT:get_size(rt(State)).
 
 %%% util
-
+-spec dump(state()) -> ok.
 dump(State) ->
     io:format("dump <~s,~w> <~s,~w> <~s,~w>~n", [id(State), self()
 						 , pred_id(State), pred_pid(State), succ_id(State), succ_pid(State)]),
     ok.
 
 %% @doc Gets the requested details about the current node.
--spec details(state(), [predlist | pred | node | my_range | succ | succlist | load | hostname | rt_size | message_log | memory]) -> node_details:node_details().
+-spec details(state(), [node_details:node_details_name()]) -> node_details:node_details().
 details(State, Which) ->
     ExtractValues =
         fun(Elem, NodeDetails) ->
@@ -187,18 +202,27 @@ details(State) ->
 %%% Transactions
 %%% Information on transactions that all possible TMs and TPs share
 
-%% get the transaction log
+-spec get_trans_log(state()) -> #translog{}.
+%% @doc Gets the transaction log.
 get_trans_log(#state{trans_log=Log}) ->
     Log.
-%% set the transaction log
+
+%% @doc Sets the transaction log.
+-spec set_trans_log(state(), #translog{}) -> state().
 set_trans_log(State, NewLog) ->
     State#state{trans_log=NewLog}.
 
+%% @doc Sets the predecessor and successor lists.
+-spec update_preds_succs(state(), [node:node_type(),...], [node:node_type(),...]) -> state().
 update_preds_succs(State, Preds, Succs) ->
     State#state{predecessors=Preds, successors=Succs, my_range={node:id(hd(Preds)), id(State)}}.
 
+%% @doc Sets the predecessor list.
+-spec update_preds(state(), [node:node_type(),...]) -> state().
 update_preds(State, Preds) ->
     State#state{predecessors=Preds, my_range={node:id(hd(Preds)), id(State)}}.
 
+%% @doc Sets the successor list.
+-spec update_succs(state(), [node:node_type(),...]) -> state().
 update_succs(State, Succs) ->
     State#state{successors=Succs}.

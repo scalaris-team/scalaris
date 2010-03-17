@@ -89,7 +89,10 @@
 %% -type(values() :: gossip_state:values()).
 -type(avg_kr() :: gossip_state:avg_kr()).
 
-% {PreviousState, CurrentState, QueuedMessages, TriggerState}
+%% Full state of the gossip process:
+%% {PreviousState, CurrentState, QueuedMessages, TriggerState}
+%% -> previous and current state, queued messages (get_state messages received
+%% before local values are known) and the state of the trigger.
 -type(full_state() :: {state(), state(), list(), any()}).
 
 % accepted messages of gossip processes
@@ -100,29 +103,85 @@
 	{{get_node_details_response, node_details:node_details()}, leader_debug_output} |
 	{get_state, cs_send:mypid(), values_internal()} |
 	{get_state_response, values_internal()} |
-	{cache, [node:node_type()]} |
-	{get_avgLoad, cs_send:mypid()} |
-	{get_minLoad, cs_send:mypid()} |
-	{get_maxLoad, cs_send:mypid()} |
-	{get_size, cs_send:mypid()} |
-	{get_stddev, cs_send:mypid()} |
-	{get_all, cs_send:mypid()}).
+	{cy_cache, [node:node_type()]} |
+	{get_values_all, cs_send:erl_local_pid()} | 
+    {get_values_best, cs_send:erl_local_pid()} |
+    {'$gen_cast', {debug_info, cs_send:erl_local_pid()}}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Helper functions that create and send messages to nodes requesting information.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends a response message to a request for the best stored values.
--spec msg_get_values_best_response(cs_send:mypid(), values()) -> ok.
+-spec msg_get_values_best_response(cs_send:erl_local_pid(), values()) -> ok.
 msg_get_values_best_response(Pid, BestValues) ->
-    cs_send:send(Pid, {get_values_all_response, BestValues}).
+    cs_send:send_local(Pid, {gossip_get_values_best_response, BestValues}).
 
 %% @doc Sends a response message to a request for all stored values.
--spec msg_get_values_all_response(cs_send:mypid(), values(), values(), values()) -> ok.
+-spec msg_get_values_all_response(cs_send:erl_local_pid(), values(), values(), values()) -> ok.
 msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
-    cs_send:send(Pid, {get_values_all_response, PreviousValues, CurrentValues, BestValues}).
+    cs_send:send_local(Pid, {gossip_get_values_all_response, PreviousValues, CurrentValues, BestValues}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Getters
+%
+% Functions that other processes can call to receive information from the gossip
+% process
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for the best values of the stored information.
+%%      see on({get_values_best, SourcePid}, FullState) and
+%%      msg_get_values_best_response/2
+-spec get_values_best() -> ok.
+get_values_best() ->
+    get_values_best(self()).
+
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for the best values of the stored information to
+%%      be send to Pid.
+%%      see on({get_values_best, SourcePid}, FullState) and
+%%      msg_get_values_best_response/2
+-spec get_values_best(cs_send:erl_local_pid()) -> ok.
+get_values_best(Pid) ->
+    GossipPid = process_dictionary:get_group_member(gossip),
+    cs_send:send_local(GossipPid, {get_values_best, Pid}).
+
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for all stored information.
+%%      see on({get_values_all, SourcePid}, FullState) and
+%%      msg_get_values_all_response/4
+-spec get_values_all() -> ok.
+get_values_all() ->
+    get_values_all(self()).
+
+%% @doc Sends a (local) message to the gossip process of the requesting
+%%      process' group asking for all stored information to be send to Pid.
+%%      see on({get_values_all, SourcePid}, FullState) and
+%%      msg_get_values_all_response/4
+-spec get_values_all(cs_send:erl_local_pid()) -> ok.
+get_values_all(Pid) ->
+    GossipPid = process_dictionary:get_group_member(gossip),
+    cs_send:send_local(GossipPid, {get_values_all, Pid}).
+
+%% @doc Returns the previous state if the current state has not sufficiently
+%%      converged yet otherwise returns the current state.
+-spec previous_or_current(state(), state()) -> state().
+previous_or_current(PreviousState, CurrentState) ->
+    CurrentInitialized = gossip_state:is_initialized(CurrentState),
+    MinConvergeAvgCount = get_converge_avg_count(),
+    CurrentEpsilonCount_Avg = gossip_state:get_converge_avg_count(CurrentState),
+    _BestValue =
+        case (not CurrentInitialized) or (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
+            true -> PreviousState;
+            false -> CurrentState
+        end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc initialises the module
+%% @doc Initialises the module with an empty state.
 -spec init([any()]) -> full_state().
 init([_InstanceId, []]) ->
 %%     io:format("gossip start ~n"),
@@ -130,9 +189,11 @@ init([_InstanceId, []]) ->
     TriggerState2 = Trigger:trigger_first(TriggerState, 1),
 	PreviousState = gossip_state:new_state(),
 	State = gossip_state:new_state(),
+    log:log(info, "Gossip spawn: ~p~n", [cs_send:this()]),
     {PreviousState, State, [], TriggerState2}.
 
-%% @doc starts the gossip module and returns its pid for use by a supervisor
+%% @doc Starts the gossip process, registers it with the process dictionary and
+%%      returns its pid for use by a supervisor.
 -spec start_link(term()) -> {ok, pid()}.
 start_link(InstanceId) ->
     gen_component:start_link(THIS, [InstanceId, []], [{register, InstanceId, gossip}]).
@@ -266,39 +327,40 @@ on({get_state, Source_PID, OtherValues} = Msg,
 			end,
     {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState};
 
-on({get_state_response, OtherState},
+on({get_state_response, OtherValues},
    {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
 	% This message is received as a response to a get_state message and contains
     % another node's state. We will use it to update our own state
 	% if both are valid.
 	{MyNewPreviousState, MyNewState} =
-		integrate_state(OtherState, MyPreviousState, MyState, false, none),
+		integrate_state(OtherValues, MyPreviousState, MyState, false, none),
     {MyNewPreviousState, MyNewState, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contacting random nodes (response from cyclon)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({cache, Cache},
+on({cy_cache, []}, FullState)  ->
+    % ignore empty cache from cyclon
+    FullState;
+
+on({cy_cache, [Node] = _Cache},
     {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	% This message is received as a response to a get_subset message to the
+    % This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node. We will then contact this
     % random node and ask for a state exchange.
-%%     io:format("gossip: got random node from Cyclon: ~p~n",[Cache]),
-    case Cache of
-        [Node] ->
-			NodePid = node:pidX(Node),
-			SelfPid = cs_send:make_global(process_dictionary:get_group_member(cs_node)),
-			% do not exchange states with itself
-			if
-				(NodePid =/= SelfPid) ->
-            		cs_send:send_to_group_member(node:pidX(Node), gossip,
-						{get_state, cs_send:this(), gossip_state:get_values(State)});
-				true -> ok
-			end,
-            FullState;
-        [] -> FullState
-    end;
+%%     io:format("gossip: got random node from Cyclon: ~p~n",[_Cache]),
+    NodePid = node:pidX(Node),
+    SelfPid = cs_send:make_global(process_dictionary:get_group_member(cs_node)),
+    % do not exchange states with itself
+    if
+        (NodePid =/= SelfPid) ->
+            cs_send:send_to_group_member(node:pidX(Node), gossip,
+                                         {get_state, cs_send:this(),
+                                          gossip_state:get_values(State)});
+        true -> ok
+    end,
+    FullState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getter messages
@@ -357,7 +419,7 @@ on({'$gen_cast', {debug_info, Requestor}},
          {"best_size",            gossip_state:get_size(BestState)},
          {"best_size_ldr",        gossip_state:get_size_ldr(BestState)},
          {"best_size_kr",         gossip_state:get_size_kr(BestState)}],
-    cs_send:send_local(Requestor , {debug_info_response, KeyValueList}),
+    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
     FullState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -445,7 +507,7 @@ update(MyState, OtherValues) ->
 			false ->
 				% this case should not happen since the on/2 handlers should only
 				% call update/2 if the rounds match
-            	log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring): ~p", [self(),util:get_stacktrace()]),
+            	log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring): ~p", [cs_send:this(),util:get_stacktrace()]),
     			MyValues
 		end,
 	% now check whether all average-based values changed less than epsilon percent:
@@ -614,58 +676,6 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Getters
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for the best values of the stored information.
-%%      see on({get_values_best, SourcePid}, FullState) and
-%%      msg_get_values_best_response/2
--spec get_values_best() -> ok.
-get_values_best() ->
-    get_values_best(cs_send:this()).
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for the best values of the stored information to
-%%      be send to Pid.
-%%      see on({get_values_best, SourcePid}, FullState) and
-%%      msg_get_values_best_response/2
--spec get_values_best(cs_send:erl_local_pid()) -> ok.
-get_values_best((Pid)) ->
-    cs_send:send_local(process_dictionary:get_group_member(gossip),
-        {get_values_best, (Pid)}).
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for all stored information.
-%%      see on({get_values_all, SourcePid}, FullState) and
-%%      msg_get_values_all_response/4
--spec get_values_all() -> ok.
-get_values_all() ->
-    get_values_all(cs_send:this()).
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for all stored information to be send to Pid.
-%%      see on({get_values_all, SourcePid}, FullState) and
-%%      msg_get_values_all_response/4
--spec get_values_all(cs_send:erl_local_pid()) -> ok.
-get_values_all(Pid) ->
-    cs_send:send_local(process_dictionary:get_group_member(gossip),
-        {get_values_all, Pid}).
-
-%% @doc Returns the previous state if the current state has not sufficiently
-%%      converged yet otherwise returns the current state.
--spec previous_or_current(state(), state()) -> state().
-previous_or_current(PreviousState, CurrentState) ->
-	CurrentInitialized = gossip_state:is_initialized(CurrentState),
-	MinConvergeAvgCount = get_converge_avg_count(),
-	CurrentEpsilonCount_Avg = gossip_state:get_converge_avg_count(CurrentState),
-	_BestValue =
-		case (not CurrentInitialized) or (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
-			true -> PreviousState;
-			false -> CurrentState
-		end.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Requests send to other processes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -718,11 +728,10 @@ request_local_info() ->
     cs_send:send_local(CS_Node, {get_node_details, cs_send:this_with_cookie(local_info), [my_range, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
-%%      on({cache, Cache},State) will handle the response
+%%      on({cy_cache, Cache},State) will handle the response
 -spec request_random_node() -> ok.
 request_random_node() ->
-	CyclonPid = process_dictionary:get_group_member(cyclon),
-	cs_send:send_local(CyclonPid,{get_subset, 1, self()}),
+    cyclon:get_subset_rand(1),
 	ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -751,12 +760,12 @@ calc_initial_avg_kr({PredKey, MyKey} = _Range) ->
 	end.
 
 %% @doc Gets the gossip interval set in scalaris.cfg.
--spec get_base_interval() -> non_neg_integer().
+-spec get_base_interval() -> pos_integer().
 get_base_interval() ->
     _GossipInterval = 
     	case config:read(gossip_interval) of 
         	failed ->
-            	log:log(warning,"gossip_interval not defined (see scalaris.cfg), using default (1000)~n"),
+            	log:log(warning, "gossip_interval not defined (see scalaris.cfg), using default (1000)~n"),
 				1000;
 			X -> X
 		end.
@@ -769,7 +778,7 @@ get_min_tpr() ->
     _MinTPR = 
 	    case config:read(gossip_min_triggers_per_round) of 
     	    failed ->
-        	    log:log(warning,"gossip_min_triggers_per_round not defined (see scalaris.cfg), using default (10)~n"),
+        	    log:log(warning, "gossip_min_triggers_per_round not defined (see scalaris.cfg), using default (10)~n"),
 				10;
 			X -> X
 		end.
@@ -782,7 +791,7 @@ get_max_tpr() ->
     _MaxTPR = 
 	    case config:read(gossip_max_triggers_per_round) of 
     	    failed ->
-        	    log:log(warning,"gossip_max_triggers_per_round not defined (see scalaris.cfg), using default (1000)~n"),
+        	    log:log(warning, "gossip_max_triggers_per_round not defined (see scalaris.cfg), using default (1000)~n"),
 				1000;
 			X -> X
 		end.
@@ -795,7 +804,7 @@ get_converge_avg_epsilon() ->
     _ConvergeAvgEpsilon = 
 	    case config:read(gossip_converge_avg_epsilon) of 
     	    failed ->
-        	    log:log(warning,"gossip_converge_avg_epsilon not defined (see scalaris.cfg), using default (5.0)~n"),
+        	    log:log(warning, "gossip_converge_avg_epsilon not defined (see scalaris.cfg), using default (5.0)~n"),
 				5.0;
 			X -> X
 		end.
@@ -808,7 +817,7 @@ get_converge_avg_count() ->
     _ConvergeAvgCount = 
 	    case config:read(gossip_converge_avg_count) of 
     	    failed ->
-        	    log:log(warning,"gossip_converge_avg_count not defined (see scalaris.cfg), using default (10)~n"),
+        	    log:log(warning, "gossip_converge_avg_count not defined (see scalaris.cfg), using default (10)~n"),
 				10;
 			X -> X
 		end.
@@ -820,7 +829,7 @@ get_converge_avg_count_start_new_round() ->
     _ConvergeAvgCountStartNewRound = 
 	    case config:read(gossip_converge_avg_count_start_new_round) of 
     	    failed ->
-        	    log:log(warning,"gossip_converge_avg_count_start_new_round not defined (see scalaris.cfg), using default (20)~n"),
+        	    log:log(warning, "gossip_converge_avg_count_start_new_round not defined (see scalaris.cfg), using default (20)~n"),
 				20;
 			X -> X
 		end.

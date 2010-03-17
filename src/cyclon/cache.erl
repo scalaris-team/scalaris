@@ -1,210 +1,293 @@
+%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
+%
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cyclon.erl
-%%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : Cache implementation using a list
-%%%
+%%% File    cache.erl
+%%% @author Christian Hennig <hennig@zib.de>
+%%% @doc    Cyclon node cache implementation using a list.
+%%% @end
 %%% Created :  1 Dec 2008 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% @version $Id $
+%% @version $Id$
+
 -module(cache).
 -author('hennig@zib.de').
 -vsn('$Id $ ').
 
--import(lists).
--import(cs_send).
--import(config).
--import(random).
-%-import(node).
--import(io).
--import(crypto).
--import(util).
 %% API
 
--export([get_subset_max_age/2, add_element/2, get_cache/1, add_list/2, size/1, new/0, get_random_element/1, get_random_subset/2, is_element/2, delete/2, minus/2, merge/3, trim/1, get_list_of_nodes/1 ,inc_age/1, get_youngest/2, get_oldest/1, ages/1, get_youngest/1]).
+-export([new/0, new/2, size/1,
+         add_node/3, remove_node/2, trim/2,
+         get_random_subset/2, get_random_nodes/2,
+         get_nodes/1, get_ages/1,
+         inc_age/1, merge/5,
+         pop_random_node/1, pop_oldest_node/1,
+         debug_format_by_age/1]).
 
-% list of {pid of cs_node process, age}
--type(cache() :: list({node:node_type(), pos_integer()})).
+-type age() :: non_neg_integer().
+-type element() :: {node:node_type(), age()}.
+-type cache() :: [ element() ].
 
-%% @doc Firstly try to insert QT in Cache on the empty slots, and secondly replacing entries among the ones original sent
--spec(merge/3 :: (cache(), cache(), cache()) -> cache()).
-merge(Cache,[],_Send) ->
-    Cache;
-merge([],QsSub,_SendSub) ->
-    QsSub;
-merge(Cache,[_QH|_QT],[]) ->
-    Cache;
-%     Cache  QsSUB    SendSub 	
-merge(Cache,[QH|QT],[SH|ST] = S) ->
-    %io:format("~p ~p-~p-~p ~n",[self(),length(Cache),length(Q),length(S)]),
-    case (cache:size(Cache) < config:read(cyclon_cache_size)) of
-	true ->
-	    merge(add_element(QH,Cache),QT,S);
-	false ->
-	    merge(add_element(QH,trim(delete(SH,Cache))),QT,ST)
-    end.
-
-%% @doc minus(M,N) : { x | x in M and x notin N} 
-minus([],_N) ->
-    [];
-minus([H|T],N) ->
-    case is_element(H,N) of
- 	true -> 
-	    minus(T,N);
-	false ->
-	    [H]++minus(T,N)
-    end.
-
-
-%% @doc 
-get_list_of_nodes([]) ->
-	[];
-get_list_of_nodes([{A,_}|T]) ->
-	[A]++get_list_of_nodes(T).
-	
-
-%% @doc ensure that one place is empty in the stack, by delete a random entrie if no space left
-trim(Cache) ->
-	case cache:size(Cache) <  config:read(cyclon_cache_size) of
-		true ->
-			Cache;
-		false ->
-			delete(get_random_element(Cache),Cache)
-	end.
-
-get_cache(Foo) ->
-	Foo.
-
-add_list([],Foo) ->
-	Foo;
-add_list([NodePid|T],Foo) ->
-	add_list(T,add_element({NodePid,0},Foo)).
-
-
-get_random_element(State) ->
-    L=cache:size(State),
-    P=randoms:rand_uniform(0, L)+1,
-    % picks nth element of state
-    lists:nth(P,State).
-
-worker(_,Target,[]) -> Target;
-worker(N,Target,Cache) ->
-    case N==length(Target) of
-	true ->
-	    Target;
-	false ->
-	    Q = get_random_element(Cache),
-	    worker(N,add_element(Q,Target),delete(Q,Cache))
-    end.
-	
-
-get_random_subset(0,_Cache) -> 
-		new();
-get_random_subset(N,Cache) -> 
-		worker(N,[],Cache).
-
-%% @doc find oldest element (randomize if multiple oldest elements)
-get_oldest(Cache) ->
-    HighestAge = lists:foldl(fun ({_, Age}, MaxAge) ->
-				    util:max(Age, MaxAge)
-			    end,
-			    0,
-			    Cache),
-    %io:format("Oldest: ~p~n",[HighestAge]),
-    OldElements = lists:filter(fun ({_, Age}) ->
-				       Age == HighestAge
-			       end,
-			       Cache),
-    get_random_element(OldElements).
-
-get_youngest(X) ->
-    get_youngest(1,X).
-
-%% @doc find youngest N element, List of nodes
-get_youngest(_,null) ->
-    [];
-get_youngest(_,[]) ->
-    [];
-get_youngest(N,Cache) ->
-    Order = fun(A, B) ->
-		    get_age(A) =< get_age(B)
-	    end,
-    SortAge = lists:sort(Order,Cache),
-		lists:map(fun(X) -> get_node(X) end ,lists:sublist(SortAge,1, N)).
-
-% first_same_age([]) ->
-%     0;
-% first_same_age([_X]) ->
-%     1;
-% first_same_age([H|T]) ->
-%     case get_age(H) == get_age(hd(T)) of
-%         true ->
-%             1 + first_same_age(T);
-%         false ->
-%             1
-% 		end.
-        
-  
-
-get_node({X,_}) ->
-    X.
-
-get_age({_,X}) ->
-    X.
-
-inc_age(Cache) ->
-    lists:map(fun({A,C}) ->
-		      {A, C + 1}
-              end,
-	      Cache).
-
-eq({A,_},{B,_}) ->
-	A==B . 
-
-
+%% @doc Creates a new and empty node cache.
+-spec new() -> cache().
 new() ->
-	[].
-%% @doc Amount of valid Cache entries 
-size([]) ->
-	0;
-size(null) ->
-	0;
-size([H|T]) ->
-	{Node,_}=H,
-	case Node of
-		nil	-> cache:size(T);
-		_	-> 1+cache:size(T)
+    [].
+
+%% @doc Creates a new node cache with the given two nodes and ages 0.
+-spec new(node_details:node_type(), node_details:node_type()) -> cache().
+new(Node1, Node2) ->
+    case Node1 =:= Node2 of
+        true -> [{Node1, 0}];
+        false -> [{Node2, 0}, {Node1, 0}]
     end.
 
+%% @doc Counts the number of Cache entries.
+-spec size(cache()) -> non_neg_integer().
+size(Cache) ->
+    length(Cache).
 
-get_subset_max_age(_MaxAge,null) ->
+%% @doc Returns a random node from the cache.
+-spec get_random_node(cache()) -> node:node_type().
+get_random_node(Cache) ->
+    {Node, _Age} = get_random_element(Cache),
+    Node.
+
+%% @doc Returns a random element (node and age) from the cache.
+-spec get_random_element(cache()) -> element().
+get_random_element(Cache) ->
+    Size = cache:size(Cache),
+    N = randoms:rand_uniform(0, Size) + 1,
+    % picks nth element of state
+    lists:nth(N, Cache).
+
+%% @doc Removes a random element from the (non-empty!) cache and returns the
+%%      resulting cache and the removed node.
+-spec pop_random_node([Cache::element(),...]) -> {NewCache::cache(), PoppedNode::node_details:node_type()}.
+pop_random_node(Cache) ->
+    pop_random_node(Cache, cache:size(Cache)).
+
+%% @doc Removes a random element from the (non-empty!) cache and returns the
+%%      resulting cache and the removed node.
+-spec pop_random_node(Cache::[element(),...], CacheSize::non_neg_integer()) -> {NewCache::cache(), PoppedNode::node_details:node_type()}.
+pop_random_node(Cache, CacheSize) ->
+    {NewCache, {Node, _Age}} = pop_random_element(Cache, CacheSize),
+    {NewCache, Node}.
+
+%% @doc Removes a random element from the (non-empty!) cache and returns the
+%%      resulting cache and the removed element.
+-spec pop_random_element(Cache::[element(),...], CacheSize::non_neg_integer()) -> {NewCache::cache(), PoppedElement::element()}.
+pop_random_element(Cache, CacheSize) ->
+    N = randoms:rand_uniform(0, CacheSize),
+    % picks nth element of state
+    {CacheHead, [Element | CacheTail]} = lists:split(N, Cache),
+    NewCache = CacheHead ++ CacheTail,
+    {NewCache, Element}.
+
+%% @doc Returns a random subset of size N elements from the cache.
+-spec get_random_subset(N::non_neg_integer(), Cache::cache()) -> RandomSubset::cache().
+get_random_subset(0, _Cache) ->
+    % having this special case here prevents unnecessary calls to cache:size()
+    new();
+get_random_subset(N, Cache) ->
+    get_random_subset_helper(N, new(), Cache, cache:size(Cache), fun pop_random_element/2).
+
+%% @doc Returns a random subset of size N nodes from the cache.
+-spec get_random_nodes(N::non_neg_integer(), Cache::cache()) -> Nodes::[node_details:node_type()].
+get_random_nodes(0, _Cache) ->
+    % having this special case here prevents unnecessary calls to cache:size()
     [];
-get_subset_max_age(MaxAge,Cache) ->
-    get_list_of_nodes(lists:filter(fun ({_,Age}) -> Age < MaxAge end ,Cache)).
+get_random_nodes(N, Cache) ->
+    get_random_subset_helper(N, new(), Cache, cache:size(Cache), fun pop_random_node/2).
 
+%% @doc Extracts a random element one-by-one from the Cache until a Subset of
+%%      size N is created or all elements of the cache have been taken.
+-spec get_random_subset_helper(N::non_neg_integer(), Result::[X], Cache::cache(), CacheSize::non_neg_integer(), PopFun::fun((Cache1::cache(), Cache1Size::non_neg_integer()) -> X)) -> cache().
+get_random_subset_helper(0, Subset, _Cache, _CacheSize, _PopFun) ->
+    Subset;
+get_random_subset_helper(_N, Subset, [] = _Cache, _CacheSize, _PopFun) ->
+    Subset;
+get_random_subset_helper(N, Subset, Cache, CacheSize, PopFun) ->
+    {NewCache, Element} = PopFun(Cache, CacheSize),
+    get_random_subset_helper(N - 1, [Element | Subset], NewCache, CacheSize - 1, PopFun).
 
+%% @doc Finds the oldest element (randomized if multiple oldest elements) and
+%%      removes it from the cache returning the new cache and this node.
+-spec pop_oldest_node(Cache::cache()) -> {NewCache::cache(), PoppedNode::node:node_type()}.
+pop_oldest_node(Cache) ->
+    {OldElements, _MaxAge} =
+        lists:foldl(
+          fun ({Node, Age}, {PrevOldElems, MaxAge}) ->
+                   if Age > MaxAge ->
+                          {[{Node, Age}], Age};
+                      Age =:= MaxAge ->
+                          {[{Node, Age} | PrevOldElems] , Age};
+                      Age < MaxAge ->
+                          {PrevOldElems, MaxAge}
+                   end
+          end,
+          {[], 0},
+          Cache),
+    NodeP = get_random_node(OldElements),
+    NewCache = remove_node(NodeP, Cache),
+    {NewCache, NodeP}.
 
+%% @doc Increases the age of every element in the cache by 1.
+-spec inc_age(Cache::cache()) -> NewCache::cache().
+inc_age(Cache) ->
+    [{Node, Age + 1} || {Node, Age} <- Cache].
 
+%% @doc Checks whether the cache contains an element with the given Node.
+-spec contains_node(Node::node:node_type(), Cache::cache()) -> Result::bool().
+contains_node(Node, Cache) ->
+    lists:any(fun({SomeNode, _Age}) -> SomeNode =:= Node end, Cache).
 
-%% @doc returns true if Element is in Cache
-is_element(Element, Cache) ->
-    lists:any(fun(SomeElement) -> eq(Element, SomeElement) end, Cache).
+%% @doc Returns the ages of all nodes in the cache.
+-spec get_ages(Cache::cache()) -> Ages::[age()].
+get_ages(Cache) ->
+    [Age || {_Node, Age} <- Cache].
 
-%% @doc removes Element from Cache
-delete(Element, Cache) ->
-    lists:filter(fun(SomeElement) -> not eq(SomeElement, Element) end, Cache).
+%% @doc Returns all nodes in the cache (without their ages).
+-spec get_nodes(Cache::cache()) -> Nodes::[node:node_type()].
+get_nodes(Cache) ->
+    [Node || {Node, _Age} <- Cache].
 
-%% @doc adds Element to Cache or updates Element in Cache
-add_element(Element, Cache) ->
-    case is_element(Element, Cache) of
-	true ->
-	    add_element(Element, delete(Element, Cache));
-	false ->
-	    [Element | Cache]
+%% @doc Merges MyCache at node MyNode with the ReceivedCache from another node
+%%      to whom SendCache has been send. The final cache size will not extend
+%%      TargetSize.
+%%      This will discard received entries pointing at MyNode and entries
+%%      already contained in MyCache, fill up empty slots in the cache with
+%%      received entries and further replace elements in MyCache using
+%%      replace/5.
+-spec merge(MyCache::cache(), MyNode::node_details:node_type(), ReceivedCache::cache(), SendCache::cache(), TargetSize::pos_integer()) -> NewCache::cache().
+merge(MyCache, MyNode, ReceivedCache, SendCache, TargetSize) ->
+    MyCacheSize = cache:size(MyCache),
+    ReceivedCache_Filtered =
+        [Elem || {Node, _Age} = Elem <- ReceivedCache,
+                 not contains_node(Node, MyCache),
+                 Node =/= MyNode],
+    SendCache_Filtered =
+        [Elem || {Node, _Age} = Elem <- SendCache,
+                 Node =/= MyNode],
+    {MyC1, ReceivedCacheRest, AddedElements} =
+        fillup(MyCache, ReceivedCache_Filtered, TargetSize - MyCacheSize),
+    MyC1Size = MyCacheSize + AddedElements,
+    replace(MyC1, MyC1Size, ReceivedCacheRest, SendCache_Filtered, TargetSize).
+
+%% @doc Trims the cache to size TargetSize (if necessary) by deleting random
+%%      entries as long as the cache is larger than the given TargetSize.
+-spec trim(Cache::cache(), CacheSize::non_neg_integer(), TargetSize::pos_integer()) -> NewCache::cache().
+trim(Cache, CacheSize, TargetSize) ->
+    case CacheSize =< TargetSize of
+        true ->
+            Cache;
+        false ->
+            {NewCache, _Element} = pop_random_element(Cache, CacheSize),
+            trim(NewCache, CacheSize - 1, TargetSize)
     end.
 
-ages([]) ->
-	[];
-ages([{_,Age}|T]) ->
-    [Age]++ages(T).
+%% @doc Fills up MyCache with (up to) ToAddCount entries from ReceivedCache,
+%%      returning the new cache, the rest of the ReceivedCache and the number of
+%%      actually added elements.
+-spec fillup(MyCache::cache(), ReceivedCache::cache(), ToAddCount::non_neg_integer()) -> {MyNewCache::cache(), ReceivedCacheRest::cache(), AddedElements::non_neg_integer()}.
+fillup(MyCache, ReceivedCache, ToAddCount) ->
+    fillup(MyCache, ReceivedCache, ToAddCount, 0).
+
+%% @doc Helper to fill up MyCache with (up to) ToAddCount entries from
+%%      ReceivedCache, returning the new cache, the rest of the ReceivedCache
+%%      and the number of actually added elements.
+-spec fillup(MyCache::cache(), ReceivedCache::cache(), ToAddCount::non_neg_integer(), AddedElements::non_neg_integer()) -> {MyNewCache::cache(), ReceivedCacheRest::cache(), AddedElements::non_neg_integer()}.
+fillup(MyCache, ReceivedCache, 0 = _ToAddCount, AddedElements) ->
+    {MyCache, ReceivedCache, AddedElements};
+fillup(MyCache, [], _ToAddCount, AddedElements) ->
+    {MyCache, [], AddedElements};
+fillup(MyCache, [Elem | Rest] = _ReceivedCache, ToAddCount, AddedElements) ->
+    fillup([Elem | MyCache], Rest, ToAddCount - 1, AddedElements + 1).
+
+%% @doc Updates MyCache to include all entries of ReceivedCache by firstly
+%%      replacing entries among SendCache and thirdly by replacing random
+%%      entries.
+%%      ReceivedCache must not contain the local node and must not contain any
+%%      node that MyCache already contains!
+%%      SendCache must not contain the local node!
+-spec replace(MyCache::cache(), MyCacheSize::non_neg_integer(), ReceivedCache::cache(), SendCache::cache(), TargetSize::pos_integer()) -> MyNewCache::cache().
+replace([] = _MyCache, MyCacheSize, ReceivedCache, _SendCache, TargetSize) ->
+    % the cache size (although otherwise not needed) should still be correct:
+    0 = MyCacheSize,
+    trim(ReceivedCache, cache:size(ReceivedCache), TargetSize);
+
+replace(MyCache, _MyCacheSize, [], _SendCache, _TargetSize) ->
+    MyCache;
+replace(MyCache, MyCacheSize, ReceivedCache, [] = _SendCache, TargetSize) ->
+    % trim MyCache so it has enough space for all elements of ReceivedCache
+    % and add all received elements
+    ReceivedCacheSize = cache:size(ReceivedCache),
+    MyC1 = trim(MyCache, MyCacheSize, TargetSize - ReceivedCacheSize),
+    MyC2 = MyC1 ++ ReceivedCache,
+    MyC2;
+
+replace(MyCache, _MyCacheSize, ReceivedCache, SendCache, TargetSize) ->
+    % filter all nodes from SendCache out of MyCache to make room for entries
+    % from ReceivedCache
+    {MyC1, SendCache_new} =
+        lists:partition(
+          fun({Node, _Age}) -> not contains_node(Node, SendCache) end,
+          MyCache),
+    MyC1Size = cache:size(MyC1),
+    % trim MyC1 so it has enough space for all elements of ReceivedCache
+    ReceivedCacheSize = cache:size(ReceivedCache),
+    MyC2 = trim(MyC1, MyC1Size, TargetSize - ReceivedCacheSize),
+    MyC2Size = util:min(MyC1Size, TargetSize - ReceivedCacheSize),
+    % add all received elements to MyC2
+    MyC3 = MyC2 ++ ReceivedCache,
+    MyC3Size = MyC2Size + ReceivedCacheSize,
+    % finally fill up MyC3 (if necessary) with elements from SendCache_new that
+    % are not in ReceivedCache and thus not in MyC3
+    case MyC3Size < TargetSize of
+        true ->
+            SendC3 = [Elem || {Node, _Age} = Elem <- SendCache_new,
+                              not contains_node(Node, ReceivedCache)],
+            {MyC4, _SendC3Rest, _AddedElements} =
+                fillup(MyC3, SendC3, TargetSize - MyC3Size),
+            MyC4;
+        false ->
+            MyC3
+    end.
+
+%% @doc Adds the given node to the cache or updates its age in the Cache if
+%%      present.
+%%      Beware: the node will be added to the cache no matter what size it
+%%      already has!
+-spec add_node(Node::node:node_type(), Age::age(), Cache::cache()) -> NewCache::cache().
+add_node(Node, Age, Cache) ->
+    case contains_node(Node, Cache) of
+        true  -> [{Node, Age} | remove_node(Node, Cache)];
+        false -> [{Node, Age} | Cache]
+    end.
+
+%% @doc Removes any element with the given Node from the Cache.
+-spec remove_node(Node::node:node_type(), Cache::cache()) -> NewCache::cache().
+remove_node(Node, Cache) ->
+    [Element || {SomeNode, _Age} = Element <- Cache, SomeNode =/= Node].
+
+%% @doc Trims the cache to size TargetSize (if necessary) by deleting random
+%%      entries as long as the cache is larger than the given TargetSize.
+-spec trim(Cache::cache(), TargetSize::pos_integer()) -> NewCache::cache().
+trim(Cache, TargetSize) ->
+    trim(Cache, cache:size(Cache), TargetSize).
+
+%% @doc Returns a list of keys (ages) and string values (nodes) for debug output
+%%      used in the web interface.
+-spec debug_format_by_age(Cache::cache()) -> KeyValueList::[{Age::age(), Node::string()}].
+debug_format_by_age(Cache) ->
+    [{Age, lists:flatten(io_lib:format("~p", [Node]))} || {Node, Age} <- Cache].
