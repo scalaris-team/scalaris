@@ -117,9 +117,9 @@ getVivaldiMap() ->
     renderVivaldiMap(CC_list,Nodes).
 
 get_vivaldi(Pid) ->
-    cs_send:send_to_group_member(Pid,vivaldi, {query_vivaldi,cs_send:this()}),
+    cs_send:send_to_group_member(Pid,vivaldi, {get_coordinate,cs_send:this()}),
     receive
-        {query_vivaldi_response,Coordinate,_Confidence} ->
+        {vivaldi_get_coordinate_response,Coordinate,_Confidence} ->
             Coordinate
     end.
 

@@ -28,50 +28,46 @@
 
 -behaviour(gen_component).
 
--export([measure_latency/3]).
-
 -export([on/2, init/1]).
 
-% vivaldi types
--type(latency() :: float()).
+-export([measure_latency/3, check_config/0]).
 
 % state of the vivaldi loop
--type(state() :: {cs_send:mypid(),
+-type(state() :: {cs_send:erl_local_pid(),
                   cs_send:mypid(),
-                  any(),
+                  {vivaldi:network_coordinate(), vivaldi:error()},
                   {integer(), integer(), integer()} | unknown,
-                  [latency()]}).
+                  [vivaldi:latency()]}).
 
 
 % accepted messages of vivaldi_latency processes
--type(message() :: any()).
+-type(message() :: {pong} | {start_ping} | {shutdown}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc message handler
--spec(on/2 :: (Message::message(), State::state()) -> state()).
-on({pong}, {Owner, RemoteNode, Token, Start, Latencies}) ->
+-spec on(Message::message(), State::state()) -> state().
+on({pong}, {Owner, RemotePid, Token, Start, Latencies}) ->
     Stop = erlang:now(),
-    NewLatencies = [timer:now_diff(Stop, Start)| Latencies],
-    case length(NewLatencies) == config:read(vivaldi_count_measurements, 4) of
+    NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
+    case length(NewLatencies) == config:read(vivaldi_count_measurements) of
         true ->
-            cs_send:send_local(Owner,{update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
+            cs_send:send_local(Owner, {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
             kill;
         false ->
             cs_send:send_local_after(config:read(vivaldi_measurements_delay),
-                              self(),
-                              {start_ping}),
-            {Owner, RemoteNode, Token, unknown, NewLatencies}
+                              self(), {start_ping}),
+            {Owner, RemotePid, Token, unknown, NewLatencies}
     end;
 
-on({start_ping}, {Owner, RemoteNode, Token, _, Latencies}) ->
-    cs_send:send(RemoteNode, {ping, cs_send:this()}),
-    {Owner, RemoteNode, Token, erlang:now(), Latencies};
+on({start_ping}, {Owner, RemotePid, Token, _, Latencies}) ->
+    cs_send:send(RemotePid, {ping, cs_send:this()}),
+    {Owner, RemotePid, Token, erlang:now(), Latencies};
 
 on({shutdown}, _State) ->
-    log:log(info, "shutdown vivaldi_latency", []),
+    log:log(info, "shutdown vivaldi_latency due to timeout", []),
     kill;
 
 on(_, _State) ->
@@ -80,25 +76,37 @@ on(_, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(init/1 :: ([any(), ...]) -> state()).
-init([Owner, RemoteNode, Token]) ->
+-spec init({cs_send:erl_local_pid(), cs_send:mypid(), {vivaldi:network_coordinate(), vivaldi:error()}}) -> state().
+init({Owner, RemotePid, Token}) ->
     %io:format("vivaldi_latency start ~n"),
-    erlang:send_after(config:read(vivaldi_latency_timeout, 60*1000),
-                      self(),
-                      {shutdown}),
-    cs_send:send_local(self() , {start_ping}),
-    {Owner, RemoteNode, Token, unknown, []}.
+    cs_send:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
+    cs_send:send_local(self(), {start_ping}),
+    {Owner, RemotePid, Token, unknown, []}.
 
--spec(start/3 :: (pid(), any(), any()) -> {ok, pid()}).
-start(Owner, RemoteNode, Token) ->
-    gen_component:start(?MODULE, [Owner, RemoteNode, Token], []).
-
-measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence) ->
-    start(self(), RemoteNode, {RemoteCoordinate, RemoteConfidence}).
+-spec measure_latency(cs_send:mypid(), vivaldi:network_coordinate(), vivaldi:error()) -> {ok, pid()}.
+measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
+    gen_component:start(?MODULE, {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}}, []).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(calc_latency/1 :: ([latency()]) -> number()).
+-spec calc_latency([vivaldi:latency(),...]) -> number().
 calc_latency(Latencies) ->
     mathlib:median(Latencies).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Miscellaneous
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Checks whether config parameters of the vivaldi_latency process exist
+%%      and are valid.
+-spec check_config() -> bool().
+check_config() ->
+    config:is_integer(vivaldi_count_measurements) and
+    config:is_greater_than(vivaldi_count_measurements, 0) and
+    
+    config:is_integer(vivaldi_measurements_delay) and
+    config:is_greater_than_equal(vivaldi_measurements_delay, 0) and
+    
+    config:is_integer(vivaldi_latency_timeout) and
+    config:is_greater_than(vivaldi_latency_timeout, 0).

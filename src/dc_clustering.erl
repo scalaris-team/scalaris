@@ -70,11 +70,11 @@ on({start_clustering_shuffle}, State) ->
 % ask vivaldi for network coordinate
 on({reset_clustering}, State) ->
     erlang:send_after(config:read(dc_clustering_reset_interval), self(), {reset_clustering}),
-    cs_send:send_local(get_local_vivaldi_pid(), {query_vivaldi, cs_send:this()}),
+    vivaldi:get_coordinate(),
     State;
 
 % reset the local state
-on({query_vivaldi_response, Coordinate, _Confidence}, _State) ->
+on({vivaldi_get_coordinate_response, Coordinate, _Confidence}, _State) ->
     {[Coordinate], [1.0]};
 
 on({cy_cache, []}, State)  ->

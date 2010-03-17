@@ -58,58 +58,26 @@ end_per_suite(Config) ->
 
 on_trigger(Config) ->
     process_dictionary:register_process(vivaldi_group, cyclon, self()),
-    VivaldiModule = vivaldi:new(trigger_periodic),
-    InitialState = VivaldiModule:init([vivaldi_group, []]),
+    VivaldiModule = vivaldi,
+    InitialState = VivaldiModule:init(trigger_periodic),
     NewState = VivaldiModule:on({trigger}, InitialState),
 
-    expect_message({get_subset_rand, 1, self()}),
+    Self = self(),
+    ?expect_message({get_subset_rand, 1, Self}),
     ?equals(element(1, InitialState), element(1, NewState)),
     ?equals(element(2, InitialState), element(2, NewState)),
     Config.
 
 on_vivaldi_shuffle(Config) ->
-    VivaldiModule = vivaldi:new(trigger_periodic),
-    InitialState = VivaldiModule:init([vivaldi_group, []]),
+    config:write(vivaldi_count_measurements, 1),
+    config:write(vivaldi_measurements_delay, 0),
+    VivaldiModule = vivaldi,
+    InitialState = VivaldiModule:init(trigger_periodic),
     _NewState = VivaldiModule:on({vivaldi_shuffle, cs_send:this(), [0.0, 0.0], 1.0},
                                  InitialState),
+    receive
+        {ping, SourcePid} -> cs_send:send(SourcePid, {pong})
+    end,
 
-    expect_message({vivaldi_shuffle_reply, cs_send:this(), element(1, InitialState),
-                    element(2, InitialState)}, {trigger}),
+    ?expect_message({update_vivaldi_coordinate, _Latency, {[0.0, 0.0], 1.0}}),
     Config.
-
-expect_message(Msg) ->
-    receive
-        Msg ->
-            ok
-    after
-        1000 ->
-            ActualMessage = receive
-                                X ->
-                                    X
-                            after
-                                0 ->
-                                    unknown
-                            end,
-            ct:pal("expected message ~p but got ~p", [Msg, ActualMessage]),
-            ?assert(false)
-    end.
-
-expect_message(Msg, IgnoredMessage) ->
-    receive
-        IgnoredMessage ->
-            ct:pal("ignored ~p", [IgnoredMessage]),
-            expect_message(Msg, IgnoredMessage);
-        Msg ->
-            ok
-    after
-        1000 ->
-            ActualMessage = receive
-                                X ->
-                                    X
-                            after
-                                0 ->
-                                    unknown
-                            end,
-            ct:pal("expected message ~p but got ~p", [Msg, ActualMessage]),
-            ?assert(false)
-    end.
