@@ -75,5 +75,9 @@
 -endif.
 
 -ifdef(node_not_builtin).
--type node() :: atom().
+-type node() :: erlang:node().
+-endif.
+
+-ifdef(module_not_builtin).
+-type module() :: erlang:module().
 -endif.
