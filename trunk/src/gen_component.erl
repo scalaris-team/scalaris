@@ -89,11 +89,11 @@ start_link(Module, Args, Options) ->
             {ok, Pid}
     end.
 
--spec(start/2 :: (any(), list()) -> {ok, pid()}).
+-spec(start/2 :: (any(), any()) -> {ok, pid()}).
 start(Module, Args) ->
     start(Module, Args, []).
 
--spec(start/3 :: (any(), list(), list()) -> {ok, pid()}).
+-spec(start/3 :: (any(), any(), list()) -> {ok, pid()}).
 start(Module, Args, Options) ->
     Pid = spawn(?MODULE, start, [Module, Args, Options, self()]),
     receive
@@ -101,6 +101,7 @@ start(Module, Args, Options) ->
             {ok, Pid}
     end.
 
+-spec(start/4 :: (module(), any(), list(), cs_send:erl_local_pid()) -> ok).
 start(Module, Args, Options, Supervisor) ->
     %io:format("Sarting ~p~n",[Module]),
     case lists:keysearch(register, 1, Options) of

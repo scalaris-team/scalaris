@@ -60,7 +60,9 @@
 %%% Created : 19 Feb 2010 by Nico Kruber <kruber@zib.de>
 %%%-------------------------------------------------------------------
 %% @version $Id$
--module(gossip,[Trigger]).
+%% @reference M. Jelasity, A. Montresor, O. Babaoglu: Gossip-based aggregation
+%% in large dynamic networks. ACM Trans. Comput. Syst. 23(3), 219-252 (2005)
+-module(gossip).
 
 -author('kruber@zib.de').
 -vsn('$Id$ ').
@@ -74,12 +76,12 @@
 
 -export([start_link/1]).
 
--export([on/2, init/1, get_base_interval/0]).
+% functions gen_component, the trigger and the config module use
+-export([on/2, init/1, get_base_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
 -export([get_values_best/0, get_values_best/1,
-		 get_values_all/0, get_values_all/1
-]).
+		 get_values_all/0, get_values_all/1]).
 
 -type(load() :: integer()).
 
@@ -93,7 +95,7 @@
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
 %% -> previous and current state, queued messages (get_state messages received
 %% before local values are known) and the state of the trigger.
--type(full_state() :: {state(), state(), list(), any()}).
+-type(full_state() :: {state(), state(), list(), module(), any()}).
 
 % accepted messages of gossip processes
 -type(message() ::
@@ -181,22 +183,23 @@ previous_or_current(PreviousState, CurrentState) ->
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Initialises the module with an empty state.
--spec init([any()]) -> full_state().
-init([_InstanceId, []]) ->
-%%     io:format("gossip start ~n"),
-    TriggerState = Trigger:init(THIS),
-    TriggerState2 = Trigger:trigger_first(TriggerState, 1),
-	PreviousState = gossip_state:new_state(),
-	State = gossip_state:new_state(),
-    log:log(info, "Gossip spawn: ~p~n", [cs_send:this()]),
-    {PreviousState, State, [], TriggerState2}.
-
 %% @doc Starts the gossip process, registers it with the process dictionary and
 %%      returns its pid for use by a supervisor.
 -spec start_link(term()) -> {ok, pid()}.
 start_link(InstanceId) ->
-    gen_component:start_link(THIS, [InstanceId, []], [{register, InstanceId, gossip}]).
+    Trigger = config:read(gossip_trigger),
+    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, gossip}]).
+
+%% @doc Initialises the module with an empty state.
+-spec init(module()) -> full_state().
+init(Trigger) ->
+%%     io:format("gossip start ~n"),
+    TriggerState = Trigger:init(?MODULE),
+    TriggerState2 = Trigger:trigger_first(TriggerState, 1),
+	PreviousState = gossip_state:new_state(),
+	State = gossip_state:new_state(),
+    log:log(info, "Gossip spawn: ~p~n", [cs_send:this()]),
+    {PreviousState, State, [], Trigger, TriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -204,7 +207,7 @@ start_link(InstanceId) ->
 
 %% @doc message handler
 -spec on(message(), full_state()) -> full_state() | unknown_event.
-on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
+on({trigger}, {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
 	% this message is received continuously when the Trigger calls
 	% see gossip_trigger and gossip_interval in the scalaris.cfg file
 %% 	io:format("{trigger_gossip}: ~p~n", [State]),
@@ -221,14 +224,14 @@ on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
         true -> request_random_node();
         false -> ok
     end,
-    {PreviousState, NewState, QueuedMessages, NewTriggerState};
+    {PreviousState, NewState, QueuedMessages, Trigger, NewTriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Responses to requests for information about the local node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({{get_node_details_response, NodeDetails}, local_info},
-   {PreviousState, State, QueuedMessages, TriggerState}) ->
+   {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
 	% this message is received when the (local) node was asked to tell us its
 	% load and key range
 %%     io:format("gossip: got get_node_details_response: ~p~n",[NodeDetails]),
@@ -240,14 +243,14 @@ on({{get_node_details_response, NodeDetails}, local_info},
 				[cs_send:send_local(self(), Message) || Message <- QueuedMessages],
 				{[], integrate_local_info(State, node_details:get(NodeDetails, load), calc_initial_avg_kr(node_details:get(NodeDetails, my_range)))}
 			end,
-    {PreviousState, NewState, NewQueuedMessages, TriggerState};
+    {PreviousState, NewState, NewQueuedMessages, Trigger, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Leader election
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({{get_node_details_response, NodeDetails}, leader_start_new_round},
-   {PreviousState, State, QueuedMessages, TriggerState}) ->
+   {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_new_round_if_leader/1 which only asks for this if the condition to
 	% start a new round has already been met
@@ -260,11 +263,11 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 			% leader -> start a new round
 			true -> new_round(State)
 	end,
-    {NewPreviousState, NewState, QueuedMessages, TriggerState};
+    {NewPreviousState, NewState, QueuedMessages, Trigger, TriggerState};
 
 %% Prints some debug information if the current node is the leader.
 on({{get_node_details_response, NodeDetails}, leader_debug_output},
-   {PreviousState, State, QueuedMessages, TriggerState}) ->
+   {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_leader_debug_output/0
 %%     io:format("gossip: got get_node_details_response, leader_debug_output: ~p~n",[NodeDetails]),
@@ -306,14 +309,14 @@ on({{get_node_details_response, NodeDetails}, leader_debug_output},
 				 {size_kr,gossip_state:calc_size_kr(BestState)}]),
 			ok
 	end,
-    {PreviousState, State, QueuedMessages, TriggerState};
+    {PreviousState, State, QueuedMessages, Trigger, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State exchange
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state, Source_PID, OtherValues} = Msg,
-   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
+   {MyPreviousState, MyState, QueuedMessages, Trigger, TriggerState}) ->
 	% This message is received when a node asked our node for its state.
 	% The piggy-backed other node's state will be used to update our own state
 	% if we have already initialized it (otherwise postpone the message). A
@@ -325,27 +328,27 @@ on({get_state, Source_PID, OtherValues} = Msg,
 			false ->
 				{[Msg | QueuedMessages], enter_round(MyPreviousState, MyState, OtherValues)}
 			end,
-    {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState};
+    {MyNewPreviousState, MyNewState, NewQueuesMessages, Trigger, TriggerState};
 
 on({get_state_response, OtherValues},
-   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
+   {MyPreviousState, MyState, QueuedMessages, Trigger, TriggerState}) ->
 	% This message is received as a response to a get_state message and contains
     % another node's state. We will use it to update our own state
 	% if both are valid.
 	{MyNewPreviousState, MyNewState} =
 		integrate_state(OtherValues, MyPreviousState, MyState, false, none),
-    {MyNewPreviousState, MyNewState, QueuedMessages, TriggerState};
+    {MyNewPreviousState, MyNewState, QueuedMessages, Trigger, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contacting random nodes (response from cyclon)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% ignore empty node list from cyclon
 on({cy_cache, []}, FullState)  ->
-    % ignore empty cache from cyclon
     FullState;
 
 on({cy_cache, [Node] = _Cache},
-    {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+    {_PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
     % This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node. We will then contact this
     % random node and ask for a state exchange.
@@ -367,14 +370,14 @@ on({cy_cache, [Node] = _Cache},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_values_best, SourcePid},
-    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+    {PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
 	BestState = previous_or_current(PreviousState, State),
 	BestValues = gossip_state:conv_state_to_extval(BestState),
 	msg_get_values_best_response(SourcePid, BestValues),
 	FullState;
 
 on({get_values_all, SourcePid},
-    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+    {PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
 	PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
 	CurrentValues = gossip_state:conv_state_to_extval(State),
 	BestState = previous_or_current(PreviousState, State),
@@ -387,7 +390,7 @@ on({get_values_all, SourcePid},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({'$gen_cast', {debug_info, Requestor}},
-   {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+   {PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
     BestState = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
     KeyValueList =
         [{"prev_round",          gossip_state:get_round(PreviousState)},
@@ -528,7 +531,8 @@ update(MyState, OtherValues) ->
 	?GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(),
 	Result.
 
--spec calc_change(number() | unknown, number() | unknown) -> float() | unknown.
+%% @doc Calculates the change in percent from the Old value to the New value.
+-spec calc_change(Old::number() | unknown, New::number() | unknown) -> Change::float().
 calc_change(Old, New) ->
 	if
 		(Old =/= unknown) and (Old =:= New) -> 0.0;
@@ -759,77 +763,65 @@ calc_initial_avg_kr({PredKey, MyKey} = _Range) ->
 		error:_ -> unknown
 	end.
 
+%% @doc Checks whether config parameters of the gossip process exist and are
+%%      valid.
+-spec check_config() -> bool().
+check_config() ->
+    config:is_atom(gossip_trigger) and
+    
+    config:is_integer(gossip_interval) and
+    config:is_greater_than(gossip_interval, 0) and
+    
+    config:is_integer(gossip_min_triggers_per_round) and
+    config:is_greater_than_equal(gossip_min_triggers_per_round, 0) and
+    
+    config:is_integer(gossip_max_triggers_per_round) and
+    config:is_greater_than_equal(gossip_max_triggers_per_round, 1) and
+    
+    config:is_float(gossip_converge_avg_epsilon) and
+    config:is_in_range(gossip_converge_avg_epsilon, 0.0, 100.0) and
+    
+    config:is_integer(gossip_converge_avg_count) and
+    config:is_greater_than(gossip_converge_avg_count, 0) and
+    
+    config:is_integer(gossip_converge_avg_count_start_new_round) and
+    config:is_greater_than(gossip_converge_avg_count_start_new_round, 0).
+    
 %% @doc Gets the gossip interval set in scalaris.cfg.
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
-    _GossipInterval = 
-    	case config:read(gossip_interval) of 
-        	failed ->
-            	log:log(warning, "gossip_interval not defined (see scalaris.cfg), using default (1000)~n"),
-				1000;
-			X -> X
-		end.
+    config:read(gossip_interval).
 
 %% @doc Gets the number of minimum triggers a round should have (set in
 %%      scalaris.cfg). A new round will not be started as long as this number
 %%      has not been reached at the leader.
 -spec get_min_tpr() -> pos_integer().
 get_min_tpr() ->
-    _MinTPR = 
-	    case config:read(gossip_min_triggers_per_round) of 
-    	    failed ->
-        	    log:log(warning, "gossip_min_triggers_per_round not defined (see scalaris.cfg), using default (10)~n"),
-				10;
-			X -> X
-		end.
+    config:read(gossip_min_triggers_per_round).
 
 %% @doc Gets the number of maximum triggers a round should have (set in
 %%      scalaris.cfg). A new round will be started when this number is reached
 %%      at the leader.
 -spec get_max_tpr() -> pos_integer().
 get_max_tpr() ->
-    _MaxTPR = 
-	    case config:read(gossip_max_triggers_per_round) of 
-    	    failed ->
-        	    log:log(warning, "gossip_max_triggers_per_round not defined (see scalaris.cfg), using default (1000)~n"),
-				1000;
-			X -> X
-		end.
+    config:read(gossip_max_triggers_per_round).
 
 %% @doc Gets the epsilon parameter that defines the maximum change of
 %%      average-based values (in percent) to be considered as "converged", i.e.
 %%      stable.
 -spec get_converge_avg_epsilon() -> float().
 get_converge_avg_epsilon() ->
-    _ConvergeAvgEpsilon = 
-	    case config:read(gossip_converge_avg_epsilon) of 
-    	    failed ->
-        	    log:log(warning, "gossip_converge_avg_epsilon not defined (see scalaris.cfg), using default (5.0)~n"),
-				5.0;
-			X -> X
-		end.
+    config:read(gossip_converge_avg_epsilon).
 
 %% @doc Gets the count parameter that defines how often average-based values
 %%      should change within an epsilon in order to be considered as
 %%      "converged", i.e. stable.
 -spec get_converge_avg_count() -> pos_integer().
 get_converge_avg_count() ->
-    _ConvergeAvgCount = 
-	    case config:read(gossip_converge_avg_count) of 
-    	    failed ->
-        	    log:log(warning, "gossip_converge_avg_count not defined (see scalaris.cfg), using default (10)~n"),
-				10;
-			X -> X
-		end.
+    config:read(gossip_converge_avg_count).
 
 %% @doc Gets the count parameter that defines how often average-based values
 %%      should change within an epsilon in order to start a new round.
 -spec get_converge_avg_count_start_new_round() -> pos_integer().
 get_converge_avg_count_start_new_round() ->
-    _ConvergeAvgCountStartNewRound = 
-	    case config:read(gossip_converge_avg_count_start_new_round) of 
-    	    failed ->
-        	    log:log(warning, "gossip_converge_avg_count_start_new_round not defined (see scalaris.cfg), using default (20)~n"),
-				20;
-			X -> X
-		end.
+    config:read(gossip_converge_avg_count_start_new_round).

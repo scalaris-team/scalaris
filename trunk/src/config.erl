@@ -29,7 +29,14 @@
 -export([
          start_link/1, start/2,
 
-         read/1, read/2,
+         read/1, write/2,
+         
+         check_config/0,
+         
+         exists/1, is_atom/1, is_bool/1, is_mypid/1, is_ip/1, is_integer/1,
+         is_float/1, is_string/1, is_in_range/3,
+         is_greater_than/2, is_greater_than_equal/2,
+         is_less_than/2, is_less_than_equal/2, is_in/2,
 
          succListLength/0, stabilizationInterval_max/0,
          stabilizationInterval_min/0,stabilizationInterval/0,
@@ -53,25 +60,34 @@
 %% public functions
 %%====================================================================
 
-%% @doc read config parameter
+%% @doc Reads config parameter.
 -spec(read/1 :: (atom()) -> any() | failed).
 read(Key) ->
-    read(Key, failed).
-
-% @doc read with default-value
--spec(read/2 :: (atom(), any()) -> any()).
-read(Key, Default) ->
     case ets:lookup(config_ets, Key) of
-	[{Key, Value}] ->
-	    %% allow values defined as application environments to override
-	    Value;
-	[] ->
-	    case preconfig:get_env(Key, failed) of
-		failed -> Default;
-		X ->
-		    ets:insert(config_ets, {Key, X}),
-		    X
-	    end
+        [{Key, Value}] ->
+            %% allow values defined as application environments to override
+            Value;
+        [] ->
+            case preconfig:get_env(Key, failed) of
+                failed ->
+%%                     log:log(warning,
+%%                             lists:flatten(
+%%                               io_lib:format("~p not defined (see scalaris.cfg and scalaris.local.cfg), using default (~p)~n",
+%%                                             [Key, Default]))
+%%                            ),
+                    failed;
+                X ->
+                    ets:insert(config_ets, {Key, X}),
+                    X
+            end
+    end.
+
+%% @doc Writes a config parameter.
+-spec write(atom(), any()) -> ok.
+write(Key, Value) ->
+    cs_send:send_local(config, {write, self(), Key, Value}),
+    receive
+        {write_done} -> ok
     end.
 
 %%====================================================================
@@ -287,13 +303,19 @@ start_link(Files) ->
 
 %@private
 start(Files, Owner) ->
+    register(?MODULE, self()),
     ets:new(config_ets, [set, protected, named_table]),
     [ populate_db(File) || File <- Files],
+    check_config(),
     Owner ! done,
     loop().
 
 loop() ->
     receive
+        {write, Pid, Key, Value} ->
+            ets:insert(config_ets, {Key, Value}),
+            cs_send:send_local(Pid, {write_done}),
+            loop();
         _ ->
             loop()
     end.
@@ -317,3 +339,230 @@ eval_environment(Port) ->
     
 process_term({Key, Value}) ->
     ets:insert(config_ets, {Key, preconfig:get_env(Key, Value)}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% check config methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Checks whether config parameters of all processes exist and are valid.
+-spec check_config() -> bool().
+check_config() ->
+    gossip:check_config() and
+    vivaldi:check_config() and
+    cyclon:check_config() and
+    vivaldi_latency:check_config().
+
+-spec exists(Key::atom()) -> bool().
+exists(Key) ->
+    case read(Key) of
+        failed ->
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key]))
+                   ),
+            false;
+        _X -> true
+    end.
+
+-spec is_atom(Key::atom()) -> bool().
+is_atom(Key) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when is_atom(X) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not an atom (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X]))
+                   ),
+            false
+        end.
+
+-spec is_bool(Key::atom()) -> bool().
+is_bool(Key) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when is_boolean(X) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X]))
+                   ),
+            false
+        end.
+
+-spec is_mypid(Key::atom()) -> bool().
+is_mypid(Key) ->
+    Value = read(Key),
+    exists(Key) andalso case cs_send:is_valid(Value) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        true -> true;
+        false -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not a valid pid (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, Value]))
+                   ),
+            false
+        end.
+
+-spec is_ip(Key::atom()) -> bool().
+is_ip(Key) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        {IP1, IP2, IP3, IP4}
+          when (IP1 >= 0) andalso (IP2 >= 0) andalso (IP3 >= 0) andalso (IP4 >= 0) andalso
+                   (IP1 =< 255) andalso (IP2 =< 255) andalso (IP3 =< 255) andalso (IP4 =< 255) ->
+            true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not a valid IP4 address (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X]))
+                   ),
+            false
+        end.
+
+-spec is_integer(Key::atom()) -> bool().
+is_integer(Key) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when is_integer(X) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X]))
+                   ),
+            false
+        end.
+
+-spec is_float(Key::atom()) -> bool().
+is_float(Key) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when is_float(X) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X]))
+                   ),
+            false
+        end.
+
+-spec is_string(Key::atom()) -> bool().
+is_string(Key) ->
+    IsChar = fun(X) ->
+                     if (X >= 0) andalso (X =< 255) -> true;
+                        true -> false
+                     end
+             end,
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1
+        X when is_list(X) ->
+            case lists:all(IsChar, X) of
+                true -> true;
+                false -> 
+                    log:log(warning,
+                            lists:flatten(
+                              io_lib:format("~p = ~p is not a (printable) string (see scalaris.cfg and scalaris.local.cfg)~n",
+                                            [Key, X]))
+                           )
+            end;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not a (printable) string (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X]))
+                   ),
+            false
+        end.
+
+-spec is_in_range(Key::atom(), Min::number(), Max::number()) -> bool().
+is_in_range(Key, Min, Max) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when (X >= Min) andalso (X =< Max) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not between ~p and ~p (both inclusive) (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X, Min, Max]))
+                   ),
+            false
+        end.
+
+-spec is_greater_than(Key::atom(), Min::number()) -> bool().
+is_greater_than(Key, Min) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when (X > Min) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not larger than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X, Min]))
+                   ),
+            false
+        end.
+
+-spec is_greater_than_equal(Key::atom(), Min::number()) -> bool().
+is_greater_than_equal(Key, Min) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when (X >= Min) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not larger than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X, Min]))
+                   ),
+            false
+        end.
+
+-spec is_less_than(Key::atom(), Max::number()) -> bool().
+is_less_than(Key, Max) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when (X < Max) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not less than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X, Max]))
+                   ),
+            false
+        end.
+
+-spec is_less_than_equal(Key::atom(), Max::number()) -> bool().
+is_less_than_equal(Key, Max) ->
+    exists(Key) andalso case read(Key) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        X when (X =< Max) -> true;
+        X -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not less than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, X, Max]))
+                   ),
+            false
+        end.
+
+-spec is_in(Key::atom(), ValidValues::[any(),...]) -> bool().
+is_in(Key, ValidValues) ->
+    Value = read(Key),
+    IsValue = fun(X) -> X =:= Value end,
+    exists(Key) andalso case lists:any(IsValue, ValidValues) of
+        % no need to check for 'failed', this has been checked by exist/1 
+        true -> true;
+        false -> 
+            log:log(warning,
+                    lists:flatten(
+                      io_lib:format("~p = ~p is not allowed (valid values: ~p) (see scalaris.cfg and scalaris.local.cfg)~n",
+                                    [Key, Value, ValidValues]))
+                   ),
+            false
+        end.

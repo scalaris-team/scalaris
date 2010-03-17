@@ -41,3 +41,38 @@ myequals(true, _, _, _, _) ->
 myequals(false, XS, YS, X ,Y) ->
     ct:fail(lists:flatten(io_lib:format("~p(~p) != ~p(~p)", [XS, X, YS, Y]))).
 
+-define(expect_message(Msg),
+        receive
+            Msg -> ok
+        after
+            1000 ->
+                ActualMessage =
+                    receive
+                        X -> X
+                    after
+                        0 -> unknown
+                    end,
+                ct:pal("expected message ~p but got ~p", [??Msg, ActualMessage]),
+                ?assert(false)
+        end).
+
+% maybe also define a expect_message macro which ignores certain messages, similar to this function:
+%% expect_message(Msg, IgnoredMessage) ->
+%%     receive
+%%         IgnoredMessage ->
+%%             ct:pal("ignored ~p", [IgnoredMessage]),
+%%             expect_message(Msg, IgnoredMessage);
+%%         Msg ->
+%%             ok
+%%     after
+%%         1000 ->
+%%             ActualMessage = receive
+%%                                 X ->
+%%                                     X
+%%                             after
+%%                                 0 ->
+%%                                     unknown
+%%                             end,
+%%             ct:pal("expected message ~p but got ~p", [Msg, ActualMessage]),
+%%             ?assert(false)
+%%     end.

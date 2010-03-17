@@ -34,11 +34,14 @@
 
 -include("../../include/scalaris.hrl").
 
-%% API
--export([start_link/1, init/1, on/2, get_base_interval/0,
-         get_subset_rand/1, get_subset_rand/2,
-         get_subset_rand_next_interval/1, get_subset_rand_next_interval/2
-        ]).
+-export([start_link/1]).
+
+% functions gen_component, the trigger and the config module use
+-export([init/1, on/2, get_base_interval/0, check_config/0]).
+
+% helpers for creating getter messages:
+-export([get_subset_rand/1, get_subset_rand/2,
+         get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
 
 %% -export([get_ages/0, get_ages/1]).
 
@@ -151,11 +154,11 @@ get_subset_rand_next_interval(N, Pid) ->
 -spec start_link(term()) -> {ok, pid()}.
 start_link(InstanceId) ->
     Trigger = config:read(cyclon_trigger),
-    gen_component:start_link(?MODULE, [Trigger], [{register, InstanceId, cyclon}]).
+    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, cyclon}]).
 
 %% @doc Initialises the module with an empty state.
--spec init([module(),...]) -> state().
-init([Trigger]) ->
+-spec init(module()) -> state().
+init(Trigger) ->
     request_node_details([node, pred, succ]),
     cs_send:send_local_after(100, self(), {check_state}),
     TriggerState = Trigger:init(?MODULE),
@@ -285,43 +288,40 @@ check_state({Cache, Node, _Cycles, _Trigger, _TriggerState} = _State) ->
             ok
     end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Miscellaneous
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Checks whether config parameters of the cyclon process exist and are
+%%      valid.
+-spec check_config() -> bool().
+check_config() ->
+    config:is_atom(cyclon_trigger) and
+    
+    config:is_integer(cyclon_interval) and
+    config:is_greater_than(cyclon_interval, 0) and
+    
+    config:is_integer(cyclon_cache_size) and
+    config:is_greater_than(cyclon_cache_size, 2) and
+    
+    config:is_integer(cyclon_shuffle_length) and
+    config:is_greater_than_equal(cyclon_shuffle_length, 1) and
+    config:is_less_than_equal(cyclon_shuffle_length, config:read(cyclon_cache_size)).
 
 %% @doc Gets the cyclon interval set in scalaris.cfg.
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
-    _CyclonInterval = 
-        case config:read(cyclon_interval) of 
-            failed ->
-                log:log(warning, "cyclon_interval not defined (see scalaris.cfg), using default (1000)~n"),
-                1000;
-            X -> X
-        end.
+    config:read(cyclon_interval).
 
 %% @doc Gets the cyclon_shuffle_length parameter that defines how many entries
 %%      of the cache are exchanged.
 -spec get_shuffle_length() -> pos_integer().
 get_shuffle_length() ->
-    _ShuffleLength = 
-        case config:read(cyclon_shuffle_length) of 
-            failed ->
-                log:log(warning, "cyclon_shuffle_length not defined (see scalaris.cfg), using default (8)~n"),
-                8;
-            X -> X
-        end.
+    config:read(cyclon_shuffle_length).
 
 %% @doc Gets the cyclon_cache_size parameter that defines how many entries a
 %%      cache should at most have.
 -spec get_cache_size() -> pos_integer().
 get_cache_size() ->
-    _CacheSize = 
-        case config:read(cyclon_cache_size) of 
-            failed ->
-                log:log(warning, "cyclon_cache_size not defined (see scalaris.cfg), using default (20)~n"),
-                20;
-            X when X > 2 ->
-                X;
-            _Y -> 
-                log:log(warning, "cyclon_cache_size should be larger than 2 (see scalaris.cfg), using minnimum (3)~n"),
-                3
-        end.
+    config:read(cyclon_cache_size).
     

@@ -59,9 +59,8 @@ init([Options]) ->
                              [dn_cache:new(config:read(dn_cache_trigger)),
                               [InstanceId]]),
     Vivaldi =
-        util:sup_worker_desc(vivaldi, util, parameterized_start_link,
-                             [vivaldi:new(config:read(vivaldi_trigger)),
-                              [InstanceId]]),
+        util:sup_worker_desc(vivaldi, vivaldi, start_link,
+                             [InstanceId]),
     CS_Reregister =
         util:sup_worker_desc(cs_reregister, util, parameterized_start_link,
                              [cs_reregister:new(config:read(cs_reregister_trigger)),
@@ -72,14 +71,9 @@ init([Options]) ->
     Cyclon =
         util:sup_worker_desc(cyclon, cyclon, start_link,
                              [InstanceId]),
-%%     Cyclon =
-%%         util:sup_worker_desc(cyclon, util, parameterized_start_link,
-%%                              [cyclon:new(config:read(cyclon_trigger)),
-%%                               [InstanceId]]),
     Gossip =
-        util:sup_worker_desc(gossip, util, parameterized_start_link,
-                             [gossip:new(config:read(gossip_trigger)),
-                              [InstanceId]]),
+        util:sup_worker_desc(gossip, gossip, start_link,
+                             [InstanceId]),
     Self_Man =
         util:sup_worker_desc(self_man, self_man, start_link,
                              [InstanceId]),

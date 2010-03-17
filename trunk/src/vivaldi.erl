@@ -25,16 +25,22 @@
 %% Vivaldi: A Decentralized Network Coordinate System</em>. SigComm 2004.
 %% @reference Jonathan Ledlie, Peter Pietzuch, Margo Seltzer. <em>Stable
 %% and Accurate Network Coordinates</em>. ICDCS 2006.
--module(vivaldi,[Trigger]).
+-module(vivaldi).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -behaviour(gen_component).
 
+-include("../include/scalaris.hrl").
+
 -export([start_link/1]).
 
--export([on/2, init/1,get_base_interval/0]).
+% functions gen_component, the trigger and the config module use
+-export([on/2, init/1, get_base_interval/0, check_config/0]).
+
+% helpers for creating getter messages:
+-export([get_coordinate/0, get_coordinate/1]).
 
 % vivaldi types
 -type(network_coordinate() :: [float()]).
@@ -42,10 +48,66 @@
 -type(latency() :: number()).
 
 % state of the vivaldi loop
--type(state() :: {network_coordinate(), error()}).
+-type(state() :: {network_coordinate(), error(), module(), any()}).
 
 % accepted messages of vivaldi processes
--type(message() :: any()).
+-type(message() ::
+    {trigger} |
+    {cy_cache, cyclon_cache:cache()} |
+    {vivaldi_shuffle, cs_send:mypid(), network_coordinate(), error()} |
+    {vivaldi_shuffle_reply, cs_send:mypid(), network_coordinate(), error()} |
+    {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |
+    {get_coordinate, cs_send:mypid()}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Helper functions that create and send messages to nodes requesting information.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sends a response message to a request for the best stored values.
+-spec msg_get_coordinate_response(cs_send:mypid(), network_coordinate(), error()) -> ok.
+msg_get_coordinate_response(Pid, Coordinate, Confidence) ->
+    cs_send:send(Pid, {vivaldi_get_coordinate_response, Coordinate, Confidence}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Getters
+%
+% Functions that other processes can call to receive information from the
+% vivaldi process
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sends a (local) message to the vivaldi process of the requesting
+%%      process' group asking for the current coordinate and confidence.
+%%      see on({get_coordinate, Pid}, State) and
+%%      msg_get_coordinate_response/3
+-spec get_coordinate() -> ok.
+get_coordinate() ->
+    get_coordinate(cs_send:this()).
+
+%% @doc Sends a (local) message to the vivaldi process of the requesting
+%%      process' group asking for the current coordinate and confidence to
+%%      be send to Pid.
+%%      see on({get_coordinate, Pid}, State) and
+%%      msg_get_coordinate_response/3
+-spec get_coordinate(cs_send:mypid()) -> ok.
+get_coordinate(Pid) ->
+    VivaldiPid = process_dictionary:get_group_member(vivaldi),
+    cs_send:send_local(VivaldiPid, {get_coordinate, Pid}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Startup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec start_link(term()) -> {ok, pid()}.
+start_link(InstanceId) ->
+    Trigger = config:read(vivaldi_trigger),
+    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, vivaldi}]).
+
+-spec init(module()) -> vivaldi:state().
+init(Trigger) ->
+    %io:format("vivaldi start ~n"),
+    TriggerState = Trigger:init(?MODULE),
+    TriggerState2 = Trigger:trigger_first(TriggerState, 1),
+    {random_coordinate(), 1.0, Trigger, TriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -53,85 +115,65 @@
 
 % start new vivaldi shuffle
 %% @doc message handler
--spec(on/2 :: (Message::message(), State::state()) -> state()).
-on({trigger},{Coordinate, Confidence,TriggerState} ) ->
+-spec on(Message::message(), State::state()) -> state().
+on({trigger}, {Coordinate, Confidence, Trigger, TriggerState} ) ->
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
-    NewTriggerState = Trigger:trigger_next(TriggerState,1),
+    NewTriggerState = Trigger:trigger_next(TriggerState, 1),
     cyclon:get_subset_rand(1),
-    {Coordinate, Confidence, NewTriggerState};
+    {Coordinate, Confidence, Trigger, NewTriggerState};
 
+% ignore empty node list from cyclon
 on({cy_cache, []}, State)  ->
-    % ignore empty cache from cyclon
     State;
 
 % got random node from cyclon
-on({cy_cache, [Node] = _Cache}, {Coordinate, Confidence, _TriggerState} = State) ->
+on({cy_cache, [Node] = _Cache},
+   {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
     cs_send:send_to_group_member(node:pidX(Node), vivaldi,
                                  {vivaldi_shuffle, cs_send:this(),
                                   Coordinate, Confidence}),
     State;
 
-%
-on({vivaldi_shuffle, RemoteNode, RemoteCoordinate, RemoteConfidence},
-   {Coordinate, Confidence, _TriggerState} = State) ->
+on({vivaldi_shuffle, SourcePid, RemoteCoordinate, RemoteConfidence},
+   {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
     %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    cs_send:send(RemoteNode, {vivaldi_shuffle_reply, cs_send:this(),
-                              Coordinate, Confidence}),
-    vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
-    State;
-
-on({vivaldi_shuffle_reply, _RemoteNode, _RemoteCoordinate, _RemoteConfidence}, State) ->
-    %io:format("{shuffle_reply, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    %vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
+    vivaldi_latency:measure_latency(SourcePid, RemoteCoordinate, RemoteConfidence),
     State;
 
 on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
-   {Coordinate, Confidence,TriggerState}) ->
+   {Coordinate, Confidence, Trigger, TriggerState}) ->
     %io:format("latency is ~pus~n", [Latency]),
-    {NewCoordinate, NewConfidence } =
+    {NewCoordinate, NewConfidence} =
         try
             update_coordinate(RemoteCoordinate, RemoteConfidence,
                               Latency, Coordinate, Confidence)
         catch
             % ignore any exceptions, e.g. badarith
-            error:_ -> {Coordinate, Confidence }
+            error:_ -> {Coordinate, Confidence}
         end,
-    {NewCoordinate, NewConfidence, TriggerState};
+    {NewCoordinate, NewConfidence, Trigger, TriggerState};
 
-on({query_vivaldi, Pid}, {Coordinate, Confidence, _TriggerState} = State) ->
-    cs_send:send(Pid,{query_vivaldi_response,Coordinate,Confidence}),
+on({get_coordinate, Pid}, {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
+    msg_get_coordinate_response(Pid, Coordinate, Confidence),
     State;
 
 on(_, _State) ->
     unknown_event.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Init
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(init/1 :: ([any()]) -> vivaldi:state()).
-init([_InstanceId, []]) ->
-    %io:format("vivaldi start ~n"),
-    TriggerState = Trigger:init(THIS),
-    TriggerState2 = Trigger:trigger_first(TriggerState,1),
-    {random_coordinate(), 1.0,TriggerState2}.
-
-%% @spec start_link(term()) -> {ok, pid()}
-start_link(InstanceId) ->
-    gen_component:start_link(THIS, [InstanceId, []], [{register, InstanceId, vivaldi}]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec(random_coordinate/0 :: () -> network_coordinate()).
+-spec random_coordinate() -> network_coordinate().
 random_coordinate() ->
-    Dim = config:read(vivaldi_dimensions, 2),
+    Dim = config:read(vivaldi_dimensions),
     % note: network coordinates are float vectors!
     [ float(crypto:rand_uniform(1, 10)) || _ <- lists:seq(1, Dim) ].
 
--spec(update_coordinate/5 :: (network_coordinate(), error(), latency(),
-                              network_coordinate(), error()) -> vivaldi:state()).
+-spec update_coordinate(network_coordinate(), error(), latency(),
+                         network_coordinate(), error()) ->
+                            {network_coordinate(), error()}.
 update_coordinate(Coordinate, _RemoteError, _Latency, Coordinate, Error) ->
     % same coordinate
     {Coordinate, Error};
@@ -154,5 +196,23 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
     %io:format("new coordinate ~p and error ~p~n", [Coordinate1, Error1]),
     {Coordinate1, Error1}.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Miscellaneous
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Checks whether config parameters of the gossip process exist and are
+%%      valid.
+-spec check_config() -> bool().
+check_config() ->
+    config:is_atom(vivaldi_trigger) and
+    
+    config:is_integer(vivaldi_interval) and
+    config:is_greater_than(vivaldi_interval, 0) and
+    
+    config:is_integer(vivaldi_dimensions) and
+    config:is_greater_than_equal(vivaldi_dimensions, 2).
+
+%% @doc Gets the vivaldi interval set in scalaris.cfg.
+-spec get_base_interval() -> pos_integer().
 get_base_interval() ->
     config:read(vivaldi_interval).
