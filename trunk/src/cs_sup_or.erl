@@ -70,9 +70,12 @@ init([Options]) ->
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
                              [InstanceId]),
     Cyclon =
-        util:sup_worker_desc(cyclon, util, parameterized_start_link,
-                             [cyclon:new(config:read(cyclon_trigger)),
-                              [InstanceId]]),
+        util:sup_worker_desc(cyclon, cyclon, start_link,
+                             [InstanceId]),
+%%     Cyclon =
+%%         util:sup_worker_desc(cyclon, util, parameterized_start_link,
+%%                              [cyclon:new(config:read(cyclon_trigger)),
+%%                               [InstanceId]]),
     Gossip =
         util:sup_worker_desc(gossip, util, parameterized_start_link,
                              [gossip:new(config:read(gossip_trigger)),

@@ -62,7 +62,7 @@ on_trigger(Config) ->
     InitialState = VivaldiModule:init([vivaldi_group, []]),
     NewState = VivaldiModule:on({trigger}, InitialState),
 
-    expect_message({get_subset, 1, self()}),
+    expect_message({get_subset_rand, 1, self()}),
     ?equals(element(1, InitialState), element(1, NewState)),
     ?equals(element(2, InitialState), element(2, NewState)),
     Config.

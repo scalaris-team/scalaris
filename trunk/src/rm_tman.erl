@@ -75,7 +75,7 @@ init(_Args) ->
 on({init, Id, Me, Predecessor, SuccList}, uninit) ->
     ring_maintenance:update_preds_and_succs([Predecessor], SuccList),
     fd:subscribe(lists:usort([node:pidX(Node) || Node <- [Predecessor | SuccList]])),
-    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid() , {get_subset_max_age,1,self()}),
+    cyclon:get_subset_rand_next_interval(1),
     TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
     {Id, Me, [Predecessor], SuccList, config:read(cyclon_cache_size),
@@ -128,15 +128,14 @@ on({trigger},{Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, Cache,
         end,
    {Id, Me, Preds, Succs, RandViewSize, Interval, NewTriggerState, Cache, Churn};
 % got empty cyclon cache
-on({cache, []}, {_Id, _Me, _Preds, _Succs, RandViewSize, _Interval,
+on({cy_cache, []}, {_Id, _Me, _Preds, _Succs, RandViewSize, _Interval,
                  _TriggerState, _Cache, _Churn} = State)  ->
     % ignore empty cache from cyclon
-    cs_send:send_local_after(config:read(cyclon_interval),get_cyclon_pid(),
-                        {get_subset_max_age, RandViewSize, self()}),
+    cyclon:get_subset_rand_next_interval(RandViewSize),
     State;
 
 % got cyclon cache
-on({cache, NewCache},{Id, Me, OldPreds, OldSuccs, RandViewSize, Interval,
+on({cy_cache, NewCache},{Id, Me, OldPreds, OldSuccs, RandViewSize, Interval,
                      TriggerState, _Cache, Churn})  ->
              %inc RandViewSize (no error detected)
     RandViewSizeNew = case (RandViewSize < config:read(cyclon_cache_size)) of
@@ -146,8 +145,7 @@ on({cache, NewCache},{Id, Me, OldPreds, OldSuccs, RandViewSize, Interval,
                               RandViewSize
                       end,
     % trigger new cyclon cache request
-    cs_send:send_local_after(config:read(cyclon_interval), get_cyclon_pid(),
-                       {get_subset_max_age, RandViewSizeNew, self()}),
+    cyclon:get_subset_rand_next_interval(RandViewSizeNew),
     RndView = get_RndView(RandViewSizeNew, NewCache),
     {NewPreds, NewSuccs, NewInterval, NewChurn} =
         update_view(OldPreds, OldSuccs, NewCache, RndView,
@@ -330,9 +328,6 @@ new_interval(OldPreds, NewPreds, OldSuccs, NewSuccs,_Interval,Churn) ->
 % @doc is there churn in the system
 has_churn(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
     OldPreds =:= NewPreds andalso OldSuccs =:= NewSuccs.
-
-get_cyclon_pid() ->
-    process_dictionary:get_group_member(cyclon).
 
 get_pid_dnc() ->
     process_dictionary:get_group_member(dn_cache).

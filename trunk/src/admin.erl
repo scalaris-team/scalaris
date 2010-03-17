@@ -220,7 +220,7 @@ print_ages() ->
 
 worker_loop() ->
     receive
-        {ages,Ages} ->
+        {cy_ages, Ages} ->
             io:format("~p~n",[Ages]),
             worker_loop()
     after 400 ->

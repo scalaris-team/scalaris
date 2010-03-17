@@ -47,6 +47,10 @@
 -type(memory() :: non_neg_integer()).
 -type(node_range() :: {any(), any()}). % two node IDs
 
+-type(node_details_name() :: predlist | pred | node | my_range | succ |
+                             succlist | load | hostname | rt_size |
+                             message_log | memory).
+
 -record(node_details, {predlist    :: predlist(),
                        node        :: node_type(),
                        succlist    :: succlist(),

@@ -32,6 +32,7 @@
 	 get_loadbalance_flag/1, reset_loadbalance_flag/1]).
 
 -record(lb, {loadbalance_flag, reset_ref, last_keys}).
+-type lb() :: #lb{}.
 
 new() ->
     ResetRef=cs_send:send_local_after(config:loadBalanceInterval(), self(), {reset_loadbalance_flag}),
