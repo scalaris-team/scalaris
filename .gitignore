@@ -11,3 +11,6 @@
 /config.log
 /variables-ct@*
 /erl_crash.dump
+/autom4te.cache
+/aclocal.m4
+/.codepath
