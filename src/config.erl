@@ -26,6 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+-include("../include/scalaris.hrl").
+
 -export([
          start_link/1, start/2,
 
@@ -345,14 +347,14 @@ process_term({Key, Value}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether config parameters of all processes exist and are valid.
--spec check_config() -> bool().
+-spec check_config() -> boolean().
 check_config() ->
     gossip:check_config() and
     vivaldi:check_config() and
     cyclon:check_config() and
     vivaldi_latency:check_config().
 
--spec exists(Key::atom()) -> bool().
+-spec exists(Key::atom()) -> boolean().
 exists(Key) ->
     case read(Key) of
         failed ->
@@ -365,7 +367,7 @@ exists(Key) ->
         _X -> true
     end.
 
--spec is_atom(Key::atom()) -> bool().
+-spec is_atom(Key::atom()) -> boolean().
 is_atom(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -379,7 +381,7 @@ is_atom(Key) ->
             false
         end.
 
--spec is_bool(Key::atom()) -> bool().
+-spec is_bool(Key::atom()) -> boolean().
 is_bool(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -393,7 +395,7 @@ is_bool(Key) ->
             false
         end.
 
--spec is_mypid(Key::atom()) -> bool().
+-spec is_mypid(Key::atom()) -> boolean().
 is_mypid(Key) ->
     Value = read(Key),
     exists(Key) andalso case cs_send:is_valid(Value) of
@@ -408,7 +410,7 @@ is_mypid(Key) ->
             false
         end.
 
--spec is_ip(Key::atom()) -> bool().
+-spec is_ip(Key::atom()) -> boolean().
 is_ip(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -425,7 +427,7 @@ is_ip(Key) ->
             false
         end.
 
--spec is_integer(Key::atom()) -> bool().
+-spec is_integer(Key::atom()) -> boolean().
 is_integer(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -439,7 +441,7 @@ is_integer(Key) ->
             false
         end.
 
--spec is_float(Key::atom()) -> bool().
+-spec is_float(Key::atom()) -> boolean().
 is_float(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -453,7 +455,7 @@ is_float(Key) ->
             false
         end.
 
--spec is_string(Key::atom()) -> bool().
+-spec is_string(Key::atom()) -> boolean().
 is_string(Key) ->
     IsChar = fun(X) ->
                      if (X >= 0) andalso (X =< 255) -> true;
@@ -481,7 +483,7 @@ is_string(Key) ->
             false
         end.
 
--spec is_in_range(Key::atom(), Min::number(), Max::number()) -> bool().
+-spec is_in_range(Key::atom(), Min::number(), Max::number()) -> boolean().
 is_in_range(Key, Min, Max) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -495,7 +497,7 @@ is_in_range(Key, Min, Max) ->
             false
         end.
 
--spec is_greater_than(Key::atom(), Min::number()) -> bool().
+-spec is_greater_than(Key::atom(), Min::number()) -> boolean().
 is_greater_than(Key, Min) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -509,7 +511,7 @@ is_greater_than(Key, Min) ->
             false
         end.
 
--spec is_greater_than_equal(Key::atom(), Min::number()) -> bool().
+-spec is_greater_than_equal(Key::atom(), Min::number()) -> boolean().
 is_greater_than_equal(Key, Min) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -523,7 +525,7 @@ is_greater_than_equal(Key, Min) ->
             false
         end.
 
--spec is_less_than(Key::atom(), Max::number()) -> bool().
+-spec is_less_than(Key::atom(), Max::number()) -> boolean().
 is_less_than(Key, Max) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -537,7 +539,7 @@ is_less_than(Key, Max) ->
             false
         end.
 
--spec is_less_than_equal(Key::atom(), Max::number()) -> bool().
+-spec is_less_than_equal(Key::atom(), Max::number()) -> boolean().
 is_less_than_equal(Key, Max) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
@@ -551,7 +553,7 @@ is_less_than_equal(Key, Max) ->
             false
         end.
 
--spec is_in(Key::atom(), ValidValues::[any(),...]) -> bool().
+-spec is_in(Key::atom(), ValidValues::[any(),...]) -> boolean().
 is_in(Key, ValidValues) ->
     Value = read(Key),
     IsValue = fun(X) -> X =:= Value end,

@@ -26,6 +26,8 @@
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
+-include("../include/scalaris.hrl").
+
 %%
 %% Exported Functions
 %%
@@ -130,7 +132,7 @@
 
 % state of the gossip process
 -record(state, {values             = #values_internal{} :: values_internal(),  % stored (internal) values
-                initialized        = false :: bool(), % load and range information from the local node have been integrated?
+                initialized        = false :: boolean(), % load and range information from the local node have been integrated?
                 triggered          = 0 :: triggered(), % how often the trigger called since the node entered/created the round
                 msg_exch           = 0 :: msg_exch(), % how often messages have been exchanged with other nodes
                 converge_avg_count = 0 :: converge_avg_count() % how often all values based on averages have changed less than epsilon percent
@@ -246,7 +248,7 @@ get_values(#state{values=Values}) -> Values.
 
 %$ @doc Checks whether local load and key range information have been integrated
 %%      into the values of a gossip state.
--spec is_initialized(state()) -> bool().
+-spec is_initialized(state()) -> boolean().
 is_initialized(#state{initialized=Initialized}) -> Initialized.
 
 %$ @doc Returns how often the changes in all average-based values have been less

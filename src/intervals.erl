@@ -84,7 +84,7 @@ unpack(X) ->
     X.
 
 
-% @spec is_empty(interval()) -> bool()
+% @spec is_empty(interval()) -> boolean()
 is_empty([]) ->
     true;
 is_empty(_) ->
@@ -149,8 +149,8 @@ cut_iter({interval, A0, A1}, {interval, B0, B1}) ->
 	    
 
 % @doc returns true if the intervals cover the complete interval
-% @spec is_covered(interval(), [interval()]) -> bool()
--spec(is_covered/2 :: (interval(), [interval()] | interval()) -> bool()).
+% @spec is_covered(interval(), [interval()]) -> boolean()
+-spec(is_covered/2 :: (interval(), [interval()] | interval()) -> boolean()).
 is_covered([], _) ->
     true;
 is_covered(_, all) ->
@@ -287,7 +287,7 @@ find_start(Start, Interval, Remainder) ->
     find_start(Start, [Interval], Remainder).
 
 % @private
-% @spec is_between(term(), term(), term()) -> bool()
+% @spec is_between(term(), term(), term()) -> boolean()
 is_between(_, X, X) ->
     true;
 is_between(X, _, X) ->

@@ -3,6 +3,8 @@
 %% Description: TODO: Add description to scheduler
 -module(scheduler).
 
+-include("../../include/scalaris.hrl").
+
 %%
 %% Include files
 %%
@@ -10,7 +12,7 @@
 %%
 %% Exported Functions
 %%
--export([send/3, send/2,start/0,init/1,stop/0]).
+-export([send/3, send/2, start/0, init/1, stop/0]).
 
 %%
 %% API Functions
@@ -53,7 +55,7 @@ init(Sup) ->
 %% Local Functions
 %%
 
--spec scheduler_loop(message_queue:message_queue(), bool(), message_queue:msg_time(), non_neg_integer()) -> any().
+-spec scheduler_loop(message_queue:message_queue(), boolean(), message_queue:msg_time(), non_neg_integer()) -> any().
 scheduler_loop(Q,Once,AkkTime,Ins) ->
     receive 
         %{halt_simulation} ->

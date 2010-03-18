@@ -25,6 +25,8 @@
 -author('hennig@zib.de').
 -vsn('$Id $ ').
 
+-include("../../include/scalaris.hrl").
+
 %% API
 
 -export([new/0, new/2, size/1,
@@ -148,7 +150,7 @@ inc_age(Cache) ->
     [{Node, Age + 1} || {Node, Age} <- Cache].
 
 %% @doc Checks whether the cache contains an element with the given Node.
--spec contains_node(Node::node:node_type(), Cache::cache()) -> Result::bool().
+-spec contains_node(Node::node:node_type(), Cache::cache()) -> Result::boolean().
 contains_node(Node, Cache) ->
     lists:any(fun({SomeNode, _Age}) -> SomeNode =:= Node end, Cache).
 

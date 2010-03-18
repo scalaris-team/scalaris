@@ -294,7 +294,7 @@ check_state({Cache, Node, _Cycles, _Trigger, _TriggerState} = _State) ->
 
 %% @doc Checks whether config parameters of the cyclon process exist and are
 %%      valid.
--spec check_config() -> bool().
+-spec check_config() -> boolean().
 check_config() ->
     config:is_atom(cyclon_trigger) and
     

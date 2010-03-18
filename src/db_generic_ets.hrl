@@ -22,6 +22,8 @@
 %% @copyright 2009 Konrad-Zuse-Zentrum f<FC>r Informationstechnik Berlin
 %% @version $Id $
 
+-include("../include/scalaris.hrl").
+
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
 -spec(set_write_lock/2 :: (db(), key()) -> {db(), ok | failed}).
@@ -84,7 +86,7 @@ unset_read_lock(DB, Key) ->
     end.
 
 %% @doc get the locks and version of a key
--spec(get_locks/2 :: (db(), key()) -> {db(), {bool(), integer(), version()} | failed}).
+-spec(get_locks/2 :: (db(), key()) -> {db(), {boolean(), integer(), version()} | failed}).
 get_locks(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, WriteLock, ReadLock, Version}}] ->
@@ -146,14 +148,14 @@ get_load(DB) ->
     ?ETS:info(DB, size).
 
 %% @doc adds keys
--spec(add_data/2 :: (db(), [{key(), {value(), bool(), integer(), version()}}]) -> db()).
+-spec(add_data/2 :: (db(), [{key(), {value(), boolean(), integer(), version()}}]) -> db()).
 add_data(DB, Data) ->
     ?ETS:insert(DB, Data),
     DB.
 
 %% @doc returns all keys (and removes them from the db) which belong 
 %%      to a new node with id HisKey
--spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {value(), bool(), integer(), version()}}]}).
+-spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {value(), boolean(), integer(), version()}}]}).
 split_data(DB, MyKey, HisKey) ->
     F = fun (KV = {Key, _}, HisList) ->
                 case util:is_between(HisKey, Key, MyKey) of
@@ -203,7 +205,7 @@ get_range(DB, From, To) ->
 
 %% @doc get keys and versions in a range
 -spec(get_range_with_version/2 :: (db(), intervals:interval()) -> [{Key::key(),
-       Value::value(), Version::version(), WriteLock::bool(), ReadLock::integer()}]).
+       Value::value(), Version::version(), WriteLock::boolean(), ReadLock::integer()}]).
 get_range_with_version(DB, Interval) ->
     F = fun ({Key, {Value, WriteLock, ReadLock, Version}}, Data) ->
                 case intervals:in(Key, Interval) andalso Value =/= empty_val of

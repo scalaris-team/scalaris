@@ -143,7 +143,7 @@ unset_read_lock(DB, Key) ->
     end.
 
 %% @doc get the locks and version of a key
-%% @spec get_locks(db(), string()) -> {bool(), int(), int()}| failed
+%% @spec get_locks(db(), string()) -> {boolean(), int(), int()}| failed
 get_locks(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, WriteLock, ReadLock, Version}} ->
@@ -222,19 +222,19 @@ get_middle_key(DB) ->
 
 %% @doc returns all keys (and removes them from the db) which belong 
 %%      to a new node with id HisKey
--spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {key(), bool(), integer(), integer()}}]}).
+-spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {key(), boolean(), integer(), integer()}}]}).
 split_data(DB, MyKey, HisKey) ->
     DataList = gb_trees:to_list(DB),
     {MyList, HisList} = lists:partition(fun ({Key, _}) -> util:is_between(HisKey, Key, MyKey) end, DataList),
     {gb_trees:from_orddict(MyList), HisList}.
 
 %% @doc returns all keys
-%% @spec get_data(db()) -> [{string(), {string(), bool(), integer(), integer()}}]
+%% @spec get_data(db()) -> [{string(), {string(), boolean(), integer(), integer()}}]
 get_data(DB) ->
     gb_trees:to_list(DB).
 
 %% @doc adds keys
-%% @spec add_data(db(), [{string(), {string(), bool(), integer(), integer()}}]) -> any()
+%% @spec add_data(db(), [{string(), {string(), boolean(), integer(), integer()}}]) -> any()
 add_data(DB, Data) ->
     lists:foldl(fun ({Key, Value}, Tree) -> gb_trees:enter(Key, Value, Tree) end, DB, Data).
 
@@ -246,7 +246,7 @@ get_range(DB, From, To) ->
 
 %% @doc get keys and versions in a range
 %% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(),
-%%       Value::term(), Version::integer(), WriteLock::bool(), ReadLock::integer()}]
+%%       Value::term(), Version::integer(), WriteLock::boolean(), ReadLock::integer()}]
 get_range_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
     [ {Key, Value, Version, WriteLock, ReadLock}

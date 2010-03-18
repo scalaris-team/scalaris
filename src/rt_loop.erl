@@ -28,11 +28,11 @@
 
 -behaviour(gen_component).
 
+-include("../include/scalaris.hrl").
+
 % for routing table implementation
 -export([start_link/1]).
 -export([init/1, on/2, get_base_interval/0]).
-
--include("../include/scalaris.hrl").
 
 % state of the routing table loop
 -type(state() :: {Id::?RT:key(),
@@ -151,7 +151,7 @@ check(Old, New, Id, Pred, Succ) ->
 
 % OldRT, NewRT, CheckFD
 -spec(check/6 :: (Old::?RT:state(), New::?RT:state(), ?RT:key(), node:node_type(),
-                  node:node_type(), ReportFD::bool() | any()) -> any()).
+                  node:node_type(), ReportFD::boolean() | any()) -> any()).
 check(X, X, _Id, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, Pred, Succ, true) ->

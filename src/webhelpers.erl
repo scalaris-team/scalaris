@@ -27,14 +27,16 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([getLoadRendered/0, getRingChart/0, getRingRendered/0, getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1 , getVivaldiMap/0]).
-
 -include("yaws_api.hrl").
 -include("../include/scalaris.hrl").
 
+-export([getLoadRendered/0, getRingChart/0, getRingRendered/0,
+         getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1,
+         getVivaldiMap/0]).
+
 
 %% @doc checks whether the current request is a post operation
-%% @spec isPost(A) -> bool()
+%% @spec isPost(A) -> boolean()
 %%   A = http_request
 isPost(A) ->
     Method = (A#arg.req)#http_request.method,

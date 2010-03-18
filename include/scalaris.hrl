@@ -81,3 +81,7 @@
 -ifdef(module_not_builtin).
 -type module() :: erlang:module().
 -endif.
+
+-ifdef(boolean_not_builtin).
+-type boolean() :: bool().
+-endif.

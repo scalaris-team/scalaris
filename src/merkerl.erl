@@ -42,6 +42,8 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
+-include("../include/scalaris.hrl").
+
 -module(merkerl).
 -export([insert/2,delete/2,build_tree/1,diff/2,test_merkle/0,allkeys/1, contains/2]).
 
@@ -332,9 +334,9 @@ sha(X) ->
 
 assert(X, X) -> true.
 
-% @spec contains(tree(), userdata()) -> bool()
+% @spec contains(tree(), userdata()) -> boolean()
 % @doc Checks whether the specified item is in the tree.
--spec(contains/2 :: (tree(), userdata()) -> bool()).
+-spec(contains/2 :: (tree(), userdata()) -> boolean()).
 contains(undefined, _Key)  ->
     false;
 contains(Tree, Key) when is_record(Tree, merk) ->
@@ -356,11 +358,11 @@ mi_contains({Offset, MI}, Tree) ->
 	    end
     end.
 
-% @spec test_merkle() -> bool()
+% @spec test_merkle() -> boolean()
 % @doc A test function and example code.
 %
 % This should be changed into a proper unit test suite.
--spec(test_merkle/0 :: () -> bool()).
+-spec(test_merkle/0 :: () -> boolean()).
 test_merkle() ->
     A = [{one,"one data"},{two,"two data"},{three,"three data"},
 	 {four,"four data"},{five,"five data"}],

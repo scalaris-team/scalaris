@@ -61,10 +61,7 @@ on({start_clustering_shuffle}, State) ->
     %io:format("~p~n", [State]),
     erlang:send_after(config:read(dc_clustering_interval), self(),
                       {start_clustering_shuffle}),
-    case get_local_cyclon_pid() of
-        failed    -> ok;
-        CyclonPid -> cyclon:get_subset_rand(1)
-    end,
+    cyclon:get_subset_rand(1),
     State;
 
 % ask vivaldi for network coordinate
@@ -137,11 +134,6 @@ start_link(InstanceId) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_local_cyclon_pid() ->
-    process_dictionary:get_group_member(cyclon).
-
-get_local_vivaldi_pid() ->
-    process_dictionary:get_group_member(vivaldi).
 
 -spec(cluster/4 :: (centroids(), sizes(), centroids(), sizes()) -> {centroids(), sizes()}).
 cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes) ->
