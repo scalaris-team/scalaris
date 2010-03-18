@@ -18,10 +18,12 @@ handle_event(_Event, State) ->
     {ok, State}.
 
 handle_call(_Request, State) ->
+    io:format("dummy_appender called with message ~p~n",[_Request]),
     Reply = ok,
     {ok, Reply, State}.
 
 handle_info(_Info, State) ->
+    io:format("dummy_appender got info message ~p~n",[_Info]),
     {ok, State}.
 
 terminate(_Reason, _State) ->
