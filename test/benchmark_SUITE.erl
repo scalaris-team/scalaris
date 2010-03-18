@@ -77,7 +77,7 @@ run_read_1_100000(_Config) ->
     bench_server:run_read(Threads, Iterations, [locally]),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
-    write_result("result_read_1_10000.txt", Threads * Iterations / RunTime * 1000000.0),
+    write_result("result_read_1_100000.txt", Threads * Iterations / RunTime * 1000000.0),
     ok.
 
 run_read_10_10000(_Config) ->
