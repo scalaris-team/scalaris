@@ -12,6 +12,7 @@ clean:
 	rm -f src/*~
 	rm -f ebin/*~
 	rm -f include/*~
-#       cd dir1; make clean
+	cd ${SRC}; make clean
+
 #install:
 #        cp -f ebin/* ../../www/ebin

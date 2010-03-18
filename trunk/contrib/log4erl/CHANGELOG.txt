@@ -1,8 +1,37 @@
+log4erl 0.8.6:
+==============
+* Added xml_appender for outputing logs to xml files
+* Changed default behaviour to use sync logging (helps to eleminate
+  crash due to many processes due to high load)
+* file_appender renames files when rotating instead of copying
+* syslog_appender add missing facilities
+* Updated leex to fix a critical bug
+* Added error_logger_log4erl_h.erl which is a handler for error_logger
+  Makes it possible to forward error_logger logs to log4erl.
+
+log4erl 0.8.5:
+==============
+* Added new file configuration (log4erl:conf(File)).
+* Added syslog_appender.
+* Added support for ISO standard format to appenders (%I, %S & %Z specifiers).
+* Changed %d & %j to output the date in YYYY-MM-DD format according to ISO standard format
+
+log4erl 0.8.4:
+==============
+* Added smtp_appender (new functions add_smtp_appender/2,3)
+* Added change_level/2,3 for changing level of specific Appender
+* Immproved feedback in case of errors
+* Seperated API documentation into 2 files: API.txt & Appenders_API.txt.
+  The first includes general functions and the other includes appenders
+  specific API, such as file appenders and SMTP appenders API.
+* Created a github.com repository (http://github.com/ahmednawras/log4erl/).
+
 log4erl 0.8.3:
 ==============
 * Added console_appender
 * Added more modifiers to the possible pattern of formats (milliseconds, short/long name of month)
 * Added an extra atom in the tuple argument for add_file_appender/2,3 for specifying format
+* Fixed a bug when rotation. (_02)
 
 log4erl 0.8.2:
 ==============

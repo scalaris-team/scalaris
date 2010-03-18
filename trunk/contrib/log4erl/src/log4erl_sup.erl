@@ -16,7 +16,7 @@
 -export([init/1]).
 
 start_link(Default_logger) ->
-    R = supervisor:start_link({local, ?MODULE}, ?MODULE, [Default_logger]),
+    R = supervisor:start_link({local, ?MODULE}, ?MODULE, []),
     %log4erl:start_link(Default_logger),
     add_logger(Default_logger),
     ?LOG2("Result in supervisor is ~p~n",[R]),
@@ -50,23 +50,23 @@ add_logger(Name) when is_list(Name) ->
 %%======================================
 %% supervisor callback functions
 %%======================================
-init([Default_logger]) ->
+init([]) ->
     ?LOG("Starting supervisor~n"),
     %% No children to be added yet.
     %% The default has to be added from log4erl
     
     % start log4erl gen_server
-    _Child =  {log4erl_p,
-	  {log4erl, start_link ,[Default_logger]},
-	  permanent,
-	  10000,
-	  worker,
-	  [log4erl]},
+    %% _Child =  {log4erl_p,
+%% 	  {log4erl, start_link ,[Default_logger]},
+%% 	  permanent,
+%% 	  10000,
+%% 	  worker,
+%% 	  [log4erl]},
     
     {ok,
      {
        {one_for_one,3,10}, 
-       [_Child]
+       []
        %[]
       }
     }.
