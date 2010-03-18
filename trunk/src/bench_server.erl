@@ -14,7 +14,7 @@
 %%%-----------------------------------------------------------------------------
 %%% File    : bench_server.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : bench server 
+%%% Description : bench server
 %%%
 %%% Created :  13 Oct 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-----------------------------------------------------------------------------
@@ -27,8 +27,8 @@
 -author('schuett@zib.de').
 -vsn('$Id').
 
--export([start_link/0, start/0, run_increment/2, run_increment_locally/2, run_read/2, run_increment/3,
-	bench_runner/3]).
+-export([start_link/0, start/0, run_increment/2, run_increment_locally/2, run_read/2,
+         run_read/3, run_increment/3, bench_runner/3]).
 
 -include("../include/scalaris.hrl").
 
@@ -38,11 +38,11 @@
 %% @doc run an increment benchmark (i++) on all nodes
 run_increment(ThreadsPerVM, Iterations) ->
     Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
-    runner(ThreadsPerVM, Iterations, [], Msg).
+    runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
 run_increment_locally(ThreadsPerVM, Iterations) ->
     Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
-    runner(ThreadsPerVM, Iterations, [locally], Msg).
+    runner(ThreadsPerVM, Iterations, [locally, verbose], Msg).
 
 %% @doc run an increment benchmark (i++) on all nodes
 %% profile : enable profiling
@@ -54,7 +54,11 @@ run_increment(ThreadsPerVM, Iterations, Options) ->
 %% @doc run an read benchmark on all nodes
 run_read(ThreadsPerVM, Iterations) ->
     Msg = {bench_read, ThreadsPerVM, Iterations, cs_send:this()},
-    runner(ThreadsPerVM, Iterations, [], Msg).
+    runner(ThreadsPerVM, Iterations, [verbose], Msg).
+
+run_read(ThreadsPerVM, Iterations, Options) ->
+    Msg = {bench_read, ThreadsPerVM, Iterations, cs_send:this()},
+    runner(ThreadsPerVM, Iterations, Options, Msg).
 
 runner(ThreadsPerVM, Iterations, Options, Message) ->
     ServerList = case lists:member(locally, Options) of
@@ -72,35 +76,40 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
     {BeforeDump, _} = admin:get_dump(),
     Before = erlang:now(),
     Times = case lists:member(profile, Options) of
-	false ->
-    		[cs_send:send(Server, Message) || Server <- ServerList],
-    		[receive {done, Time} -> io:format("BS: ~p~n",[Time]),Time end || _Server <- ServerList];
-	true ->
-	    	Result = fprof:apply(fun () ->
-		    		[cs_send:send(Server, Message) || Server <- ServerList],
-    				[receive {done, Time} -> Time end || _Server <- ServerList]
-			    end, 
-			    [], [{procs, process_dictionary:get_all_pids()}]),
-    		fprof:profile(),
-    		%fprof:analyse(),
-    		fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), 
-		Result
-	end,
+                false ->
+                    [cs_send:send(Server, Message) || Server <- ServerList],
+                    [receive {done, Time} -> io:format("BS: ~p~n",[Time]),Time end || _Server <- ServerList];
+                true ->
+                    Result = fprof:apply(fun () ->
+                                                 [cs_send:send(Server, Message) || Server <- ServerList],
+                                                 [receive {done, Time} -> Time end || _Server <- ServerList]
+                                         end,
+                                         [], [{procs, process_dictionary:get_all_pids()}]),
+                    fprof:profile(),
+                    %fprof:analyse(),
+                    fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), 
+                    Result
+            end,
     After = erlang:now(),
-    {AfterDump, _} = admin:get_dump(),
-    RunTime = timer:now_diff(After, Before),
-    DiffDump = admin:diff_dump(BeforeDump, AfterDump, RunTime),
-    io:format("servers: ~p threads/vm: ~p iterations: ~p~n", 
-	[length(ServerList), ThreadsPerVM, Iterations]),
-    io:format("total time: ~p~n", [RunTime / 1000000.0]),
-    io:format("1/s: ~p~n", 
-	[length(ServerList) * ThreadsPerVM * Iterations / RunTime * 1000000.0]),
-    Throughput = [ThreadsPerVM * Iterations / Time * 1000000.0 || Time <- Times],
-    
-    io:format("~p~n", [Throughput]),
-    io:format("High load avg. latency: ~p ms~n", [ RunTime / 1000.0 / Iterations ]),
-    io:format("Message statistics (message name, bytes, how often): ~p~n", [DiffDump]),    ok.
-    
+    case lists:member(verbose, Options) of
+        true ->
+            {AfterDump, _} = admin:get_dump(),
+            RunTime = timer:now_diff(After, Before),
+            DiffDump = admin:diff_dump(BeforeDump, AfterDump, RunTime),
+            io:format("servers: ~p threads/vm: ~p iterations: ~p~n",
+                      [length(ServerList), ThreadsPerVM, Iterations]),
+            io:format("total time: ~p~n", [RunTime / 1000000.0]),
+            io:format("1/s: ~p~n",
+                      [length(ServerList) * ThreadsPerVM * Iterations / RunTime * 1000000.0]),
+            Throughput = [ThreadsPerVM * Iterations / Time * 1000000.0 || Time <- Times],
+            io:format("~p~n", [Throughput]),
+            io:format("High load avg. latency: ~p ms~n", [ RunTime / 1000.0 / Iterations ]),
+            io:format("Message statistics (message name, bytes, how often): ~p~n", [DiffDump]);
+        false ->
+            ok
+    end,
+    ok.
+
 %%==============================================================================
 %% benchmarks
 %%==============================================================================
