@@ -32,7 +32,9 @@
 -export([start_link/0]).
 -export([log/2,log/3,log/4]).
 
+-type log_level() :: warn | info | error | fatal | debug.
 
+-spec start_link() -> ignore.
 start_link() ->
     application:start(log4erl),
     log4erl:add_console_appender(stdout,{info, config:read(log_format)}), 
@@ -40,10 +42,14 @@ start_link() ->
     log(info, "Log4erl started"),
     ignore.
 
-log(Level,Log) ->
+-spec log(Level::log_level(), LogMsg::any()) -> any().
+log(Level, Log) ->
     log4erl:log(Level,Log).
-log(Level,Log,Data) ->
-    log4erl:log(Level,Log,Data).
+
+-spec log(Level::log_level(), LogMsg::any(), Data::any()) -> any().
+log(Level, Log, Data) ->
+    log4erl:log(Level, Log, Data).
+
+-spec log(Logger::atom(), Level::log_level(), LogMsg::any(), Data::any()) -> any().
 log(Logger, Level, Log, Data) ->
     log4erl:log(Logger, Level, Log, Data).
-

@@ -72,11 +72,6 @@ read(Key) ->
         [] ->
             case preconfig:get_env(Key, failed) of
                 failed ->
-%%                     log:log(warning,
-%%                             lists:flatten(
-%%                               io_lib:format("~p not defined (see scalaris.cfg and scalaris.local.cfg), using default (~p)~n",
-%%                                             [Key, Default]))
-%%                            ),
                     failed;
                 X ->
                     ets:insert(config_ets, {Key, X}),
@@ -328,8 +323,14 @@ populate_db(File) ->
 	{ok, Terms} ->
 	    lists:map(fun process_term/1, Terms),
 	    eval_environment(os:getenv("CS_PORT"));
+    {error, enoent} ->
+        % note: log4erl may not be available
+        io:format("Can't load config file ~p: File does not exist. Ignoring.\n", [File]),
+        fail;
 	{error, Reason} ->
-	    io:format("Can't load config file ~p: ~p. Ignoring.\n", [File, Reason]),
+        % note: log4erl may not be available
+        io:format("Can't load config file ~p: ~p. Exiting.\n", [File, Reason]),
+        erlang:halt(1),
 	    fail
     end.
 
@@ -347,22 +348,28 @@ process_term({Key, Value}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether config parameters of all processes exist and are valid.
--spec check_config() -> boolean().
+-spec check_config() -> true.
 check_config() ->
-    gossip:check_config() and
-    vivaldi:check_config() and
-    cyclon:check_config() and
-    vivaldi_latency:check_config().
+    Correct =
+        gossip:check_config() andalso
+            vivaldi:check_config() andalso
+            cyclon:check_config() andalso
+            vivaldi_latency:check_config(),
+    case Correct of
+       true -> true;
+       false ->
+        erlang:halt(1)
+    end.
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->
     case read(Key) of
         failed ->
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key]))
-                   ),
+            io:format(
+              lists:flatten(
+                io_lib:format("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key]))
+                     ),
             false;
         _X -> true
     end.
@@ -372,12 +379,12 @@ is_atom(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
         X when is_atom(X) -> true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not an atom (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not an atom (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X]))
+                     ),
             false
         end.
 
@@ -386,12 +393,12 @@ is_bool(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
         X when is_boolean(X) -> true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X]))
+                     ),
             false
         end.
 
@@ -401,12 +408,12 @@ is_mypid(Key) ->
     exists(Key) andalso case cs_send:is_valid(Value) of
         % no need to check for 'failed', this has been checked by exist/1 
         true -> true;
-        false -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not a valid pid (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, Value]))
-                   ),
+        false ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not a valid pid (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, Value]))
+                     ),
             false
         end.
 
@@ -418,12 +425,12 @@ is_ip(Key) ->
           when (IP1 >= 0) andalso (IP2 >= 0) andalso (IP3 >= 0) andalso (IP4 >= 0) andalso
                    (IP1 =< 255) andalso (IP2 =< 255) andalso (IP3 =< 255) andalso (IP4 =< 255) ->
             true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not a valid IP4 address (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not a valid IP4 address (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X]))
+                     ),
             false
         end.
 
@@ -432,12 +439,12 @@ is_integer(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
         X when is_integer(X) -> true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X]))
+                     ),
             false
         end.
 
@@ -446,12 +453,12 @@ is_float(Key) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
         X when is_float(X) -> true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not a boolean (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X]))
+                     ),
             false
         end.
 
@@ -467,19 +474,19 @@ is_string(Key) ->
         X when is_list(X) ->
             case lists:all(IsChar, X) of
                 true -> true;
-                false -> 
-                    log:log(warning,
-                            lists:flatten(
-                              io_lib:format("~p = ~p is not a (printable) string (see scalaris.cfg and scalaris.local.cfg)~n",
-                                            [Key, X]))
-                           )
+                false ->
+                    io:format(
+                      lists:flatten(
+                        io_lib:format("~p = ~p is not a (printable) string (see scalaris.cfg and scalaris.local.cfg)~n",
+                                      [Key, X]))
+                             )
             end;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not a (printable) string (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not a (printable) string (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X]))
+                     ),
             false
         end.
 
@@ -488,12 +495,12 @@ is_in_range(Key, Min, Max) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
         X when (X >= Min) andalso (X =< Max) -> true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not between ~p and ~p (both inclusive) (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X, Min, Max]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not between ~p and ~p (both inclusive) (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X, Min, Max]))
+                     ),
             false
         end.
 
@@ -503,11 +510,11 @@ is_greater_than(Key, Min) ->
         % no need to check for 'failed', this has been checked by exist/1 
         X when (X > Min) -> true;
         X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not larger than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X, Min]))
-                   ),
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not larger than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X, Min]))
+                     ),
             false
         end.
 
@@ -517,11 +524,11 @@ is_greater_than_equal(Key, Min) ->
         % no need to check for 'failed', this has been checked by exist/1 
         X when (X >= Min) -> true;
         X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not larger than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X, Min]))
-                   ),
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not larger than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X, Min]))
+                     ),
             false
         end.
 
@@ -530,12 +537,12 @@ is_less_than(Key, Max) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
         X when (X < Max) -> true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not less than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X, Max]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not less than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X, Max]))
+                     ),
             false
         end.
 
@@ -544,12 +551,12 @@ is_less_than_equal(Key, Max) ->
     exists(Key) andalso case read(Key) of
         % no need to check for 'failed', this has been checked by exist/1 
         X when (X =< Max) -> true;
-        X -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not less than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, X, Max]))
-                   ),
+        X ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not less than ~p (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, X, Max]))
+                     ),
             false
         end.
 
@@ -560,11 +567,11 @@ is_in(Key, ValidValues) ->
     exists(Key) andalso case lists:any(IsValue, ValidValues) of
         % no need to check for 'failed', this has been checked by exist/1 
         true -> true;
-        false -> 
-            log:log(warning,
-                    lists:flatten(
-                      io_lib:format("~p = ~p is not allowed (valid values: ~p) (see scalaris.cfg and scalaris.local.cfg)~n",
-                                    [Key, Value, ValidValues]))
-                   ),
+        false ->
+            io:format(
+              lists:flatten(
+                io_lib:format("~p = ~p is not allowed (valid values: ~p) (see scalaris.cfg and scalaris.local.cfg)~n",
+                              [Key, Value, ValidValues]))
+                     ),
             false
         end.
