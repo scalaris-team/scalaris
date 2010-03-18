@@ -28,6 +28,8 @@
 
 -behaviour(gen_component).
 
+-include("../include/scalaris.hrl").
+
 -export([on/2, init/1]).
 
 -export([measure_latency/3, check_config/0]).
@@ -100,7 +102,7 @@ calc_latency(Latencies) ->
 
 %% @doc Checks whether config parameters of the vivaldi_latency process exist
 %%      and are valid.
--spec check_config() -> bool().
+-spec check_config() -> boolean().
 check_config() ->
     config:is_integer(vivaldi_count_measurements) and
     config:is_greater_than(vivaldi_count_measurements, 0) and

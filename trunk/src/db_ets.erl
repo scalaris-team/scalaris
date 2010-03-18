@@ -28,7 +28,8 @@
 
 -behaviour(database).
 
--include("../include/scalaris.hrl").
+% included by db_generic_ets.hrl which is included at the bottom of this file
+%% -include("../include/scalaris.hrl").
 
 -import(ct).
 -import(randoms).
@@ -77,7 +78,7 @@ close(DB) ->
     ets:delete(DB).
 
 %% @doc returns all keys
-%% @spec get_data(db()) -> [{string(), {string(), bool(), integer(), integer()}}]
+%% @spec get_data(db()) -> [{string(), {string(), boolean(), integer(), integer()}}]
 get_data(DB) ->
     ets:tab2list(DB).
 

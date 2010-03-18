@@ -383,9 +383,6 @@ new_interval(View,NewView,Interval) ->
 
 
 
-get_cyclon_pid() ->
-    process_dictionary:get_group_member(cyclon).
-
 % print_view(Me,View) ->
 %     io:format("[~p] -> ",[node:pidX(Me)]),
 %     [io:format("~p",[node:pidX(Node)]) || Node <- View],

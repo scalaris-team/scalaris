@@ -765,7 +765,7 @@ calc_initial_avg_kr({PredKey, MyKey} = _Range) ->
 
 %% @doc Checks whether config parameters of the gossip process exist and are
 %%      valid.
--spec check_config() -> bool().
+-spec check_config() -> boolean().
 check_config() ->
     config:is_atom(gossip_trigger) and
     

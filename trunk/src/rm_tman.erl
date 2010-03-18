@@ -67,7 +67,7 @@ init(_Args) ->
                   Interval       :: pos_integer(),
                   TriggerState   :: any(),
                   Cache          :: list(node:node_type()), % random cyclon nodes
-                  Churn          :: bool()}
+                  Churn          :: boolean()}
      | uninit).
 
 % @doc the Token takes care, that there is only one timermessage for stabilize

@@ -97,6 +97,11 @@ AC_RUN_IFELSE(
        [MODULEISBUILTIN=", {d, module_not_builtin}"; AC_MSG_NOTICE([module() is not built-in])])
 
 AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::boolean()).], [ok])],
+       [BOOLEANISBUILTIN=""; AC_MSG_NOTICE([boolean() is a built-in type])],
+       [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; AC_MSG_NOTICE([boolean() is not built-in])])
+
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [crypto:start()])],
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
@@ -105,6 +110,7 @@ AC_SUBST(GBTREESISBUILTIN)
 AC_SUBST(TERMISBUILTIN)
 AC_SUBST(NODEISBUILTIN)
 AC_SUBST(MODULEISBUILTIN)
+AC_SUBST(BOOLEANISBUILTIN)
 
 ###########################################################
 #

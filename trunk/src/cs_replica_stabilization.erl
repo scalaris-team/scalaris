@@ -95,7 +95,7 @@ on({bulk_read_with_version_response, Interval, NewData},{Owner, Index, Interval,
 on(_, _State) ->
     unknown_event.
 
-% @spec done(intervals:interval(), [intervals:interval()]) -> bool()
+% @spec done(intervals:interval(), [intervals:interval()]) -> boolean()
 done(Interval, Done) ->
     intervals:is_covered(Interval, Done).
 
@@ -104,7 +104,7 @@ done(Interval, Done) ->
 %%====================================================================  
 
 %% @TODO
-% @spec update_db([{Key::term(), Value::term(), Version::int(), WriteLock::bool(), ReadLock::int()}]) -> ok
+% @spec update_db([{Key::term(), Value::term(), Version::int(), WriteLock::boolean(), ReadLock::int()}]) -> ok
 update_db(Data) ->
     ok.
 

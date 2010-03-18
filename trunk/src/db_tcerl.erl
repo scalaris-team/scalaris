@@ -28,7 +28,8 @@
 
 -behaviour(database).
 
--include("../include/scalaris.hrl").
+% included by db_generic_ets.hrl which is included at the bottom of this file
+%% -include("../include/scalaris.hrl").
 -include("autoconf.hrl").
 
 -type(key()::database:key()).
@@ -79,7 +80,7 @@ close(DB) ->
     tcbdbets:close(DB).
 
 %% @doc returns all keys
-%% @spec get_data(db()) -> [{string(), {string(), bool(), integer(), integer()}}]
+%% @spec get_data(db()) -> [{string(), {string(), boolean(), integer(), integer()}}]
 get_data(DB) ->
     tcbdbets:traverse(DB, fun (X) -> {continue, X} end).
 

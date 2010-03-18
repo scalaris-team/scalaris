@@ -135,8 +135,7 @@ on({cy_cache, [Node] = _Cache},
                                   Coordinate, Confidence}),
     State;
 
-on({vivaldi_shuffle, SourcePid, RemoteCoordinate, RemoteConfidence},
-   {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
+on({vivaldi_shuffle, SourcePid, RemoteCoordinate, RemoteConfidence}, State) ->
     %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     vivaldi_latency:measure_latency(SourcePid, RemoteCoordinate, RemoteConfidence),
     State;
@@ -202,7 +201,7 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
 
 %% @doc Checks whether config parameters of the gossip process exist and are
 %%      valid.
--spec check_config() -> bool().
+-spec check_config() -> boolean().
 check_config() ->
     config:is_atom(vivaldi_trigger) and
     

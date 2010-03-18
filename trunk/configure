@@ -559,6 +559,7 @@ PACKAGE_URL=''
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 DRIVER_OS
+BOOLEANISBUILTIN
 MODULEISBUILTIN
 NODEISBUILTIN
 TERMISBUILTIN
@@ -2712,6 +2713,33 @@ else
   cat > conftest.$ac_ext <<_ACEOF
 -module(conftest).
 -export([start/0]).
+-type(mytype()::boolean()).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  BOOLEANISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is a built-in type" >&5
+$as_echo "$as_me: boolean() is a built-in type" >&6;}
+else
+  BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is not built-in" >&5
+$as_echo "$as_me: boolean() is not built-in" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "cannot run test program while cross compiling
+See \`config.log' for more details." "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
 
 start() ->
 crypto:start()
@@ -2730,6 +2758,7 @@ fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
+
 
 
 
