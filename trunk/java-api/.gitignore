@@ -20,3 +20,6 @@
 /scalaris.zip
 /scalaris.tar.gz
 /.ant-targets-build.xml
+/.settings
+/junit*.properties
+/junitvmwatcher*.properties
