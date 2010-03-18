@@ -289,13 +289,13 @@ update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
 % @doc inform the cs_node of new [succ|pred] if necessary
 update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
     %io:format("UCN: ~p ~n",[{PredsNew,SuccsNew,ShuffelBuddy,AktPred,AktSucc}]),
-    case OldPreds == NewPreds of
-        true -> ok;
-        false -> ring_maintenance:update_preds(NewPreds)
+    case NewPreds =/= [] andalso OldPreds =/= NewPreds of
+        true -> ring_maintenance:update_preds(NewPreds);
+        false -> ok
     end,
-    case OldSuccs == NewSuccs of
-        true -> ok;
-        false -> ring_maintenance:update_succs(NewSuccs)
+    case NewSuccs =/= [] andalso OldSuccs =/= NewSuccs of
+        true -> ring_maintenance:update_succs(NewSuccs);
+        false -> ok
     end,
     {NewPreds,NewSuccs}.
 
