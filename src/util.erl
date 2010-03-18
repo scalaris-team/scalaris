@@ -121,8 +121,8 @@ logged_exec(Cmd) ->
     OutputLength = length(Output),
     if
         OutputLength > 10 ->
-            log:log("exec", Cmd),
-            log:log("exec", Output);
+            log:log(info, "exec", Cmd),
+            log:log(info, "exec", Output);
         true ->
             ok
     end.
