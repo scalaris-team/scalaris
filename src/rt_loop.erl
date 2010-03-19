@@ -173,7 +173,7 @@ check_fd(NewRT, OldRT) ->
     fd:subscribe(NewNodes).
 
 get_base_interval() ->
-    config:pointerBaseStabilizationInterval().
+    config:read(pointer_base_stabilization_interval).
 
 make_utility(RTSize) ->
     Now = erlang:now(),

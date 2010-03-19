@@ -64,7 +64,7 @@ start_link(InstanceId,Options) ->
 init(_Args) ->
     log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
     cs_send:send_local(get_cs_pid(), {init_rm,self()}),
-    cs_send:send_local_after(config:stabilizationInterval(), self(), {stabilize}),
+    cs_send:send_local_after(stabilizationInterval(), self(), {stabilize}),
     uninit.
     
 
@@ -139,7 +139,7 @@ on({stabilize},{Id, Me, Pred, Succs})  -> % new stabilization interval
             _  -> 
                 cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
         end,
-        cs_send:send_local_after(config:stabilizationInterval(), self(), {stabilize}),
+        cs_send:send_local_after(stabilizationInterval(), self(), {stabilize}),
 	    {Id, Me, Pred, Succs};
 on({get_pred_response, SuccsPred},{Id, Me, Pred, Succs})  ->
 	    case node:is_null(SuccsPred) of
@@ -159,7 +159,7 @@ on({get_pred_response, SuccsPred},{Id, Me, Pred, Succs})  ->
 		    {Id, Me, Pred, Succs}
 	    end;
 on({get_succ_list_response, Succ, SuccsSuccList},{Id, Me, Pred, Succs})  ->
-	    NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), config:succListLength()),
+	    NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), succListLength()),
 	    %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
 	    cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
 	    ring_maintenance:update_succ_and_pred(Pred, hd(NewSuccs)), 
@@ -229,3 +229,13 @@ get_pid() ->
 % get Pid of assigned cs_node
 get_cs_pid() ->
     process_dictionary:get_group_member(cs_node).
+
+%% @doc the length of the successor list
+%% @spec succListLength() -> integer() | failed
+succListLength() ->
+    config:read(succ_list_length).
+
+%% @doc the interval between two stabilization runs Max
+%% @spec stabilizationInterval() -> integer() | failed
+stabilizationInterval() ->
+    config:read(stabilization_interval_max).

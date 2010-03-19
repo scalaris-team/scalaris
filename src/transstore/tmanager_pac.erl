@@ -137,8 +137,8 @@ check_acks_item([{_, AcksReplica}| Rest]) ->
 					end,
 					{0, 0},
 					AcksReplica),
-    PreparedLimit = config:quorumFactor(),
-    AbortLimit = config:replicationFactor() - config:quorumFactor() + 1, 
+    PreparedLimit = config:read(quorum_factor),
+    AbortLimit = config:read(replication_factor) - config:read(quorum_factor) + 1, 
 
     if
 	NumAbort >= AbortLimit ->
@@ -169,7 +169,7 @@ check_acks_item([{_, AcksReplica}| Rest]) ->
 -type(timestamp_type() :: pos_integer()).
 -spec(check_acks_replica/1 :: (list({decision_type(),timestamp_type()})) -> decision_type() | undecided).
 check_acks_replica(AcksForReplicaList) ->
-    count_acks_replica(-1, bottom, 0, erlang:trunc(config:replicationFactor()/2) + 1, lists:keysort(2, AcksForReplicaList)).
+    count_acks_replica(-1, bottom, 0, erlang:trunc(config:read(replication_factor)/2) + 1, lists:keysort(2, AcksForReplicaList)).
     
 count_acks_replica(_LastTimeStamp, LastDecision, Count, Limit, _) when Count >= Limit ->
     LastDecision;
@@ -278,7 +278,7 @@ check_rv_acks(RVAcksList)->
 				end,
 				CounterList,
 				RVAcksList),
-    Limit = config:quorumFactor(),
+    Limit = config:read(quorum_factor),
     check_counter_fh(NewCounterList, Limit).
 
 

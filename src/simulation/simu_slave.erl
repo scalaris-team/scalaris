@@ -73,7 +73,7 @@ on({check_ring},_) ->
     %scheduler ! {halt_simulation},
     %Implement a Noneblocking CheckRing 
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
-    cs_send:send_local(config:bootPid(), {get_list, cs_send:this()}),
+    cs_send:send_local(bootPid(), {get_list, cs_send:this()}),
     %io:format("A~n"),
     {check_ring_p1};
 on({get_list_response, N}, _) ->
@@ -141,3 +141,8 @@ succ({_,X}) -> X.
 
 get_pid() ->
     process_dictionary:get_group_member(simu_slave).
+
+%% @doc pid of the boot daemon
+%% @spec bootPid() -> pid()
+bootPid() ->
+    config:read(boot_host).

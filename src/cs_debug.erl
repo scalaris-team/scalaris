@@ -32,7 +32,7 @@ new() ->
     [].
 
 debug(Debug, NewState, Message) ->
-    NewDebug = util:trunc([ {calendar:universal_time(), NewState, Message} | Debug], config:debugQueueLength()),
+    NewDebug = util:trunc([ {calendar:universal_time(), NewState, Message} | Debug], debugQueueLength()),
     check(NewDebug, assert(NewState, checks())),
     NewDebug.
 	    
@@ -69,3 +69,8 @@ dump(FD, Hostname, Debug, Message) ->
 
 % dump({Time, State, Message}) ->
 %     io_lib:format("~p~n~p~n~p", [Time, State, Message]).
+
+%% @doc length of the debug queue
+%% @spec debugQueueLength() -> integer() | failed
+debugQueueLength() ->
+    config:read(debug_queue_length).

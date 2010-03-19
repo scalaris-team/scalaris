@@ -1,7 +1,9 @@
 -module(preconfig).
 
 -export([get_env/2]).
--export([log_path/0,cs_log_file/0,docroot/0,config/0,local_config/0,cs_port/0,cs_instances/0,yaws_port/0]).
+
+-export([log_path/0, cs_log_file/0, mem_log_file/0, docroot/0, config/0,
+         local_config/0, cs_port/0, cs_instances/0, yaws_port/0]).
 
 %% @doc path to the log directory
 %% @spec log_path() -> string()
@@ -12,6 +14,11 @@ log_path() ->
 %% @spec cs_log_file() -> string()
 cs_log_file() ->
     filename:join(log_path(), "cs_log.txt").
+
+%% @doc path to the mem log file
+%% @spec mem_log_file() -> string()
+mem_log_file() ->
+    filename:join(log_path(), "mem.txt").
 
 %% @doc document root for the application yaws server
 %% @spec docroot() -> string()

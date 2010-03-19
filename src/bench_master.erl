@@ -45,7 +45,7 @@ run_1() ->
     timer:sleep(1000),
     check_ring_size(RingSize),
     wait_for_stable_ring(),
-    timer:sleep(config:pointerBaseStabilizationInterval()+8000),
+    timer:sleep(pointerBaseStabilizationInterval()+8000),
     bench_server:run_increment(Worker, Iterations),
     timer:sleep(3000),
     bench_server:run_read(Worker, Iterations),
@@ -86,7 +86,8 @@ check_ring_size(Size) ->
 	    timer:sleep(1000),
 	    check_ring_size(Size)
     end.
-    
-    
-    
 
+%% @doc the interval between two finger/pointer stabilization runs
+%% @spec pointerBaseStabilizationInterval() -> integer() | failed
+pointerBaseStabilizationInterval() ->
+    config:read(pointer_base_stabilization_interval).
