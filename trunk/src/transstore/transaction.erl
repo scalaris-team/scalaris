@@ -130,7 +130,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
             %% information from remote
             ReplicaKeys = ?RT:get_keys_for_replicas(Key),
             [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
-            erlang:send_after(config:transactionLookupTimeout(), self(),
+            erlang:send_after(config:read(transaction_lookup_timeout), self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
             {Flag, Result} = write_read_receive(ReplicaKeys, Operation),
             if Flag == fail ->
@@ -172,7 +172,7 @@ do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_keys_for_replicas(Key),
     [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
-    erlang:send_after(config:transactionLookupTimeout(), self(),
+    erlang:send_after(config:read(transaction_lookup_timeout), self(),
                       {write_read_receive_timeout, hd(ReplicaKeys)}),
     {Flag, Result} = write_read_receive(ReplicaKeys, read),
     if
@@ -185,8 +185,8 @@ do_quorum_read(Key, SourcePID, InstanceId)->
 
 write_read_receive(ReplicaKeys, Operation)->
     write_read_receive(ReplicaKeys, Operation,
-                       {config:replicationFactor(),
-                        config:quorumFactor(),
+                       {config:read(replication_factor),
+                        config:read(quorum_factor),
                         0, 0, {0,-1}}).
 
 write_read_receive(ReplicaKeys, Operation, State)->
@@ -290,7 +290,7 @@ parallel_reads(Keys, TransLog)->
             ResultsInit = [ {Key, [], undecided} ||
                               [Key | _RKeys] <- ReplicaKeysAll ],
 
-            erlang:send_after(config:transactionLookupTimeout(), self(),
+            erlang:send_after(config:read(transaction_lookup_timeout), self(),
                               {write_read_receive_timeout, hd(hd(ReplicaKeysAll))}),
             {Flag, WRResult} = write_read_receive_parallel(ResultsInit, ReplicaKeysAll),
             if
@@ -394,8 +394,8 @@ check_results_parallel([Head |Results], AllResults)->
             TMPResults = [ Elem || Elem <- ResKey, Elem /= fail ],
             TMPResultsFailed = [ Elem || Elem <- ResKey, Elem == fail ],
 
-            ReplFactor = config:replicationFactor(),
-            QuorumFactor = config:quorumFactor(),
+            ReplFactor = config:read(replication_factor),
+            QuorumFactor = config:read(quorum_factor),
             NumSuccessfulResponses = length(TMPResults),
             NumFailedResponses = length(TMPResultsFailed),
 
@@ -497,7 +497,7 @@ do_delete(Key, SourcePID, InstanceId)->
     ReplicaKeys = ?RT:get_keys_for_replicas(Key),
     [ cs_lookup:unreliable_lookup(Replica, {delete_key, cs_send:this(), Replica}) ||
 	Replica <- ReplicaKeys],
-    erlang:send_after(config:transactionLookupTimeout(), self(), {timeout}),
+    erlang:send_after(config:read(transaction_lookup_timeout), self(), {timeout}),
     delete_collect_results(ReplicaKeys, SourcePID, []).
 
 %% @doc collect the response for the delete requests

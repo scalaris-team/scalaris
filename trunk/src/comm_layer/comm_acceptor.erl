@@ -45,12 +45,12 @@ start_link(InstanceId) ->
 init(InstanceId, Supervisor) ->
     process_dictionary:register_process(InstanceId, acceptor, self()),
     erlang:register(comm_layer_acceptor, self()),
-   log:log(info,"[ CC ] listening on ~p:~p", [config:listenIP(), config:listenPort()]),
-    LS = case config:listenIP() of
+   log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), preconfig:cs_port()]),
+    LS = case config:read(listen_ip) of
 		       undefined ->
-			   open_listen_port(config:listenPort(), first_ip());
+			   open_listen_port(preconfig:cs_port(), first_ip());
 		       _ ->
-			   open_listen_port(config:listenPort(), config:listenIP())
+			   open_listen_port(preconfig:cs_port(), config:read(listen_ip))
 		   end,
     {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
     comm_port:set_local_address(undefined, LocalPort),

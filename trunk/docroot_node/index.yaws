@@ -10,7 +10,7 @@
 
 <erl>
 out(Arg) ->
-  {html, io_lib:format("~p", [config:listenIP()])}.
+  {html, io_lib:format("~p", [config:read(listen_ip)])}.
 </erl>
 
 </body>

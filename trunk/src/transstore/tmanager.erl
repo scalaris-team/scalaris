@@ -57,7 +57,7 @@
 %%
 %%    Ballot numbers reflect the order of replicated transaction
 %%      mangers. When the leader fails the next rTM takes over
-%%      after the interval of (Ballot-2)*config:leaderDetectorInterval().
+%%      after the interval of (Ballot-2)*config:read(leader_detector_interval).
 %%      rTMs do not really elect a leader, rather they behave like a
 %%      leader after a certain amount of time. This is reasonable as
 %%      the commit phase should not take longer than some seconds.
@@ -123,7 +123,7 @@ commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID)->
     %% ?TLOGN("init phase: initres ~p", [InitRes]),
     case InitRes of
         ok ->
-            erlang:send_after(config:tpFailureTimeout(), self(),
+            erlang:send_after(config:read(tp_failure_timeout), self(),
                               {check_failed_tps}),
             {_TimeCP, TransRes} = timer:tc(tmanager, start_commit, [TMState2]),
             ?TIMELOG("commit phase", _TimeCP/1000),
@@ -165,7 +165,7 @@ init_phase(TMState) ->
                             }
                 },
     tsend:send_to_participants_with_lookup(TMState, TPMessage),
-    erlang:send_after(config:transactionLookupTimeout(), self(),
+    erlang:send_after(config:read(transaction_lookup_timeout), self(),
                       {rtm_lookup_timeout}),
     receive_lookup_rtms_tps_repl(TMState).
 
@@ -173,7 +173,7 @@ receive_lookup_rtms_tps_repl(TMState)->
     receive
         {rtm, Address, RKey}->
             %% ?TLOGN("rtm for key ~p at ~p", [RKey, node(Address)]),
-            Limit = config:replicationFactor(),
+            Limit = config:read(replication_factor),
             NumRTMs = TMState#tm_state.rtms_found + 1,
 %            io:format("rtms ~p ~n", [NumRTMs]),
             Ballot = NumRTMs + 1,
@@ -189,7 +189,7 @@ receive_lookup_rtms_tps_repl(TMState)->
         {tp, ItemKey, OrigKey, Address} ->
             %% io:format("tp ~n"),
             %% ?TLOGN("tp for key ~p at ~p ", [ItemKey, node(Address)]),
-            Limit = config:replicationFactor(),
+            Limit = config:read(replication_factor),
             TMState1 = add_tp(TMState, ItemKey, OrigKey, Address, Limit),
             if (TMState1#tm_state.tps_found >= TMState1#tm_state.numitems)
                and (TMState1#tm_state.rtms_found >= Limit)
@@ -198,7 +198,7 @@ receive_lookup_rtms_tps_repl(TMState)->
             end;
         {rtm_lookup_timeout} ->
 %            io:format("lookup timeout ~n"),
-            Limit = config:quorumFactor(),
+            Limit = config:read(quorum_factor),
             if (TMState#tm_state.tps_found >= TMState#tm_state.numitems)
                and (TMState#tm_state.rtms_found >= Limit)
                -> {ok, TMState};
@@ -293,14 +293,14 @@ loop(TMState)->
         {become_leader} ->
             ?TLOGN("I'm becoming a leader", []),
             tmanager_pac:vote_for_suspected(TMState),
-            NewBal = TMState#tm_state.myBallot + config:replicationFactor(),
+            NewBal = TMState#tm_state.myBallot + config:read(replication_factor),
             erlang:send_after(time_become_leader(NewBal), self(), {become_leader}),
             loop(TMState#tm_state{myBallot = NewBal});
         _ ->
             %% io:format("TManager got unknown message ~p~n", [X]),
             %% ?TLOGN("unknown message ~p", [X]),
             loop(TMState)
-    after config:tmanagerTimeout()->
+    after config:read(tmanager_timeout)->
             if TMState#tm_state.rtms_found == 1
                -> ?TLOGN("Tmanager Timeout: in init phase", []),
                   %% loop(TMState);
@@ -328,4 +328,4 @@ check_failed_tps(TMState)->
     TMState.
 
 time_become_leader(MyBallot)->
-    (MyBallot - 2) * config:leaderDetectorInterval().
+    (MyBallot - 2) * config:read(leader_detector_interval).

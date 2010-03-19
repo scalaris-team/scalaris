@@ -108,7 +108,7 @@ on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
         fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
         cs_send:send_local_after(0, self(), {stabilize,Token}),
-        {NewId, NewMe, [NewPred]++NewSuccList,config:read(cyclon_cache_size),config:stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
+        {NewId, NewMe, [NewPred]++NewSuccList,config:read(cyclon_cache_size),stabilizationInterval_min(),Token,NewPred,hd(NewSuccList),[]};
 on(_,uninit) ->
         uninit;
 
@@ -192,7 +192,7 @@ on({crash, DeadPid},{Id, Me, View ,_RandViewSize,_Interval,AktToken,AktPred,AktS
             NewCache = filter(DeadPid, RandomCache),
             update_failuredetector(View,NewView),
             erlang:send(self(), {stabilize,AktToken+1}),
-		 	{Id, Me, NewView,0,config:stabilizationInterval_min(),AktToken+1,AktPred,AktSucc,NewCache};
+		 	{Id, Me, NewView,0,stabilizationInterval_min(),AktToken+1,AktPred,AktSucc,NewCache};
 on({'$gen_cast', {debug_info, Requestor}},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
 	    	cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))}, 
 					       {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]}),
@@ -364,15 +364,15 @@ update_cs_node(View,_AktPred,_AktSucc) ->
 new_interval(View,NewView,Interval) ->
 			case (View==NewView) of
             	true ->
-					case (Interval >= config:stabilizationInterval_max() ) of
-						true -> config:stabilizationInterval_max();
-						false -> Interval + ((config:stabilizationInterval_max() - config:stabilizationInterval_min()) div 10)
+					case (Interval >= stabilizationInterval_max() ) of
+						true -> stabilizationInterval_max();
+						false -> Interval + ((stabilizationInterval_max() - stabilizationInterval_min()) div 10)
                                  
 					end;
             	false ->
-					case (Interval - (config:stabilizationInterval_max()-config:stabilizationInterval_min()) div 2) =< (config:stabilizationInterval_min()  ) of
-						true -> config:stabilizationInterval_min() ;
-						false -> Interval - (config:stabilizationInterval_max()-config:stabilizationInterval_min()) div 2
+					case (Interval - (stabilizationInterval_max()-stabilizationInterval_min()) div 2) =< (stabilizationInterval_min()  ) of
+						true -> stabilizationInterval_min() ;
+						false -> Interval - (stabilizationInterval_max()-stabilizationInterval_min()) div 2
 					end
     		end.
 
@@ -397,3 +397,13 @@ get_pid() ->
 % get Pid of assigned cs_node
 get_cs_pid() ->
     process_dictionary:get_group_member(cs_node).
+
+%% @doc the interval between two stabilization runs Max
+%% @spec stabilizationInterval_max() -> integer() | failed
+stabilizationInterval_max() ->
+    config:read(stabilization_interval_max).
+
+%% @doc the interval between two stabilization runs Min
+%% @spec stabilizationInterval_min() -> integer() | failed
+stabilizationInterval_min() ->
+    config:read(stabilization_interval_min).

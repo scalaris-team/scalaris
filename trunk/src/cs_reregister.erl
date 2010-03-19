@@ -54,10 +54,10 @@ on(_, _State) ->
 
 trigger_reregister() ->
     RegisterMessage = {register,get_cs_node_this()},
-    reregister(config:register_hosts(), RegisterMessage).
+    reregister(config:read(register_hosts), RegisterMessage).
 
 reregister(failed, Message)->
-    cs_send:send(config:bootPid(), Message);
+    cs_send:send(bootPid(), Message);
 reregister(Hosts, Message) ->
     lists:foreach(fun (Host) -> 
 			  cs_send:send(Host, Message)
@@ -71,3 +71,8 @@ get_base_interval() ->
 
 get_cs_node_this() ->
     cs_send:make_global(process_dictionary:get_group_member(cs_node)).
+
+%% @doc pid of the boot daemon
+%% @spec bootPid() -> pid()
+bootPid() ->
+    config:read(boot_host).

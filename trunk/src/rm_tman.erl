@@ -79,7 +79,7 @@ on({init, Id, Me, Predecessor, SuccList}, uninit) ->
     TriggerState = Trigger:init(THIS),
     TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
     {Id, Me, [Predecessor], SuccList, config:read(cyclon_cache_size),
-     config:stabilizationInterval_min(), TriggerState2, [], true};
+     stabilizationInterval_min(), TriggerState2, [], true};
 on(Msg, uninit) ->
     cs_send:send_local_after(100, self(), Msg),
     uninit;
@@ -182,8 +182,8 @@ on({rm_buffer_response, OtherBuffer}, {Id, Me, OldPreds, OldSuccs, RandViewSize,
 on({zombie, Node}, {Id, Me, Preds, Succs, RandViewSize, _Interval, TriggerState, Cache, Churn})  ->
     NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
     cs_send:send_local(self_man:get_pid(), {update, ?MODULE, stabilizationInterval,
-                                            self(), config:stabilizationInterval_min()}),
-    {Id, Me, Preds, Succs, RandViewSize, config:stabilizationInterval_min(), NewTriggerState,
+                                            self(), stabilizationInterval_min()}),
+    {Id, Me, Preds, Succs, RandViewSize, stabilizationInterval_min(), NewTriggerState,
      [Node|Cache], Churn};
 % failure detector reported dead node
 on({crash, DeadPid},{Id, Me, OldPreds, OldSuccs, _RandViewSize, _Interval, TriggerState, Cache, Churn})  ->
@@ -193,7 +193,7 @@ on({crash, DeadPid},{Id, Me, OldPreds, OldSuccs, _RandViewSize, _Interval, Trigg
     update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
     update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs),
     NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
-    {Id, Me, NewPreds, NewSuccs, 0, config:stabilizationInterval_min(), NewTriggerState,
+    {Id, Me, NewPreds, NewSuccs, 0, stabilizationInterval_min(), NewTriggerState,
      NewCache,Churn};
 on({'$gen_cast', {debug_info, Requestor}},{_Id, _Me, Preds, Succs, _RandViewSize, _Interval,
                                            _TriggerState, _Cache, _Churn} = State)  ->
@@ -358,3 +358,8 @@ update_view(OldPreds, OldSuccs, OtherBuffer, RndView, Me, Interval, Churn) ->
     NewInterval = new_interval(OldPreds, NewPreds, OldSuccs, NewSuccs, Interval, Churn),
     NewChurn = has_churn(OldPreds, NewPreds, OldSuccs, NewSuccs),
     {NewPreds, NewSuccs, NewInterval, NewChurn}.
+
+%% @doc the interval between two stabilization runs Min
+%% @spec stabilizationInterval_min() -> integer() | failed
+stabilizationInterval_min() ->
+    config:read(stabilization_interval_min).

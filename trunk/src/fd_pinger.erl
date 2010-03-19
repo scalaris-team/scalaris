@@ -47,7 +47,7 @@ start_link([Module,Pid]) ->
 init([Module,Pid]) ->
     log:log(info,"[ fd_pinger ~p ] starting Node", [self()]),
     cs_send:send(Pid, {ping, cs_send:this()}),
-    cs_send:send_local_after(config:failureDetectorInterval(), self(), {timeout,0}), 
+    cs_send:send_local_after(failureDetectorInterval(), self(), {timeout,0}), 
     {Module,Pid,0}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -63,7 +63,7 @@ on({timeout,OldCount},{Module,Pid,Count}) ->
     case OldCount < Count of 
         true -> 
             cs_send:send(Pid, {ping, cs_send:this()}),
-            cs_send:send_local_after(config:failureDetectorInterval(), self(), {timeout,Count}),
+            cs_send:send_local_after(failureDetectorInterval(), self(), {timeout,Count}),
             {Module,Pid,Count};
         false ->    
            report_crash(Pid,Module),
@@ -78,4 +78,7 @@ report_crash(Pid,Module) ->
     log:log(warn,"[ FD ] ~p crashed",[Pid]),
     cs_send:send_local(Module , {crash, Pid}).
 
-
+%% @doc the interval between two failure detection runs
+%% @spec failureDetectorInterval() -> integer() | failed
+failureDetectorInterval() ->
+    config:read(failure_detector_interval).
