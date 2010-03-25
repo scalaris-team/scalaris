@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ end_per_suite(_Config) ->
 
 read(_Config) ->
     DB = db_gb_trees:new(1),
-    ?assert(db_gb_trees:read(DB, "Unknown") == failed),
+    ?assert(db_gb_trees:read(DB, "Unknown") == {ok, empty_val, -1}),
     ok.
 
 write(_Config) ->

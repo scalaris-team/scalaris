@@ -1,4 +1,4 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,9 +42,17 @@ init([InstanceId, Options]) ->
     DB =
         util:sup_worker_desc(?DB, ?DB, start_link,
                              [InstanceId]),
+    Delayer =
+        util:sup_worker_desc(msg_delay, msg_delay, start_link,
+                             [InstanceId]),
+    TX =
+        util:sup_supervisor_desc(cs_sup_tx, cs_sup_tx, start_link,
+                                 [InstanceId]),
     {ok, {{one_for_all, 10, 1},
           [
            DB,
-           Node
+           Node,
+           Delayer,
+           TX
           ]}}.
 %% userdevguide-end cs_sup_and:init

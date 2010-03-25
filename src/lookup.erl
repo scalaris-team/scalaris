@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,25 +28,20 @@
 
 -include("../include/scalaris.hrl").
 
--export([lookup_aux/4, lookup_fin/2, get_key/4, set_key/5, delete_key/3]).
+-export([lookup_aux/4, get_key/4, set_key/5, delete_key/3]).
 
 %logging on
 %-define(LOG(S, L), io:format(S, L)).
 %logging off
 -define(LOG(S, L), ok).
 
-lookup_fin(_Hops, Msg) ->
-    %io:format("Hops: ~p~n", [Hops]),
-    cs_send:send_local(self() , Msg).
-
 lookup_aux(State, Key, Hops, Msg) ->
     Terminate = util:is_between(cs_state:id(State), Key, cs_state:succ_id(State)),
-    P = ?RT:next_hop(State, Key),
-    ?LOG("[ ~w | I | Node   | ~w ] lookup_aux ~w ~w ~s~n",[calendar:universal_time(), self(), Terminate, P, Key]),
     if
         Terminate ->
             cs_send:send(cs_state:succ_pid(State), {lookup_fin, Hops + 1, Msg});
         true ->
+            P = ?RT:next_hop(State, Key),
             cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
     end.
 

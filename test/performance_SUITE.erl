@@ -1,4 +1,4 @@
-%  Copyright 2008, 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -33,7 +33,18 @@ all() ->
      get_keys_for_replica_string,
      md5,
      next_hop,
-     process_dictionary].
+     process_dictionary,
+     ets_insert,
+     ets_lookup,
+     erlang_put,
+     erlang_get,
+     pdb_set,
+     pdb_get,
+     erlang_send,
+     cs_send_local,
+    erlang_send_after,
+    erlang_spawn,
+    erlang_now].
 
 suite() ->
     [
@@ -57,6 +68,81 @@ empty(_Config) ->
                        ok
                end, "empty"),
     ok.
+
+ets_lookup(_Config) ->
+    ets:new(performance, [ordered_set, private, named_table]),
+    ets:insert(performance, {123456, "foo"}),
+    iter(count(), fun() ->
+                          ets:lookup(performance, 123456)
+                              end, "ets:lookup"),
+    ok.
+
+ets_insert(_Config) ->
+    ets:new(ets_insert, [ordered_set, private, named_table]),
+    iter(count(), fun() ->
+                          ets:insert(ets_insert, {performance, "abc"})
+                              end, "ets:insert"),
+    ok.
+
+erlang_get(_Config) ->
+    erlang:put(performance, "foo"),
+    iter(count(), fun() ->
+                          erlang:get(performance)
+                              end, "erlang:get"),
+    ok.
+
+erlang_put(_Config) ->
+    iter(count(), fun() ->
+                          erlang:put(performance, "abc")
+                              end, "erlang:put"),
+    ok.
+
+pdb_get(_Config) ->
+    pdb:new(pdb_get, [ordered_set, private, named_table]),
+    pdb:set({performance, "foo"}, pdb_get),
+    iter(count(), fun() ->
+                          pdb:get(performance, pdb_get)
+                  end, "pdb:get"),
+    ok.
+
+pdb_set(_Config) ->
+    pdb:new(pdb_set, [ordered_set, private, named_table]),
+    iter(count(), fun() ->
+                          pdb:set({performance, "abc"}, pdb_set)
+                  end, "pdb:set"),
+    ok.
+
+erlang_send(_Config) ->
+    Pid = spawn(?MODULE, helper_rec, [count(), self()]),
+    iter(count(), fun() -> Pid ! ping end, "erlang:send"),
+    receive pong -> ok end,
+    ok.
+
+cs_send_local(_Config) ->
+    Pid = spawn(?MODULE, helper_rec, [count(), self()]),
+    iter(count(), fun() -> cs_send:send_local(Pid, ping) end, "cs_send_local"),
+    receive pong -> ok end,
+    ok.
+
+helper_rec(0, Pid) -> Pid ! pong;
+helper_rec(Iter, Pid) ->
+    receive Any -> ok end,
+    helper_rec(Iter - 1, Pid).
+
+erlang_send_after(_Config) ->
+    Pid = spawn(?MODULE, helper_rec, [count(), self()]),
+    iter(count(), fun() -> cs_send:send_local_after(5000, Pid, ping) end, "cs_send:send_after"),
+    receive pong -> ok end,
+    ok.
+
+erlang_spawn(_Config) ->
+    iter(count(), fun() -> spawn(fun() -> ok end) end, "erlang:spawn"),
+    ok.
+
+erlang_now(_Config) ->
+    iter(count(), fun() -> erlang:now() end, "erlang:now"),
+    ok.
+
 
 get_keys_for_replica_string(_Config) ->
     iter(count(), fun () ->

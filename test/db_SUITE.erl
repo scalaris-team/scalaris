@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ end_per_suite(Config) ->
 read(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?DB:new(1),
-    ?assert(?DB:read(DB, ?RT:hash_key("Unknown")) == failed),
+    ?assert(?DB:read(DB, ?RT:hash_key("Unknown")) == {ok, empty_val, -1}),
     ?DB:close(DB),
     ok.
 
@@ -140,7 +140,8 @@ read_lock(_Config) ->
     {DB10, failed} = ?DB:get_locks(DB9, ?RT:hash_key("Unknown")),
     % read on write locked new key should fail
     {DB11, ok}     = ?DB:set_write_lock(DB10, ?RT:hash_key("ReadLockKey1")),
-    failed     = ?DB:read(DB11, ?RT:hash_key("ReadLockKey1")),
+    %% never set a value, but DB Entry was created
+    {ok, empty_val, -1} = ?DB:read(DB11, ?RT:hash_key("ReadLockKey1")),
     ?DB:close(DB),
     ok.
 
@@ -170,7 +171,7 @@ delete(_Config) ->
     DB = ?DB:new(1),
     DB2 = ?DB:write(DB, ?RT:hash_key("Key1"), "Value1", 1),
     {DB3, ok} = ?DB:delete(DB2, ?RT:hash_key("Key1")),
-    ?assert(?DB:read(DB3, ?RT:hash_key("Key1")) == failed),
+    ?assert(?DB:read(DB3, ?RT:hash_key("Key1")) == {ok, empty_val, -1}),
     {DB5, undef} = ?DB:delete(DB3, ?RT:hash_key("Key1")),
     DB6 = ?DB:write(DB5, ?RT:hash_key("Key1"), "Value1", 1),
     {DB7, ok} = ?DB:set_read_lock(DB6, ?RT:hash_key("Key1")),

@@ -1,4 +1,4 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,13 +45,9 @@
 -spec(on/2 :: (message(), state()) -> state()).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Join Messages
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % join protocol
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % first node
 on({get_key_response_keyholder, Key}, {join_as_first}) ->
@@ -137,13 +133,11 @@ on({join_response, Pred, Data}, {join_phase4, Id, Succ, Me}) ->
 
 % Catch all messages until the join protocol is finshed
 on(Msg, State) when element(1, State) /= state ->
-    %io:format("[~p] postponed delivery of ~p~n", [self(), Msg]),
+    %log:log(info("[csnode] [~p] postponed delivery of ~p~n", [self(), Msg]),
     cs_send:send_local_after(100, self(), Msg),
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Kill Messages
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Kill Messages
 on({kill}, _State) ->
     kill;
 
@@ -157,9 +151,7 @@ on({halt}, _State) ->
 on({die}, _State) ->
     kill;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Ring Maintenance (see ring_maintenance.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Ring Maintenance (see ring_maintenance.erl)
 on({init_rm,Pid},State) ->
     cs_send:send_local(Pid , {init, cs_state:id(State), cs_state:me(State),cs_state:pred(State), [cs_state:succ(State)]}),
     State;
@@ -228,15 +220,15 @@ on({lookup_tp, Message}, State) ->
     {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
     Responsible = util:is_between(RangeBeg, Message#tp_message.item_key, RangeEnd),
     if
-	Responsible == true ->
-	    cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
-	    State;
-	true ->
-	    log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),
-	    State
+        Responsible == true ->
+            cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
+            State;
+        true ->
+            log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),
+            State
     end;
 
-	%% answer - lookup for replicated transaction manager
+        %% answer - lookup for replicated transaction manager
 on({init_rtm, Message}, State) ->
     transaction:initRTM(State, Message);
 
@@ -248,10 +240,10 @@ on({validate, TransID, Item}, State) ->
 on({decision, Message}, State) ->
     {_, TransID, Decision} = Message#tp_message.message,
     if
-	Decision == commit ->
-	    tparticipant:tp_commit(State, TransID);
-	true ->
-	    tparticipant:tp_abort(State, TransID)
+        Decision == commit ->
+            tparticipant:tp_commit(State, TransID);
+        true ->
+            tparticipant:tp_abort(State, TransID)
     end;
 
 %% remove tm->tid mapping after transaction manager stopped
@@ -280,9 +272,7 @@ on({notify, Pred}, State) ->
     rm_chord:notify(Pred),
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Finger Maintenance 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Finger Maintenance
 on({lookup_pointer, Source_Pid, Index}, State) ->
     RT = process_dictionary:get_group_member(routing_table),
     cs_send:send_local(RT, {lookup_pointer, Source_Pid, Index}),
@@ -294,15 +284,13 @@ on({rt_get_node, Source_PID, Index}, State) ->
     State;
 %% userdevguide-end cs_node:rt_get_node
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Lookup (see lookup.erl) 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({lookup_aux, Key, Hops, Msg}, State) -> 
+%% Lookup (see lookup.erl)
+on({lookup_aux, Key, Hops, Msg}, State) ->
     lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on({lookup_fin, Hops, Msg}, State) -> 
-    lookup:lookup_fin(Hops, Msg),
+on({lookup_fin, Hops, Msg}, State) ->
+    cs_send:send_local(self(), Msg),
     State;
 
 on({get_node, Source_PID, Key}, State) ->
@@ -315,56 +303,83 @@ on({get_process_in_group, Source_PID, Key, Process}, State) ->
     cs_send:send(Source_PID, {get_process_in_group_reply, Key, GPid}),
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Cyclon (see cyclon/*.erl) 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({get_rtm, Source_PID, Key, Process}, State) ->
+    InstanceId = erlang:get(instance_id),
+    Pid = process_dictionary:get_group_member(Process),
+    SupTx = process_dictionary:get_group_member(cs_sup_tx),
+    NewPid = case Pid of
+                 failed ->
+                     %% start, if necessary
+                     RTM_desc = util:sup_worker_desc(
+                                  Process, tx_tm_rtm, start_link,
+                                  [InstanceId, Process]),
+                     case supervisor:start_child(SupTx, RTM_desc) of
+                         {ok, TmpPid} -> TmpPid;
+                         {ok, TmpPid, _} -> TmpPid;
+                         {error, _} -> Pid
+                     end;
+                 _ -> Pid
+             end,
+    GPid = cs_send:make_global(NewPid),
+    cs_send:send(Source_PID, {get_rtm_reply, Key, GPid}),
+    State;
+
+%% Cyclon (see cyclon/*.erl)
 on({get_cyclon_pid, Pid,Me}, State) ->
     CyclonPid = cs_send:make_global(get_local_cyclon_pid()),
     cs_send:send(Pid,{cyclon_pid, Me, CyclonPid}),
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% database 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% database
 on({get_key, Source_PID, Key}, State) ->
     {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
     case util:is_between(RangeBeg, Key, RangeEnd) of
-	true ->
-	    lookup:get_key(State, Source_PID, Key, Key),
-	    State;
-	false ->
-	    log:log(info,"[ Node ] Get_Key: Got Request for Key ~p, it is not between ~p and ~p", [Key, RangeBeg, RangeEnd]),
-	    State
+        true ->
+            lookup:get_key(State, Source_PID, Key, Key),
+            State;
+        false ->
+            log:log(info,"[ Node ] Get_Key: Got Request for Key ~p, it is not between ~p and ~p", [Key, RangeBeg, RangeEnd]),
+            State
     end;
+
+on({get_key, Source_PID, SourceId, HashedKey}, State) ->
+%      case 0 =:= randoms:rand_uniform(0,6) of
+%          true ->
+%              io:format("drop get_key request~n");
+%          false ->
+    cs_send:send(Source_PID,
+                 {get_key_with_id_reply, SourceId, HashedKey,
+                  ?DB:read(cs_state:get_db(State), HashedKey)}),
+%    end,
+    State;
 
 on({set_key, Source_PID, Key, Value, Versionnr}, State) ->
     {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
     case util:is_between(RangeBeg, Key, RangeEnd) of
-	true ->
-	    lookup:set_key(State, Source_PID, Key, Value, Versionnr);
-	false ->
-	    log:log(info,"[ Node ] Set_Key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
-	    State
+        true ->
+            lookup:set_key(State, Source_PID, Key, Value, Versionnr);
+        false ->
+            log:log(info,"[ Node ] Set_Key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
+            State
     end;
 
 on({delete_key, Source_PID, Key}, State) ->
     {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
     case util:is_between(RangeBeg, Key, RangeEnd) of
-	true ->
-	    lookup:delete_key(State, Source_PID, Key);
-	false ->
-	    log:log(info,"[ Node ] delete_key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
-	    State
-    end;    
+        true ->
+            lookup:delete_key(State, Source_PID, Key);
+        false ->
+            log:log(info,"[ Node ] delete_key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
+            State
+    end;
 
 on({drop_data, Data, Sender}, State) ->
     cs_send:send(Sender, {drop_data_ack}),
     DB = ?DB:add_data(cs_state:get_db(State), Data),
     cs_state:set_db(State, DB);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % bulk owner messages (see bulkowner.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({bulk_owner, I, Msg}, State) ->
     bulkowner:bulk_owner(State, I, Msg),
     State;
@@ -374,13 +389,11 @@ on({start_bulk_owner, I, Msg}, State) ->
     State;
 
 on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
-    cs_send:send(Issuer, {bulk_read_with_version_response, cs_state:get_my_range(State), 
-			  ?DB:get_range_with_version(cs_state:get_db(State), Range)}),
+    cs_send:send(Issuer, {bulk_read_with_version_response, cs_state:get_my_range(State),
+                          ?DB:get_range_with_version(cs_state:get_db(State), Range)}),
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load balancing messages (see cs_lb.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_load, Source_PID}, State) ->
     cs_send:send(Source_PID, {get_load_response, cs_send:this(), cs_state:load(State)}),
     State;
@@ -400,13 +413,6 @@ on({get_middle_key_response, Source_PID, MiddleKey}, State) ->
 on({reset_loadbalance_flag}, State) ->
     cs_lb:reset_loadbalance_flag(State);
 
-
-
-%% userdevguide-end cs_node:join_message
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({stabilize_loadbalance}, State) ->
     cs_lb:balance_load(State),
     State;
@@ -419,7 +425,7 @@ on({get_node_details, Pid, Which}, State) ->
     cs_send:send(Pid, {get_node_details_response, cs_state:details(State, Which)}),
     State;
 
-on({dump}, State) -> 
+on({dump}, State) ->
     cs_state:dump(State),
     State;
 
@@ -431,11 +437,11 @@ on({'$gen_cast', {debug_info, Requestor}}, State) ->
 %% unit_tests
 on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
     Res = lists:map(fun ({Key, {Value, _, _, _}}) ->
-			    {Key, Value}
-		    end, 
-		    lists:filter(fun ({Key, _}) ->
-					 intervals:in(Key, Range)
-				 end, ?DB:get_data(cs_state:get_db(State)))),
+                            {Key, Value}
+                    end,
+                    lists:filter(fun ({Key, _}) ->
+                                         intervals:in(Key, Range)
+                                 end, ?DB:get_data(cs_state:get_db(State)))),
     cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, cs_state:id(State)}),
     State;
 
@@ -443,12 +449,11 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 %on({get_node_response, _, _}, State) ->
 %    State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% join messages (see cs_join.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% join messages (see cs_join.erl)
 %% userdevguide-begin cs_node:join_message
 on({join, Source_PID, Id}, State) ->
     cs_join:join_request(State, Source_PID, Id);
+%% userdevguide-end cs_node:join_message
 
 on({get_cs_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
@@ -461,6 +466,12 @@ on({known_hosts_timeout}, State) ->
 on({lookup_timeout}, State) ->
     % will ignore these messages after join
     State;
+
+%% messages handled as a transaction participant (TP)
+on({init_TP, Params}, State) ->
+    tx_tp:on_init_TP(Params, State);
+on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
+    tx_tp:on_tx_commitreply(Id, Result, State);
 
 on(_, _State) ->
     unknown_event.
@@ -483,7 +494,6 @@ init([_InstanceId, Options]) ->
             cs_keyholder:get_key(),
             {join_phase1}
     end.
-
 %% userdevguide-end cs_node:start
 
 %% userdevguide-begin cs_node:start_link
@@ -521,3 +531,4 @@ trigger_known_nodes() ->
 is_unittest() ->
     code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
     lists:member(ct_logs, registered()).
+

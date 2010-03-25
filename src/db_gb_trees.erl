@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -156,12 +156,10 @@ get_locks(DB, Key) ->
 %% @spec read(db(), string()) -> {ok, string(), integer()} | failed
 read(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {empty_val, true, 0, -1}} ->
-            failed;
 	{value, {Value, _WriteLock, _ReadLock, Version}} ->
 	    {ok, Value, Version};
 	none ->
-	    failed
+	    {ok, empty_val, -1}
     end.
 
 %% @doc updates the value of key

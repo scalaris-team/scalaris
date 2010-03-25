@@ -18,7 +18,7 @@
 %%%
 %%% Created :  14 Mar 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
--module(transaction_SUITE).
+-module(transaction_v2_SUITE).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -47,7 +47,7 @@ end_per_suite(Config) ->
     ok.
 
 read(_Config) ->
-    ?equals(cs_api:read("UnknownKey"), {fail, not_found}),
+    ?equals(cs_api_v2:read("UnknownKey"), {fail, not_found}),
     ok.
 
 write(_Config) ->

@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2008, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,8 +27,9 @@
 -author('schuett@zib.de').
 -vsn('$Id').
 
--export([start_link/0, start/0, run_increment/2, run_increment_locally/2, run_read/2,
-         run_read/3, run_increment/3, bench_runner/3]).
+-export([start_link/0, start/0]).
+-export([run_increment/2, run_increment_v2/2, run_increment/3, run_increment_locally/2]).
+-export([run_read/2, run_read_v2/2, run_read/3, bench_runner/3]).
 
 -include("../include/scalaris.hrl").
 
@@ -38,6 +39,10 @@
 %% @doc run an increment benchmark (i++) on all nodes
 run_increment(ThreadsPerVM, Iterations) ->
     Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
+    runner(ThreadsPerVM, Iterations, [verbose], Msg).
+
+run_increment_v2(ThreadsPerVM, Iterations) ->
+    Msg = {bench_increment_v2, ThreadsPerVM, Iterations, cs_send:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
 run_increment_locally(ThreadsPerVM, Iterations) ->
@@ -54,6 +59,10 @@ run_increment(ThreadsPerVM, Iterations, Options) ->
 %% @doc run an read benchmark on all nodes
 run_read(ThreadsPerVM, Iterations) ->
     Msg = {bench_read, ThreadsPerVM, Iterations, cs_send:this()},
+    runner(ThreadsPerVM, Iterations, [verbose], Msg).
+
+run_read_v2(ThreadsPerVM, Iterations) ->
+    Msg = {bench_read_v2, ThreadsPerVM, Iterations, cs_send:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
 run_read(ThreadsPerVM, Iterations, Options) ->
@@ -126,6 +135,17 @@ bench_increment(Threads, Iterations, Owner) ->
     cs_send:send(Owner, {done, Time}),
     ok.
 
+bench_increment_v2(Threads, Iterations, Owner) ->
+    Bench = fun (Parent) -> 
+	          Key = get_and_init_key(),
+		  bench_increment:process_v2(Parent, 
+                                             Key, 
+                                             Iterations) 
+	  end,
+    {Time, _} = timer:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
+    cs_send:send(Owner, {done, Time}),
+    ok.
+
 %% @doc run the read bench locally
 -spec(bench_read/3 :: (integer(), integer(), any()) -> ok).
 bench_read(Threads, Iterations, Owner) ->
@@ -136,6 +156,17 @@ bench_read(Threads, Iterations, Owner) ->
 		             Iterations)
 	  end,
     {Time, _} = timer:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
+    cs_send:send(Owner, {done, Time}),
+    ok.
+
+bench_read_v2(Threads, Iterations, Owner) ->
+    Bench = fun (Parent) -> 
+	          Key = get_and_init_key(),
+		  run_bench_read_v2(Parent,
+                                    Key,
+                                    Iterations, 0)
+	  end,
+    {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
     cs_send:send(Owner, {done, Time}),
     ok.
 
@@ -162,6 +193,18 @@ run_bench_read(Owner, Key, Iterations) ->
 	{_Value, _Version} ->
 	    run_bench_read(Owner, Key, Iterations - 1)
     end.
+
+run_bench_read_v2(Owner, _Key, 0, Fail) ->
+    io:format("repeated requests: ~p~n", [Fail]),
+    cs_send:send_local(Owner , {done, ok});
+run_bench_read_v2(Owner, Key, Iterations, Fail) ->
+    case cs_api_v2:read(Key) of
+	{fail, _Reason} ->
+	    run_bench_read_v2(Owner, Key, Iterations, Fail + 1);
+	_Value ->
+	    run_bench_read_v2(Owner, Key, Iterations - 1, Fail)
+    end.
+
 %%==============================================================================
 %% main loop
 %%==============================================================================
@@ -172,9 +215,19 @@ loop() ->
 			  bench_increment(Threads, Iterations, Owner) 
 		  end),
 	    loop();
+	{bench_increment_v2, Threads, Iterations, Owner} ->
+	    spawn(fun () -> 
+			  bench_increment_v2(Threads, Iterations, Owner) 
+		  end),
+	    loop();
 	{bench_read, Threads, Iterations, Owner} ->
 	    spawn(fun () -> 
 			  bench_read(Threads, Iterations, Owner) 
+		  end),
+	    loop();
+	{bench_read_v2, Threads, Iterations, Owner} ->
+	    spawn(fun () -> 
+			  bench_read_v2(Threads, Iterations, Owner) 
 		  end),
 	    loop()
     end.

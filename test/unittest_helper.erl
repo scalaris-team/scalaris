@@ -1,4 +1,4 @@
-%  Copyright 2008, 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@
 
 make_ring(Size) ->
     error_logger:tty(true),
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
     Owner = self(),
     undefined = ets:info(config_ets),
     Pid = spawn(fun () ->
@@ -68,7 +69,7 @@ stop_ring(Pid) ->
             wait_for_process_to_die(Pid),
             gen_component:kill(process_dictionary),
             wait_for_table_to_disappear(process_dictionary),
-            timer:sleep(10000),
+            timer:sleep(2000),
             ok
         end
     catch
