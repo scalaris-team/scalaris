@@ -86,7 +86,7 @@ Inside those repositories you will also find erlang packages - you don't need th
 
 === How to add deb-based repositories (Debian, Ubuntu)? ===
 
-Please note that the openSUSE BuildService does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list:
+Please note that the openSUSE !BuildService does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list:
 
 {{{
 deb http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.10/ ./
