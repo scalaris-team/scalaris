@@ -84,6 +84,16 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 
 Inside those repositories you will also find erlang packages - you don't need this if you already have a recent enough erlang version (`R12B-4`)!
 
+=== How to add deb-based repositories (Debian, Ubuntu)? ===
+
+Please note that the openSUSE BuildService does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list:
+
+{{{
+deb http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.10/ ./
+}}}
+
+Refer to http://en.opensuse.org/Build_Service/Deb_builds#Configuring_sources.list if you are having trouble adding .deb-based repositories.
+
 == How to build an rpm? ==
 
 {{{
