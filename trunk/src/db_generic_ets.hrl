@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -23,6 +23,23 @@
 %% @version $Id $
 
 -include("../include/scalaris.hrl").
+
+get_entry(DB, Key) ->
+    case ?ETS:lookup(DB, Key) of
+%% for new storage format
+%%        [Entry] -> Entry;
+%% for compatibility with old DB format:
+        [{Key, {A,B,C,D}}] -> {Key,A,B,C,D};
+        [] -> db_entry:new(Key)
+    end.
+
+set_entry(DB, Entry) ->
+%%  for new storage format
+%%   ets:insert(DB, Entry).
+%% for compatibility with old DB format:
+    {Key, A,B,C,D} = Entry,
+    ets:insert(DB, {Key, {A,B,C,D}}),
+    DB.
 
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
@@ -98,14 +115,22 @@ get_locks(DB, Key) ->
 %% @doc reads the version and value of a key
 -spec(read/2 :: (db(), string()) -> {ok, value(), version()} | failed).
 read(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {empty_val, true, 0, -1}}] ->
-            failed;
-        [{Key, {Value, _WriteLock, _ReadLock, Version}}] ->
-            {ok, Value, Version};
-        [] ->
-            failed
-    end.
+%%    Start = erlang:now(),
+    Res = case ?ETS:lookup(DB, Key) of
+              [{Key, {Value, _WriteLock, _ReadLock, Version}}] ->
+                  {ok, Value, Version};
+              [] ->
+                  {ok, empty_val, -1}
+          end,
+%%     Stop = erlang:now(),
+%%     Span = timer:now_diff(Stop, Start),
+%%     case ets:lookup(profiling, db_read_lookup) of
+%%         [] ->
+%%             ets:insert(profiling, {db_read_lookup, Span});
+%%         [{_, Sum}] ->
+%%             ets:insert(profiling, {db_read_lookup, Sum + Span})
+%%     end,
+    Res.
 
 %% @doc updates the value of key
 -spec(write/4 :: (db(), key(), value(), version()) -> db()).

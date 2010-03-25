@@ -1,4 +1,4 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
+-export([get_pids_uid/0]).
+-export([get_global_uid/0]).
 
 -ifdef(types_not_builtin).
 -type gb_tree() :: gb_trees:gb_tree().
@@ -351,3 +353,16 @@ tc(M, F, A) ->
     Val = apply(M, F, A),
     After = erlang:now(),
     {timer:now_diff(After, Before), Val}.
+
+get_pids_uid() ->
+    Result = case erlang:get(pids_uid_counter) of
+                 undefined -> 1;
+                 Any -> Any + 1
+             end,
+    erlang:put(pids_uid_counter, Result),
+    Result.
+
+get_global_uid() ->
+    Result = {get_pids_uid(), cs_send:this()}
+    %% , term_to_binary(Result)
+    .

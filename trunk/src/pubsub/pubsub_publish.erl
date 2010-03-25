@@ -45,6 +45,5 @@ publish(URL, Topic, Content) ->
     ok.
 
 publish_internal(URL, Topic, Content) ->
-    Res = jsonrpc:call(URL, [], {call, notify, [Topic, Content]}),
-    io:format("~p ~p~n", [Res, URL]).
+    jsonrpc:call(URL, [], {call, notify, [Topic, Content]}).
 

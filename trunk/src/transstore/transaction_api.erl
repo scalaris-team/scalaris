@@ -79,6 +79,9 @@ quorum_read(Key)->
     RTO = config:read(quorum_read_timeout),
     transaction:quorum_read(Key, cs_send:this()),
     receive
+        {single_read_return, {value, empty_val, _Version}}->
+            ?TLOG2("single read return fail", [Page]),
+            {fail, not_found};
         {single_read_return, {value, Page, Version}}->
             ?TLOG2("read_page returned", [Page]),
             {Page, Version};
@@ -195,7 +198,12 @@ write(Key, Value, TransLog) ->
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
 read(Key, TransLog)->
-    transaction:read(Key, TransLog).
+    TLog = transaction:read(Key, TransLog),
+    case TLog of
+        {{value, empty_val}, NTlog} -> {{fail, not_found}, NTlog};
+        _ -> TLog
+    end.
+
 
 %%--------------------------------------------------------------------
 %% Function: parallel_reads(Keys, TransLog) -> {fail, NewTransLog},

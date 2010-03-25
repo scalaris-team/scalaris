@@ -64,8 +64,7 @@ on_trigger(Config) ->
 
     Self = self(),
     ?expect_message({get_subset_rand, 1, Self}),
-    ?equals(element(1, InitialState), element(1, NewState)),
-    ?equals(element(2, InitialState), element(2, NewState)),
+    ?equals(InitialState, NewState),
     Config.
 
 on_vivaldi_shuffle(Config) ->

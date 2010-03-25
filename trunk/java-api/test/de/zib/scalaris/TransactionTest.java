@@ -774,7 +774,7 @@ public class TransactionTest {
 	 * {@link Transaction#write(String, String)} and
 	 * {@link Transaction#read(String)} which should show that
 	 * writing a value for a key for which a previous read returned a
-	 * NotFoundException is not possible without reverting the last operation.
+	 * NotFoundException is possible without reverting the last operation.
 	 * 
 	 * @throws TransactionNotFinishedException
 	 * @throws UnknownException
@@ -782,7 +782,7 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws NotFoundException
 	 */
-	@Test(expected=UnknownException.class)
+	@Test
 	public void testRevertLastOp4() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
 		Transaction t = new Transaction();
 		try {

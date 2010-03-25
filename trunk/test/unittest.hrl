@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,20 +26,21 @@
 -vsn('$Id$ ').
 
 -define(assert(Boolean), myassert(Boolean, ??Boolean)).
--define(equals(X, Y), myequals(??X, ??Y, X, Y)).
+-define(equals(X, Y),
+        case X of
+            Y -> ok;
+            _ ->
+                ct:pal("Failed: Stacktrace ~p~n", [erlang:get_stacktrace()]),
+                ct:fail(
+                   lists:flatten(
+                     io_lib:format("~p evaluated to ~p which is not the expected ~p", [??X, X, ??Y])))
+        end).
 
 myassert(true, _Reason) ->
     ok;
 myassert(false, Reason) ->
     ct:fail(Reason).
 
-myequals(XS, YS, X, Y) ->
-    myequals(X == Y, XS, YS, X, Y).
-    
-myequals(true, _, _, _, _) ->
-    ok;
-myequals(false, XS, YS, X ,Y) ->
-    ct:fail(lists:flatten(io_lib:format("~p(~p) != ~p(~p)", [XS, X, YS, Y]))).
 
 -define(expect_message(Msg),
         receive

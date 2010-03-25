@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@
 -import(transaction_api, [read2/2, write2/3]).
 
 -export([start/0, bench/0, bench_raw/0, process/3]).
+-export([process_v2/3]).
 
 init() ->
     Pid = spawn(fun () ->
@@ -55,14 +56,31 @@ make_tfun(Key) ->
 	    {{ok, ok}, TransLog2}
     end.
 
+inc(Key) ->
+    {TLog1, {results, [{read, Key, ReadResult}]}} =
+        cs_api_v2:process_request_list([], [{read, Key}]),
+    case ReadResult of
+        {value, Value} ->
+            {_TLog, {results, [{write, Key, {value, Written}}, CommitResult]}} =
+                cs_api_v2:process_request_list(
+                  TLog1, [{write, Key, Value + 1}, {commit}]),
+                case CommitResult of
+                    commit -> ok;
+                    Reason -> {failure, Reason}
+                end;
+        {fail, Reason} ->
+            {failure, Reason}
+    end.
+
 process(Parent, Key, Count) ->
-    SuccessFun = fun(X) ->
-                         {success, X}
-                 end,
-    FailureFun = fun(Reason)->
-                         {failure, Reason}
-                 end,
+    SuccessFun = fun(X) -> {success, X} end,
+    FailureFun = fun(Reason)-> {failure, Reason} end,
     process_iter(Parent, make_tfun(Key), Count, SuccessFun, FailureFun, 0).
+
+process_v2(Parent, Key, Count) ->
+    SuccessFun = fun(X) -> {success, X} end,
+    FailureFun = fun(Reason)-> {failure, Reason} end,
+    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, 0).
 
 process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
     cs_send:send_local(Parent , {done, AbortCount});
@@ -78,10 +96,25 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
 	    io:format("~p~n", [X])
     end.
 
+process_iter_v2(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
+    cs_send:send_local(Parent , {done, AbortCount});
+process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
+    Result = inc(Key),
+    case Result of
+	ok ->
+	    process_iter_v2(Parent, Key, Count - 1, SuccessFun, FailureFun, AbortCount);
+	{failure, abort} ->
+	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+	{failure, timeout} ->
+	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+	{failure, failed} ->
+	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1)
+    end.
+
 bench() ->
     bench_raw().
 
-bench_raw() ->    
+bench_raw() ->
     Self = self(),
     Count = 1000,
     Key = "i",
@@ -94,14 +127,14 @@ bench_raw() ->
     wait_for_done(6),
     Count.
 
-bench_cprof() ->    
+bench_cprof() ->
     Self = self(),
     Count = 300,
     Key = "i",
-    cprof:start(), 
+    cprof:start(),
     spawn(fun () -> process(Self, Key, Count) end),
     wait_for_done(1),
-    cprof:pause(), 
+    cprof:pause(),
     io:format("~p~n", [cprof:analyse()]),
     Count.
 

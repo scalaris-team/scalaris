@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -125,7 +125,7 @@ commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID)->
         ok ->
             erlang:send_after(config:read(tp_failure_timeout), self(),
                               {check_failed_tps}),
-            {_TimeCP, TransRes} = timer:tc(tmanager, start_commit, [TMState2]),
+            {_TimeCP, TransRes} = util:tc(tmanager, start_commit, [TMState2]),
             ?TIMELOG("commit phase", _TimeCP/1000),
             %% ?TLOGN("Result of transaction: ~p", [TransRes]),
             case TransRes of

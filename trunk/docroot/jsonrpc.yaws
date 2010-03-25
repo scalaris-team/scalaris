@@ -141,13 +141,13 @@ results_to_json(Results) ->
                           case Val of
                               {fail, Reason} -> {fail, atom_to_list(Reason)};
                               {value, Value} -> {value, Value}
-                          end ]} 
+                          end ]}
                 || {Op, Key, Val} <- Results ],
     {array, Entries}.
 
 data_to_json(Data) ->
     {array, [ {struct, [{key, Key},
                         {value, Value},
-                        {version, Version}]} || 
+                        {version, Version}]} ||
 		{Key, Value, Version, WriteLock, ReadLock} <- Data]}.
 </erl>

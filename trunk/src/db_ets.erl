@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@
 -type(db()::atom()).
 
 -export([start_link/1,
+         get_entry/2, set_entry/2,
          set_write_lock/2, unset_write_lock/2, set_read_lock/2,
          unset_read_lock/2, get_locks/2,
 
@@ -70,8 +71,8 @@ new(_) ->
     % ets prefix: DB_ + random name
     DBname = list_to_atom(string:concat("db_", randoms:getRandomId())),
     % better protected? All accesses would have to go to DB-process
-    % ets:new(DBname, [ordered_set, protected, named_table]).
-    ets:new(DBname, [ordered_set, public, named_table]).
+     ets:new(DBname, [ordered_set, protected, named_table]).
+    %ets:new(DBname, [ordered_set, private, named_table]).
 
 %% delete DB (missing function)
 close(DB) ->

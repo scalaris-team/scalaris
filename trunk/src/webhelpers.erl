@@ -45,6 +45,7 @@ isPost(A) ->
 %%%-----------------------------Lookup/Put---------------------------
 
 lookup(Key) ->
+%%    timer:tc(cs_api, read, [Key]).
     timer:tc(transaction_api, quorum_read, [Key]).
 
 set_key(Key, Value) ->

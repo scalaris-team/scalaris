@@ -105,13 +105,13 @@ def req_list2()
 end
 
 def range_query()
-  result = json_call('range_read', 
+  result = json_call('range_read',
                      [0, 0x40000000000000000000000000000000])
   puts result.to_json
   write("keyA", "valueA")
   write("keyB", "valueB")
   write("keyC", "valueC")
-  result = json_call('range_read', 
+  result = json_call('range_read',
                      [0, 0x40000000000000000000000000000000])
   puts result.to_json
 end
@@ -134,36 +134,43 @@ end
 
 n = 100
 
-range_query()
-
+puts "testing request lists ..."
 req_list()
+
+puts "testing range queries ..."
+range_query()
 
 puts "benchmarking ..."
 
+puts " nops ..."
 nop = Benchmark.realtime {
   n.times do
     nop("key")
   end
 }
 
+puts " read ..."
 read = Benchmark.realtime {
   n.times do
     read("key")
   end
 }
 
+puts " write ..."
 write = Benchmark.realtime {
   n.times do
     write("key", "value")
   end
 }
 
+puts " test and set ..."
 test_and_set = Benchmark.realtime {
   n.times do
     test_and_set("key", "value", "value")
   end
 }
 
+puts " request list processing ..."
 reql = Benchmark.realtime {
   n.times do
     req_list2()
@@ -171,6 +178,7 @@ reql = Benchmark.realtime {
 }
 
 
+puts "testing pub sub once more ..."
 def pubsub()
   subs = get_subscribers("Topic")
   printf("subscribers: %s\n", subs.to_json)

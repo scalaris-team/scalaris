@@ -87,6 +87,16 @@
   @MODULEISBUILTIN@
   @BOOLEANISBUILTIN@
  ]}.
+{"src/paxos/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
+{"src/transactions/*",
+ [debug_info,
+  {outdir, "ebin"},
+  {i, "include"}
+ ]}.
 {"src/simulation/*",
  [debug_info,
   {outdir, "ebin"},

@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ lookup_process(InstanceId, Name) ->
         [{{InstanceId, Name}, Value}] ->
             Value;
         [] ->
-            log:log(error, "[ PD ] lookup_process failed: InstanceID:  ~p  For: ~p",[InstanceId, Name]),
+            log:log(error, "[ PD ] lookup_process failed in Pid ~p: InstanceID:  ~p  For: ~p StacK: ~p~n",[self(), InstanceId, Name, util:get_stacktrace()]),
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
@@ -271,10 +271,12 @@ on({drop_state}, State) ->
     [unlink(Pid) || [Pid] <- Links],
     ets:delete_all_objects(?MODULE),
     State;
+
 on({'EXIT', FromPid, _Reason}, State) ->
     Processes = ets:match(?MODULE, {'$1', FromPid}),
     [ets:delete(?MODULE, {InstanceId, Name}) || [{InstanceId, Name}] <- Processes],
     State;
+
 on(_, _State) ->
     unknown_event.
 

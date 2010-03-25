@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -109,7 +109,7 @@ increment_test_8(_Config) ->
     ct:pal("aborts: ~p~n", [Aborts]),
     Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
-    ?equals(Total, 8 * Count),
+    ?equals(8* Count, Total),
     ok.
 
 increment_test_4(_Config) ->
@@ -128,7 +128,7 @@ increment_test_4(_Config) ->
     ct:pal("aborts: ~p~n", [Aborts]),
     Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
-    ?equals(Total, 4 * Count),
+    ?equals(4 * Count, Total),
     ok.
 
 increment_test_2(_Config) ->
@@ -145,7 +145,7 @@ increment_test_2(_Config) ->
     ct:pal("aborts: ~p~n", [Aborts]),
     Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
-    ?equals(Total, 2 * Count),
+    ?equals(2* Count, Total),
     ok.
 
 wait_for_done(0) ->

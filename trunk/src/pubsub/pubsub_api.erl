@@ -41,9 +41,7 @@
 %% @spec publish(string(), string()) -> ok
 publish(Topic, Content) ->
     Subscribers = get_subscribers(Topic),
-    io:format("calling subscribers ~p~n", [Subscribers]),
     lists:foreach(fun (Subscriber) -> 
-			  io:format("calling ~p~n", [Subscriber]),
 			  pubsub_publish:publish(Subscriber, Topic, Content) 
 		  end, 
 		  Subscribers),
@@ -60,7 +58,11 @@ subscribe(Topic, URL) ->
                            fail ->
                                transaction_api:write(Topic, [URL], TransLog); %obacht: muss TransLog sein!
                            _Any ->
-                               {value, Subscribers} = Result,
+                               {value, Subscribers} =
+                                   case Result of
+                                       {value, empty_val} -> {value, []};
+                                       _ -> Result
+                                   end,
                                case [ X || X <- Subscribers, X =:= URL ] of
                                    [] ->
                                        transaction_api:write(Topic, [URL | Subscribers], TransLog1);
@@ -81,8 +83,9 @@ subscribe(Topic, URL) ->
 unsubscribe(Topic, URL) ->
     TFun = fun(TransLog) ->
 		   {Subscribers, TransLog1} = transaction_api:read2(TransLog, Topic),
-		   case lists:member(URL, Subscribers) of
-		       true ->
+		   case (Subscribers =/= empty_val) andalso
+                       lists:member(URL, Subscribers) of
+                       true ->
 			   NewSubscribers = lists:delete(URL, Subscribers),
 			   TransLog2 = transaction_api:write2(TransLog1, Topic, NewSubscribers),
 			   {{ok, ok}, TransLog2};
@@ -95,10 +98,13 @@ unsubscribe(Topic, URL) ->
 %% @doc queries the subscribers of a query
 %% @spec get_subscribers(string()) -> [string()]
 get_subscribers(Topic) ->
-    {Fl, _Value} = transaction_api:quorum_read(Topic),
-    if 
-	Fl == fail -> %% Fl is either Fail or the Value/Subscribers
+    {Res, _Value} = transaction_api:quorum_read(Topic),
+    if
+        %% Fl is either empty/fail or the Value/Subscribers
+	Res == empty_val ->
 	    [];
+        Res == fail ->
+            [];
 	true ->
-	    Fl
+	    Res
     end.

@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -22,28 +22,21 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(cs_lookup).
-
-
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([unreliable_lookup/2,unreliable_get_key/1]).
-
-
+-export([unreliable_lookup/2,
+         unreliable_get_key/1, unreliable_get_key/3]).
 
 -include("../include/scalaris.hrl").
 
 %%%-----------------------Public API----------------------------------
-
-
-    
-	
-
 unreliable_lookup(Key, Msg) ->
     cs_send:send_local(process_dictionary:get_group_member(cs_node), {lookup_aux, Key, 0, Msg}).
 
 unreliable_get_key(Key) ->
     unreliable_lookup(Key, {get_key, cs_send:this(), Key}).
 
-%%%-----------------------Implementation------------------------------
+unreliable_get_key(CollectorPid, ReqId, Key) ->
+    unreliable_lookup(Key, {get_key, CollectorPid, ReqId, Key}).
+

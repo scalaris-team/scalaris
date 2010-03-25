@@ -1,5 +1,6 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+%% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% end
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,25 +12,23 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : cs_api.erl
+
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Chord# API
-%%%
-%%% Created : 16 Apr 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+%%% Description : Scalaris API
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(cs_api).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+%-define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
 -export([process_request_list/2, read/1, write/2, delete/1,
          test_and_set/3, range_read/2]).
 
 -include("../include/scalaris.hrl").
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -41,6 +40,7 @@
 -type(value() :: term()).
 
 process_request_list(TLog, ReqList) ->
+    ?TRACE("cs_api:process_request_list(~p, ~p)~n", [TLog, ReqList]),
     erlang:put(instance_id, process_dictionary:find_group(cs_node)),
     % should just call transaction_api:process_request_list
     % for parallel quorum reads and scan for commit request to actually do
@@ -57,9 +57,13 @@ process_request_list(TLog, ReqList) ->
     {{translog, TransLogResult}, {results, lists:reverse(ReverseResultList)}}.
 
 process_request(TLog, Request) ->
+    ?TRACE("cs_api:process_request(~p, ~p)~n", [TLog, Request]),
     case Request of
         {read, Key} ->
             case util:tc(transaction_api, read, [Key, TLog]) of
+                {_Time, {{value, empty_val}, NTLog}} ->
+                    ?LOG_CS_API(read_fail, _Time / 1000.0),
+                    {NTLog, {read, Key, {fail, not_found}}};
                 {_Time, {{value, Val}, NTLog}} ->
                     ?LOG_CS_API(read_success, _Time / 1000.0),
                     {NTLog, {read, Key, {value, Val}}};
@@ -91,7 +95,11 @@ process_request(TLog, Request) ->
 %% @spec read(key()) -> value() | {fail, term()} 
 -spec read(key()) -> value() | {fail, term()}.
 read(Key) ->
+    ?TRACE("cs_api:read(~p)~n", [Key]),
     case util:tc(transaction_api, quorum_read, [Key]) of
+        {_Time, {empty_val, _}} ->
+            ?LOG_CS_API(quorum_read_fail, _Time / 1000.0),
+            {fail, not_found};
         {_Time, {fail, Reason}} ->
             ?LOG_CS_API(quorum_read_fail, _Time / 1000.0),
             {fail, Reason};
@@ -104,6 +112,7 @@ read(Key) ->
 %% @spec write(key(), value()) -> ok | {fail, term()}
 -spec write(key(), value()) -> ok | {fail, term()}.
 write(Key, Value) ->
+    ?TRACE("cs_api:write(~p, ~p)~n", [Key, Value]),
     case util:tc(transaction_api, single_write, [Key, Value]) of
         {_Time, commit} ->
             ?LOG_CS_API(single_write_success, _Time / 1000.0),
@@ -114,15 +123,26 @@ write(Key, Value) ->
     end.
 
 delete(Key) ->
+    ?TRACE("cs_api:delete(~p)~n", [Key]),
     transaction_api:delete(Key, 2000).
 
 %% @doc atomic compare and swap
 %% @spec test_and_set(key(), value(), value()) -> ok | {fail, term()}
 -spec test_and_set(key(), value(), value()) -> ok | {fail, Reason::term()}.
 test_and_set(Key, OldValue, NewValue) ->
+    ?TRACE("cs_api:test_and_set(~p, ~p, ~p)~n", [Key, OldValue, NewValue]),
     TFun = fun(TransLog) ->
                    {Result, TransLog1} = transaction_api:read(Key, TransLog),
                    case Result of
+                       {value, empty_val} ->
+                           %% same as not found
+                           {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog),
+                           if
+                               Result2 == ok ->
+                                   {{ok, done}, TransLog2};
+                               true ->
+                                   {{fail, write}, TransLog2}
+                           end;
                        {value, ReadValue} ->
                            if
                                ReadValue == OldValue ->
@@ -177,6 +197,7 @@ do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
 
 %@doc range a range of key-value pairs
 range_read(From, To) ->
+    ?TRACE("cs_api:range_read(~p, ~p)~n", [From, To]),
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, cs_send:this()}),
