@@ -15,7 +15,7 @@
 
 %% @author Florian Schintke <schintke@onscale.de>
 %% @doc Part of generic transaction implementation -
-%%      The state for a single request in a transaction of a TM & RTM.
+%%      The state for a single request in a transaction of a TM and RTM.
 %% @version $Id$
 -module(tx_item_state).
 -author('schintke@onscale.de').
