@@ -157,6 +157,18 @@ on({get_coordinate, Pid}, {Coordinate, Confidence, _Trigger, _TriggerState} = St
     msg_get_coordinate_response(Pid, Coordinate, Confidence),
     State;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Web interface
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({'$gen_cast', {debug_info, Requestor}},
+   {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
+    KeyValueList =
+        [{"coordinate", lists:flatten(io_lib:format("~p", [Coordinate]))},
+         {"confidence", Confidence}],
+    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
+    State;
+
 on(_, _State) ->
     unknown_event.
 
@@ -199,7 +211,7 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Checks whether config parameters of the gossip process exist and are
+%% @doc Checks whether config parameters of the vivaldi process exist and are
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
