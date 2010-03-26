@@ -344,7 +344,7 @@ handle_call({add_sconf, SC}, From, State) ->
 	    receive
 		{added_sconf, Pid, SC2} ->
 		    P2 = lists:keyreplace(Pid, 1, State#state.pairs,
-					  {Pid, [SC2|Group]}),
+					  {Pid, Group ++ [SC2]}),
 		    {noreply, State#state{pairs = P2}}
 	    after 2000 ->
 		    {reply, {error, "Failed to add new conf"}, State}
@@ -662,8 +662,15 @@ gserv_loop(GS, Ready, Rnum, Last) ->
 			     end,
                     stop_ready(Ready, Last),
                     NewSc2 = clear_ets_complete(NewSc1),
-                    GS2 = GS#gs{group = [ NewSc2 |
-                                          lists:delete(OldSc,GS#gs.group)]},
+                    %% Need to insert the sconf at the same position
+                    %% it previously was
+                    NewG = lists:map(fun(Sc) when Sc == OldSc->
+                                             NewSc2;
+                                        (Other) ->
+                                             Other
+                                     end, GS#gs.group),
+
+                    GS2 = GS#gs{group = NewG},
                     Ready2 = [],
                     Updater ! {updated_sconf, self(), NewSc2},
                     gen_server:reply(From, ok),
@@ -709,7 +716,7 @@ gserv_loop(GS, Ready, Rnum, Last) ->
 		 end,
             stop_ready(Ready, Last),
             SC2 = setup_ets(SC),
-	    GS2 = GS#gs{group =  [SC2 |GS#gs.group]},
+	    GS2 = GS#gs{group =  GS#gs.group ++ [SC2]},
             Ready2 = [],
             Adder ! {added_sconf, self(), SC2},
             gen_server:reply(From, ok),
@@ -810,6 +817,12 @@ call_start_mod(SC) ->
     end.
 
 listen_opts(SC) ->
+    InetType = if 
+                   is_tuple( SC#sconf.listen), size( SC#sconf.listen) == 8 ->
+                       [inet6];
+                 true ->
+                       []
+             end,
     [binary,
      {ip, SC#sconf.listen},
      {packet, http},
@@ -817,13 +830,19 @@ listen_opts(SC) ->
      {reuseaddr, true},
      {active, false}
      | proplists:get_value(listen_opts, SC#sconf.soptions, [])
-    ].
+    ] ++ InetType.
 
 ssl_listen_opts(GC, SC, SSL) ->
+    InetType = if 
+                   is_tuple( SC#sconf.listen), size( SC#sconf.listen) == 8 ->
+                       [inet6];
+                 true ->
+                       []
+             end,
     [binary,
      {ip, SC#sconf.listen},
      {packet, http},
-     {active, false} | ssl_listen_opts(GC, SSL)].
+     {active, false} | ssl_listen_opts(GC, SSL)] ++ InetType.
 
 ssl_listen_opts(GC, SSL) ->
     L = [if SSL#ssl.keyfile /= undefined ->
@@ -860,11 +879,15 @@ ssl_listen_opts(GC, SSL) ->
             true ->
                  false
          end,
+         if SSL#ssl.depth /= undefined ->
+                 {depth, SSL#ssl.depth};
+            true ->
+                 false
+         end,
          if ?gc_use_old_ssl(GC) ->
                  false;
             true ->
-                 %%{ssl_imp, new} - still doesn't work (R13B)
-                 false
+                 {ssl_imp, new}
          end
         ],
     filter_false(L).
@@ -898,6 +921,9 @@ acceptor0(GS, Top) ->
                     case ssl:ssl_accept(Client) of
                         ok ->
                             ok;
+                        {error, closed} ->
+                            Top ! {self(), decrement},
+                            exit(normal);
                         {error, Reason} ->
                             error_logger:format("SSL accept failed: ~p~n",
                                                 [Reason]),
@@ -1521,6 +1547,7 @@ handle_request(CliSock, ARG, N) ->
                         _ ->
                             ok
                     end,
+
                     {IsAuth, ARG1} =
                         case is_auth(ARG, DecPath,ARG#arg.headers,
                                      SC#sconf.authdirs) of
@@ -1721,9 +1748,7 @@ is_revproxy(ARG, Path, SC = #sconf{revproxy = RevConf}) ->
         {false, _} ->
             is_revproxy1(Path, RevConf);
         {true, _} ->
-            {true, {"/", fwdproxy_url(ARG)}};
-        {_, _} ->
-            false
+            {true, {"/", fwdproxy_url(ARG)}}
     end.
 
 is_revproxy1(_,[]) ->
@@ -2281,7 +2306,7 @@ get_client_data(CliSock, Len, Bs, SSlBool) ->
         {ok, B} ->
             get_client_data(CliSock, Len-size(B), [Bs,B], SSlBool);
         _Other ->
-            ?Debug("get_client_data: ~p~n", [_Other]),
+            error_logger:format("get_client_data: ~p~n", [_Other]),
             exit(normal)
     end.
 
@@ -4453,18 +4478,13 @@ fwdproxy_url(ARG) ->
     Headers = ARG#arg.headers,
     {abs_path, Path} = (ARG#arg.req)#http_request.path,
 
-    {Host, Port} =
-    case yaws:split_at(Headers#headers.host, $:) of
-        {Host0, Port0} ->
-            case string:to_integer(Port0) of
-                {Port1, []} ->
-                    {Host0, Port1};
-                _ ->
-                    {Headers#headers.host, undefined}
-            end;
-        _Other ->
-            {Headers#headers.host, undefined}
-    end,
+    {Host0, Port0} = yaws:split_at(Headers#headers.host, $:),
+    {Host, Port} = case string:to_integer(Port0) of
+                       {Port1, []} ->
+                           {Host0, Port1};
+                       _ ->
+                           {Headers#headers.host, undefined}
+                   end,
 
     #url{scheme = http,
          host = Host,

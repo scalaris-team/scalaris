@@ -12,7 +12,7 @@
 
 -compile(export_all).
 
-version() -> "1.87".
+version() -> "1.88".
 
 vardir() ->  "/usr/local/var".
 
