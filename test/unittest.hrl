@@ -27,14 +27,18 @@
 
 -define(assert(Boolean), myassert(Boolean, ??Boolean)).
 -define(equals(X, Y),
-        case X of
-            Y -> ok;
-            _ ->
-                ct:pal("Failed: Stacktrace ~p~n", [erlang:get_stacktrace()]),
-                ct:fail(
-                   lists:flatten(
-                     io_lib:format("~p evaluated to ~p which is not the expected ~p", [??X, X, ??Y])))
-        end).
+        fun(A) ->
+                case A of
+                    Y -> ok;
+                    Any ->
+                        ct:pal("Failed: Stacktrace ~p~n",
+                               [erlang:get_stacktrace()]),
+                        ct:fail(lists:flatten(
+                            io_lib:format("~p evaluated to ~p which is"
+                                          "not the expected ~p",
+                                          [??X, Any, ??Y])))
+                end
+        end(X)).
 
 myassert(true, _Reason) ->
     ok;
