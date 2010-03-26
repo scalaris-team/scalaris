@@ -16,4 +16,8 @@
 /.codepath
 *.beam
 *~
-
+/ct.log
+/result_increment_10_1000.txt
+/result_increment_1_10000.txt
+/result_read_10_10000.txt
+/result_read_1_100000.txt
