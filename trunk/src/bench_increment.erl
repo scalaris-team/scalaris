@@ -1,4 +1,4 @@
-%  Copyright 2008, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+% Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -30,11 +30,11 @@
 
 init() ->
     Pid = spawn(fun () ->
-			process_dictionary:start_link_for_unittest(), 
-			boot_sup:start_link(), 
+			process_dictionary:start_link_for_unittest(),
+			boot_sup:start_link(),
 			timer:sleep(11000),
 			admin:add_nodes(3),
-			timer:sleep(6010000) 
+			timer:sleep(6010000)
 		end),
     timer:sleep(22000),
    log:log(info,"[ Bench ] init done"),
