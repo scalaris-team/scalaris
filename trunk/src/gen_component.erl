@@ -77,11 +77,11 @@ change_handler(State, Handler) when is_atom(Handler) ->
 % Options:
 % register, InstanceId, Name
 % profile
--spec(start_link/2 :: (any(), list()) -> {ok, pid()}).
+-spec(start_link/2 :: (module(), term()) -> {ok, pid()}).
 start_link(Module, Args) ->
     start_link(Module, Args, []).
 
--spec(start_link/3 :: (any(), list(), list()) -> {ok, pid()}).
+-spec(start_link/3 :: (module(), term(), list()) -> {ok, pid()}).
 start_link(Module, Args, Options) ->
     Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
     receive
@@ -89,11 +89,11 @@ start_link(Module, Args, Options) ->
             {ok, Pid}
     end.
 
--spec(start/2 :: (any(), any()) -> {ok, pid()}).
+-spec(start/2 :: (module(), term()) -> {ok, pid()}).
 start(Module, Args) ->
     start(Module, Args, []).
 
--spec(start/3 :: (any(), any(), list()) -> {ok, pid()}).
+-spec(start/3 :: (module(), term(), list()) -> {ok, pid()}).
 start(Module, Args, Options) ->
     Pid = spawn(?MODULE, start, [Module, Args, Options, self()]),
     receive

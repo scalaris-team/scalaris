@@ -76,8 +76,8 @@ on({init, Id, Me, Predecessor, SuccList}, uninit) ->
     ring_maintenance:update_preds_and_succs([Predecessor], SuccList),
     fd:subscribe(lists:usort([node:pidX(Node) || Node <- [Predecessor | SuccList]])),
     cyclon:get_subset_rand_next_interval(1),
-    TriggerState = Trigger:init(THIS),
-    TriggerState2 = Trigger:trigger_first(TriggerState,make_utility(1)),
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0),
+    TriggerState2 = trigger:first(TriggerState,make_utility(1)),
     {Id, Me, [Predecessor], SuccList, config:read(cyclon_cache_size),
      stabilizationInterval_min(), TriggerState2, [], true};
 on(Msg, uninit) ->
@@ -124,7 +124,7 @@ on({trigger},{Id, Me, Preds, Succs, RandViewSize, Interval, TriggerState, Cache,
                                                  Message),
                 cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance,
                                              Message),
-                Trigger:trigger_next(TriggerState,make_utility(1))
+                trigger:next(TriggerState,make_utility(1))
         end,
    {Id, Me, Preds, Succs, RandViewSize, Interval, NewTriggerState, Cache, Churn};
 % got empty cyclon cache
@@ -161,7 +161,7 @@ on({rm_buffer, OtherNode, OtherBuffer}, {Id, Me, OldPreds, OldSuccs, RandViewSiz
     {NewPreds, NewSuccs, NewInterval, NewChurn} =
         update_view(OldPreds, OldSuccs, OtherBuffer, RndView,
                     Me, Interval, Churn),
-        NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
+        NewTriggerState = trigger:next(TriggerState,make_utility(NewInterval)),
     {Id, Me, NewPreds, NewSuccs, RandViewSize, NewInterval, NewTriggerState, Cache, NewChurn};
 on({rm_buffer_response, OtherBuffer}, {Id, Me, OldPreds, OldSuccs, RandViewSize, Interval,
                                         TriggerState, Cache, Churn})  ->
@@ -176,11 +176,11 @@ on({rm_buffer_response, OtherBuffer}, {Id, Me, OldPreds, OldSuccs, RandViewSize,
                           false ->
                               RandViewSize
                       end,
-    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(NewInterval)),
+    NewTriggerState = trigger:next(TriggerState,make_utility(NewInterval)),
     {Id, Me, NewPreds, NewSuccs, NewRandViewSize, NewInterval, NewTriggerState, Cache, NewChurn};
 % dead-node-cache reported dead node to be alive again
 on({zombie, Node}, {Id, Me, Preds, Succs, RandViewSize, _Interval, TriggerState, Cache, Churn})  ->
-    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
+    NewTriggerState = trigger:next(TriggerState,make_utility(3)),
     cs_send:send_local(self_man:get_pid(), {update, ?MODULE, stabilizationInterval,
                                             self(), stabilizationInterval_min()}),
     {Id, Me, Preds, Succs, RandViewSize, stabilizationInterval_min(), NewTriggerState,
@@ -192,7 +192,7 @@ on({crash, DeadPid},{Id, Me, OldPreds, OldSuccs, _RandViewSize, _Interval, Trigg
     NewCache = filter(DeadPid, Cache),
     update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
     update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs),
-    NewTriggerState = Trigger:trigger_next(TriggerState,make_utility(3)),
+    NewTriggerState = trigger:next(TriggerState,make_utility(3)),
     {Id, Me, NewPreds, NewSuccs, 0, stabilizationInterval_min(), NewTriggerState,
      NewCache,Churn};
 on({'$gen_cast', {debug_info, Requestor}},{_Id, _Me, Preds, Succs, _RandViewSize, _Interval,

@@ -63,7 +63,7 @@ start_link(InstanceId) ->
 init(_Args) ->
     log:log(info,"[ RT ~p ] starting routingtable", [self()]),
     %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    TriggerState = Trigger:init(THIS),
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0),
     {uninit, TriggerState}.
     
 
@@ -74,7 +74,7 @@ init(_Args) ->
 -spec(on/2 :: (message(), state()) -> state()).
 
 on({init, Id, Pred, Succ},{uninit, TriggerState}) ->
-    TriggerState2 = Trigger:trigger_next(TriggerState, make_utility(0)),
+    TriggerState2 = trigger:next(TriggerState, make_utility(0)),
     {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
 
 on(Message,{uninit, TriggerState}) ->
@@ -97,7 +97,7 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
     %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    TriggerState2 = Trigger:trigger_next(TriggerState, make_utility(?RT:get_size(RTState))),
+    TriggerState2 = trigger:next(TriggerState, make_utility(?RT:get_size(RTState))),
     {Id, Pred, Succ, NewRTState,TriggerState2};
 
 % got new predecessor/successor

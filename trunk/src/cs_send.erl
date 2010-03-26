@@ -49,10 +49,6 @@
          send_local/2, make_global/1, is_valid/1, get_msg_tag/1,
          this_with_cookie/1, self_with_cookie/1]).
 
--ifdef(types_not_builtin).
--type reference() :: erlang:reference().
--endif.
-
 -type cookie() :: any().
 -type reg_name() :: atom().
 -type erl_local_pid_plain() :: pid() | reg_name().
@@ -76,18 +72,19 @@
 %% -type erl_pid() :: erl_pid_plain() | erl_pid_with_cookie().
 -type mypid_with_cookie() :: {mypid_plain(), c, cookie()}.
 -type mypid() :: mypid_plain() | mypid_with_cookie().
+-type message_tag() :: atom().
 % there is no variable length-tuple definition for types -> declare messages with up to 10 parameters here:
--type message_plain() :: {atom()} |
-                         {atom(), any()} |
-                         {atom(), any(), any()} |
-                         {atom(), any(), any(), any()} |
-                         {atom(), any(), any(), any(), any()} |
-                         {atom(), any(), any(), any(), any(), any()} |
-                         {atom(), any(), any(), any(), any(), any(), any()} |
-                         {atom(), any(), any(), any(), any(), any(), any(), any()} |
-                         {atom(), any(), any(), any(), any(), any(), any(), any(), any()} |
-                         {atom(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
-                         {atom(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
+-type message_plain() :: {message_tag()} |
+                         {message_tag(), any()} |
+                         {message_tag(), any(), any()} |
+                         {message_tag(), any(), any(), any()} |
+                         {message_tag(), any(), any(), any(), any()} |
+                         {message_tag(), any(), any(), any(), any(), any()} |
+                         {message_tag(), any(), any(), any(), any(), any(), any()} |
+                         {message_tag(), any(), any(), any(), any(), any(), any(), any()} |
+                         {message_tag(), any(), any(), any(), any(), any(), any(), any(), any()} |
+                         {message_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+                         {message_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
 -type message_with_cookie() :: {message_plain(), any()}.
 -type message() :: message_plain() | message_with_cookie().
 -type group_message() :: {send_to_group_member, atom(), message()}.

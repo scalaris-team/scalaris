@@ -63,8 +63,8 @@ unsubscribe() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init(_ARG) ->
-    TriggerState = Trigger:init(THIS),
-    TriggerState2 = Trigger:trigger_first(TriggerState,1),
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0),
+    TriggerState2 = trigger:first(TriggerState,1),
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [self()]),
 	{fix_queue:new(config:read(zombieDetectorSize)),gb_sets:new(),TriggerState2}.
 
@@ -72,7 +72,7 @@ init(_ARG) ->
 
 on({trigger},{Queue,Subscriber,TriggerState}) ->
         fix_queue:map(fun (X) -> cs_send:send(node:pidX(X),{ping,cs_send:this_with_cookie(X)}) end,Queue), 
-        NewTriggerState = Trigger:trigger_next(TriggerState,1),
+        NewTriggerState = trigger:next(TriggerState,1),
         {Queue,Subscriber,NewTriggerState};
 on({{pong},Zombie},{Queue,Subscriber,TriggerState}) ->
         gb_sets:fold(fun (X,_) -> cs_send:send_local(X , {zombie,Zombie}) end,0, Subscriber),

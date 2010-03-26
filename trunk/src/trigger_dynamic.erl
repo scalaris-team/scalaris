@@ -17,25 +17,17 @@
 %%% @author Christian Hennig <hennig@zib.de>
 %%% @doc    Dynamic trigger for (parameterized) modules.
 %%%
-%%% Can be used by a module <code>Module</code> in order to get a
-%%% <code>{trigger}</code> message every
-%%% <code>Module:get_base_interval()</code>,
-%%% <code>Module:get_min_interval()</code>,
-%%% <code>0</code> and <code>Module:get_min_interval()</code> or
-%%% <code>Module:get_max_interval()</code> milliseconds depending on a
-%%% user-provided function (note: this is not fully implemented yet).
-%%% For this the module needs to initialize the trigger with an instantiation
-%%% of itself (including the trigger) and tell it to send the first message,
-%%% e.g. by calling this (and storing the TriggerState2 for later use):
-%%% <p><code>
-%%%  TriggerState = Trigger:init(THIS),<br />
-%%%  TriggerState2 = Trigger:trigger_first(TriggerState, TriggerFun)
-%%% </code></p>
-%%% Then on each received <code>{trigger}</code> message, the trigger needs to
-%%% be told to issue another <code>{trigger}</code> message:
-%%% <p><code>
-%%%  NewTriggerState = Trigger:trigger_next(TriggerState, TriggerFun),
-%%% </code></p>
+%%% Can be used by a module <code>Module</code> in order to get a configurable
+%%% message (by default <code>{trigger}</code>) every
+%%% <code>BaseIntervalFun()</code> (default: <code>Module:get_base_interval()</code>),
+%%% <code>MinIntervalFun()</code> (default: <code>Module:get_min_interval()</code>),
+%%% <code>0</code> and <code>MinIntervalFun()</code> or
+%%% <code>MaxIntervalFun()</code> (default: <code>Module:get_max_interval()</code>),
+%%% milliseconds depending on a user-provided function (note: this is not fully
+%%% implemented yet).
+%%% 
+%%% Use this module through the interface provided by the trigger module,
+%%% initializing it with trigger_periodic!
 %%% @end
 %%% Created :  2 Oct 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
@@ -46,48 +38,52 @@
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
--behaviour(trigger).
+-behaviour(gen_trigger).
 
--export([init/1, trigger_first/2, trigger_next/2]).
+-include("../include/scalaris.hrl").
 
--ifdef(types_not_builtin).
--type reference() :: erlang:reference().
--endif.
+-export([init/4, first/2, next/2]).
 
--type par_module() :: any(). % parameterized module
--type state() :: {par_module(), reference() | ok}.
--type my_fun() :: fun((number(), number()) -> 0..3).
+-type interval_fun() :: trigger:interval_fun().
+-type message_tag() :: cs_send:message_tag().
+-type state() :: {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference() | ok}.
+-type dyn_fun() :: trigger:dyn_fun().
 
-%% @doc Initializes the trigger.
--spec init(par_module()) -> {par_module(), ok}.
-init(Module) ->
-    {Module, ok}.
+%% @doc Initializes the trigger with the given interval functions and the given
+%%      message tag used for the trigger message.
+-spec init(BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun(), message_tag()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), ok}.
+init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
+    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}.
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization.
--spec trigger_first(state(), any()) -> state().
-trigger_first({Module, ok}, _U) ->
-    TimerRef = cs_send:send_local_after(0, self(), {trigger}),
-    {Module, TimerRef}.
+-spec first(state(), any()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}.
+first({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, _U) ->
+    TimerRef = cs_send:send_local_after(0, self(), {MsgTag}),
+    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}.
 
 %% @doc Sets the trigger to send its message after some delay (in milliseconds).
-%%      If the trigger has not been called before, Module:get_base_interval()
+%%      If the trigger has not been called before, BaseIntervalFun()
 %%      will be used, otherwise function U will be evaluated in order to decide
-%%      whether to use Module:get_max_interval() (return value 0),
-%%      Module:get_min_interval() (return value 2),
-%%      0 (now) and Module:get_min_interval() (return value 3) or
-%%      Module:get_base_interval() (any other return value) for the delay.
--spec trigger_next({par_module(), ok}, any()) -> state()
-                 ; ({par_module(), reference()}, my_fun()) -> state().
-trigger_next({Module, ok}, _U) ->
-    NewTimerRef = cs_send:send_local_after(Module:get_base_interval(), self(), {trigger}),
-    {Module,NewTimerRef};
+%%      whether to use MaxIntervalFun() (return value 0),
+%%      MinIntervalFun() (return value 2),
+%%      0 (now) and MinIntervalFun() (return value 3) or
+%%      BaseIntervalFun() (any other return value) for the delay.
+-spec next({interval_fun(), interval_fun(), interval_fun(), message_tag(), ok}, any()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}
+         ; ({interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}, dyn_fun()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}.
+next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, _U) ->
+    NewTimerRef = cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
+    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef};
 
 % 0 - > max
 % 1 - > base
 % 2 - > min
 % 3 - > now,min
-trigger_next({Module, TimerRef}, U) ->
+next(State, U) when is_function(U, 2) ->
+    %io:format("[ TD ] ~p U(0,0) ~p~n",[self(), U(0,0)]),
+    % TODO: make use of the functions parameters
+    next(State, U(0, 0));
+next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, U) ->
     % timer still running?
     case erlang:read_timer(TimerRef) of
         false ->
@@ -95,20 +91,18 @@ trigger_next({Module, TimerRef}, U) ->
         _ ->
             erlang:cancel_timer(TimerRef)
     end,
-    %io:format("[ TD ] ~p U(0,0) ~p~n",[self(),U(0,0)]),
-    % TODO: make use of the functions parameters
     NewTimerRef = 
-        case U(0, 0) of
+        case U of
             0 ->
-                cs_send:send_local_after(Module:get_max_interval(),self(), {trigger});
+                cs_send:send_local_after(MaxIntervalFun(),self(), {MsgTag});
             1 ->
-                cs_send:send_local_after(Module:get_base_interval(),self(), {trigger});
+                cs_send:send_local_after(BaseIntervalFun(),self(), {MsgTag});
             2 ->
-                cs_send:send_local_after(Module:get_min_interval(),self(), {trigger});
+                cs_send:send_local_after(MinIntervalFun(),self(), {MsgTag});
             3 ->
-                cs_send:send_local(self(), {trigger}),
-                cs_send:send_local_after(Module:get_min_interval(), self(), {trigger});
+                cs_send:send_local(self(), {MsgTag}),
+                cs_send:send_local_after(MinIntervalFun(), self(), {MsgTag});
             _ ->
-                cs_send:send_local_after(Module:get_base_interval(),self(), {trigger})
+                cs_send:send_local_after(BaseIntervalFun(),self(), {MsgTag})
      end,
-    {Module, NewTimerRef}.
+    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef}.
