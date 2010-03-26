@@ -95,7 +95,7 @@
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
 %% -> previous and current state, queued messages (get_state messages received
 %% before local values are known) and the state of the trigger.
--type(full_state() :: {state(), state(), list(), module(), any()}).
+-type(full_state() :: {state(), state(), list(), trigger:state()}).
 
 % accepted messages of gossip processes
 -type(message() ::
@@ -194,12 +194,12 @@ start_link(InstanceId) ->
 -spec init(module()) -> full_state().
 init(Trigger) ->
 %%     io:format("gossip start ~n"),
-    TriggerState = Trigger:init(?MODULE),
-    TriggerState2 = Trigger:trigger_first(TriggerState, 1),
+    TriggerState = trigger:init(Trigger, ?MODULE),
+    TriggerState2 = trigger:first(TriggerState, 1),
 	PreviousState = gossip_state:new_state(),
 	State = gossip_state:new_state(),
     log:log(info, "Gossip spawn: ~p~n", [cs_send:this()]),
-    {PreviousState, State, [], Trigger, TriggerState2}.
+    {PreviousState, State, [], TriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -207,11 +207,11 @@ init(Trigger) ->
 
 %% @doc message handler
 -spec on(message(), full_state()) -> full_state() | unknown_event.
-on({trigger}, {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
+on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received continuously when the Trigger calls
 	% see gossip_trigger and gossip_interval in the scalaris.cfg file
 %% 	io:format("{trigger_gossip}: ~p~n", [State]),
-    NewTriggerState = Trigger:trigger_next(TriggerState, 1),
+    NewTriggerState = trigger:next(TriggerState, 1),
 	NewState = gossip_state:inc_triggered(State),
 	% request a check whether we are the leader and can thus decide whether to
 	% start a new round
@@ -224,14 +224,14 @@ on({trigger}, {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
         true -> request_random_node();
         false -> ok
     end,
-    {PreviousState, NewState, QueuedMessages, Trigger, NewTriggerState};
+    {PreviousState, NewState, QueuedMessages, NewTriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Responses to requests for information about the local node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({{get_node_details_response, NodeDetails}, local_info},
-   {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
+   {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received when the (local) node was asked to tell us its
 	% load and key range
 %%     io:format("gossip: got get_node_details_response: ~p~n",[NodeDetails]),
@@ -243,14 +243,14 @@ on({{get_node_details_response, NodeDetails}, local_info},
 				[cs_send:send_local(self(), Message) || Message <- QueuedMessages],
 				{[], integrate_local_info(State, node_details:get(NodeDetails, load), calc_initial_avg_kr(node_details:get(NodeDetails, my_range)))}
 			end,
-    {PreviousState, NewState, NewQueuedMessages, Trigger, TriggerState};
+    {PreviousState, NewState, NewQueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Leader election
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({{get_node_details_response, NodeDetails}, leader_start_new_round},
-   {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
+   {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_new_round_if_leader/1 which only asks for this if the condition to
 	% start a new round has already been met
@@ -263,11 +263,11 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 			% leader -> start a new round
 			true -> new_round(State)
 	end,
-    {NewPreviousState, NewState, QueuedMessages, Trigger, TriggerState};
+    {NewPreviousState, NewState, QueuedMessages, TriggerState};
 
 %% Prints some debug information if the current node is the leader.
 on({{get_node_details_response, NodeDetails}, leader_debug_output},
-   {PreviousState, State, QueuedMessages, Trigger, TriggerState}) ->
+   {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message can only be received after being requested by
 	% request_leader_debug_output/0
 %%     io:format("gossip: got get_node_details_response, leader_debug_output: ~p~n",[NodeDetails]),
@@ -309,14 +309,14 @@ on({{get_node_details_response, NodeDetails}, leader_debug_output},
 				 {size_kr,gossip_state:calc_size_kr(BestState)}]),
 			ok
 	end,
-    {PreviousState, State, QueuedMessages, Trigger, TriggerState};
+    {PreviousState, State, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State exchange
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state, Source_PID, OtherValues} = Msg,
-   {MyPreviousState, MyState, QueuedMessages, Trigger, TriggerState}) ->
+   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
 	% This message is received when a node asked our node for its state.
 	% The piggy-backed other node's state will be used to update our own state
 	% if we have already initialized it (otherwise postpone the message). A
@@ -328,16 +328,16 @@ on({get_state, Source_PID, OtherValues} = Msg,
 			false ->
 				{[Msg | QueuedMessages], enter_round(MyPreviousState, MyState, OtherValues)}
 			end,
-    {MyNewPreviousState, MyNewState, NewQueuesMessages, Trigger, TriggerState};
+    {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState};
 
 on({get_state_response, OtherValues},
-   {MyPreviousState, MyState, QueuedMessages, Trigger, TriggerState}) ->
+   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
 	% This message is received as a response to a get_state message and contains
     % another node's state. We will use it to update our own state
 	% if both are valid.
 	{MyNewPreviousState, MyNewState} =
 		integrate_state(OtherValues, MyPreviousState, MyState, false, none),
-    {MyNewPreviousState, MyNewState, QueuedMessages, Trigger, TriggerState};
+    {MyNewPreviousState, MyNewState, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contacting random nodes (response from cyclon)
@@ -348,7 +348,7 @@ on({cy_cache, []}, FullState)  ->
     FullState;
 
 on({cy_cache, [Node] = _Cache},
-    {_PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
+    {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
     % This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node. We will then contact this
     % random node and ask for a state exchange.
@@ -370,14 +370,14 @@ on({cy_cache, [Node] = _Cache},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_values_best, SourcePid},
-    {PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
+    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	BestState = previous_or_current(PreviousState, State),
 	BestValues = gossip_state:conv_state_to_extval(BestState),
 	msg_get_values_best_response(SourcePid, BestValues),
 	FullState;
 
 on({get_values_all, SourcePid},
-    {PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
+    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
 	PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
 	CurrentValues = gossip_state:conv_state_to_extval(State),
 	BestState = previous_or_current(PreviousState, State),
@@ -390,7 +390,7 @@ on({get_values_all, SourcePid},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({'$gen_cast', {debug_info, Requestor}},
-   {PreviousState, State, _QueuedMessages, _Trigger, _TriggerState} = FullState) ->
+   {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
     BestState = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
     KeyValueList =
         [{"prev_round",          gossip_state:get_round(PreviousState)},

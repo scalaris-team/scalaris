@@ -48,12 +48,12 @@
 -type(latency() :: number()).
 
 % state of the vivaldi loop
--type(state() :: {network_coordinate(), error(), module(), any()}).
+-type(state() :: {network_coordinate(), error(), trigger:state()}).
 
 % accepted messages of vivaldi processes
 -type(message() ::
     {trigger} |
-    {cy_cache, cyclon_cache:cache()} |
+    {cy_cache, [node:node_type()]} |
     {vivaldi_shuffle, cs_send:mypid(), network_coordinate(), error()} |
     {vivaldi_shuffle_reply, cs_send:mypid(), network_coordinate(), error()} |
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |
@@ -63,7 +63,7 @@
 % Helper functions that create and send messages to nodes requesting information.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Sends a response message to a request for the best stored values.
+%% @doc Sends a response message to a request for the vivaldi coordinate.
 -spec msg_get_coordinate_response(cs_send:mypid(), network_coordinate(), error()) -> ok.
 msg_get_coordinate_response(Pid, Coordinate, Confidence) ->
     cs_send:send(Pid, {vivaldi_get_coordinate_response, Coordinate, Confidence}).
@@ -105,9 +105,9 @@ start_link(InstanceId) ->
 -spec init(module()) -> vivaldi:state().
 init(Trigger) ->
     %io:format("vivaldi start ~n"),
-    TriggerState = Trigger:init(?MODULE),
-    TriggerState2 = Trigger:trigger_first(TriggerState, 1),
-    {random_coordinate(), 1.0, Trigger, TriggerState2}.
+    TriggerState = trigger:init(Trigger, ?MODULE),
+    TriggerState2 = trigger:first(TriggerState, 1),
+    {random_coordinate(), 1.0, TriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -116,11 +116,11 @@ init(Trigger) ->
 % start new vivaldi shuffle
 %% @doc message handler
 -spec on(Message::message(), State::state()) -> state().
-on({trigger}, {Coordinate, Confidence, Trigger, TriggerState} ) ->
+on({trigger}, {Coordinate, Confidence, TriggerState} ) ->
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
-    NewTriggerState = Trigger:trigger_next(TriggerState, 1),
+    NewTriggerState = trigger:next(TriggerState, 1),
     cyclon:get_subset_rand(1),
-    {Coordinate, Confidence, Trigger, NewTriggerState};
+    {Coordinate, Confidence, NewTriggerState};
 
 % ignore empty node list from cyclon
 on({cy_cache, []}, State)  ->
@@ -128,7 +128,7 @@ on({cy_cache, []}, State)  ->
 
 % got random node from cyclon
 on({cy_cache, [Node] = _Cache},
-   {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
+   {Coordinate, Confidence, _TriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
     cs_send:send_to_group_member(node:pidX(Node), vivaldi,
                                  {vivaldi_shuffle, cs_send:this(),
@@ -141,7 +141,7 @@ on({vivaldi_shuffle, SourcePid, RemoteCoordinate, RemoteConfidence}, State) ->
     State;
 
 on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
-   {Coordinate, Confidence, Trigger, TriggerState}) ->
+   {Coordinate, Confidence, TriggerState}) ->
     %io:format("latency is ~pus~n", [Latency]),
     {NewCoordinate, NewConfidence} =
         try
@@ -151,9 +151,9 @@ on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
             % ignore any exceptions, e.g. badarith
             error:_ -> {Coordinate, Confidence}
         end,
-    {NewCoordinate, NewConfidence, Trigger, TriggerState};
+    {NewCoordinate, NewConfidence, TriggerState};
 
-on({get_coordinate, Pid}, {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
+on({get_coordinate, Pid}, {Coordinate, Confidence, _TriggerState} = State) ->
     msg_get_coordinate_response(Pid, Coordinate, Confidence),
     State;
 
@@ -162,7 +162,7 @@ on({get_coordinate, Pid}, {Coordinate, Confidence, _Trigger, _TriggerState} = St
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({'$gen_cast', {debug_info, Requestor}},
-   {Coordinate, Confidence, _Trigger, _TriggerState} = State) ->
+   {Coordinate, Confidence, _TriggerState} = State) ->
     KeyValueList =
         [{"coordinate", lists:flatten(io_lib:format("~p", [Coordinate]))},
          {"confidence", Confidence}],

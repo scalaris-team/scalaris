@@ -85,3 +85,7 @@
 -ifdef(boolean_not_builtin).
 -type boolean() :: bool().
 -endif.
+
+-ifdef(types_not_builtin).
+-type reference() :: erlang:reference().
+-endif.

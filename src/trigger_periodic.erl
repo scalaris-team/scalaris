@@ -17,21 +17,13 @@
 %%% @author Christian Hennig <hennig@zib.de>
 %%% @doc    Periodic trigger for (parameterized) modules.
 %%%
-%%% Can be used by a module <code>Module</code> in order to get a
-%%% <code>{trigger}</code> message every <code>Module:get_base_interval()</code>
-%%% milliseconds. For this the module needs to initialize the trigger with an
-%%% instantiation of itself (including the trigger) and tell it to send the
-%%% first message, e.g. by calling this (and storing the TriggerState2 for later
-%%% use):
-%%% <p><code>
-%%%  TriggerState = Trigger:init(THIS),<br />
-%%%  TriggerState2 = Trigger:trigger_first(TriggerState, 1)
-%%% </code></p>
-%%% Then on each received <code>{trigger}</code> message, the trigger needs to
-%%% be told to issue another <code>{trigger}</code> message:
-%%% <p><code>
-%%%  NewTriggerState = Trigger:trigger_next(TriggerState, 1),
-%%% </code></p>
+%%% Can be used by a module <code>Module</code> in order to get a configurable
+%%% message (by default <code>{trigger}</code>) every
+%%% <code>BaseIntervalFun()</code> (default: <code>Module:get_base_interval()</code>)
+%%% milliseconds.
+%%% 
+%%% Use this module through the interface provided by the trigger module,
+%%% initializing it with trigger_periodic!
 %%% @end
 %%% Created :  2 Oct 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
@@ -42,46 +34,42 @@
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
--behaviour(trigger).
+-behaviour(gen_trigger).
 
--export([init/1, trigger_first/2, trigger_next/2]).
+-include("../include/scalaris.hrl").
 
--ifdef(types_not_builtin).
--type reference() :: erlang:reference().
--endif.
+-export([init/4, first/2, next/2]).
 
--type par_module() :: any(). % parameterized module
--type state() :: {par_module(), reference() | ok}.
+-type interval_fun() :: trigger:interval_fun().
+-type message_tag() :: cs_send:message_tag().
+-type state() :: {interval_fun(), message_tag(), reference() | ok}.
 
-%% @doc Initializes the trigger.
--spec init(par_module()) -> {par_module(), ok}.
-init(Module) ->
-    %io:format("[ TR ~p ] ~p init ~n", [self(),Module]),
-    {Module, ok}.
+%% @doc Initializes the trigger with the given interval functions and the given
+%%      message tag used for the trigger message.
+-spec init(BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun(), message_tag()) -> {interval_fun(), message_tag(), ok}.
+init(BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
+    {BaseIntervalFun, MsgTag, ok}.
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization.
--spec trigger_first(state(), any()) -> state().
-trigger_first({Module, ok}, _U) ->
-    %io:format("[ TR ~p ] ~p first ~n", [self(),Module]),
-    TimerRef = cs_send:send_local_after(0, self(), {trigger}),
-    {Module, TimerRef}.
+-spec first(state(), any()) -> {interval_fun(), message_tag(), reference()}.
+first({BaseIntervalFun, MsgTag, ok}, _U) ->
+    TimerRef = cs_send:send_local_after(0, self(), {MsgTag}),
+    {BaseIntervalFun, MsgTag, TimerRef}.
 
-%% @doc Sets the trigger to send its message after Module:get_base_interval()
+%% @doc Sets the trigger to send its message after BaseIntervalFun()
 %%      milliseconds.
--spec trigger_next(state(), any()) -> state().
-trigger_next({Module, ok}, _U) ->
-    NewTimerRef = cs_send:send_local_after(Module:get_base_interval(), self(), {trigger}),
-    {Module, NewTimerRef};
+-spec next(state(), any()) -> {interval_fun(), message_tag(), reference()}.
+next({BaseIntervalFun, MsgTag, ok}, _U) ->
+    NewTimerRef = cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
+    {BaseIntervalFun, MsgTag, NewTimerRef};
 
-trigger_next({Module, TimerRef}, _U) ->
+next({BaseIntervalFun, MsgTag, TimerRef}, _U) ->
     % timer still running?
     case erlang:read_timer(TimerRef) of
         false ->
-            %io:format("[ TR ~p ] ~p next ~n", [self(),Module]),
-            NewTimerRef = cs_send:send_local_after(Module:get_base_interval(), self(), {trigger});
+            NewTimerRef = cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag});
         _T ->
-            %io:format("[ TR ~p ] ~p call next befor Timer Release ~p ms ~n", [self(), Module, T]),
             NewTimerRef = TimerRef
     end,
-    {Module, NewTimerRef}.
+    {BaseIntervalFun, MsgTag, NewTimerRef}.

@@ -38,17 +38,17 @@ init(_Args_) ->
     uninit.
 
 on({go},uninit) ->
-    TriggerState = Trigger:init(THIS),
-    TriggerState2 = Trigger:trigger_first(TriggerState,1),
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0),
+    TriggerState2 = trigger:first(TriggerState,1),
     TriggerState2;
 on(_,uninit) ->
     uninit;
 on({trigger},TriggerState) ->
     trigger_reregister(),
-    Trigger:trigger_next(TriggerState,1);
+    trigger:next(TriggerState,1);
 on({go},TriggerState) ->
     trigger_reregister(),
-    Trigger:trigger_next(TriggerState,1);
+    trigger:next(TriggerState,1);
 on(_, _State) ->
     unknown_event.
 

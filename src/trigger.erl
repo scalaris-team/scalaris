@@ -1,4 +1,5 @@
-%  Copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,33 +13,93 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : trigger.erl
-%%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : trigger behaviour
+%%% File    trigger.erl
+%%% @author Nico Kruber <kruber@zib.de>
+%%% @doc    Generic trigger for (parameterized) modules.
 %%%
-%%% Created :  2 Oct 2009 by Christian Hennig <hennig@zib.de>
+%%% Can be used by a module <code>Module</code> in order to get a configurable
+%%% message (by default <code>{trigger}</code>) in intervals defined by a given
+%%% trigger.
+%%% The basic pattern for the use of this module is as follows:
+%%% <p><code>
+%%%  TriggerState = trigger:init(Trigger, ?MODULE),<br />
+%%%  TriggerState2 = trigger:first(TriggerState, 1)
+%%% </code></p>
+%%% Then on each received <code>{trigger}</code> message, the trigger needs to
+%%% be told to issue another <code>{trigger}</code> message:
+%%% <p><code>
+%%%  NewTriggerState = trigger:next(TriggerState, 1),
+%%% </code></p>
+%%% Note: When parameterized modules are used, trigger:init(Trigger, THIS) does
+%%% not work. Use code like the following instead:
+%%% <p><code>
+%%%  TriggerState = trigger:init(Trigger, fun get_base_interval/0)
+%%% </code></p>
+%%% @end
+%%% Created : 26 Jan 2010 by Nico Kruber <kruber@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
+
 -module(trigger).
 
--author('hennig@zib.de').
--vsn('$Id').
+-author('kruber@zib.de').
+-vsn('$Id$ ').
 
-% for behaviour
--export([behaviour_info/1]).
+-include("../include/scalaris.hrl").
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Behaviour definition
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-export([init/2, init/3, init/4, init/5, first/2, next/2]).
 
-behaviour_info(callbacks) ->
-    [
-     {init, 1},
-     {trigger_first, 2},
-     {trigger_next, 2}
-    ];
+-type interval_fun() :: fun(() -> pos_integer()).
+-type message_tag() :: cs_send:message_tag().
+-type state() :: {module(), term()}.
+-type dyn_fun() :: fun((number(), number()) -> 0..3) | 0..3.
 
-behaviour_info(_Other) ->
-    undefined.
+%% @doc Initializes the given trigger with the given base interval function
+%%      (also used for min and max interval). If a Module is given instead,
+%%      the trigger will use the module's get_base_interval(),
+%%      get_min_interval() and get_max_interval() functions for the according
+%%      intervals.
+-spec init(Trigger::module(), Module_or_BaseIntervalFun :: module() | interval_fun()) -> state().
+init(Trigger, BaseIntervalFun) when is_function(BaseIntervalFun, 0) ->
+    {Trigger, Trigger:init(BaseIntervalFun, BaseIntervalFun, BaseIntervalFun, trigger)};
+init(Trigger, Module) ->
+    BaseIntervalFun = fun() -> Module:get_base_interval() end,
+    MinIntervalFun = fun() -> Module:get_min_interval() end,
+    MaxIntervalFun = fun() -> Module:get_max_interval() end,
+    {Trigger, Trigger:init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, trigger)}.
+
+%% @doc Initializes the given trigger with the given base interval function
+%%      (also used for min and max interval) and the given message tag used for
+%%      the trigger message.
+-spec init(Trigger::module(), BaseIntervalFun::interval_fun(), message_tag()) -> state().
+init(Trigger, BaseIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
+    {Trigger, Trigger:init(BaseIntervalFun, BaseIntervalFun, BaseIntervalFun, MsgTag)}.
+
+%% @doc Initializes the trigger with the given interval functions.
+-spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun()) -> state().
+init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun)
+  when is_function(BaseIntervalFun, 0) and
+           is_function(MinIntervalFun, 0) and
+           is_function(MaxIntervalFun, 0) ->
+    {Trigger, Trigger:init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, trigger)}.
+
+%% @doc Initializes the trigger with the given interval functions and the given
+%%      message tag.
+-spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun(), message_tag()) -> state().
+init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)
+  when is_function(BaseIntervalFun, 0) and
+           is_function(MinIntervalFun, 0) and
+           is_function(MaxIntervalFun, 0) ->
+    {Trigger, Trigger:init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)}.
+
+%% @doc Sets the trigger to send its message immediately, for example after
+%%      its initialization.
+-spec first(state(), dyn_fun()) -> state().
+first({Trigger, TriggerState}, U) ->
+    {Trigger, Trigger:first(TriggerState, U)}.
+
+%% @doc Sets the trigger to send its message after BaseIntervalFun()
+%%      milliseconds.
+-spec next(state(), dyn_fun()) -> state().
+next({Trigger, TriggerState}, U) ->
+    {Trigger, Trigger:next(TriggerState, U)}.

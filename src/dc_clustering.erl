@@ -44,11 +44,44 @@
 -type(sizes() :: [relative_size()]).
 
 % state of the clustering loop
--type(state() :: {centroids(), sizes()}).
+-type(state() :: {centroids(), sizes(), trigger:state(), trigger:state()}).
 
 % accepted messages of cluistering process
--type(message() :: any()).
+-type(message() :: 
+    {start_clustering_shuffle} |
+    {reset_clustering} |
+    {vivaldi_get_coordinate_response, vivaldi:network_coordinate(), vivaldi:error()} |
+    {cy_cache, [node:node_type()]} |
+    {clustering_shuffle, cs_send:mypid(), centroids(), sizes()} |
+    {clustering_shuffle_reply, cs_send:mypid(), centroids(), sizes()} |
+    {query_clustering, cs_send:mypid()}).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Init
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Starts the dc_clustering process, registers it with the process
+%%      dictionary and returns its pid for use by a supervisor.
+-spec start_link(term()) -> {ok, pid()} | ignore.
+start_link(InstanceId) ->
+    case config:read(dc_clustering_enable) of
+        true ->
+            ResetTrigger = config:read(dc_clustering_reset_trigger),
+            ClusterTrigger = config:read(dc_clustering_cluster_trigger),
+            gen_component:start_link(?MODULE, {ResetTrigger, ClusterTrigger}, [{register, InstanceId, dc_clustering}]);
+        false ->
+            ignore
+    end.
+
+%% @doc Initialises the module with an empty state.
+-spec init({module(), module()}) -> state().
+init({ResetTrigger, ClusterTrigger}) ->
+    ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
+    ResetTriggerState2 = trigger:first(ResetTriggerState, 1),
+    ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
+    ClusterTriggerState2 = trigger:first(ClusterTriggerState, 1),
+    log:log(info,"dc_clustering spawn: ~p~n", [cs_send:this()]),
+    {[], [], ResetTriggerState2, ClusterTriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -57,29 +90,32 @@
 % start new clustering shuffle
 %% @doc message handler
 -spec(on/2 :: (Message::message(), State::state()) -> state()).
-on({start_clustering_shuffle}, State) ->
+on({start_clustering_shuffle},
+   {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
     %io:format("~p~n", [State]),
-    erlang:send_after(config:read(dc_clustering_interval), self(),
-                      {start_clustering_shuffle}),
+    NewClusterTriggerState = trigger:next(ClusterTriggerState, 1),
     cyclon:get_subset_rand(1),
-    State;
+    {Centroids, Sizes, ResetTriggerState, NewClusterTriggerState};
 
 % ask vivaldi for network coordinate
-on({reset_clustering}, State) ->
-    erlang:send_after(config:read(dc_clustering_reset_interval), self(), {reset_clustering}),
+on({reset_clustering},
+   {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
+    NewResetTriggerState = trigger:next(ResetTriggerState, 1),
     vivaldi:get_coordinate(),
-    State;
+    {Centroids, Sizes, NewResetTriggerState, ClusterTriggerState};
 
 % reset the local state
-on({vivaldi_get_coordinate_response, Coordinate, _Confidence}, _State) ->
-    {[Coordinate], [1.0]};
+on({vivaldi_get_coordinate_response, Coordinate, _Confidence},
+   {_Centroids, _Sizes, ResetTriggerState, ClusterTriggerState}) ->
+    {[Coordinate], [1.0], ResetTriggerState, ClusterTriggerState};
 
 on({cy_cache, []}, State)  ->
     % ignore empty cache from cyclon
     State;
 
 % got random node from cyclon
-on({cy_cache, [Node] = _Cache}, {Centroids, Sizes} = State) ->
+on({cy_cache, [Node] = _Cache},
+   {Centroids, Sizes, _ResetTriggerState, _ClusterTriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
     cs_send:send_to_group_member(node:pidX(Node), dc_clustering,
                                  {clustering_shuffle, cs_send:this(),
@@ -88,48 +124,29 @@ on({cy_cache, [Node] = _Cache}, {Centroids, Sizes} = State) ->
 
 % have been asked to shuffle
 on({clustering_shuffle, RemoteNode, RemoteCentroids, RemoteSizes},
-   {Centroids, Sizes}) ->
+   {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
    %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     cs_send:send(RemoteNode, {clustering_shuffle_reply,
                               cs_send:this(),
                               Centroids, Sizes}),
-    NewState = cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes),
-    NewState;
+    {NewCentroids, NewSizes} = cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes),
+    {NewCentroids, NewSizes, ResetTriggerState, ClusterTriggerState};
 
 % got shuffle response
 on({clustering_shuffle_reply, _RemoteNode, RemoteCentroids, RemoteSizes},
-   {Centroids, Sizes}) ->
+   {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
     %io:format("{shuffle_reply, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     %vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
-    NewState = cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes),
-    NewState;
+    {NewCentroids, NewSizes} = cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes),
+    {NewCentroids, NewSizes, ResetTriggerState, ClusterTriggerState};
 
 % return my clusters
-on({query_clustering, Pid}, State) ->
-    cs_send:send(Pid,{query_clustering_response, State}),
+on({query_clustering, Pid}, {Centroids, Sizes, _ResetTriggerState, _ClusterTriggerState} = State) ->
+    cs_send:send(Pid, {query_clustering_response, {Centroids, Sizes}}),
     State;
 
 on(_, _State) ->
     unknown_event.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Init
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(init/1 :: ([any()]) -> state()).
-init([_InstanceId, []]) ->
-    erlang:send_after(config:read(dc_clustering_reset_interval), self(), {reset_clustering}),
-    cs_send:send_local(self(),{reset_clustering}),
-    cs_send:send_local(self(),{start_clustering_shuffle}),
-    {[], []}.
-
--spec(start_link(term()) -> {ok, pid()} | ignore).
-start_link(InstanceId) ->
-    case config:read(dc_clustering_enable) of
-        true ->
-            gen_component:start_link(?MODULE, [InstanceId, []], [{register, InstanceId, dc_clustering}]);
-        false ->
-            ignore
-    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
@@ -140,5 +157,16 @@ cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes) ->
     Radius = config:read(dc_clustering_radius),
     {NewCentroids, NewSizes} = mathlib:aggloClustering(Centroids ++ RemoteCentroids,
                                                        Sizes ++ RemoteSizes, Radius),
-    NormalizedSizes = lists:map(fun (S) -> 0.5*S end, NewSizes),
+    NormalizedSizes = lists:map(fun (S) -> 0.5 * S end, NewSizes),
     {NewCentroids, NormalizedSizes}.
+
+%% @doc Gets the clustering reset interval set in scalaris.cfg.
+-spec get_clustering_reset_interval() -> pos_integer().
+get_clustering_reset_interval() ->
+    config:read(dc_clustering_reset_interval).
+
+%% @doc Gets the clustering interval, e.g. how often to calculate clusters, set
+%%      in scalaris.cfg.
+-spec get_clustering_interval() -> pos_integer().
+get_clustering_interval() ->
+    config:read(dc_clustering_interval).

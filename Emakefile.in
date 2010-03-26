@@ -9,7 +9,7 @@
   @MODULEISBUILTIN@
   @BOOLEANISBUILTIN@
  ]}.
-{"src/trigger.erl",
+{"src/gen_trigger.erl",
  [debug_info,
   {outdir, "ebin"},
   {i, "include"},
