@@ -98,6 +98,7 @@ actl_trace(What) ->
 %%          {stop, Reason}
 %%----------------------------------------------------------------------
 init([]) ->
+    process_flag(trap_exit, true),
     {ok, #state{running = false, now = fmtnow()}}.
 
 %%----------------------------------------------------------------------
@@ -403,7 +404,9 @@ handle_info(minute10, State) ->
             ok
     end,
     {noreply, State#state{alogs= L,
-                          auth_log = wrap(State#state.auth_log, State)}}.
+                          auth_log = wrap(State#state.auth_log, State)}};
+handle_info({'EXIT', _, _}, State) ->
+    {noreply, State}.
 
 
 
@@ -455,6 +458,7 @@ wrap(AL, State) ->
 %% Returns: any (ignored by gen_server)
 %%----------------------------------------------------------------------
 terminate(_Reason, _State) ->
+    gen_event:delete_handler(error_logger, yaws_log_file_h, normal),
     ok.
 
 %%%----------------------------------------------------------------------
@@ -489,8 +493,8 @@ fmt_ip(HostName) ->
 fmtnow() ->
     {{Year, Month, Day}, {Hour, Min, Sec}} = 
         calendar:now_to_local_time(now()),
-    [fill_zero(Day,2),"/",yaws:month(Month),"/",integer_to_list(Year),":",
-     fill_zero(Hour,2),":",fill_zero(Min,2),":",fill_zero(Sec,2)," ",zone()].
+    ["[",fill_zero(Day,2),"/",yaws:month(Month),"/",integer_to_list(Year),":",
+     fill_zero(Hour,2),":",fill_zero(Min,2),":",fill_zero(Sec,2)," ",zone(),"]"].
     
 
 zone() ->
