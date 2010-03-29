@@ -16,6 +16,7 @@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 datarootdir=@datarootdir@
+ERL=erl
 
 # /bin
 BINDIR=$DESTDIR@bindir@
@@ -35,6 +36,8 @@ DOCDIR=$DESTDIR@docdir@
 JAVADIR=$DESTDIR@datarootdir@/java
 # /var/log/scalaris
 LOGDIR=$DESTDIR@localstatedir@/log/scalaris
+# /usr/bin/scalaris
+SCALARISCLIENT=$DESTDIR${exec_prefix}/bin/scalaris
 
 SCALARIS_COOKIE="chocolate chip cookie"
 
@@ -74,6 +77,8 @@ fix_paths() {
         NODEDOCROOTDIR=$SCALARISDIR/docroot_node
         # scalaris/log
         LOGDIR=$SCALARISDIR/log
+        # /usr/bin/scalaris
+        SCALARISCLIENT=$SCALARISDIR/java-api/scalaris
     fi
 }
 
@@ -83,7 +88,7 @@ checkinstallation() {
         echo "you have to set a fully qualified domain name (FQDN)"
         exit -1
     fi
-    erl -noinput -eval 'halt(0).'
+    $ERL -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: erl could not be run"
@@ -95,7 +100,7 @@ checkinstallation() {
         echo "ls -l `which erl`"
         exit 1
     fi
-    erl -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
+    $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: erlang could not start the crypto module"
@@ -103,7 +108,7 @@ checkinstallation() {
         exit 1
     fi
     if [ -e $ETCDIR/scalaris.cfg ]; then
-        erl -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
             echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.cfg"
@@ -114,7 +119,7 @@ checkinstallation() {
         echo "ERROR: there is no config file: $ETCDIR/scalaris.cfg"
     fi
     if [ -e $ETCDIR/scalaris.local.cfg ]; then
-        erl -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
             echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.local.cfg"
@@ -122,11 +127,30 @@ checkinstallation() {
             exit 1
         fi
     fi
-    erl -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'
+    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: could not find Scalaris' beam files"
         echo "erl -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'"
+        exit 1
+    fi
+    ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
+    JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
+    if [ $ERLANGHOST != $JAVAHOST ]; then
+        echo "ERROR: the hostnames reported by Erlang and Java do not match"
+        echo " please check that /etc/hosts and DNS are consistent"
+        echo "$ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
+        echo "$SCALARISCLIENT -lh"
+        exit 1
+    fi
+    $ERL -noinput -pa $BEAMDIR \
+        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), config:check_config(), halt(0)." > /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        $ERL -noinput -pa $BEAMDIR \
+            -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), config:check_config(), halt(0)."
+        echo "ERROR: some parameters in the config files are wrong or missing"
+        echo "$ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), config:check_config(), halt(0).\""
         exit 1
     fi
     exit 0
@@ -138,7 +162,7 @@ bootstart(){
         BACKGROUND="-detached"
     fi
     pushd $BEAMDIR > /dev/null
-    erl -setcookie "$SCALARIS_COOKIE" \
+    $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
         -pa $SCALARISDIR/contrib/log4erl/ebin \
         -pa $BEAMDIR $TCERLFLAGS $BACKGROUND \
@@ -162,12 +186,12 @@ bootstart(){
 
 debug(){
     # look into epmd -list: boot or node
-    erl -setcookie "$SCALARIS_COOKIE" -name rem -remsh boot@`hostname -f`
+    $ERL -setcookie "$SCALARIS_COOKIE" -name rem -remsh boot@`hostname -f`
 }
 
 bootstop(){
     pushd $BEAMDIR > /dev/null
-    erl -setcookie "$SCALARIS_COOKIE" \
+    $ERL -setcookie "$SCALARIS_COOKIE" \
         -name ctl \
         -pa $BEAMDIR \
         -noinput \
@@ -181,7 +205,7 @@ nodestart(){
         BACKGROUND="-detached"
     fi
     pushd $BEAMDIR > /dev/null
-    erl -setcookie "$SCALARIS_COOKIE" \
+    $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
         -pa $SCALARISDIR/contrib/log4erl/ebin \
         -pa $BEAMDIR $TCERLFLAGS $BACKGROUND \
@@ -205,7 +229,7 @@ nodestart(){
 
 nodestop(){
     pushd $BEAMDIR > /dev/null
-    erl -setcookie "$SCALARIS_COOKIE" \
+    $ERL -setcookie "$SCALARIS_COOKIE" \
         -name ctl \
         -pa $BEAMDIR \
         -noinput \
