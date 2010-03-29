@@ -78,7 +78,7 @@ fix_paths() {
         # scalaris/log
         LOGDIR=$SCALARISDIR/log
         # /usr/bin/scalaris
-        SCALARISCLIENT=$SCALARISDIR/java-api/scalaris
+        SCALARISCLIENT="$SCALARISDIR/java-api/scalaris --noconfig"
     fi
 }
 
