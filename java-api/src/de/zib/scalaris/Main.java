@@ -163,11 +163,13 @@ public class Main {
 			} catch (UnknownException e) {
 				printException("getSubscribers failed with unknown error", e, verbose);
 			}
+		} else if (line.hasOption("lh")) { // get local host name
+			System.out.println(ConnectionFactory.getLocalhostName());
 		} else {
 			// print help if no other option was given
 //		if (line.hasOption("help")) {
 			HelpFormatter formatter = new HelpFormatter();
-			formatter.printHelp("scalaris", getOptions());
+			formatter.printHelp("scalaris [Options]", getOptions());
 		}
 	}
 
@@ -189,23 +191,23 @@ public class Main {
 		read.setArgs(1);
 		group.addOption(read);
 
-		Option write = new Option("w", "write", true, "write an item: <key> <value>");
-		write.setArgName("params");
+		Option write = new Option("w", "write", true, "write an item");
+		write.setArgName("key> <value");
 		write.setArgs(2);
 		group.addOption(write);
 
-		Option publish = new Option("p", "publish", true, "publish a new message for a topic: <topic> <message>");
-		publish.setArgName("params");
+		Option publish = new Option("p", "publish", true, "publish a new message for the given topic");
+		publish.setArgName("topic> <message");
 		publish.setArgs(2);
 		group.addOption(publish);
 
-		Option subscribe = new Option("s", "subscribe", true, "subscribe to a topic: <topic> <url>");
-		subscribe.setArgName("params");
+		Option subscribe = new Option("s", "subscribe", true, "subscribe to a topic");
+		subscribe.setArgName("topic> <url");
 		subscribe.setArgs(2);
 		group.addOption(subscribe);
 		
-		Option unsubscribe = new Option("u", "unsubscribe", true, "unsubscribe from a topic: <topic> <url>");
-		unsubscribe.setArgName("params");
+		Option unsubscribe = new Option("u", "unsubscribe", true, "unsubscribe from a topic");
+		unsubscribe.setArgName("topic> <url");
 		unsubscribe.setArgs(2);
 		group.addOption(unsubscribe);
 
@@ -215,6 +217,8 @@ public class Main {
 		group.addOption(getSubscribers);
 
 		options.addOption(new Option("b", "minibench", false, "run mini benchmark"));
+
+		options.addOption(new Option("lh", "localhost", false, "gets the local host's name as known to Java (for debugging purposes)"));
 
 		options.addOptionGroup(group);
 

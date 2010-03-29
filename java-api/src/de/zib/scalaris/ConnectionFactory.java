@@ -327,15 +327,25 @@ public class ConnectionFactory {
 	 */
 	public static String fixLocalhostName(String node) {
 		if (node.endsWith("@localhost")) {
-			String hostname = "localhost";
-			try {
-				InetAddress addr = InetAddress.getLocalHost();
-				hostname = addr.getCanonicalHostName();
-			} catch (UnknownHostException e) {
-			}
-			return node.replaceAll("@localhost$", "@" + hostname);
+			return node.replaceAll("@localhost$", "@" + getLocalhostName());
 		}
 		return node;
+	}
+
+	/**
+	 * Returns the name of the local host (or at least what Java thinks it is).
+	 * 
+	 * @return the local host' name or <tt>localhost</tt> if no IP address could
+	 *         be found
+	 */
+	public static final String getLocalhostName() {
+		String hostname = "localhost";
+		try {
+			InetAddress addr = InetAddress.getLocalHost();
+			hostname = addr.getCanonicalHostName();
+		} catch (UnknownHostException e) {
+		}
+		return hostname;
 	}
 	
 	/**
