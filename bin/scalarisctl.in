@@ -88,6 +88,7 @@ checkinstallation() {
         echo "you have to set a fully qualified domain name (FQDN)"
         exit -1
     fi
+
     $ERL -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -95,11 +96,13 @@ checkinstallation() {
         echo "erl -noinput -eval 'halt(0).'"
         exit 1
     fi
+
     if [ ! -s `which erl` ]; then
         echo "ERROR: your erl executable is of size zero bytes: `which erl`"
         echo "ls -l `which erl`"
         exit 1
     fi
+
     $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -107,6 +110,7 @@ checkinstallation() {
         echo "erl -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
         exit 1
     fi
+
     if [ -e $ETCDIR/scalaris.cfg ]; then
         $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
         FAILED=$?
@@ -118,6 +122,7 @@ checkinstallation() {
     else
         echo "ERROR: there is no config file: $ETCDIR/scalaris.cfg"
     fi
+
     if [ -e $ETCDIR/scalaris.local.cfg ]; then
         $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
         FAILED=$?
@@ -127,6 +132,7 @@ checkinstallation() {
             exit 1
         fi
     fi
+
     $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -134,6 +140,7 @@ checkinstallation() {
         echo "erl -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'"
         exit 1
     fi
+
     ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
     JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
     if [ $ERLANGHOST != $JAVAHOST ]; then
@@ -143,14 +150,14 @@ checkinstallation() {
         echo "$SCALARISCLIENT -lh"
         exit 1
     fi
-    $ERL -noinput -pa $BEAMDIR \
-        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), config:check_config(), halt(0)." > /dev/null
+
+    CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
+        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0)."`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
-        $ERL -noinput -pa $BEAMDIR \
-            -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), config:check_config(), halt(0)."
+        echo "$CHECKCONFIGMSG"
         echo "ERROR: some parameters in the config files are wrong or missing"
-        echo "$ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), config:check_config(), halt(0).\""
+        echo "$ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0).\""
         exit 1
     fi
     exit 0
