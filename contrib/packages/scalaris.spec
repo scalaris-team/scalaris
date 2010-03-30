@@ -12,8 +12,8 @@ Source0:        %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  erlang >= R12B-4
-Requires:       erlang >= R12B-4
+BuildRequires:  erlang >= R13B01
+Requires:       erlang >= R13B01
 BuildArch:      noarch 
 
 ##########################################################################################  
@@ -27,8 +27,8 @@ BuildArch:      noarch
 ##########################################################################################  
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 %if 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
-BuildRequires:  erlang-stack >= R12B-4
-Requires:       erlang-stack >= R12B-4
+BuildRequires:  erlang-stack >= R13B01
+Requires:       erlang-stack >= R13B01
 %else
 #BuildRequires:  classpathx-jaf
 %endif
@@ -60,7 +60,7 @@ Summary:    Java API for scalaris
 Group:      Applications/Databases
 Requires:   jre >= 1.6.0
 %if 0%{?suse_version} || 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
-Requires:   erlang-jinterface >= R12B-4
+Requires:   erlang-jinterface >= R13B01
 %else
 Requires:   erlang
 %endif
