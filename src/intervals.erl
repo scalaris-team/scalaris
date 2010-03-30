@@ -37,13 +37,13 @@
 	 is_covered/2,
 	 unpack/1,
 	 in/2,
-	 sanitize/1,
+	 sanitize/1
 	 % for unit testing only
-	 cut_iter/2,
-	 normalize/1,
-	 wraps_around/1,
-	 is_between/3,
-	 find_start/3
+%% 	 cut_iter/2,
+%% 	 normalize/1,
+%% 	 wraps_around/1,
+%% 	 is_between/3,
+%% 	 find_start/3
 	 ]).
 
 -type(key() :: ?RT:key() | minus_infinity | plus_infinity).

@@ -12,12 +12,15 @@
 
 -compile(export_all).
 
--import(intervals).
-
 -include_lib("unittest.hrl").
 
 all() ->
-    [on_trigger, on_vivaldi_shuffle].
+    [test_init,
+     test_on_trigger,
+     test_on_vivaldi_shuffle,
+     test_on_cy_cache1,
+     test_on_cy_cache2,
+     test_on_cy_cache3].
 
 suite() ->
     [
@@ -50,33 +53,143 @@ init_per_suite(Config) ->
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
+    reset_config(),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
     gen_component:kill(process_dictionary),
     error_logger:tty(false),
     exit(Pid, kill),
     Config.
 
-on_trigger(Config) ->
-    process_dictionary:register_process(vivaldi_group, cyclon, self()),
-    VivaldiModule = vivaldi,
-    InitialState = VivaldiModule:init(trigger_periodic),
-    NewState = VivaldiModule:on({trigger}, InitialState),
-
-    Self = self(),
-    ?expect_message({get_subset_rand, 1, Self}),
-    ?equals(InitialState, NewState),
+init_per_testcase(_TestCase, Config) ->
     Config.
 
-on_vivaldi_shuffle(Config) ->
+end_per_testcase(_TestCase, Config) ->
+    reset_config(),
+    Config.
+
+test_init(Config) ->
+    config:write(vivaldi_interval, 100),
+    InitialState1 = vivaldi:init('trigger_periodic'),
+    
+    ?equals_pattern(InitialState1, {[_X, _Y], 1.0, {'trigger_periodic', _TriggerState}}),
+    ?expect_message({trigger}),
+    ?expect_no_message(),
+    Config.
+
+test_on_trigger(Config) ->
+    process_dictionary:register_process(vivaldi_group, cyclon, self()),
+    Coordinate = [1, 1],
+    Confidence = 1.0,
+    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    {NewCoordinate, NewConfidence, NewTriggerState} =
+        vivaldi:on({trigger}, InitialState),
+
+    Self = self(),
+    ?equals(Coordinate, NewCoordinate),
+    ?equals(Confidence, NewConfidence),
+    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
+    ?expect_message({get_subset_rand, 1, Self}),
+    ?expect_message({trigger}),
+    ?expect_no_message(),
+    Config.
+
+test_on_vivaldi_shuffle(Config) ->
     config:write(vivaldi_count_measurements, 1),
     config:write(vivaldi_measurements_delay, 0),
-    VivaldiModule = vivaldi,
-    InitialState = VivaldiModule:init(trigger_periodic),
-    _NewState = VivaldiModule:on({vivaldi_shuffle, cs_send:this(), [0.0, 0.0], 1.0},
+    Coordinate = [1, 1],
+    Confidence = 1.0,
+    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    _NewState = vivaldi:on({vivaldi_shuffle, cs_send:this(), [0.0, 0.0], 1.0},
                                  InitialState),
     receive
         {ping, SourcePid} -> cs_send:send(SourcePid, {pong})
     end,
 
     ?expect_message({update_vivaldi_coordinate, _Latency, {[0.0, 0.0], 1.0}}),
+    ?expect_no_message(),
+    % TODO: check the node's state
     Config.
+
+test_on_cy_cache1(Config) ->
+    Coordinate = [1, 1],
+    Confidence = 1.0,
+    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    % empty node cache
+    Cache = [],
+    NewState =
+        vivaldi:on({cy_cache, Cache}, InitialState),
+
+    ?equals(NewState, InitialState),
+    % no messages should be send if no node given
+    ?expect_no_message(),
+    Config.
+
+test_on_cy_cache2(Config) ->
+    process_dictionary:register_process(vivaldi_group, cs_node, self()),
+
+    Coordinate = [1, 1],
+    Confidence = 1.0,
+    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    % non-empty node cache
+    Cache = [node:new(cs_send:make_global(self()), 10)],
+    NewState =
+        vivaldi:on({cy_cache, Cache}, InitialState),
+
+    ?equals(NewState, InitialState),
+    % no messages sent to itself
+    ?expect_no_message(),
+    Config.
+
+test_on_cy_cache3(Config) ->
+    erlang:put(instance_id, vivaldi_group),
+    % register some other process as the cs_node
+    CS_Node = fake_cs_node(),
+%%     ?equals(process_dictionary:get_group_member(cs_node), CS_Node),
+
+    Coordinate = [1, 1],
+    Confidence = 1.0,
+    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    % non-empty node cache
+    Cache = [node:new(cs_send:make_global(self()), 10)],
+    NewState =
+        vivaldi:on({cy_cache, Cache}, InitialState),
+
+    ?equals(NewState, InitialState),
+    % if pids don't match, a get_state is send to the cached node's cs_node
+    This = cs_send:this(),
+    ?expect_message({send_to_group_member, vivaldi,
+                     {vivaldi_shuffle, THIS, Coordinate, Confidence}}),
+    % no further messages
+    ?expect_no_message(),
+    
+    exit(CS_Node, kill),
+    Config.
+
+reset_config() ->
+    config:write(vivaldi_interval, 10000),
+    config:write(vivaldi_dimensions, 2),
+    config:write(vivaldi_count_measurements, 10),
+    config:write(vivaldi_measurements_delay, 1000),
+    config:write(vivaldi_latency_timeout, 60000),
+    config:write(vivaldi_trigger, trigger_periodic).
+
+get_ptrigger_nodelay() ->
+    get_ptrigger_delay(0).
+
+get_ptrigger_delay(Delay) ->
+    trigger:init('trigger_periodic', fun () -> Delay end, 'trigger').
+
+fake_cs_node() ->
+    CS_Node = spawn(?MODULE, fake_cs_node_start, [self()]),
+    receive
+        {started, CS_Node} -> CS_Node
+    end.
+
+fake_cs_node_start(Supervisor) ->
+    process_dictionary:register_process(vivaldi_group, cs_node, self()),
+    Supervisor ! {started, self()},
+    fake_process().
+
+fake_process() ->
+    consume_message({ok}, 1000),
+    fake_process().

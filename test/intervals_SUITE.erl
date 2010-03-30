@@ -12,8 +12,6 @@
 
 -compile(export_all).
 
--import(intervals).
-
 -include_lib("unittest.hrl").
 
 all() ->
