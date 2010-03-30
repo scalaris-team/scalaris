@@ -61,10 +61,18 @@ compile:
 
 
 test: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test $(UNITTESTARGS) @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec | tee ct.log ; grep " 0 failed" ct.log
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test $(UNITTESTARGS) @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skip_benchmark.cfg -cover test/scalaris.coverspec | tee ct.log ; \
+	grep " 0 failed" ct.log
+
+test-clean:
+	-rm -rf ct_run.ct@* ct.log index.html all_runs.html variables-ct@* \
+            result_increment_10_1000.txt result_increment_1_10000.txt \
+            result_read_10_10000.txt result_read_1_100000.txt
+
 
 %_SUITE: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test $(UNITTESTARGS) @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; grep " 0 failed" ct.log
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test $(UNITTESTARGS) @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; \
+	grep " 0 failed" ct.log
 
 test-vts: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror

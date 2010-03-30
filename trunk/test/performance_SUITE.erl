@@ -126,7 +126,7 @@ cs_send_local(_Config) ->
 
 helper_rec(0, Pid) -> Pid ! pong;
 helper_rec(Iter, Pid) ->
-    receive Any -> ok end,
+    receive _Any -> ok end,
     helper_rec(Iter - 1, Pid).
 
 erlang_send_after(_Config) ->
@@ -183,7 +183,7 @@ next_hop(_Config) ->
     ok.
 
 process_dictionary(_Config) ->
-    {ok, Pid} = process_dictionary:start_link(),
+    {ok, _Pid} = process_dictionary:start_link(),
     process_dictionary:register_process(?MODULE, "process_dictionary", self()),
     iter(count(), fun () ->
                           process_dictionary:lookup_process(?MODULE,

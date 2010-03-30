@@ -34,7 +34,7 @@
 %%%  scalaris.cfg).
 %%%  
 %%%  New rounds are started by the leader which is identified as the node for
-%%%  which intervals:is_between(PredId, 0, MyId) is true. It will propagate its
+%%%  which util:is_between(PredId, 0, MyId) is true. It will propagate its
 %%%  round with its state so that gossip processes of other nodes can join this
 %%%  round. Several parameters (added to scalaris.cfg) influence the decision
 %%%  about when to start a new round:
@@ -238,7 +238,7 @@ on({{get_node_details_response, NodeDetails}, local_info},
 	Initialized = gossip_state:is_initialized(State),
 	{NewQueuedMessages, NewState} =
 		case Initialized of
-			true -> {QueuedMessages, State};
+			true -> {[], State};
 			false ->
 				[cs_send:send_local(self(), Message) || Message <- QueuedMessages],
 				{[], integrate_local_info(State, node_details:get(NodeDetails, load), calc_initial_avg_kr(node_details:get(NodeDetails, my_range)))}
@@ -257,7 +257,7 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 %%     io:format("gossip: got get_node_details_response, leader_start_new_round: ~p~n",[NodeDetails]),
 	{PredId, MyId} = node_details:get(NodeDetails, my_range),
 	{NewPreviousState, NewState} = 
-		case intervals:is_between(PredId, 0, MyId) of
+		case util:is_between(PredId, 0, MyId) of
 	        % not the leader -> continue as normal with the old state
 			false -> {PreviousState, State};
 			% leader -> start a new round
@@ -272,7 +272,7 @@ on({{get_node_details_response, NodeDetails}, leader_debug_output},
 	% request_leader_debug_output/0
 %%     io:format("gossip: got get_node_details_response, leader_debug_output: ~p~n",[NodeDetails]),
 	{PredId, MyId} = node_details:get(NodeDetails, my_range),
-	case intervals:is_between(PredId, 0, MyId) of
+	case util:is_between(PredId, 0, MyId) of
         % not the leader
 		false -> ok;
 		% leader -> provide debug information
