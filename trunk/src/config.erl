@@ -98,7 +98,7 @@ start(Files, Owner) ->
     register(?MODULE, self()),
     ets:new(config_ets, [set, protected, named_table]),
     [ populate_db(File) || File <- Files],
-    check_config(),
+    check_config() orelse halt(1),
     Owner ! done,
     loop().
 
@@ -143,18 +143,12 @@ process_term({Key, Value}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether config parameters of all processes exist and are valid.
--spec check_config() -> true.
+-spec check_config() -> boolean().
 check_config() ->
-    Correct =
-        gossip:check_config() andalso
-            vivaldi:check_config() andalso
-            cyclon:check_config() andalso
-            vivaldi_latency:check_config(),
-    case Correct of
-       true -> true;
-       false ->
-        erlang:halt(1)
-    end.
+    gossip:check_config() and
+        vivaldi:check_config() and
+        cyclon:check_config() and
+        vivaldi_latency:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->
