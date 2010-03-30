@@ -71,9 +71,6 @@
 
 -include("../include/scalaris.hrl").
 
-%% -define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), request_leader_debug_output()).
--define(GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(), ok).
-
 -export([start_link/1]).
 
 % functions gen_component, the trigger and the config module use
@@ -102,7 +99,6 @@
 	{trigger} |
 	{{get_node_details_response, node_details:node_details()}, local_info} |
 	{{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
-	{{get_node_details_response, node_details:node_details()}, leader_debug_output} |
 	{get_state, cs_send:mypid(), values_internal()} |
 	{get_state_response, values_internal()} |
 	{cy_cache, [node:node_type()]} |
@@ -264,52 +260,6 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 			true -> new_round(State)
 	end,
     {NewPreviousState, NewState, QueuedMessages, TriggerState};
-
-%% Prints some debug information if the current node is the leader.
-on({{get_node_details_response, NodeDetails}, leader_debug_output},
-   {PreviousState, State, QueuedMessages, TriggerState}) ->
-	% this message can only be received after being requested by
-	% request_leader_debug_output/0
-%%     io:format("gossip: got get_node_details_response, leader_debug_output: ~p~n",[NodeDetails]),
-	{PredId, MyId} = node_details:get(NodeDetails, my_range),
-	case util:is_between(PredId, 0, MyId) of
-        % not the leader
-		false -> ok;
-		% leader -> provide debug information
-		true ->
-			BestState = previous_or_current(PreviousState, State),
-			io:format("gossip:~n    prv: ~p, ~p, ~p, ~p:~n         ~p, ~p, ~p, ~p,~n         ~p, ~p~n    cur: ~p, ~p, ~p, ~p:~n         ~p, ~p, ~p, ~p,~n         ~p, ~p~n    usr: ~p, ~p, ~p, ~p,~n         ~p, ~p~n",
-				[{round,gossip_state:get_round(PreviousState)},
-				 {triggered,gossip_state:get_triggered(PreviousState)},
-				 {msg_exch,gossip_state:get_msg_exch(PreviousState)},
-				 {converge_avg_count,gossip_state:get_converge_avg_count(PreviousState)},
-				 {avg,gossip_state:get_avgLoad(PreviousState)},
-				 {min,gossip_state:get_minLoad(PreviousState)},
-				 {max,gossip_state:get_maxLoad(PreviousState)},
-				 {stddev,gossip_state:calc_stddev(PreviousState)},
-				 {size_ldr,gossip_state:calc_size_ldr(PreviousState)},
-				 {size_kr,gossip_state:calc_size_kr(PreviousState)},
-				 
-				 {round,gossip_state:get_round(State)},
-				 {triggered,gossip_state:get_triggered(State)},
-				 {msg_exch,gossip_state:get_msg_exch(State)},
-				 {converge_avg_count,gossip_state:get_converge_avg_count(State)},
-				 {avg,gossip_state:get_avgLoad(State)},
-				 {min,gossip_state:get_minLoad(State)},
-				 {max,gossip_state:get_maxLoad(State)},
-				 {stddev,gossip_state:calc_stddev(State)},
-				 {size_ldr,gossip_state:calc_size_ldr(State)},
-				 {size_kr,gossip_state:calc_size_kr(State)},
-				 
-				 {avg,gossip_state:get_avgLoad(BestState)},
-				 {min,gossip_state:get_minLoad(BestState)},
-				 {max,gossip_state:get_maxLoad(BestState)},
-				 {stddev,gossip_state:calc_stddev(BestState)},
-				 {size_ldr,gossip_state:calc_size_ldr(BestState)},
-				 {size_kr,gossip_state:calc_size_kr(BestState)}]),
-			ok
-	end,
-    {PreviousState, State, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State exchange
@@ -528,7 +478,6 @@ update(MyState, OtherValues) ->
 			false -> gossip_state:reset_converge_avg_count(MyState)
 		end,
 	Result = gossip_state:set_values(MyNewState, MyNewValues),
-	?GOSSIP_REQUEST_LEADER_DEBUG_OUTPUT(),
 	Result.
 
 %% @doc Calculates the change in percent from the Old value to the New value.
@@ -710,16 +659,6 @@ request_new_round_if_leader(State) ->
 		false ->
 			ok
 	end.
-
-%% @doc Sends the local node's cs_node a request to tell us its successor and
-%%      predecessor in order to allow debug output at the leader only.
-%%      The node will respond with a
-%%      {{get_node_details_response, NodeDetails}, leader_debug_output}
-%%      message.
--spec request_leader_debug_output() -> ok.
-request_leader_debug_output() ->
-	CS_Node = process_dictionary:get_group_member(cs_node),
-	cs_send:send_local(CS_Node, {get_node_details, cs_send:this_with_cookie(leader_debug_output), [my_range]}).
 
 %% @doc Sends the local node's cs_node a request to tell us some information
 %%      about itself.
