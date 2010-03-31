@@ -64,7 +64,7 @@ myassert(true, _Reason) ->
 myassert(false, Reason) ->
     ct:fail(Reason).
 
--define(expect_message(MsgPattern, Timeout),
+-define(expect_message_timeout(MsgPattern, Timeout),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 receive
@@ -81,9 +81,9 @@ myassert(false, Reason) ->
                         ?assert(false)
                 end
         end()).
--define(expect_message(MsgPattern), ?expect_message(MsgPattern, 1000)).
+-define(expect_message(MsgPattern), ?expect_message_timeout(MsgPattern, 1000)).
 
--define(expect_no_message(Timeout),
+-define(expect_no_message_timeout(Timeout),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 receive
@@ -94,7 +94,7 @@ myassert(false, Reason) ->
                     Timeout -> ok
                 end
         end()).
--define(expect_no_message(), ?expect_no_message(0)).
+-define(expect_no_message(), ?expect_no_message_timeout(100)).
 
 consume_message(Message, Timeout) ->
     receive
@@ -103,7 +103,7 @@ consume_message(Message, Timeout) ->
         Timeout -> ok
     end.
 
--define(expect_message_ignore(MsgPattern, IgnoredMessage, Timeout),
+-define(expect_message_ignore_timeout(MsgPattern, IgnoredMessage, Timeout),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 % ignore two ignored messages, then wait for Timeout ignoring all ignored messages and do a final receive with the expected message
