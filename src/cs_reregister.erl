@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,63 +13,92 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_reregister.erl
-%%% Author  : Thorsten Schuett <schuett@csr-pc11.zib.de>
-%%% Description : reregister with boot nodes
-%%%
-%%% Created : 11 Oct 2007 by Thorsten Schuett <schuett@csr-pc11.zib.de>
+%%% File    cs_reregister.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Reregister with boot nodes
+%%% @end
+%%% Created : 11 Oct 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(cs_reregister,[Trigger]).
+-module(cs_reregister).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([start_link/1,init/1,on/2, get_base_interval/0]).
 -behavior(gen_component).
 
+-include("../include/scalaris.hrl").
 
+-export([start_link/1]).
+-export([init/1, on/2, get_base_interval/0]).
 
+-type(message() ::
+    {go} |
+    {trigger}).
+
+-type(state() :: {init | uninit, trigger:state()}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Startup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Starts a Dead Node Cache process, registers it with the process
+%%      dictionary and returns its pid for use by a supervisor.
+-spec start_link(term()) -> {ok, pid()}.
 start_link(InstanceId) ->
-   gen_component:start_link(THIS, [], [{register, InstanceId, cs_reregister}]).
+    Trigger = config:read(cs_reregister_trigger),
+    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, cs_reregister}]).
 
-init(_Args_) ->
-    uninit.
+%% @doc Initialises the module with an uninitialized state.
+-spec init(module()) -> {uninit, trigger:state()}.
+init(Trigger) ->
+    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [cs_send:this()]),
+    TriggerState = trigger:init(Trigger, ?MODULE),
+    {uninit, TriggerState}.
+      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Internal Loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({go},uninit) ->
-    TriggerState = trigger:init(Trigger, fun get_base_interval/0),
-    TriggerState2 = trigger:first(TriggerState,1),
-    TriggerState2;
-on(_,uninit) ->
-    uninit;
-on({trigger},TriggerState) ->
+-spec on(message(), state()) -> state() | unknown_event.
+on({go}, {uninit, TriggerState}) ->
+    NewTriggerState = trigger:first(TriggerState, 1),
+    {init, NewTriggerState};
+
+on(_, {uninit, _TriggerState} = State) ->
+    State;
+
+on({trigger}, {init, TriggerState}) ->
     trigger_reregister(),
-    trigger:next(TriggerState,1);
-on({go},TriggerState) ->
+    NewTriggerState = trigger:next(TriggerState, 1),
+    {init, NewTriggerState};
+
+on({go}, {init, TriggerState}) ->
     trigger_reregister(),
-    trigger:next(TriggerState,1);
+    NewTriggerState = trigger:next(TriggerState, 1),
+    {init, NewTriggerState};
+
 on(_, _State) ->
     unknown_event.
 
 trigger_reregister() ->
-    RegisterMessage = {register,get_cs_node_this()},
+    RegisterMessage = {register, get_cs_node_this()},
     reregister(config:read(register_hosts), RegisterMessage).
 
 reregister(failed, Message)->
     cs_send:send(bootPid(), Message);
 reregister(Hosts, Message) ->
-    lists:foreach(fun (Host) -> 
-			  cs_send:send(Host, Message)
-		  end, 
-		  Hosts).
+    lists:foreach(
+      fun(Host) -> cs_send:send(Host, Message) end,
+      Hosts).
 
-
+%% @doc Gets the zombie detector interval set in scalaris.cfg.
 get_base_interval() ->
     config:read(reregister_interval).
 
-
+%% @doc Gets the pid of the cs_node process in the same group as the calling
+%%      process.
+-spec get_cs_node_this() -> cs_send:mypid().
 get_cs_node_this() ->
     cs_send:make_global(process_dictionary:get_group_member(cs_node)).
 

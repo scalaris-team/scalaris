@@ -48,10 +48,6 @@
 	 get_trans_log/1,
 	 set_trans_log/2]).
 
--ifdef(types_not_builtin).
--type gb_set() :: gb_sets:gb_set().
--endif.
-
 -type my_range() :: {?RT:key(), ?RT:key()}.
 -type join_time() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}. % {MegaSecs, Secs, MicroSecs}
 

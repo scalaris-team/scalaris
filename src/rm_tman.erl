@@ -259,7 +259,7 @@ filter(Pid, [Succ | Rest]) ->
     case Pid == node:pidX(Succ) of
         true ->
             %Hook for DeadNodeCache
-            cs_send:send_local(get_pid_dnc() , {add_zombie_candidate, Succ}),
+            dn_cache:add_zombie_candidate(Succ),
             filter(Pid, Rest);
         false ->
             [Succ | filter(Pid, Rest)]

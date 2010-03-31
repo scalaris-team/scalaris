@@ -1,4 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,16 +13,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : rt_loop.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : routing table process
-%%%
-%%% Created :  5 Dec 2008 by Thorsten Schuett <schuett@zib.de>
+%%% File    rt_loop.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    routing table process
+%%% @end
+%%% Created : 5 Dec 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(rt_loop, [Trigger]).
+-module(rt_loop).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -35,10 +34,12 @@
 -export([init/1, on/2, get_base_interval/0]).
 
 % state of the routing table loop
--type(state() :: {Id::?RT:key(),
-		  Pred::node:node_type(), 
-		  Succ::node:node_type(), 
-		  RTState::?RT:rt()}).
+-type(state() :: {Id           :: ?RT:key(),
+		          Pred         :: node:node_type(), 
+		          Succ         :: node:node_type(), 
+		          RTState      :: ?RT:rt(),
+                  TriggerState :: trigger:state()} | 
+                 {uninit, TriggerState :: trigger:state()}).
 
 % accepted messages of rt_loop processes
 -type(message() :: 
@@ -49,29 +50,30 @@
      | {lookup_pointer_response, Index::pos_integer(), Node::node:node_type()} 
      | {crash, DeadPid::cs_send:mypid()}).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Routing Table maintenance process
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Startup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc spawns a routing table maintenance process
-%% @spec start_link(term()) -> {ok, pid()}
--spec(start_link/1 :: (any()) -> {ok, pid()}).
+%% @doc Starts the routing tabe maintenance process, registers it with the
+%%      process dictionary and returns its pid for use by a supervisor.
+-spec start_link(term()) -> {ok, pid()}.
 start_link(InstanceId) ->
-    gen_component:start_link(THIS, [], [{register, InstanceId,routing_table} ]).
+    Trigger = config:read(routingtable_trigger),
+    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, routing_table}]).
 
--spec(init/1 :: ([any()]) -> state()).
-init(_Args) ->
-    log:log(info,"[ RT ~p ] starting routingtable", [self()]),
+%% @doc Initialises the module with an empty state.
+-spec init(module()) -> {uninit, trigger:state()}.
+init(Trigger) ->
+    log:log(info,"[ RT ~p ] starting routingtable", [cs_send:this()]),
     %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    TriggerState = trigger:init(Trigger, fun get_base_interval/0),
+    TriggerState = trigger:init(Trigger, ?MODULE),
     {uninit, TriggerState}.
-    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Private Code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc message handler
--spec(on/2 :: (message(), state()) -> state()).
+-spec on(message(), state()) -> state() | unknown_event.
 
 on({init, Id, Pred, Succ},{uninit, TriggerState}) ->
     TriggerState2 = trigger:next(TriggerState, make_utility(0)),
