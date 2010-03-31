@@ -1,4 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,17 +13,16 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : db_generic_ets.hrl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : generic db code for ets
-%%%
+%%% File    db_generic_ets.hrl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    generic db code for ets
+%%% @end
 %%% Created : 13 Jul 2009 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum f<FC>r Informationstechnik Berlin
-%% @version $Id $
+%% @version $Id$
 
--include("../include/scalaris.hrl").
+% Note: this include must be included in files including this file!
+%% -include("../include/scalaris.hrl").
 
 get_entry(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
@@ -43,7 +43,6 @@ set_entry(DB, Entry) ->
 
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
--spec(set_write_lock/2 :: (db(), key()) -> {db(), ok | failed}).
 set_write_lock(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {Value, false, 0, Version}}] ->
@@ -59,7 +58,6 @@ set_write_lock(DB, Key) ->
 
 %% @doc unsets the write lock of a key
 %%      the write lock is a boolean value per key
--spec(unset_write_lock/2 :: (db(), key()) -> {db(), ok | failed}).
 unset_write_lock(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {empty_val, true, 0, -1}}] ->
@@ -76,7 +74,6 @@ unset_write_lock(DB, Key) ->
 
 %% @doc sets a read lock on a key
 %%      the read lock is an integer value per key
--spec(set_read_lock/2 :: (db(), key()) -> {db(), ok | failed}).
 set_read_lock(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {Value, false, ReadLock, Version}}] ->
@@ -90,7 +87,6 @@ set_read_lock(DB, Key) ->
 
 %% @doc unsets a read lock on a key
 %%      the read lock is an integer value per key
--spec(unset_read_lock/2 :: (db(), key()) -> {db(), ok | failed}).
 unset_read_lock(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, _WriteLock, 0, _Version}}] ->
@@ -103,7 +99,6 @@ unset_read_lock(DB, Key) ->
     end.
 
 %% @doc get the locks and version of a key
--spec(get_locks/2 :: (db(), key()) -> {db(), {boolean(), integer(), version()} | failed}).
 get_locks(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, WriteLock, ReadLock, Version}}] ->
@@ -113,7 +108,6 @@ get_locks(DB, Key) ->
     end.
 
 %% @doc reads the version and value of a key
--spec(read/2 :: (db(), string()) -> {ok, value(), version()} | failed).
 read(DB, Key) ->
 %%    Start = erlang:now(),
     Res = case ?ETS:lookup(DB, Key) of
@@ -133,7 +127,6 @@ read(DB, Key) ->
     Res.
 
 %% @doc updates the value of key
--spec(write/4 :: (db(), key(), value(), version()) -> db()).
 write(DB, Key, Value, Version) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, WriteLock, ReadLock, _Version}}] ->
@@ -145,7 +138,6 @@ write(DB, Key, Value, Version) ->
     DB.
 
 %% @doc deletes the key
--spec(delete/2 :: (db(), key()) -> {db(), ok | locks_set | undef}).
 delete(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, false, 0, _Version}}] ->
@@ -158,7 +150,6 @@ delete(DB, Key) ->
     end.
 
 %% @doc reads the version of a key
--spec(get_version/2 :: (db(), key()) -> {ok, version()} | failed).
 get_version(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, _WriteLock, _ReadLock, Version}}] ->
@@ -168,19 +159,16 @@ get_version(DB, Key) ->
     end.
 
 %% @doc returns the number of stored keys
--spec(get_load/1 :: (db()) -> integer()).
 get_load(DB) ->
     ?ETS:info(DB, size).
 
 %% @doc adds keys
--spec(add_data/2 :: (db(), [{key(), {value(), boolean(), integer(), version()}}]) -> db()).
 add_data(DB, Data) ->
     ?ETS:insert(DB, Data),
     DB.
 
 %% @doc returns all keys (and removes them from the db) which belong 
 %%      to a new node with id HisKey
--spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {value(), boolean(), integer(), version()}}]}).
 split_data(DB, MyKey, HisKey) ->
     F = fun (KV = {Key, _}, HisList) ->
                 case util:is_between(HisKey, Key, MyKey) of
@@ -229,21 +217,16 @@ get_range(DB, From, To) ->
     ?ETS:foldl(F, [], DB).
 
 %% @doc get keys and versions in a range
--spec(get_range_with_version/2 :: (db(), intervals:interval()) -> [{Key::key(),
-       Value::value(), Version::version(), WriteLock::boolean(), ReadLock::integer()}]).
 get_range_with_version(DB, Interval) ->
     F = fun ({Key, {Value, WriteLock, ReadLock, Version}}, Data) ->
                 case intervals:in(Key, Interval) andalso Value =/= empty_val of
                     true ->
-                        [{Key, Value, Version, WriteLock, ReadLock} | Data];
+                        [{Key, Value, WriteLock, ReadLock, Version} | Data];
                     false ->
                         Data
                 end
         end,
     ?ETS:foldl(F, [], DB).
-
-% get_range_with_version
-%@private
 
 get_range_only_with_version(DB, Interval) ->
     F = fun ({Key, {Value, WLock, _, Version}}, Data) ->
@@ -258,7 +241,6 @@ get_range_only_with_version(DB, Interval) ->
 
 %% @doc returns the key, which splits the data into two equally
 %%      sized groups
--spec(get_middle_key/1 :: (db()) -> {ok, key()} | failed).
 get_middle_key(DB) ->
     case (Length = ?ETS:info(DB, size)) < 3 of
         true ->

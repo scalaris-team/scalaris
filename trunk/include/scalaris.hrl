@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,14 +13,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : chordsharp.hrl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : misc
-%%%
-%%% Created :  10 Apr 2008 by Thorsten Schuett <schuett@zib.de>
+%%% File    scalaris.hrl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Globally included file (sets the modules being used in cases where
+%%%         multiple choices exist)
+%%% @end
+%%% Created : 10 Apr 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 
 %% userdevguide-begin chordsharp:rt
@@ -90,4 +90,6 @@
 -type reference() :: erlang:reference().
 -type gb_set() :: gb_sets:gb_set().
 -type queue() :: queue:queue().
+-type gb_tree() :: gb_trees:gb_tree().
+-type dict() :: dict:dictionary().
 -endif.

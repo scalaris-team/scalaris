@@ -26,6 +26,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+-include("../include/scalaris.hrl").
+
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
          trunc/2, min/2, max/2, randomelem/1, logged_exec/1,
          wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0,
@@ -35,10 +37,6 @@
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
-
--ifdef(types_not_builtin).
--type gb_tree() :: gb_trees:gb_tree().
--endif.
 
 parameterized_start_link(Module, Parameters) ->
     apply(Module, start_link, Parameters).

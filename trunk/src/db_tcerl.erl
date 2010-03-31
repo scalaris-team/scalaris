@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,15 +13,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : db_tcerl.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : In-process Database using tcerl
-%%%
+%%% File    db_tcerl.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    In-process Database using tcerl
+%%% @end
 %%% Created : 13 Jul 2009 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum f<FC>r Informationstechnik Berlin
-%% @version $Id $
+%% @version $Id$
 -module(db_tcerl).
 
 -author('schuett@zib.de').
@@ -28,15 +27,12 @@
 
 -behaviour(database).
 
-% included by db_generic_ets.hrl which is included at the bottom of this file
-%% -include("../include/scalaris.hrl").
+-include("../include/scalaris.hrl").
 -include("autoconf.hrl").
 
--type(key()::database:key()).
--type(value()::database:value()).
--type(version()::database:version()).
-
 -type(db()::atom()).
+
+-include("database.hrl").
 
 -export([start_link/1,
          set_write_lock/2, unset_write_lock/2, set_read_lock/2,
@@ -80,7 +76,6 @@ close(DB) ->
     tcbdbets:close(DB).
 
 %% @doc returns all keys
-%% @spec get_data(db()) -> [{string(), {string(), boolean(), integer(), integer()}}]
 get_data(DB) ->
     tcbdbets:traverse(DB, fun (X) -> {continue, X} end).
 

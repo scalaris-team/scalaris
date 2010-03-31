@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,14 +13,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : database.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : database behaviour
-%%%
-%%% Created :  29 Jul 2008 by Thorsten Schuett <schuett@zib.de>
+%%% File    database.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    database behaviour
+%%% @end
+%%% Created : 29 Jul 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(database).
 
@@ -27,10 +26,6 @@
 -vsn('$Id$ ').
 
 -export([behaviour_info/1]).
-
--type(key()::integer() | string()).
--type(value()::any()).
--type(version()::pos_integer()).
 
 behaviour_info(callbacks) ->
     [
