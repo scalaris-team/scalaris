@@ -1,4 +1,6 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+%             2009 onScale solutions
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,15 +14,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : db_ets.erl
-%%% Author  : Florian Schintke <schintke@onscale.de>
-%%% Description : In-process database using ets
-%%%
+%%% File    db_ets.erl
+%%% @author Florian Schintke <schintke@onscale.de>
+%%% @doc    In-process database using ets
+%%% @end
 %%% Created : 21 Mar 2009 by Florian Schintke <schintke@onscale.de>
 %%%-------------------------------------------------------------------
-%% @author Florian Schintke <schintke@onscale.de>
-%% @copyright 2009 onScale solutions
-%% @version $Id $
+%% @version $Id$
 -module(db_ets).
 
 -author('schintke@onscale.de').
@@ -28,18 +28,15 @@
 
 -behaviour(database).
 
-% included by db_generic_ets.hrl which is included at the bottom of this file
-%% -include("../include/scalaris.hrl").
+-include("../include/scalaris.hrl").
 
 -import(ct).
 -import(randoms).
 -import(string).
 
--type(key()::database:key()).
--type(value()::database:value()).
--type(version()::database:version()).
-
 -type(db()::atom()).
+
+-include("database.hrl").
 
 -export([start_link/1,
          get_entry/2, set_entry/2,
@@ -79,7 +76,6 @@ close(DB) ->
     ets:delete(DB).
 
 %% @doc returns all keys
-%% @spec get_data(db()) -> [{string(), {string(), boolean(), integer(), integer()}}]
 get_data(DB) ->
     ets:tab2list(DB).
 

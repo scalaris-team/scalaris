@@ -25,6 +25,11 @@
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
+
+-behaviour(routingtable).
+
+-include("../include/scalaris.hrl").
+
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
@@ -32,12 +37,6 @@
          update_pred_succ_in_cs_node/3]).
 
 -export([normalize/1]).
-
--behaviour(routingtable).
-
--ifdef(types_not_builtin).
--type gb_tree() :: gb_trees:gb_tree().
--endif.
 
 %% userdevguide-begin rt_simple:types
 % @type key(). Identifier.

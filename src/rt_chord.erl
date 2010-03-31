@@ -28,6 +28,8 @@
 
 -behaviour(routingtable).
 
+-include("../include/scalaris.hrl").
+
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
@@ -36,11 +38,6 @@
 
 % stabilize for Chord
 -export([stabilize/5]).
-
--ifdef(types_not_builtin).
--type gb_tree() :: gb_trees:gb_tree().
--type dict() :: dict:dictionary().
--endif.
 
 %% userdevguide-begin rt_chord:types
 -type(key()::pos_integer()).

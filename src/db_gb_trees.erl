@@ -1,4 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,15 +13,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : db_gb_trees.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : In-process Database using gb_trees
-%%%
+%%% File    db_gb_trees.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    In-process Database using gb_trees
+%%% @end
 %%% Created : 19 Dec 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% @version $Id $
+%% @version $Id$
 -module(db_gb_trees).
 
 -author('schuett@zib.de').
@@ -32,12 +31,9 @@
 
 -import(ct).
 
--ifdef(types_not_builtin).
--type gb_tree() :: gb_trees:gb_tree().
--endif.
-
--type(key()::database:key()).
 -type(db()::gb_tree()).
+
+-include("database.hrl").
 
 -export([start_link/1,
 	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 
@@ -73,7 +69,6 @@ close(_) ->
 
 %% @doc sets a write lock on a key.
 %%      the write lock is a boolean value per key
-%% @spec set_write_lock(db(), string()) -> {db(), ok | failed}
 set_write_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {Value, false, 0, Version}} ->
@@ -93,7 +88,6 @@ set_write_lock(DB, Key) ->
 
 %% @doc unsets the write lock of a key
 %%      the write lock is a boolean value per key
-%% @spec unset_write_lock(db(), string()) -> {db(), ok | failed}
 unset_write_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {empty_val, true, 0, -1}} ->
@@ -112,7 +106,6 @@ unset_write_lock(DB, Key) ->
 
 %% @doc sets a read lock on a key
 %%      the read lock is an integer value per key
-%% @spec set_read_lock(db(), string()) -> {db(), ok | failed}
 set_read_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {Value, false, ReadLock, Version}} ->
@@ -128,7 +121,6 @@ set_read_lock(DB, Key) ->
 
 %% @doc unsets a read lock on a key
 %%      the read lock is an integer value per key
-%% @spec unset_read_lock(db(), string()) -> {db(), ok | failed}
 unset_read_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, _WriteLock, 0, _Version}} ->
@@ -143,7 +135,6 @@ unset_read_lock(DB, Key) ->
     end.
 
 %% @doc get the locks and version of a key
-%% @spec get_locks(db(), string()) -> {boolean(), int(), int()}| failed
 get_locks(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, WriteLock, ReadLock, Version}} ->
@@ -153,7 +144,6 @@ get_locks(DB, Key) ->
     end.
 
 %% @doc reads the version and value of a key
-%% @spec read(db(), string()) -> {ok, string(), integer()} | failed
 read(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {Value, _WriteLock, _ReadLock, Version}} ->
@@ -163,7 +153,6 @@ read(DB, Key) ->
     end.
 
 %% @doc updates the value of key
-%% @spec write(db(), string(), string(), integer()) -> db()
 write(DB, Key, Value, Version) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, WriteLock, ReadLock, _Version}} ->
@@ -177,8 +166,6 @@ write(DB, Key, Value, Version) ->
     end.
 
 %% @doc deletes the key
--spec(delete/2 :: (db(), key()) -> {db(), ok | locks_set
-				    | undef}).
 delete(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, false, 0, _Version}} ->
@@ -190,7 +177,6 @@ delete(DB, Key) ->
     end.
 
 %% @doc reads the version of a key
-%% @spec get_version(db(), string()) -> {ok, integer()} | failed
 get_version(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
 	{value, {_Value, _WriteLock, _ReadLock, Version}} ->
@@ -200,13 +186,11 @@ get_version(DB, Key) ->
     end.
 
 %% @doc returns the number of stored keys
-%% @spec get_load(db()) -> integer()
 get_load(DB) ->
     gb_trees:size(DB).
 
 %% @doc returns the key, which splits the data into two equally 
 %%      sized groups
-%% @spec get_middle_key(db()) -> {ok, string()} | failed
 get_middle_key(DB) ->
     case (Length = gb_trees:size(DB)) < 3 of
 	true ->
@@ -220,19 +204,16 @@ get_middle_key(DB) ->
 
 %% @doc returns all keys (and removes them from the db) which belong 
 %%      to a new node with id HisKey
--spec(split_data/3 :: (db(), key(), key()) -> {db(), [{key(), {key(), boolean(), integer(), integer()}}]}).
 split_data(DB, MyKey, HisKey) ->
     DataList = gb_trees:to_list(DB),
     {MyList, HisList} = lists:partition(fun ({Key, _}) -> util:is_between(HisKey, Key, MyKey) end, DataList),
     {gb_trees:from_orddict(MyList), HisList}.
 
 %% @doc returns all keys
-%% @spec get_data(db()) -> [{string(), {string(), boolean(), integer(), integer()}}]
 get_data(DB) ->
     gb_trees:to_list(DB).
 
 %% @doc adds keys
-%% @spec add_data(db(), [{string(), {string(), boolean(), integer(), integer()}}]) -> any()
 add_data(DB, Data) ->
     lists:foldl(fun ({Key, Value}, Tree) -> gb_trees:enter(Key, Value, Tree) end, DB, Data).
 
@@ -243,11 +224,9 @@ get_range(DB, From, To) ->
                       util:is_between(From, Key, To), Value =/= empty_val ].
 
 %% @doc get keys and versions in a range
-%% @spec get_range_with_version(db(), intervals:interval()) -> [{Key::term(),
-%%       Value::term(), Version::integer(), WriteLock::boolean(), ReadLock::integer()}]
 get_range_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
-    [ {Key, Value, Version, WriteLock, ReadLock}
+    [ {Key, Value, WriteLock, ReadLock, Version}
       || {Key, {Value, WriteLock, ReadLock, Version}} <- gb_trees:to_list(DB),
          util:is_between(From, Key, To), Value =/= empty_val ].
 
