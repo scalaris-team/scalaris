@@ -35,11 +35,9 @@
 
 -behaviour(gen_component).
 
--export([init/1, on/2]).
+-include("../include/scalaris.hrl").
 
--ifdef(types_not_builtin).
--type gb_set() :: gb_sets:gb_set().
--endif.
+-export([init/1, on/2]).
 
 -type(boot_node_list()::gb_set()).
 

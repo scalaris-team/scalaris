@@ -115,7 +115,7 @@ init(Trigger) ->
 
 % start new vivaldi shuffle
 %% @doc message handler
--spec on(Message::message(), State::state()) -> state().
+-spec on(Message::message(), State::state()) -> state() | unknown_event.
 on({trigger}, {Coordinate, Confidence, TriggerState} ) ->
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
     NewTriggerState = trigger:next(TriggerState, 1),

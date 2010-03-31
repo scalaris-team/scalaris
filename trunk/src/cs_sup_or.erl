@@ -51,32 +51,23 @@ init([Options]) ->
                              [?RM:new(config:read(ringmaintenance_trigger)),
                               [InstanceId]]),
     RoutingTable =
-        util:sup_worker_desc(routingtable, util, parameterized_start_link,
-                             [rt_loop:new(config:read(routingtable_trigger)),
-                              [InstanceId]]),
+        util:sup_worker_desc(routingtable, rt_loop, start_link, [InstanceId]),
     DeadNodeCache =
-        util:sup_worker_desc(deadnodecache, util, parameterized_start_link,
-                             [dn_cache:new(config:read(dn_cache_trigger)),
-                              [InstanceId]]),
+        util:sup_worker_desc(deadnodecache, dn_cache, start_link, [InstanceId]),
     Vivaldi =
-        util:sup_worker_desc(vivaldi, vivaldi, start_link,
-                             [InstanceId]),
+        util:sup_worker_desc(vivaldi, vivaldi, start_link, [InstanceId]),
     CS_Reregister =
-        util:sup_worker_desc(cs_reregister, util, parameterized_start_link,
-                             [cs_reregister:new(config:read(cs_reregister_trigger)),
-                              [InstanceId]]),
+        util:sup_worker_desc(cs_reregister, cs_reregister, start_link,
+                             [InstanceId]),
     DC_Clustering =
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
                              [InstanceId]),
     Cyclon =
-        util:sup_worker_desc(cyclon, cyclon, start_link,
-                             [InstanceId]),
+        util:sup_worker_desc(cyclon, cyclon, start_link, [InstanceId]),
     Gossip =
-        util:sup_worker_desc(gossip, gossip, start_link,
-                             [InstanceId]),
+        util:sup_worker_desc(gossip, gossip, start_link, [InstanceId]),
     Self_Man =
-        util:sup_worker_desc(self_man, self_man, start_link,
-                             [InstanceId]),
+        util:sup_worker_desc(self_man, self_man, start_link, [InstanceId]),
     {ok, {{one_for_one, 10, 1},
           [
            Self_Man,
