@@ -22,6 +22,7 @@
 -define(TRACE(X,Y), ok).
 
 -export([process_request_list/2]).
+-export([check_config/0]).
 
 %% single request and empty translog, done separately for optimization only
 process_request_list([], [SingleReq]) ->
@@ -52,7 +53,7 @@ process_request_list(TLog, PlainReqList) ->
     %% @TODO only if TransLog is ok, do the validation here if requested
     CommitResult = case Commit of
         [] -> none;
-        [{Num,{commit}}] ->
+        [{_Num,{commit}}] ->
             commit(NewTLog)
     end,
     TransLogResult = NewTLog,
@@ -94,8 +95,8 @@ my_split_ops(TLog, ReqList) ->
     {A, B, C, D} = lists:foldl(Splitter, {[],[],[],[]}, ReqList),
     {lists:reverse(A), lists:reverse(B), lists:reverse(C), lists:reverse(D)}.
 
-my_key_in_numbered_reqlist(Key, []) -> false;
-my_key_in_numbered_reqlist(Key, [{Num, Entry} | Tail]) ->
+my_key_in_numbered_reqlist(_Key, []) -> false;
+my_key_in_numbered_reqlist(Key, [{_Num, Entry} | Tail]) ->
     case Key =:= element(2, Entry) of
         true -> true;
         false -> my_key_in_numbered_reqlist(Key, Tail)
@@ -113,15 +114,15 @@ initiate_rdht_ops(ReqList) ->
 collect_results_and_do_translogops({TLog, Results, [], [], []}) ->
     {TLog, Results, [], [], []};
 %% single request and empty translog, done separately for optimization only
-collect_results_and_do_translogops({[], [], [RdhtOpWithReqId], [], []}
+collect_results_and_do_translogops({[], [], [_RdhtOpWithReqId], [], []}
                                    = _Args) ->
     Reply = receive_answer(),
-    {_, RdhtId, RdhtTlog, RdhtResult} = Reply,
+    {_, _RdhtId, RdhtTlog, RdhtResult} = Reply,
     {[RdhtTlog], [{1, RdhtResult}], [], [], []};
 %% all translogops done -> wait for a RdhtOpReply
 collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
-                                    Delayed, []} = Args) ->
-    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [Args]),
+                                    Delayed, []} = _Args) ->
+    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [_Args]),
     Reply = receive_answer(),
     ?TRACE("rdht reply was ~p~n", [Reply]),
     {_, RdhtId, RdhtTlog, RdhtResult} = Reply,
@@ -146,8 +147,8 @@ collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
        NewDelayed, NewTransLogOps});
 %% do translog ops
 collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
-                                    Delayed, TransLogOps} = Args) ->
-    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [Args]),
+                                    Delayed, TransLogOps} = _Args) ->
+    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [_Args]),
     {NewTLog, TmpResults} = do_translogops(TransLogOps, {TLog, []}),
     collect_results_and_do_translogops(
       {NewTLog, TmpResults ++ Results, RdhtOpsWithReqIds, Delayed, []}).
@@ -189,9 +190,9 @@ commit(TLog) ->
         TM ->
             tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
     end,
-    Result =
+    _Result =
         receive
-            {tx_tm_rtm_commit_reply, ClID, Decision} ->
+            {tx_tm_rtm_commit_reply, _ClID, Decision} ->
                 {Decision} %% commit / abort
          %% @TODO solve without timeout per tx?
         after config:read(tx_timeout) ->
@@ -208,4 +209,11 @@ receive_answer() ->
     end.
 
 %%% delete
+
+
+%% @doc Checks whether used config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(tx_timeout) and
+    config:is_greater_than(tx_timeout, 0).
 

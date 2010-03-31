@@ -49,14 +49,14 @@ start_link(InstanceId, Options) ->
 
 %% initialize: return initial state.
 init(Args) ->
-    [InstanceID, _Options] = Args,
-    ?TRACE("Starting learner for instance: ~p~n", [InstanceID]),
+    [_InstanceID, _Options] = Args,
+    ?TRACE("Starting learner for instance: ~p~n", [_InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_learner", [InstanceID]))),
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     TableName = pdb:new(?MODULE, [set, private]),
-    State = TableName.
+    _State = TableName.
 
 on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
    ETSTableName = State) ->

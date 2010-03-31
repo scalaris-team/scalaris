@@ -34,8 +34,8 @@
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
-
 -export([start_link/1]).
+-export([check_config/0]).
 
 %% reply messages a client should expect (when calling asynch work_phase/3)
 msg_reply(Id, TLogEntry, ResultEntry) ->
@@ -67,7 +67,6 @@ work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
     %% find rdht_tx_read process as collector
-    InstanceID = erlang:get(instance_id),
     CollectorPid = process_dictionary:get_group_member(?MODULE),
     Key = element(2, Request),
     %% do a quorum read
@@ -172,7 +171,7 @@ on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
                 rdht_tx_read_state:set_client_informed(TmpEntry);
             {false, unknown} ->
                 TmpEntry;
-            {false, Client} ->
+            {false, _Client} ->
                 my_delete_if_all_replied(TmpEntry, Reps, WaitTable, ActiveTable)
         end,
     my_set_entry(NewEntry, State);
@@ -194,7 +193,7 @@ on({client_is, Id, Pid, Key}, {_CurrEntry, Reps, _Maj, WaitTable, ActiveTable} =
     my_set_entry(NewEntry, State);
 
 %% triggered periodically
-on({periodic_timeout}, {CurrEntry, Reps, Maj, WaitTable, ActiveTable} = State) ->
+on({periodic_timeout}, {CurrEntry, Reps, Maj, WaitTable, ActiveTable} = _State) ->
     ?TRACE("rdht_tx_read:on(timeout)~n", []),
     %% CurrEntry in WaitTable? -> clean cache, else -> put into next Waittable
     Id = rdht_tx_read_state:get_id(CurrEntry),
@@ -301,3 +300,15 @@ my_delete_if_all_replied(Entry, Reps, WaitTable, ActiveTable) ->
             rdht_tx_read_state:new('$_no_curr_entry');
         false -> Entry
     end.
+
+%% @doc Checks whether config parameters for rdht_tx_read exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(quorum_factor) and
+    config:is_greater_than(quorum_factor, 0) and
+    config:is_integer(replication_factor) and
+    config:is_greater_than(replication_factor, 0) and
+
+    config:is_integer(transaction_lookup_timeout) and
+    config:is_greater_than(transaction_lookup_timeout, 0).

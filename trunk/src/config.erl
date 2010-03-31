@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : config.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : config file for chord# and the bootstrapping service
+%%% Description : config file parser for scalaris
 %%%
 %%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
@@ -22,29 +22,22 @@
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(config).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
-
 -include("../include/scalaris.hrl").
 
 -export([
          start_link/1, start/2,
-
          read/1, write/2,
-         
          check_config/0,
-         
+
          exists/1, is_atom/1, is_bool/1, is_mypid/1, is_ip/1, is_integer/1,
          is_float/1, is_string/1, is_in_range/3,
          is_greater_than/2, is_greater_than_equal/2,
          is_less_than/2, is_less_than_equal/2, is_in/2
         ]).
 
-
-%%====================================================================
 %% public functions
-%%====================================================================
 
 %% @doc Reads config parameter.
 -spec(read/1 :: (atom()) -> any() | failed).
@@ -71,9 +64,7 @@ write(Key, Value) ->
         {write_done} -> ok
     end.
 
-%%====================================================================
 %% gen_server setup
-%%====================================================================
 
 start_link(Files) ->
     TheFiles = case application:get_env(add_config) of
@@ -86,10 +77,10 @@ start_link(Files) ->
     Owner = self(),
     Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
     receive
-	done ->
-	    ok;
-	X ->
-	    io:format("unknown config message  ~p", [X])
+        done ->
+            ok;
+        X ->
+            io:format("unknown config message  ~p", [X])
     end,
     {ok, Link}.
 
@@ -115,18 +106,18 @@ loop() ->
 %@private
 populate_db(File) ->
     case file:consult(File) of
-	{ok, Terms} ->
-	    lists:map(fun process_term/1, Terms),
-	    eval_environment(os:getenv("CS_PORT"));
-    {error, enoent} ->
-        % note: log4erl may not be available
-        io:format("Can't load config file ~p: File does not exist. Ignoring.\n", [File]),
-        fail;
-	{error, Reason} ->
-        % note: log4erl may not be available
-        io:format("Can't load config file ~p: ~p. Exiting.\n", [File, Reason]),
-        erlang:halt(1),
-	    fail
+        {ok, Terms} ->
+            lists:map(fun process_term/1, Terms),
+            eval_environment(os:getenv("CS_PORT"));
+        {error, enoent} ->
+            %% note: log4erl may not be available
+            io:format("Can't load config file ~p: File does not exist. Ignoring.\n", [File]),
+            fail;
+        {error, Reason} ->
+            %% note: log4erl may not be available
+            io:format("Can't load config file ~p: ~p. Exiting.\n", [File, Reason]),
+            erlang:halt(1),
+            fail
     end.
 
 eval_environment(false) ->
@@ -134,20 +125,23 @@ eval_environment(false) ->
 eval_environment(Port) ->
     {PortInt, []} = string:to_integer(Port),
     ets:insert(config_ets, {listen_port, PortInt}).
-    
+
 process_term({Key, Value}) ->
     ets:insert(config_ets, {Key, preconfig:get_env(Key, Value)}).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %% check config methods
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether config parameters of all processes exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    gossip:check_config() and
+    cyclon:check_config() and
+        gossip:check_config() and
+        tx_tm_rtm:check_config() and
+        rdht_tx:check_config() and
+        rdht_tx_read:check_config() and
+        rdht_tx_write:check_config() and
         vivaldi:check_config() and
-        cyclon:check_config() and
         vivaldi_latency:check_config().
 
 -spec exists(Key::atom()) -> boolean().
@@ -194,14 +188,15 @@ is_mypid(Key) ->
 is_ip(Key) ->
     IsIp = fun(Value) ->
                    case Value of
-                       {IP1, IP2, IP3, IP4}
-                         when (IP1 >= 0) andalso (IP2 >= 0) andalso (IP3 >= 0) andalso (IP4 >= 0) andalso
-                                  (IP1 =< 255) andalso (IP2 =< 255) andalso (IP3 =< 255) andalso (IP4 =< 255) ->
-                           true;
+                       {IP1, IP2, IP3, IP4} ->
+                           ((IP1 >= 0) andalso (IP1 =< 255)
+                            andalso (IP2 >= 0) andalso (IP2 =< 255)
+                            andalso (IP3 >= 0) andalso (IP3 =< 255)
+                            andalso (IP4 >= 0) andalso (IP4 =< 255));
                        _X -> false
                    end
            end,
-    Msg = "is not a valid IP4 address",
+    Msg = "is not a valid IPv4 address",
     test_and_error(Key, IsIp, Msg).
 
 -spec is_integer(Key::atom()) -> boolean().
@@ -218,11 +213,7 @@ is_float(Key) ->
 
 -spec is_string(Key::atom()) -> boolean().
 is_string(Key) ->
-    IsChar = fun(X) ->
-                     if (X >= 0) andalso (X =< 255) -> true;
-                        true -> false
-                     end
-             end,
+    IsChar = fun(X) -> (X >= 0) andalso (X =< 255) end,
     IsString = fun(Value) ->
                    case Value of
                        X when is_list(X) ->

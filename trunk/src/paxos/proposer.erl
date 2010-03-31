@@ -92,14 +92,14 @@ start_link(InstanceId, Options) ->
 
 %% initialize: return initial state.
 init(Args) ->
-    [InstanceID, _Options] = Args,
-    ?TRACE("Starting proposer for instance: ~p~n", [InstanceID]),
+    [_InstanceID, _Options] = Args,
+    ?TRACE("Starting proposer for instance: ~p~n", [_InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_proposer", [InstanceID]))),
     %%ets:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     TableName = ets:new(?MODULE, [set, private]),
-    State = TableName.
+    _State = TableName.
 
 on({proposer_initialize, PaxosID, Acceptors, Proposal,
     Majority, MaxProposers, InitialRound},
@@ -186,13 +186,13 @@ on({acceptor_ack, PaxosID, Round, Value, RLast}, ETSTableName = State) ->
     end,
     State;
 
-on({acceptor_nack, PaxosID, Round}, ETSTableName = State) ->
+on({acceptor_nack, PaxosID, Round}, _ETSTableName = State) ->
     ?TRACE("proposer:nack for paxos id ~p and round ~p is newest seen~n",
            [PaxosID, Round]),
     start_new_higher_round(PaxosID, Round, State),
     State;
 
-on({acceptor_naccepted, PaxosID, Round}, ETSTableName = State) ->
+on({acceptor_naccepted, PaxosID, Round}, _ETSTableName = State) ->
     ?TRACE("proposer:naccepted for paxos id ~p and round ~p is newest seen~n",
            [PaxosID, Round]),
     start_new_higher_round(PaxosID, Round, State),
@@ -205,7 +205,7 @@ on({proposer_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
 on(_, _State) ->
     unknown_event.
 
-start_new_higher_round(PaxosID, Round, ETSTableName = State) ->
+start_new_higher_round(PaxosID, Round, ETSTableName) ->
     case ets:lookup(ETSTableName, PaxosID) of
         [StateForID] ->
             MyRound = proposer_state:get_round(StateForID),
