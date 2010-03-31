@@ -30,10 +30,11 @@
 -export([commit/4]).
 -export([msg_commit_reply/3]).
 
-%% functions for gen_component module and supervisor callbacks
+%% functions for gen_component module, supervisor callbacks and config
 -export([start_link/2]).
 -export([on/2, init/1]).
 -export([on_init/2]).
+-export([check_config/0]).
 
 %% messages a client has to expect when using this module
 msg_commit_reply(Client, ClientsID, Result) ->
@@ -173,7 +174,7 @@ on({tx_tm_rtm_delete, TxId} = Msg, {RTMs, TableName, Role} = State) ->
     case Role of
         tx_tm ->
             RTMS = tx_state:get_rtms(TxState),
-            [ cs_send:send(RTM, Msg) || {_Key, RTM, _Nth} <- RTMs ],
+            [ cs_send:send(RTM, Msg) || {_Key, RTM, _Nth} <- RTMS ],
             %% inform used learner to delete paxosids.
             LLearner = process_dictionary:get_group_member(paxos_learner),
             AllPaxIds =
@@ -238,7 +239,6 @@ on({init_RTM, TxState, ItemStates, _InRole} = _Msg,
     [ my_set_entry(Entry, State) || Entry <- ItemStates],
     %% @TODO set timeout and remember timerid to cancel, if finished earlier?
     %% initiate local paxos acceptors (with received paxos_ids)
-    LAcceptor = process_dictionary:get_group_member(paxos_acceptor),
     Learners = tx_state:get_learners(TxState),
     [ [ acceptor:start_paxosid({PaxId, Role}, Learners)
         || {PaxId, _RTlog, _TP}
@@ -249,7 +249,7 @@ on({init_RTM, TxState, ItemStates, _InRole} = _Msg,
     my_set_entry(NewEntry, State);
 
 on({register_TP, {Tid, ItemId, PaxosID, TP}} = _Msg,
-   {_RTMs, TableName, Role} = State) ->
+   {_RTMs, _TableName, Role} = State) ->
     %% TODO merge register_TP and accept messages to a single message
     ?TRACE("tx_tm_rtm:on(~p)~n", [_Msg]),
     TmpTxState = my_get_entry(Tid, State),
@@ -314,7 +314,7 @@ on_init({get_key_response_keyholder, IdSelf}, {_RTMs, TableName, Role} = _State)
     ?TRACE("tx_tm_rtm:on_init:get_key_response_keyholder State; ~p~n", [_State]),
     RTM_ids = my_get_RTM_ids(IdSelf),
     NewRTMs = lists:zip3(RTM_ids,
-                         [ unknown || X <- lists:seq(1, length(RTM_ids))],
+                         [ unknown || _X <- lists:seq(1, length(RTM_ids))],
                          lists:seq(0, length(RTM_ids) - 1)),
     my_RTM_update(NewRTMs),
     {NewRTMs, TableName, Role};
@@ -465,3 +465,18 @@ my_trigger_delete_if_done(TxState) ->
             cs_send:send_local(self(), {tx_tm_rtm_delete, TxId});
         false -> ok
     end, ok.
+
+%% @doc Checks whether config parameters for tx_tm_rtm exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(quorum_factor) and
+    config:is_greater_than(quorum_factor, 0) and
+    config:is_integer(replication_factor) and
+    config:is_greater_than(replication_factor, 0) and
+
+    config:is_integer(tx_timeout) and
+    config:is_greater_than(tx_timeout, 0) and
+    config:is_integer(tx_rtm_update_interval) and
+    config:is_greater_than(tx_rtm_update_interval, 0).
+

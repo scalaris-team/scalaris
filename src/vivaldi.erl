@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -214,19 +214,18 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
     %io:format("new coordinate ~p and error ~p~n", [Coordinate1, Error1]),
     {Coordinate1, Error1}.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Miscellaneous
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% Miscellaneous
 
 %% @doc Checks whether config parameters of the vivaldi process exist and are
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
     config:is_atom(vivaldi_trigger) and
-    
+
     config:is_integer(vivaldi_interval) and
     config:is_greater_than(vivaldi_interval, 0) and
-    
+
     config:is_integer(vivaldi_dimensions) and
     config:is_greater_than_equal(vivaldi_dimensions, 2).
 

@@ -35,8 +35,8 @@
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
-
 -export([start_link/1]).
+-export([check_config/0]).
 
 %% reply messages a client should expect (when calling asynch work_phase/3)
 msg_reply(Id, TLogEntry, ResultEntry) ->
@@ -59,7 +59,6 @@ work_phase(ClientPid, ReqId, Request) ->
     %% build translog entry from quorum read
     %% Find rdht_tx_write process
     WriteValue = erlang:element(3, Request),
-    InstanceID = erlang:get(instance_id),
     RdhtTxWritePid = process_dictionary:get_group_member(?MODULE),
     rdht_tx_read:work_phase(RdhtTxWritePid, {ReqId, ClientPid, WriteValue},
                             Request),
@@ -118,8 +117,8 @@ start_link(InstanceId) ->
                              [{register, InstanceId, ?MODULE}]).
 
 %% initialize: return initial state.
-init([InstanceID]) ->
-    ?TRACE("rdht_tx_write: Starting rdht_tx_write for instance: ~p~n", [InstanceID]),
+init([_InstanceID]) ->
+    ?TRACE("rdht_tx_write: Starting rdht_tx_write for instance: ~p~n", [_InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
     %%TableName =
     %%    list_to_atom(lists:flatten(
@@ -129,7 +128,7 @@ init([InstanceID]) ->
     %%TableName = ets:new(?MODULE, [set, private]),
     Reps = config:read(replication_factor),
     Maj = config:read(quorum_factor),
-    State = {Reps, Maj}.
+    _State = {Reps, Maj}.
 
 %% reply triggered by rdht_tx_write:work_phase/3
 %% ClientPid and WriteValue could also be stored in local process state via ets
@@ -149,7 +148,6 @@ on(_, _State) ->
 
 my_make_tlog_result_entry(TLogEntry, Request) ->
     Status = apply(element(1, TLogEntry), tlogentry_get_status, [TLogEntry]),
-    Value = element(3, Request),
     Version = apply(element(1, TLogEntry), tlogentry_get_version, [TLogEntry]),
     Key = element(2, TLogEntry),
     WriteValue = element(3, Request),
@@ -163,3 +161,11 @@ my_make_tlog_result_entry(TLogEntry, Request) ->
             {{?MODULE, Key, value, WriteValue, Version},
              {?MODULE, Key, {value, WriteValue}}}
     end.
+
+%% @doc Checks whether used config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(quorum_factor) and
+    config:is_greater_than(quorum_factor, 0) and
+    config:is_integer(replication_factor) and
+    config:is_greater_than(replication_factor, 0).
