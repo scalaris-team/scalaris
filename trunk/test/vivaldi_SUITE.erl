@@ -158,7 +158,7 @@ test_on_cy_cache3(Config) ->
     % if pids don't match, a get_state is send to the cached node's cs_node
     This = cs_send:this(),
     ?expect_message({send_to_group_member, vivaldi,
-                     {vivaldi_shuffle, THIS, Coordinate, Confidence}}),
+                     {vivaldi_shuffle, This, Coordinate, Confidence}}),
     % no further messages
     ?expect_no_message(),
     
