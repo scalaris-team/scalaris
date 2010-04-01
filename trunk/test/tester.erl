@@ -84,6 +84,7 @@
     | pid
     | port
     | reference
+    | none
     | {typedef, module(), atom()}
     | atom
     | float
@@ -224,6 +225,8 @@ parse_type({type, _Line, nil, []}, _Module) ->
     nil;
 parse_type({type, _Line, node, []}, _Module) ->
     node;
+parse_type({type, _Line, none, []}, _Module) ->
+    none;
 parse_type({type, _Line, reference, []}, _Module) ->
     reference;
 parse_type({type, _Line, term, []}, _Module) ->
@@ -430,6 +433,8 @@ find_unknown_types_helper(pid, _TypeInfo, UnknownTypes) ->
 find_unknown_types_helper(port, _TypeInfo, UnknownTypes) ->
     UnknownTypes;
 find_unknown_types_helper(reference, _TypeInfo, UnknownTypes) ->
+    UnknownTypes;
+find_unknown_types_helper(none, _TypeInfo, UnknownTypes) ->
     UnknownTypes;
 find_unknown_types_helper(nil, _TypeInfo, UnknownTypes) ->
     UnknownTypes;
