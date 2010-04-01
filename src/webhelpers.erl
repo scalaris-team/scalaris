@@ -308,15 +308,7 @@ getRingRendered() ->
                                {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
                                {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
                                {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-                               {td, [], io_lib:format('~p', [fun () ->
-                                                        boot_server:node_list(),
-                                                        receive
-                                                            {get_list_response,X} ->
-                                                                X
-                                                        after 2000 ->
-                                                                {failed}
-                                                        end
-                                                             end])}
+                               {td, [], io_lib:format('~p', [RingSize])}
                            ]
 		}
 	       ]
@@ -390,16 +382,7 @@ getIndexedRingRendered() ->
 		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
 		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-		  {td, [], io_lib:format('~p', [fun () ->
-                                                        boot_server:node_list(),
-                                                        receive
-                                                            {get_list_response,X} ->
-                                                                X
-                                                        after 2000 ->
-                                                                {failed}
-
-                                                        end
-                                                             end])}
+		  {td, [], io_lib:format('~p', [RingSize])}
 		 ]
 		}
 	       ]
