@@ -142,7 +142,8 @@ check_config() ->
         rdht_tx_read:check_config() and
         rdht_tx_write:check_config() and
         vivaldi:check_config() and
-        vivaldi_latency:check_config().
+        vivaldi_latency:check_config() and
+        ?RM:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->

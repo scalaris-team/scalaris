@@ -47,9 +47,7 @@ init([Options]) ->
         util:sup_supervisor_desc(cs_supervisor_and, cs_sup_and, start_link,
                                  [InstanceId, Options]),
     RingMaintenance =
-        util:sup_worker_desc(?RM, util, parameterized_start_link,
-                             [?RM:new(config:read(ringmaintenance_trigger)),
-                              [InstanceId]]),
+        util:sup_worker_desc(?RM, ?RM, start_link, [InstanceId]),
     RoutingTable =
         util:sup_worker_desc(routingtable, rt_loop, start_link, [InstanceId]),
     DeadNodeCache =

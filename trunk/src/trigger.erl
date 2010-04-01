@@ -23,12 +23,13 @@
 %%% The basic pattern for the use of this module is as follows:
 %%% <p><code>
 %%%  TriggerState = trigger:init(Trigger, ?MODULE),<br />
-%%%  TriggerState2 = trigger:first(TriggerState, 1)
+%%%  TriggerState2 = trigger:first(TriggerState)
 %%% </code></p>
 %%% Then on each received <code>{trigger}</code> message, the trigger needs to
 %%% be told to issue another <code>{trigger}</code> message:
 %%% <p><code>
-%%%  NewTriggerState = trigger:next(TriggerState, 1),
+%%%  NewTriggerState1 = trigger:next(TriggerState),
+%%%  NewTriggerState2 = trigger:next(TriggerState, base_interval),
 %%% </code></p>
 %%% Note: When parameterized modules are used, trigger:init(Trigger, THIS) does
 %%% not work. Use code like the following instead:
@@ -47,12 +48,12 @@
 
 -include("../include/scalaris.hrl").
 
--export([init/2, init/3, init/4, init/5, first/2, next/2]).
+-export([init/2, init/3, init/4, init/5, first/1, next/2, next/1]).
 
+-type interval() :: max_interval | base_interval | min_interval | now_and_min_interval.
 -type interval_fun() :: fun(() -> pos_integer()).
 -type message_tag() :: cs_send:message_tag().
 -type state() :: {module(), term()}.
--type dyn_fun() :: fun((number(), number()) -> 0..3) | 0..3.
 
 %% @doc Initializes the given trigger with the given base interval function
 %%      (also used for min and max interval). If a Module is given instead,
@@ -94,12 +95,18 @@ init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization.
--spec first(state(), dyn_fun()) -> state().
-first({Trigger, TriggerState}, U) ->
-    {Trigger, Trigger:first(TriggerState, U)}.
+-spec first(state()) -> state().
+first({Trigger, TriggerState}) ->
+    {Trigger, Trigger:first(TriggerState)}.
 
 %% @doc Sets the trigger to send its message after BaseIntervalFun()
 %%      milliseconds.
--spec next(state(), dyn_fun()) -> state().
-next({Trigger, TriggerState}, U) ->
-    {Trigger, Trigger:next(TriggerState, U)}.
+-spec next(state()) -> state().
+next(State) ->
+    next(State, base_interval).
+
+%% @doc Sets the trigger to send its message after the given interval's number
+%%      of milliseconds.
+-spec next(state(), IntervalTag::interval()) -> state().
+next({Trigger, TriggerState}, IntervalTag) ->
+    {Trigger, Trigger:next(TriggerState, IntervalTag)}.

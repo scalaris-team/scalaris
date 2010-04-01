@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,14 +13,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : ring_maintenance.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : ring maintenance behaviour
-%%%
-%%% Created :  27 Nov 2008 by Thorsten Schuett <schuett@zib.de>
+%%% File    ring_maintenance.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    ring maintenance behaviour
+%%% @end
+%%% Created : 27 Nov 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(ring_maintenance).
 
@@ -80,21 +79,21 @@ get_as_list() ->
              ok).
 update_preds_and_succs(Preds, Succs) ->
     Pid = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(Pid , {rm_update_preds_succs, Preds, Succs}),
+    cs_send:send_local(Pid, {rm_update_preds_succs, Preds, Succs}),
     ok.
 
 %% @doc functions for rm_*.erl modules to notify the cs_node
 %%      that his pred/succ changed
 update_preds(Preds) ->
     Pid = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(Pid , {rm_update_preds, Preds}).
+    cs_send:send_local(Pid, {rm_update_preds, Preds}).
 
 
 %% @doc functions for rm_*.erl modules to notify the cs_node
 %%      that his pred/succ changed
 update_succs(Succs) ->
     Pid = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(Pid , {rm_update_succs, Succs}).
+    cs_send:send_local(Pid, {rm_update_succs, Succs}).
 
 % @private
 get_pid() ->

@@ -62,7 +62,7 @@ init(Trigger) ->
 
 -spec on(message(), state()) -> state() | unknown_event.
 on({go}, {uninit, TriggerState}) ->
-    NewTriggerState = trigger:first(TriggerState, 1),
+    NewTriggerState = trigger:first(TriggerState),
     {init, NewTriggerState};
 
 on(_, {uninit, _TriggerState} = State) ->
@@ -70,12 +70,12 @@ on(_, {uninit, _TriggerState} = State) ->
 
 on({trigger}, {init, TriggerState}) ->
     trigger_reregister(),
-    NewTriggerState = trigger:next(TriggerState, 1),
+    NewTriggerState = trigger:next(TriggerState),
     {init, NewTriggerState};
 
 on({go}, {init, TriggerState}) ->
     trigger_reregister(),
-    NewTriggerState = trigger:next(TriggerState, 1),
+    NewTriggerState = trigger:next(TriggerState),
     {init, NewTriggerState};
 
 on(_, _State) ->

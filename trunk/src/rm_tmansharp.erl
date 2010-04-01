@@ -1,4 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,23 +13,19 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : rm_tman.erl
-%%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : T-Man ring maintenance
-%%%
-%%% Created :  12 Jan 2009 by Christian Hennig <hennig@zib.de>
+%%% File    rm_tman.erl
+%%% @author Christian Hennig <hennig@zib.de>
+%%% @doc    T-Man ring maintenance
+%%% @end
+%%% Created : 12 Jan 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(rm_tmansharp).
 
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
-
-
--export([init/1,on/2]).
+-export([init/1, on/2]).
 
 -behavior(ring_maintenance).
 -behavior(gen_component).
@@ -36,10 +33,10 @@
 -export([start_link/1, 
 	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1, 
          update_succ/1, update_pred/1, 
-	 get_as_list/0]).
+	 get_as_list/0, check_config/0]).
 
 % unit testing
--export([ merge/2, rank/2,get_pred/1,get_succ/1,get_preds/1,get_succs/1]).
+-export([merge/2, rank/2, get_pred/1, get_succ/1, get_preds/1, get_succs/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -113,108 +110,154 @@ on(_,uninit) ->
         uninit;
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
-on({get_successorlist, Pid},{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            cs_send:send_local(Pid , {get_successorlist_response,[Me]}),
-	    	{Id, Me, [] ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({get_predlist, Pid},{Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-			cs_send:send_local(Pid , {get_predlist_response, [Me]}),
-            {Id, Me, [],RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({get_successorlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            cs_send:send_local(Pid , {get_successorlist_response, get_succs(View)}),
-            {Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({get_predlist, Pid},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            cs_send:send_local(Pid , {get_predlist_response, get_preds(View)}),
-            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({get_successorlist, Pid},
+   {_Id, Me, [], _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    cs_send:send_local(Pid, {get_successorlist_response,[Me]}),
+    State;
 
+on({get_predlist, Pid},
+   {_Id, Me, [], _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    cs_send:send_local(Pid, {get_predlist_response, [Me]}),
+    State;
 
-on({stabilize,AktToken},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) -> % new stabilization interval
-              
-            % Triger an update of the Random view
-            cyclon:get_subset_rand(RandViewSize),
-            RndView=get_RndView(RandViewSize,RandomCache),
-            %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-			P =selectPeer(rank(View++RndView,node:id(Me)),Me),
-            %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
-            %Test for being alone
-            case (P == Me) of 
-                true ->
-                    ring_maintenance:update_pred(Me),
-		      		ring_maintenance:update_succ(Me);
-          		false ->
-                    cs_send:send_to_group_member(node:pidX(P), ring_maintenance, {rm_buffer,Me,extractMessage(View++[Me]++RndView,P)})
-        	end,
-			cs_send:send_local_after(Interval, self(), {stabilize,AktToken}),
-            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({stabilize,_},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({cy_cache,NewCache},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,_RandomCache}) ->
-            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,NewCache};
-on({rm_buffer,Q,Buffer_q},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            RndView=get_RndView(RandViewSize,RandomCache),
-            cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,extractMessage(View++[Me]++RndView,Q)}),
-            %io:format("after_send~p~n",[self()]),
-            NewView=rank(View++Buffer_q++RndView,node:id(Me)),
-            %io:format("after_rank~p~n",[self()]),
-   	        %SuccsNew=get_succs(NewView),
-            %PredsNew=get_preds(NewView),
-            {NewAktPred,NewAktSucc} = update_cs_node(NewView,AktPred,AktSucc),
-            update_failuredetector(View,NewView),
-            NewInterval = new_interval(View,NewView,Interval),
-            cs_send:send_local_after(NewInterval , self(), {stabilize,AktToken+1}),
-            %io:format("loop~p~n",[self()]),   
-            {Id, Me, NewView,RandViewSize,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};	
-on({rm_buffer_response,Buffer_p},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache})->
-            
-            RndView=get_RndView(RandViewSize,RandomCache),
-            %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-            Buffer=rank(View++Buffer_p++RndView,node:id(Me)),
-            %io:format("after_rank~p~n",[self()]),
-            NewView=lists:sublist(Buffer,config:read(succ_list_length)+config:read(pred_list_length)),
-            {NewAktPred,NewAktSucc} = update_cs_node(View,AktPred,AktSucc),
-            update_failuredetector(View,NewView),
-            NewInterval = new_interval(View,NewView,Interval),
-            %inc RandViewSize (no error detected)
-            RandViewSizeNew = case RandViewSize < config:read(cyclon_cache_size) of
-                true ->
-                    RandViewSize+1;
-                false ->
-                    RandViewSize
-            end,
-            cs_send:send_local_after(NewInterval , self(), {stabilize,AktToken+1}),
-            
-            {Id, Me, NewView,RandViewSizeNew,NewInterval,AktToken+1,NewAktPred,NewAktSucc,RandomCache};
-on({zombie,Node},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            erlang:send(self(), {stabilize,AktToken+1}),
-            %Inform Cyclon !!!!
-            {Id, Me, View,RandViewSize,Interval,AktToken+1,AktPred,AktSucc,[Node|RandomCache]};
-on({crash, DeadPid},{Id, Me, View ,_RandViewSize,_Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            NewView = filter(DeadPid, View),
-            NewCache = filter(DeadPid, RandomCache),
-            update_failuredetector(View,NewView),
-            erlang:send(self(), {stabilize,AktToken+1}),
-		 	{Id, Me, NewView,0,stabilizationInterval_min(),AktToken+1,AktPred,AktSucc,NewCache};
-on({'$gen_cast', {debug_info, Requestor}},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-	    	cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))}, 
-					       {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]}),
-	    	{Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({get_successorlist, Pid},
+   {_Id, _Me, View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    cs_send:send_local(Pid, {get_successorlist_response, get_succs(View)}),
+    State;
+
+on({get_predlist, Pid},
+   {_Id, _Me, View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    cs_send:send_local(Pid, {get_predlist_response, get_preds(View)}),
+    State;
+
+on({stabilize, AktToken},
+   {_Id, Me, View, RandViewSize, Interval, AktToken, _AktPred, _AktSucc, RandomCache} = State) -> % new stabilization interval
+    % Triger an update of the Random view
+    cyclon:get_subset_rand(RandViewSize),
+    RndView = get_RndView(RandViewSize,RandomCache),
+    %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
+    P = selectPeer(rank(View++RndView,node:id(Me)),Me),
+    %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
+    %Test for being alone
+    case (P == Me) of
+        true ->
+            ring_maintenance:update_pred(Me),
+            ring_maintenance:update_succ(Me);
+        false ->
+            cs_send:send_to_group_member(node:pidX(P), ring_maintenance, {rm_buffer,Me,extractMessage(View++[Me]++RndView,P)})
+    end,
+    cs_send:send_local_after(Interval, self(), {stabilize,AktToken}),
+    State;
+
+on({stabilize,_}, State) ->
+    State;
+
+on({cy_cache, NewCache},
+   {Id, Me, View, RandViewSize, Interval, AktToken, AktPred, AktSucc, _RandomCache}) ->
+    {Id, Me, View, RandViewSize, Interval, AktToken, AktPred, AktSucc, NewCache};
+
+on({rm_buffer, Q, Buffer_q},
+   {Id, Me, View, RandViewSize, Interval, AktToken, AktPred, AktSucc, RandomCache}) ->
+    RndView = get_RndView(RandViewSize,RandomCache),
+    cs_send:send_to_group_member(node:pidX(Q),ring_maintenance,{rm_buffer_response,extractMessage(View++[Me]++RndView,Q)}),
+    %io:format("after_send~p~n",[self()]),
+    NewView = rank(View++Buffer_q++RndView,node:id(Me)),
+    %io:format("after_rank~p~n",[self()]),
+    %SuccsNew=get_succs(NewView),
+    %PredsNew=get_preds(NewView),
+    {NewAktPred,NewAktSucc} = update_cs_node(NewView,AktPred,AktSucc),
+    update_failuredetector(View,NewView),
+    NewInterval = new_interval(View,NewView,Interval),
+    cs_send:send_local_after(NewInterval , self(), {stabilize,AktToken+1}),
+    %io:format("loop~p~n",[self()]),
+    {Id, Me, NewView, RandViewSize, NewInterval, AktToken+1, NewAktPred, NewAktSucc, RandomCache};
+
+on({rm_buffer_response, Buffer_p},
+   {Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache})->
+    RndView = get_RndView(RandViewSize,RandomCache),
+    %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
+    Buffer = rank(View++Buffer_p++RndView,node:id(Me)),
+    %io:format("after_rank~p~n",[self()]),
+    NewView = lists:sublist(Buffer,config:read(succ_list_length)+config:read(pred_list_length)),
+    {NewAktPred,NewAktSucc} = update_cs_node(View,AktPred,AktSucc),
+    update_failuredetector(View,NewView),
+    NewInterval = new_interval(View,NewView,Interval),
+    %inc RandViewSize (no error detected)
+    RandViewSizeNew = case RandViewSize < config:read(cyclon_cache_size) of
+                          true  -> RandViewSize+1;
+                          false -> RandViewSize
+                      end,
+    cs_send:send_local_after(NewInterval , self(), {stabilize,AktToken+1}),
+    {Id, Me, NewView, RandViewSizeNew, NewInterval, AktToken+1, NewAktPred, NewAktSucc, RandomCache};
+
+on({zombie, Node},
+   {Id, Me, View, RandViewSize, Interval, AktToken, AktPred, AktSucc, RandomCache}) ->
+    erlang:send(self(), {stabilize, AktToken+1}),
+    %TODO: Inform Cyclon !!!!
+    {Id, Me, View, RandViewSize, Interval, AktToken+1, AktPred, AktSucc, [Node|RandomCache]};
+
+on({crash, DeadPid},
+   {Id, Me, View, _RandViewSize, _Interval, AktToken, AktPred, AktSucc, RandomCache}) ->
+    NewView = filter(DeadPid, View),
+    NewCache = filter(DeadPid, RandomCache),
+    update_failuredetector(View,NewView),
+    erlang:send(self(), {stabilize, AktToken+1}),
+    {Id, Me, NewView, 0, stabilizationInterval_min(), AktToken+1, AktPred, AktSucc, NewCache};
+
+on({'$gen_cast', {debug_info, Requestor}},
+   {_Id, _Me, View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    cs_send:send_local(Requestor,
+                       {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))},
+                                              {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]}),
+    State;
         
-on({check_ring,0,Me},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            io:format(" [RM ] CheckRing   OK  ~n"),
-             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({check_ring,Token,Me},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            io:format(" [RM ] Token back with Value: ~p~n",[Token]),
-            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({check_ring,0,Master},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-            io:format(" [RM ] CheckRing  reach TTL in Node ~p not in ~p~n",[Master,Me]),
-            {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({check_ring,Token,Master},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-             cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Master}),
-             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
-on({init_check_ring,Token},{Id, Me, View ,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache}) ->
-             cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Me}),
-             {Id, Me, View,RandViewSize,Interval,AktToken,AktPred,AktSucc,RandomCache};
+on({check_ring, 0, Me},
+   {_Id, Me, _View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    io:format(" [RM ] CheckRing   OK  ~n"),
+    State;
+
+on({check_ring, Token, Me},
+   {_Id, Me, _View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    io:format(" [RM ] Token back with Value: ~p~n",[Token]),
+    State;
+
+on({check_ring, 0, Master},
+   {_Id, Me, _View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
+    io:format(" [RM ] CheckRing  reach TTL in Node ~p not in ~p~n", [Master, Me]),
+    State;
+
+on({check_ring, Token, Master},
+   {_Id, _Me, _View, _RandViewSize, _Interval, _AktToken, AktPred, _AktSucc, _RandomCache} = State) ->
+    cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Master}),
+    State;
+
+on({init_check_ring, Token},
+   {_Id, Me, _View, _RandViewSize, _Interval, _AktToken, AktPred, _AktSucc, _RandomCache} = State) ->
+    cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Me}),
+    State;
+
 on(_, _State) ->
     unknown_event.
+
+%% @doc Checks whether config parameters of the rm_tmansharp process exist and
+%%      are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(stabilization_interval_min) and
+    config:is_greater_than(stabilization_interval_min, 0) and
+    
+    config:is_integer(stabilization_interval_max) and
+    config:is_greater_than(stabilization_interval_max, 0) and
+    config:is_greater_than_equal(stabilization_interval_max, stabilization_interval_min) and
+
+    config:is_integer(cyclon_cache_size) and
+    config:is_greater_than(cyclon_cache_size, 2) and
+    
+    config:is_integer(succ_list_length) and
+    config:is_greater_than_equal(succ_list_length, 0) and
+    
+    config:is_integer(pred_list_length) and
+    config:is_greater_than_equal(pred_list_length, 0).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
@@ -325,26 +368,17 @@ get_RndView(N,Cache) ->
 
 % @doc Check if change of failuredetector is necessary
 update_failuredetector(OldView,NewView) ->
-    
-		case (NewView /= OldView) of
+    case (NewView /= OldView) of
         true ->
-            	
-                
-                NewNodes = util:minus(NewView,OldView),
-                OldNodes = util:minus(OldView,NewView),
-                            
-                update_fd([node:pidX(Node) || Node <- OldNodes],fun fd:unsubscribe/1),
-           		update_fd([node:pidX(Node) || Node <- NewNodes],fun fd:subscribe/1);
-                
-        		
-		false ->
-            	
-              	ok
-		end,
-    	ok.
-             
-             
-    
+            NewNodes = util:minus(NewView,OldView),
+            OldNodes = util:minus(OldView,NewView),
+            update_fd([node:pidX(Node) || Node <- OldNodes],fun fd:unsubscribe/1),
+            update_fd([node:pidX(Node) || Node <- NewNodes],fun fd:subscribe/1);
+        false ->
+            ok
+    end,
+    ok.
+
 
 update_fd([], _) ->
     ok;
@@ -360,27 +394,20 @@ update_cs_node(View,_AktPred,_AktSucc) ->
       	ring_maintenance:update_succ(NewAktSucc),
 {NewAktPred,NewAktSucc}.
 
-% @doc adaptize the Tman-interval
+% @doc adapt the Tman-interval
 new_interval(View,NewView,Interval) ->
-			case (View==NewView) of
-            	true ->
-					case (Interval >= stabilizationInterval_max() ) of
-						true -> stabilizationInterval_max();
-						false -> Interval + ((stabilizationInterval_max() - stabilizationInterval_min()) div 10)
-                                 
-					end;
-            	false ->
-					case (Interval - (stabilizationInterval_max()-stabilizationInterval_min()) div 2) =< (stabilizationInterval_min()  ) of
-						true -> stabilizationInterval_min() ;
-						false -> Interval - (stabilizationInterval_max()-stabilizationInterval_min()) div 2
-					end
-    		end.
-
-
-
-
-
-
+    case (View==NewView) of
+        true ->
+            case (Interval >= stabilizationInterval_max() ) of
+                true -> stabilizationInterval_max();
+                false -> Interval + ((stabilizationInterval_max() - stabilizationInterval_min()) div 10)
+            end;
+        false ->
+            case (Interval - (stabilizationInterval_max()-stabilizationInterval_min()) div 2) =< (stabilizationInterval_min()  ) of
+                true -> stabilizationInterval_min() ;
+                false -> Interval - (stabilizationInterval_max()-stabilizationInterval_min()) div 2
+            end
+    end.
 
 
 % print_view(Me,View) ->

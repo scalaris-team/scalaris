@@ -1,4 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,21 +13,17 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : rm_chord.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Chord-like ring maintenance
-%%%
-%%% Created :  27 Nov 2008 by Thorsten Schuett <schuett@zib.de>
+%%% File    rm_chord.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Chord-like ring maintenance
+%%% @end
+%%% Created : 27 Nov 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(rm_chord).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
-
-
 
 -behavior(ring_maintenance).
 -behavior(gen_component).
@@ -36,41 +33,41 @@
 -export([start_link/1, 
 	 get_successorlist/1, succ_left/1, pred_left/1, 
 	 notify/1, update_succ/1, update_pred/1, 
-	 get_predlist/0]).
+	 get_predlist/0, check_config/0]).
 
 % unit testing
 -export([merge/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Public Interface
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc spawns a chord-like ring maintenance process
-%% @spec start_link(term()) -> {ok, pid()}
-start_link(InstanceId) ->
-    start_link(InstanceId, []).
-
-start_link(InstanceId,Options) ->
-   gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, ring_maintenance}]).
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc starts ring maintenance
 
-init(_Args) ->
-    log:log(info,"[ RM ~p ] starting ring maintainer~n", [self()]),
+%% @doc Starts a chord-like ring maintenance process, registers it with the
+%%      process dictionary and returns its pid for use by a supervisor.
+-spec start_link(term()) -> {ok, pid()}.
+start_link(InstanceId) ->
+    Trigger = config:read(ringmaintenance_trigger),
+    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, ring_maintenance}]).
+
+%% @doc Initialises the module with an uninitialized state.
+-spec init(module()) -> {uninit, TriggerState::trigger:state()}.
+init(Trigger) ->
+    log:log(info,"[ RM ~p ] starting ring maintainer chord~n", [cs_send:this()]),
+    TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, stabilize),
     cs_send:send_local(get_cs_pid(), {init_rm,self()}),
-    cs_send:send_local_after(stabilizationInterval(), self(), {stabilize}),
-    uninit.
-    
+    TriggerState2 = trigger:next(TriggerState),
+    {uninit, TriggerState2}.
 
 get_successorlist(Source) ->
-    cs_send:send_local(get_pid() , {get_successorlist,Source,Source}).
-    
+    cs_send:send_local(get_pid(), {get_successorlist, Source, Source}).
+
+get_predlist() ->
+    log:log(error, "[ RM-CHORD] OLD FUNCTION use broke with gen_component"),
+    cs_send:send_local(get_pid(), {get_predlist, self()}),
+    receive
+        {get_predlist_response, PredList} ->
+            PredList
+    end.
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
@@ -97,103 +94,116 @@ update_pred(_Pred) ->
     ok.
 
 notify(Pred) ->
-    cs_send:send_local(get_pid() , {notify, Pred}).
-
-
-
-get_predlist() ->
-    log:log(error, "[ RM-CHORD] OLD FUNCTION use broke with gen_component"),
-    cs_send:send_local(get_pid() , {get_predlist, self()}),
-    receive
-	{get_predlist_response, PredList} ->
-	    PredList
-    end.
+    cs_send:send_local(get_pid(), {notify, Pred}).
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %set info for cs_node
-on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
-        ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
-        cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
-        fd:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
-       
-        {NewId, NewMe, NewPred, NewSuccList};
-on(_,uninit) ->
-        uninit;
-on({get_successorlist, Pid},{Id, Me, Pred, Succs})  ->
-	    cs_send:send_local(Pid , {get_successorlist_response, Succs}),
-	    {Id, Me, Pred, Succs};
-on({get_successorlist, Pid,S},{Id, Me, Pred, Succs})  ->
-        cs_send:send_local(Pid , {get_successorlist_response, Succs,S}),
-        {Id, Me, Pred, Succs};
-on({get_predlist, Pid},{Id, Me, Pred, Succs})  ->
-        cs_send:send_local(Pid , {get_predlist_response, [Pred]}),
-       	{Id, Me, Pred, Succs};
+on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode}, {uninit, TriggerState}) ->
+    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
+    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
+    fd:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
+    {NewId, NewMe, NewPred, NewSuccList, TriggerState};
 
-on({stabilize},{Id, Me, Pred, Succs})  -> % new stabilization interval
-        case Succs of
-            [] -> 
-                ok;
-            _  -> 
-                cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
-        end,
-        cs_send:send_local_after(stabilizationInterval(), self(), {stabilize}),
-	    {Id, Me, Pred, Succs};
-on({get_pred_response, SuccsPred},{Id, Me, Pred, Succs})  ->
-	    case node:is_null(SuccsPred) of
-		false ->
-		    case util:is_between_stab(Id, node:id(SuccsPred), node:id(hd(Succs))) of
-			true ->
-			    cs_send:send(node:pidX(SuccsPred), {get_succ_list, cs_send:this()}),
-			    ring_maintenance:update_succ_and_pred(Pred, SuccsPred),
-			    fd:subscribe(node:pidX(SuccsPred)),
-			    {Id, Me, Pred, [SuccsPred | Succs]};
-			false ->
-			    cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
-			    {Id, Me, Pred, Succs}
-		    end;
-		true ->
-		    cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
-		    {Id, Me, Pred, Succs}
-	    end;
-on({get_succ_list_response, Succ, SuccsSuccList},{Id, Me, Pred, Succs})  ->
-	    NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), succListLength()),
-	    %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
-	    cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
-	    ring_maintenance:update_succ_and_pred(Pred, hd(NewSuccs)), 
-	    fd:subscribe([node:pidX(Node) || Node <- NewSuccs]),
-	    {Id, Me, Pred, NewSuccs};
-on({notify, NewPred},{Id, Me, Pred, Succs})  ->
-	    case node:is_null(Pred) of
-		true ->
-		    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
-		    fd:subscribe(node:pidX(NewPred)),
-		    {Id, Me, NewPred, Succs};
-		false ->
-		    case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
-			true ->
-			    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
-			    fd:subscribe(node:pidX(NewPred)),
-			    {Id, Me, NewPred, Succs};
-			false ->
-			    {Id, Me, Pred, Succs}
-		    end
-	    end;
-on({crash, DeadPid},{Id, Me, Pred, Succs})  ->
-	    case node:is_null(Pred) orelse DeadPid == node:pidX(Pred) of
-		true ->
-		    {Id, Me, node:null(), filter(DeadPid, Succs)};
-		false ->
-		    {Id, Me, Pred, filter(DeadPid, Succs)}
-	    end;
-on({'$gen_cast', {debug_info, Requestor}},{Id, Me, Pred, Succs})  ->
-	    cs_send:send_local(Requestor , {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [Pred]))},{"succs", lists:flatten(io_lib:format("~p", [Succs]))}]}),
-	    {Id, Me, Pred, Succs};
+on(_, {uninit, _TriggerState} = State) ->
+    State;
+
+on({get_successorlist, Pid}, {_Id, _Me, _Pred, Succs, _TriggerState} = State) ->
+    cs_send:send_local(Pid, {get_successorlist_response, Succs}),
+    State;
+
+on({get_successorlist, Pid, S}, {_Id, _Me, _Pred, Succs, _TriggerState} = State) ->
+    cs_send:send_local(Pid, {get_successorlist_response, Succs, S}),
+    State;
+
+on({get_predlist, Pid}, {_Id, _Me, Pred, _Succs, _TriggerState} = State) ->
+    cs_send:send_local(Pid, {get_predlist_response, [Pred]}),
+    State;
+
+on({stabilize}, {Id, Me, Pred, Succs, TriggerState}) -> % new stabilization interval
+    case Succs of
+        [] ->
+            ok;
+        _  ->
+            cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
+    end,
+    NewTriggerState = trigger:next(TriggerState),
+    {Id, Me, Pred, Succs, NewTriggerState};
+
+on({get_pred_response, SuccsPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
+    case node:is_null(SuccsPred) of
+        false ->
+            case util:is_between_stab(Id, node:id(SuccsPred), node:id(hd(Succs))) of
+                true ->
+                    cs_send:send(node:pidX(SuccsPred), {get_succ_list, cs_send:this()}),
+                    ring_maintenance:update_succ_and_pred(Pred, SuccsPred),
+                    fd:subscribe(node:pidX(SuccsPred)),
+                    {Id, Me, Pred, [SuccsPred | Succs], TriggerState};
+                false ->
+                    cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
+                    State
+            end;
+        true ->
+            cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
+            State
+    end;
+
+on({get_succ_list_response, Succ, SuccsSuccList}, {Id, Me, Pred, Succs, TriggerState}) ->
+    NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), succListLength()),
+    %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
+    cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
+    ring_maintenance:update_succ_and_pred(Pred, hd(NewSuccs)),
+    fd:subscribe([node:pidX(Node) || Node <- NewSuccs]),
+    {Id, Me, Pred, NewSuccs, TriggerState};
+
+on({notify, NewPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
+    case node:is_null(Pred) of
+        true ->
+            ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
+            fd:subscribe(node:pidX(NewPred)),
+            {Id, Me, NewPred, Succs, TriggerState};
+        false ->
+            case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
+                true ->
+                    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
+                    fd:subscribe(node:pidX(NewPred)),
+                    {Id, Me, NewPred, Succs, TriggerState};
+                false ->
+                    State
+            end
+    end;
+
+on({crash, DeadPid}, {Id, Me, Pred, Succs, TriggerState})  ->
+    case node:is_null(Pred) orelse DeadPid == node:pidX(Pred) of
+        true ->
+            {Id, Me, node:null(), filter(DeadPid, Succs), TriggerState};
+        false ->
+            {Id, Me, Pred, filter(DeadPid, Succs), TriggerState}
+    end;
+
+on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Me, Pred, Succs, _TriggerState} = State)  ->
+    cs_send:send_local(Requestor,
+                       {debug_info_response,
+                        [{"pred", lists:flatten(io_lib:format("~p", [Pred]))},
+                         {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]}),
+    State;
 
 on(_, _State) ->
     unknown_event.
+
+%% @doc Checks whether config parameters of the rm_chord process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_atom(ringmaintenance_trigger) and
+    
+    config:is_integer(stabilization_interval_max) and
+    config:is_greater_than(stabilization_interval_max, 0) and
+    
+    config:is_integer(succ_list_length) and
+    config:is_greater_than_equal(succ_list_length, 0).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions

@@ -104,7 +104,7 @@
 	{cy_cache, [node:node_type()]} |
 	{get_values_all, cs_send:erl_local_pid()} | 
     {get_values_best, cs_send:erl_local_pid()} |
-    {'$gen_cast', {debug_info, cs_send:erl_local_pid()}}).
+    {'$gen_cast', {debug_info, Requestor::cs_send:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -189,12 +189,11 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> full_state().
 init(Trigger) ->
-%%     io:format("gossip start ~n"),
+    log:log(info,"[ Gossip ~p ] starting~n", [cs_send:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:first(TriggerState, 1),
+    TriggerState2 = trigger:first(TriggerState),
 	PreviousState = gossip_state:new_state(),
 	State = gossip_state:new_state(),
-    log:log(info, "Gossip spawn: ~p~n", [cs_send:this()]),
     {PreviousState, State, [], TriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -207,7 +206,7 @@ on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% this message is received continuously when the Trigger calls
 	% see gossip_trigger and gossip_interval in the scalaris.cfg file
 %% 	io:format("{trigger_gossip}: ~p~n", [State]),
-    NewTriggerState = trigger:next(TriggerState, 1),
+    NewTriggerState = trigger:next(TriggerState),
 	NewState = gossip_state:inc_triggered(State),
 	% request a check whether we are the leader and can thus decide whether to
 	% start a new round

@@ -38,8 +38,9 @@
 
 -include("../include/scalaris.hrl").
 
--export([init/4, first/2, next/2]).
+-export([init/4, first/1, next/2]).
 
+-type interval() :: trigger:interval().
 -type interval_fun() :: trigger:interval_fun().
 -type message_tag() :: cs_send:message_tag().
 -type state() :: {interval_fun(), message_tag(), reference() | ok}.
@@ -52,15 +53,15 @@ init(BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, MsgTag) when is_function
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization.
--spec first(state(), any()) -> {interval_fun(), message_tag(), reference()}.
-first({BaseIntervalFun, MsgTag, ok}, _U) ->
+-spec first(state()) -> {interval_fun(), message_tag(), reference()}.
+first({BaseIntervalFun, MsgTag, ok}) ->
     TimerRef = cs_send:send_local_after(0, self(), {MsgTag}),
     {BaseIntervalFun, MsgTag, TimerRef}.
 
 %% @doc Sets the trigger to send its message after BaseIntervalFun()
 %%      milliseconds.
--spec next(state(), any()) -> {interval_fun(), message_tag(), reference()}.
-next({BaseIntervalFun, MsgTag, ok}, _U) ->
+-spec next(state(), _IntervalTag::interval()) -> {interval_fun(), message_tag(), reference()}.
+next({BaseIntervalFun, MsgTag, ok}, _IntervalTag) ->
     NewTimerRef = cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
     {BaseIntervalFun, MsgTag, NewTimerRef};
 
