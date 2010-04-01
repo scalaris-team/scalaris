@@ -77,9 +77,9 @@ start_link(InstanceId) ->
 -spec init({module(), module()}) -> state().
 init({ResetTrigger, ClusterTrigger}) ->
     ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
-    ResetTriggerState2 = trigger:first(ResetTriggerState, 1),
+    ResetTriggerState2 = trigger:first(ResetTriggerState),
     ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
-    ClusterTriggerState2 = trigger:first(ClusterTriggerState, 1),
+    ClusterTriggerState2 = trigger:first(ClusterTriggerState),
     log:log(info,"dc_clustering spawn: ~p~n", [cs_send:this()]),
     {[], [], ResetTriggerState2, ClusterTriggerState2}.
 
@@ -93,14 +93,14 @@ init({ResetTrigger, ClusterTrigger}) ->
 on({start_clustering_shuffle},
    {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
     %io:format("~p~n", [State]),
-    NewClusterTriggerState = trigger:next(ClusterTriggerState, 1),
+    NewClusterTriggerState = trigger:next(ClusterTriggerState),
     cyclon:get_subset_rand(1),
     {Centroids, Sizes, ResetTriggerState, NewClusterTriggerState};
 
 % ask vivaldi for network coordinate
 on({reset_clustering},
    {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
-    NewResetTriggerState = trigger:next(ResetTriggerState, 1),
+    NewResetTriggerState = trigger:next(ResetTriggerState),
     vivaldi:get_coordinate(),
     {Centroids, Sizes, NewResetTriggerState, ClusterTriggerState};
 

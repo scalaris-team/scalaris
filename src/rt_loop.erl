@@ -75,11 +75,11 @@ init(Trigger) ->
 %% @doc message handler
 -spec on(message(), state()) -> state() | unknown_event.
 
-on({init, Id, Pred, Succ},{uninit, TriggerState}) ->
-    TriggerState2 = trigger:next(TriggerState, make_utility(0)),
+on({init, Id, Pred, Succ}, {uninit, TriggerState}) ->
+    TriggerState2 = trigger:next(TriggerState),
     {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
 
-on(Message,{uninit, TriggerState}) ->
+on(Message, {uninit, TriggerState}) ->
     cs_send:send_local(self() , Message),
     {uninit, TriggerState};
 
@@ -99,7 +99,7 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
     %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    TriggerState2 = trigger:next(TriggerState, make_utility(?RT:get_size(RTState))),
+    TriggerState2 = trigger:next(TriggerState),
     {Id, Pred, Succ, NewRTState,TriggerState2};
 
 % got new predecessor/successor
@@ -176,7 +176,3 @@ check_fd(NewRT, OldRT) ->
 
 get_base_interval() ->
     config:read(pointer_base_stabilization_interval).
-
-make_utility(RTSize) ->
-    Now = erlang:now(),
-    fun (T, C) -> 10 + 5 * (1 + C) * timer:now_diff(T, Now)  + RTSize / 2 end.

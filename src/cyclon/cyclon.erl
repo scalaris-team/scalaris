@@ -158,7 +158,7 @@ init(Trigger) ->
     request_node_details([node, pred, succ]),
     cs_send:send_local_after(100, self(), {check_state}),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:first(TriggerState, 1),
+    TriggerState2 = trigger:first(TriggerState),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
     {cyclon_cache:new(), null, 0, TriggerState2}.
 
@@ -170,7 +170,7 @@ on({trigger}, {Cache, Node, Cycles, TriggerState} = State)  ->
             fail -> Cache;
             _    -> enhanced_shuffle(Cache, Node)
         end,
-    TriggerState2 = trigger:next(TriggerState, 1),
+    TriggerState2 = trigger:next(TriggerState),
     {NewCache, Node, Cycles + 1, TriggerState2};
 
 on({check_state}, State) ->

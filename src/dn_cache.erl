@@ -74,7 +74,7 @@ start_link(InstanceId) ->
 init(Trigger) ->
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [cs_send:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:first(TriggerState, 1),
+    TriggerState2 = trigger:first(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new(), TriggerState2}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -86,7 +86,7 @@ init(Trigger) ->
 -spec on(message(), state()) -> state() | unknown_event.
 on({trigger}, {Queue, Subscriber, TriggerState}) ->
         fix_queue:map(fun(X) -> cs_send:send(node:pidX(X), {ping, cs_send:this_with_cookie(X)}) end, Queue), 
-        NewTriggerState = trigger:next(TriggerState, 1),
+        NewTriggerState = trigger:next(TriggerState),
         {Queue, Subscriber, NewTriggerState};
 
 on({{pong}, Zombie}, {Queue, Subscriber, TriggerState}) ->

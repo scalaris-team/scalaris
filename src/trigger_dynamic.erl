@@ -42,12 +42,12 @@
 
 -include("../include/scalaris.hrl").
 
--export([init/4, first/2, next/2]).
+-export([init/4, first/1, next/2]).
 
+-type interval() :: trigger:interval().
 -type interval_fun() :: trigger:interval_fun().
 -type message_tag() :: cs_send:message_tag().
 -type state() :: {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference() | ok}.
--type dyn_fun() :: trigger:dyn_fun().
 
 %% @doc Initializes the trigger with the given interval functions and the given
 %%      message tag used for the trigger message.
@@ -57,8 +57,8 @@ init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) when is_function(B
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization.
--spec first(state(), any()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}.
-first({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, _U) ->
+-spec first(state()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}.
+first({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}) ->
     TimerRef = cs_send:send_local_after(0, self(), {MsgTag}),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}.
 
@@ -69,21 +69,13 @@ first({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, _U) ->
 %%      MinIntervalFun() (return value 2),
 %%      0 (now) and MinIntervalFun() (return value 3) or
 %%      BaseIntervalFun() (any other return value) for the delay.
--spec next({interval_fun(), interval_fun(), interval_fun(), message_tag(), ok}, any()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}
-         ; ({interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}, dyn_fun()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}.
-next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, _U) ->
-    NewTimerRef = cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
+-spec next({interval_fun(), interval_fun(), interval_fun(), message_tag(), ok | reference()}, IntervalTag::interval()) ->
+              {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}.
+next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, IntervalTag) ->
+    NewTimerRef = send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef};
 
-% 0 - > max
-% 1 - > base
-% 2 - > min
-% 3 - > now,min
-next(State, U) when is_function(U, 2) ->
-    %io:format("[ TD ] ~p U(0,0) ~p~n",[self(), U(0,0)]),
-    % TODO: make use of the functions parameters
-    next(State, U(0, 0));
-next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, U) ->
+next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, IntervalTag) ->
     % timer still running?
     case erlang:read_timer(TimerRef) of
         false ->
@@ -91,18 +83,21 @@ next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, U) ->
         _ ->
             erlang:cancel_timer(TimerRef)
     end,
-    NewTimerRef = 
-        case U of
-            0 ->
-                cs_send:send_local_after(MaxIntervalFun(),self(), {MsgTag});
-            1 ->
-                cs_send:send_local_after(BaseIntervalFun(),self(), {MsgTag});
-            2 ->
-                cs_send:send_local_after(MinIntervalFun(),self(), {MsgTag});
-            3 ->
-                cs_send:send_local(self(), {MsgTag}),
-                cs_send:send_local_after(MinIntervalFun(), self(), {MsgTag});
-            _ ->
-                cs_send:send_local_after(BaseIntervalFun(),self(), {MsgTag})
-     end,
+    NewTimerRef = send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef}.
+
+-spec send_message(interval(), interval_fun(), interval_fun(), interval_fun(), message_tag()) -> reference().
+send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) ->
+    case IntervalTag of
+        max_interval ->
+            cs_send:send_local_after(MaxIntervalFun(), self(), {MsgTag});
+        base_interval ->
+            cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag});
+        min_interval ->
+            cs_send:send_local_after(MinIntervalFun(), self(), {MsgTag});
+        now_and_min_interval ->
+            cs_send:send_local(self(), {MsgTag}),
+            cs_send:send_local_after(MinIntervalFun(), self(), {MsgTag});
+        _ ->
+            cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag})
+     end.

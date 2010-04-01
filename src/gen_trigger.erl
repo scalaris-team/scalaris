@@ -36,7 +36,7 @@
 behaviour_info(callbacks) ->
     [
      {init, 4},
-     {first, 2},
+     {first, 1},
      {next, 2}
     ];
 
