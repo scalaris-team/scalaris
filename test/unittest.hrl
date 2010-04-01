@@ -64,6 +64,8 @@ ct_fail(Format, Data) ->
                 end
         end()).
 
+-define(implies(A, B), (not (A)) orelse (B)).
+
 myassert(true, _Reason) ->
     ok;
 myassert(false, Reason) ->
