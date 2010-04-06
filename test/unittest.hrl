@@ -27,12 +27,15 @@
 
 %% @doc Fails the currently run unit test with a reason that is made of the
 %%      given Date formatted using the Format string (see io_lib:format/2).
--spec ct_fail(Format::atom() | string() | binary(), Data::[term()]) -> none().
-ct_fail(Format, Data) ->
-    Reason = lists:flatten(io_lib:format(Format, Data)),
-    ct:fail(Reason).
+% -spec ct_fail(Format::atom() | string() | binary(), Data::[term()]) -> none().
+-define(ct_fail(Format, Data),
+    ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 
--define(assert(Boolean), myassert(Boolean, ??Boolean)).
+-define(assert(Boolean),
+        case Boolean of
+            true  -> ok;
+            false -> ct:fail(??Boolean)
+        end).
 
 -define(equals(Actual, Expected),
         % wrap in function so that the internal variables are out of the calling function's scope
@@ -44,7 +47,7 @@ ct_fail(Format, Data) ->
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
                                [erlang:get_stacktrace()]),
-                        ct_fail("~p evaluated to \"~p\" which is "
+                        ?ct_fail("~p evaluated to \"~p\" which is "
                                "not the expected ~p that evaluates to \"~p\"",
                                [??Actual, Any, ??Expected, ExpectedVal])
                 end
@@ -58,18 +61,13 @@ ct_fail(Format, Data) ->
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
                                [erlang:get_stacktrace()]),
-                        ct_fail("~p evaluated to \"~p\" which is "
+                        ?ct_fail("~p evaluated to \"~p\" which is "
                                "not the expected ~p",
                                [??Actual, Any, ??ExpectedPattern])
                 end
         end()).
 
 -define(implies(A, B), (not (A)) orelse (B)).
-
-myassert(true, _Reason) ->
-    ok;
-myassert(false, Reason) ->
-    ct:fail(Reason).
 
 -define(expect_message_timeout(MsgPattern, Timeout),
         % wrap in function so that the internal variables are out of the calling function's scope
@@ -84,7 +82,7 @@ myassert(false, Reason) ->
                             after
                                 0 -> no_message
                             end,
-                        ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
+                        ?ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
                 end
         end()).
 -define(expect_message(MsgPattern), ?expect_message_timeout(MsgPattern, 1000)).
@@ -94,19 +92,19 @@ myassert(false, Reason) ->
         fun() ->
                 receive
                     ActualMessage ->
-                        ct_fail("expected no message but got \"~p\"", [ActualMessage])
+                        ?ct_fail("expected no message but got \"~p\"", [ActualMessage])
                 after
                     Timeout -> ok
                 end
         end()).
 -define(expect_no_message(), ?expect_no_message_timeout(100)).
 
-consume_message(Message, Timeout) ->
+-define(consume_message(Message, Timeout),
     receive
         Message -> ok
     after
         Timeout -> ok
-    end.
+    end).
 
 -define(expect_message_ignore_timeout(MsgPattern, IgnoredMessage, Timeout),
         % wrap in function so that the internal variables are out of the calling function's scope
@@ -118,7 +116,7 @@ consume_message(Message, Timeout) ->
                         receive
                             IgnoredMessage ->
                                 ct:pal("ignored \"~p\"", [IgnoredMessage]),
-                                consume_message(IgnoredMessage, Timeout),
+                                ?consume_message(IgnoredMessage, Timeout),
                                 receive
                                     IgnoredMessage ->
                                         ct:pal("ignored \"~p\" for the last time", [IgnoredMessage]),
@@ -131,7 +129,7 @@ consume_message(Message, Timeout) ->
                                             after
                                                 0 -> no_message
                                             end,
-                                        ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
+                                        ?ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
                                 end
                             MsgPattern -> ok
                         after
@@ -142,7 +140,7 @@ consume_message(Message, Timeout) ->
                                     after
                                         0 -> no_message
                                     end,
-                                ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
+                                ?ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
                         end
                     MsgPattern -> ok
                 after
@@ -153,7 +151,7 @@ consume_message(Message, Timeout) ->
                             after
                                 0 -> no_message
                             end,
-                        ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
+                        ?ct_fail("expected message ~p but got \"~p\"", [??MsgPattern, ActualMessage])
                 end
         end()).
 -define(expect_message_ignore(MsgPattern, IgnoredMessage), ?expect_message_ignore(MsgPattern, IgnoredMessage, 1000)).
@@ -178,5 +176,5 @@ consume_message(Message, Timeout) ->
 %%                                 0 ->
 %%                                     unknown
 %%                             end,
-%%             ct_fail("expected message ~p but got ~p", [MsgPattern, ActualMessage])
+%%             ?ct_fail("expected message ~p but got ~p", [MsgPattern, ActualMessage])
 %%     end.

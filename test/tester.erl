@@ -360,7 +360,7 @@ run_helper(Module, Func, Iterations, {'fun', ArgType, _ResultType} = FunType, Ty
         true ->
             run_helper(Module, Func, Iterations - 1, FunType, TypeInfo);
         X ->
-            ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, X])
+            ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, X])
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
