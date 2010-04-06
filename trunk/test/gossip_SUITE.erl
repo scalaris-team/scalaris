@@ -890,5 +890,5 @@ fake_cs_node_start(Supervisor) ->
     fake_process().
 
 fake_process() ->
-    consume_message({ok}, 1000),
+    ?consume_message({ok}, 1000),
     fake_process().
