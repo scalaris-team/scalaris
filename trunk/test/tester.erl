@@ -32,6 +32,7 @@
 -export([create_value/3]).
 
 -include_lib("unittest.hrl").
+-include_lib("../include/scalaris.hrl").
 
 -type(test_any() ::
    % | none()
@@ -65,7 +66,7 @@
     | gb_set
     | module).
 
--ifdef(recursive_types_are_not_allowed).
+-ifdef(forward_or_recursive_types_are_not_allowed).
 -type(record_field_type() ::
      {typed_record_field, atom(), any()}
    | {untyped_record_field, atom()}).
