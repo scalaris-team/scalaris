@@ -102,15 +102,24 @@ AC_RUN_IFELSE(
        [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; AC_MSG_NOTICE([boolean() is not built-in])])
 
 AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::ok | mytype()).], [ok])],
+       [RECURSIVETYPESALLOWED=""; AC_MSG_NOTICE([recursive types are supported])],
+       [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; AC_MSG_NOTICE([recursive types are not supported])])
+
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [crypto:start()])],
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
+
+EMAKEFILEDEFINES="$GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED"
 
 AC_SUBST(GBTREESISBUILTIN)
 AC_SUBST(TERMISBUILTIN)
 AC_SUBST(NODEISBUILTIN)
 AC_SUBST(MODULEISBUILTIN)
 AC_SUBST(BOOLEANISBUILTIN)
+AC_SUBST(RECURSIVETYPESALLOWED)
+AC_SUBST(EMAKEFILEDEFINES)
 
 ###########################################################
 #

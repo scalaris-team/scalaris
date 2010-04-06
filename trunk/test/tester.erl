@@ -28,6 +28,11 @@
 
 -export([test/4]).
 
+% for unit tests
+-export([create_value/3]).
+
+-include_lib("unittest.hrl").
+
 -type(test_any() ::
    % | none()
    % | pid()
@@ -60,6 +65,42 @@
     | gb_set
     | module).
 
+-ifdef(recursive_types_are_not_allowed).
+-type(record_field_type() ::
+     {typed_record_field, atom(), any()}
+   | {untyped_record_field, atom()}).
+
+-type(tester_type() ::
+      {'fun', any(), any()}
+    | {product, [any()]}
+    | {tuple, [any()]}
+    | {tuple, {typedef, tester, test_any}}
+    | {list, any()}
+    | {nonempty_list, any()}
+    | {range, {integer, integer()}, {integer, integer()}}
+    | {union, [any()]}
+    | {record, atom(), atom()}
+    | integer
+    | pos_integer
+    | non_neg_integer
+    | bool
+    | binary
+    | iolist
+    | node
+    | pid
+    | port
+    | reference
+    | none
+    | {typedef, module(), atom()}
+    | atom
+    | float
+    | nil
+    | {atom, atom()}
+    | {integer, integer()}
+    | {builtin_type, builtin_type()}
+    | {record, list(record_field_type())}
+     ).
+-else.
 -type(record_field_type() ::
      {typed_record_field, atom(), tester_type()}
    | {untyped_record_field, atom()}).
@@ -94,6 +135,7 @@
     | {builtin_type, builtin_type()}
     | {record, list(record_field_type())}
      ).
+-endif.
 
 list_length_min() -> 1.
 list_length_max() -> 5.
@@ -106,6 +148,11 @@ test(Module, Func, Arity, Iterations) ->
     run(Module, Func, Arity, Iterations, TypeInfo),
     ok.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% collect necessary type information
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 collect_fun_info(Module, Func, Arity, TypeInfo) ->
     TypeInfo2 = case gb_trees:lookup({'fun', Module, Func, Arity}, TypeInfo) of
                     {value, _} ->
@@ -302,13 +349,24 @@ run_helper(_Module, _Func, 0, _FunType, _TypeInfo) ->
 run_helper(Module, Func, Iterations, {'fun', ArgType, _ResultType} = FunType, TypeInfo) ->
     Size = 30,
     Args = create_value(ArgType, Size, TypeInfo),
-    case erlang:apply(Module, Func, Args) of
+    case (try
+              erlang:apply(Module, Func, Args)
+          catch
+              throw:Term -> {exception, Term};
+              exit:Reason -> {exception, Reason};
+              error:Reason -> {exception, {Reason, erlang:get_stacktrace()}} 
+          end) of
         true ->
             run_helper(Module, Func, Iterations - 1, FunType, TypeInfo);
-        false ->
-            ct:fail("error ~p:~p(~p) failed~n", [Module, Func, Args])
+        X ->
+            ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, X])
     end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% create a random value of the given type
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc create a random value of the given type
 -spec(create_value/3 :: (tester_type(), pos_integer(), type_info()) -> term()).
 create_value({product, Types}, Size, TypeInfo) ->
@@ -371,6 +429,11 @@ create_value({typedef, Module, TypeName}, Size, TypeInfo) ->
             io:format("error: unknown type ~p:~p~n", [Module, TypeName])
     end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% find unknown types in the provided type_info()
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc find types which are referenced in the typeinfo but not registered
 -spec(find_unknown_types/1 :: (type_info()) -> list(tester_type())).
 find_unknown_types(TypeInfo) ->
