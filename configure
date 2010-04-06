@@ -560,12 +560,6 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 DRIVER_OS
 EMAKEFILEDEFINES
-RECURSIVETYPESALLOWED
-BOOLEANISBUILTIN
-MODULEISBUILTIN
-NODEISBUILTIN
-TERMISBUILTIN
-GBTREESISBUILTIN
 ERLANG_LIB_VER_common_test
 ERLANG_LIB_DIR_common_test
 ERLANG_TCERL_FLAGS
@@ -2742,7 +2736,7 @@ else
   cat > conftest.$ac_ext <<_ACEOF
 -module(conftest).
 -export([start/0]).
--type(mytype()::ok | mytype()).
+-type(mytype()::{ok, mytype()} | ok).
 start() ->
 ok
 .
@@ -2759,6 +2753,39 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "cannot run test program while cross compiling
+See \`config.log' for more details." "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+-type(mytype()::{ok, mytype2()} | ok). -type(mytype2() :: ok).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  TYPEFORWARDDECLARATIONS=""; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are supported" >&5
+$as_echo "$as_me: type forward declarations are supported" >&6;}
+else
+  TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are not supported" >&5
+$as_echo "$as_me: type forward declarations are not supported" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: forward declarations or recursive types are not allowed" >&5
+$as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
+   FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
+fi
 
 if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
@@ -2789,13 +2816,7 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-EMAKEFILEDEFINES="$GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED"
-
-
-
-
-
-
+EMAKEFILEDEFINES="$GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
 
 
 

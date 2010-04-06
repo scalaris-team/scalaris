@@ -102,23 +102,27 @@ AC_RUN_IFELSE(
        [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; AC_MSG_NOTICE([boolean() is not built-in])])
 
 AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::ok | mytype()).], [ok])],
+       [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype()} | ok).], [ok])],
        [RECURSIVETYPESALLOWED=""; AC_MSG_NOTICE([recursive types are supported])],
        [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; AC_MSG_NOTICE([recursive types are not supported])])
+
+AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype2()} | ok). -type(mytype2() :: ok).], [ok])],
+       [TYPEFORWARDDECLARATIONS=""; AC_MSG_NOTICE([type forward declarations are supported])],
+       [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; AC_MSG_NOTICE([type forward declarations are not supported])])
+
+if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
+   AC_MSG_NOTICE([forward declarations or recursive types are not allowed])
+   FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
+fi
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [crypto:start()])],
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-EMAKEFILEDEFINES="$GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED"
+EMAKEFILEDEFINES="$GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
 
-AC_SUBST(GBTREESISBUILTIN)
-AC_SUBST(TERMISBUILTIN)
-AC_SUBST(NODEISBUILTIN)
-AC_SUBST(MODULEISBUILTIN)
-AC_SUBST(BOOLEANISBUILTIN)
-AC_SUBST(RECURSIVETYPESALLOWED)
 AC_SUBST(EMAKEFILEDEFINES)
 
 ###########################################################
