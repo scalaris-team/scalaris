@@ -23,7 +23,7 @@ AC_INIT(scalaris, 0.0.1, schuett@zib.de)
 PKG_PROG_PKG_CONFIG
 
 TCERLPREFIX=no
-AC_ARG_ENABLE([tcerl], AS_HELP_STRING([enable support for tokyo cabinet]), [TCERLPREFIX=$enableval])
+AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--enable-tcerl=DIR], [enable support for tokyo cabinet]), [TCERLPREFIX=$enableval])
 
 export PKG_CONFIG_PATH=$TCERLPREFIX/lib/pkgconfig
 AS_IF([test "x$TCERLPREFIX" != xno],
