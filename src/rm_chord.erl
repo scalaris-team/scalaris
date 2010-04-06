@@ -25,6 +25,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
+-include("../include/scalaris.hrl").
+
 -behavior(ring_maintenance).
 -behavior(gen_component).
 
