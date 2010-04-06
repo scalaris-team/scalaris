@@ -38,6 +38,22 @@ AC_SUBST(HAVETCERL)
 
 ###########################################################
 #
+# check browser for 'make test-vts'
+#
+###########################################################
+
+AC_ARG_WITH([browser],
+            [AS_HELP_STRING([--with-browser=BROWSER],
+               [use the given browser for 'make test-vts' (default is xdg-open)])],
+            [with_browser=$withval],
+            [with_browser=xdg-open])
+
+AC_PATH_PROG([BROWSER], [$with_browser], [$with_browser])
+AS_IF([test "x$BROWSER" = x],
+      [AC_MSG_WARN([--with-browser was given, but "$with_browser" was not found ('make test-vts' will likely fail)])])
+
+###########################################################
+#
 # check erlang
 #
 ###########################################################

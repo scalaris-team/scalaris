@@ -52,30 +52,35 @@ JAVADIR=$(DESTDIR)@datarootdir@/java
 # /var/log/scalaris
 LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
 
+# paths of source files for make doc
+SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
+SOURCEPATHS_JAVA=java-api/src/de/zib/*/*.java java-api/src/de/zib/*/*/*.java java-api/test/de/zib/*/*.java
+
 all: compile
 #all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
 compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
+	@touch .make-compile
 
 
 test: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test $(UNITTESTARGS) @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skip_benchmark.cfg -cover test/scalaris.coverspec | tee ct.log ; \
 	grep " 0 failed" ct.log
 
-test-clean:
-	-rm -rf ct_run.ct@* ct.log index.html all_runs.html variables-ct@* \
-            result_increment_10_1000.txt result_increment_1_10000.txt \
-            result_read_10_10000.txt result_read_1_100000.txt
-
-
 %_SUITE: compile
 	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test $(UNITTESTARGS) @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-vts: compile
-	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser konqueror
+	@ERLANG_LIB_DIR_common_test@/priv/bin/run_test @ERLANG_TCERL_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@
+
+test-clean:
+	-rm -rf ct_run.ct@* ct.log index.html all_runs.html variables-ct@* \
+            result_increment_10_1000.txt result_increment_1_10000.txt \
+            result_read_10_10000.txt result_read_1_100000.txt
+
 
 java:
 	ant -buildfile java-api/build.xml jar
@@ -91,7 +96,9 @@ java-test: compile java
 	  true ; \
 	fi
 
+
 clean:
+	-rm -f .make-docs
 	-rm -rf bin/*.beam
 	-rm -rf ebin/*.beam
 	-rm -rf src/*.beam
@@ -106,10 +113,14 @@ clean:
 	-rm -rf doc/edoc-info
 	-rm -rf docroot/graphs/*.png
 
-docs:
+
+docs: .make-docs
+
+.make-docs: $(SOURCEPATHS_ERL) $(SOURCEPATHS_JAVA)
 	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
 	'"."' '[{def,{vsn,"$(VSN)"}}]'
 	ant -buildfile java-api/build.xml doc
+	@touch .make-docs
 
 svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/cyclon/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg

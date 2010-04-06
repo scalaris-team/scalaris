@@ -8,6 +8,7 @@
 /.settings
 /.externalToolBuilders
 /.Makefile.swp
+/.make-docs
 /config.log
 /variables-ct@*
 /erl_crash.dump
