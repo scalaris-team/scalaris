@@ -30,6 +30,7 @@
 -behaviour(gen_component).
 
 -export([dump_node_states/0, kill_nodes/1]).
+-export([get_round_trip/2]).
 
 -export([start_link/0, init/1, on/2]).
 
@@ -72,3 +73,15 @@ on(_, _State) ->
 
 get_live_cs_nodes() ->
     [cs_send:make_global(Pid) || Pid <- process_dictionary:find_all_cs_nodes(), element(1, gen_component:get_state(Pid)) == state].
+
+get_round_trip(GPid, Iterations) ->
+    Start = erlang:now(),
+    [ begin
+          cs_send:send(GPid, {ping, cs_send:this()}),
+          receive
+              Any -> ok
+          end
+      end
+      || _ <- lists:seq(1, Iterations) ],
+    End = erlang:now(),
+    timer:now_diff(End, Start) / Iterations.

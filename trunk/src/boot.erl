@@ -28,11 +28,11 @@
 -vsn('$Id$ ').
 
 -export([start/0, stop/0]).
-	
+
 start() ->
-    %tracer:start(),
+    %% tracer:start(),
     application:start(boot_cs).
 
 stop() ->
     application:stop(boot_cs).
- 
+
