@@ -1,46 +1,14 @@
-{"src/gen_component.erl",
+% behaviors first - otherwise there are compile warnings
+{["src/gen_component.erl", "src/gen_trigger.erl", "src/database.erl", "src/ring_maintenance.erl", "src/routingtable.erl", "src/self_man.erl", "src/transactions/rdht_op_beh.erl", "src/transactions/tx_op_beh.erl"],
  [debug_info,
   {outdir, "ebin"},
   {i, "include"},
-  {i, "contrib/yaws/include"}
+  {i, "contrib/yaws/include"},
+  {i, "contrib/log4erl/include"}
   @EMAKEFILEDEFINES@
  ]}.
-{"src/gen_trigger.erl",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"},
-  {i, "contrib/yaws/include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/simulation/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/ring_maintenance.erl",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"},
-  {i, "contrib/yaws/include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/routingtable.erl",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"},
-  {i, "src"},
-  {i, "contrib/yaws/include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/database.erl",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"},
-  {i, "contrib/yaws/include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/*",
+% now the source and all of its sub-directories:
+{["src/*", "src/comm_layer/*", "src/cyclon/*", "src/paxos/*", "src/pubsub/*", "src/simulation/*", "src/transactions/*", "src/transstore/*"],
  [debug_info,
   {outdir, "ebin"},
   {i, "ebin"},
@@ -49,54 +17,14 @@
   {i, "contrib/log4erl/include"}
   @EMAKEFILEDEFINES@
  ]}.
-{"src/comm_layer/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/paxos/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/transactions/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/simulation/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/cyclon/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/pubsub/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
-{"src/transstore/*",
- [debug_info,
-  {outdir, "ebin"},
-  {i, "include"}
-  @EMAKEFILEDEFINES@
- ]}.
+% unit tests:
 {"test/*",
  [debug_info,
   {outdir, "test"},
   {i, "include"}
   @EMAKEFILEDEFINES@
  ]}.
+% contributing libraries:
 {"contrib/log4erl/src/*",
  [debug_info,
   {outdir, "contrib/log4erl/ebin/"},
