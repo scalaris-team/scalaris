@@ -17,7 +17,8 @@
 all() ->
     [new, is_empty, cut, tc1,
      tester_make, tester_in, tester_sanitize,
-     tester_cut, tester_not_cut, tester_not_cut2].
+     tester_cut, tester_not_cut, tester_not_cut2
+     ].
 
 suite() ->
     [

@@ -54,7 +54,7 @@
 -type erl_local_pid_plain() :: pid() | reg_name().
 -type erl_local_pid_with_cookie() :: {erl_local_pid_plain(), c, cookie()}.
 -type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_cookie().
--type erl_pid_plain() :: erl_local_pid_plain() | port() | {reg_name(), node()}.
+-type erl_pid_plain() :: erl_local_pid_plain() | {reg_name(), node()}. % port() | 
 
 
 -ifdef(TCP_LAYER).
