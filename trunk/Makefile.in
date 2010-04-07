@@ -86,11 +86,16 @@ java:
 	ant -buildfile java-api/build.xml jar
 
 java-test: compile java
-	./bin/scalarisctl boot start ; \
+	SCALARIS_ADDITIONAL_PARAMETERS="-noinput" ./bin/scalarisctl -i boot start > log/java-test-log.txt & \
 	ant -buildfile java-api/build.xml test ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl boot stop ; \
 	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages:" ; \
+	  echo "####################" ; \
+	  cat log/java-test-log.txt ; \
+	  echo "####################" ; \
 	  false ; \
 	else \
 	  true ; \
