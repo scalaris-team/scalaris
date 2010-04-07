@@ -159,8 +159,8 @@ collect_fun_info(Module, Func, Arity, TypeInfo) ->
                     {value, _} ->
                         TypeInfo;
                     none ->
-                        {ok, {Module, [{abstract_code, {raw_abstract_v1, AbstractCode}}]}}
-                            = beam_lib:chunks(code:which(Module), [abstract_code]),
+                        {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
+                            = beam_lib:chunks(code:where_is_file(atom_to_list(Module) ++ ".beam"), [abstract_code]),
                         lists:foldl(fun (Chunk, InnerTypeInfo) ->
                                             parse_chunk(Chunk, Module, InnerTypeInfo)
                                     end, TypeInfo, AbstractCode)
@@ -194,8 +194,8 @@ collect_unknown_type_infos(UnknownTypes, TypeInfo) ->
     end.
 
 collect_type_info(Module, _Type, TypeInfo) ->
-    {ok, {Module, [{abstract_code, {raw_abstract_v1, AbstractCode}}]}}
-        = beam_lib:chunks(code:which(Module), [abstract_code]),
+    {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
+        = beam_lib:chunks(code:where_is_file(atom_to_list(Module) ++ ".beam"), [abstract_code]),
     lists:foldl(fun (Chunk, InnerTypeInfo) ->
                         parse_chunk(Chunk, Module, InnerTypeInfo)
                 end, TypeInfo, AbstractCode).
@@ -350,17 +350,15 @@ run_helper(_Module, _Func, 0, _FunType, _TypeInfo) ->
 run_helper(Module, Func, Iterations, {'fun', ArgType, _ResultType} = FunType, TypeInfo) ->
     Size = 30,
     Args = create_value(ArgType, Size, TypeInfo),
-    case (try
-              erlang:apply(Module, Func, Args)
-          catch
-              throw:Term -> {exception, Term};
-              exit:Reason -> {exception, Reason};
-              error:Reason -> {exception, {Reason, erlang:get_stacktrace()}} 
-          end) of
+    try erlang:apply(Module, Func, Args) of
         true ->
             run_helper(Module, Func, Iterations - 1, FunType, TypeInfo);
         X ->
             ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, X])
+    catch
+        throw:Term -> {exception, Term};
+        exit:Reason -> {exception, Reason};
+        error:Reason -> {exception, {Reason, erlang:get_stacktrace()}}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
