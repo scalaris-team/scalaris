@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,14 +13,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : node_details.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Node summary for statistics
-%%%
-%%% Created :  7 May 2007 by Thorsten Schuett <schuett@zib.de>
+%%% File    node_details.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Node summary for statistics
+%%% @end
+%%% Created : 7 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(node_details).
 
@@ -37,9 +36,8 @@
 
 -include("../include/scalaris.hrl").
 
--type(predlist() :: [node:node_type()]).
+-type(nodelist() :: [node:node_type()]).
 -type(node_type() :: node:node_type()).
--type(succlist() :: [node:node_type()]).
 -type(load() :: integer()).
 -type(hostname() :: string()).
 -type(rt_size() :: integer()).
@@ -51,9 +49,9 @@
                              succlist | load | hostname | rt_size |
                              message_log | memory).
 
--record(node_details, {predlist    :: predlist(),
+-record(node_details, {predlist    :: nodelist(),
                        node        :: node_type(),
-                       succlist    :: succlist(),
+                       succlist    :: nodelist(),
                        load        :: load(),
                        hostname    :: hostname(),
                        rt_size     :: rt_size(),
@@ -61,12 +59,12 @@
 -type(node_details_record() :: #node_details{}).
 
 -type(node_details_list() ::
-	[{predlist, predlist()} |
+	[{predlist, nodelist()} |
 	 {pred, node_type()} |
 	 {node, node_type()} |
 	 {my_range, node_range()} |
 	 {succ, node_type()} |
-	 {succlist, succlist()} |
+	 {succlist, nodelist()} |
 	 {load, load()} |
 	 {hostname, hostname()} |
 	 {rt_size, rt_size()} |
@@ -78,10 +76,10 @@
 -spec new() -> node_details_list().
 new() -> [].
 
--spec new(predlist(), node_type(), succlist(), load(), hostname(), rt_size(), memory()) -> node_details_record().
-new(Pred, Node, SuccList, Load, Hostname, RTSize, Memory) ->
+-spec new(nodelist(), node_type(), nodelist(), load(), hostname(), rt_size(), memory()) -> node_details_record().
+new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     #node_details{
-     predlist = Pred,
+     predlist = PredList,
      node = Node,
      succlist = SuccList,
      load = Load,
@@ -101,12 +99,12 @@ record_to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load
 	 {rt_size, RTSize},
 	 {memory, Memory}].
 
--spec set(node_details(), predlist, predlist()) -> node_details()
+-spec set(node_details(), predlist, nodelist()) -> node_details()
         ; (node_details(), pred, node_type()) -> node_details()
         ; (node_details(), node, node_type()) -> node_details()
         ; (node_details(), my_range, node_range()) -> node_details()
         ; (node_details(), succ, node_type()) -> node_details()
-        ; (node_details(), succlist, succlist()) -> node_details()
+        ; (node_details(), succlist, nodelist()) -> node_details()
         ; (node_details(), load, load()) -> node_details()
         ; (node_details(), hostname, hostname()) -> node_details()
         ; (node_details(), rt_size, rt_size()) -> node_details()
@@ -133,12 +131,12 @@ set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
 set(NodeDetails, Key, Value) when is_list(NodeDetails) ->
 	lists:keystore(Key, 1, NodeDetails, {Key, Value}).
 
--spec get(node_details(), predlist) -> predlist() | unknown
+-spec get(node_details(), predlist) -> nodelist() | unknown
         ; (node_details(), pred) -> node_type() | unknown
         ; (node_details(), node) -> node_type() | unknown
         ; (node_details(), my_range) -> node_range() | unknown
         ; (node_details(), succ) -> node_type() | unknown
-        ; (node_details(), succlist) -> succlist() | unknown
+        ; (node_details(), succlist) -> nodelist() | unknown
         ; (node_details(), load) -> load() | unknown
         ; (node_details(), hostname) -> hostname() | unknown
         ; (node_details(), rt_size) -> rt_size() | unknown
