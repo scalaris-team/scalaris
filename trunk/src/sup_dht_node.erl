@@ -1,4 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,16 +13,18 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_sup_or.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Supervisor for chord# nodes
+%%% File    sup_dht_node.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Supervisor for each DHT node that is responsible for keeping
+%%%         processes running that run for themselves.
 %%%
+%%%         If one of the supervised processes fails, only the failed process
+%%%         will be re-started!
+%%% @end
 %%% Created : 17 Jan 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(cs_sup_or).
+-module(sup_dht_node).
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
@@ -30,21 +33,23 @@
 
 -export([start_link/1, start_link/0, init/1]).
 
+-spec start_link([any()]) -> {ok, Pid::cs_send:erl_pid_plain()} | ignore | {error, Error::{already_started, Pid::cs_send:erl_pid_plain()} | term()}.
 start_link(Options) ->
     supervisor:start_link(?MODULE, [Options]).
 start_link() ->
     supervisor:start_link(?MODULE, [[]]).
 
-%% userdevguide-begin cs_sup_or:init
+%% userdevguide-begin sup_dht_node:init
+-spec init([term() | [any()]]) -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init([Options]) ->
-    InstanceId = string:concat("cs_node_", randoms:getRandomId()),
-    process_dictionary:register_process(InstanceId, cs_sup_or, self()),
+    InstanceId = string:concat("dht_node_", randoms:getRandomId()),
+    process_dictionary:register_process(InstanceId, sup_dht_node, self()),
     boot_server:connect(),
     KeyHolder =
-        util:sup_worker_desc(cs_keyholder, cs_keyholder, start_link,
+        util:sup_worker_desc(idholder, idholder, start_link,
                              [InstanceId]),
     Supervisor_AND =
-        util:sup_supervisor_desc(cs_supervisor_and, cs_sup_and, start_link,
+        util:sup_supervisor_desc(cs_supervisor_and, sup_dht_node_core, start_link,
                                  [InstanceId, Options]),
     RingMaintenance =
         util:sup_worker_desc(?RM, ?RM, start_link, [InstanceId]),
@@ -54,8 +59,8 @@ init([Options]) ->
         util:sup_worker_desc(deadnodecache, dn_cache, start_link, [InstanceId]),
     Vivaldi =
         util:sup_worker_desc(vivaldi, vivaldi, start_link, [InstanceId]),
-    CS_Reregister =
-        util:sup_worker_desc(cs_reregister, cs_reregister, start_link,
+    Reregister =
+        util:sup_worker_desc(dht_node_reregister, dht_node_reregister, start_link,
                              [InstanceId]),
     DC_Clustering =
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
@@ -69,7 +74,7 @@ init([Options]) ->
     {ok, {{one_for_one, 10, 1},
           [
            Self_Man,
-           CS_Reregister,
+           Reregister,
            KeyHolder,
            RoutingTable,
            Supervisor_AND,
@@ -81,4 +86,4 @@ init([Options]) ->
 		   Gossip
            %% _RSE
           ]}}.
-%% userdevguide-end cs_sup_or:init
+%% userdevguide-end sup_dht_node:init

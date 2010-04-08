@@ -46,7 +46,7 @@ add_nodes(0) ->
 add_nodes(Count) ->
     [ begin
           Desc = util:sup_supervisor_desc(randoms:getRandomId(),
-                                   cs_sup_or, start_link),
+                                   sup_dht_node, start_link),
           supervisor:start_child(main_sup, Desc)
       end || _ <- lists:seq(1, Count) ],
     ok.
@@ -80,7 +80,7 @@ del_single_node([H|T]) ->
 % @doc contact boot server and check ring
 -spec(check_ring/0 :: () -> {error, string()} | ok).
 check_ring() ->
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     Nodes = statistics:get_ring_details(),
     case lists:foldl(fun check_ring_foldl/2, first, Nodes) of
         {error, Reason} ->
@@ -240,6 +240,6 @@ dd_check_ring() ->
     dd_check_ring(0).
 
 dd_check_ring(Token) ->
-    {ok,One} = process_dictionary:find_cs_node(),
+    {ok,One} = process_dictionary:find_dht_node(),
     cs_send:send_local(One , {send_to_group_member,ring_maintenance,{init_check_ring,Token}}),
     {token_on_the_way}.

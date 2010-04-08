@@ -72,7 +72,7 @@ on({check_ring},_) ->
     %io:format("Check"),
     %scheduler ! {halt_simulation},
     %Implement a Noneblocking CheckRing 
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     cs_send:send_local(bootPid(), {get_list, cs_send:this()}),
     %io:format("A~n"),
     {check_ring_p1};

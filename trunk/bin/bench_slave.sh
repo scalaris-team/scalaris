@@ -26,6 +26,6 @@ A=$2
 YAWS_PORT=$((8000+A))
 CS_PORT=$((14195+A))
 erl $ERL_OPTS -noinput -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false \
-    -chordsharp cs_port $CS_PORT \
-    -chordsharp yaws_port $YAWS_PORT \
+    -scalaris cs_port $CS_PORT \
+    -scalaris yaws_port $YAWS_PORT \
     -name node$A -s bench_slave ;

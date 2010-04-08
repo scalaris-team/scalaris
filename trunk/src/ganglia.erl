@@ -47,7 +47,7 @@ ganglia_loop(Last) ->
     Timers = monitor_timing:get_timers(),
     [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
     % vivaldi statistics
-    monitor_per_cs_node(fun monitor_vivaldi_errors/2, process_dictionary:find_all_groups(cs_node)),
+    monitor_per_dht_node(fun monitor_vivaldi_errors/2, process_dictionary:find_all_groups(dht_node)),
     timer:sleep(config:read(ganglia_interval)),
     ganglia_loop(Now).
 
@@ -58,9 +58,9 @@ update(Tree) ->
   gmetric(both, "Memory used by atoms", "int32", erlang:memory(atom), "Bytes"),
   gmetric(both, "Memory used by binaries", "int32", erlang:memory(binary), "Bytes"),
   gmetric(both, "Memory used by system", "int32", erlang:memory(system), "Bytes"),
-  CSNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
-                                  || P <- process_dictionary:find_all_cs_nodes()]),
-  gmetric(both, "Memory used by cs_nodes", "int32", CSNodesMemoryUsage, "Bytes"),
+  DHTNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
+                                  || P <- process_dictionary:find_all_dht_nodes()]),
+  gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
   traverse(gb_trees:iterator(Tree)).
 
 update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
@@ -94,12 +94,12 @@ monitor_vivaldi_errors(Group, Idx) ->
             end
     end.
 
-monitor_per_cs_node(_, failed) ->
+monitor_per_dht_node(_, failed) ->
     ok;
-monitor_per_cs_node(F, Nodes) ->
-    CSNodes = lists:sort(Nodes),
+monitor_per_dht_node(F, Nodes) ->
+    DHTNodes = lists:sort(Nodes),
     lists:foldl(fun (Group, Idx) ->
                         F(Group, Idx),
                         Idx + 1
-                end, 0, CSNodes).
+                end, 0, DHTNodes).
 

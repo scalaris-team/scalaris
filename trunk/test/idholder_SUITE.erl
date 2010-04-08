@@ -12,13 +12,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_keyholder_SUITE.erl
+%%% File    : idholder_SUITE.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Unit tests for src/cs_keyholder.erl
+%%% Description : Unit tests for src/idholder.erl
 %%%
 %%% Created :  12 Jun 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
--module(cs_keyholder_SUITE).
+-module(idholder_SUITE).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -41,7 +41,7 @@ init_per_suite(Config) ->
 			config:start_link(["scalaris.cfg"]),
 			crypto:start(),
 			process_dictionary:start_link(),
-			cs_keyholder:start_link(foo),
+			idholder:start_link(foo),
 			timer:sleep(5000)
 		end),
     timer:sleep(1000),
@@ -56,14 +56,14 @@ end_per_suite(Config) ->
 getset_key(_Config) ->
     util:dump2(),
     process_dictionary:register_process(foo, foo, self()),
-    cs_keyholder:get_key(),
+    idholder:get_key(),
     _X = receive
 	{get_key_response_keyholder, D} ->
 	    D
     end,
     %ct:pal("X: ~p~n",[_X]),
-    cs_keyholder:set_key("getset_key"),
-    cs_keyholder:get_key(),
+    idholder:set_key("getset_key"),
+    idholder:get_key(),
     Res = receive
 	{get_key_response_keyholder, Key} ->
 	    Key

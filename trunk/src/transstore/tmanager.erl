@@ -242,8 +242,8 @@ start_replicated_manager(Message, InstanceId)->
                                     {RKey, cs_send:this(), unknownballot}),
     loop(TMState),
     % done: remove tid_tm_mapping.
-    CSNodePid = process_dictionary:get_group_member(cs_node),
-    CSNodePid ! {remove_tm_tid_mapping, TransID, cs_send:this()}.
+    DHTNodePid = process_dictionary:get_group_member(dht_node),
+    DHTNodePid ! {remove_tm_tid_mapping, TransID, cs_send:this()}.
 
 loop(TMState)->
     receive

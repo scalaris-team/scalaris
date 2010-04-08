@@ -102,7 +102,7 @@ get_as_list() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode},uninit) ->
+on({init, NewId, NewMe, NewPred, NewSuccList, _DHTNode},uninit) ->
         ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
         fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
@@ -167,7 +167,7 @@ on({rm_buffer, Q, Buffer_q},
     %io:format("after_rank~p~n",[self()]),
     %SuccsNew=get_succs(NewView),
     %PredsNew=get_preds(NewView),
-    {NewAktPred,NewAktSucc} = update_cs_node(NewView,AktPred,AktSucc),
+    {NewAktPred,NewAktSucc} = update_dht_node(NewView,AktPred,AktSucc),
     update_failuredetector(View,NewView),
     NewInterval = new_interval(View,NewView,Interval),
     cs_send:send_local_after(NewInterval , self(), {stabilize,AktToken+1}),
@@ -181,7 +181,7 @@ on({rm_buffer_response, Buffer_p},
     Buffer = rank(View++Buffer_p++RndView,node:id(Me)),
     %io:format("after_rank~p~n",[self()]),
     NewView = lists:sublist(Buffer,config:read(succ_list_length)+config:read(pred_list_length)),
-    {NewAktPred,NewAktSucc} = update_cs_node(View,AktPred,AktSucc),
+    {NewAktPred,NewAktSucc} = update_dht_node(View,AktPred,AktSucc),
     update_failuredetector(View,NewView),
     NewInterval = new_interval(View,NewView,Interval),
     %inc RandViewSize (no error detected)
@@ -388,8 +388,8 @@ update_fd(Nodes, F) ->
     F(Nodes).             
            
 	
-% @doc informed the cs_node for new [succ|pred] if necessary
-update_cs_node(View,_AktPred,_AktSucc) ->
+% @doc informed the dht_node for new [succ|pred] if necessary
+update_dht_node(View,_AktPred,_AktSucc) ->
         NewAktPred=get_pred(View),
         NewAktSucc=get_succ(View),
       	ring_maintenance:update_pred(NewAktPred),
@@ -423,9 +423,9 @@ new_interval(View,NewView,Interval) ->
 get_pid() ->
     process_dictionary:get_group_member(ring_maintenance).
 
-% get Pid of assigned cs_node
+% get Pid of assigned dht_node
 get_cs_pid() ->
-    process_dictionary:get_group_member(cs_node).
+    process_dictionary:get_group_member(dht_node).
 
 %% @doc the interval between two stabilization runs Max
 %% @spec stabilizationInterval_max() -> integer() | failed

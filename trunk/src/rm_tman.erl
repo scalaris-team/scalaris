@@ -214,7 +214,7 @@ on({crash, DeadPid},
     NewPreds = filter(DeadPid, OldPreds),
     NewSuccs = filter(DeadPid, OldSuccs),
     NewCache = filter(DeadPid, Cache),
-    update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
+    update_dht_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
     update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs),
     NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
     {Id, Me, NewPreds, NewSuccs, 0, stabilizationInterval_min(), NewTriggerState, NewCache,Churn};
@@ -346,12 +346,12 @@ update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
             ok
     end.
 
-% @doc inform the cs_node of new [succ|pred] if necessary
--spec update_cs_node(
+% @doc inform the dht_node of new [succ|pred] if necessary
+-spec update_dht_node(
         OldPreds::[node:node_type()], NewPreds::[node:node_type()],
         OldSuccs::[node:node_type()], NewSuccs::[node:node_type()]) ->
               {NewPreds::[node:node_type()], NewSuccs::[node:node_type()]}.
-update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
+update_dht_node(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
     %io:format("UCN: ~p ~n",[{PredsNew,SuccsNew,ShuffelBuddy,AktPred,AktSucc}]),
     case NewPreds =/= [] andalso OldPreds =/= NewPreds of
         true -> ring_maintenance:update_preds(NewPreds);
@@ -411,10 +411,10 @@ has_churn(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
 get_pid_dnc() ->
     process_dictionary:get_group_member(dn_cache).
 
-% get Pid of assigned cs_node
+% get Pid of assigned dht_node
 -spec get_cs_pid() -> pid() | failed.
 get_cs_pid() ->
-    process_dictionary:get_group_member(cs_node).
+    process_dictionary:get_group_member(dht_node).
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
@@ -438,7 +438,7 @@ update_view(OldPreds, OldSuccs, OtherBuffer, RndView, Me, Interval, Churn) ->
     Buffer = merge(OldSuccs++OldPreds, OtherBuffer++RndView, node:id(Me)),
     NewSuccs = lists:sublist(Buffer, config:read(succ_list_length)),
     NewPreds = lists:sublist(lists:reverse(Buffer), config:read(pred_list_length)),
-    update_cs_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
+    update_dht_node(OldPreds, NewPreds, OldSuccs, NewSuccs),
     update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs),
     NewInterval = new_interval(OldPreds, NewPreds, OldSuccs, NewSuccs, Interval, Churn),
     NewChurn = has_churn(OldPreds, NewPreds, OldSuccs, NewSuccs),

@@ -125,7 +125,7 @@ test_on_cy_cache1(Config) ->
     Config.
 
 test_on_cy_cache2(Config) ->
-    process_dictionary:register_process(vivaldi_group, cs_node, self()),
+    process_dictionary:register_process(vivaldi_group, dht_node, self()),
 
     Coordinate = [1, 1],
     Confidence = 1.0,
@@ -142,9 +142,9 @@ test_on_cy_cache2(Config) ->
 
 test_on_cy_cache3(Config) ->
     erlang:put(instance_id, vivaldi_group),
-    % register some other process as the cs_node
-    CS_Node = fake_cs_node(),
-%%     ?equals(process_dictionary:get_group_member(cs_node), CS_Node),
+    % register some other process as the dht_node
+    DHT_Node = fake_dht_node(),
+%%     ?equals(process_dictionary:get_group_member(dht_node), DHT_Node),
 
     Coordinate = [1, 1],
     Confidence = 1.0,
@@ -155,14 +155,14 @@ test_on_cy_cache3(Config) ->
         vivaldi:on({cy_cache, Cache}, InitialState),
 
     ?equals(NewState, InitialState),
-    % if pids don't match, a get_state is send to the cached node's cs_node
+    % if pids don't match, a get_state is send to the cached node's dht_node
     This = cs_send:this(),
     ?expect_message({send_to_group_member, vivaldi,
                      {vivaldi_shuffle, This, Coordinate, Confidence}}),
     % no further messages
     ?expect_no_message(),
     
-    exit(CS_Node, kill),
+    exit(DHT_Node, kill),
     Config.
 
 reset_config() ->
@@ -179,14 +179,14 @@ get_ptrigger_nodelay() ->
 get_ptrigger_delay(Delay) ->
     trigger:init('trigger_periodic', fun () -> Delay end, 'trigger').
 
-fake_cs_node() ->
-    CS_Node = spawn(?MODULE, fake_cs_node_start, [self()]),
+fake_dht_node() ->
+    DHT_Node = spawn(?MODULE, fake_dht_node_start, [self()]),
     receive
-        {started, CS_Node} -> CS_Node
+        {started, DHT_Node} -> DHT_Node
     end.
 
-fake_cs_node_start(Supervisor) ->
-    process_dictionary:register_process(vivaldi_group, cs_node, self()),
+fake_dht_node_start(Supervisor) ->
+    process_dictionary:register_process(vivaldi_group, dht_node, self()),
     Supervisor ! {started, self()},
     fake_process().
 

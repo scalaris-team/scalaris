@@ -37,22 +37,22 @@
 %%      sends the message to all nodes in the given interval
 %% @spec issue_bulk_owner(intervals:interval(), term()) -> ok
 issue_bulk_owner(I, Msg) ->
-    {ok, CSNode} = process_dictionary:find_cs_node(),
-    cs_send:send_local(CSNode , {start_bulk_owner, I, Msg}).
+    {ok, DHTNode} = process_dictionary:find_dht_node(),
+    cs_send:send_local(DHTNode , {start_bulk_owner, I, Msg}).
 
 start_bulk_owner(I, Msg) ->
     cs_send:send_local(self() , {bulk_owner, I, Msg}).
 
 %% @doc main routine. It spans a broadcast tree over the nodes in I
-%% @spec bulk_owner(State::cs_state:state(), I::intervals:interval(), 
+%% @spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), 
 %%                 Msg::term()) -> ok
 bulk_owner(State, I, Msg) ->
-    Range = intervals:sanitize(intervals:cut(I, cs_state:next_interval(State))),
+    Range = intervals:sanitize(intervals:cut(I, dht_node_state:next_interval(State))),
     case intervals:is_empty(Range) of
 	true ->
 	    ok;
 	false ->
-	    cs_send:send(cs_state:succ_pid(State), {bulkowner_deliver, Range, Msg})
+	    cs_send:send(dht_node_state:succ_pid(State), {bulkowner_deliver, Range, Msg})
     end,
     U = ?RT:to_dict(State),
     case intervals:is_covered(I, Range) of
@@ -62,7 +62,7 @@ bulk_owner(State, I, Msg) ->
 	    bulk_owner_iter(State, U, 1, I, Msg)
     end.
 
-% @spec bulk_owner_iter(State::cs_state:state(), U::dict:dictionary(), 
+% @spec bulk_owner_iter(State::dht_node_state:state(), U::dict:dictionary(), 
 %       Index::int(), I::intervals:interval(), Msg::term()) -> ok
 bulk_owner_iter(State, U, Index, I, Msg) ->
     case dict:find(Index, U) of

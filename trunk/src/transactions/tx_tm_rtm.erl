@@ -69,7 +69,7 @@ init([InstanceID, Name]) ->
     %% start getting rtms and maintain them.
     case Name of
         tx_tm ->
-            cs_keyholder:get_key(),
+            idholder:get_key(),
             gen_component:change_handler(State, on_init);
         _ -> State
     end.
@@ -399,7 +399,7 @@ my_init_TPs(TxState, ItemStates) ->
           [ begin
                 Key = element(2, RTLog),
                 Msg1 = {init_TP, {Tid, CleanRTMs, TM, RTLog, ItemId, PaxId}},
-                %% delivers message to a cs_node process, which has
+                %% delivers message to a dht_node process, which has
                 %% also the role of a TP
                 cs_lookup:unreliable_lookup(Key, Msg1)
             end

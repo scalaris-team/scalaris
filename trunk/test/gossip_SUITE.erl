@@ -122,7 +122,7 @@ test_init(Config) ->
     Config.
 
 test_on_trigger1(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     process_dictionary:register_process(gossip_group, cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
@@ -157,7 +157,7 @@ test_on_trigger1(Config) ->
     Config.
 
 test_on_trigger2(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     process_dictionary:register_process(gossip_group, cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
@@ -192,7 +192,7 @@ test_on_trigger2(Config) ->
     Config.
 
 test_on_trigger3(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     process_dictionary:register_process(gossip_group, cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
@@ -228,7 +228,7 @@ test_on_trigger3(Config) ->
     Config.
 
 test_on_trigger4(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     process_dictionary:register_process(gossip_group, cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
@@ -264,7 +264,7 @@ test_on_trigger4(Config) ->
     Config.
 
 test_on_trigger5(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     process_dictionary:register_process(gossip_group, cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
@@ -300,7 +300,7 @@ test_on_trigger5(Config) ->
     Config.
 
 test_on_trigger6(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     process_dictionary:register_process(gossip_group, cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
@@ -336,7 +336,7 @@ test_on_trigger6(Config) ->
     Config.
 
 test_on_trigger7(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     process_dictionary:register_process(gossip_group, cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
@@ -554,7 +554,7 @@ test_on_get_node_details_response_local_info7(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round1(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -577,7 +577,7 @@ test_on_get_node_details_response_leader_start_new_round1(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round2(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -601,7 +601,7 @@ test_on_get_node_details_response_leader_start_new_round2(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round3(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -625,7 +625,7 @@ test_on_get_node_details_response_leader_start_new_round3(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round4(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -657,7 +657,7 @@ test_on_get_node_details_response_leader_start_new_round4(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round5(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -689,7 +689,7 @@ test_on_get_node_details_response_leader_start_new_round5(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round6(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -721,7 +721,7 @@ test_on_get_node_details_response_leader_start_new_round6(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round7(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -782,7 +782,7 @@ test_on_cy_cache1(Config) ->
     Config.
 
 test_on_cy_cache2(Config) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+    process_dictionary:register_process(gossip_group, dht_node, self()),
 
     GossipNewValues = gossip_state:new_internal(),
     
@@ -806,9 +806,9 @@ test_on_cy_cache2(Config) ->
 
 test_on_cy_cache3(Config) ->
     erlang:put(instance_id, gossip_group),
-    % register some other process as the cs_node
-    CS_Node = fake_cs_node(),
-%%     ?equals(process_dictionary:get_group_member(cs_node), CS_Node),
+    % register some other process as the dht_node
+    DHT_Node = fake_dht_node(),
+%%     ?equals(process_dictionary:get_group_member(dht_node), DHT_Node),
 
     GossipNewValues = gossip_state:new_internal(),
     
@@ -826,13 +826,13 @@ test_on_cy_cache3(Config) ->
     ?equals(NewState, State),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % if pids don't match, a get_state is send to the cached node's cs_node
+    % if pids don't match, a get_state is send to the cached node's dht_node
     This = cs_send:this(),
     ?expect_message({send_to_group_member, gossip, {get_state, This, Values}}),
     % no further messages
     ?expect_no_message(),
     
-    exit(CS_Node, kill),
+    exit(DHT_Node, kill),
     Config.
 
 test_on_get_values_best(Config) ->
@@ -878,14 +878,14 @@ get_ptrigger_nodelay() ->
 get_ptrigger_delay(Delay) ->
     trigger:init('trigger_periodic', fun () -> Delay end, 'trigger').
 
-fake_cs_node() ->
-    CS_Node = spawn(?MODULE, fake_cs_node_start, [self()]),
+fake_dht_node() ->
+    DHT_Node = spawn(?MODULE, fake_dht_node_start, [self()]),
     receive
-        {started, CS_Node} -> CS_Node
+        {started, DHT_Node} -> DHT_Node
     end.
 
-fake_cs_node_start(Supervisor) ->
-    process_dictionary:register_process(gossip_group, cs_node, self()),
+fake_dht_node_start(Supervisor) ->
+    process_dictionary:register_process(gossip_group, dht_node, self()),
     Supervisor ! {started, self()},
     fake_process().
 

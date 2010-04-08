@@ -35,7 +35,7 @@ make_ring(Size) ->
                         randoms:start(),
                         process_dictionary:start_link(),
                         %timer:sleep(1000),
-                        boot_sup:start_link(),
+                        sup_scalaris_boot:start_link(),
                         %timer:sleep(1000),
                         boot_server:connect(),
                         admin:add_nodes(Size - 1),
@@ -114,7 +114,7 @@ wait_for_stable_ring() ->
     end.
 
 check_ring_size(Size) ->
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     boot_server:number_of_nodes(),
     RSize = receive
         {get_list_length_response,L} ->

@@ -1,4 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,16 +13,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_join.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : join procedure
-%%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
+%%% File    dht_node_join.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    dht_node join procedure
+%%% @end
+%%% Created : 3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(cs_join).
+-module(dht_node_join).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -34,15 +33,15 @@
 %% @spec join_request(state:state(), pid(), Id) -> state:state()
 %%   Id = term()
 
-%% userdevguide-begin cs_join:join_request
--spec(join_request/3 :: (cs_state:state(), cs_send:mypid(), ?RT:key()) -> cs_state:state()).
+%% userdevguide-begin dht_node_join:join_request
+-spec(join_request/3 :: (dht_node_state:state(), cs_send:mypid(), ?RT:key()) -> dht_node_state:state()).
 join_request(State, Source_PID, Id) ->
     Pred = node:new(Source_PID, Id),
-    {DB, HisData} = ?DB:split_data(cs_state:get_db(State), cs_state:id(State), Id),
-    cs_send:send(Source_PID, {join_response, cs_state:pred(State), HisData}),
+    {DB, HisData} = ?DB:split_data(dht_node_state:get_db(State), dht_node_state:id(State), Id),
+    cs_send:send(Source_PID, {join_response, dht_node_state:pred(State), HisData}),
     ring_maintenance:update_preds([Pred]),
-    cs_state:set_db(State, DB).
-%% userdevguide-end cs_join:join_request
+    dht_node_state:set_db(State, DB).
+%% userdevguide-end dht_node_join:join_request
 
 %%%------------------------------Join---------------------------------
 
@@ -52,5 +51,5 @@ join_first(Id) ->
     log:log(info,"[ Node ~w ] join as first ~w",[self(), Id]),
     Me = node:new(cs_send:this(), Id),
     routingtable:initialize(Id, Me, Me),
-    cs_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, cs_lb:new(), ?DB:new(Id)).
-%% userdevguide-end cs_join:join_ring
+    dht_node_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, dht_node_lb:new(), ?DB:new(Id)).
+%% userdevguide-end dht_node_join:join_ring

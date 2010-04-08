@@ -51,7 +51,7 @@
 %% Cycles: the amount of shuffle-cycles
 -type(state() :: {cyclon_cache:cache(), node:node_type() | null, integer(), trigger:state()}).
 
-% accepted messages of cs_node processes
+% accepted messages of cyclon process
 -type(message() ::
     {trigger} |
     {check_state} |
@@ -249,23 +249,23 @@ simple_shuffle(Cache, Node) ->
     cs_send:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, cs_send:this(), ForSend}),
     NewCache.
 
-%% @doc Sends the local node's cs_node a request to tell us some information
+%% @doc Sends the local node's dht_node a request to tell us some information
 %%      about itself.
 %%      The node will respond with a
 %%      {get_node_details_response, NodeDetails} message.
 -spec request_node_details([node_details:node_details_name()]) -> ok.
 request_node_details(Details) ->
-    CS_Node = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(CS_Node, {get_node_details, cs_send:this(), Details}).
+    DHT_Node = process_dictionary:get_group_member(dht_node),
+    cs_send:send_local(DHT_Node, {get_node_details, cs_send:this(), Details}).
 
 %% @doc Checks the current state. If the cache is empty or the current node is
-%%      unknown, the local cs_node will be asked for these values and the check
+%%      unknown, the local dht_node will be asked for these values and the check
 %%      will be re-scheduled after 1s.
 -spec check_state(state()) -> ok | fail.
 check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
     % if the own node is unknown or the cache is empty (it should at least
     % contain the nodes predecessor and successor), request this information
-    % from the local cs_node
+    % from the local dht_node
     NeedsInfo1 = case cyclon_cache:size(Cache) of
                      0 -> [pred, succ];
                      _ -> []

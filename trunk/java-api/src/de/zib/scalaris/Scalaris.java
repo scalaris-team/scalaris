@@ -188,7 +188,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  */
 public class Scalaris {
 	/**
-	 * the connection to a chorsharp node
+	 * Connection to a Scalaris node.
 	 */
 	private Connection connection;
 	

@@ -131,7 +131,7 @@ on({cy_cache, [Node] = _Cache},
    {Coordinate, Confidence, _TriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
     NodePid = node:pidX(Node),
-    SelfPid = cs_send:make_global(process_dictionary:get_group_member(cs_node)),
+    SelfPid = cs_send:make_global(process_dictionary:get_group_member(dht_node)),
     % do not exchange states with itself
     if
         (NodePid =/= SelfPid) ->

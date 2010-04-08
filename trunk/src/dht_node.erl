@@ -1,4 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,16 +13,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_node.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : cs_node main file
-%%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
+%%% File    dht_node.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    dht_node main file
+%%% @end
+%%% Created : 3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(cs_node).
+-module(dht_node).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -35,10 +34,10 @@
 
 -export([on/2, init/1]).
 
-% state of the cs_node loop
+% state of the dht_node loop
 -type(state() :: any()).
 
-% accepted messages of cs_node processes
+% accepted messages of dht_node processes
 -type(message() :: any()).
 
 %% @doc message handler
@@ -52,8 +51,8 @@
 % first node
 on({get_key_response_keyholder, Key}, {join_as_first}) ->
     log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Key]),
-    State = cs_join:join_first(Key),
-    cs_send:send_local(get_local_cs_reregister_pid(),{go}),
+    State = dht_node_join:join_first(Key),
+    cs_send:send_local(get_local_dht_node_reregister_pid(),{go}),
     %log:log(info,"[ Node ~w ] joined",[self()]),
     State;  % join complete, State is the first "State"
 
@@ -73,20 +72,20 @@ on({known_hosts_timeout}, {join_phase2, Key}) ->
     %io:format("p2: known hosts timeout~n"),
     KnownHosts = config:read(known_hosts),
     % contact all known VMs
-    _Res = [cs_send:send(KnownHost, {get_cs_nodes, cs_send:this()})
+    _Res = [cs_send:send(KnownHost, {get_dht_nodes, cs_send:this()})
            || KnownHost <- KnownHosts],
     %io:format("~p~n", [Res]),
     % timeout just in case
     cs_send:send_local_after(1000, self() , {known_hosts_timeout}),
     {join_phase2, Key};
 
-on({get_cs_nodes_response, []}, {join_phase2, Key}) ->
-    %io:format("p2: got empty cs_nodes_response~n"),
+on({get_dht_nodes_response, []}, {join_phase2, Key}) ->
+    %io:format("p2: got empty dht_nodes_response~n"),
     % there is a VM with no nodes
     {join_phase2, Key};
 
-on({get_cs_nodes_response, Nodes}, {join_phase2, Key}) ->
-    %io:format("p2: got cs_nodes_response ~p~n", [lists:delete(cs_send:this(), Nodes)]),
+on({get_dht_nodes_response, Nodes}, {join_phase2, Key}) ->
+    %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(cs_send:this(), Nodes)]),
     case lists:delete(cs_send:this(), Nodes) of
         [] ->
             {join_phase2, Key};
@@ -120,15 +119,15 @@ on({join_response, Pred, Data}, {join_phase4, Id, Succ, Me}) ->
     routingtable:initialize(Id, Pred, Succ),
     State = case node:is_null(Pred) of
                 true ->
-                    cs_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                 {Id, Id}, cs_lb:new(), DB);
+                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
+                                 {Id, Id}, dht_node_lb:new(), DB);
                 false ->
                     cs_send:send(node:pidX(Pred), {update_succ, Me}),
-                    cs_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                 {node:id(Pred), Id}, cs_lb:new(), DB)
+                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
+                                 {node:id(Pred), Id}, dht_node_lb:new(), DB)
             end,
-    cs_replica_stabilization:recreate_replicas(cs_state:get_my_range(State)),
-    cs_send:send_local(get_local_cs_reregister_pid(), {go}),
+    cs_replica_stabilization:recreate_replicas(dht_node_state:get_my_range(State)),
+    cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
     State;
 
 % Catch all messages until the join protocol is finshed
@@ -142,7 +141,7 @@ on({kill}, _State) ->
     kill;
 
 on({churn}, _State) ->
-    cs_keyholder:reinit(),
+    idholder:reinit(),
     kill;
 
 on({halt}, _State) ->
@@ -153,20 +152,20 @@ on({die}, _State) ->
 
 %% Ring Maintenance (see ring_maintenance.erl)
 on({init_rm,Pid},State) ->
-    cs_send:send_local(Pid , {init, cs_state:id(State), cs_state:me(State),cs_state:pred(State), [cs_state:succ(State)]}),
+    cs_send:send_local(Pid , {init, dht_node_state:id(State), dht_node_state:me(State),dht_node_state:pred(State), [dht_node_state:succ(State)]}),
     State;
 
 on({rm_update_preds_succs, Preds, Succs}, State) ->
-    cs_state:set_rt(cs_state:update_preds_succs(State, Preds, Succs),
-                    ?RT:update_pred_succ_in_cs_node(hd(Preds), hd(Succs), cs_state:rt(State)));
+    dht_node_state:set_rt(dht_node_state:update_preds_succs(State, Preds, Succs),
+                    ?RT:update_pred_succ_in_dht_node(hd(Preds), hd(Succs), dht_node_state:rt(State)));
 
 on({rm_update_preds, Preds}, State) ->
-    cs_state:set_rt(cs_state:update_preds(State, Preds),
-                    ?RT:update_pred_succ_in_cs_node(hd(Preds), cs_state:succ(State), cs_state:rt(State)));
+    dht_node_state:set_rt(dht_node_state:update_preds(State, Preds),
+                    ?RT:update_pred_succ_in_dht_node(hd(Preds), dht_node_state:succ(State), dht_node_state:rt(State)));
 
 on({rm_update_succs, Succs}, State) ->
-    cs_state:set_rt(cs_state:update_succs(State, Succs),
-                    ?RT:update_pred_succ_in_cs_node(cs_state:pred(State), hd(Succs), cs_state:rt(State)));
+    dht_node_state:set_rt(dht_node_state:update_succs(State, Succs),
+                    ?RT:update_pred_succ_in_dht_node(dht_node_state:pred(State), hd(Succs), dht_node_state:rt(State)));
 
 %% @doc notification that my successor left
 on({succ_left, Succ}, State) ->
@@ -178,7 +177,7 @@ on({pred_left, Pred}, State) ->
     ring_maintenance:pred_left(Pred),
     State;
 
-%% @doc notify the cs_node his successor changed
+%% @doc notify the dht_node his successor changed
 on({update_succ, Succ}, State) ->
     ring_maintenance:notify_new_succ(Succ),
     State;
@@ -187,7 +186,7 @@ on({update_succ, Succ}, State) ->
 % Finger Maintenance 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({rt_update, RoutingTable}, State) ->
-    cs_state:set_rt(State, RoutingTable);
+    dht_node_state:set_rt(State, RoutingTable);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Transactions (see transstore/*.erl)
@@ -217,7 +216,7 @@ on({do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Own
 %% answer - lookup for transaction participant
 on({lookup_tp, Message}, State) ->
     {Leader} = Message#tp_message.message,
-    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
     Responsible = util:is_between(RangeBeg, Message#tp_message.item_key, RangeEnd),
     if
         Responsible == true ->
@@ -248,15 +247,15 @@ on({decision, Message}, State) ->
 
 %% remove tm->tid mapping after transaction manager stopped
 on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
-    {translog, TID_TM_Mapping, Decided, Undecided} = cs_state:get_trans_log(State),
+    {translog, TID_TM_Mapping, Decided, Undecided} = dht_node_state:get_trans_log(State),
     NewTID_TM_Mapping = dict:erase(TransID, TID_TM_Mapping),
-    cs_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
+    dht_node_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance (rm_chord)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_pred, Source_Pid}, State) ->
-    cs_send:send(Source_Pid, {get_pred_response, cs_state:pred(State)}),
+    cs_send:send(Source_Pid, {get_pred_response, dht_node_state:pred(State)}),
     State;
 
 on({get_succ_list, Source_Pid}, State) ->
@@ -264,7 +263,7 @@ on({get_succ_list, Source_Pid}, State) ->
     State;
 
 on({get_successorlist_response, SuccList,Source_Pid}, State) ->
-    cs_send:send(Source_Pid, {get_succ_list_response, cs_state:me(State),SuccList}),
+    cs_send:send(Source_Pid, {get_succ_list_response, dht_node_state:me(State),SuccList}),
     State;
 
 
@@ -278,15 +277,15 @@ on({lookup_pointer, Source_Pid, Index}, State) ->
     cs_send:send_local(RT, {lookup_pointer, Source_Pid, Index}),
     State;
 
-%% userdevguide-begin cs_node:rt_get_node
+%% userdevguide-begin dht_node:rt_get_node
 on({rt_get_node, Source_PID, Index}, State) ->
-    cs_send:send(Source_PID, {rt_get_node_response, Index, cs_state:me(State)}),
+    cs_send:send(Source_PID, {rt_get_node_response, Index, dht_node_state:me(State)}),
     State;
-%% userdevguide-end cs_node:rt_get_node
+%% userdevguide-end dht_node:rt_get_node
 
 %% Lookup (see lookup.erl)
 on({lookup_aux, Key, Hops, Msg}, State) ->
-    lookup:lookup_aux(State, Key, Hops, Msg),
+    dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
 on({lookup_fin, Hops, Msg}, State) ->
@@ -294,7 +293,7 @@ on({lookup_fin, Hops, Msg}, State) ->
     State;
 
 on({get_node, Source_PID, Key}, State) ->
-    cs_send:send(Source_PID, {get_node_response, Key, cs_state:me(State)}),
+    cs_send:send(Source_PID, {get_node_response, Key, dht_node_state:me(State)}),
     State;
 
 on({get_process_in_group, Source_PID, Key, Process}, State) ->
@@ -306,7 +305,7 @@ on({get_process_in_group, Source_PID, Key, Process}, State) ->
 on({get_rtm, Source_PID, Key, Process}, State) ->
     InstanceId = erlang:get(instance_id),
     Pid = process_dictionary:get_group_member(Process),
-    SupTx = process_dictionary:get_group_member(cs_sup_tx),
+    SupTx = process_dictionary:get_group_member(sup_dht_node_core_tx),
     NewPid = case Pid of
                  failed ->
                      %% start, if necessary
@@ -332,10 +331,10 @@ on({get_cyclon_pid, Pid,Me}, State) ->
 
 %% database
 on({get_key, Source_PID, Key}, State) ->
-    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
     case util:is_between(RangeBeg, Key, RangeEnd) of
         true ->
-            lookup:get_key(State, Source_PID, Key, Key),
+            dht_node_lookup:get_key(State, Source_PID, Key, Key),
             State;
         false ->
             log:log(info,"[ Node ] Get_Key: Got Request for Key ~p, it is not between ~p and ~p", [Key, RangeBeg, RangeEnd]),
@@ -349,25 +348,25 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
 %          false ->
     cs_send:send(Source_PID,
                  {get_key_with_id_reply, SourceId, HashedKey,
-                  ?DB:read(cs_state:get_db(State), HashedKey)}),
+                  ?DB:read(dht_node_state:get_db(State), HashedKey)}),
 %    end,
     State;
 
 on({set_key, Source_PID, Key, Value, Versionnr}, State) ->
-    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
     case util:is_between(RangeBeg, Key, RangeEnd) of
         true ->
-            lookup:set_key(State, Source_PID, Key, Value, Versionnr);
+            dht_node_lookup:set_key(State, Source_PID, Key, Value, Versionnr);
         false ->
             log:log(info,"[ Node ] Set_Key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
             State
     end;
 
 on({delete_key, Source_PID, Key}, State) ->
-    {RangeBeg, RangeEnd} = cs_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
     case util:is_between(RangeBeg, Key, RangeEnd) of
         true ->
-            lookup:delete_key(State, Source_PID, Key);
+            dht_node_lookup:delete_key(State, Source_PID, Key);
         false ->
             log:log(info,"[ Node ] delete_key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
             State
@@ -375,8 +374,8 @@ on({delete_key, Source_PID, Key}, State) ->
 
 on({drop_data, Data, Sender}, State) ->
     cs_send:send(Sender, {drop_data_ack}),
-    DB = ?DB:add_data(cs_state:get_db(State), Data),
-    cs_state:set_db(State, DB);
+    DB = ?DB:add_data(dht_node_state:get_db(State), Data),
+    dht_node_state:set_db(State, DB);
 
 
 % bulk owner messages (see bulkowner.erl)
@@ -389,48 +388,48 @@ on({start_bulk_owner, I, Msg}, State) ->
     State;
 
 on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
-    cs_send:send(Issuer, {bulk_read_with_version_response, cs_state:get_my_range(State),
-                          ?DB:get_range_with_version(cs_state:get_db(State), Range)}),
+    cs_send:send(Issuer, {bulk_read_with_version_response, dht_node_state:get_my_range(State),
+                          ?DB:get_range_with_version(dht_node_state:get_db(State), Range)}),
     State;
 
-% load balancing messages (see cs_lb.erl)
+% load balancing messages (see dht_node_lb.erl)
 on({get_load, Source_PID}, State) ->
-    cs_send:send(Source_PID, {get_load_response, cs_send:this(), cs_state:load(State)}),
+    cs_send:send(Source_PID, {get_load_response, cs_send:this(), dht_node_state:load(State)}),
     State;
 
 on({get_load_response, Source_PID, Load}, State) ->
-    cs_lb:check_balance(State, Source_PID, Load),
+    dht_node_lb:check_balance(State, Source_PID, Load),
     State;
 
 on({get_middle_key, Source_PID}, State) ->
-    {MiddleKey, NewState} = cs_lb:get_middle_key(State),
+    {MiddleKey, NewState} = dht_node_lb:get_middle_key(State),
     cs_send:send(Source_PID, {get_middle_key_response, cs_send:this(), MiddleKey}),
     NewState;
 
 on({get_middle_key_response, Source_PID, MiddleKey}, State) ->
-    cs_lb:move_load(State, Source_PID, MiddleKey);
+    dht_node_lb:move_load(State, Source_PID, MiddleKey);
 
 on({reset_loadbalance_flag}, State) ->
-    cs_lb:reset_loadbalance_flag(State);
+    dht_node_lb:reset_loadbalance_flag(State);
 
 on({stabilize_loadbalance}, State) ->
-    cs_lb:balance_load(State),
+    dht_node_lb:balance_load(State),
     State;
 
 %% misc.
 on({get_node_details, Pid}, State) ->
-    cs_send:send(Pid, {get_node_details_response, cs_state:details(State)}),
+    cs_send:send(Pid, {get_node_details_response, dht_node_state:details(State)}),
     State;
 on({get_node_details, Pid, Which}, State) ->
-    cs_send:send(Pid, {get_node_details_response, cs_state:details(State, Which)}),
+    cs_send:send(Pid, {get_node_details_response, dht_node_state:details(State, Which)}),
     State;
 
 on({dump}, State) ->
-    cs_state:dump(State),
+    dht_node_state:dump(State),
     State;
 
 on({'$gen_cast', {debug_info, Requestor}}, State) ->
-    cs_send:send_local(Requestor , {debug_info_response, [{"rt_size", ?RT:get_size(cs_state:rt(State))}]}),
+    cs_send:send_local(Requestor , {debug_info_response, [{"rt_size", ?RT:get_size(dht_node_state:rt(State))}]}),
     State;
 
 
@@ -441,21 +440,21 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
                     end,
                     lists:filter(fun ({Key, _}) ->
                                          intervals:in(Key, Range)
-                                 end, ?DB:get_data(cs_state:get_db(State)))),
-    cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, cs_state:id(State)}),
+                                 end, ?DB:get_data(dht_node_state:get_db(State)))),
+    cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, dht_node_state:id(State)}),
     State;
 
 %% @TODO buggy ...
 %on({get_node_response, _, _}, State) ->
 %    State;
 
-%% join messages (see cs_join.erl)
-%% userdevguide-begin cs_node:join_message
+%% join messages (see dht_node_join.erl)
+%% userdevguide-begin dht_node:join_message
 on({join, Source_PID, Id}, State) ->
-    cs_join:join_request(State, Source_PID, Id);
-%% userdevguide-end cs_node:join_message
+    dht_node_join:join_request(State, Source_PID, Id);
+%% userdevguide-end dht_node:join_message
 
-on({get_cs_nodes_response, _KnownHosts}, State) ->
+on({get_dht_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
     State;
 
@@ -476,7 +475,7 @@ on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
 on(_, _State) ->
     unknown_event.
 
-%% userdevguide-begin cs_node:start
+%% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
 -spec(init/1 :: ([any()]) -> {join_as_first, join_phase1}).
 init([_InstanceId, Options]) ->
@@ -488,15 +487,15 @@ init([_InstanceId, Options]) ->
           application:get_env(boot_cs, first) == {ok, true}) of
         true ->
             trigger_known_nodes(),
-            cs_keyholder:get_key(),
+            idholder:get_key(),
             {join_as_first};
         _ ->
-            cs_keyholder:get_key(),
+            idholder:get_key(),
             {join_phase1}
     end.
-%% userdevguide-end cs_node:start
+%% userdevguide-end dht_node:start
 
-%% userdevguide-begin cs_node:start_link
+%% userdevguide-begin dht_node:start_link
 %% @doc spawns a scalaris node, called by the scalaris supervisor process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
@@ -504,20 +503,20 @@ start_link(InstanceId) ->
 
 start_link(InstanceId, Options) ->
     gen_component:start_link(?MODULE, [InstanceId, Options],
-                             [{register, InstanceId, cs_node}]).
-%% userdevguide-end cs_node:start_link
+                             [{register, InstanceId, dht_node}]).
+%% userdevguide-end dht_node:start_link
 
 get_local_cyclon_pid() ->
     process_dictionary:get_group_member(cyclon).
 
-get_local_cs_reregister_pid() ->
-    process_dictionary:get_group_member(cs_reregister).
+get_local_dht_node_reregister_pid() ->
+    process_dictionary:get_group_member(dht_node_reregister).
 
 % @doc find existing nodes and initialize the comm_layer
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
     % note, cs_send:this() may be invalid at this moment
-    [cs_send:send(KnownHost, {get_cs_nodes, cs_send:this()})
+    [cs_send:send(KnownHost, {get_dht_nodes, cs_send:this()})
      || KnownHost <- KnownHosts],
     timer:sleep(100),
     case cs_send:is_valid(cs_send:this()) of

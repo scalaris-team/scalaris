@@ -470,7 +470,7 @@ public class TransactionReadWriteExample {
 	 *            the transaction object to operate on
 	 * @param key
 	 *            the key to store the value under
-	 * @return the value read from chordsharp
+	 * @return the value read from scalaris
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node
@@ -525,7 +525,7 @@ public class TransactionReadWriteExample {
 	 *            the transaction object to operate on
 	 * @param key
 	 *            the key to store the value under
-	 * @return the value read from chordsharp
+	 * @return the value read from scalaris
 	 * @throws ConnectionException
 	 *             if the connection is not active or a communication error
 	 *             occurs or an exit signal was received or the remote node

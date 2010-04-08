@@ -245,7 +245,7 @@ get_proc_in_vms(Proc) ->
         after 2000 ->
             {failed}
         end,
-    lists:usort([cs_send:get(Proc, CSNode) || CSNode <- Nodes]).
+    lists:usort([cs_send:get(Proc, DHTNode) || DHTNode <- Nodes]).
 
 sleep_for_ever() ->
     timer:sleep(5000),

@@ -28,16 +28,16 @@
 -export([on_init_TP/2, on_tx_commitreply/3]).
 
 %%
-%% Attention: this is not a separate process it runs inside the cs_node
+%% Attention: this is not a separate process it runs inside the dht_node
 %%            to get access to the ?DB
 %%
 
-%% messages handled in cs_node context:
+%% messages handled in dht_node context:
 on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, CS_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% need Acceptors (given via RTMs), Learner,
     %% validate locally via callback
-    DB = cs_state:get_db(CS_State),
+    DB = dht_node_state:get_db(CS_State),
     {NewDB, Proposal} = apply(element(1, RTLogEntry),
                               validate,
                               [DB, RTLogEntry]),
@@ -53,15 +53,15 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, CS_State) ->
     [ cs_send:send(X, {register_TP, {Tid, ItemId, PaxId, cs_send:this()}})
       || X <- [TM | RTMs]],
     %% (optimized: embed the proposer`s accept message in registerTP message)
-    cs_state:set_db(CS_State, NewDB).
+    dht_node_state:set_db(CS_State, NewDB).
 
 on_tx_commitreply({PaxosId, RTLogEntry}, Result, CS_State) ->
     ?TRACE("tx_tp:on_tx_commitreply({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.
-    DB = cs_state:get_db(CS_State),
+    DB = dht_node_state:get_db(CS_State),
     NewDB = apply(element(1, RTLogEntry), Result, [DB, RTLogEntry]),
     %% delete corresponding proposer state
     Proposer = cs_send:make_global(
                  process_dictionary:get_group_member(paxos_proposer)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
-    cs_state:set_db(CS_State, NewDB).
+    dht_node_state:set_db(CS_State, NewDB).

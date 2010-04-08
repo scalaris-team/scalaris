@@ -41,7 +41,7 @@
 
 process_request_list(TLog, ReqList) ->
     ?TRACE("cs_api:process_request_list(~p, ~p)~n", [TLog, ReqList]),
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     % should just call transaction_api:process_request_list
     % for parallel quorum reads and scan for commit request to actually do
     % the transaction
@@ -182,10 +182,10 @@ test_and_set(Key, OldValue, NewValue) ->
     end.
 
 
-% I know there is a cs_node in this instance so I will use it directly
+% I know there is a dht_node in this instance so I will use it directly
 %@private
 do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
-    {ok, PID} = process_dictionary:find_cs_node(),
+    {ok, PID} = process_dictionary:find_dht_node(),
     cs_send:send_local(PID , {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()}),
     receive
         X ->
