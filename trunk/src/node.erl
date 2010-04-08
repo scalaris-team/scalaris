@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,14 +13,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : node.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : node data structure + functions
-%%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
+%%% File    node.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    node data structure + functions
+%%% @end
+%%% Created : 3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(node).
 
@@ -35,7 +34,7 @@
 -record(node, {pid :: cs_send:mypid(), id :: ?RT:key()}).
 -type(node_type() :: #node{}).
 
--spec(new/2 :: (cs_send:mypid(), any()) -> node_type()).
+-spec(new/2 :: (cs_send:mypid(), ?RT:key()) -> node_type()).
 new(PID, Id) ->
     #node{
      pid = PID,
