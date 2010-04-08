@@ -378,9 +378,11 @@ run_helper(Module, Func, 0, Iterations, {'fun', _ArgType, _ResultType} = FunType
         X ->
             ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, [], X])
     catch
-        throw:Term -> ?ct_fail("exception in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Term}]);
-        exit:Reason -> ?ct_fail("exception in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Reason}]);
-        error:Reason -> ?ct_fail("exception in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, {Reason, erlang:get_stacktrace()}}])
+        throw:Term -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Term}]);
+        % special handling for exits that come from a ct:fail() call:
+        exit:{test_case_failed, _} = Reason -> exit(Reason);
+        exit:Reason -> ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Reason}]);
+        error:Reason -> ?ct_fail("exception (error) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, {Reason, erlang:get_stacktrace()}}])
     end;
 run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunType, TypeInfo) ->
     Size = 30,
@@ -391,9 +393,11 @@ run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunT
         X ->
             ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, X])
     catch
-        throw:Term -> ?ct_fail("exception in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Term}]);
-        exit:Reason -> ?ct_fail("exception in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Reason}]);
-        error:Reason -> ?ct_fail("exception in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, {Reason, erlang:get_stacktrace()}}])
+        throw:Term -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Term}]);
+        % special handling for exits that come from a ct:fail() call:
+        exit:{test_case_failed, _} = Reason -> exit(Reason);
+        exit:Reason -> ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Reason}]);
+        error:Reason -> ?ct_fail("exception (error) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, {Reason, erlang:get_stacktrace()}}])
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
