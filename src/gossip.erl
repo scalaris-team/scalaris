@@ -19,7 +19,7 @@
 %%%         gossip techniques.
 %%%  
 %%%  Gossiping is organized in rounds. At the start of each round, a node's
-%%%  gossip process has to ask its cs_node for information about its state,
+%%%  gossip process has to ask its dht_node for information about its state,
 %%%  i.e. its load and the IDs of itself and its predecessor. It will not
 %%%  participate in any state exchanges until this information has been
 %%%  received and postpone such messages, i.e. 'get_state', if received. All
@@ -303,7 +303,7 @@ on({cy_cache, [Node] = _Cache},
     % random node and ask for a state exchange.
 %%     io:format("gossip: got random node from Cyclon: ~p~n",[_Cache]),
     NodePid = node:pidX(Node),
-    SelfPid = cs_send:make_global(process_dictionary:get_group_member(cs_node)),
+    SelfPid = cs_send:make_global(process_dictionary:get_group_member(dht_node)),
     % do not exchange states with itself
     if
         (NodePid =/= SelfPid) ->
@@ -631,7 +631,7 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 % Requests send to other processes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Sends the local node's cs_node a request to tell us its successor and
+%% @doc Sends the local node's dht_node a request to tell us its successor and
 %%      predecessor if a new round should be started. A new round will then only
 %%      be started if we are the leader, i.e. we are responsible for key 0.
 %%      The node will respond with a
@@ -652,22 +652,22 @@ request_new_round_if_leader(State) ->
              (ConvAvgCount >= ConvAvgCountNewRound)))
 		of
 		true ->
-			CS_Node = process_dictionary:get_group_member(cs_node),
-    		cs_send:send_local(CS_Node, {get_node_details, cs_send:this_with_cookie(leader_start_new_round), [my_range]}),
+			DHT_Node = process_dictionary:get_group_member(dht_node),
+    		cs_send:send_local(DHT_Node, {get_node_details, cs_send:this_with_cookie(leader_start_new_round), [my_range]}),
 			ok;
 		false ->
 			ok
 	end.
 
-%% @doc Sends the local node's cs_node a request to tell us some information
+%% @doc Sends the local node's dht_node a request to tell us some information
 %%      about itself.
 %%      The node will respond with a
 %%      {{get_node_details_response, NodeDetails}, local_info} message.
 -spec request_local_info() -> ok.
 request_local_info() ->
 	% ask for local load and key range:
-	CS_Node = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(CS_Node, {get_node_details, cs_send:this_with_cookie(local_info), [my_range, load]}).
+	DHT_Node = process_dictionary:get_group_member(dht_node),
+    cs_send:send_local(DHT_Node, {get_node_details, cs_send:this_with_cookie(local_info), [my_range, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
 %%      on({cy_cache, Cache},State) will handle the response

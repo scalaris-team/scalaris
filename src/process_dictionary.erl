@@ -28,7 +28,7 @@
 %     groups. The motivation for this module was to run several scalaris
 %     nodes in one erlang vm. But for the processes forming a scalaris
 %     node being able to talk to each other, they have to now their
-%     names (cs_node, config, etc.). This module allows the processes
+%     names (dht_node, config, etc.). This module allows the processes
 %     to keep their names.
 %
 %     When a new process group is created, a unique "instance_id" is
@@ -59,8 +59,8 @@
          register_process/3,
          lookup_process/2,
          lookup_process/1,
-         find_cs_node/0,
-         find_all_cs_nodes/0,
+         find_dht_node/0,
+         find_all_dht_nodes/0,
          find_all_processes/1,
          find_group/1,
          find_all_groups/1,
@@ -107,15 +107,15 @@ lookup_process(Pid) ->
             failed
     end.
 
-%% @doc tries to find a cs_node process
--spec(find_cs_node/0 :: () -> {ok, pid()} | failed).
-find_cs_node() ->
-    find_process(cs_node).
+%% @doc tries to find a dht_node process
+-spec(find_dht_node/0 :: () -> {ok, pid()} | failed).
+find_dht_node() ->
+    find_process(dht_node).
 
-%% @doc tries to find all cs_node processes
--spec(find_all_cs_nodes/0 :: () -> list()).
-find_all_cs_nodes() ->
-    find_all_processes(cs_node).
+%% @doc tries to find all dht_node processes
+-spec(find_all_dht_nodes/0 :: () -> list()).
+find_all_dht_nodes() ->
+    find_all_processes(dht_node).
 
 -spec(find_all_processes/1 :: (any()) -> list()).
 find_all_processes(Name) ->

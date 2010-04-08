@@ -1,4 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,16 +13,18 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : boot_sup.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Supervisor for boot nodes
+%%% File    sup_scalaris_boot.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Supervisor for a boot node (the first node that creates a Scalaris
+%%%         network) that is responsible for keeping its processes running.
 %%%
+%%%         If one of the supervised processes fails, only the failed process
+%%%         will be re-started!
+%%% @end
 %%% Created : 17 Jan 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(boot_sup).
+-module(sup_scalaris_boot).
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
@@ -29,17 +32,18 @@
 -include("autoconf.hrl").
 -export([start_link/0, init/1]).
 
+-spec start_link() -> {ok, Pid::cs_send:erl_pid_plain()} | ignore | {error, Error::{already_started, Pid::cs_send:erl_pid_plain()} | term()}.
 start_link() ->
     Link = supervisor:start_link({local, main_sup}, ?MODULE, []),
     case Link of
         {ok, _Pid} ->
             ok;
         ignore ->
-            io:format("error in starting boot supervisor: supervisor should not return ignore~n");
+            io:format("error in starting scalaris boot supervisor: supervisor should not return ignore~n");
         {error, Error} ->
-            io:format("error in starting boot supervisor: ~p~n", [Error])
+            io:format("error in starting scalaris boot supervisor: ~p~n", [Error])
     end,
-    cs_sup_standalone:scan_environment(),
+    sup_scalaris_node:scan_environment(),
     Link.
 
 -ifdef(HAVE_TCERL).
@@ -50,6 +54,7 @@ start_tcerl() ->
     ok.
 -endif.
 
+-spec init(any()) -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 -ifdef(SIMULATION).
 init(_Args) ->
     randoms:start(),
@@ -91,8 +96,8 @@ my_process_list(InstanceId) ->
         util:sup_worker_desc(logger, log, start_link),
     Service =
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link),
-    CSNode =
-        util:sup_supervisor_desc(cs_node, cs_sup_or, start_link, [[first]]),
+    DHTNode =
+        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [[first]]),
     YAWS =
         util:sup_worker_desc(yaws, yaws_wrapper, start_link,
                              [ preconfig:docroot(),
@@ -124,4 +129,4 @@ my_process_list(InstanceId) ->
      YAWS,
      BenchServer,
      Ganglia,
-     CSNode].
+     DHTNode].

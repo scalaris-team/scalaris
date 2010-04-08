@@ -12,19 +12,19 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_keyholder.erl
+%%% File    : idholder.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Stores the key for the cs_node process
+%%% Description : Stores the key for the dht_node process
 %%%
 %%% Created : 24 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @doc this process stores the identifier of the cs_node. If the cs_node is 
+%% @doc this process stores the identifier of the dht_node. If the dht_node is 
 %%      restarted his identifier will survive in this process. We could use 
 %%      this e.g. when doing load-blancing
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(cs_keyholder).
+-module(idholder).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -38,12 +38,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc sets the key of the cs_node
+%% @doc sets the key of the dht_node
 -spec(set_key/1 :: (?RT:key()) -> ok).
 set_key(Key) ->
     cs_send:send_local(get_pid() , {set_key_keyholder, Key}),ok.
 
-%% @doc reads the key of the cs_node
+%% @doc reads the key of the dht_node
 -spec(get_key/0 :: () -> ok).
 get_key() ->
     cs_send:send_local(get_pid() , {get_key_keyholder, self()}),
@@ -54,7 +54,7 @@ init(_Arg) ->
     
 
 start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [InstanceId,[]], [{register, InstanceId, cs_keyholder}]).
+    gen_component:start_link(?MODULE, [InstanceId,[]], [{register, InstanceId, idholder}]).
     
 
 reinit() ->
@@ -78,7 +78,7 @@ on(_, _State) ->
     unknown_event.
 
 get_pid() ->
-    process_dictionary:get_group_member(cs_keyholder).
+    process_dictionary:get_group_member(idholder).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Key creation algorithms

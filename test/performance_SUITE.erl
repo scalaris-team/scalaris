@@ -175,7 +175,7 @@ next_hop(_Config) ->
                gb_trees:enter(102, succ,
                 gb_trees:enter(103, pred,
                  rt_chord:empty(succ))))))))),
-    State = cs_state:new(RT, node:new(succ, 3), node:new(pred, 1),
+    State = dht_node_state:new(RT, node:new(succ, 3), node:new(pred, 1),
                          node:new(me, 2), my_range, lb, db),
     iter(count(), fun () ->
                           rt_chord:next_hop(State, 42)

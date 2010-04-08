@@ -22,7 +22,7 @@
 %%%-------------------------------------------------------------------
 %% @version $Id$
 
-%% userdevguide-begin chordsharp:rt
+%% userdevguide-begin scalaris:rt
 %%This file determines which kind of routingtable is used. Uncomment the
 %%one that is desired.
 
@@ -31,7 +31,7 @@
 
 %%Simple routingtable
 %-define(RT, rt_simple).
-%% userdevguide-end chordsharp:rt
+%% userdevguide-end scalaris:rt
 
 %%Standard database backend
 %-define(DB, cs_db_otp).

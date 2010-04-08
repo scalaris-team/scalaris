@@ -54,7 +54,7 @@ assert(_, _, {fail, Message}) ->
 
 checks() ->
     [
-     fun cs_state:assert/1
+     fun dht_node_state:assert/1
     ].
 
 

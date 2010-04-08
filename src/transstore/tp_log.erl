@@ -31,7 +31,6 @@
 
 -export([get_log/1, new_item/6, new_logentry/3, add_to_undecided/3, remove_from_undecided/4]).
 
--import(cs_state).
 -import(gb_trees).
 -import(lists).
 
@@ -66,11 +65,11 @@ new_logentry(Status, TransID, Item)->
 
 
 get_log(State)->
-    cs_state:get_trans_log(State).
+    dht_node_state:get_trans_log(State).
 
 
 add_to_undecided(State, TransID, LogEntry)->
-    TransLog = cs_state:get_trans_log(State),
+    TransLog = dht_node_state:get_trans_log(State),
     NewTransInLogList = case gb_trees:lookup(TransID, TransLog#translog.undecided) of
 			    {value, TransInLogList} ->
 				lists:append([LogEntry], TransInLogList);
@@ -78,8 +77,8 @@ add_to_undecided(State, TransID, LogEntry)->
 				[LogEntry]
 			end,
     NewTransInLog = gb_trees:enter(TransID, NewTransInLogList, TransLog#translog.undecided),
-    cs_state:set_trans_log(State, TransLog#translog{undecided=NewTransInLog}).
+    dht_node_state:set_trans_log(State, TransLog#translog{undecided=NewTransInLog}).
 
 remove_from_undecided(State, TransID, TransLog, TransLogUndecided)->
     NewLogEntries = gb_trees:delete(TransID, TransLogUndecided),
-    cs_state:set_trans_log(State, TransLog#translog{undecided=NewLogEntries}).
+    dht_node_state:set_trans_log(State, TransLog#translog{undecided=NewLogEntries}).

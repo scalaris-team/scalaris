@@ -12,7 +12,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_state.erl
+%%% File    : dht_node_state.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
 %%% Description : 
 %%%
@@ -21,7 +21,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(cs_state).
+-module(dht_node_state).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -57,19 +57,19 @@
 		        predecessors :: [node:node_type(),...], 
 		        me           :: node:node_type(),
 		        my_range     :: my_range(), 
-		        lb           :: cs_lb:lb(),
+		        lb           :: dht_node_lb:lb(),
 		        deadnodes    :: gb_set(),
 		        join_time    :: join_time(),
 		        trans_log    :: #translog{},
 		        db           :: ?DB:db()}).
 -type state() :: #state{}.
 
--spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), cs_lb:lb()) -> state().
+-spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), dht_node_lb:lb()) -> state().
 new(RT, Successor, Predecessor, Me, MyRange, LB) ->
     new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new(node:id(Me))).
 
-%% userdevguide-begin cs_state:state
--spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), cs_lb:lb(), ?DB:db()) -> state().
+%% userdevguide-begin dht_node_state:state
+-spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), dht_node_lb:lb(), ?DB:db()) -> state().
 new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
     #state{
      routingtable = RT, 
@@ -87,7 +87,7 @@ new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
       },
      db = DB
     }.
-%% userdevguide-end cs_state:state
+%% userdevguide-end dht_node_state:state
 
 -spec next_interval(state()) -> intervals:interval().
 next_interval(State) -> intervals:new(id(State), succ_id(State)).
@@ -101,10 +101,10 @@ get_db(#state{db=DB}) -> DB.
 -spec set_db(state(), ?DB:db()) -> state().
 set_db(State, DB) -> State#state{db=DB}.
 
--spec get_lb(state()) -> cs_lb:lb().
+-spec get_lb(state()) -> dht_node_lb:lb().
 get_lb(#state{lb=LB}) -> LB.
 
--spec set_lb(state(), cs_lb:lb()) -> state().
+-spec set_lb(state(), dht_node_lb:lb()) -> state().
 set_lb(State, LB) -> State#state{lb=LB}.
 
 -spec me(state()) -> node_details:node_type().

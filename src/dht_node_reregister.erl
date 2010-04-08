@@ -13,14 +13,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    cs_reregister.erl
+%%% File    dht_node_reregister.erl
 %%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Reregister with boot nodes
+%%% @doc    Re-register with boot nodes
 %%% @end
 %%% Created : 11 Oct 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @version $Id$
--module(cs_reregister).
+-module(dht_node_reregister).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
@@ -46,8 +46,8 @@
 %%      dictionary and returns its pid for use by a supervisor.
 -spec start_link(term()) -> {ok, pid()}.
 start_link(InstanceId) ->
-    Trigger = config:read(cs_reregister_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, cs_reregister}]).
+    Trigger = config:read(dht_node_reregister_trigger),
+    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, dht_node_reregister}]).
 
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, trigger:state()}.
@@ -82,7 +82,7 @@ on(_, _State) ->
     unknown_event.
 
 trigger_reregister() ->
-    RegisterMessage = {register, get_cs_node_this()},
+    RegisterMessage = {register, get_dht_node_this()},
     reregister(config:read(register_hosts), RegisterMessage).
 
 reregister(failed, Message)->
@@ -96,11 +96,11 @@ reregister(Hosts, Message) ->
 get_base_interval() ->
     config:read(reregister_interval).
 
-%% @doc Gets the pid of the cs_node process in the same group as the calling
+%% @doc Gets the pid of the dht_node process in the same group as the calling
 %%      process.
--spec get_cs_node_this() -> cs_send:mypid().
-get_cs_node_this() ->
-    cs_send:make_global(process_dictionary:get_group_member(cs_node)).
+-spec get_dht_node_this() -> cs_send:mypid().
+get_dht_node_this() ->
+    cs_send:make_global(process_dictionary:get_group_member(dht_node)).
 
 %% @doc pid of the boot daemon
 %% @spec bootPid() -> pid()

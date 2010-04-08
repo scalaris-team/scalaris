@@ -102,8 +102,8 @@ notify(Pred) ->
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%set info for cs_node
-on({init, NewId, NewMe, NewPred, NewSuccList, _CSNode}, {uninit, TriggerState}) ->
+%set info for dht_node
+on({init, NewId, NewMe, NewPred, NewSuccList, _DHTNode}, {uninit, TriggerState}) ->
     ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
     cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
     fd:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
@@ -238,9 +238,9 @@ filter(Pid, [Succ | Rest]) ->
 get_pid() ->
     process_dictionary:get_group_member(ring_maintenance).
 
-% get Pid of assigned cs_node
+% get Pid of assigned dht_node
 get_cs_pid() ->
-    process_dictionary:get_group_member(cs_node).
+    process_dictionary:get_group_member(dht_node).
 
 %% @doc the length of the successor list
 %% @spec succListLength() -> integer() | failed

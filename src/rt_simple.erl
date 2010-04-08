@@ -33,8 +33,8 @@
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_cs_node/4, n/0, to_html/1,
-         update_pred_succ_in_cs_node/3]).
+         dump/1, to_dict/1, export_rt_to_dht_node/4, n/0, to_html/1,
+         update_pred_succ_in_dht_node/3]).
 
 -export([normalize/1]).
 
@@ -75,9 +75,9 @@ getRandomNodeId() ->
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc returns the next hop to contact for a lookup
--spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
+-spec(next_hop/2 :: (dht_node_state:state(), key()) -> cs_send:mypid()).
 next_hop(State, _Key) ->
-    cs_state:succ_pid(State).
+    dht_node_state:succ_pid(State).
 %% userdevguide-end rt_simple:next_hop
 
 %% userdevguide-begin rt_simple:init_stabilize
@@ -138,13 +138,13 @@ dump(_State) ->
 % 2 -> next longer finger
 % 3 -> ...
 % n -> me
-% @spec to_dict(cs_state:state()) -> dict:dictionary()
+% @spec to_dict(dht_node_state:state()) -> dict:dictionary()
 to_dict(State) ->
-    Succ = cs_state:succ(State),
-    dict:store(0, Succ, dict:store(1, cs_state:me(State), dict:new())).
+    Succ = dht_node_state:succ(State),
+    dict:store(0, Succ, dict:store(1, dht_node_state:me(State), dict:new())).
 
--spec(export_rt_to_cs_node/4 :: (rt(), key(), node:node_type(), node:node_type()) -> external_rt()).
-export_rt_to_cs_node(RT, _Id, _Pred, _Succ) ->
+-spec(export_rt_to_dht_node/4 :: (rt(), key(), node:node_type(), node:node_type()) -> external_rt()).
+export_rt_to_dht_node(RT, _Id, _Pred, _Succ) ->
     RT.
 
 %% @doc prepare routing table for printing in web interface
@@ -152,7 +152,7 @@ export_rt_to_cs_node(RT, _Id, _Pred, _Succ) ->
 to_html({Succ, _}) ->
     io_lib:format("succ: ~p", [Succ]).
 
--spec(update_pred_succ_in_cs_node/3 :: (node:node_type(), node:node_type(), external_rt())
+-spec(update_pred_succ_in_dht_node/3 :: (node:node_type(), node:node_type(), external_rt())
       -> external_rt()).
-update_pred_succ_in_cs_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
+update_pred_succ_in_dht_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
     {Succ, Tree}.

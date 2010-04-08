@@ -91,8 +91,8 @@ on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState,TriggerState}) ->
 % start new periodic stabilization
 on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     %io:format("[ RT ] stabilize~n"),
-    Pid = process_dictionary:get_group_member(cs_node),
-    % get new pred and succ from cs_node
+    Pid = process_dictionary:get_group_member(dht_node),
+    % get new pred and succ from dht_node
     cs_send:send_local(Pid , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
     % start periodic stabilization
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
@@ -157,12 +157,12 @@ check(Old, New, Id, Pred, Succ) ->
 check(X, X, _Id, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, Pred, Succ, true) ->
-    Pid = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_cs_node(NewRT, Id, Pred, Succ)}),
+    Pid = process_dictionary:get_group_member(dht_node),
+    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_dht_node(NewRT, Id, Pred, Succ)}),
     check_fd(NewRT, OldRT);
 check(_OldRT, NewRT, Id, Pred, Succ, false) ->
-    Pid = process_dictionary:get_group_member(cs_node),
-    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_cs_node(NewRT, Id, Pred, Succ)}).
+    Pid = process_dictionary:get_group_member(dht_node),
+    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_dht_node(NewRT, Id, Pred, Succ)}).
 
 check_fd(X, X) ->
     ok;

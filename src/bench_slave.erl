@@ -29,7 +29,7 @@
 %% API Functions
 %%
 start() ->
-    application:start(chordsharp),
+    application:start(scalaris),
 	erlang:spawn(?MODULE,run_1,[]).
 
 

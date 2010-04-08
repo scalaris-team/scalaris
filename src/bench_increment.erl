@@ -31,7 +31,7 @@
 init() ->
     Pid = spawn(fun () ->
 			process_dictionary:start_link_for_unittest(),
-			boot_sup:start_link(),
+			sup_scalaris_boot:start_link(),
 			timer:sleep(11000),
 			admin:add_nodes(3),
 			timer:sleep(6010000)

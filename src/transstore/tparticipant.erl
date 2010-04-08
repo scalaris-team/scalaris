@@ -40,7 +40,6 @@
 -import(lists).
 -import(io).
 -import(cs_send).
--import(cs_state).
 -import(timer).
 
 
@@ -52,7 +51,7 @@
 tp_validate(State, Tid, Item)->
     %?TLOGN("validating item ~p", [Item]),
     %% Check whether the version is still valid
-    StateDB = cs_state:get_db(State),
+    StateDB = dht_node_state:get_db(State),
     {DB, LockRes} = case ?DB:read(StateDB, Item#item.rkey) of
 			 {ok, _Value, Version} ->
 			     set_lock(StateDB, check_version(Item, Version), Item);
@@ -65,7 +64,7 @@ tp_validate(State, Tid, Item)->
 			     end
 		     end,
     Decision = decision(LockRes),
-    NewState = update_transaction_participant_log(cs_state:set_db(State, DB), Tid, Item, Decision),
+    NewState = update_transaction_participant_log(dht_node_state:set_db(State, DB), Tid, Item, Decision),
     NewVote = trecords:new_vote(Tid, Item#item.key, Item#item.rkey, Decision, 1),   
     tsend:send_vote_to_rtms(Item#item.tms, NewVote),
     NewState.
@@ -114,8 +113,8 @@ tp_commit(State, TransactionID)->
     case gb_trees:lookup(TransactionID, TransLogUndecided) of
 	{value, LogEntries} ->
 	    %LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
-	    DB = tp_commit_store_unlock(cs_state:get_db(State), LogEntries),
-	    State2 = cs_state:set_db(State, DB),
+	    DB = tp_commit_store_unlock(dht_node_state:get_db(State), LogEntries),
+	    State2 = dht_node_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);
 	none ->
@@ -144,8 +143,8 @@ tp_abort(State, TransactionID)->
     case gb_trees:lookup(TransactionID, TransLogUndecided) of
 	{value, LogEntries} ->
 	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
-	    DB = tp_abort_unlock(cs_state:get_db(State), LogEntries),
-	    State2 = cs_state:set_db(State, DB),
+	    DB = tp_abort_unlock(dht_node_state:get_db(State), LogEntries),
+	    State2 = dht_node_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);
 	none ->

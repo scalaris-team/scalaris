@@ -33,8 +33,8 @@
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_cs_node/4,
-         update_pred_succ_in_cs_node/3, to_html/1]).
+         dump/1, to_dict/1, export_rt_to_dht_node/4,
+         update_pred_succ_in_dht_node/3, to_html/1]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -164,16 +164,16 @@ next_index({I, J}) ->
 % 2 -> next longer finger
 % 3 -> ...
 % n -> me
--spec(to_dict/1 :: (cs_state:state()) -> dict_type()).
+-spec(to_dict/1 :: (dht_node_state:state()) -> dict_type()).
 to_dict(State) ->
-    RT = cs_state:rt(State),
-    Succ = cs_state:succ(State),
+    RT = dht_node_state:rt(State),
+    Succ = dht_node_state:succ(State),
     Fingers = util:uniq(flatten(RT, 127)),
     {Dict, Next} = lists:foldl(fun(Finger, {Dict, Index}) ->
                                        {dict:store(Index, Finger, Dict), Index + 1}
                                end,
                                {dict:store(0, Succ, dict:new()), 1}, lists:reverse(Fingers)),
-    dict:store(Next, cs_state:me(State), Dict).
+    dict:store(Next, dht_node_state:me(State), Dict).
 
 % @private
 flatten(RT, Index) ->
@@ -185,33 +185,33 @@ flatten(RT, Index) ->
     end.
 
 %%====================================================================
-%% Communication with cs_node
+%% Communication with dht_node
 %%====================================================================
 
 %% userdevguide-begin rt_chord:next_hop1
 %% @doc returns the next hop to contact for a lookup
-%%      Note, that this code will be called from the cs_node process and
+%%      Note, that this code will be called from the dht_node process and
 %%      it will have an external_rt!
--spec(next_hop/2 :: (cs_state:state(), key()) -> cs_send:mypid()).
+-spec(next_hop/2 :: (dht_node_state:state(), key()) -> cs_send:mypid()).
 next_hop(State, Id) ->
-    case util:is_between(cs_state:id(State), Id, cs_state:succ_id(State)) of
+    case util:is_between(dht_node_state:id(State), Id, dht_node_state:succ_id(State)) of
         %succ is responsible for the key
         true ->
-            cs_state:succ_pid(State);
+            dht_node_state:succ_pid(State);
         % check routing table
         false ->
-            case util:gb_trees_largest_smaller_than(Id, cs_state:rt(State)) of
+            case util:gb_trees_largest_smaller_than(Id, dht_node_state:rt(State)) of
                 nil ->
-                    cs_state:succ_pid(State);
+                    dht_node_state:succ_pid(State);
                 {value, _Key, Value} ->
                     Value
             end
     end.
 %% userdevguide-end rt_chord:next_hop1
 
--spec(export_rt_to_cs_node/4 :: (rt(), key(), node:node_type(), node:node_type())
+-spec(export_rt_to_dht_node/4 :: (rt(), key(), node:node_type(), node:node_type())
       -> external_rt()).
-export_rt_to_cs_node(RT, Id, Pred, Succ) ->
+export_rt_to_dht_node(RT, Id, Pred, Succ) ->
     Tree = gb_trees:enter(node:id(Succ), node:pidX(Succ),
                           gb_trees:enter(node:id(Pred), node:pidX(Pred),
                                          gb_trees:empty())),
@@ -227,9 +227,9 @@ export_rt_to_cs_node(RT, Id, Pred, Succ) ->
                         Tree,
                         RT).
 
--spec(update_pred_succ_in_cs_node/3 :: (node:node_type(), node:node_type(), external_rt())
+-spec(update_pred_succ_in_dht_node/3 :: (node:node_type(), node:node_type(), external_rt())
       -> external_rt()).
-update_pred_succ_in_cs_node(Pred, Succ, RT) ->
+update_pred_succ_in_dht_node(Pred, Succ, RT) ->
     gb_trees:enter(node:id(Succ), node:pidX(Succ),
                    gb_trees:enter(node:id(Pred), node:pidX(Pred),
                                   RT)).

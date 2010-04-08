@@ -75,7 +75,7 @@
 %% * for {fail, fail} the reason is currently unknown, should 
 %%   not occur 
 quorum_read(Key)->
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     RTO = config:read(quorum_read_timeout),
     transaction:quorum_read(Key, cs_send:this()),
     receive
@@ -99,13 +99,13 @@ quorum_read(Key)->
 %% Use this function to do parallel quorum reads on a list of keys with a commit phase
 parallel_quorum_reads(Keys, _Par)->
 %    ?TLOGN("starting quorum reads on ~p", [Keys]),
-    {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
+    {Flag, LocalDHTNode} = process_dictionary:find_dht_node(),
     RTO = config:read(parallel_quorum_read_timeout),
     if 
 	Flag /= ok->
 	    fail;
 	true ->
-	    LocalCSNode ! {parallel_reads, cs_send:this(), Keys, []},
+	    LocalDHTNode ! {parallel_reads, cs_send:this(), Keys, []},
 	    receive
 		{parallel_reads_return, fail}->
 		    {fail};
@@ -136,10 +136,10 @@ single_write(Key, Value)->
 
 %% use this function to do a full transaction including a readphase
 do_transaction(TFun, SuccessFun, FailureFun)->
-    LocalCSNodes = process_dictionary:find_all_cs_nodes(),
-    LocalCSNode = lists:nth(random:uniform(length(LocalCSNodes)), LocalCSNodes),
-    %{_, LocalCSNode} = process_dictionary:find_cs_node(),
-    LocalCSNode ! {do_transaction, TFun, SuccessFun, FailureFun, cs_send:this()},
+    LocalDHTNodes = process_dictionary:find_all_dht_nodes(),
+    LocalDHTNode = lists:nth(random:uniform(length(LocalDHTNodes)), LocalDHTNodes),
+    %{_, LocalDHTNode} = process_dictionary:find_dht_node(),
+    LocalDHTNode ! {do_transaction, TFun, SuccessFun, FailureFun, cs_send:this()},
     receive
         {trans, Message}->
             Message
@@ -150,12 +150,12 @@ do_transaction(TFun, SuccessFun, FailureFun)->
 do_transaction_wo_rp([], _SuccessFun, _FailureFun)->
     {ok};
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
-    {Flag, LocalCSNode} = process_dictionary:find_cs_node(),
+    {Flag, LocalDHTNode} = process_dictionary:find_dht_node(),
     if
 	Flag /= ok->
 	    fail;
 	true ->
-	    LocalCSNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, cs_send:this()},
+	    LocalDHTNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, cs_send:this()},
 	    receive
 		{trans, Message}->
 		    %?TLOGN(" received ~p~n", [Message]),
@@ -253,9 +253,9 @@ abort()->
 						{fail, timeout, pos_integer(), list()} | 
 						{fail, node_not_found}).
 delete(Key, Timeout) ->
-    case process_dictionary:find_cs_node() of
-	{ok, LocalCSNode} ->
-	    LocalCSNode ! {delete, cs_send:this(), Key},
+    case process_dictionary:find_dht_node() of
+	{ok, LocalDHTNode} ->
+	    LocalDHTNode ! {delete, cs_send:this(), Key},
 	    receive
 		{delete_result, Result} ->
 		    Result
@@ -280,7 +280,7 @@ delete(Key, Timeout) ->
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
 jWrite(Key, Value, TransLog)->
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     write(Key, Value, TransLog).
 
 %%--------------------------------------------------------------------
@@ -292,7 +292,7 @@ jWrite(Key, Value, TransLog)->
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
 jRead(Key, TransLog)->
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     read(Key, TransLog).
 
 %%--------------------------------------------------------------------
@@ -305,7 +305,7 @@ jRead(Key, TransLog)->
 %%--------------------------------------------------------------------
 jParallel_reads(Keys, TransLog)->
     io:format("~p~n", [TransLog]),
-    erlang:put(instance_id, process_dictionary:find_group(cs_node)),
+    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     A = parallel_reads(Keys, TransLog),
     io:format("~p~n", [A]),
     A.

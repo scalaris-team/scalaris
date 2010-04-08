@@ -1,4 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,16 +13,20 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_sup_and.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Supervisor for chord# nodes
+%%% File    sup_dht_node_core.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Supervisor for each DHT node that is responsible for keeping
+%%%         processes running that are essential to the operation of the node.
 %%%
+%%%         If one of the supervised processes (dht_node, ?DB, msg_delay or
+%%%         sup_dht_node_core_tx) fails, all will be re-started!
+%%%         Note that the DB is needed by the dht_node (and not vice-versa) and
+%%%         is thus started at first.
+%%% @end
 %%% Created : 17 Jan 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(cs_sup_and).
+-module(sup_dht_node_core).
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
@@ -30,14 +35,16 @@
 
 -export([start_link/2, init/1]).
 
+-spec start_link(term(), [any()]) -> {ok, Pid::cs_send:erl_pid_plain()} | ignore | {error, Error::{already_started, Pid::cs_send:erl_pid_plain()} | term()}.
 start_link(InstanceId, Options) ->
     supervisor:start_link(?MODULE, [InstanceId, Options]).
 
-%% userdevguide-begin cs_sup_and:init
+%% userdevguide-begin sup_dht_node_core:init
+-spec init([term() | [any()]]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init([InstanceId, Options]) ->
-    process_dictionary:register_process(InstanceId, cs_sup_and, self()),
+    process_dictionary:register_process(InstanceId, sup_dht_node_core, self()),
     Node =
-        util:sup_worker_desc(cs_node, cs_node, start_link,
+        util:sup_worker_desc(dht_node, dht_node, start_link,
                              [InstanceId, Options]),
     DB =
         util:sup_worker_desc(?DB, ?DB, start_link,
@@ -46,7 +53,7 @@ init([InstanceId, Options]) ->
         util:sup_worker_desc(msg_delay, msg_delay, start_link,
                              [InstanceId]),
     TX =
-        util:sup_supervisor_desc(cs_sup_tx, cs_sup_tx, start_link,
+        util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
                                  [InstanceId]),
     {ok, {{one_for_all, 10, 1},
           [
@@ -55,4 +62,4 @@ init([InstanceId, Options]) ->
            Delayer,
            TX
           ]}}.
-%% userdevguide-end cs_sup_and:init
+%% userdevguide-end sup_dht_node_core:init

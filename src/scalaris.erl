@@ -12,34 +12,24 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : chordsharp_app.erl
+%%% File    : scalaris.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : chordsharp application file
+%%% Description : 
 %%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
+%%% Created :  7 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(chordsharp_app).
+-module(scalaris).
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behaviour(application).
+-export([start/0, stop/0]).
 
--export([start/2, stop/1]).
+start() ->
+    application:start(scalaris).
 
-start(normal, _Args) ->
-    process_dictionary:start_link(),
-    Sup = cs_sup_standalone:start_link(),
-    Size = config:read(nodes_per_vm),
-    log:log(info,"Do ~p~n",[Size]),
-    admin:add_nodes(Size-1),
-    Sup;
-    
-start(_, _) ->
-    {error, badarg}.
-
-stop(_State) ->
-    ok.
+stop() ->
+    application:stop(scalaris).

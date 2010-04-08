@@ -133,11 +133,11 @@ checkinstallation() {
         fi
     fi
 
-    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'
+    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(dht_node)} of {{module,boot},{module,dht_node}} -> halt(0); X -> halt(1) end.'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: could not find Scalaris' beam files"
-        echo "erl -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(cs_node)} of {{module,boot},{module,cs_node}} -> halt(0); X -> halt(1) end.'"
+        echo "erl -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(dht_node)} of {{module,boot},{module,dht_node}} -> halt(0); X -> halt(1) end.'"
         exit 1
     fi
 
@@ -217,13 +217,13 @@ nodestart(){
         -pa $SCALARISDIR/contrib/log4erl/ebin \
         -pa $BEAMDIR $TCERLFLAGS $BACKGROUND \
         -yaws embedded true \
-        -chordsharp log_path "\"$LOGDIR\"" \
-        -chordsharp docroot "\"$NODEDOCROOTDIR\"" \
-        -chordsharp config "\"$ETCDIR/scalaris.cfg\"" \
-        -chordsharp local_config "\"$ETCDIR/scalaris.local.cfg\"" \
+        -scalaris log_path "\"$LOGDIR\"" \
+        -scalaris docroot "\"$NODEDOCROOTDIR\"" \
+        -scalaris config "\"$ETCDIR/scalaris.cfg\"" \
+        -scalaris local_config "\"$ETCDIR/scalaris.local.cfg\"" \
         -connect_all false -hidden -name $NODE_NAME \
         $SCALARIS_ADDITIONAL_PARAMETERS \
-        -s chordsharp $*;
+        -s scalaris $*;
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: could not start scalaris"

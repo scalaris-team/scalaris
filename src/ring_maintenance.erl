@@ -73,26 +73,26 @@ get_as_list() ->
     get_successorlist().
 
 
-%% @doc functions for rm_*.erl modules to notify the cs_node
+%% @doc functions for rm_*.erl modules to notify the dht_node
 %%      that his pred/succ changed
 -spec(update_preds_and_succs/2 :: (list(node:node_type()), list(node:node_type())) ->
              ok).
 update_preds_and_succs(Preds, Succs) ->
-    Pid = process_dictionary:get_group_member(cs_node),
+    Pid = process_dictionary:get_group_member(dht_node),
     cs_send:send_local(Pid, {rm_update_preds_succs, Preds, Succs}),
     ok.
 
-%% @doc functions for rm_*.erl modules to notify the cs_node
+%% @doc functions for rm_*.erl modules to notify the dht_node
 %%      that his pred/succ changed
 update_preds(Preds) ->
-    Pid = process_dictionary:get_group_member(cs_node),
+    Pid = process_dictionary:get_group_member(dht_node),
     cs_send:send_local(Pid, {rm_update_preds, Preds}).
 
 
-%% @doc functions for rm_*.erl modules to notify the cs_node
+%% @doc functions for rm_*.erl modules to notify the dht_node
 %%      that his pred/succ changed
 update_succs(Succs) ->
-    Pid = process_dictionary:get_group_member(cs_node),
+    Pid = process_dictionary:get_group_member(dht_node),
     cs_send:send_local(Pid, {rm_update_succs, Succs}).
 
 % @private

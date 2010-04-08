@@ -40,7 +40,7 @@
 % @doc ask all local nodes for their state
 dump_node_states() ->
     [gen_component:get_state(Pid)
-     || Pid <- process_dictionary:find_all_cs_nodes()].
+     || Pid <- process_dictionary:find_all_dht_nodes()].
 
 kill_nodes(No) ->
     Childs = lists:sublist([X || X <- supervisor:which_children(main_sup),
@@ -58,11 +58,11 @@ start_link() ->
 init(_Arg) ->
     ok.
 
-on({get_cs_nodes, Pid}, ok) ->
+on({get_dht_nodes, Pid}, ok) ->
     case cs_send:is_valid(Pid) of
         true ->
-            Nodes = get_live_cs_nodes(),
-            cs_send:send(Pid, {get_cs_nodes_response, Nodes});
+            Nodes = get_live_dht_nodes(),
+            cs_send:send(Pid, {get_dht_nodes_response, Nodes});
         false ->
             ok
     end,
@@ -71,8 +71,8 @@ on({get_cs_nodes, Pid}, ok) ->
 on(_, _State) ->
     unknown_event.
 
-get_live_cs_nodes() ->
-    [cs_send:make_global(Pid) || Pid <- process_dictionary:find_all_cs_nodes(), element(1, gen_component:get_state(Pid)) == state].
+get_live_dht_nodes() ->
+    [cs_send:make_global(Pid) || Pid <- process_dictionary:find_all_dht_nodes(), element(1, gen_component:get_state(Pid)) == state].
 
 get_round_trip(GPid, Iterations) ->
     Start = erlang:now(),

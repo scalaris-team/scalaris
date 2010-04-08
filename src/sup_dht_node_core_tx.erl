@@ -1,5 +1,6 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %  and onScale solutions GmbH
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,28 +14,32 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_sup_tx.erl
-%%% Author  : Florian Schintke <schintke@zib.de>
-%%% Description : Supervisor for transactions
+%%% File    sup_dht_node_core_tx.erl
+%%% @author Florian Schintke <schintke@zib.de>
+%%% @doc    Supervisor for each DHT node that is responsible for keeping
+%%%         its transaction processes running.
 %%%
-%%% Created : 01 Dec 2009 by Florian Schintke <schintke@zib.de>
+%%%         If one of the supervised processes fails, all will be re-started!
+%%% @end
+%%% Created : 1 Dec 2009 by Florian Schintke <schintke@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Florian Schintke <schintke@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum für Informationstechnik Berlin and onScale solutions GmbH
 %% @version $Id$
--module(cs_sup_tx).
+-module(sup_dht_node_core_tx).
 -author('schintke@zib.de').
 -vsn('$Id$ ').
 
 -behaviour(supervisor).
 -include("../include/scalaris.hrl").
+
 -export([start_link/1, init/1]).
 
+-spec start_link(term()) -> {ok, Pid::cs_send:erl_pid_plain()} | ignore | {error, Error::{already_started, Pid::cs_send:erl_pid_plain()} | term()}.
 start_link(InstanceId) ->
     supervisor:start_link(?MODULE, [InstanceId]).
 
+-spec init([term()]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init([InstanceId]) ->
-    process_dictionary:register_process(InstanceId, cs_sup_tx, self()),
+    process_dictionary:register_process(InstanceId, sup_dht_node_core_tx, self()),
     Proposer =
         util:sup_worker_desc(proposer, proposer, start_link, [InstanceId]),
     Acceptor =

@@ -1,4 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,15 +13,23 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_sup_standalone.erl
-%%% Author  : Thorsten Schuett <schuett@csr-pc11.zib.de>
-%%% Description : Supervisor for "standalone" mode
+%%% File    sup_scalaris_node.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Supervisor for "standalone" mode
+%%% @doc    Supervisor for an "ordinary" Scalaris node (nodes joining an
+%%%         existing Scalaris network) that is responsible for keeping its
+%%%         processes running.
 %%%
+%%%         If one of the supervised processes fails, only the failed process
+%%%         will be re-started!
+%%% @end
 %%% Created : 17 Aug 2007 by Thorsten Schuett <schuett@csr-pc11.zib.de>
 %%%-------------------------------------------------------------------
--module(cs_sup_standalone).
+%% @version $Id$
+-module(sup_scalaris_node).
 -behaviour(supervisor).
--include("autoconf.hrl").
+-include("../include/scalaris.hrl").
+-include("../include/autoconf.hrl").
 
 %% API
 -export([start_link/0, scan_environment/0]).
@@ -29,15 +38,16 @@
 
 -define(SERVER, ?MODULE).
 
+-spec start_link() -> {ok, Pid::cs_send:erl_pid_plain()} | ignore | {error, Error::{already_started, Pid::cs_send:erl_pid_plain()} | term()}.
 start_link() ->
     Link = supervisor:start_link({local, main_sup}, ?MODULE, []),
     case Link of
         {ok, _Pid} ->
             ok;
         ignore ->
-            io:format("error in starting standalone supervisor: supervisor should not return ignore~n");
+            io:format("error in starting scalaris node supervisor: supervisor should not return ignore~n");
         {error, Error} ->
-            io:format("error in starting standalone supervisor: ~p~n", [Error])
+            io:format("error in starting scalaris node supervisor: ~p~n", [Error])
     end,
     scan_environment(),
     Link.
@@ -50,6 +60,7 @@ start_tcerl() ->
     ok.
 -endif.
 
+-spec init([]) -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init([]) ->
     randoms:start(),
     inets:start(),
@@ -67,13 +78,13 @@ init([]) ->
         util:sup_supervisor_desc(comm_port_sup, comm_port_sup, start_link),
     Logger =
         util:sup_worker_desc(logger, log, start_link),
-    ChordSharp =
-        {chordsharp,
-         {cs_sup_or, start_link, []},
+    Scalaris =
+        {scalaris,
+         {sup_dht_node, start_link, []},
          permanent,
          brutal_kill,
          supervisor,
-         [cs_sup_or]
+         [sup_dht_node]
         },
     YAWS =
         util:sup_worker_desc(yaws, yaws_wrapper, try_link,
@@ -92,7 +103,7 @@ init([]) ->
         util:sup_worker_desc(ganglia_server, ganglia, start_link),
     MonitorTiming =
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link),
-    {ok,{{one_for_all,10,1},
+    {ok,{{one_for_one,10,1},
          [
           Config,
           Service,
@@ -104,7 +115,7 @@ init([]) ->
           YAWS,
           BenchServer,
           Ganglia,
-          ChordSharp
+          Scalaris
          ]}}.
 
 scan_environment() ->
