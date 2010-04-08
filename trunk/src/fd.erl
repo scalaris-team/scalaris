@@ -42,6 +42,8 @@
 %%% Public Interface
 %% @doc generates a failure detector for the calling process on the given pid.
 %-spec(subscribe/1 :: (cs_send:mypid() | list(cs_send:mypid())) -> ok).
+subscribe([]) ->
+    ok;
 subscribe(GlobalPids) when is_list(GlobalPids) ->
     subscribe(GlobalPids, '$fd_nil');
 subscribe(GlobalPid) ->
@@ -55,6 +57,8 @@ subscribe(GlobalPid, Cookie) ->
 
 %% @doc deletes the failure detector for the given pid.
 -spec(unsubscribe/1 :: (cs_send:mypid() | [cs_send:mypid()]) -> ok).
+unsubscribe([]) ->
+    ok;
 unsubscribe(GlobalPids) when is_list(GlobalPids) ->
     unsubscribe(GlobalPids, '$fd_nil');
 unsubscribe(GlobalPid) ->

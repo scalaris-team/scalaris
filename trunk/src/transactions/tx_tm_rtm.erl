@@ -356,7 +356,7 @@ my_RTM_update(RTMs) ->
 
 my_update_rtm_entry(RTMs, InKey, InPid) ->
     [ case InKey =:= Key of
-          true -> case InPid =:= RTM of
+          true -> case InPid =/= RTM of
                       true -> fd:unsubscribe(RTM),
                               fd:subscribe(InPid);
                       false -> ok
