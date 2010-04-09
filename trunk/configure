@@ -572,7 +572,6 @@ ERL
 ERLCFLAGS
 ERLC
 BROWSER
-HAVETCERL
 TCERLDRV_LIBS
 TCERLDRV_CFLAGS
 TOKYOCABINET_LIBS
@@ -2022,10 +2021,9 @@ else
 	TCERLDRV_LIBS=$pkg_cv_TCERLDRV_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	HAVETCERL='-define(HAVE_TCERL, true).'
+	HAVETCERL=", {d, HAVE_TCERL}"
 fi
 fi
-
 
 ###########################################################
 #
@@ -2884,7 +2882,7 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-EMAKEFILEDEFINES="$GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
+EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
 
 
 
@@ -2913,7 +2911,7 @@ echo "detected OS is: '$DRIVER_OS'"
 
 mkdir -p ~/.yaws 2> /dev/null
 
-ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl include/autoconf.hrl"
+ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3616,7 +3614,6 @@ do
     "Emakefile") CONFIG_FILES="$CONFIG_FILES Emakefile" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "bin/scalarisctl") CONFIG_FILES="$CONFIG_FILES bin/scalarisctl" ;;
-    "include/autoconf.hrl") CONFIG_FILES="$CONFIG_FILES include/autoconf.hrl" ;;
 
   *) as_fn_error "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
