@@ -20,11 +20,14 @@
 -vsn('$Id').
 
 -include("../include/scalaris.hrl").
--include("db.hrl").
 
 -behaviour(db_beh).
 
 -type(db()::atom()).
+
+% note: must include this file AFTER the type definitions for erlang < R13B04
+% to work 
+-include("db.hrl").
 
 -export([start_link/1]).
 -export([new/1, close/1]).
