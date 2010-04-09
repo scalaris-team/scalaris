@@ -77,7 +77,8 @@
 %% public functions
 %%====================================================================
 
-%% @doc register a process with InstanceId and Name
+%% @doc register a process with InstanceId and Name and stores the
+%%      process group info with put/2
 -spec(register_process/3 :: (term(), term(), pid()) -> ok).
 register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
@@ -92,7 +93,9 @@ lookup_process(InstanceId, Name) ->
         [{{InstanceId, Name}, Value}] ->
             Value;
         [] ->
-            log:log(error, "[ PD ] lookup_process failed in Pid ~p: InstanceID:  ~p  For: ~p StacK: ~p~n",[self(), InstanceId, Name, util:get_stacktrace()]),
+            log:log(error, "[ PD ] lookup_process failed in Pid ~p: InstanceID:  "
+                    "~p  For: ~p StacK: ~p~n",[self(), InstanceId, Name,
+                                               util:get_stacktrace()]),
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).

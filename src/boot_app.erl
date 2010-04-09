@@ -34,12 +34,11 @@
 start(normal, _Args) ->
     randoms:start(),
     process_dictionary:start_link(),
-    Sup = sup_scalaris_boot:start_link(),
+    Sup = sup_scalaris:start_link(boot),
     Size = config:read(nodes_per_vm),
     log:log(info,"Do ~p~n",[Size]),
     admin:add_nodes(Size-1),
     Sup;
-
 start(_, _) ->
     {error, badarg}.
 
