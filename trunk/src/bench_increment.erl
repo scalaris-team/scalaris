@@ -25,29 +25,8 @@
 
 -import(transaction_api, [read2/2, write2/3]).
 
--export([start/0, bench/0, bench_raw/0, process/3]).
+-export([bench/0, bench_raw/0, process/3]).
 -export([process_v2/3]).
-
-init() ->
-    Pid = spawn(fun () ->
-			process_dictionary:start_link_for_unittest(),
-			sup_scalaris_boot:start_link(),
-			timer:sleep(11000),
-			admin:add_nodes(3),
-			timer:sleep(6010000)
-		end),
-    timer:sleep(22000),
-   log:log(info,"[ Bench ] init done"),
-    Pid.
-
-tini(Pid) ->
-    exit(Pid, kill).
-
-start() ->
-    Pid = init(),
-    increment_test(),
-    tini(Pid),
-    init:stop().
 
 make_tfun(Key) ->
     fun (TransLog)->

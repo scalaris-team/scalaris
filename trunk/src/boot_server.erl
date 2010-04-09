@@ -111,7 +111,7 @@ init(_Arg) ->
     {gb_sets:empty(),true,[]}.
 
 %% @doc starts the server; called by the boot supervisor
-%% @see sup_scalaris_boot
+%% @see sup_scalaris
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
      gen_component:start_link(?MODULE, [InstanceId, []], [{register_native, boot}]).
