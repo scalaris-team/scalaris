@@ -311,8 +311,8 @@ find_start(Start, [Interval | Rest], Remainder) ->
 find_start(Start, Interval, Remainder) ->
     find_start(Start, [Interval], Remainder).
 
-% @doc Begin <= X <= End
-% precondition Begin <= End
+% @doc Begin &lt;= X &lt;= End
+% precondition Begin &lt;= End
 % @spec is_between(term(), term(), term()) -> boolean()
 -spec is_between/3 :: (Begin::key(), X::key(), End::key()) -> boolean().
 is_between(_, X, X) ->
