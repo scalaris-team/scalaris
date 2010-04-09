@@ -32,9 +32,8 @@ AS_IF([test "x$TCERLPREFIX" != xno],
              AC_SUBST([TOKYOCABINET_LIBS])
              PKG_CHECK_MODULES([TCERLDRV],
                                [tcerldrv-1.0],
-                               [[HAVETCERL='-define(HAVE_TCERL, true).']],
+                               [[HAVETCERL=", {d, HAVE_TCERL}"]],
                                [HAVETCERL=""])])
-AC_SUBST(HAVETCERL)
 
 ###########################################################
 #
@@ -137,7 +136,7 @@ AC_RUN_IFELSE(
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-EMAKEFILEDEFINES="$GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
+EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
 
 AC_SUBST(EMAKEFILEDEFINES)
 
@@ -166,7 +165,7 @@ AC_SUBST(DRIVER_OS)
 
 mkdir -p ~/.yaws 2> /dev/null
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl include/autoconf.hrl])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl])
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl

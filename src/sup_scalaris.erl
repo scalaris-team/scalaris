@@ -32,7 +32,7 @@
 
 -behaviour(supervisor).
 -include("../include/scalaris.hrl").
--include("../include/autoconf.hrl").
+
 -export([start_link/1, init/1]).
 
 -type supervisor_type() :: boot | node.

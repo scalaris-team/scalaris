@@ -28,7 +28,6 @@
 -behaviour(database).
 
 -include("../include/scalaris.hrl").
--include("autoconf.hrl").
 
 -type(db()::atom()).
 
