@@ -12,7 +12,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : trigger.erl
+%%% File    : trigger_beh.erl
 %%% Author  : Christian Hennig <hennig@zib.de>
 %%% Description : trigger behaviour
 %%%
@@ -21,7 +21,7 @@
 %% @author Christian Hennig <hennig@zib.de>
 %% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
--module(gen_trigger).
+-module(trigger_beh).
 
 -author('hennig@zib.de').
 -vsn('$Id').
