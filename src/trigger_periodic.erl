@@ -34,7 +34,7 @@
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
--behaviour(gen_trigger).
+-behaviour(trigger_beh).
 
 -include("../include/scalaris.hrl").
 
