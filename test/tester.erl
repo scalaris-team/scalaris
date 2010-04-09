@@ -81,6 +81,7 @@
     | {range, {integer, integer()}, {integer, integer()}}
     | {union, [any()]}
     | {record, atom(), atom()}
+    | nonempty_string
     | integer
     | pos_integer
     | non_neg_integer
@@ -116,6 +117,7 @@
     | {range, {integer, integer()}, {integer, integer()}}
     | {union, [tester_type()]}
     | {record, atom(), atom()}
+    | nonempty_string
     | integer
     | pos_integer
     | non_neg_integer
@@ -266,6 +268,8 @@ parse_type({type, _Line, char, []}, _Module, ParseState) ->
     {{range, {integer, 0}, {integer, 16#10ffff}}, ParseState};
 parse_type({type, _Line, string, []}, _Module, ParseState) ->
     {{list, {range, {integer, 0}, {integer, 16#10ffff}}}, ParseState};
+parse_type({type, _Line, nonempty_string, []}, _Module, ParseState) ->
+    {nonempty_string, ParseState};
 parse_type({type, _Line, number, []}, _Module, ParseState) ->
     {{union, [integer, float]}, ParseState};
 parse_type({type, _Line, boolean, []}, _Module, ParseState) ->
@@ -432,6 +436,12 @@ create_value({list, Type}, Size, TypeInfo) ->
             NewSize = erlang:max(1, (Size - ListLength) div ListLength),
             [create_value(Type, NewSize, TypeInfo) || _ <- lists:seq(1, ListLength)]
     end;
+create_value(nonempty_string, Size, TypeInfo) ->
+    ListLength = erlang:max(1, erlang:min(Size, crypto:rand_uniform(list_length_min(),
+                                                                    list_length_max() + 1))),
+    Type = {range, {integer, 0}, {integer, 16#10ffff}},
+    NewSize = erlang:max(1, (Size - ListLength) div ListLength),
+    [create_value(Type, NewSize, TypeInfo) || _ <- lists:seq(1, ListLength)];
 create_value(integer, _Size, _TypeInfo) ->
     crypto:rand_uniform(integer_min(), integer_max() + 1);
 create_value(pos_integer, _Size, _TypeInfo) ->
