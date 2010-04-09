@@ -1,6 +1,5 @@
 %  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,16 +11,13 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    ring_maintenance.erl
+
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    ring maintenance behaviour
 %%% @end
-%%% Created : 27 Nov 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
-%% @version $Id$
--module(ring_maintenance).
 
+%% @version $Id$
+-module(rm_beh).
 -author('schuett@zib.de').
 -vsn('$Id').
 
@@ -39,9 +35,9 @@ behaviour_info(callbacks) ->
 behaviour_info(_Other) ->
     undefined.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 get_successorlist() ->
     cs_send:send_local(get_pid(), {get_successorlist, self()}).

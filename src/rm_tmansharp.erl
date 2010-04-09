@@ -1,6 +1,5 @@
 %  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,16 +11,12 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    rm_tman.erl
+
 %%% @author Christian Hennig <hennig@zib.de>
 %%% @doc    T-Man ring maintenance
 %%% @end
-%%% Created : 12 Jan 2009 by Christian Hennig <hennig@zib.de>
-%%%-------------------------------------------------------------------
 %% @version $Id$
 -module(rm_tmansharp).
-
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
@@ -29,20 +24,20 @@
 
 -export([init/1, on/2]).
 
--behavior(ring_maintenance).
+-behavior(rm_beh).
 -behavior(gen_component).
 
--export([start_link/1, 
-	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1, 
-         update_succ/1, update_pred/1, 
+-export([start_link/1,
+	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1,
+         update_succ/1, update_pred/1,
 	 get_as_list/0, check_config/0]).
 
 % unit testing
 -export([merge/2, rank/2, get_pred/1, get_succ/1, get_preds/1, get_succs/1]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc spawns a chord-like ring maintenance process
 %% @spec start_link(term()) -> {ok, pid()}
 start_link(InstanceId) ->
@@ -57,17 +52,14 @@ init(_Args) ->
      cs_send:send_local(get_cs_pid(), {init_rm,self()}),
     uninit.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_successorlist() ->
     cs_send:send_local(get_pid() , {get_successorlist, self()}).
 
 get_predlist() ->
     cs_send:send_local(get_pid() , {get_predlist, self()}).
-    
 
 %% @doc notification that my succ left
 %%      parameter is his current succ list
@@ -96,14 +88,12 @@ update_pred(_Pred) ->
 
 get_as_list() ->
     get_successorlist().
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({init, NewId, NewMe, NewPred, NewSuccList, _DHTNode},uninit) ->
-        ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
+        rm_beh:update_succ_and_pred(NewPred, hd(NewSuccList)),
         fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
         cs_send:send_local_after(0, self(), {stabilize,Token}),
@@ -143,8 +133,8 @@ on({stabilize, AktToken},
     %Test for being alone
     case (P == Me) of
         true ->
-            ring_maintenance:update_pred(Me),
-            ring_maintenance:update_succ(Me);
+            rm_beh:update_pred(Me),
+            rm_beh:update_succ(Me);
         false ->
             cs_send:send_to_group_member(node:pidX(P), ring_maintenance, {rm_buffer,Me,extractMessage(View++[Me]++RndView,P)})
     end,
@@ -212,7 +202,7 @@ on({'$gen_cast', {debug_info, Requestor}},
                        {debug_info_response, [{"pred", lists:flatten(io_lib:format("~p", [get_preds(View)]))},
                                               {"succs", lists:flatten(io_lib:format("~p", [get_succs(View)]))}]}),
     State;
-        
+
 on({check_ring, 0, Me},
    {_Id, Me, _View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
     io:format(" [RM ] CheckRing   OK  ~n"),
@@ -247,27 +237,25 @@ on(_, _State) ->
 check_config() ->
     config:is_integer(stabilization_interval_min) and
     config:is_greater_than(stabilization_interval_min, 0) and
-    
+
     config:is_integer(stabilization_interval_max) and
     config:is_greater_than(stabilization_interval_max, 0) and
     config:is_greater_than_equal(stabilization_interval_max, stabilization_interval_min) and
 
     config:is_integer(cyclon_cache_size) and
     config:is_greater_than(cyclon_cache_size, 2) and
-    
+
     config:is_integer(succ_list_length) and
     config:is_greater_than_equal(succ_list_length, 0) and
-    
+
     config:is_integer(pred_list_length) and
     config:is_greater_than_equal(pred_list_length, 0).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc merge two successor lists into one
 %%      and sort by identifier
-
-
 rank(MergedList,Id) ->
     %io:format("--------------------------------- ~p ~n",[Id]),
     %io:format("in: ~p ~p ~n",[self(),MergedList]),
@@ -278,12 +266,12 @@ rank(MergedList,Id) ->
     Larger  = lists:usort(Order, [X || X <- MergedList, node:id(X) >  Id]),
     Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) == Id]),
     Smaller = lists:usort(Order, [X || X <- MergedList, node:id(X) <  Id]),
-    
+
     H1 = Larger++Smaller,
     Half = length(H1) div 2,
     {Succs,Preds} = lists:split(Half,H1),
     Return=lists:sublist(merge(Succs,lists:reverse(Preds)),10), %config:read(succ_list_length)+config:read(pred_list_length)
-   
+
     %io:format("return: ~p ~p ~n",[self(),Return]),
     A =case Return of
         []  -> Equal;
@@ -300,11 +288,9 @@ selectPeer(View,_) ->
         true -> lists:nth( NTH,View);
         false -> lists:nth(length(View),View)
     end.
-            
 
 extractMessage(View,P) ->
     lists:sublist(rank(View,node:id(P)),10).
-    
 
 merge([H1|T1],[H2|T2]) ->
     [H1,H2]++merge(T1,T2);
@@ -316,7 +302,6 @@ merge(X,[]) ->
     X;
 merge([],[]) ->
     [].
-
 
 get_succs([T]) ->
     [T];
@@ -335,7 +320,6 @@ get_pred([H|T]) ->
         []  -> H;
         _   -> get_succ(T)
     end.
-    
 
 get_every_nth([],_,_) ->
     [];
@@ -344,7 +328,6 @@ get_every_nth([H|T],Nth,Offset) ->
         0 ->  [H|get_every_nth(T,Nth,Nth)];
         _ ->  get_every_nth(T,Nth,Offset-1)
     end.
-        
 
 %-spec(filter/2 :: (cs_send:mypid(), list(node:node_type()) -> list(node:node_type()).
 filter(_Pid, []) ->
@@ -352,7 +335,7 @@ filter(_Pid, []) ->
 filter(Pid, [Succ | Rest]) ->
     case Pid == node:pidX(Succ) of
 	true ->
-        
+
         %Hook for DeadNodeCache
         dn_cache:add_zombie_candidate(Succ),
 
@@ -361,12 +344,9 @@ filter(Pid, [Succ | Rest]) ->
 	    [Succ | filter(Pid, Rest)]
     end.
 
-%% @doc get a peer form the cycloncache which is alive 
+%% @doc get a peer form the cycloncache which is alive
 get_RndView(N,Cache) ->
      lists:sublist(Cache, N).
-     
-     
-     
 
 % @doc Check if change of failuredetector is necessary
 update_failuredetector(OldView,NewView) ->
@@ -381,19 +361,18 @@ update_failuredetector(OldView,NewView) ->
     end,
     ok.
 
-
 update_fd([], _) ->
     ok;
 update_fd(Nodes, F) ->
-    F(Nodes).             
-           
+    F(Nodes).
+
 	
 % @doc informed the dht_node for new [succ|pred] if necessary
 update_dht_node(View,_AktPred,_AktSucc) ->
         NewAktPred=get_pred(View),
         NewAktSucc=get_succ(View),
-      	ring_maintenance:update_pred(NewAktPred),
-      	ring_maintenance:update_succ(NewAktSucc),
+      	rm_beh:update_pred(NewAktPred),
+      	rm_beh:update_succ(NewAktSucc),
 {NewAktPred,NewAktSucc}.
 
 % @doc adapt the Tman-interval
@@ -411,13 +390,10 @@ new_interval(View,NewView,Interval) ->
             end
     end.
 
-
 % print_view(Me,View) ->
 %     io:format("[~p] -> ",[node:pidX(Me)]),
 %     [io:format("~p",[node:pidX(Node)]) || Node <- View],
 %     io:format("~n").
-
-
 
 % @private
 get_pid() ->

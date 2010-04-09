@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,23 +11,16 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : rt_chord.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Routing Table
-%%%
-%%% Created : 10 Apr 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc Routing Table
+%% @end
 %% @version $Id$
 -module(rt_chord).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behaviour(routingtable).
-
+-behaviour(rt_beh).
 -include("../include/scalaris.hrl").
 
 % routingtable behaviour
@@ -49,9 +42,9 @@
 -type(state()::rt()).
 %% userdevguide-end rt_chord:types
 
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_chord:empty
 %% @doc creates an empty routing table.
@@ -71,9 +64,9 @@ hash_key(Key) ->
 getRandomNodeId() ->
     rt_simple:getRandomNodeId().
 
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% RT Management
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_chord:init_stab
 %% @doc starts the stabilization routine
@@ -137,9 +130,9 @@ stabilize(Id, Succ, RT, Index, Node) ->
     end.
 %% userdevguide-end rt_chord:stab
 
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Finger calculation
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @private
 -spec(calculateKey/2 :: (key(), index()) -> key()).
 calculateKey(Id, {I, J}) ->
@@ -156,9 +149,9 @@ next_index({I, 1}) ->
 next_index({I, J}) ->
     {I, J - 1}.
 
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 0 -> succ
 % 1 -> shortest finger
 % 2 -> next longer finger
@@ -184,9 +177,9 @@ flatten(RT, Index) ->
             []
     end.
 
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Communication with dht_node
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_chord:next_hop1
 %% @doc returns the next hop to contact for a lookup

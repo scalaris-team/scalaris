@@ -1,5 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,23 +11,16 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : rt_simple.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : sample routing table
-%%%
-%%% Created :  14 Apr 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc sample routing table
+%% @end
 %% @version $Id$
 -module(rt_simple).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--behaviour(routingtable).
-
+-behaviour(rt_beh).
 -include("../include/scalaris.hrl").
 
 % routingtable behaviour

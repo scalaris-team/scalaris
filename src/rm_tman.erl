@@ -1,6 +1,5 @@
 %  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,23 +11,19 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    rm_tman.erl
+
 %%% @author Christian Hennig <hennig@zib.de>
 %%% @doc    T-Man ring maintenance
 %%% @end
-%%% Created : 12 Jan 2009 by Christian Hennig <hennig@zib.de>
-%%%-------------------------------------------------------------------
 %% @version $Id$
 -module(rm_tman).
-
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 
 -include("../include/scalaris.hrl").
 
 -behavior(gen_component).
--behavior(ring_maintenance).
+-behavior(rm_beh).
 -behavior(self_man).
 
 -export([start_link/1]).
@@ -68,9 +63,9 @@
     {notify_new_pred, Pred::node:node_type()} |
     {notify_new_succ, Succ::node:node_type()}).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Starts a chord-like ring maintenance process, registers it with the
 %%      process dictionary and returns its pid for use by a supervisor.
@@ -88,14 +83,14 @@ init(Trigger) ->
     cs_send:send_local(get_cs_pid(), {init_rm,self()}),
     {uninit, TriggerState}.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc the Token takes care, that there is only one timermessage for stabilize
 -spec on(message(), state()) -> state().
 on({init, Id, Me, Predecessor, SuccList}, {uninit, TriggerState}) ->
-    ring_maintenance:update_preds_and_succs([Predecessor], SuccList),
+    rm_beh:update_preds_and_succs([Predecessor], SuccList),
     fd:subscribe(lists:usort([node:pidX(Node) || Node <- [Predecessor | SuccList]])),
     cyclon:get_subset_rand_next_interval(1),
     NewTriggerState = trigger:first(TriggerState),
@@ -139,8 +134,8 @@ on({trigger},
     NewTriggerState =
         case ((Pred == Me) and (Succ == Me)) of
             true ->
-                ring_maintenance:update_preds([Me]),
-                ring_maintenance:update_succs([Me]),
+                rm_beh:update_preds([Me]),
+                rm_beh:update_succs([Me]),
                 TriggerState;
             false ->
                 Message = {rm_buffer, Me, Succs ++ Preds ++ [Me]},
@@ -267,14 +262,14 @@ on(_, _State) ->
 -spec check_config() -> boolean().
 check_config() ->
     config:is_atom(ringmaintenance_trigger) and
-    
+
     config:is_integer(stabilization_interval_base) and
     config:is_greater_than(stabilization_interval_base, 0) and
-    
+
     config:is_integer(stabilization_interval_min) and
     config:is_greater_than(stabilization_interval_min, 0) and
     config:is_greater_than_equal(stabilization_interval_base, stabilization_interval_min) and
-    
+
     config:is_integer(stabilization_interval_max) and
     config:is_greater_than(stabilization_interval_max, 0) and
     config:is_greater_than_equal(stabilization_interval_max, stabilization_interval_min) and
@@ -282,16 +277,17 @@ check_config() ->
 
     config:is_integer(cyclon_cache_size) and
     config:is_greater_than(cyclon_cache_size, 2) and
-    
+
     config:is_integer(succ_list_length) and
     config:is_greater_than_equal(succ_list_length, 0) and
-    
+
     config:is_integer(pred_list_length) and
     config:is_greater_than_equal(pred_list_length, 0).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %% @doc merge two successor lists into one
 %%      and sort by identifier
 -spec merge([node:node_type()], [node:node_type()], ?RT:key()) -> [node:node_type()].
@@ -354,11 +350,11 @@ update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
 update_dht_node(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
     %io:format("UCN: ~p ~n",[{PredsNew,SuccsNew,ShuffelBuddy,AktPred,AktSucc}]),
     case NewPreds =/= [] andalso OldPreds =/= NewPreds of
-        true -> ring_maintenance:update_preds(NewPreds);
+        true -> rm_beh:update_preds(NewPreds);
         false -> ok
     end,
     case NewSuccs =/= [] andalso OldSuccs =/= NewSuccs of
-        true -> ring_maintenance:update_succs(NewSuccs);
+        true -> rm_beh:update_succs(NewSuccs);
         false -> ok
     end,
     {NewPreds, NewSuccs}.

@@ -1,7 +1,6 @@
-%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
-%             2009 onScale solutions
-%  @end
-%
+% @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+%            2009 onScale solutions
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -13,53 +12,39 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    db_ets.erl
+
 %%% @author Florian Schintke <schintke@onscale.de>
 %%% @doc    In-process database using ets
 %%% @end
-%%% Created : 21 Mar 2009 by Florian Schintke <schintke@onscale.de>
-%%%-------------------------------------------------------------------
+
 %% @version $Id$
 -module(db_ets).
-
 -author('schintke@onscale.de').
 -vsn('$Id').
 
--behaviour(database).
-
 -include("../include/scalaris.hrl").
+-include("db.hrl").
 
--import(ct).
--import(randoms).
--import(string).
-
+-behaviour(db_beh).
 -type(db()::atom()).
 
--include("database.hrl").
-
--export([start_link/1,
-         get_entry/2, set_entry/2,
-         set_write_lock/2, unset_write_lock/2, set_read_lock/2,
-         unset_read_lock/2, get_locks/2,
-
-         read/2, write/4, get_version/2,
-
-         delete/2,
-
-         get_range/3, get_range_with_version/2,
-
-         get_load/1, get_middle_key/1, split_data/3, get_data/1,
-         add_data/2,
-         get_range_only_with_version/2,
+-export([start_link/1]).
+-export([new/1, close/1]).
+-export([get_entry/2, set_entry/2]).
+-export([read/2, write/4, get_version/2]).
+-export([delete/2]).
+-export([set_write_lock/2, unset_write_lock/2,
+         set_read_lock/2, unset_read_lock/2, get_locks/2]).
+-export([get_range/3, get_range_with_version/2]).
+-export([get_load/1, get_middle_key/1, split_data/3, get_data/1,
+         add_data/2]).
+-export([get_range_only_with_version/2,
          build_merkle_tree/2,
-         update_if_newer/2,
-         new/1, close/1]).
+         update_if_newer/2]).
 
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% public functions
-%%====================================================================
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(_InstanceId) ->
     ignore.
 
