@@ -30,6 +30,8 @@
 -author('schintke@onscale.de').
 -behaviour(gen_component).
 
+-include("../include/scalaris.hrl").
+
 %% public interface for transaction validation using Paxos-Commit.
 -export([send_local/3]).
 
@@ -42,16 +44,19 @@ send_local(Seconds, Dest, Msg) ->
     cs_send:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
 
 %% be startable via supervisor, use gen_component
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     start_link(InstanceId, []).
 
+-spec start_link(instanceid(), [any()]) -> {ok, pid()}.
 start_link(InstanceId, Options) ->
     gen_component:start_link(?MODULE,
                              [InstanceId, Options],
                              [{register, InstanceId, msg_delay}]).
 
 %% initialize: return initial state.
-init([InstanceID, Options]) ->
+-spec init([instanceid() | [any()]]) -> any().
+init([InstanceID, _Options]) ->
     ?TRACE("msg_delay:init ~p~n", [InstanceID]),
     TableName =
         list_to_atom(lists:flatten(
@@ -60,7 +65,7 @@ init([InstanceID, Options]) ->
     %% TableName = pdb:new(?MODULE, [set, private]),
     pdb:new(TableName, [set, private, named_table]),
     cs_send:send_local(self(), {msg_delay_periodic}),
-    State = {TableName, _Round = 0}.
+    _State = {TableName, _Round = 0}.
 
 %% forward to local acceptor but add my role to the paxos id
 on({msg_delay_req, Seconds, Dest, Msg}, {TableName, Counter} = State) ->

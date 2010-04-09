@@ -25,6 +25,8 @@
 %% @version $Id $
 -module(comm_acceptor).
 
+-include("../../include/scalaris.hrl").
+
 -export([start_link/1, init/2]).
 
 -import(comm_connection).
@@ -35,6 +37,7 @@
 -import(lists).
 -import(process_dictionary).
 
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     Pid = spawn_link(comm_acceptor, init, [InstanceId, self()]),
     receive
@@ -42,6 +45,7 @@ start_link(InstanceId) ->
             {ok, Pid}
     end.
 
+-spec init(instanceid(), pid()) -> any().
 init(InstanceId, Supervisor) ->
     process_dictionary:register_process(InstanceId, acceptor, self()),
     erlang:register(comm_layer_acceptor, self()),

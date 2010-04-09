@@ -283,7 +283,7 @@ on({lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on({lookup_fin, Hops, Msg}, State) ->
+on({lookup_fin, _Hops, Msg}, State) ->
     cs_send:send_local(self(), Msg),
     State;
 
@@ -472,7 +472,7 @@ on(_, _State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec(init/1 :: ([any()]) -> {join_as_first, join_phase1}).
+-spec(init/1 :: ([instanceid() | [any()]]) -> {join_as_first | join_phase1}).
 init([_InstanceId, Options]) ->
     %io:format("~p~n", [Options]),
     % first node in this vm and also vm is marked as first
@@ -492,10 +492,11 @@ init([_InstanceId, Options]) ->
 
 %% userdevguide-begin dht_node:start_link
 %% @doc spawns a scalaris node, called by the scalaris supervisor process
-%% @spec start_link(term()) -> {ok, pid()}
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     start_link(InstanceId, []).
 
+-spec start_link(instanceid(), [any()]) -> {ok, pid()}.
 start_link(InstanceId, Options) ->
     gen_component:start_link(?MODULE, [InstanceId, Options],
                              [{register, InstanceId, dht_node}]).

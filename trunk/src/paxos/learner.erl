@@ -22,6 +22,8 @@
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
+-include("../../include/scalaris.hrl").
+
 -export([start_paxosid/5]).
 -export([stop_paxosids/2]).
 
@@ -39,17 +41,19 @@ stop_paxosids(Learner, ListOfPaxosIDs) ->
     cs_send:send(Learner, {learner_deleteids, ListOfPaxosIDs}).
 
 %% startable via supervisor, use gen_component
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     start_link(InstanceId, []).
 
+-spec start_link(instanceid(), [any()]) -> {ok, pid()}.
 start_link(InstanceId, Options) ->
     gen_component:start_link(?MODULE,
                              [InstanceId, Options],
                              [{register, InstanceId, paxos_learner}]).
 
 %% initialize: return initial state.
-init(Args) ->
-    [_InstanceID, _Options] = Args,
+-spec init([instanceid() | [any()]]) -> any().
+init([_InstanceID, _Options]) ->
     ?TRACE("Starting learner for instance: ~p~n", [_InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_learner", [InstanceID]))),

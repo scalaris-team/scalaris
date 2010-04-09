@@ -39,13 +39,15 @@
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc spawns a chord-like ring maintenance process
-%% @spec start_link(term()) -> {ok, pid()}
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     start_link(InstanceId, []).
 
-start_link(InstanceId,Options) ->
+-spec start_link(instanceid(), [any()]) -> {ok, pid()}.
+start_link(InstanceId, Options) ->
    gen_component:start_link(?MODULE, [InstanceId, Options], [{register, InstanceId, ring_maintenance}]).
 
+-spec init([instanceid() | [any()]]) -> any().
 init(_Args) ->
     log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [self()]),
     dn_cache:subscribe(),

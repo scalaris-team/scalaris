@@ -31,7 +31,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([start_link/1, number_of_nodes/0, node_list/0, connect/0, be_the_first/0]).
+-export([start_link/0, number_of_nodes/0, node_list/0, connect/0, be_the_first/0]).
 
 -behaviour(gen_component).
 
@@ -106,17 +106,18 @@ on({connect},State) ->
 on(_, _State) ->
     unknown_event.
 
+-spec init([]) -> any().
 init(_Arg) ->
     log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
     {gb_sets:empty(),true,[]}.
 
 %% @doc starts the server; called by the boot supervisor
 %% @see sup_scalaris
-%% @spec start_link(term()) -> {ok, pid()}
-start_link(InstanceId) ->
-     gen_component:start_link(?MODULE, [InstanceId, []], [{register_native, boot}]).
+-spec start_link() -> {ok, pid()}.
+start_link() ->
+     gen_component:start_link(?MODULE, [], [{register_native, boot}]).
 
 %% @doc pid of the boot daemon
-%% @spec bootPid() -> pid()
+-spec bootPid() -> cs_send:mypid().
 bootPid() ->
     config:read(boot_host).

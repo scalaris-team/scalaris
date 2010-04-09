@@ -62,7 +62,7 @@
 
 %% @doc Starts the dc_clustering process, registers it with the process
 %%      dictionary and returns its pid for use by a supervisor.
--spec start_link(term()) -> {ok, pid()} | ignore.
+-spec start_link(instanceid()) -> {ok, pid()} | ignore.
 start_link(InstanceId) ->
     case config:read(dc_clustering_enable) of
         true ->

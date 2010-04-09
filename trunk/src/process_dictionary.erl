@@ -79,7 +79,7 @@
 
 %% @doc register a process with InstanceId and Name and stores the
 %%      process group info with put/2
--spec(register_process/3 :: (term(), term(), pid()) -> ok).
+-spec(register_process/3 :: (instanceid(), term(), pid()) -> ok).
 register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
@@ -87,7 +87,7 @@ register_process(InstanceId, Name, Pid) ->
     gen_component:wait_for_ok().
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
--spec(lookup_process/2 :: (term(), term()) -> pid() | failed).
+-spec(lookup_process/2 :: (instanceid(), term()) -> pid() | failed).
 lookup_process(InstanceId, Name) ->
     case ets:lookup(?MODULE, {InstanceId, Name}) of
         [{{InstanceId, Name}, Value}] ->
@@ -159,7 +159,7 @@ get_processes_in_group(Group) ->
     ProcessesAsJson.
 
 %% @doc get info about process (for web interface)
-%% @spec get_info(term(), term()) -> term()
+-spec get_info(instanceid(), term()) -> term().
 get_info(InstanceId, Name) ->
     KVs =
         case lookup_process(InstanceId, list_to_atom(Name)) of

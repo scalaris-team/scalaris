@@ -181,7 +181,7 @@ previous_or_current(PreviousState, CurrentState) ->
 
 %% @doc Starts the gossip process, registers it with the process dictionary and
 %%      returns its pid for use by a supervisor.
--spec start_link(term()) -> {ok, pid()}.
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     Trigger = config:read(gossip_trigger),
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, gossip}]).

@@ -51,7 +51,7 @@
 
 %% @doc Starts the routing tabe maintenance process, registers it with the
 %%      process dictionary and returns its pid for use by a supervisor.
--spec start_link(term()) -> {ok, pid()}.
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     Trigger = config:read(routingtable_trigger),
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, routing_table}]).

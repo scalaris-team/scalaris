@@ -23,11 +23,11 @@
 -export([make/3]).
 
 make(P, A, L) ->
-    Ps = [ cs_send:make_global(element(2, proposer:start_link(X)))
+    Ps = [ cs_send:make_global(element(2, proposer:start_link([X])))
            || X <- lists:seq(1,P)],
-    As = [ cs_send:make_global(element(2, acceptor:start_link(X)))
+    As = [ cs_send:make_global(element(2, acceptor:start_link([X])))
            || X <- lists:seq(1,A)],
-    Ls = [ cs_send:make_global(element(2, learner:start_link(X)))
+    Ls = [ cs_send:make_global(element(2, learner:start_link([X])))
            || X <- lists:seq(1,L)],
     {Ps, As, Ls}.
 

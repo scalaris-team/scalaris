@@ -97,7 +97,7 @@ get_coordinate(Pid) ->
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_link(term()) -> {ok, pid()}.
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     Trigger = config:read(vivaldi_trigger),
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, vivaldi}]).

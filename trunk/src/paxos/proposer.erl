@@ -22,6 +22,8 @@
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
+-include("../../include/scalaris.hrl").
+
 %%% public interface for triggering a paxos proposer executed in any process
 %%% a Fast-Paxos is triggered by giving 0 as initial round number explicitly
 -export([start_paxosid/6,start_paxosid/7]).
@@ -82,17 +84,19 @@ trigger(Proposer, PaxosID) ->
     cs_send:send_local(Proposer, {trigger, PaxosID}).
 
 %% be startable via supervisor, use gen_component
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     start_link(InstanceId, []).
 
+-spec start_link(instanceid(), [any()]) -> {ok, pid()}.
 start_link(InstanceId, Options) ->
     gen_component:start_link(?MODULE,
                              [InstanceId, Options],
                              [{register, InstanceId, paxos_proposer}]).
 
 %% initialize: return initial state.
-init(Args) ->
-    [_InstanceID, _Options] = Args,
+-spec init([instanceid() | [any()]]) -> any().
+init([_InstanceID, _Options]) ->
     ?TRACE("Starting proposer for instance: ~p~n", [_InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_proposer", [InstanceID]))),

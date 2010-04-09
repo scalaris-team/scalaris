@@ -23,7 +23,7 @@
 %% @version $Id$
 
 %% userdevguide-begin scalaris:rt
-%%This file determines which kind of routingtable is used. Uncomment the
+%%The RT macro determines which kind of routingtable is used. Uncomment the
 %%one that is desired.
 
 %%Standard Chord routingtable
@@ -33,11 +33,17 @@
 %-define(RT, rt_simple).
 %% userdevguide-end scalaris:rt
 
+
+%% userdevguide-begin scalaris:db
 %%Standard database backend
 %-define(DB, cs_db_otp).
 %-define(DB, db_gb_trees).
 %-define(DB, db_tcerl).
 -define(DB, db_ets).
+%% userdevguide-end scalaris:db
+
+
+%% userdevguide-begin scalaris:rm
 %%Standard chord ring maintenance
 %-define(RM, rm_chord).
 
@@ -46,10 +52,11 @@
 
 %% ring maintenance by T-man-Sharp
 %-define(RM, rm_tmansharp).
+%% userdevguide-end scalaris:rm
+
 
 -define(TCP_LAYER, true). % TCP communication
 %-define(BUILTIN, true).   % distributed Erlang native communication
-
 %-define(SIMULATION, true).
 
 
@@ -70,26 +77,5 @@
 %-define(LOG_CS_API(Timer, Time), monitor_timing:log(Timer, Time)).
 -define(LOG_CS_API(Timer, Time), ok).
 
--ifdef(term_not_builtin).
--type term() :: any().
--endif.
 
--ifdef(node_not_builtin).
--type node() :: erlang:node().
--endif.
-
--ifdef(module_not_builtin).
--type module() :: erlang:module().
--endif.
-
--ifdef(boolean_not_builtin).
--type boolean() :: bool().
--endif.
-
--ifdef(types_not_builtin).
--type reference() :: erlang:reference().
--type gb_set() :: gb_sets:gb_set().
--type queue() :: queue:queue().
--type gb_tree() :: gb_trees:gb_tree().
--type dict() :: dict:dictionary().
--endif.
+-include("types.hrl").

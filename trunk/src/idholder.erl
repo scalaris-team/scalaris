@@ -49,10 +49,12 @@ get_key() ->
     cs_send:send_local(get_pid() , {get_key_keyholder, self()}),
     ok.
 
+-spec init([instanceid() | [any()]]) -> any().
 init(_Arg) ->
     get_initial_key(config:read(key_creator)).
     
 
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     gen_component:start_link(?MODULE, [InstanceId,[]], [{register, InstanceId, idholder}]).
     
