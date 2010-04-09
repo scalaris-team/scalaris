@@ -1,6 +1,5 @@
-%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,37 +11,33 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    rm_chord.erl
+
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    Chord-like ring maintenance
 %%% @end
-%%% Created : 27 Nov 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
 %% @version $Id$
 -module(rm_chord).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
 -include("../include/scalaris.hrl").
 
--behavior(ring_maintenance).
+-behavior(rm_beh).
 -behavior(gen_component).
 
 -export([init/1,on/2]).
 
--export([start_link/1, 
-	 get_successorlist/1, succ_left/1, pred_left/1, 
-	 notify/1, update_succ/1, update_pred/1, 
+-export([start_link/1,
+	 get_successorlist/1, succ_left/1, pred_left/1,
+	 notify/1, update_succ/1, update_pred/1,
 	 get_predlist/0, check_config/0]).
 
 % unit testing
 -export([merge/3]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Starts a chord-like ring maintenance process, registers it with the
 %%      process dictionary and returns its pid for use by a supervisor.
@@ -97,14 +92,14 @@ update_pred(_Pred) ->
 
 notify(Pred) ->
     cs_send:send_local(get_pid(), {notify, Pred}).
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %set info for dht_node
 on({init, NewId, NewMe, NewPred, NewSuccList, _DHTNode}, {uninit, TriggerState}) ->
-    ring_maintenance:update_succ_and_pred(NewPred, hd(NewSuccList)),
+    rm_beh:update_succ_and_pred(NewPred, hd(NewSuccList)),
     cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
     fd:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
     {NewId, NewMe, NewPred, NewSuccList, TriggerState};
@@ -140,7 +135,7 @@ on({get_pred_response, SuccsPred}, {Id, Me, Pred, Succs, TriggerState} = State) 
             case util:is_between_stab(Id, node:id(SuccsPred), node:id(hd(Succs))) of
                 true ->
                     cs_send:send(node:pidX(SuccsPred), {get_succ_list, cs_send:this()}),
-                    ring_maintenance:update_succ_and_pred(Pred, SuccsPred),
+                    rm_beh:update_succ_and_pred(Pred, SuccsPred),
                     fd:subscribe(node:pidX(SuccsPred)),
                     {Id, Me, Pred, [SuccsPred | Succs], TriggerState};
                 false ->
@@ -156,20 +151,20 @@ on({get_succ_list_response, Succ, SuccsSuccList}, {Id, Me, Pred, Succs, TriggerS
     NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), succListLength()),
     %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
     cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
-    ring_maintenance:update_succ_and_pred(Pred, hd(NewSuccs)),
+    rm_beh:update_succ_and_pred(Pred, hd(NewSuccs)),
     fd:subscribe([node:pidX(Node) || Node <- NewSuccs]),
     {Id, Me, Pred, NewSuccs, TriggerState};
 
 on({notify, NewPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
     case node:is_null(Pred) of
         true ->
-            ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
+            rm_beh:update_succ_and_pred(NewPred, hd(Succs)),
             fd:subscribe(node:pidX(NewPred)),
             {Id, Me, NewPred, Succs, TriggerState};
         false ->
             case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
                 true ->
-                    ring_maintenance:update_succ_and_pred(NewPred, hd(Succs)),
+                    rm_beh:update_succ_and_pred(NewPred, hd(Succs)),
                     fd:subscribe(node:pidX(NewPred)),
                     {Id, Me, NewPred, Succs, TriggerState};
                 false ->
@@ -207,9 +202,9 @@ check_config() ->
     config:is_integer(succ_list_length) and
     config:is_greater_than_equal(succ_list_length, 0).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc merge two successor lists into one
 %%      and sort by identifier
 merge(L1, L2, Id) ->

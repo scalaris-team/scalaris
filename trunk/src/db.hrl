@@ -1,6 +1,5 @@
-%  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+% @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,13 +11,10 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    database.hrl
+
 %%% @author Nico Kruber <kruber@zib.de>
 %%% @doc    Common types and function specs for database implementations.
 %%% @end
-%%% Created : 31 Mar 2010 by Nico Kruber <kruber@zib.de>
-%%%-------------------------------------------------------------------
 %% @version $Id$
 
 -type(key()::integer() | string()).

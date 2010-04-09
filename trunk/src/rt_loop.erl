@@ -1,6 +1,5 @@
 %  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,16 +11,12 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    rt_loop.erl
+
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    routing table process
 %%% @end
-%%% Created : 5 Dec 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
 %% @version $Id$
 -module(rt_loop).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
@@ -35,24 +30,24 @@
 
 % state of the routing table loop
 -type(state() :: {Id           :: ?RT:key(),
-		          Pred         :: node:node_type(), 
-		          Succ         :: node:node_type(), 
-		          RTState      :: ?RT:rt(),
-                  TriggerState :: trigger:state()} | 
+                  Pred         :: node:node_type(),
+                  Succ         :: node:node_type(),
+                  RTState      :: ?RT:rt(),
+                  TriggerState :: trigger:state()} |
                  {uninit, TriggerState :: trigger:state()}).
 
 % accepted messages of rt_loop processes
--type(message() :: 
+-type(message() ::
       {init, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()}
      | {stabilize}
      | {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ}
      | {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}
-     | {lookup_pointer_response, Index::pos_integer(), Node::node:node_type()} 
+     | {lookup_pointer_response, Index::pos_integer(), Node::node:node_type()}
      | {crash, DeadPid::cs_send:mypid()}).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Starts the routing tabe maintenance process, registers it with the
 %%      process dictionary and returns its pid for use by a supervisor.

@@ -1,6 +1,5 @@
 %  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,50 +11,39 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    db_gb_trees.erl
+
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    In-process Database using gb_trees
 %%% @end
-%%% Created : 19 Dec 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
-%% @version $Id$
+%%% @version $Id$
 -module(db_gb_trees).
-
 -author('schuett@zib.de').
 -vsn('$Id').
 
--behaviour(database).
-
 -include("../include/scalaris.hrl").
+-include("db.hrl").
 
--import(ct).
+-behaviour(db_beh).
 
 -type(db()::gb_tree()).
 
--include("database.hrl").
+-export([start_link/1]).
+-export([new/1, close/1]).
+%% @TODO -export([get_entry/2, set_entry/2]).
+-export([read/2, write/4, get_version/2]).
+-export([delete/2]).
+-export([set_write_lock/2, unset_write_lock/2,
+         set_read_lock/2, unset_read_lock/2, get_locks/2]).
+-export([get_range/3, get_range_with_version/2]).
+-export([get_load/1, get_middle_key/1, split_data/3, get_data/1,
+         add_data/2]).
+-export([get_range_only_with_version/2,
+         build_merkle_tree/2,
+         update_if_newer/2]).
 
--export([start_link/1,
-	 set_write_lock/2, unset_write_lock/2, set_read_lock/2, 
-	 unset_read_lock/2, get_locks/2,
-
-	 read/2, write/4, get_version/2, 
-
-	 delete/2,
-
-	 get_range/3, get_range_with_version/2,
-
-	 get_load/1, get_middle_key/1, split_data/3, get_data/1, 
-	 add_data/2,
-	 get_range_only_with_version/2,
-	 build_merkle_tree/2,
-	 update_if_newer/2,
-	 new/1, close/1]).
-
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% public functions
-%%====================================================================
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(_InstanceId) ->
     ignore.
 
@@ -71,138 +59,138 @@ close(_) ->
 %%      the write lock is a boolean value per key
 set_write_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {Value, false, 0, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, true, 0, Version}, 
-				    DB),
-	    {NewDB, ok};
-	{value, {_Value, _WriteLock, _ReadLock, _Version}} ->
-	    {DB, failed};
-	none ->
-	    % no value stored yet
-	    NewDB = gb_trees:enter(Key, 
-				   {empty_val, true, 0, -1},
-				   DB),
-	    {NewDB, ok}
+        {value, {Value, false, 0, Version}} ->
+            NewDB = gb_trees:update(Key,
+                                    {Value, true, 0, Version},
+                                    DB),
+            {NewDB, ok};
+        {value, {_Value, _WriteLock, _ReadLock, _Version}} ->
+            {DB, failed};
+        none ->
+            % no value stored yet
+            NewDB = gb_trees:enter(Key,
+                                   {empty_val, true, 0, -1},
+                                   DB),
+            {NewDB, ok}
     end.
 
 %% @doc unsets the write lock of a key
 %%      the write lock is a boolean value per key
 unset_write_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {empty_val, true, 0, -1}} ->
-	    NewDB = gb_trees:delete(Key, DB),
+        {value, {empty_val, true, 0, -1}} ->
+            NewDB = gb_trees:delete(Key, DB),
             {NewDB, ok};
-	{value, {Value, true, ReadLock, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, false, ReadLock, Version}, 
-				    DB),
-	    {NewDB, ok};
-	{value, {_Value, false, _ReadLock, _Version}} ->
-	    {DB, failed};
-	none ->
-	    {DB, failed}
+        {value, {Value, true, ReadLock, Version}} ->
+            NewDB = gb_trees:update(Key,
+                                    {Value, false, ReadLock, Version},
+                                    DB),
+            {NewDB, ok};
+        {value, {_Value, false, _ReadLock, _Version}} ->
+            {DB, failed};
+        none ->
+            {DB, failed}
     end.
 
 %% @doc sets a read lock on a key
 %%      the read lock is an integer value per key
 set_read_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {Value, false, ReadLock, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, false, ReadLock + 1, Version}, 
-				    DB),
-	    {NewDB, ok};
-	{value, {_Value, _WriteLock, _ReadLock, _Version}} ->
-	    {DB, failed};
-	none ->
-	    {DB, failed}
+        {value, {Value, false, ReadLock, Version}} ->
+            NewDB = gb_trees:update(Key,
+                                    {Value, false, ReadLock + 1, Version},
+                                    DB),
+            {NewDB, ok};
+        {value, {_Value, _WriteLock, _ReadLock, _Version}} ->
+            {DB, failed};
+        none ->
+            {DB, failed}
     end.
 
 %% @doc unsets a read lock on a key
 %%      the read lock is an integer value per key
 unset_read_lock(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {_Value, _WriteLock, 0, _Version}} ->
-	    {DB, failed};
-	{value, {Value, WriteLock, ReadLock, Version}} ->
-	    NewDB = gb_trees:update(Key, 
-				    {Value, WriteLock, ReadLock - 1, Version}, 
-				    DB),
-	    {NewDB, ok};
-	none ->
-	    {DB, failed}
+        {value, {_Value, _WriteLock, 0, _Version}} ->
+            {DB, failed};
+        {value, {Value, WriteLock, ReadLock, Version}} ->
+            NewDB = gb_trees:update(Key,
+                                    {Value, WriteLock, ReadLock - 1, Version},
+                                    DB),
+            {NewDB, ok};
+        none ->
+            {DB, failed}
     end.
 
 %% @doc get the locks and version of a key
 get_locks(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {_Value, WriteLock, ReadLock, Version}} ->
-	    {DB, {WriteLock, ReadLock, Version}};
-	none ->
-	    {DB, failed}
+        {value, {_Value, WriteLock, ReadLock, Version}} ->
+            {DB, {WriteLock, ReadLock, Version}};
+        none ->
+            {DB, failed}
     end.
 
 %% @doc reads the version and value of a key
 read(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {Value, _WriteLock, _ReadLock, Version}} ->
-	    {ok, Value, Version};
-	none ->
-	    {ok, empty_val, -1}
+        {value, {Value, _WriteLock, _ReadLock, Version}} ->
+            {ok, Value, Version};
+        none ->
+            {ok, empty_val, -1}
     end.
 
 %% @doc updates the value of key
 write(DB, Key, Value, Version) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {_Value, WriteLock, ReadLock, _Version}} ->
-	    gb_trees:enter(Key, 
-			   {Value, WriteLock, ReadLock, Version}, 
-			   DB);
-	none ->
-	    gb_trees:enter(Key, 
-			   {Value, false, 0, Version}, 
-			   DB)
+        {value, {_Value, WriteLock, ReadLock, _Version}} ->
+            gb_trees:enter(Key,
+                           {Value, WriteLock, ReadLock, Version},
+                           DB);
+        none ->
+            gb_trees:enter(Key,
+                           {Value, false, 0, Version},
+                           DB)
     end.
 
 %% @doc deletes the key
 delete(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {_Value, false, 0, _Version}} ->
-	    {gb_trees:delete(Key, DB), ok};
-	{value, _Value} ->
-	    {DB, locks_set};
-	none ->
-	    {DB, undef}
+        {value, {_Value, false, 0, _Version}} ->
+            {gb_trees:delete(Key, DB), ok};
+        {value, _Value} ->
+            {DB, locks_set};
+        none ->
+            {DB, undef}
     end.
 
 %% @doc reads the version of a key
 get_version(DB, Key) ->
     case gb_trees:lookup(Key, DB) of
-	{value, {_Value, _WriteLock, _ReadLock, Version}} ->
-	    {ok, Version};
-	none ->
-	    failed
+        {value, {_Value, _WriteLock, _ReadLock, Version}} ->
+            {ok, Version};
+        none ->
+            failed
     end.
 
 %% @doc returns the number of stored keys
 get_load(DB) ->
     gb_trees:size(DB).
 
-%% @doc returns the key, which splits the data into two equally 
+%% @doc returns the key, which splits the data into two equally
 %%      sized groups
 get_middle_key(DB) ->
     case (Length = gb_trees:size(DB)) < 3 of
-	true ->
-	    failed;
-	false ->
-	    Keys = gb_trees:keys(DB),
-	    Middle = Length div 2,
-	    MiddleKey = lists:nth(Middle, Keys),
-	    {ok, MiddleKey}
+        true ->
+            failed;
+        false ->
+            Keys = gb_trees:keys(DB),
+            Middle = Length div 2,
+            MiddleKey = lists:nth(Middle, Keys),
+            {ok, MiddleKey}
     end.
 
-%% @doc returns all keys (and removes them from the db) which belong 
+%% @doc returns all keys (and removes them from the db) which belong
 %%      to a new node with id HisKey
 split_data(DB, MyKey, HisKey) ->
     DataList = gb_trees:to_list(DB),
@@ -242,32 +230,32 @@ get_range_only_with_version(DB, Interval) ->
 
 build_merkle_tree(DB, Range) ->
     {From, To} = intervals:unpack(Range),
-    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) -> 
-				     case util:is_between(From, Key, To) of
-					 true ->
-					     merkerl:insert({Key, 0}, Tree);
-					 false ->
-					     Tree
-				     end
-			     end, 
-		undefined, gb_trees:to_list(DB)),
+    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
+                                     case util:is_between(From, Key, To) of
+                                         true ->
+                                             merkerl:insert({Key, 0}, Tree);
+                                         false ->
+                                             Tree
+                                     end
+                             end,
+                undefined, gb_trees:to_list(DB)),
     MerkleTree.
 
 % update only if no locks are taken and version number is higher
 update_if_newer(OldDB,  KVs) ->
     F = fun ({Key, Value, Version}, DB) ->
-		case gb_trees:lookup(Key, DB) of
-		    none ->
-			gb_trees:insert(Key, {Value, false, 0, Version}, DB);
-		    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
-			case not WriteLock andalso ReadLock == 0 andalso OldVersion < Version of
-			    true ->
-				gb_trees:update(Key, 
-						{Value, WriteLock, ReadLock, Version}, 
-						DB);
-			    false ->
-				DB
-			end
-		end
-	end, 
+                case gb_trees:lookup(Key, DB) of
+                    none ->
+                        gb_trees:insert(Key, {Value, false, 0, Version}, DB);
+                    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
+                        case not WriteLock andalso ReadLock == 0 andalso OldVersion < Version of
+                            true ->
+                                gb_trees:update(Key,
+                                                {Value, WriteLock, ReadLock, Version},
+                                                DB);
+                            false ->
+                                DB
+                        end
+                end
+        end,
     lists:foldl(F, OldDB, KVs).

@@ -1,6 +1,5 @@
 %  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,16 +11,12 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    dht_node.erl
+
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    dht_node main file
 %%% @end
-%%% Created : 3 May 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
 %% @version $Id$
 -module(dht_node).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
@@ -116,7 +111,7 @@ on({join_response, Pred, Data}, {join_phase4, Id, Succ, Me}) ->
     % @TODO data shouldn't be moved here, might be large
     log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),
     DB = ?DB:add_data(?DB:new(Id), Data),
-    routingtable:initialize(Id, Pred, Succ),
+    rt_beh:initialize(Id, Pred, Succ),
     State = case node:is_null(Pred) of
                 true ->
                     dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
@@ -150,7 +145,7 @@ on({halt}, _State) ->
 on({die}, _State) ->
     kill;
 
-%% Ring Maintenance (see ring_maintenance.erl)
+%% Ring Maintenance (see rm_beh.erl)
 on({init_rm,Pid},State) ->
     cs_send:send_local(Pid , {init, dht_node_state:id(State), dht_node_state:me(State),dht_node_state:pred(State), [dht_node_state:succ(State)]}),
     State;
@@ -169,17 +164,17 @@ on({rm_update_succs, Succs}, State) ->
 
 %% @doc notification that my successor left
 on({succ_left, Succ}, State) ->
-    ring_maintenance:succ_left(Succ),
+    rm_beh:succ_left(Succ),
     State;
 
 %% @doc notification that my predecessor left
 on({pred_left, Pred}, State) ->
-    ring_maintenance:pred_left(Pred),
+    rm_beh:pred_left(Pred),
     State;
 
 %% @doc notify the dht_node his successor changed
 on({update_succ, Succ}, State) ->
-    ring_maintenance:notify_new_succ(Succ),
+    rm_beh:notify_new_succ(Succ),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
