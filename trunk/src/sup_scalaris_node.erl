@@ -15,7 +15,6 @@
 %%%-------------------------------------------------------------------
 %%% File    sup_scalaris_node.erl
 %%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Supervisor for "standalone" mode
 %%% @doc    Supervisor for an "ordinary" Scalaris node (nodes joining an
 %%%         existing Scalaris network) that is responsible for keeping its
 %%%         processes running.
