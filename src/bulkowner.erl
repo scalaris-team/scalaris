@@ -47,7 +47,7 @@ start_bulk_owner(I, Msg) ->
 %% @spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), 
 %%                 Msg::term()) -> ok
 bulk_owner(State, I, Msg) ->
-    Range = intervals:sanitize(intervals:cut(I, dht_node_state:next_interval(State))),
+    Range = intervals:normalize(intervals:cut(I, dht_node_state:next_interval(State))),
     case intervals:is_empty(Range) of
 	true ->
 	    ok;
@@ -68,7 +68,7 @@ bulk_owner_iter(State, U, Index, I, Msg) ->
     case dict:find(Index, U) of
 	{ok, U_of_Index} ->
 	    U_of_IndexM1 = dict:fetch(Index - 1, U),
-	    Range = intervals:sanitize(intervals:cut(I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)))),
+	    Range = intervals:normalize(intervals:cut(I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)))),
 	    %ct:pal("iter: ~p ~p ~p ~n", [I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)), Range]),
 	    case intervals:is_empty(Range) of
 		false ->

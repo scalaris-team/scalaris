@@ -31,20 +31,21 @@
 -include("../include/scalaris.hrl").
 
 -export([first/0,last/0,
-	 new/1, new/2, make/1,
-	 is_empty/1, empty/0,
-	 cut/2,
-	 is_covered/2,
-	 unpack/1,
-	 in/2,
-	 sanitize/1
-	 % for unit testing only
-%% 	 cut_iter/2,
-%% 	 normalize/1,
-%% 	 wraps_around/1,
-%% 	 is_between/3,
-%% 	 find_start/3
-	 ]).
+         new/1, new/2, make/1,
+         is_empty/1, empty/0,
+         cut/2,
+         is_covered/2,
+         unpack/1,
+         in/2,
+         normalize/1
+         % for unit testing only
+%%       cut_iter/2,
+%%         , wraps_around/1
+%%         , is_between/3
+%%       find_start/3
+%%         , greater_equals_than/2
+%%         , normalize/2
+        ]).
 
 -type(key() :: ?RT:key() | minus_infinity | plus_infinity).
 -type(simple_interval() :: {element, key()} | {interval, key(), key()} | all).
@@ -56,7 +57,7 @@
 % all -> minus_infinity to plus_infinity
 % list(interval()) -> [i1, i2, i3,...]
 %
-% access start and endpoint of a tuple-interval using 
+% access start and endpoint of a tuple-interval using
 % element(first(),Interval) and element(last(),Interval).
 first() ->
     2.
@@ -65,13 +66,25 @@ last() ->
 
 
 % @spec new(term(), term()) -> interval()
+-spec new/2 :: (key(), key()) ->  all | {interval, key(), key()} | list(simple_interval()).
+new(minus_infinity, plus_infinity) ->
+    all;
+new(minus_infinity, minus_infinity) ->
+    {element, minus_infinity};
+new(plus_infinity, plus_infinity) ->
+    {element, plus_infinity};
+new(plus_infinity, minus_infinity) ->
+    [{element, plus_infinity}, {element, minus_infinity}];
 new(X, X) ->
     all;
 new(Begin, End) ->
     {interval, Begin, End}.
+
+-spec new/1 :: (key()) -> {element, key()}.
 new(X) ->
     {element,X}.
 
+-spec make/1 :: ({key(), key()}) -> all | {interval, key(), key()}.
 make({Begin, End}) ->
     new(Begin, End).
 
@@ -84,33 +97,37 @@ unpack(X) ->
     X.
 
 
-% @spec is_empty(interval()) -> boolean()
+%% @doc checks whether the given set is empty
+-spec is_empty/1 :: (interval()) -> boolean().
 is_empty([]) ->
     true;
 is_empty(_) ->
     false.
 
-% @spec empty() -> interval()
+%% @doc the empty set
+-spec empty/0 :: () -> [].
 empty() ->
     [].
 
-% @spec cut(A::interval(), B::interval()) -> interval()
+%% @doc the cut of two sets
+-spec cut/2 :: (interval(), interval()) -> interval().
 cut([], _) ->
     empty();
 cut(_, []) ->
     empty();
 cut({element,X}=A, B) ->
     case in(X,B) of
-	true -> A;
-	false -> empty()
+        true -> A;
+        false -> empty()
     end;
-cut(A, {element,_}=B) -> 
+cut(A, {element,_}=B) ->
     cut(B, A);
 cut(A, B) ->
     A_ = normalize(A),
     B_ = normalize(B),
-    cut_iter(A_, B_).
+    normalize(cut_iter(A_, B_)).
 
+-spec cut_iter/2 :: (interval(), interval()) -> interval().
 cut_iter([First | Rest], B) ->
     [cut_iter(First, B) | cut_iter(Rest, B)];
 cut_iter(A, [First | Rest]) ->
@@ -123,10 +140,10 @@ cut_iter(_, []) ->
     [];
 cut_iter(A, all) ->
     A;
-cut_iter({element,_}=A, B) ->
-    case in(A, B) of
-	true -> A;
-	false -> empty()
+cut_iter({element,A_Value}=A, B) ->
+    case in(A_Value, B) of
+        true -> A;
+        false -> empty()
     end;
 cut_iter(A, {element,_}=B) ->
     cut_iter(B, A);
@@ -136,17 +153,16 @@ cut_iter({interval, A0, A1}, {interval, B0, B1}) ->
     A0_in_B = is_between(B0, A0, B1),
     A1_in_B = is_between(B0, A1, B1),
     if
-	(A1 == B0) and not A0_in_B ->
-	    {element,A1};
-	(B1 == A0) and not B0_in_A ->
-	    {element,B1};
-	B0_in_A or B1_in_A or A0_in_B or A1_in_B ->
-	    new(util:max(A0, B0), util:min(A1, B1));
+        (A1 == B0) and not A0_in_B ->
+            {element,A1};
+        (B1 == A0) and not B0_in_A ->
+            {element,B1};
+        B0_in_A or B1_in_A or A0_in_B or A1_in_B ->
+            new(util:max(A0, B0), util:min(A1, B1));
 
-	true ->
-	    empty()
+        true ->
+            empty()
     end.
-	    
 
 % @doc returns true if the intervals cover the complete interval
 % @spec is_covered(interval(), [interval()]) -> boolean()
@@ -170,12 +186,12 @@ is_covered(Interval, Intervals) ->
     %io:format("is_covered: ~p ~p~n", [Interval, Intervals]),
     NormalIntervals = normalize(Intervals),
     case wraps_around(Interval) of
-	true ->
-	    is_covered_helper(new(minus_infinity, element(last(), Interval)), NormalIntervals) 
-			      and 
-			      is_covered_helper(new(element(first(),Interval), plus_infinity), NormalIntervals);
-	false ->
-	    is_covered_helper(Interval, NormalIntervals)
+        true ->
+            is_covered_helper(new(minus_infinity, element(last(), Interval)), NormalIntervals) 
+                and
+                is_covered_helper(new(element(first(),Interval), plus_infinity), NormalIntervals);
+        false ->
+            is_covered_helper(Interval, NormalIntervals)
     end.
 
 % @private
@@ -183,21 +199,28 @@ is_covered_helper(Interval, Intervals) ->
     %io:format("helper: ~p ~p~n", [Interval, Intervals]),
     %io:format("find_start: ~p~n", [find_start(element(first(),Interval), Intervals, [])]),
     case find_start(element(first(),Interval), Intervals, []) of
-	none ->
-	    false;
-	{CoversStart, RemainingIntervals} ->
-	    case greater_equals_than(element(last(),CoversStart), element(last(),Interval)) of
-		true ->
-		    true;
-		false ->
-		    is_covered_helper(intervals:new(element(last(),CoversStart), element(last(),Interval)), RemainingIntervals)
-	    end
+        none ->
+            false;
+        {CoversStart, RemainingIntervals} ->
+            case greater_equals_than(element(last(),CoversStart), element(last(),Interval)) of
+                true ->
+                    true;
+                false ->
+                    is_covered_helper(intervals:new(element(last(),CoversStart), element(last(),Interval)), RemainingIntervals)
+            end
     end.
 
-in(X, {interval, First, Last}) ->
-    is_between(First, X, Last);
+%% @doc X \in I
+-spec in/2 :: (X::key(), I::interval()) -> boolean().
+in(X, {interval, First, Last} = I) ->
+    case wraps_around(I) of
+        false ->
+            is_between(First, X, Last);
+        true ->
+            in(X, normalize(I))
+    end;
 in(X, [I | Rest]) ->
-    in(X, I) or in(X, Rest);
+    in(X, I) orelse in(X, Rest);
 in(_, []) ->
     false;
 in(_, all) ->
@@ -207,68 +230,69 @@ in(X, {element,X}) ->
 in(_, {element,_}) ->
     false.
 
-sanitize(X) when is_list(X) ->
-    case sanitize_helper(X, []) of
-	[Y] ->
-	    Y;
-	Y ->
-	    Y
+%% @doc bring list of intervals to normal form
+-spec normalize(interval()) -> interval().
+normalize(List) when is_list(List) ->
+    case normalize(lists:usort(lists:flatten(List)), []) of
+        [Element] ->
+            Element;
+        X ->
+            X
     end;
-sanitize(X) ->
-    X.
+normalize(Element) ->
+    case normalize(Element, []) of
+        [Element2] ->
+            Element2;
+        X ->
+            X
+    end.
 
-sanitize_helper([[] | Rest], List) ->
-    sanitize_helper(Rest, List);
-sanitize_helper([all | _], _) ->
-    all;
-sanitize_helper([X | Rest], List) when is_list(X) ->
-    sanitize_helper(Rest, sanitize_helper(X, List));
-sanitize_helper([X | Rest], List) ->
-    sanitize_helper(Rest, [X | List]);
-sanitize_helper(all, List) ->
+%% @doc helper for normalize/1
+-spec normalize/2 :: (interval(), list(interval)) ->
+    list(interval()).
+normalize(_, [all] = List) ->
     List;
-sanitize_helper({interval, _First, _Last} = X, List) ->
-    [X | List];
-sanitize_helper({element, _} = X, List) ->
-    [X | List];
-sanitize_helper([], List) ->
-    List.
+normalize([], List) ->
+    List;
+normalize([all | _Rest], _List) ->
+    [all];
+normalize([Interval | Rest], List) ->
+    normalize(Rest, normalize(Interval, List));
+normalize({element, _} = Element, List) ->
+    [Element | List];
+normalize({interval,First,First}, List) ->
+    [{element, First} | List];
+normalize({interval,First,Last}=I, List) ->
+    case wraps_around(I) of
+        true ->  [new(minus_infinity, Last),
+                  new(First, plus_infinity) | List];
+        false -> [new(First, Last) | List]
+    end;
+normalize(all, _List) ->
+    [all];
+normalize(A, List) ->
+    [A | List].
+
 %%====================================================================
 %% private functions
-%%====================================================================  
+%%====================================================================
 
 % @private
+wraps_around({interval, X, X}) ->
+    false;
 wraps_around({interval, minus_infinity, _}) ->
-  false;
+    false;
 wraps_around({interval, _, plus_infinity}) ->
-  false;
-wraps_around({interval, First, Last}) when First >= Last ->
+    false;
+wraps_around({interval, _, minus_infinity}) ->
+    true;
+wraps_around({interval, plus_infinity, _}) ->
+    true;
+wraps_around({interval, First, Last}) when First > Last ->
     true;
 wraps_around(_) ->
     false.
 
-normalize([]) ->
-    [];
-normalize([all | Rest]) ->
-    [new(minus_infinity, plus_infinity) | normalize(Rest)];
-normalize([[] | Rest]) ->
-    normalize(Rest);
-normalize([Interval]) -> 
-    normalize(Interval);
-normalize([Interval|Rest]) ->
-    case wraps_around(Interval) of
-	true ->
-	    [new(element(first(),Interval), plus_infinity), new(minus_infinity, element(last(),Interval)) | normalize(Rest)];
-	false ->
-	    [Interval | normalize(Rest)]
-    end;
-normalize({interval,First,Last}=I) ->
-    case greater_equals_than(First,Last) of
-	true ->  [new(minus_infinity, Last), new(First, plus_infinity)];
-	false -> I
-    end;
-normalize(A) ->
-    A.
 
 % @private
 % @spec find_start(term(), [interval()], [interval()]) -> {interval(), [interval()]} | none
@@ -277,21 +301,24 @@ find_start(_Start, [], _) ->
 find_start(Start, [{element,_} | Rest], Remainder) ->
     find_start(Start, Rest, Remainder);
 find_start(Start, [Interval | Rest], Remainder) ->
+    %% @todo is the precondition of is_between fulfilled?
     case is_between(element(first(),Interval), Start, element(last(),Interval)) of
-	true ->
-	    {Interval, Remainder ++ Rest};
-	false ->
-	    find_start(Start, Rest, [Interval | Remainder])
+        true ->
+            {Interval, Remainder ++ Rest};
+        false ->
+            find_start(Start, Rest, [Interval | Remainder])
     end;
 find_start(Start, Interval, Remainder) ->
     find_start(Start, [Interval], Remainder).
 
-% @private
+% @doc Begin <= X <= End
+% precondition Begin <= End
 % @spec is_between(term(), term(), term()) -> boolean()
+-spec is_between/3 :: (Begin::key(), X::key(), End::key()) -> boolean().
 is_between(_, X, X) ->
     true;
 is_between(X, _, X) ->
-    true;
+    false;
 is_between(_, plus_infinity, plus_infinity) ->
     true;
 is_between(minus_infinity, _, plus_infinity) ->
@@ -306,24 +333,22 @@ is_between(minus_infinity, plus_infinity, _) ->
     false;
 is_between(minus_infinity, X, Y) ->
     X =< Y;
-is_between(X, plus_infinity, Y) when X > Y->
-    true;
 is_between(_, plus_infinity, _) ->
     false;
-is_between(X, minus_infinity, Y) when X > Y->
-    true;
 is_between(_, minus_infinity, _) ->
     false;
 is_between(Begin, Id, End) ->
     if
-	Begin < End -> 
-	    (Begin =< Id) and (Id =< End);
-	Begin == End ->
-	    true;
-	true -> 
-	    (Begin =< Id) or (Id =< End)
+        Begin < End ->
+            (Begin =< Id) and (Id =< End);
+        Begin == End ->
+            true;
+        true ->
+            (Begin =< Id) or (Id =< End)
     end.
 
+%% @doc A >= B
+-spec greater_equals_than/2 :: (A::key(), B::key()) -> boolean().
 greater_equals_than(minus_infinity, minus_infinity) ->
     true;
 greater_equals_than(minus_infinity, _) ->
@@ -332,5 +357,7 @@ greater_equals_than(plus_infinity, plus_infinity) ->
     true;
 greater_equals_than(_, plus_infinity) ->
     false;
+greater_equals_than(_, minus_infinity) ->
+    true;
 greater_equals_than(X, Y) ->
     X >= Y.
