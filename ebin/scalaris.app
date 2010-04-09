@@ -12,12 +12,12 @@
 %    See the License for the specific language governing permissions and
 %    limitations under the License.
 %
-% $Id: scalaris.app 1 2007-07-05 09:25:05Z schuett $
+% $Id$
 
 {application, scalaris,
               [{description, "scalaris"},
                {vsn, "0.2"},
-               {mod, {scalaris_app, []}},
+               {mod, {scalaris_app, node}},
                {registered, []},
                {applications, [kernel, stdlib]},
                {env, [
