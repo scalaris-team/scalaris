@@ -79,7 +79,7 @@ get_round_trip(GPid, Iterations) ->
     [ begin
           cs_send:send(GPid, {ping, cs_send:this()}),
           receive
-              Any -> ok
+              _Any -> ok
           end
       end
       || _ <- lists:seq(1, Iterations) ],

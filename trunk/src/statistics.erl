@@ -91,13 +91,13 @@ get_node_details(Pid) ->
 	    {ok, Details}
     after
         2000 ->
-            log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response form ~p~n",[Pid]),
+            log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response from ~p~n",[Pid]),
             receive
                 {{get_node_details_response, Details}, Pid} ->
                     {ok, Details}
             after
                 4000 ->
-                    log:log(error,"[ ST ]: 6sec Timeout by waiting on get_node_details_response form ~p~n",[Pid]),
+                    log:log(error,"[ ST ]: 6sec Timeout by waiting on get_node_details_response from ~p~n",[Pid]),
                     {failed}
             end
     end.
