@@ -33,11 +33,11 @@
 
 -export([start_link/1, init/1]).
 
--spec start_link(term()) -> {ok, Pid::cs_send:erl_pid_plain()} | ignore | {error, Error::{already_started, Pid::cs_send:erl_pid_plain()} | term()}.
+-spec start_link(instanceid()) -> {ok, Pid::pid()} | ignore | {error, Error::{already_started, Pid::pid()} | term()}.
 start_link(InstanceId) ->
     supervisor:start_link(?MODULE, [InstanceId]).
 
--spec init([term()]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
+-spec init([instanceid()]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, sup_dht_node_core_tx, self()),
     Proposer =

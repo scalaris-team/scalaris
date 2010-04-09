@@ -147,7 +147,7 @@ get_subset_rand_next_interval(N, Pid) ->
 
 %% @doc Starts the cyclon process, registers it with the process dictionary and
 %%      returns its pid for use by a supervisor.
--spec start_link(term()) -> {ok, pid()}.
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     Trigger = config:read(cyclon_trigger),
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, cyclon}]).

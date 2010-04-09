@@ -37,10 +37,10 @@
 
 -type supervisor_type() :: boot | node.
 
--spec start_link(supervisor_type()) -> {ok, Pid::cs_send:erl_pid_plain()}
+-spec start_link(supervisor_type()) -> {ok, Pid::pid()}
                                      | ignore
                                      | {error, Error::{already_started,
-                                                       Pid::cs_send:erl_pid_plain()}
+                                                       Pid::pid()}
                                      | term()}.
 start_link(SupervisorType) ->
     Link = supervisor:start_link({local, main_sup}, ?MODULE, SupervisorType),
@@ -76,7 +76,7 @@ init(SupervisorType) ->
     start_tcerl(),
     {ok, {{one_for_one, 10, 1}, my_process_list(InstanceId, SupervisorType)}}.
 
--spec my_process_list/2 :: (any(), supervisor_type()) -> list(supervisor:child_spec()).
+-spec my_process_list/2 :: (instanceid(), supervisor_type()) -> [any()].
 my_process_list(InstanceId, SupervisorType) ->
     AdminServer =
         util:sup_worker_desc(admin_server, admin, start_link),
@@ -98,7 +98,7 @@ my_process_list(InstanceId, SupervisorType) ->
     MonitorTiming =
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link),
     BootServer =
-        util:sup_worker_desc(boot_server, boot_server, start_link, [InstanceId]),
+        util:sup_worker_desc(boot_server, boot_server, start_link),
     Service =
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link),
     YAWS =

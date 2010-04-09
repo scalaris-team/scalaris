@@ -89,7 +89,7 @@ new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
     }.
 %% userdevguide-end dht_node_state:state
 
--spec next_interval(state()) -> intervals:interval().
+-spec next_interval(state()) -> intervals:simple_interval().
 next_interval(State) -> intervals:new(id(State), succ_id(State)).
 
 -spec get_my_range(state()) -> my_range().

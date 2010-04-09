@@ -49,12 +49,14 @@ commit(TM, Client, ClientsID, TLog) ->
     cs_send:send_local(TM, Msg).
 
 %% be startable via supervisor, use gen_component
+-spec start_link(instanceid(), any()) -> {ok, pid()}.
 start_link(InstanceId, Name) ->
     gen_component:start_link(?MODULE,
                              [InstanceId, Name],
                              [{register, InstanceId, Name}]).
 
 %% initialize: return initial state.
+-spec init([instanceid() | any()]) -> any().
 init([InstanceID, Name]) ->
     ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n", [InstanceID, Name]),
     %% For easier debugging, use a named table (generates an atom)

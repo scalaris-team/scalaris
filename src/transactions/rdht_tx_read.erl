@@ -125,12 +125,14 @@ abort(DB, RTLogEntry) ->
 
 
 %% be startable via supervisor, use gen_component
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     gen_component:start_link(?MODULE,
                              [InstanceId],
                              [{register, InstanceId, ?MODULE}]).
 
 %% initialize: return initial state.
+-spec init([instanceid()]) -> any().
 init([InstanceID]) ->
     ?TRACE("rdht_tx_read: Starting rdht_tx_read for instance: ~p~n", [InstanceID]),
     %% For easier debugging, use a named table (generates an atom)

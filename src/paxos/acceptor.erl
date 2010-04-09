@@ -23,6 +23,8 @@
 -author('schintke@onscale.de').
 -behaviour(gen_component).
 
+-include("../../include/scalaris.hrl").
+
 %%% public interface for initiating a paxos acceptor for a new PoxosID
 -export([start_paxosid/2, start_paxosid/3]).
 -export([msg_accepted/4]).
@@ -61,17 +63,19 @@ start_paxosid(Acceptor, PaxosID, Learners) ->
     cs_send:send(Acceptor, {acceptor_initialize, PaxosID, Learners}).
 
 %% be startable via supervisor, use gen_component
+-spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     start_link(InstanceId, []).
 
+-spec start_link(instanceid(), [any()]) -> {ok, pid()}.
 start_link(InstanceId, Options) ->
     gen_component:start_link(?MODULE,
                              [InstanceId, Options],
                              [{register, InstanceId, paxos_acceptor}]).
 
 %% initialize: return initial state.
-init(Args) ->
-    [_InstanceID, _Options] = Args,
+-spec init([instanceid() | [any()]]) -> any().
+init([_InstanceID, _Options]) ->
     ?TRACE("Starting acceptor for instance: ~p~n", [_InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_acceptor", [InstanceID]))),

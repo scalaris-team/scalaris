@@ -24,24 +24,24 @@
 -module(fd_linker).
 
 -author('hennig@zib.de').
-
-
+-vsn('$Id$ ').
 
 -behavior(gen_component).
--export([init/1,on/2,start_link/1]).
 
--export([]).
+-include("../include/scalaris.hrl").
 
+-export([init/1, on/2, start_link/2]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc spawns a fd_linker instance
-%% @spec start_link(term()) -> {ok, pid()}
-start_link(InstanceId) ->
-    start_link(InstanceId, []).
+%% NOTE: this cannot work! use start_link/2 instead or re-write start_link/1
+%% %% @doc spawns a fd_linker instance
+%% -spec start_link(instanceid()) -> {ok, pid()}.
+%% start_link(InstanceId) ->
+%%     start_link(InstanceId, []).
 
 start_link(InstanceId,[Module,Param]) ->
     gen_component:start_link(?MODULE,Module, [{Param},{register, InstanceId,fd_linker}]).
