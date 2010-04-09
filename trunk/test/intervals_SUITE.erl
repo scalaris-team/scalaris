@@ -16,7 +16,7 @@
 
 all() ->
     [new, is_empty, cut, tc1,
-     tester_make, tester_in, tester_sanitize,
+     tester_make, tester_in, tester_normalize,
      tester_cut, tester_not_cut, tester_not_cut2
      ].
 
@@ -41,7 +41,7 @@ is_empty(_Config) ->
     Empty = intervals:empty(),
     ?assert(not intervals:is_empty(NotEmpty)),
     ?assert(intervals:is_empty(Empty)).
-    
+
 cut(_Config) ->
     NotEmpty = intervals:new("a", "b"),
     Empty = intervals:empty(),
@@ -51,16 +51,16 @@ cut(_Config) ->
     ?assert(not intervals:is_empty(intervals:cut(NotEmpty, NotEmpty))),
     ?assert(intervals:cut(NotEmpty, NotEmpty) == NotEmpty),
     ok.
-    
+
 tc1(_Config) ->
     ?assert(intervals:is_covered([{interval,minus_infinity,42312921949186639748260586507533448975},
-				  {interval,316058952221211684850834434588481137334,plus_infinity}], 
-				 {interval,316058952221211684850834434588481137334,
-				  127383513679421255614104238365475501839})),
+                                  {interval,316058952221211684850834434588481137334,plus_infinity}],
+                                 {interval,316058952221211684850834434588481137334,
+                                  127383513679421255614104238365475501839})),
     ?assert(intervals:is_covered([{element,187356034246551717222654062087646951235},
-				  {element,36721483204272088954146455621100499974}],
-				 {interval,36721483204272088954146455621100499974,
-				  187356034246551717222654062087646951235})),
+                                  {element,36721483204272088954146455621100499974}],
+                                 {interval,36721483204272088954146455621100499974,
+                                  187356034246551717222654062087646951235})),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -73,7 +73,7 @@ prop_make(X, Y) ->
     intervals:make({X,Y}) == intervals:new(X, Y).
 
 tester_make(_Config) ->
-    tester:test(intervals_SUITE, prop_make, 2, 10).
+    tester:test(intervals_SUITE, prop_make, 2, 100).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -86,20 +86,20 @@ prop_in(X, Y) ->
         intervals:in(Y, intervals:new(X, Y)).
 
 tester_in(_Config) ->
-    tester:test(intervals_SUITE, prop_in, 2, 10).
+    tester:test(intervals_SUITE, prop_in, 2, 100).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% intervals:sanitize/2
+% intervals:normalize/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_sanitize/2 :: (list(intervals:interval()), intervals:key()) -> boolean()).
-prop_sanitize(Is, X) ->
+-spec(prop_normalize/2 :: (list(intervals:interval()), intervals:key()) -> boolean()).
+prop_normalize(Is, X) ->
     intervals:in(X, Is) ==
-        intervals:in(X, intervals:sanitize(Is)).
+        intervals:in(X, intervals:normalize(Is)).
 
-tester_sanitize(_Config) ->
-    tester:test(intervals_SUITE, prop_sanitize, 2, 10).
+tester_normalize(_Config) ->
+    tester:test(intervals_SUITE, prop_normalize, 2, 100).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -124,11 +124,11 @@ prop_not_cut2(A, B, X) ->
              not intervals:in(X, intervals:cut(A, B))).
 
 tester_cut(_Config) ->
-    tester:test(?MODULE, prop_cut, 3, 10).
+    tester:test(?MODULE, prop_cut, 3, 1000).
 
 tester_not_cut(_Config) ->
-    tester:test(?MODULE, prop_not_cut, 3, 10).
+    tester:test(?MODULE, prop_not_cut, 3, 1000).
 
 tester_not_cut2(_Config) ->
-    tester:test(?MODULE, prop_not_cut2, 3, 10).
+    tester:test(?MODULE, prop_not_cut2, 3, 1000).
 
