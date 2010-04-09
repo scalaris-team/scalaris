@@ -39,7 +39,6 @@
 -type(dict_type() :: dict()).
 -type(index() :: {pos_integer(), pos_integer()}).
 
--type(state()::rt()).
 %% userdevguide-end rt_chord:types
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -40,7 +40,7 @@ inc(Key) ->
         cs_api_v2:process_request_list([], [{read, Key}]),
     case ReadResult of
         {value, Value} ->
-            {_TLog, {results, [{write, Key, {value, Written}}, CommitResult]}} =
+            {_TLog, {results, [{write, Key, {value, _Written}}, CommitResult]}} =
                 cs_api_v2:process_request_list(
                   TLog1, [{write, Key, Value + 1}, {commit}]),
                 case CommitResult of

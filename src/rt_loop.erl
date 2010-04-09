@@ -141,13 +141,13 @@ on(_UnknownMessage, _State) ->
     unknown_event.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(check/5 :: (Old::?RT:state(), New::?RT:state(), ?RT:key(), node:node_type(),
+-spec(check/5 :: (Old::?RT:rt(), New::?RT:rt(), ?RT:key(), node:node_type(),
                   node:node_type()) -> any()).
 check(Old, New, Id, Pred, Succ) ->
     check(Old, New, Id, Pred, Succ, true).
 
 % OldRT, NewRT, CheckFD
--spec(check/6 :: (Old::?RT:state(), New::?RT:state(), ?RT:key(), node:node_type(),
+-spec(check/6 :: (Old::?RT:rt(), New::?RT:rt(), ?RT:key(), node:node_type(),
                   node:node_type(), ReportFD::boolean() | any()) -> any()).
 check(X, X, _Id, _Pred, _Succ, _) ->
     ok;

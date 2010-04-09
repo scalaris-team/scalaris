@@ -79,7 +79,7 @@ on({msg_delay_req, Seconds, Dest, Msg}, {TableName, Counter} = State) ->
     State;
 
 %% periodic trigger
-on({msg_delay_periodic} = Trigger, {TableName, Counter} = State) ->
+on({msg_delay_periodic} = Trigger, {TableName, Counter} = _State) ->
     ?TRACE("tx_tm_rtm:on(msg_delay_periodic)~n", []),
     case pdb:get(Counter, TableName) of
         undefined -> ok;
