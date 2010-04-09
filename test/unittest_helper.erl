@@ -35,7 +35,7 @@ make_ring(Size) ->
                         randoms:start(),
                         process_dictionary:start_link(),
                         %timer:sleep(1000),
-                        sup_scalaris_boot:start_link(),
+                        sup_scalaris:start_link(boot),
                         %timer:sleep(1000),
                         boot_server:connect(),
                         admin:add_nodes(Size - 1),
