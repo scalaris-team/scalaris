@@ -173,7 +173,7 @@ is_covered(_, all) ->
     true;
 is_covered(all, Intervals) ->
     %io:format("is_covered: ~p ~p~n", [all, Intervals]),
-    is_covered(new(minus_infinity, plus_infinity), Intervals);
+    is_covered({interval, minus_infinity, plus_infinity}, Intervals);
 is_covered({element,X}, Intervals) ->
     in(X, Intervals);
 is_covered({interval, _, _}, {element,_}) ->
