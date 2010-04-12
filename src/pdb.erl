@@ -41,7 +41,7 @@ delete(Key, _TableName) ->
     erlang:erase(Key),
     ok.
 
-%% ets variant
+%% %% ets variant (only for debugging! has performance issues with msg_delay)
 %% new(TableName, Params) ->
 %%     Name = ets:new(TableName, Params).
 %% 

@@ -63,18 +63,18 @@ init([InstanceID, _Options]) ->
                        io_lib:format("~p_msg_delay", [InstanceID]))),
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
-    pdb:new(TableName, [set, private, named_table]),
+    pdb:new(TableName, [set, protected, named_table]),
     cs_send:send_local(self(), {msg_delay_periodic}),
     _State = {TableName, _Round = 0}.
 
-%% forward to local acceptor but add my role to the paxos id
 on({msg_delay_req, Seconds, Dest, Msg}, {TableName, Counter} = State) ->
     ?TRACE("msg_delay:on(msg_delay...)~n", []),
-    case pdb:get(Counter + Seconds, TableName) of
+    Future = trunc(Counter + Seconds),
+    case pdb:get(Future, TableName) of
         undefined ->
-            pdb:set({Counter + Seconds, [{Dest, Msg}]}, TableName);
+            pdb:set({Future, [{Dest, Msg}]}, TableName);
         {_, Queue} ->
-            pdb:set({Counter + Seconds, [{Dest, Msg}| Queue]}, TableName)
+            pdb:set({Future, [{Dest, Msg}| Queue]}, TableName)
     end,
     State;
 

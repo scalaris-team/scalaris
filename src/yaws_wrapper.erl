@@ -68,5 +68,4 @@ try_port(Port) ->
 	_  ->
 	    false
     end.
-    
-    
+

@@ -119,5 +119,3 @@ add_ack_msg(InState, InAckRound, InAckValue, InAckRLast) ->
     end.
     %% multicast accept(Round, Latest_value) to Acceptors
     %% (done in on() handler)
-
-

@@ -31,6 +31,7 @@
 %%% functions for gen_component module and supervisor callbacks
 -export([start_link/1, start_link/2]).
 -export([on/2, init/1]).
+-export([check_config/0]).
 
 %% Messages to expect from this module
 msg_ack(Proposer, PaxosID, InRound, Val, Raccepted) ->
@@ -81,12 +82,12 @@ init([_InstanceID, _Options]) ->
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_acceptor", [InstanceID]))),
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    TableName = pdb:new(?MODULE, [set, private]),
+    TableName = pdb:new(?MODULE, [set, protected]),
     _State = TableName.
 
 on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
     ?TRACE("acceptor:initialize for paxos id: Pid ~p Learners ~p~n", [PaxosID, Learners]),
-    StateForID = my_get_entry(PaxosID, ETSTableName),
+    {_, StateForID} = my_get_entry(PaxosID, ETSTableName),
     case acceptor_state:get_learners(StateForID) of
         Learners -> io:format("dupl. acceptor init for id ~p~n", [PaxosID]);
         _ ->
@@ -102,7 +103,13 @@ on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
 % need Sender & PaxosID
 on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
     ?TRACE("acceptor:prepare for paxos id: ~p round ~p~n", [PaxosID,InRound]),
-    StateForID = my_get_entry(PaxosID, ETSTableName),
+    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    case ErrCode of
+        new -> msg_delay:send_local(
+                 config:read(acceptor_noinit_timeout) / 1000, self(),
+                 {acceptor_delete_if_no_learner, PaxosID});
+        _ -> ok
+    end,
     case acceptor_state:add_prepare_msg(StateForID, InRound) of
         {ok, NewState} ->
             my_set_entry(NewState, ETSTableName),
@@ -115,7 +122,12 @@ on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
 
 on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = State) ->
     ?TRACE("acceptor:accept for paxos id: ~p round ~p~n", [PaxosID, InRound]),
-    StateForID = my_get_entry(PaxosID, ETSTableName),
+    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    case ErrCode of
+        new -> msg_delay:send_local(config:read(tx_timeout) * 4 / 1000, self(),
+                         {acceptor_delete_if_no_learner, PaxosID});
+        _ -> ok
+    end,
     case acceptor_state:add_accept_msg(StateForID, InRound, InProposal) of
         {ok, NewState} ->
             my_set_entry(NewState, ETSTableName),
@@ -125,7 +137,20 @@ on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = Sta
     State;
 
 on({acceptor_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
+    ?TRACE("acceptor:deleteids~n", []),
     [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
+    State;
+
+on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->
+    ?TRACE("acceptor:delete_if_no_learner~n", []),
+    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    case {ErrCode, acceptor_state:get_learners(StateForID)} of
+        {new, _} -> ok; %% already deleted
+        {_, []} ->
+            %% io:format("Deleting unhosted acceptor id~n"),
+            pdb:delete(PaxosID, ETSTableName);
+        {_, _} -> ok %% learners are registered
+    end,
     State;
 
 on(_, _State) ->
@@ -133,8 +158,8 @@ on(_, _State) ->
 
 my_get_entry(Id, TableName) ->
     case pdb:get(Id, TableName) of
-        undefined -> acceptor_state:new(Id);
-        Entry -> Entry
+        undefined -> {new, acceptor_state:new(Id)};
+        Entry -> {ok, Entry}
     end.
 
 my_set_entry(NewEntry, TableName) ->
@@ -147,3 +172,9 @@ inform_learners(PaxosID, State) ->
                    acceptor_state:get_raccepted(State),
                    acceptor_state:get_value(State))
       || X <- acceptor_state:get_learners(State) ].
+
+%% @doc Checks whether config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(acceptor_noinit_timeout) and
+    config:is_greater_than(acceptor_noinit_timeout, tx_timeout).

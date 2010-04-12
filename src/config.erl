@@ -136,11 +136,13 @@ process_term({Key, Value}) ->
 -spec check_config() -> boolean().
 check_config() ->
     cyclon:check_config() and
+        acceptor:check_config() and
         gossip:check_config() and
-        tx_tm_rtm:check_config() and
+        learner:check_config() and
         rdht_tx:check_config() and
         rdht_tx_read:check_config() and
         rdht_tx_write:check_config() and
+        tx_tm_rtm:check_config() and
         vivaldi:check_config() and
         vivaldi_latency:check_config() and
         ?RM:check_config().

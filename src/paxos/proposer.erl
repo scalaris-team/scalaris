@@ -18,7 +18,7 @@
 %%           The role of a proposer.
 %% @end
 -module(proposer).
-%-define(TRACE(X,Y), io:format(X,Y)).
+%-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
@@ -81,7 +81,7 @@ stop_paxosids(Proposer, PaxosIds) ->
     cs_send:send(Proposer, {proposer_deleteids, PaxosIds}).
 
 trigger(Proposer, PaxosID) ->
-    cs_send:send_local(Proposer, {trigger, PaxosID}).
+    cs_send:send_local(Proposer, {proposer_trigger, PaxosID}).
 
 %% be startable via supervisor, use gen_component
 -spec start_link(instanceid()) -> {ok, pid()}.
@@ -100,9 +100,9 @@ init([_InstanceID, _Options]) ->
     ?TRACE("Starting proposer for instance: ~p~n", [_InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_proposer", [InstanceID]))),
-    %%ets:new(TableName, [set, protected, named_table]),
+    %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    TableName = ets:new(?MODULE, [set, private]),
+    TableName = pdb:new(?MODULE, [set, private]),
     _State = TableName.
 
 on({proposer_initialize, PaxosID, Acceptors, Proposal,
@@ -117,12 +117,12 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
     MaxProposers, InitialRound, ReplyTo},
    ETSTableName = State) ->
     ?TRACE("proposer:initialize for paxos id: ~p round ~p~n", [PaxosID,InitialRound]),
-    case ets:member(ETSTableName, PaxosID) of
-        false ->
-            ets:insert(ETSTableName,
-                       proposer_state:new(PaxosID, ReplyTo, Acceptors, Proposal,
-                                          Majority, MaxProposers, InitialRound));
-        true ->
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined ->
+            pdb:set(proposer_state:new(PaxosID, ReplyTo, Acceptors, Proposal,
+                                       Majority, MaxProposers, InitialRound),
+                    ETSTableName);
+        _ ->
             io:format("Duplicate proposer:initialize for paxos id ~p~n", [PaxosID]),
             io:format("Just triggering instead~n")
     end,
@@ -131,13 +131,13 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
 % trigger new proposer round
 on({proposer_trigger, PaxosID}, ETSTableName = State) ->
     ?TRACE("proposer:trigger for paxos id ~p with auto round increment~n", [PaxosID]),
-    case ets:lookup(ETSTableName, PaxosID) of
-        [StateForID] ->
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> ok;
+        StateForID ->
             TmpState = proposer_state:reset_state(StateForID),
             NewState = proposer_state:inc_round(TmpState),
-            ets:insert(ETSTableName, NewState),
-            on({trigger, PaxosID, proposer_state:get_round(NewState)}, State);
-        [] -> ok
+            pdb:set(NewState, ETSTableName),
+            on({proposer_trigger, PaxosID, proposer_state:get_round(NewState)}, State)
     end,
     State;
 
@@ -146,47 +146,51 @@ on({proposer_trigger, PaxosID}, ETSTableName = State) ->
 %% Rounds must always have the form "InitialRound + x * MaxProposers"
 on({proposer_trigger, PaxosID, Round}, ETSTableName = State) ->
     ?TRACE("proposer:trigger for paxos id ~p and round ~p~n", [PaxosID, Round]),
-    case ets:lookup(ETSTableName, PaxosID) of
-        [StateForID] ->
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> ok;
+        StateForID ->
+            Acceptors = proposer_state:get_acceptors(StateForID),
+            ReplyTo = proposer_state:get_replyto(StateForID),
+            Proposal = proposer_state:get_proposal(StateForID),
             case Round of
-                0 -> [msg_accept(X, proposer_state:get_replyto(StateForID),
+                0 -> [msg_accept(X, ReplyTo,
                                  PaxosID, Round,
-                                 proposer_state:get_proposal(StateForID))
-                      || X <- proposer_state:get_acceptors(StateForID)];
-                _ -> [msg_prepare(X, proposer_state:get_replyto(StateForID),
-                                  PaxosID, Round)
-                      || X <- proposer_state:get_acceptors(StateForID)]
+                                 Proposal)
+                      || X <- Acceptors];
+                _ -> [msg_prepare(X, ReplyTo, PaxosID, Round)
+                      || X <- Acceptors]
             end,
             case Round > proposer_state:get_round(StateForID) of
                 true ->
-                    ets:insert(ETSTableName, proposer_state:set_round(StateForID, Round));
+                    pdb:set(proposer_state:set_round(StateForID, Round),
+                            ETSTableName);
                 false -> ok
-            end;
-        [] -> ok
+            end
     end,
     State;
 
 on({acceptor_ack, PaxosID, Round, Value, RLast}, ETSTableName = State) ->
     ?TRACE("proposer:ack for paxos id ~p round ~p~n", [PaxosID, Round]),
-    case ets:lookup(ETSTableName, PaxosID) of
-        [StateForID] ->
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined ->
+            %% What to do when this PaxosID does not already exist? Think!
+            %% -> Proposers don't get messages, they not requested.
+            ok;
+        StateForID ->
             case proposer_state:add_ack_msg(StateForID, Round, Value, RLast) of
                 {ok, NewState} ->
                     %% ?TRACE("NEW State: ~p~n", [NewState]),
-                    ets:insert(ETSTableName, NewState);
+                    pdb:set(NewState, ETSTableName);
                 {majority_acked, NewState} ->
                     %%   multicast accept(Round, Latest_value) to Acceptors
                     %% ?TRACE("NEW State: ~p majority accepted~n", [NewState]),
-                    ets:insert(ETSTableName, NewState),
-                    [msg_accept(X, proposer_state:get_replyto(NewState),
-                                PaxosID, Round,
-                                proposer_state:get_latest_value(NewState))
-                     || X <- proposer_state:get_acceptors(NewState)]
-            end;
-        [] ->
-            %% What to do when this PaxosID does not already exist? Think!
-            %% -> Proposers don't get messages, they not requested.
-            ok
+                    pdb:set(NewState, ETSTableName),
+                    Acceptors = proposer_state:get_acceptors(NewState),
+                    ReplyTo = proposer_state:get_replyto(NewState),
+                    LatestVal = proposer_state:get_proposal(NewState),
+                    [msg_accept(X, ReplyTo, PaxosID, Round, LatestVal)
+                     || X <- Acceptors]
+            end
     end,
     State;
 
@@ -203,15 +207,16 @@ on({acceptor_naccepted, PaxosID, Round}, _ETSTableName = State) ->
     State;
 
 on({proposer_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
-    [ets:delete(ETSTableName, Id) || Id <- ListOfPaxosIDs],
+    [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
     State;
 
 on(_, _State) ->
     unknown_event.
 
 start_new_higher_round(PaxosID, Round, ETSTableName) ->
-    case ets:lookup(ETSTableName, PaxosID) of
-        [StateForID] ->
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> ok;
+        StateForID ->
             MyRound = proposer_state:get_round(StateForID),
             %% check whether outdated nack message? (we get them from each acceptor)
             case MyRound < Round of
@@ -223,6 +228,5 @@ start_new_higher_round(PaxosID, Round, ETSTableName) ->
                     cs_send:send_local_after(NextRound, self(),
                                              {proposer_trigger, PaxosID, NextRound});
                 false -> dropped
-            end;
-        [] -> ok
+            end
     end.

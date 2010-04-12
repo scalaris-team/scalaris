@@ -39,8 +39,9 @@
 -export([get_numinformed/1, set_numinformed/2, inc_numinformed/1]).
 -export([get_numpaxdecided/1, set_numpaxdecided/2, inc_numpaxdecided/1]).
 -export([get_numtpsregistered/1, inc_numtpsregistered/1]).
+-export([get_status/1, set_status/2]).
+-export([hold_back/2, get_hold_back/1, set_hold_back/2]).
 
--export([add_init_RTM/2]).
 -export([newly_decided/1]).
 -export([all_tps_informed/1]).
 -export([all_pax_decided/1]).
@@ -65,7 +66,8 @@
 new(Tid, Client, ClientsID, RTMs, TLogTxItemIds, Learners) ->
     {Tid, tx_state, Client, ClientsID, RTMs, TLogTxItemIds, Learners,
      undecided, length(TLogTxItemIds),
-     _Prepared = 0, _Aborts = 0, _Informed =0, _PaxDecided = 0, _TpsRegistered = 0}.
+     _Prepared = 0, _Aborts = 0, _Informed =0, _PaxDecided = 0,
+     _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = []}.
 new(Tid) ->
     new(Tid, unknown, unknown, _RTMs = [], _TLogTxItemIds = [], []).
 
@@ -96,10 +98,12 @@ inc_numpaxdecided(State) ->       setelement(13, State, 1 + element(13, State)).
 get_numtpsregistered(State) ->    element(14, State).
 inc_numtpsregistered(State) ->    setelement(14, State, 1 + element(14, State)).
 
-add_init_RTM(State, InitRTM_State) ->
-    %% @TODO merge if State was created earlier than initRTM arrived
-    %% for example via a registerTP message
-    InitRTM_State.
+%% new / uninitialized / ok.
+get_status(State) -> element(15, State).
+set_status(State, Status) -> setelement(15, State, Status).
+hold_back(Msg, State) -> setelement(16, State, [Msg | element(16, State)]).
+get_hold_back(State) -> element(16, State).
+set_hold_back(State, Queue) -> setelement(16, State, Queue).
 
 newly_decided(State) ->
     case (undecided =:= is_decided(State)) of
