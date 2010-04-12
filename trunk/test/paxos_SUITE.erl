@@ -31,7 +31,7 @@ all() -> [
          ].
 
 suite() ->
-    [{timetrap, {seconds, 20}}].
+    [{timetrap, {seconds, 40}}].
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
@@ -46,6 +46,8 @@ end_per_suite(Config) ->
 
 %% make proposers, acceptors, and learners
 make(P, A, L, Prefix) ->
+    NumMDs = lists:max([P,A,L]),
+    [ msg_delay:start_link({Prefix, X}) || X <- lists:seq(1,NumMDs)],
     Ps = [ cs_send:make_global(element(2, proposer:start_link({Prefix, X})))
            || X <- lists:seq(1,P)],
     As = [ cs_send:make_global(element(2, acceptor:start_link({Prefix, X})))
@@ -64,8 +66,10 @@ collect(0) ->
     ok;
 collect(Count) ->
     receive
-        _ ->
-            collect(Count - 1)
+        _ -> collect(Count - 1)
+%%     after 2000 ->
+%%             ct:pal("No further receives at count ~p", [Count]),
+%%             collect(Count - 1)
     end.
 
 tester_fast_paxos(CountAcceptors, Count, Prefix) ->

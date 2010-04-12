@@ -29,6 +29,7 @@
 
 -export([start_link/1, start_link/2]).
 -export([on/2, init/1]).
+-export([check_config/0]).
 
 msg_decide(Client, ClientCookie, PaxosID, Val) ->
     cs_send:send(Client, {learner_decide, ClientCookie, PaxosID, Val}).
@@ -59,7 +60,7 @@ init([_InstanceID, _Options]) ->
     %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_learner", [InstanceID]))),
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    TableName = pdb:new(?MODULE, [set, private]),
+    TableName = pdb:new(?MODULE, [set, protected]),
     _State = TableName.
 
 on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
@@ -94,6 +95,9 @@ on({acceptor_accepted, PaxosID, Round, Value}, ETSTableName = State) ->
            [PaxosID, Round, Value]),
     MyState = case pdb:get(PaxosID, ETSTableName) of
                   undefined ->
+                      msg_delay:send_local(
+                        config:read(learner_noinit_timeout) / 1000, self(),
+                        {learner_deleteid_if_still_no_client, PaxosID}),
                       learner_state:new(PaxosID, unknown, none, no_cookie);
                   StateForID -> StateForID
               end,
@@ -110,6 +114,19 @@ on({learner_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
     [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
     State;
 
+on({learner_deleteid_if_still_no_client, PaxosID}, ETSTableName = State) ->
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> ok;
+        StateForId ->
+            case learner_state:get_process_to_inform(StateForId) of
+                none ->
+                    %% io:format("Deleting unhosted learner id~n"),
+                    pdb:delete(PaxosID, ETSTableName);
+                _ -> ok
+            end
+    end,
+    State;
+
 on(_, _State) ->
     unknown_event.
 
@@ -121,4 +138,10 @@ decide(PaxosID, State) ->
         Pid -> msg_decide(Pid, learner_state:get_client_cookie(State),
                           PaxosID, learner_state:get_value(State))
     end.
+
+%% @doc Checks whether config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(learner_noinit_timeout) and
+    config:is_greater_than(learner_noinit_timeout, tx_timeout).
 

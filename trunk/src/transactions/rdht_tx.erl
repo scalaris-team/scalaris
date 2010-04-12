@@ -190,12 +190,13 @@ commit(TLog) ->
         TM ->
             tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
     end,
+    msg_delay:send_local(config:read(tx_timeout) / 1000,
+                         self(), {tx_timeout, ClientsId}),
     _Result =
         receive
-            {tx_tm_rtm_commit_reply, _ClID, Decision} ->
-                {Decision} %% commit / abort
-         %% @TODO solve without timeout per tx?
-        after config:read(tx_timeout) ->
+            {tx_tm_rtm_commit_reply, ClientsId, Decision} ->
+                {Decision}; %% commit / abort;
+            {tx_timeout, ClientsId} ->
                 io:format("No result for commit received!~n"),
                 {failed, timeout}
         end.
@@ -203,6 +204,9 @@ commit(TLog) ->
 receive_answer() ->
     receive
         {tx_tm_rtm_commit_reply, _, _} ->
+            %% probably an outdated commit reply: drop it.
+            receive_answer();
+        {tx_timeout, _} ->
             %% probably an outdated commit reply: drop it.
             receive_answer();
         Any -> Any
