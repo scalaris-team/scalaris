@@ -27,7 +27,7 @@
 -vsn('$Id$ ').
 
 -include("trecords.hrl").
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([do_transaction/5,
          do_transaction_wo_readphase/6,

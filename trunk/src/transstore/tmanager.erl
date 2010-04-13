@@ -27,7 +27,7 @@
 -vsn('$Id$').
 
 -include("trecords.hrl").
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -import(boot_logger).
 -import(config).

@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id').
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -behaviour(db_beh).
 

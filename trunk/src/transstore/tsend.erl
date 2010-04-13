@@ -29,7 +29,7 @@
 
 
 -include("trecords.hrl").
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([send/2,
          send_to_rtms_with_lookup/2,

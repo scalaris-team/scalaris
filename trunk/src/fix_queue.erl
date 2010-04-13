@@ -22,7 +22,7 @@
 %% @version $Id$
 -module(fix_queue).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([new/1, add/2, map/2]).
 

@@ -46,7 +46,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([init/2, init/3, init/4, init/5, first/1, next/2, next/1]).
 

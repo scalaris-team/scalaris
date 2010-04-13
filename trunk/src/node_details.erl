@@ -34,7 +34,7 @@
 % setters
 -export([set/3]).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -type(nodelist() :: [node:node_type()]).
 -type(node_type() :: node:node_type()).

@@ -22,7 +22,7 @@
 %% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(self_man).
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 -author('hennig@zib.de').
 -vsn('$Id$ ').
 -behaviour(gen_component).

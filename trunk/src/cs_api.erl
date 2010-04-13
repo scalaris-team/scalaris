@@ -26,7 +26,7 @@
 -export([process_request_list/2, read/1, write/2, delete/1,
          test_and_set/3, range_read/2]).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 
 

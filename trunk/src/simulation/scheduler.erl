@@ -3,7 +3,7 @@
 %% Description: TODO: Add description to scheduler
 -module(scheduler).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %%
 %% Include files

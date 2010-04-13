@@ -21,7 +21,7 @@
 -vsn('$Id$ ').
 
 -behaviour(rt_beh).
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 % routingtable behaviour
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,

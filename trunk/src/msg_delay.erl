@@ -30,7 +30,7 @@
 -author('schintke@onscale.de').
 -behaviour(gen_component).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %% public interface for transaction validation using Paxos-Commit.
 -export([send_local/3]).

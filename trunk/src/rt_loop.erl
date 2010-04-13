@@ -22,7 +22,7 @@
 
 -behaviour(gen_component).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 % for routing table implementation
 -export([start_link/1]).

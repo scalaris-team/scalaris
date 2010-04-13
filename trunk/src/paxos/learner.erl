@@ -22,7 +22,7 @@
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([start_paxosid/5]).
 -export([stop_paxosids/2]).

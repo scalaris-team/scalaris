@@ -25,7 +25,7 @@
 -author('hennig@zib.de').
 -vsn('$Id $ ').
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %% API
 

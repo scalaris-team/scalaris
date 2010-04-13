@@ -25,7 +25,7 @@
 %% @version $Id $
 -module(comm_acceptor).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([start_link/1, init/2]).
 
