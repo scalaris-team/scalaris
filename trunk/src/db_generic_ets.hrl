@@ -64,8 +64,7 @@ unset_write_lock(DB, Key) ->
             {DB, ok};
         [{Key, {_Value, false, _ReadLock, _Version}}] ->
             {DB, failed};
-        [] ->
-            {DB, failed}
+        [] -> {DB, failed}
     end.
 
 %% @doc sets a read lock on a key
@@ -77,8 +76,7 @@ set_read_lock(DB, Key) ->
             {DB, ok};
         [{Key, {_Value, _WriteLock, _ReadLock, _Version}}] ->
             {DB, failed};
-        [] ->
-            {DB, failed}
+        [] -> {DB, failed}
     end.
 
 %% @doc unsets a read lock on a key
@@ -90,8 +88,7 @@ unset_read_lock(DB, Key) ->
         [{Key, {Value, WriteLock, ReadLock, Version}}] ->
             ?ETS:insert(DB, {Key, {Value, WriteLock, ReadLock - 1, Version}}),
             {DB, ok};
-        [] ->
-            {DB, failed}
+        [] -> {DB, failed}
     end.
 
 %% @doc get the locks and version of a key
@@ -99,8 +96,7 @@ get_locks(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, WriteLock, ReadLock, Version}}] ->
             {DB, {WriteLock, ReadLock, Version}};
-        [] ->
-            {DB, failed}
+        [] -> {DB, failed}
     end.
 
 %% @doc reads the version and value of a key
@@ -109,8 +105,7 @@ read(DB, Key) ->
     Res = case ?ETS:lookup(DB, Key) of
               [{Key, {Value, _WriteLock, _ReadLock, Version}}] ->
                   {ok, Value, Version};
-              [] ->
-                  {ok, empty_val, -1}
+              [] -> {ok, empty_val, -1}
           end,
 %%     Stop = erlang:now(),
 %%     Span = timer:now_diff(Stop, Start),
@@ -128,8 +123,7 @@ write(DB, Key, Value, Version) ->
         [{Key, {_Value, WriteLock, ReadLock, _Version}}] ->
             % better use ets:update_element?
             ?ETS:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}});
-        [] ->
-            ?ETS:insert(DB, {Key, {Value, false, 0, Version}})
+        [] -> ?ETS:insert(DB, {Key, {Value, false, 0, Version}})
     end,
     DB.
 
@@ -139,10 +133,8 @@ delete(DB, Key) ->
         [{Key, {_Value, false, 0, _Version}}] ->
             ?ETS:delete(DB, Key),
             {DB, ok};
-        [{Key, _Value}] ->
-            {DB, locks_set};
-        [] ->
-            {DB, undef}
+        [{Key, _Value}] -> {DB, locks_set};
+        [] -> {DB, undef}
     end.
 
 %% @doc reads the version of a key
@@ -150,8 +142,7 @@ get_version(DB, Key) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, _WriteLock, _ReadLock, Version}}] ->
             {ok, Version};
-        [] ->
-            failed
+        [] -> failed
     end.
 
 %% @doc returns the number of stored keys
@@ -163,15 +154,13 @@ add_data(DB, Data) ->
     ?ETS:insert(DB, Data),
     DB.
 
-%% @doc returns all keys (and removes them from the db) which belong 
+%% @doc returns all keys (and removes them from the db) which belong
 %%      to a new node with id HisKey
 split_data(DB, MyKey, HisKey) ->
     F = fun (KV = {Key, _}, HisList) ->
                 case util:is_between(HisKey, Key, MyKey) of
-                    true ->
-                        HisList;
-                    false ->
-                        [KV | HisList]
+                    true -> HisList;
+                    false -> [KV | HisList]
                 end
         end,
     HisList = ?ETS:foldl(F, [], DB),
@@ -190,10 +179,10 @@ update_if_newer(OldDB, KVs) ->
                             ReadLock == 0 andalso
                             OldVersion < Version of
                             true ->
-                                ?ETS:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}}), 
+                                ?ETS:insert(DB, {Key, {Value, WriteLock,
+                                                       ReadLock, Version}}),
                                 DB;
-                            false ->
-                                DB
+                            false -> DB
                         end
                 end
         end,
@@ -203,11 +192,10 @@ update_if_newer(OldDB, KVs) ->
 -spec(get_range/3 :: (db(), key(), key()) -> [{key(), value()}]).
 get_range(DB, From, To) ->
     F = fun ({Key, {Value, _, _, _}}, Data) ->
-                case util:is_between(From, Key, To) andalso Value =/= empty_val of
-                    true ->
-                        [{Key, Value} | Data];
-                    false ->
-                        Data
+                case Value =/= empty_val
+                    andalso util:is_between(From, Key, To) of
+                    true -> [{Key, Value} | Data];
+                    false -> Data
                 end
         end,
     ?ETS:foldl(F, [], DB).
@@ -215,22 +203,21 @@ get_range(DB, From, To) ->
 %% @doc get keys and versions in a range
 get_range_with_version(DB, Interval) ->
     F = fun ({Key, {Value, WriteLock, ReadLock, Version}}, Data) ->
-                case intervals:in(Key, Interval) andalso Value =/= empty_val of
-                    true ->
-                        [{Key, Value, WriteLock, ReadLock, Version} | Data];
-                    false ->
-                        Data
+                case  Value =/= empty_val
+                    andalso intervals:in(Key, Interval) of
+                    true -> [{Key, Value, WriteLock, ReadLock, Version} | Data];
+                    false -> Data
                 end
         end,
     ?ETS:foldl(F, [], DB).
 
 get_range_only_with_version(DB, Interval) ->
     F = fun ({Key, {Value, WLock, _, Version}}, Data) ->
-                case WLock == false andalso intervals:in(Key, Interval) andalso Value =/= empty_val of
-                    true ->
-                        [{Key, Value, Version} | Data];
-                    false ->
-                        Data
+                case WLock == false
+                    andalso Value =/= empty_val
+                    andalso intervals:in(Key, Interval) of
+                    true -> [{Key, Value, Version} | Data];
+                    false -> Data
                 end
         end,
     ?ETS:foldl(F, [], DB).
@@ -239,10 +226,8 @@ get_range_only_with_version(DB, Interval) ->
 %%      sized groups
 get_middle_key(DB) ->
     case (Length = ?ETS:info(DB, size)) < 3 of
-        true ->
-            failed;
-        false ->
-            {ok, nth_key(DB, Length div 2 - 1)}
+        true -> failed;
+        false -> {ok, nth_key(DB, Length div 2 - 1)}
     end.
 
 nth_key(DB, N) ->
