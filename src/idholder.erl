@@ -31,7 +31,7 @@
 
 -behaviour(gen_component).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([start_link/1,init/1, on/2,set_key/1, get_key/0, reinit/0]).
 

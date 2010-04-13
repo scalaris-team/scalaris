@@ -36,7 +36,7 @@
 
 -behaviour(trigger_beh).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([init/4, first/1, next/2]).
 

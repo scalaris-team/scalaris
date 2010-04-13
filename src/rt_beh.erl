@@ -27,7 +27,7 @@
 % for routing table implementation
 -export([initialize/3, to_html/1]).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Behaviour definition

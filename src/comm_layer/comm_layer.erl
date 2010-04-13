@@ -36,7 +36,7 @@
 -import(util).
 -import(log).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %% @type process_id() = {inet:ip_address(), int(), pid()}.
 -type(process_id() :: {inet:ip_address(), integer(), pid()}).

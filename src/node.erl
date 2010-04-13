@@ -29,7 +29,7 @@
          new/2,
          is_null/1, null/0]).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -record(node, {pid :: cs_send:mypid(), id :: ?RT:key()}).
 -type(node_type() :: #node{}).

@@ -24,7 +24,7 @@
 -define(TRACE(_X,_Y), ok).
 -author('schintke@onscale.de').
 -behaviour(gen_component).
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %% public interface for transaction validation using Paxos-Commit.
 -export([commit/4]).

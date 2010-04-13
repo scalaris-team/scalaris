@@ -18,7 +18,7 @@
 %% @version $Id$
 
 % Note: this include must be included in files including this file!
-%% -include("../include/scalaris.hrl").
+%% -include("scalaris.hrl").
 
 get_entry(DB, Key) ->
     case ?ETS:lookup(DB, Key) of

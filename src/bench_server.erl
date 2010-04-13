@@ -31,7 +31,7 @@
 -export([run_increment/2, run_increment_v2/2, run_increment/3, run_increment_locally/2]).
 -export([run_read/2, run_read_v2/2, run_read/3, bench_runner/3]).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %%==============================================================================
 %% public interface

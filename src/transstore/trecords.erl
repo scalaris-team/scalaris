@@ -24,7 +24,7 @@
 -vsn('$Id$ ').
 
 -include("trecords.hrl").
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([new_tm_state/4, 
          get_vote/3, 

@@ -43,7 +43,7 @@
 %% limitations under the License.
 -module(merkerl).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([insert/2,delete/2,build_tree/1,diff/2,test_merkle/0,allkeys/1, contains/2]).
 

@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
          trunc/2, min/2, max/2, randomelem/1, logged_exec/1,

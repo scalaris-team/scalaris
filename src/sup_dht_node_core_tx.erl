@@ -29,7 +29,7 @@
 -vsn('$Id$ ').
 
 -behaviour(supervisor).
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([start_link/1, init/1]).
 

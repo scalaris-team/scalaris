@@ -28,7 +28,7 @@
 -vsn('$Id$ ').
 
 -include("yaws_api.hrl").
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([getLoadRendered/0, getRingChart/0, getRingRendered/0,
          getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1,

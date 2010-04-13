@@ -29,7 +29,7 @@
 
 -behaviour(gen_server).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -import(ets).
 -import(gen_server).

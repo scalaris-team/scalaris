@@ -25,7 +25,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([lookup_aux/4, get_key/4, set_key/5, delete_key/3]).
 

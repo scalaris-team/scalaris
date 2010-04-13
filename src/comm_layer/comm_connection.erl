@@ -35,7 +35,7 @@
 -import(log).
 -import(timer).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %% @doc new accepted connection. called by comm_acceptor
 %% @spec new(inet:ip_address(), int(), socket()) -> pid()

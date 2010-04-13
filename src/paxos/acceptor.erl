@@ -23,7 +23,7 @@
 -author('schintke@onscale.de').
 -behaviour(gen_component).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %%% public interface for initiating a paxos acceptor for a new PoxosID
 -export([start_paxosid/2, start_paxosid/3]).

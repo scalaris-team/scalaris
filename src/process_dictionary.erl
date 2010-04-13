@@ -49,7 +49,7 @@
 
 -behaviour(gen_component).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %% API
 -export([start_link/0, start/0]).

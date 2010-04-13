@@ -24,7 +24,7 @@
 -module(config).
 -author('schuett@zib.de').
 -vsn('$Id$ ').
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([
          start_link/1, start/2,

@@ -26,7 +26,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %%
 %% Exported Functions

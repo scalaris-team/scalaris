@@ -29,7 +29,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([issue_bulk_owner/2, start_bulk_owner/2, bulk_owner/3]).
 

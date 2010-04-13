@@ -28,7 +28,7 @@
 -export([unreliable_lookup/2,
          unreliable_get_key/1, unreliable_get_key/3]).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %%%-----------------------Public API----------------------------------
 unreliable_lookup(Key, Msg) ->

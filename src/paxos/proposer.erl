@@ -22,7 +22,7 @@
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 %%% public interface for triggering a paxos proposer executed in any process
 %%% a Fast-Paxos is triggered by giving 0 as initial round number explicitly

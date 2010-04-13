@@ -32,7 +32,7 @@
 
 -behaviour(gen_component).
 
--include("../../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([start_link/1]).
 

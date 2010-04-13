@@ -43,7 +43,7 @@
 -vsn('$Id$ ').
 
 -include("transstore/trecords.hrl").
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -export([send/2, send_local_after/3 , this/0, get/2, send_to_group_member/3,
          send_local/2, make_global/1, is_valid/1, get_msg_tag/1,

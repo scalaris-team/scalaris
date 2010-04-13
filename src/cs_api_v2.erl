@@ -23,7 +23,7 @@
          read/1, write/2, delete/1,
          test_and_set/3, range_read/2]).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 % Public Interface
 
@@ -97,7 +97,7 @@ test_and_set(Key, OldValue, NewValue) ->
         {fail, timeout} -> {{fail, timeout}, TLog};
         _ -> if (Result =:= {fail, not_found})
                 orelse (Result =:= {value, OldValue}) ->
-                     {TLog2, Results2} = process_request_list(TLog, WriteReqList),
+                     {_TLog2, Results2} = process_request_list(TLog, WriteReqList),
                      {results, [_, Result2]} = Results2,
                      case Result2 of
                          commit -> ok;

@@ -24,7 +24,7 @@
 %% @version $Id$
 -module(gen_component).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -author('schuett@zib.de').
 -vsn('$Id$ ').

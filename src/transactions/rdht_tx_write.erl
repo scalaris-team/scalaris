@@ -22,7 +22,7 @@
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
--include("../include/scalaris.hrl").
+-include("scalaris.hrl").
 
 -behaviour(tx_op_beh).
 -export([work_phase/2,work_phase/3,
