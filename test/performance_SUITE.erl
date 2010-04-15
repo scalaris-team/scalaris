@@ -167,6 +167,8 @@ md5(_Config) ->
     ok.
 
 next_hop(_Config) ->
+    {ok, _Pid} = process_dictionary:start_link(),
+    process_dictionary:register_process(?MODULE, "process_dictionary", self()),
     RT = gb_trees:enter(1, succ,
           gb_trees:enter(2, pred,
            gb_trees:enter(3, succ,
@@ -178,6 +180,8 @@ next_hop(_Config) ->
                  rt_chord:empty(succ))))))))),
     State = dht_node_state:new(RT, node:new(succ, 3), node:new(pred, 1),
                          node:new(me, 2), my_range, lb, db),
+    gen_component:kill(process_dictionary),
+    unregister(process_dictionary),
     iter(count(), fun () ->
                           rt_chord:next_hop(State, 42)
                end, "next_hop"),
@@ -198,7 +202,7 @@ process_dictionary_lookup_by_pid(_Config) ->
     {ok, _Pid} = process_dictionary:start_link(),
     process_dictionary:register_process(?MODULE, "process_dictionary", self()),
     iter(count(), fun () ->
-                          process_dictionary:lookup_process(process_dictionary)
+                          process_dictionary:lookup_process("process_dictionary")
                   end, "lookup_process by pid"),
     gen_component:kill(process_dictionary),
     unregister(process_dictionary),
