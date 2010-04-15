@@ -67,7 +67,7 @@
 
          get_groups/0,
          get_processes_in_group/1,
-		 get_group_member/1,
+         get_group_member/1,
          get_info/2,
 
          %for fprof
@@ -89,6 +89,8 @@ register_process(InstanceId, Name, Pid) ->
 %% @doc looks up a process with InstanceId and Name in the dictionary
 -spec(lookup_process/2 :: (instanceid(), term()) -> pid() | failed).
 lookup_process(InstanceId, Name) ->
+%%     [Counter] = ets:lookup(call_counter, lookup_process_by_group),
+%%     ets:insert(call_counter, {lookup_process_by_group, Counter + 1}),
     case ets:lookup(?MODULE, {InstanceId, Name}) of
         [{{InstanceId, Name}, Value}] ->
             Value;
@@ -103,6 +105,8 @@ lookup_process(InstanceId, Name) ->
 %% @doc find the process group and name of a process by pid
 -spec(lookup_process/1 :: (pid()) -> {any(), any()} | failed).
 lookup_process(Pid) ->
+%%     [Counter] = ets:lookup(call_counter, lookup_process_by_name),
+%%     ets:insert(call_counter, {lookup_process_by_name, Counter + 1}),
     case ets:match(?MODULE, {'$1',Pid}) of
         [[{Group, Name}]] ->
             {Group, Name};
@@ -237,7 +241,11 @@ start() ->
 %@private
 init(_Args) ->
     ets:new(?MODULE, [set, protected, named_table]),
-    % required to gracefully eliminate dead, but registered processes from
+     ets:new(call_counter, [set, public, named_table]),
+%%     ets:insert(call_counter, {lookup_pointer, 0}),
+%%    ets:insert(call_counter, {lookup_process_by_group, 0}),
+%%     ets:insert(call_counter, {lookup_process_by_name, 0}),
+%%    % required to gracefully eliminate dead, but registered processes from
     % the ets-table
     process_flag(trap_exit, true),
     State = null,

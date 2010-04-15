@@ -33,7 +33,8 @@ all() ->
      get_keys_for_replica_string,
      md5,
      next_hop,
-     process_dictionary,
+     process_dictionary_lookup,
+     process_dictionary_lookup_by_pid,
      ets_insert,
      ets_lookup,
      erlang_put,
@@ -182,13 +183,23 @@ next_hop(_Config) ->
                end, "next_hop"),
     ok.
 
-process_dictionary(_Config) ->
+process_dictionary_lookup(_Config) ->
     {ok, _Pid} = process_dictionary:start_link(),
     process_dictionary:register_process(?MODULE, "process_dictionary", self()),
     iter(count(), fun () ->
                           process_dictionary:lookup_process(?MODULE,
                                                             "process_dictionary")
-                  end, "lookup_process"),
+                  end, "lookup_process by instance_id"),
+    gen_component:kill(process_dictionary),
+    unregister(process_dictionary),
+    ok.
+
+process_dictionary_lookup_by_pid(_Config) ->
+    {ok, _Pid} = process_dictionary:start_link(),
+    process_dictionary:register_process(?MODULE, "process_dictionary", self()),
+    iter(count(), fun () ->
+                          process_dictionary:lookup_process(process_dictionary)
+                  end, "lookup_process by pid"),
     gen_component:kill(process_dictionary),
     unregister(process_dictionary),
     ok.

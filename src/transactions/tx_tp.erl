@@ -28,8 +28,8 @@
 -export([on_init_TP/2, on_tx_commitreply/3]).
 
 %%
-%% Attention: this is not a separate process it runs inside the dht_node
-%%            to get access to the ?DB
+%% Attention: this is not a separate process!!
+%% It runs inside the dht_node to get access to the ?DB
 %%
 
 %% messages handled in dht_node context:
@@ -44,8 +44,7 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, CS_State) ->
 
     %% initiate a paxos proposer round 0 with the proposal
     InstanceID = erlang:get(instance_id),
-    Proposer = cs_send:make_global(
-                 process_dictionary:get_group_member(paxos_proposer)),
+    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(CS_State)),
     proposer:start_paxosid_with_proxy(cs_send:this(), Proposer, PaxId,
                                      _Acceptors = RTMs, Proposal,
                                      _Maj = 3, _MaxProposers = 4, 0),
@@ -61,7 +60,6 @@ on_tx_commitreply({PaxosId, RTLogEntry}, Result, CS_State) ->
     DB = dht_node_state:get_db(CS_State),
     NewDB = apply(element(1, RTLogEntry), Result, [DB, RTLogEntry]),
     %% delete corresponding proposer state
-    Proposer = cs_send:make_global(
-                 process_dictionary:get_group_member(paxos_proposer)),
+    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(CS_State)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
     dht_node_state:set_db(CS_State, NewDB).

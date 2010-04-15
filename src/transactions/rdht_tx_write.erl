@@ -59,6 +59,7 @@ work_phase(ClientPid, ReqId, Request) ->
     %% build translog entry from quorum read
     %% Find rdht_tx_write process
     WriteValue = erlang:element(3, Request),
+
     RdhtTxWritePid = process_dictionary:get_group_member(?MODULE),
     rdht_tx_read:work_phase(RdhtTxWritePid, {ReqId, ClientPid, WriteValue},
                             Request),

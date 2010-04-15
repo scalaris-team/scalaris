@@ -67,6 +67,7 @@ work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
     %% find rdht_tx_read process as collector
+
     CollectorPid = process_dictionary:get_group_member(?MODULE),
     Key = element(2, Request),
     %% do a quorum read
