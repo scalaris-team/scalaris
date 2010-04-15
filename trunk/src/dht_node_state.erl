@@ -43,6 +43,7 @@
 	 get_lb/1, set_lb/2,
 	 details/1, details/2,
 	 get_my_range/1, 
+	 get_my_proposer/1, 
 	 next_interval/1,
 	 %%transactions
 	 get_trans_log/1,
@@ -53,15 +54,16 @@
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
 -record(state, {routingtable :: ?RT:rt(),
-                successors   :: [node:node_type(),...], 
-		        predecessors :: [node:node_type(),...], 
-		        me           :: node:node_type(),
-		        my_range     :: my_range(), 
-		        lb           :: dht_node_lb:lb(),
-		        deadnodes    :: gb_set(),
-		        join_time    :: join_time(),
-		        trans_log    :: #translog{},
-		        db           :: ?DB:db()}).
+                successors   :: [node:node_type(),...],
+                predecessors :: [node:node_type(),...],
+                me           :: node:node_type(),
+                my_range     :: my_range(),
+                lb           :: dht_node_lb:lb(),
+                deadnodes    :: gb_set(),
+                join_time    :: join_time(),
+                trans_log    :: #translog{},
+                db           :: ?DB:db(),
+                proposer     :: node:node_type()}).
 -type state() :: #state{}.
 
 -spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), dht_node_lb:lb()) -> state().
@@ -85,7 +87,8 @@ new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
        decided        = gb_trees:empty(),
        undecided      = gb_trees:empty()
       },
-     db = DB
+     db = DB,
+     proposer = process_dictionary:get_group_member(paxos_proposer)
     }.
 %% userdevguide-end dht_node_state:state
 
@@ -94,6 +97,8 @@ next_interval(State) -> intervals:new(id(State), succ_id(State)).
 
 -spec get_my_range(state()) -> my_range().
 get_my_range(#state{my_range=MyRange}) -> MyRange.
+
+get_my_proposer(#state{proposer=Proposer}) -> Proposer.
 
 -spec get_db(state()) -> ?DB:db().
 get_db(#state{db=DB}) -> DB.

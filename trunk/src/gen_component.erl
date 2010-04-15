@@ -1,4 +1,4 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -181,7 +181,7 @@ loop(Module, On, State, {Options, Slowest} = ComponentState) ->
                 unknown_event ->
                     {NewState, NewComponentState} =
                         handle_unknown_event(Message, State,
-                         {Options, Slowest},Module),
+                         {Options, Slowest},Module, On),
                     loop(Module, On, NewState, NewComponentState);
                 kill ->
                     ok;
@@ -211,6 +211,6 @@ wait_for_ok() ->
         ok
     end.
 
-handle_unknown_event(UnknownMessage, State, ComponentState,Module) ->
-   log:log(error,"unknown message: ~p in Module: ~p ~n in State ~p ~n",[UnknownMessage,Module,State]),
+handle_unknown_event(UnknownMessage, State, ComponentState,Module, On) ->
+   log:log(error,"unknown message: ~p in Module: ~p and handler ~p~n in State ~p ~n",[UnknownMessage,Module,On,State]),
     {State, ComponentState}.

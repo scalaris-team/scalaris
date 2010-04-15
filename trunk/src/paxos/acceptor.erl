@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 
 %%% public interface for initiating a paxos acceptor for a new PoxosID
--export([start_paxosid/2, start_paxosid/3]).
+-export([start_paxosid/2, start_paxosid_local/3, start_paxosid/3]).
 -export([msg_accepted/4]).
 %%% functions for gen_component module and supervisor callbacks
 -export([start_link/1, start_link/2]).
@@ -55,10 +55,13 @@ msg_accepted(Learner, PaxosID, Raccepted, Val) ->
 %%%   InitialRound (optional): start with paxos round number (default 1)
 %%%     if InitialRound is 0, a Fast-Paxos is executed
 start_paxosid(PaxosID, Learners) ->
-    %% find the groups acceptor process
     Acceptor = process_dictionary:get_group_member(paxos_acceptor),
+    start_paxosid_local(Acceptor, PaxosID, Learners).
+
+start_paxosid_local(LAcceptor, PaxosID, Learners) ->
+    %% find the groups acceptor process
     Message = {acceptor_initialize, PaxosID, Learners},
-    cs_send:send_local(Acceptor, Message).
+    cs_send:send_local(LAcceptor, Message).
 
 start_paxosid(Acceptor, PaxosID, Learners) ->
     cs_send:send(Acceptor, {acceptor_initialize, PaxosID, Learners}).
