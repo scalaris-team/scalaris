@@ -20,12 +20,14 @@ BuildArch:      noarch
 ## Fedora, RHEL or CentOS  
 ########################################################################################## 
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+BuildRequires:  pkgconfig
 %endif 
 
 ##########################################################################################  
 ## Mandrake, Mandriva  
 ##########################################################################################  
 %if 0%{?mandriva_version} || 0%{?mdkversion}
+BuildRequires:  pkgconfig
 %if 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
 BuildRequires:  erlang-stack >= R13B01
 Requires:       erlang-stack >= R13B01
@@ -38,6 +40,7 @@ Requires:       erlang-stack >= R13B01
 # SuSE, openSUSE
 ###########################################################################################
 %if 0%{?suse_version}
+BuildRequires:  pkg-config
 %endif
 
 %description 
