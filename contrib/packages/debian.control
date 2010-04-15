@@ -2,7 +2,7 @@ Source: scalaris
 Section: unknown
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), erlang (>= 13.b.1), ant, java6-sdk
+Build-Depends: debhelper (>= 4.1.16), erlang (>= 13.b.1), ant, java6-sdk, pkg-config
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris
