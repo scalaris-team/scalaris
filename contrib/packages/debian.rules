@@ -87,7 +87,7 @@ install: build
 	         $(BUILD_DIR)/etc/scalaris/scalaris.properties \
 	         $(BUILD_DIR)/etc/scalaris/scalaris.properties.example
 	cp    -t $(BUILD_DIR)-java/usr/share/java/scalaris/lib \
-	         $(CURDIR)/java-api/lib/jakarta-commons-cli-1.1.jar
+	         $(CURDIR)/java-api/lib/jakarta-commons-cli-1.2.jar
 
 	# move files of the scalaris-doc package
 	mkdir -p $(BUILD_DIR)-doc/usr/share/doc/scalaris
