@@ -37,7 +37,8 @@
          is_covered/2,
          unpack/1,
          in/2,
-         normalize/1
+         normalize/1,
+	 is_well_formed/1
          % for unit testing only
 %%       cut_iter/2,
 %%         , wraps_around/1
@@ -45,6 +46,7 @@
 %%       find_start/3
 %%         , greater_equals_than/2
 %%         , normalize/2
+	 , test/0
         ]).
 
 -type(key() :: ?RT:key() | minus_infinity | plus_infinity).
@@ -65,6 +67,21 @@ last() ->
     3.
 
 
+-spec is_well_formed/1 :: (interval()) ->  boolean().
+is_well_formed([Interval|Rest]) ->
+    is_well_formed(Interval) andalso is_well_formed(Rest);
+is_well_formed([]) ->
+    true;
+is_well_formed({element, _X}) ->
+    true;
+is_well_formed({interval, X, Y}) ->
+    not greater_equals_than(X, Y);
+is_well_formed(all) ->
+    true;
+is_well_formed(_) ->
+    false.
+
+
 % @spec new(term(), term()) -> interval()
 -spec new/2 :: (key(), key()) ->  all | {interval, key(), key()} | list(simple_interval()).
 new(minus_infinity, plus_infinity) ->
@@ -77,8 +94,16 @@ new(plus_infinity, minus_infinity) ->
     [{element, plus_infinity}, {element, minus_infinity}];
 new(X, X) ->
     all;
+new(plus_infinity, X) ->
+    [{interval, minus_infinity, X}, {element, plus_infinity}];
+new(X, minus_infinity) ->
+    [{interval, X, plus_infinity}, {element, minus_infinity}];
 new(Begin, End) ->
-    {interval, Begin, End}.
+    case wraps_around({interval, Begin, End}) of
+        true ->  [{interval, minus_infinity, End},
+                  {interval, Begin, plus_infinity}];
+        false -> {interval, Begin, End}
+    end.
 
 -spec new/1 :: (key()) -> {element, key()}.
 new(X) ->
@@ -87,6 +112,14 @@ new(X) ->
 -spec make/1 :: ({key(), key()}) -> all | {interval, key(), key()}.
 make({Begin, End}) ->
     new(Begin, End).
+
+-spec get_end_of_interval/1 :: (simple_interval()) -> key().
+get_end_of_interval(all) ->
+    plus_infinity;
+get_end_of_interval({element, X}) ->
+    X;
+get_end_of_interval({interval, _, End}) ->
+    End.
 
 % @spec unpack(interval()) -> {term(), term()}
 unpack(all) -> {minus_infinity,plus_infinity};
@@ -171,9 +204,6 @@ is_covered([], _) ->
     true;
 is_covered(_, all) ->
     true;
-is_covered(all, Intervals) ->
-    %io:format("is_covered: ~p ~p~n", [all, Intervals]),
-    is_covered({interval, minus_infinity, plus_infinity}, Intervals);
 is_covered({element,X}, Intervals) ->
     in(X, Intervals);
 is_covered({interval, _, _}, {element,_}) ->
@@ -195,6 +225,18 @@ is_covered(Interval, Intervals) ->
     end.
 
 % @private
+is_covered_helper(all, Intervals) ->
+    case find_start(minus_infinity, Intervals, []) of
+        none ->
+            false;
+        {CoversStart, RemainingIntervals} ->
+            case greater_equals_than(get_end_of_interval(CoversStart), plus_infinity) of
+                true ->
+                    true;
+                false ->
+                    is_covered_helper(intervals:new(get_end_of_interval(CoversStart), plus_infinity), RemainingIntervals)
+            end
+    end;
 is_covered_helper(Interval, Intervals) ->
     %io:format("helper: ~p ~p~n", [Interval, Intervals]),
     %io:format("find_start: ~p~n", [find_start(element(first(),Interval), Intervals, [])]),
@@ -300,6 +342,8 @@ find_start(_Start, [], _) ->
     none;
 find_start(Start, [{element,_} | Rest], Remainder) ->
     find_start(Start, Rest, Remainder);
+find_start(_Start, [all | _Rest], _Remainder) ->
+    {all, []};
 find_start(Start, [Interval | Rest], Remainder) ->
     %% @todo is the precondition of is_between fulfilled?
     case is_between(element(first(),Interval), Start, element(last(),Interval)) of

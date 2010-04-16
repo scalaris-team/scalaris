@@ -16,8 +16,12 @@
 
 all() ->
     [new, is_empty, cut, tc1,
-     tester_make, tester_in, tester_normalize,
-     tester_cut, tester_not_cut, tester_not_cut2
+     tester_make, tester_make_well_formed, 
+     tester_in, 
+     tester_normalize, tester_normalize_well_formed, 
+     tester_cut, tester_cut_well_formed, 
+     tester_not_cut, tester_not_cut2
+     %,tester_is_covered
      ].
 
 suite() ->
@@ -50,6 +54,7 @@ cut(_Config) ->
     ?assert(intervals:is_empty(intervals:cut(NotEmpty, Empty))),
     ?assert(not intervals:is_empty(intervals:cut(NotEmpty, NotEmpty))),
     ?assert(intervals:cut(NotEmpty, NotEmpty) == NotEmpty),
+    ?assert(intervals:cut(all, all) == all),
     ok.
 
 tc1(_Config) ->
@@ -74,6 +79,14 @@ prop_make(X, Y) ->
 
 tester_make(_Config) ->
     tester:test(intervals_SUITE, prop_make, 2, 100).
+
+-spec(prop_make_well_formed/2 :: (intervals:key(), intervals:key()) -> boolean()).
+prop_make_well_formed(X, Y) ->
+    intervals:is_well_formed(intervals:make({X,Y})) 
+    andalso intervals:is_well_formed(intervals:new(X, Y)).
+
+tester_make_well_formed(_Config) ->
+    tester:test(intervals_SUITE, prop_make_well_formed, 2, 100).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -101,6 +114,13 @@ prop_normalize(Is, X) ->
 tester_normalize(_Config) ->
     tester:test(intervals_SUITE, prop_normalize, 2, 100).
 
+-spec(prop_normalize_well_formed/1 :: (list(intervals:interval())) -> boolean()).
+prop_normalize_well_formed(Is) ->
+    intervals:is_well_formed(intervals:normalize(Is)).
+
+tester_normalize_well_formed(_Config) ->
+    tester:test(intervals_SUITE, prop_normalize_well_formed, 1, 100).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % intervals:cut/2
@@ -110,6 +130,10 @@ tester_normalize(_Config) ->
 prop_cut(A, B, X) ->
     ?implies(intervals:in(X, A) and intervals:in(X, B),
              intervals:in(X, intervals:cut(A, B))).
+
+-spec(prop_cut_well_formed/2 :: (intervals:interval(), intervals:interval()) -> boolean()).
+prop_cut_well_formed(A, B) ->
+    intervals:is_well_formed(intervals:cut(A, B)).
 
 -spec(prop_not_cut/3 :: (intervals:interval(), intervals:interval(), intervals:key()) -> boolean()).
 prop_not_cut(A, B, X) ->
@@ -126,9 +150,26 @@ prop_not_cut2(A, B, X) ->
 tester_cut(_Config) ->
     tester:test(?MODULE, prop_cut, 3, 1000).
 
+tester_cut_well_formed(_Config) ->
+    tester:test(?MODULE, prop_cut_well_formed, 2, 1000).
+
 tester_not_cut(_Config) ->
     tester:test(?MODULE, prop_not_cut, 3, 1000).
 
 tester_not_cut2(_Config) ->
     tester:test(?MODULE, prop_not_cut2, 3, 1000).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:is_covered/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec(prop_is_covered/2 :: (intervals:interval(), intervals:interval()) -> boolean()).
+prop_is_covered(_X, _Y) ->
+    X = intervals:normalize(_X),
+    Y = intervals:normalize(_Y),
+    intervals:is_covered(X, Y) == intervals:is_covered(X, intervals:cut(X, Y)).
+
+tester_is_covered(_Config) ->
+    tester:test(?MODULE, prop_is_covered, 2, 1000).
 
