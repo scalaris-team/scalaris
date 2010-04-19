@@ -16,12 +16,12 @@
 
 all() ->
     [new, is_empty, cut, tc1,
-     tester_make, tester_make_well_formed, 
-     tester_in, 
-     tester_normalize, tester_normalize_well_formed, 
-     tester_cut, tester_cut_well_formed, 
-     tester_not_cut, tester_not_cut2
-     %,tester_is_covered
+     tester_make, tester_make_well_formed,
+     tester_in,
+     tester_normalize, tester_normalize_well_formed,
+     tester_cut, tester_cut_well_formed,
+     tester_not_cut, tester_not_cut2,
+     tester_is_covered, tester_is_covered2
      ].
 
 suite() ->
@@ -168,8 +168,20 @@ tester_not_cut2(_Config) ->
 prop_is_covered(_X, _Y) ->
     X = intervals:normalize(_X),
     Y = intervals:normalize(_Y),
+    % Y covers X iff X \cup Y covers X
     intervals:is_covered(X, Y) == intervals:is_covered(X, intervals:cut(X, Y)).
 
 tester_is_covered(_Config) ->
     tester:test(?MODULE, prop_is_covered, 2, 1000).
+
+-spec(prop_is_covered2/2 :: (intervals:interval(), intervals:interval()) -> boolean()).
+prop_is_covered2(_X, _Y) ->
+    X = intervals:normalize(_X),
+    Y = intervals:normalize(_Y),
+    Z = intervals:cut(X, Y),
+    % X as well as Y cover X \cup Y
+    intervals:is_covered(Z, X) andalso intervals:is_covered(Z, Y).
+
+tester_is_covered2(_Config) ->
+    tester:test(?MODULE, prop_is_covered2, 2, 1000).
 

@@ -38,7 +38,7 @@
          unpack/1,
          in/2,
          normalize/1,
-	 is_well_formed/1
+         is_well_formed/1
          % for unit testing only
 %%       cut_iter/2,
 %%         , wraps_around/1
@@ -238,10 +238,13 @@ is_covered_helper(all, Intervals) ->
     end;
 is_covered_helper(Interval, Intervals) ->
     %io:format("helper: ~p ~p~n", [Interval, Intervals]),
+    %io:format("find_start: find_start(~p, ~p, ~p)~n", [element(first(), Interval), Intervals, []]),
     %io:format("find_start: ~p~n", [find_start(element(first(),Interval), Intervals, [])]),
     case find_start(element(first(),Interval), Intervals, []) of
         none ->
             false;
+        {all, _RemainingIntervals} ->
+            true;
         {CoversStart, RemainingIntervals} ->
             case greater_equals_than(element(last(),CoversStart), element(last(),Interval)) of
                 true ->
@@ -358,37 +361,8 @@ find_start(Start, Interval, Remainder) ->
 % precondition Begin &lt;= End
 % @spec is_between(term(), term(), term()) -> boolean()
 -spec is_between/3 :: (Begin::key(), X::key(), End::key()) -> boolean().
-is_between(_, X, X) ->
-    true;
-is_between(X, _, X) ->
-    false;
-is_between(_, plus_infinity, plus_infinity) ->
-    true;
-is_between(minus_infinity, _, plus_infinity) ->
-    true;
-is_between(_, minus_infinity, plus_infinity) ->
-    false;
-is_between(X, Y, plus_infinity) ->
-    X =< Y;
-is_between(minus_infinity, minus_infinity, _) ->
-    true;
-is_between(minus_infinity, plus_infinity, _) ->
-    false;
-is_between(minus_infinity, X, Y) ->
-    X =< Y;
-is_between(_, plus_infinity, _) ->
-    false;
-is_between(_, minus_infinity, _) ->
-    false;
-is_between(Begin, Id, End) ->
-    if
-        Begin < End ->
-            (Begin =< Id) and (Id =< End);
-        Begin == End ->
-            true;
-        true ->
-            (Begin =< Id) or (Id =< End)
-    end.
+is_between(Begin, X, End) ->
+    greater_equals_than(X, Begin) andalso greater_equals_than(End, X).
 
 %% @doc A >= B
 -spec greater_equals_than/2 :: (A::key(), B::key()) -> boolean().
