@@ -46,7 +46,6 @@
 %%       find_start/3
 %%         , greater_equals_than/2
 %%         , normalize/2
-	 , test/0
         ]).
 
 -type(key() :: ?RT:key() | minus_infinity | plus_infinity).
