@@ -23,11 +23,13 @@
 -export([make/3]).
 
 make(P, A, L) ->
-    Ps = [ cs_send:make_global(element(2, proposer:start_link([X])))
+    NumMDs = lists:max([P,A,L]),
+    [ msg_delay:start_link(X) || X <- lists:seq(1,NumMDs)],
+    Ps = [ cs_send:make_global(element(2, proposer:start_link(X)))
            || X <- lists:seq(1,P)],
-    As = [ cs_send:make_global(element(2, acceptor:start_link([X])))
+    As = [ cs_send:make_global(element(2, acceptor:start_link(X)))
            || X <- lists:seq(1,A)],
-    Ls = [ cs_send:make_global(element(2, learner:start_link([X])))
+    Ls = [ cs_send:make_global(element(2, learner:start_link(X)))
            || X <- lists:seq(1,L)],
     {Ps, As, Ls}.
 
@@ -37,7 +39,8 @@ run() ->
 
     {Proposers, Acceptors, Learners} = make(2,4,1),
 
-    [ learner:start_paxosid(X, pid123, 3, cs_send:make_global(self())) || X <- Learners ],
+    [ learner:start_paxosid(X, pid123, 3, cs_send:make_global(self()), mycookie)
+      || X <- Learners ],
     [Proposer,Proposer2] = Proposers,
 
     MaxProposers = 2,
@@ -45,12 +48,12 @@ run() ->
     io:format("=================~n"),
     io:format("make a fast paxos~n"),
     io:format("=================~n"),
-    [ learner:start_paxosid(X, pid124, 3, cs_send:make_global(self()))
+    [ learner:start_paxosid(X, pid124, 3, cs_send:make_global(self()), mycookie)
       || X <- Learners ],
     [ acceptor:start_paxosid(X, pid124, Learners) || X <- Acceptors ],
     proposer:start_paxosid(Proposer, pid124, Acceptors, prepared, 3, MaxProposers, 0),
     receive
-        Any4 -> io:format("Received: ~p~n", [Any4])
+        {_,_,pid124,_} = Any4 -> io:format("Received: ~p~n", [Any4])
     end,
 
     timer:sleep(100),
@@ -62,9 +65,9 @@ run() ->
     proposer:start_paxosid(Proposer, pid123, Acceptors, prepared,
                            3, MaxProposers),
 %    timer:sleep(10),
-    proposer:start_paxosid(Proposer2, pid123, Acceptors, abort, 3, 
+    proposer:start_paxosid(Proposer2, pid123, Acceptors, abort, 3,
                            MaxProposers, 2),
-    timer:sleep(1000),
+%    timer:sleep(1000),
     proposer:trigger(Proposer2, pid123),
 %    Learners = [cs_send:make_global(paxos:get_local_learner())],
     [ acceptor:start_paxosid(X, pid123, Learners) || X <- Acceptors ],
@@ -72,13 +75,13 @@ run() ->
     proposer:trigger(Proposer2, pid123),
     proposer:trigger(Proposer, pid123),
     receive
-        Any -> io:format("Received: ~p~n", [Any])
+        {_,_,pid123,_} = Any -> io:format("Received: ~p~n", [Any])
     end,
     receive
-        Any2 -> io:format("Received: ~p~n", [Any2])
+        {_,_,pid123,_} = Any2 -> io:format("Received: ~p~n", [Any2])
     end,
     receive
-        Any3 -> io:format("Received: ~p~n", [Any3])
+        {_,_,pid123,_} = Any3 -> io:format("Received: ~p~n", [Any3])
     end,
 
     ok.

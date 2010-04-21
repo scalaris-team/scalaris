@@ -19,6 +19,7 @@
 %% @end
 -module(proposer).
 %-define(TRACE(X,Y), ct:pal(X,Y)).
+%-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
@@ -50,10 +51,12 @@
 %%%       0 <= initialRound < MaxProposers if 1 proposer uses fast paxos
 
 msg_prepare(Dest, ReplyTo, PaxosID, Round) ->
+    ?TRACE("Sending proposer_prepare: ~p, ~p~n", [PaxosID, Round]),
     Msg = {proposer_prepare, ReplyTo, PaxosID, Round},
     cs_send:send(Dest, Msg).
 
 msg_accept(Dest, ReplyTo, PaxosID, Round, Value) ->
+    ?TRACE("Sending proposer_accept ~p, ~p Proposal ~p~n", [PaxosID, Round, Value]),
     Msg = {proposer_accept, ReplyTo, PaxosID, Round, Value},
     cs_send:send(Dest, Msg).
 
@@ -81,7 +84,7 @@ stop_paxosids(Proposer, PaxosIds) ->
     cs_send:send(Proposer, {proposer_deleteids, PaxosIds}).
 
 trigger(Proposer, PaxosID) ->
-    cs_send:send_local(Proposer, {proposer_trigger, PaxosID}).
+    cs_send:send(Proposer, {proposer_trigger, PaxosID}).
 
 %% be startable via supervisor, use gen_component
 -spec start_link(instanceid()) -> {ok, pid()}.
@@ -187,7 +190,7 @@ on({acceptor_ack, PaxosID, Round, Value, RLast}, ETSTableName = State) ->
                     pdb:set(NewState, ETSTableName),
                     Acceptors = proposer_state:get_acceptors(NewState),
                     ReplyTo = proposer_state:get_replyto(NewState),
-                    LatestVal = proposer_state:get_proposal(NewState),
+                    LatestVal = proposer_state:get_latest_value(NewState),
                     [msg_accept(X, ReplyTo, PaxosID, Round, LatestVal)
                      || X <- Acceptors]
             end
@@ -225,8 +228,14 @@ start_new_higher_round(PaxosID, Round, ETSTableName) ->
                     Factor = (Round - MyRound) div MaxProposers + 1,
                     NextRound = MyRound + Factor * MaxProposers,
                     %% let other prop. more time (NextRound ms) to achieve consensus
-                    cs_send:send_local_after(NextRound, self(),
-                                             {proposer_trigger, PaxosID, NextRound});
+                    TmpState = proposer_state:reset_state(StateForID),
+                    pdb:set(proposer_state:set_round(TmpState, NextRound), ETSTableName),
+%%                     cs_send:send_local_after(NextRound, self(),
+%%                                              {proposer_trigger, PaxosID,
+%%                                               NextRound});
+                    cs_send:send_local(self(),
+                                       {proposer_trigger, PaxosID,
+                                        NextRound});
                 false -> dropped
             end
     end.

@@ -27,7 +27,8 @@
 
 all() -> [
           test_fast_acceptors_4, test_fast_acceptors_16,
-          test_acceptors_4, test_acceptors_16
+          test_acceptors_4, test_acceptors_16,
+          test_two_proposers
          ].
 
 suite() ->
@@ -96,9 +97,7 @@ tester_fast_paxos(CountAcceptors, Count, Prefix) ->
     ok.
 
 tester_paxos(CountAcceptors, Count, Prefix) ->
-    %Count = 10,
     CountProposers = 1,
-    %CountAcceptors = 4,
     Majority = CountAcceptors div 2 + 1,
     {Proposers, Acceptors, Learners} =
         make(CountProposers, CountAcceptors, 1, Prefix),
@@ -154,6 +153,70 @@ test_acceptors_16(_Config) ->
     tester_paxos(16, Count, "test_acceptors_16"),
     After = erlang:now(),
     ct:pal("slow: acceptors: 16, throughput: ~p", [Count / (timer:now_diff(After, Before) / 1000000.0)]),
+    ok.
+
+test_two_proposers(_Config) ->
+    ct:pal("test_two_proposers ...~n"),
+    CountProposers = 2,
+    CountAcceptors = 4,
+    Majority = CountAcceptors div 2 + 1,
+    {Proposers, Acceptors, Learners} =
+        make(CountProposers, CountAcceptors, 1, two_proposers),
+
+    %% start paxosids in the components
+    learner:start_paxosid(hd(Learners), paxid123, Majority, cs_send:this(), cpaxid123),
+    [ acceptor:start_paxosid(X, paxid123, Learners) || X <- Acceptors ],
+    [ Proposer1, Proposer2 ] = Proposers,
+
+    %% set some breakpoints
+    gen_component:set_breakpoint(element(3, Proposer1), acceptor_ack, bp1),
+    %% initiate full paxos
+    proposer:start_paxosid(Proposer1, paxid123, Acceptors,
+                           prepared, Majority, length(Proposers), 3),
+    proposer:start_paxosid(Proposer2, paxid123, Acceptors,
+                           abort, Majority, length(Proposers), 2),
+
+    %% should receive an abort
+    receive {learner_decide, cpaxid123, _, Res1} = Any -> io:format("Expected abort Received ~p~n", [Any]) end,
+
+    gen_component:when_in_breakpoint(element(3, Proposer1)),
+    gen_component:del_breakpoint(element(3, Proposer1), bp1),
+    gen_component:breakpoint_cont(element(3, Proposer1)),
+
+    %% should receive also an abort as proposer1 was hold
+    receive {learner_decide, cpaxid123, _, Res2} = Any2 ->
+            io:format("Expected abort Received ~p~n", [Any2]) end,
+
+    ?assert(Res1 =:= Res2),
+    %%%%% now vice versa:
+    io:format("Now vice versa~n"),
+
+    %% start paxosids in the components
+    learner:start_paxosid(hd(Learners), paxid124, Majority, cs_send:this(), cpaxid124),
+    [ acceptor:start_paxosid(X, paxid124, Learners) || X <- Acceptors ],
+    [ Proposer1, Proposer2 ] = Proposers,
+    %% set some breakpoints
+    gen_component:set_breakpoint(element(3, Proposer2), acceptor_ack, bp2),
+    %% initiate full paxos
+    proposer:start_paxosid(Proposer1, paxid124, Acceptors,
+                           prepared, Majority, length(Proposers), 1),
+    proposer:start_paxosid(Proposer2, paxid124, Acceptors,
+                           abort, Majority, length(Proposers), 2),
+
+    %% should receive a prepared as proposer2 was hold
+    receive {learner_decide, cpaxid124, _, Res3} = Any3 -> io:format("Expected prepared Received ~p~n", [Any3]) end,
+
+    gen_component:when_in_breakpoint(element(3, Proposer2)),
+    gen_component:del_breakpoint(element(3, Proposer2), bp2),
+    gen_component:breakpoint_cont(element(3, Proposer2)),
+
+    %% should receive also an abort
+    receive
+        {learner_decide, cpaxid124, _, Res4} = Any4 -> io:format("Expected prepared Received ~p~n", [Any4])
+    end,
+
+    ?assert(Res3 =:= Res4),
+    ct:pal("done.~n"),
     ok.
 
 wait_for(Name) ->
