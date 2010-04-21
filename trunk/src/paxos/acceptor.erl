@@ -169,8 +169,8 @@ my_set_entry(NewEntry, TableName) ->
     pdb:set(NewEntry, TableName).
 
 inform_learners(PaxosID, State) ->
-    ?TRACE("acceptor:inform_learners: PaxosID ~p Learners ~p~n",
-           [PaxosID, acceptor_state:get_learners(State)]),
+    ?TRACE("acceptor:inform_learners: PaxosID ~p Learners ~p Decision ~p~n",
+           [PaxosID, acceptor_state:get_learners(State), acceptor_state:get_value(State)]),
     [ msg_accepted(X, PaxosID,
                    acceptor_state:get_raccepted(State),
                    acceptor_state:get_value(State))

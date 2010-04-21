@@ -84,7 +84,7 @@ register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
     cs_send:send_local(get_pid() , {register_process, InstanceId, Name, Pid}),
-    gen_component:wait_for_ok().
+    receive {process_registered} -> ok end.
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
 -spec(lookup_process/2 :: (instanceid(), term()) -> pid() | failed).
@@ -274,7 +274,7 @@ on({register_process, InstanceId, Name, Pid}, State) ->
             link(Pid),
             ets:insert_new(?MODULE, {{InstanceId, Name}, Pid})
     end,
-    cs_send:send_local(Pid , {ok}),
+    cs_send:send_local(Pid , {process_registered}),
     State;
 on({drop_state}, State) ->
     % only for unit tests

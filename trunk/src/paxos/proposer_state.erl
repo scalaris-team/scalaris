@@ -32,6 +32,7 @@
 -export([set_round/2]).
 -export([inc_round/1]).
 -export([get_ack_count/1]).
+-export([inc_ack_count/1]).
 -export([add_ack_msg/4]).
 -export([reset_state/1]).
 
@@ -107,12 +108,13 @@ add_ack_msg(InState, InAckRound, InAckValue, InAckRLast) ->
         %% ignore acks greater than majority. An 'accept'
         %%   was sent to all acceptors when majority was gathered
         true ->
+            %% io:format("Proposer: majority acked in round ~p~n",
+            %%           [get_round(NewState)]),
             {majority_acked,
-             case get_latest_value(NewState) =:= paxos_no_value_yet of
-                 %%   if Latest_value is paxos_no_value_yet?
-                 %%     Latest_value = Own_Proposal
-                 true -> set_latest_value(NewState, Proposal);
-                 false -> NewState
+             case get_latest_value(NewState) of
+                 paxos_no_value_yet ->
+                     set_latest_value(NewState, Proposal);
+                 _ -> NewState
              end
             };
         false -> {ok, NewState}
