@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -41,47 +41,47 @@
 
 %% API
 -export([start_link/0,
-	send/2,
-	unregister_connection/2, register_connection/4,
-	set_local_address/2, get_local_address_port/0]).
+        send/2,
+        unregister_connection/2, register_connection/4,
+        set_local_address/2, get_local_address_port/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+         terminate/2, code_change/3]).
 
 %%====================================================================
 %% API
 %%====================================================================
 
-%% @doc 
+%% @doc
 %% @spec send({inet:ip_address(), int(), pid()}, term()) -> ok
 -ifdef(ASYNC).
 send({Address, Port, Pid}, Message) ->
-    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, config:read(comm_layer_send_timeout)).
+    gen_server:cast(?MODULE, {send, Address, Port, Pid, Message}).
 -endif.
 -ifdef(SYNC).
 send({Address, Port, Pid}, Message) ->
     case ets:lookup(?MODULE, {Address, Port}) of
-	[{{Address, Port}, {_LPid, Socket}}] ->
-	    comm_connection:send({Address, Port, Socket}, Pid, Message),
-	    ok;
-	[] ->
-	    gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, config:read(comm_layer_send_timeout))
+        [{{Address, Port}, {_LPid, Socket}}] ->
+            comm_connection:send({Address, Port, Socket}, Pid, Message),
+            ok;
+        [] ->
+            gen_server:call(?MODULE, {send, Address, Port, Pid, Message}, config:read(comm_layer_send_timeout))
     end.
 -endif.
 
 
-%% @doc 
+%% @doc
 %% @spec unregister_connection(inet:ip_address(), int()) -> ok
 unregister_connection(Adress, Port) ->
     gen_server:call(?MODULE, {unregister_conn, Adress, Port}, config:read(comm_layer_send_timeout)).
 
-%% @doc 
+%% @doc
 %% @spec register_connection(inet:ip_address(), int(), pid(), gen_tcp:socket()) -> ok | duplicate
 register_connection(Adress, Port, Pid, Socket) ->
     gen_server:call(?MODULE, {register_conn, Adress, Port, Pid, Socket}, config:read(comm_layer_send_timeout)).
 
-%% @doc 
+%% @doc
 %% @spec set_local_address(inet:ip_address(), int()) -> ok
 set_local_address(Address, Port) ->
     gen_server:call(?MODULE, {set_local_address, Address, Port}, config:read(comm_layer_send_timeout)).
@@ -145,11 +145,11 @@ handle_call({unregister_conn, Address, Port}, _From, State) ->
 
 handle_call({register_conn, Address, Port, Pid, Socket}, _From, State) ->
     case ets:lookup(?MODULE, {Address, Port}) of
-	[{{Address, Port}, _}] ->
-	    {reply, duplicate, State};
-	[] ->
-	    ets:insert(?MODULE, {{Address, Port}, {Pid, Socket}}),
-	    {reply, ok, State}
+        [{{Address, Port}, _}] ->
+            {reply, duplicate, State};
+        [] ->
+            ets:insert(?MODULE, {{Address, Port}, {Pid, Socket}}),
+            {reply, ok, State}
     end;
 
 handle_call({set_local_address, Address, Port}, _From, State) ->
@@ -162,7 +162,12 @@ handle_call({set_local_address, Address, Port}, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
+handle_cast({send, Address, Port, Pid, Message}, State) ->
+    send(Address, Port, Pid, Message, State),
+    {noreply, State};
+
 handle_cast(_Msg, State) ->
+    io:format("Not handled cast ~p~n", [_Msg]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -199,31 +204,31 @@ code_change(_OldVsn, State, _Extra) ->
 send(Address, Port, Pid, Message, State) ->
     {DepAddr,DepPort} = get_local_address_port(),
     if
-	DepAddr == undefined ->
-	    open_sync_connection(Address, Port, Pid, Message, State);
-	true ->
-	    case ets:lookup(?MODULE, {Address, Port}) of
-		[{{Address, Port}, {ConnPid, _Socket}}] ->
-		    ConnPid ! {send, Pid, Message},
-		    {reply, ok, State};
-		[] ->
-		    ConnPid = comm_connection:open_new_async(Address, Port, 
-							     DepAddr, DepPort),
-		    ets:insert(?MODULE, {{Address, Port}, {ConnPid, undef}}),
-		    ConnPid ! {send, Pid, Message},
-		    {reply, ok, State}
-	    end
+        DepAddr == undefined ->
+            open_sync_connection(Address, Port, Pid, Message, State);
+        true ->
+            case ets:lookup(?MODULE, {Address, Port}) of
+                [{{Address, Port}, {ConnPid, _Socket}}] ->
+                    ConnPid ! {send, Pid, Message},
+                    {reply, ok, State};
+                [] ->
+                    ConnPid = comm_connection:open_new_async(Address, Port,
+                                                             DepAddr, DepPort),
+                    ets:insert(?MODULE, {{Address, Port}, {ConnPid, undef}}),
+                    ConnPid ! {send, Pid, Message},
+                    {reply, ok, State}
+            end
     end.
 -endif.
 
 -ifdef(SYNC).
 send(Address, Port, Pid, Message, State) ->
     case ets:lookup(?MODULE, {Address, Port}) of
-	[{{Address, Port}, {_LPid, Socket}}] ->
-	    comm_connection:send({Address, Port, Socket}, Pid, Message), 
-	    {reply, ok, State};
-	[] ->
-	    open_sync_connection(Address, Port, Pid, Message, State)
+        [{{Address, Port}, {_LPid, Socket}}] ->
+            comm_connection:send({Address, Port, Socket}, Pid, Message),
+            {reply, ok, State};
+        [] ->
+            open_sync_connection(Address, Port, Pid, Message, State)
     end.
 -endif.
 
@@ -231,20 +236,20 @@ send(Address, Port, Pid, Message, State) ->
 open_sync_connection(Address, Port, Pid, Message, State) ->
     {DepAddr,DepPort} = get_local_address_port(),
     case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
-	{local_ip, MyIP, MyPort, MyPid, MySocket} ->
-	    comm_connection:send({Address, Port, MySocket}, Pid, Message),
-	    log:log(info,"[ CC ] this() == ~w", [{MyIP, MyPort}]),
-						%		    set_local_address(t, {MyIP,MyPort}}),
-						%		    register_connection(Address, Port, MyPid, MySocket),
-	    ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
-	    ets:insert(?MODULE, {{Address, Port}, {MyPid, MySocket}}),
-	    {reply, ok, State};
-	fail ->
-						% drop message (remote node not reachable, failure detector will notice)
-	    {reply, fail, State};
-	{connection, LocalPid, NewSocket} ->
-	    comm_connection:send({Address, Port, NewSocket}, Pid, Message),
-	    ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),
-						%		    register_connection(Address, Port, LPid, NewSocket),
-	    {reply, ok, State}
+        {local_ip, MyIP, MyPort, MyPid, MySocket} ->
+            comm_connection:send({Address, Port, MySocket}, Pid, Message),
+            log:log(info,"[ CC ] this() == ~w", [{MyIP, MyPort}]),
+                                                %                   set_local_address(t, {MyIP,MyPort}}),
+                                                %                   register_connection(Address, Port, MyPid, MySocket),
+            ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
+            ets:insert(?MODULE, {{Address, Port}, {MyPid, MySocket}}),
+            {reply, ok, State};
+        fail ->
+                                                % drop message (remote node not reachable, failure detector will notice)
+            {reply, fail, State};
+        {connection, LocalPid, NewSocket} ->
+            comm_connection:send({Address, Port, NewSocket}, Pid, Message),
+            ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),
+                                                %                   register_connection(Address, Port, LPid, NewSocket),
+            {reply, ok, State}
     end.
