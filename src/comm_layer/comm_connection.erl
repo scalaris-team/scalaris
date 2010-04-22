@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 %%%-------------------------------------------------------------------
 %%% File    : comm_connection.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : creates and destroys connections and represents the 
-%%%           endpoint of a connection where messages are received and 
+%%% Description : creates and destroys connections and represents the
+%%%           endpoint of a connection where messages are received and
 %%            send from/to the network.
 %%%
 %%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
@@ -46,44 +46,44 @@ tcp_options() ->
     [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}].
 
 %% @doc open new connection
-%% @spec open_new(inet:ip_address(), int(), inet:ip_address(), int()) -> 
-%%       {local_ip, inet:ip_address(), int(), pid(), inet:socket()} 
-%%     | fail 
+%% @spec open_new(inet:ip_address(), int(), inet:ip_address(), int()) ->
+%%       {local_ip, inet:ip_address(), int(), pid(), inet:socket()}
+%%     | fail
 %%     | {connection, pid(), inet:socket()}
 open_new(Address, Port, undefined, MyPort) ->
     Myself = self(),
     LocalPid = spawn(fun () ->
-  			     case new_connection(Address, Port, MyPort) of
-				 fail -> 
-				     Myself ! {new_connection_failed};
-				 Socket ->
-				     {ok, {MyIP, _MyPort}} = inet:sockname(Socket),
-				     Myself ! {new_connection_started, MyIP, MyPort, Socket},
-				     loop(Socket, Address, Port)
-			     end
-  		     end),
+                             case new_connection(Address, Port, MyPort) of
+                                 fail ->
+                                     Myself ! {new_connection_failed};
+                                 Socket ->
+                                     {ok, {MyIP, _MyPort}} = inet:sockname(Socket),
+                                     Myself ! {new_connection_started, MyIP, MyPort, Socket},
+                                     loop(Socket, Address, Port)
+                             end
+                     end),
     receive
-  	{new_connection_failed} ->
-	    fail;
-  	{new_connection_started, MyIP, MyPort, S} ->
-  	    {local_ip, MyIP, MyPort, LocalPid, S}
+        {new_connection_failed} ->
+            fail;
+        {new_connection_started, MyIP, MyPort, S} ->
+            {local_ip, MyIP, MyPort, LocalPid, S}
     end;
 open_new(Address, Port, _MyAddress, MyPort) ->
     Owner = self(),
     LocalPid = spawn(fun () ->
-			     case new_connection(Address, Port, MyPort) of
-				 fail ->
-				     Owner ! {new_connection_failed};
-				 Socket ->
-				     Owner ! {new_connection_started, Socket},
-				     loop(Socket, Address, Port) 
-			     end
-		     end),
+                             case new_connection(Address, Port, MyPort) of
+                                 fail ->
+                                     Owner ! {new_connection_failed};
+                                 Socket ->
+                                     Owner ! {new_connection_started, Socket},
+                                     loop(Socket, Address, Port)
+                             end
+                     end),
     receive
-	{new_connection_failed} ->
-	    fail;
-	{new_connection_started, Socket} ->
-	    {connection, LocalPid, Socket}
+        {new_connection_failed} ->
+            fail;
+        {new_connection_started, Socket} ->
+            {connection, LocalPid, Socket}
     end.
 
 % ===============================================================================
@@ -92,70 +92,76 @@ open_new(Address, Port, _MyAddress, MyPort) ->
 -spec(open_new_async/4 :: (any(), any(), any(), any()) -> pid()).
 open_new_async(Address, Port, _MyAddr, MyPort) ->
     Pid = spawn(fun () ->
-			case new_connection(Address, Port, MyPort) of
-			    fail ->
-				comm_port:unregister_connection(Address, Port),
-				ok;
-			    Socket ->
-				loop(Socket, Address, Port)
-			end
-		end),
+                        case new_connection(Address, Port, MyPort) of
+                            fail ->
+                                comm_port:unregister_connection(Address, Port),
+                                ok;
+                            Socket ->
+                                loop(Socket, Address, Port)
+                        end
+                end),
     Pid.
 
 
-send({Address, Port, Socket}, Pid, Message) ->
+send({_Address, _Port, Socket}, Pid, Message) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message}),
-    case gen_tcp:send(Socket, BinaryMessage) of
-	ok ->
-	    ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
-	    ok;
-	{error, closed} ->
-	    comm_port:unregister_connection(Address, Port),
-	    close_connection(Socket);
-	{error, _Reason} ->
-	    %log:log(error,"[ CC ] couldn't send to ~p:~p (~p)", [Address, Port, Reason]),
-	    comm_port:unregister_connection(Address, Port),
-	    close_connection(Socket)
-    end.
+    erlang:port_command(Socket, BinaryMessage, []),
+    ok.
 
 loop(fail, Address, Port) ->
     comm_port:unregister_connection(Address, Port),
     ok;
 loop(Socket, Address, Port) ->
     receive
-	{send, Pid, Message} ->
-	    case send({Address, Port, Socket}, Pid, Message) of
-		ok -> loop(Socket, Address, Port);
-		_ -> ok
-	    end;
-	{tcp_closed, Socket} ->
-	    	comm_port:unregister_connection(Address, Port),
-	    	gen_tcp:close(Socket);
-	{tcp, Socket, Data} ->
-	    case binary_to_term(Data) of
-	        {deliver, Process, Message} ->
+        {send, Pid, Message} ->
+            case send({Address, Port, Socket}, Pid, Message) of
+                ok -> loop(Socket, Address, Port);
+                _ -> ok
+            end;
+        {tcp_closed, Socket} ->
+                comm_port:unregister_connection(Address, Port),
+                gen_tcp:close(Socket);
+        {tcp, Socket, Data} ->
+            case binary_to_term(Data) of
+                {deliver, Process, Message} ->
                     Process ! Message,
-		    inet:setopts(Socket, [{active, once}]),
-		    loop(Socket, Address, Port);
-		{user_close} ->
-		    comm_port:unregister_connection(Address, Port),
-		    gen_tcp:close(Socket);
-		{youare, _Address, _Port} ->
-		    %% @TODO what do we get from this information?
-		    inet:setopts(Socket, [{active, once}]),
-		    loop(Socket, Address, Port);
-		Unknown ->
-		    log:log(warn,"[ CC ] unknown message ~p", [Unknown]),
-		    inet:setopts(Socket, [{active, once}]),
-		    loop(Socket, Address, Port)
-	    end;
+                    inet:setopts(Socket, [{active, once}]),
+                    loop(Socket, Address, Port);
+                {user_close} ->
+                    comm_port:unregister_connection(Address, Port),
+                    gen_tcp:close(Socket);
+                {youare, _Address, _Port} ->
+                    %% @TODO what do we get from this information?
+                    inet:setopts(Socket, [{active, once}]),
+                    loop(Socket, Address, Port);
+                Unknown ->
+                    log:log(warn,"[ CC ] unknown message ~p", [Unknown]),
+                    inet:setopts(Socket, [{active, once}]),
+                    loop(Socket, Address, Port)
+            end;
 
-	{youare, _IP, _Port} ->
-	    loop(Socket, Address, Port);
+        {youare, _IP, _Port} ->
+            loop(Socket, Address, Port);
+
+        {inet_reply, _S, Status} ->
+            case Status of
+                ok ->
+                    %% ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
+                    ok;
+                {error, closed} ->
+                    comm_port:unregister_connection(Address, Port),
+                    close_connection(Socket);
+                {error, _Reason} ->
+                    %% log:log(error,"[ CC ] couldn't send to ~p:~p (~p)",
+                    %% [Address, Port, Reason]),
+                    comm_port:unregister_connection(Address, Port),
+                    close_connection(Socket)
+            end,
+            loop(Socket, Address, Port);
 
         Unknown ->
-	    log:log(warn,"[ CC ] unknown message2 ~p", [Unknown]) ,
-	    loop(Socket, Address, Port)
+            log:log(warn,"[ CC ] unknown message2 ~p", [Unknown]) ,
+            loop(Socket, Address, Port)
     end.
 
 % ===============================================================================
@@ -182,7 +188,7 @@ new_connection(Address, Port, MyPort) ->
                             new_connection(Address, Port, MyPort)
                     end;
                 {error, Reason} ->
-                    log:log(error,"[ CC ] reconnect to ~p because socket is ~p", 
+                    log:log(error,"[ CC ] reconnect to ~p because socket is ~p",
                             [Address, Reason]),
                     close_connection(Socket),
                     new_connection(Address, Port, MyPort)
@@ -194,6 +200,4 @@ new_connection(Address, Port, MyPort) ->
     end.
 
 close_connection(Socket) ->
-    spawn( fun () ->
-                   gen_tcp:close(Socket)
-           end ).
+    spawn( fun () -> gen_tcp:close(Socket) end ).
