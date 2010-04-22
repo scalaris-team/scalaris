@@ -43,7 +43,14 @@ new(Address, Port, Socket) ->
     spawn(fun () -> loop(Socket, Address, Port) end).
 
 tcp_options() ->
-    [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}].
+%    [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}].
+    [{active, once},
+     {nodelay, true},
+     {keepalive, true},
+     {reuseaddr, true},
+     {delay_send, true},
+     {send_timeout, config:read(tcp_send_timeout)}
+].
 
 %% @doc open new connection
 %% @spec open_new(inet:ip_address(), int(), inet:ip_address(), int()) ->

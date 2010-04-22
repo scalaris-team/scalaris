@@ -103,8 +103,8 @@ server(LS) ->
 open_listen_port({From, To}, IP) ->
     open_listen_port(lists:seq(From, To), IP);
 open_listen_port([Port | Rest], IP) ->
-    case gen_tcp:listen(Port, [binary, {packet, 4}, {reuseaddr, true}, 
-					      {active, once}, {ip, IP}]) of
+    case gen_tcp:listen(Port, [binary, {packet, 4}, {ip, IP}]
+                        ++ comm_connection:tcp_options()) of
 	{ok, Socket} ->
 	    Socket;
 	{error, Reason} ->
