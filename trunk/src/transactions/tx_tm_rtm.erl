@@ -235,7 +235,9 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
                                {acceptor_deleteids, lists:flatten(AllPaxIds)});
          {new, _} ->
             %% already deleted
-            DeleteIt = false
+            DeleteIt = false;
+        {uninitialized, _} ->
+            DeleteIt = false %% will be deleted when msg_delay triggers it
     end,
     case DeleteIt of
         false ->
@@ -309,7 +311,7 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg,
                    new -> TxState; %% nothing known locally
                    uninitialized ->
                        %% take over hold back from existing entry
-                       io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
+                       %%io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
                        HoldBackQ = tx_state:get_hold_back(LocalTxEntry),
                        tx_state:set_hold_back(TxState, HoldBackQ);
                    ok -> io:format("Duplicate init_RTM~n")
@@ -346,10 +348,10 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg,
     %% process hold back messages for tx_state
     %% @TODO better use a foldl
     %% io:format("Starting hold back queue processing~n"),
-    [ on(OldMsg, State) || OldMsg <- tx_state:get_hold_back(NewEntry) ],
+    [ on(OldMsg, State) || OldMsg <- lists:reverse(tx_state:get_hold_back(NewEntry)) ],
     %% process hold back messages for tx_items
     [ [ on(OldMsg, State)
-        || OldMsg <- tx_item_state:get_hold_back(Item) ]
+        || OldMsg <- lists:reverse(tx_item_state:get_hold_back(Item)) ]
       || Item <- NewItemStates],
     %% io:format("Stopping hold back queue processing~n"),
 
