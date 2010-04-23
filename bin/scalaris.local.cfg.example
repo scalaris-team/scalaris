@@ -1,12 +1,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Settings for distributed Erlang
-% (see cs_send.erl to switch)
+% (see scalaris.hrl to switch)
 
 % {boot_host, {boot,'boot@foo.bar.com'}}.
+% {known_hosts, [{service_per_vm, 'boot@foo.bar.com'}]}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Settings for TCP mode.
-% (see cs_send.erl to switch)
+% (see scalaris.hrl to switch)
 
 % Insert the appropriate IP-addresses for your setup
 % as comma separated integers:
