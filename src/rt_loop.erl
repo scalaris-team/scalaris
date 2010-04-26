@@ -171,3 +171,10 @@ check_fd(NewRT, OldRT) ->
 
 get_base_interval() ->
     config:read(pointer_base_stabilization_interval).
+
+%% @doc Checks whether config parameters of the rt_loop process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(pointer_base_stabilization_interval) and
+        config:is_greater_than_equal(pointer_base_stabilization_interval, 1000).
