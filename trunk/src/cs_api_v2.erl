@@ -16,7 +16,7 @@
 %% @doc API for transactional, consistent access to the replicated DHT items
 %% @version $Id$
 -module(cs_api_v2).
--author('schuett@zib.de').
+-author(schintke@zib.de').
 -vsn('$Id$ ').
 
 -export([process_request_list/2,
@@ -32,6 +32,8 @@
 %% @type value() = term(). Value
 -type(value() :: term()).
 
+process_request_list([], [{commit}]) ->
+    {[], {results, [{commit}]}};
 process_request_list(TLog, ReqList) ->
     %% @todo should choose a dht_node in the local VM at random or even
     %% better round robin.
