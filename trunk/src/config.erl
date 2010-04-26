@@ -32,7 +32,7 @@
          check_config/0,
 
          exists/1, is_atom/1, is_bool/1, is_mypid/1, is_ip/1, is_integer/1,
-         is_float/1, is_string/1, is_in_range/3,
+         is_float/1, is_list/1, is_string/1, is_in_range/3,
          is_greater_than/2, is_greater_than_equal/2,
          is_less_than/2, is_less_than_equal/2, is_in/2
         ]).
@@ -142,6 +142,7 @@ check_config() ->
         rdht_tx:check_config() and
         rdht_tx_read:check_config() and
         rdht_tx_write:check_config() and
+        ?RT:check_config() and
         tx_tm_rtm:check_config() and
         vivaldi:check_config() and
         vivaldi_latency:check_config() and
@@ -212,6 +213,12 @@ is_integer(Key) ->
 is_float(Key) ->
     Pred = fun erlang:is_float/1,
     Msg = "is not a valid float",
+    test_and_error(Key, Pred, Msg).
+
+-spec is_list(Key::atom()) -> boolean().
+is_list(Key) ->
+    Pred = fun erlang:is_list/1,
+    Msg = "is not a valid list",
     test_and_error(Key, Pred, Msg).
 
 -spec is_string(Key::atom()) -> boolean().

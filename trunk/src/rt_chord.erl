@@ -27,7 +27,7 @@
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          dump/1, to_dict/1, export_rt_to_dht_node/4,
-         update_pred_succ_in_dht_node/3, to_html/1]).
+         update_pred_succ_in_dht_node/3, to_html/1, check_config/0]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -231,3 +231,10 @@ update_pred_succ_in_dht_node(Pred, Succ, RT) ->
 to_html(RT) ->
     List = [ {1, Value} || {Key, Value} <- gb_trees:to_list(RT)],
     List.
+
+%% @doc Checks whether config parameters of the rt_chord process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(chord_base) and
+        config:is_greater_than_equal(chord_base, 2).
