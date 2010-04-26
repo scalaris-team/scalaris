@@ -112,7 +112,7 @@ open_new_async(Address, Port, _MyAddr, MyPort) ->
 
 send({_Address, _Port, Socket}, Pid, Message) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message}),
-    erlang:port_command(Socket, BinaryMessage, []),
+    erlang:port_command(Socket, BinaryMessage),
     ok.
 
 loop(fail, Address, Port) ->
