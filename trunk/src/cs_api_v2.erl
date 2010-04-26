@@ -16,7 +16,7 @@
 %% @doc API for transactional, consistent access to the replicated DHT items
 %% @version $Id$
 -module(cs_api_v2).
--author(schintke@zib.de').
+-author('schintke@zib.de').
 -vsn('$Id$ ').
 
 -export([process_request_list/2,
