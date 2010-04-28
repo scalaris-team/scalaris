@@ -24,7 +24,6 @@
 
 -behavior(gen_component).
 -behavior(rm_beh).
--behavior(self_man).
 
 -export([start_link/1]).
 -export([init/1, on/2]).
@@ -199,8 +198,6 @@ on({rm_buffer_response, OtherBuffer},
 % dead-node-cache reported dead node to be alive again
 on({zombie, Node}, {Id, Me, Preds, Succs, RandViewSize, _Interval, TriggerState, Cache, Churn})  ->
     NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
-    cs_send:send_local(self_man:get_pid(), {update, ?MODULE, stabilizationInterval,
-                                            self(), stabilizationInterval_min()}),
     {Id, Me, Preds, Succs, RandViewSize, stabilizationInterval_min(), NewTriggerState, [Node|Cache], Churn};
 
 % failure detector reported dead node

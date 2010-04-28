@@ -69,11 +69,8 @@ init([Options]) ->
         util:sup_worker_desc(cyclon, cyclon, start_link, [InstanceId]),
     Gossip =
         util:sup_worker_desc(gossip, gossip, start_link, [InstanceId]),
-    Self_Man =
-        util:sup_worker_desc(self_man, self_man, start_link, [InstanceId]),
     {ok, {{one_for_one, 10, 1},
           [
-           Self_Man,
            Reregister,
            KeyHolder,
            RoutingTable,
@@ -83,7 +80,7 @@ init([Options]) ->
            RingMaintenance,
            Vivaldi,
            DC_Clustering,
-		   Gossip
+           Gossip
            %% _RSE
           ]}}.
 %% userdevguide-end sup_dht_node:init
