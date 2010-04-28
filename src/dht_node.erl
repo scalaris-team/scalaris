@@ -112,14 +112,15 @@ on({join_response, Pred, Data}, {join_phase4, Id, Succ, Me}) ->
     log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),
     DB = ?DB:add_data(?DB:new(Id), Data),
     rt_beh:initialize(Id, Pred, Succ),
-    State = case node:is_null(Pred) of
+    State = case node:is_valid(Pred) of
                 true ->
-                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                 {Id, Id}, dht_node_lb:new(), DB);
-                false ->
                     cs_send:send(node:pidX(Pred), {update_succ, Me}),
                     dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                 {node:id(Pred), Id}, dht_node_lb:new(), DB)
+                                       {node:id(Pred), Id}, dht_node_lb:new(),
+                                       DB);
+                false ->
+                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
+                                       {Id, Id}, dht_node_lb:new(), DB)
             end,
     cs_replica_stabilization:recreate_replicas(dht_node_state:get_my_range(State)),
     cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
