@@ -1,5 +1,5 @@
 % behaviors first - otherwise there are compile warnings
-{["src/gen_component.erl", "src/trigger_beh.erl", "src/db_beh.erl", "src/rm_beh.erl", "src/rt_beh.erl", "src/self_man.erl", "src/transactions/rdht_op_beh.erl", "src/transactions/tx_op_beh.erl"],
+{["src/gen_component.erl", "src/trigger_beh.erl", "src/db_beh.erl", "src/rm_beh.erl", "src/rt_beh.erl", "src/transactions/rdht_op_beh.erl", "src/transactions/tx_op_beh.erl"],
  [debug_info,
   {outdir, "ebin"},
   {i, "include"},
