@@ -57,7 +57,7 @@
                 trans_log    :: #translog{},
                 db           :: ?DB:db(),
                 tx_tp_db     :: any(),
-                proposer     :: node:node_type()}).
+                proposer     :: pid()}).
 -type state() :: #state{}.
 
 -spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), dht_node_lb:lb()) -> state().

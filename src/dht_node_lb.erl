@@ -89,13 +89,8 @@ move_load(State, _, NewId) ->
     idholder:set_key(NewId),
     cs_send:send_local(self() , {kill}),
     cs_send:send(Succ, {pred_left, Pred}),
-    case node:is_valid(Pred) of
-        true ->
-            PredPid = dht_node_state:pred_pid(State),
-            cs_send:send(PredPid, {succ_left, dht_node_state:me(State)});
-        false ->
-            void
-    end,
+    PredPid = dht_node_state:pred_pid(State),
+    cs_send:send(PredPid, {succ_left, dht_node_state:me(State)}),
     State.
 
 drop_data(State) ->
