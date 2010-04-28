@@ -361,6 +361,6 @@ get_pids_uid() ->
     Result.
 
 get_global_uid() ->
-    Result = {get_pids_uid(), cs_send:this()}
-    %% , term_to_binary(Result)
+    _Result = {get_pids_uid(), cs_send:this()}
+    %% , term_to_binary(_Result)
     .

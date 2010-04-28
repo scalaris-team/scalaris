@@ -26,7 +26,7 @@
 
 % for routing table implementation
 -export([start_link/1]).
--export([init/1, on/2, get_base_interval/0]).
+-export([init/1, on/2, get_base_interval/0, check_config/0]).
 
 % state of the routing table loop
 -type(state() :: {Id           :: ?RT:key(),

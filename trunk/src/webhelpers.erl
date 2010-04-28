@@ -181,7 +181,6 @@ gen_Nodes([H|T],[HN|TN],R) ->
     S1 =  pid(HN),
 
     random:seed(S1,S1,S1),
-    random:uniform(Hi-Lo)+Lo-1,
     C1 = random:uniform(Hi-Lo)+Lo-1,
     C2 = random:uniform(Hi-Lo)+Lo-1,
     C3 = random:uniform(Hi-Lo)+Lo-1,
