@@ -40,97 +40,8 @@
 
 
 % Join Messages
-
-% join protocol
-
-% first node
-on({get_key_response_keyholder, Key}, {join_as_first}) ->
-    log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Key]),
-    State = dht_node_join:join_first(Key),
-    cs_send:send_local(get_local_dht_node_reregister_pid(),{go}),
-    %log:log(info,"[ Node ~w ] joined",[self()]),
-    State;  % join complete, State is the first "State"
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% !first node
-% 1. get my key
-on({get_key_response_keyholder, Key}, {join_phase1}) ->
-    %io:format("p1: got key~n"),
-    log:log(info,"[ Node ~w ] joining",[self()]),
-    % send message to avoid code duplication
-    cs_send:send_local(self(), {known_hosts_timeout}),
-    {join_phase2, Key};
-
-% 2. Find known hosts
-on({known_hosts_timeout}, {join_phase2, Key}) ->
-    %io:format("p2: known hosts timeout~n"),
-    KnownHosts = config:read(known_hosts),
-    % contact all known VMs
-    _Res = [cs_send:send(KnownHost, {get_dht_nodes, cs_send:this()})
-           || KnownHost <- KnownHosts],
-    %io:format("~p~n", [Res]),
-    % timeout just in case
-    cs_send:send_local_after(1000, self() , {known_hosts_timeout}),
-    {join_phase2, Key};
-
-on({get_dht_nodes_response, []}, {join_phase2, Key}) ->
-    %io:format("p2: got empty dht_nodes_response~n"),
-    % there is a VM with no nodes
-    {join_phase2, Key};
-
-on({get_dht_nodes_response, Nodes}, {join_phase2, Key}) ->
-    %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(cs_send:this(), Nodes)]),
-    case lists:delete(cs_send:this(), Nodes) of
-        [] ->
-            {join_phase2, Key};
-        [First | Rest] ->
-            cs_send:send(First, {lookup_aux, Key, 0, {get_node, cs_send:this(), Key}}),
-            cs_send:send_local_after(3000, self(), {lookup_timeout}),
-            {join_phase3, Rest, Key}
-    end;
-
-% 3. lookup my position
-on({lookup_timeout}, {join_phase3, [], Key}) ->
-    %io:format("p3: lookup_timeout~n"),
-    % no more nodes left, go back to step 2
-    cs_send:send_local(self(), {known_hosts_timeout}),
-    {join_phase2, Key};
-
-on({get_node_response, Key, Succ}, {join_phase3, _, Key}) ->
-    %io:format("p3: lookup success~n"),
-    % got my successor
-    Me = node:new(cs_send:this(), Key),
-    % announce join request
-    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Key}),
-    {join_phase4, Key, Succ, Me};
-
-% 4. joining my neighbors
-on({join_response, Pred, Data}, {join_phase4, Id, Succ, Me}) ->
-    %io:format("p4: join_response~n"),
-    % @TODO data shouldn't be moved here, might be large
-    log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),
-    DB = ?DB:add_data(?DB:new(Id), Data),
-    rt_beh:initialize(Id, Pred, Succ),
-    State = case node:is_valid(Pred) of
-                true ->
-                    cs_send:send(node:pidX(Pred), {update_succ, Me}),
-                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                       {node:id(Pred), Id}, dht_node_lb:new(),
-                                       DB);
-                false ->
-                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                       {Id, Id}, dht_node_lb:new(), DB)
-            end,
-    cs_replica_stabilization:recreate_replicas(dht_node_state:get_my_range(State)),
-    cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
-    State;
-
-% Catch all messages until the join protocol is finshed
-on(Msg, State) when element(1, State) /= state ->
-    %log:log(info("[csnode] [~p] postponed delivery of ~p~n", [self(), Msg]),
-    cs_send:send_local_after(100, self(), Msg),
-    State;
+on(Msg, State) when element(1, State) =:= join ->
+    dht_node_join:process_join_msg(Msg, State);
 
 %% Kill Messages
 on({kill}, _State) ->
@@ -449,11 +360,11 @@ on({join, Source_PID, Id}, State) ->
     dht_node_join:join_request(State, Source_PID, Id);
 %% userdevguide-end dht_node:join_message
 
-on({get_dht_nodes_response, _KnownHosts}, State) ->
+on({known_hosts_timeout}, State) ->
     % will ignore these messages after join
     State;
 
-on({known_hosts_timeout}, State) ->
+on({get_dht_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
     State;
 
@@ -472,7 +383,7 @@ on(_, _State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec(init/1 :: ([instanceid() | [any()]]) -> {join_as_first | join_phase1}).
+-spec init([instanceid() | [any()]]) -> {join, {as_first}, []} | {join, {phase1}, []}.
 init([_InstanceId, Options]) ->
     %io:format("~p~n", [Options]),
     % first node in this vm and also vm is marked as first
@@ -483,10 +394,10 @@ init([_InstanceId, Options]) ->
         true ->
             trigger_known_nodes(),
             idholder:get_key(),
-            {join_as_first};
+            {join, {as_first}, []};
         _ ->
             idholder:get_key(),
-            {join_phase1}
+            {join, {phase1}, []}
     end.
 %% userdevguide-end dht_node:start
 
@@ -504,9 +415,6 @@ start_link(InstanceId, Options) ->
 
 get_local_cyclon_pid() ->
     process_dictionary:get_group_member(cyclon).
-
-get_local_dht_node_reregister_pid() ->
-    process_dictionary:get_group_member(dht_node_reregister).
 
 % @doc find existing nodes and initialize the comm_layer
 trigger_known_nodes() ->
