@@ -25,7 +25,13 @@
 %%% public interface
 
 %%% functions for gen_component module and supervisor callbacks
--export([on_init_TP/2, on_tx_commitreply/3]).
+-export([init/0, on_init_TP/2, on_tx_commitreply/3]).
+
+init() ->
+    InstanceID = get(instance_id),
+    Table = list_to_atom(lists:flatten(
+                           io_lib:format("~p_tx_tp", [InstanceID]))),
+    pdb:new(Table, [set, private, named_table]).
 
 %%
 %% Attention: this is not a separate process!!
@@ -33,33 +39,42 @@
 %%
 
 %% messages handled in dht_node context:
-on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, CS_State) ->
+on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% need Acceptors (given via RTMs), Learner,
     %% validate locally via callback
-    DB = dht_node_state:get_db(CS_State),
+    DB = dht_node_state:get_db(DHT_Node_State),
     {NewDB, Proposal} = apply(element(1, RTLogEntry),
                               validate,
                               [DB, RTLogEntry]),
 
+    %% remember own proposal for lock release
+    TP_DB = dht_node_state:get_tx_tp_db(DHT_Node_State),
+    pdb:set({PaxId, Proposal}, TP_DB),
+
     %% initiate a paxos proposer round 0 with the proposal
-    InstanceID = erlang:get(instance_id),
-    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(CS_State)),
+    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(DHT_Node_State)),
     proposer:start_paxosid_with_proxy(cs_send:this(), Proposer, PaxId,
                                      _Acceptors = RTMs, Proposal,
                                      _Maj = 3, _MaxProposers = 4, 0),
     %% send registerTP to each RTM (send with it the learner id)
     [ cs_send:send(X, {register_TP, {Tid, ItemId, PaxId, cs_send:this()}})
       || X <- [TM | RTMs]],
-    %% (optimized: embed the proposer`s accept message in registerTP message)
-    dht_node_state:set_db(CS_State, NewDB).
+    %% (optimized: embed the proposer's accept message in registerTP message)
+    dht_node_state:set_db(DHT_Node_State, NewDB).
 
-on_tx_commitreply({PaxosId, RTLogEntry}, Result, CS_State) ->
+on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     ?TRACE("tx_tp:on_tx_commitreply({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.
-    DB = dht_node_state:get_db(CS_State),
-    NewDB = apply(element(1, RTLogEntry), Result, [DB, RTLogEntry]),
+    DB = dht_node_state:get_db(DHT_Node_State),
+
+    % get own proposal for lock release
+    TP_DB = dht_node_state:get_tx_tp_db(DHT_Node_State),
+    {PaxosId, Proposal} = pdb:get(PaxosId, TP_DB),
+
+    NewDB = apply(element(1, RTLogEntry), Result, [DB, RTLogEntry, Proposal]),
     %% delete corresponding proposer state
-    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(CS_State)),
+    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(DHT_Node_State)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
-    dht_node_state:set_db(CS_State, NewDB).
+    pdb:delete(PaxosId, TP_DB),
+    dht_node_state:set_db(DHT_Node_State, NewDB).

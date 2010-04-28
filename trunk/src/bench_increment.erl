@@ -43,10 +43,10 @@ inc(Key) ->
             {_TLog, {results, [{write, Key, {value, _Written}}, CommitResult]}} =
                 cs_api_v2:process_request_list(
                   TLog1, [{write, Key, Value + 1}, {commit}]),
-                case CommitResult of
-                    commit -> ok;
-                    Reason -> {failure, Reason}
-                end;
+            case CommitResult of
+                commit -> ok;
+                Reason -> {failure, Reason}
+            end;
         {fail, Reason} ->
             {failure, Reason}
     end.

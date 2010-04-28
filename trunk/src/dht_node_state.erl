@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,10 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : dht_node_state.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : 
-%%%
-%%% Created :  7 May 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
 -module(dht_node_state).
-
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
@@ -30,24 +22,25 @@
 -include("scalaris.hrl").
 
 -export([new/6, new/7,
-	 id/1, me/1,
-	 succ/1, succ_pid/1, succ_id/1,
-	 pred_pid/1, pred_id/1, pred/1,
-	 load/1,
-	 update_preds_succs/3,
+         id/1, me/1,
+         succ/1, succ_pid/1, succ_id/1,
+         pred_pid/1, pred_id/1, pred/1,
+         load/1,
+         update_preds_succs/3,
          update_succs/2,
          update_preds/2,
-	 dump/1,
-	 set_rt/2, rt/1,
-	 get_db/1, set_db/2,
-	 get_lb/1, set_lb/2,
-	 details/1, details/2,
-	 get_my_range/1, 
-	 get_my_proposer/1, 
-	 next_interval/1,
-	 %%transactions
-	 get_trans_log/1,
-	 set_trans_log/2]).
+         dump/1,
+         set_rt/2, rt/1,
+         get_db/1, set_db/2,
+         get_lb/1, set_lb/2,
+         details/1, details/2,
+         get_my_range/1,
+         get_my_proposer/1,
+         get_tx_tp_db/1, set_tx_tp_db/2,
+         next_interval/1,
+         %%transactions
+         get_trans_log/1,
+         set_trans_log/2]).
 
 -type my_range() :: {?RT:key(), ?RT:key()}.
 -type join_time() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}. % {MegaSecs, Secs, MicroSecs}
@@ -63,6 +56,7 @@
                 join_time    :: join_time(),
                 trans_log    :: #translog{},
                 db           :: ?DB:db(),
+                tx_tp_db     :: any(),
                 proposer     :: node:node_type()}).
 -type state() :: #state{}.
 
@@ -74,7 +68,7 @@ new(RT, Successor, Predecessor, Me, MyRange, LB) ->
 -spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), dht_node_lb:lb(), ?DB:db()) -> state().
 new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
     #state{
-     routingtable = RT, 
+     routingtable = RT,
      successors = [Successor],
      predecessors = [Predecessor],
      me = Me,
@@ -88,6 +82,7 @@ new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
        undecided      = gb_trees:empty()
       },
      db = DB,
+     tx_tp_db = tx_tp:init(),
      proposer = process_dictionary:get_group_member(paxos_proposer)
     }.
 %% userdevguide-end dht_node_state:state
@@ -99,6 +94,9 @@ next_interval(State) -> intervals:new(id(State), succ_id(State)).
 get_my_range(#state{my_range=MyRange}) -> MyRange.
 
 get_my_proposer(#state{proposer=Proposer}) -> Proposer.
+
+get_tx_tp_db(#state{tx_tp_db=TX_TP_DB}) -> TX_TP_DB.
+set_tx_tp_db(State, DB) -> State#state{tx_tp_db = DB}.
 
 -spec get_db(state()) -> ?DB:db().
 get_db(#state{db=DB}) -> DB.
@@ -162,7 +160,7 @@ rt_size(State) -> ?RT:get_size(rt(State)).
 -spec dump(state()) -> ok.
 dump(State) ->
     io:format("dump <~s,~w> <~s,~w> <~s,~w>~n", [id(State), self()
-						 , pred_id(State), pred_pid(State), succ_id(State), succ_pid(State)]),
+                                                 , pred_id(State), pred_pid(State), succ_id(State), succ_pid(State)]),
     ok.
 
 %% @doc Gets the requested details about the current node.

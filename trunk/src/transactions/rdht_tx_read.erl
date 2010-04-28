@@ -26,7 +26,7 @@
 -behaviour(tx_op_beh).
 -export([work_phase/2, work_phase/3,
          validate_prefilter/1, validate/2,
-         commit/2, abort/2]).
+         commit/3, abort/3]).
 
 -behaviour(rdht_op_beh).
 -export([tlogentry_get_status/1, tlogentry_get_value/1,
@@ -111,18 +111,26 @@ validate(DB, RTLogEntry) ->
           {DB, abort}
     end.
 
-commit(DB, RTLogEntry) ->
+commit(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_read:commit)~n", []),
-    DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
-    %% perform op: nothing to do
+    %% perform op: nothing to do for 'read'
     %% release locks
-    NewEntry = db_entry:dec_readlock(DBEntry),
-    ?DB:set_entry(DB, NewEntry).
+    case OwnProposalWas of
+        prepared ->
+            DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+            NewEntry = db_entry:dec_readlock(DBEntry),
+            ?DB:set_entry(DB, NewEntry);
+        abort ->
+            %% we could compare DB with RTLogEntry and update if outdated
+            %% as this commit confirms the status of a majority of the
+            %% replicas. Could also possible already in the validate req?
+            DB
+    end.
 
-abort(DB, RTLogEntry) ->
+abort(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_read:abort)~n", []),
     %% same as when committing
-    commit(DB, RTLogEntry).
+    commit(DB, RTLogEntry, OwnProposalWas).
 
 
 %% be startable via supervisor, use gen_component
