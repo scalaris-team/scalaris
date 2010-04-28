@@ -102,7 +102,6 @@ validate(DB, RTLogEntry) ->
         true ->
             %% set locks on entry
             NewEntry = db_entry:set_writelock(DBEntry),
-            io:format("SetWriteLock in validate ~p~n", [NewEntry]),
             NewDB = ?DB:set_entry(DB, NewEntry),
             {NewDB, prepared};
         false ->
@@ -120,21 +119,12 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
     NewEntry =
         case DBVers > RTLogVers of
             true ->
-                ct:pal("Outdated: DBVers: ~p RTLogVers: ~p~n",
-                          [DBVers, RTLogVers]),
                 DBEntry; %% outdated commit
             false ->
-                case RTLogVers > DBVers of
-                    true ->
-                        ct:pal("Fast forward: DBVers: ~p RTLogVers: ~p~n",
-                                  [DBVers, RTLogVers]);
-                    false -> ok
-                end,
                 T2DBEntry = db_entry:set_value(
                               DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
                 T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
                 TEntry = db_entry:reset_locks(T3DBEntry),
-                io:format("UnSetWriteLock in commit ~p~n", [TEntry]),
                 TEntry
         end,
     ?DB:set_entry(DB, NewEntry).
@@ -151,7 +141,6 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
             case RTLogVers of
                 DBVers ->
                     NewEntry = db_entry:unset_writelock(DBEntry),
-                    io:format("UnSetWriteLock in abort ~p~n", [NewEntry]),
                     ?DB:set_entry(DB, NewEntry);
                 _ -> DB
             end;
