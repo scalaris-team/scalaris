@@ -143,6 +143,7 @@ check_config() ->
         rdht_tx_read:check_config() and
         rdht_tx_write:check_config() and
         ?RT:check_config() and
+        rt_loop:check_config() and
         tx_tm_rtm:check_config() and
         vivaldi:check_config() and
         vivaldi_latency:check_config() and
