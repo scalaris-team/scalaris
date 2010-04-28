@@ -31,6 +31,8 @@
 -export([unset_writelock/1]).
 -export([get_version/1]).
 -export([inc_version/1]).
+-export([set_version/2]).
+-export([reset_locks/1]).
 
 %% {key,
 %%  value,
@@ -49,6 +51,7 @@ get_readlock(DBEntry) ->       element(4, DBEntry).
 set_readlock(DBEntry, Val) ->  setelement(4, DBEntry, Val).
 get_version(DBEntry) ->        element(5, DBEntry).
 inc_version(DBEntry) ->        setelement(5, DBEntry, 1 + element(5, DBEntry)).
+set_version(DBEntry, Val) ->   setelement(5, DBEntry, Val).
 
 set_writelock(DBEntry) ->
     set_writelock(DBEntry, true).
@@ -61,3 +64,6 @@ inc_readlock(DBEntry) ->
 dec_readlock(DBEntry) ->
     set_readlock(DBEntry, get_readlock(DBEntry) - 1).
 
+reset_locks(DBEntry) ->
+    TmpEntry = set_readlock(DBEntry, 0),
+    set_writelock(TmpEntry, false).

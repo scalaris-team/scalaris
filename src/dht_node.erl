@@ -262,8 +262,7 @@ on({get_successorlist_response, SuccList,Source_Pid}, State) ->
     cs_send:send(Source_Pid, {get_succ_list_response, dht_node_state:me(State),SuccList}),
     State;
 
-
-on({notify, Pred}, State) -> 
+on({notify, Pred}, State) ->
     rm_chord:notify(Pred),
     State;
 

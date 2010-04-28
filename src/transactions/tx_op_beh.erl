@@ -40,10 +40,10 @@ behaviour_info(callbacks) ->
      %% validate a single item
      %% validate(DB, RTLogentry) -> {DB, Proposal (prepared/abort)}
      {validate, 2},
-     %% commit(DB, RTLogentry)
-     {commit, 2},
-     %% abort(DB, RTLogentry)
-     {abort, 2}
+     %% commit(DB, RTLogentry, OwnProposalWas)
+     {commit, 3},
+     %% abort(DB, RTLogentry, OwnProposalWas)
+     {abort, 3}
     ];
 
 behaviour_info(_Other) ->

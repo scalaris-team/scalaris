@@ -27,7 +27,7 @@
 -behaviour(tx_op_beh).
 -export([work_phase/2,work_phase/3,
          validate_prefilter/1,validate/2,
-         commit/2,abort/2]).
+         commit/3,abort/3]).
 
 -behaviour(rdht_op_beh).
 -export([tlogentry_get_status/1, tlogentry_get_value/1,
@@ -79,9 +79,23 @@ validate(DB, RTLogEntry) ->
     %% contact DB to check entry
     %% set locks on DB
     DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
-    VersionOK =
-        (tx_tlog:get_entry_version(RTLogEntry)
-         =:= db_entry:get_version(DBEntry)),
+
+    RTVers = tx_tlog:get_entry_version(RTLogEntry),
+    DBVers = db_entry:get_version(DBEntry),
+
+%%%    case RTVers > DBVers of
+%%%        true ->
+%%%            %% This trick would need the old value in the rtlog.
+%%%            %% DB is outdated, in workphase a quorum responded with a
+%%%            %% newer version, so a newer version was committed
+%%%            %% reset all locks, set version and set writelock
+%%%            T1Entry = db_entry:reset_locks(DBEntry),
+%%%            T2Entry = db_entry:set_version(T1, RTVers),
+%%%            T3Entry = db_entry:set_writelock(T2, true),
+%%%            NewDB = ?DB:set_entry(DB, T3Entry),
+%%%            {NewDB, prepared};
+%%%        false ->
+    VersionOK = (RTVers =:= DBVers),
     Lockable = (false =:= db_entry:get_writelock(DBEntry))
         andalso (0 =:= db_entry:get_readlock(DBEntry)),
     case (VersionOK andalso Lockable) of
@@ -91,25 +105,39 @@ validate(DB, RTLogEntry) ->
             NewDB = ?DB:set_entry(DB, NewEntry),
             {NewDB, prepared};
         false ->
-%%            io:format("WriteLock: ~p VersionOK: ~p (DB) ~p (Tx) ~n", [Lockable, db_entry:get_version(DBEntry), tx_tlog:get_entry_version(RTLogEntry) ]),
+            %%            io:format("WriteLock: ~p VersionOK: ~p (DB) ~p (Tx) ~n", [Lockable, db_entry:get_version(DBEntry), tx_tlog:get_entry_version(RTLogEntry) ]),
             {DB, abort}
+%%%            end
     end.
 
-commit(DB, RTLogEntry) ->
+commit(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_write:commit)~n", []),
-    DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
-    %% perform op
-    TmpDBEntry = db_entry:set_value(DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
-    Tmp2Entry = db_entry:inc_version(TmpDBEntry),
-    %% release locks
-    NewEntry = db_entry:unset_writelock(Tmp2Entry),
-    ?DB:set_entry(DB, NewEntry).
+    case OwnProposalWas of
+        prepared ->
+            DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+            %% perform op
+            TmpDBEntry = db_entry:set_value(
+                           DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
+            Tmp2Entry = db_entry:inc_version(TmpDBEntry),
+            %% release locks
+            NewEntry = db_entry:unset_writelock(Tmp2Entry),
+            ?DB:set_entry(DB, NewEntry);
+        abort ->
+            DB
+    end.
 
-abort(DB, RTLogEntry) ->
+abort(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
     %% abort operation
-    %% release locks
-    DB.
+    %% release locks?
+    case OwnProposalWas of
+        prepared ->
+            DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+            NewEntry = db_entry:unset_writelock(DBEntry),
+            ?DB:set_entry(DB, NewEntry);
+        abort ->
+            DB
+    end.
 
 %% be startable via supervisor, use gen_component
 -spec start_link(instanceid()) -> {ok, pid()}.
@@ -135,7 +163,7 @@ init([_InstanceID]) ->
 
 %% reply triggered by rdht_tx_write:work_phase/3
 %% ClientPid and WriteValue could also be stored in local process state via ets
-on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, ResultEntry},
+on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
    State) ->
     Key = element(2, TLogEntry),
     Request = {?MODULE, Key, WriteValue},
