@@ -121,10 +121,8 @@ loop(fail, Address, Port) ->
 loop(Socket, Address, Port) ->
     receive
         {send, Pid, Message} ->
-            case send({Address, Port, Socket}, Pid, Message) of
-                ok -> loop(Socket, Address, Port);
-                _ -> ok
-            end;
+            send({Address, Port, Socket}, Pid, Message),
+            loop(Socket, Address, Port);
         {tcp_closed, Socket} ->
                 comm_port:unregister_connection(Address, Port),
                 gen_tcp:close(Socket);
