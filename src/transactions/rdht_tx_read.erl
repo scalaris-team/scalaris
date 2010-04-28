@@ -118,12 +118,18 @@ commit(DB, RTLogEntry, OwnProposalWas) ->
     case OwnProposalWas of
         prepared ->
             DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
-            NewEntry = db_entry:dec_readlock(DBEntry),
-            ?DB:set_entry(DB, NewEntry);
+            RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+            DBVers = db_entry:get_version(DBEntry),
+            case RTLogVers of
+                DBVers ->
+                    NewEntry = db_entry:dec_readlock(DBEntry),
+                    ?DB:set_entry(DB, NewEntry);
+                _ -> DB %% a write has already deleted this lock
+            end;
         abort ->
             %% we could compare DB with RTLogEntry and update if outdated
             %% as this commit confirms the status of a majority of the
-            %% replicas. Could also possible already in the validate req?
+            %% replicas. Could also be possible already in the validate req?
             DB
     end.
 

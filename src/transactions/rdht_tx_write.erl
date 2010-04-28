@@ -102,6 +102,7 @@ validate(DB, RTLogEntry) ->
         true ->
             %% set locks on entry
             NewEntry = db_entry:set_writelock(DBEntry),
+            io:format("SetWriteLock in validate ~p~n", [NewEntry]),
             NewDB = ?DB:set_entry(DB, NewEntry),
             {NewDB, prepared};
         false ->
@@ -110,21 +111,33 @@ validate(DB, RTLogEntry) ->
 %%%            end
     end.
 
-commit(DB, RTLogEntry, OwnProposalWas) ->
+commit(DB, RTLogEntry, _OwnProposalWas) ->
     ?TRACE("rdht_tx_write:commit)~n", []),
-    case OwnProposalWas of
-        prepared ->
-            DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
-            %% perform op
-            TmpDBEntry = db_entry:set_value(
-                           DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
-            Tmp2Entry = db_entry:inc_version(TmpDBEntry),
-            %% release locks
-            NewEntry = db_entry:unset_writelock(Tmp2Entry),
-            ?DB:set_entry(DB, NewEntry);
-        abort ->
-            DB
-    end.
+    DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+    %% perform op
+    RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+    DBVers = db_entry:get_version(DBEntry),
+    NewEntry =
+        case DBVers > RTLogVers of
+            true ->
+                ct:pal("Outdated: DBVers: ~p RTLogVers: ~p~n",
+                          [DBVers, RTLogVers]),
+                DBEntry; %% outdated commit
+            false ->
+                case RTLogVers > DBVers of
+                    true ->
+                        ct:pal("Fast forward: DBVers: ~p RTLogVers: ~p~n",
+                                  [DBVers, RTLogVers]);
+                    false -> ok
+                end,
+                T2DBEntry = db_entry:set_value(
+                              DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
+                T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
+                TEntry = db_entry:reset_locks(T3DBEntry),
+                io:format("UnSetWriteLock in commit ~p~n", [TEntry]),
+                TEntry
+        end,
+    ?DB:set_entry(DB, NewEntry).
 
 abort(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
@@ -133,8 +146,15 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
     case OwnProposalWas of
         prepared ->
             DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
-            NewEntry = db_entry:unset_writelock(DBEntry),
-            ?DB:set_entry(DB, NewEntry);
+            RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+            DBVers = db_entry:get_version(DBEntry),
+            case RTLogVers of
+                DBVers ->
+                    NewEntry = db_entry:unset_writelock(DBEntry),
+                    io:format("UnSetWriteLock in abort ~p~n", [NewEntry]),
+                    ?DB:set_entry(DB, NewEntry);
+                _ -> DB
+            end;
         abort ->
             DB
     end.
