@@ -40,12 +40,6 @@ start_link(InstanceId) ->
 -spec init([instanceid()]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init([InstanceId]) ->
     process_dictionary:register_process(InstanceId, sup_dht_node_core_tx, self()),
-    Proposer =
-        util:sup_worker_desc(proposer, proposer, start_link, [InstanceId]),
-    Acceptor =
-        util:sup_worker_desc(acceptor, acceptor, start_link, [InstanceId]),
-    Learner =
-        util:sup_worker_desc(learner, learner, start_link, [InstanceId]),
     RDHT_tx_read =
         util:sup_worker_desc(rdht_tx_read, rdht_tx_read, start_link, [InstanceId]),
     RDHT_tx_write =
@@ -62,7 +56,6 @@ init([InstanceId]) ->
         util:sup_worker_desc(tx_rtm3, tx_tm_rtm, start_link, [InstanceId, tx_rtm3]),
     {ok, {{one_for_all, 10, 1},
           [
-           Proposer, Acceptor, Learner,
            RDHT_tx_read, RDHT_tx_write,
            TX_TM, TX_RTM0, TX_RTM1, TX_RTM2, TX_RTM3
           ]}}.

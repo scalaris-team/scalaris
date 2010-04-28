@@ -43,6 +43,12 @@ start_link(InstanceId, Options) ->
 -spec init([instanceid() | [any()]]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init([InstanceId, Options]) ->
     process_dictionary:register_process(InstanceId, sup_dht_node_core, self()),
+    Proposer =
+        util:sup_worker_desc(proposer, proposer, start_link, [InstanceId]),
+    Acceptor =
+        util:sup_worker_desc(acceptor, acceptor, start_link, [InstanceId]),
+    Learner =
+        util:sup_worker_desc(learner, learner, start_link, [InstanceId]),
     Node =
         util:sup_worker_desc(dht_node, dht_node, start_link,
                              [InstanceId, Options]),
@@ -58,6 +64,7 @@ init([InstanceId, Options]) ->
     {ok, {{one_for_all, 10, 1},
           [
            DB,
+           Proposer, Acceptor, Learner,
            Node,
            Delayer,
            TX
