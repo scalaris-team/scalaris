@@ -235,7 +235,7 @@ on({{get_node_details_response, NodeDetails}, local_info},
 		case Initialized of
 			true -> {[], State};
 			false ->
-				[cs_send:send_local(self(), Message) || Message <- QueuedMessages],
+                send_queued_messages(QueuedMessages),
 				{[], integrate_local_info(State, node_details:get(NodeDetails, load), calc_initial_avg_kr(node_details:get(NodeDetails, my_range)))}
 			end,
     {PreviousState, NewState, NewQueuedMessages, TriggerState};
@@ -679,6 +679,12 @@ request_random_node() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sends queued messages to the gossip process itself in the order they
+%%      have been received.
+-spec send_queued_messages(list()) -> ok.
+send_queued_messages(QueuedMessages) ->
+    lists:foldr(fun(Msg, _) -> cs_send:send_local(self(), Msg) end, ok, QueuedMessages).
 
 %% @doc Gets the total number of keys available.
 -spec get_addr_size() -> number().
