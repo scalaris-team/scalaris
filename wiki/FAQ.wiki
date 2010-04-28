@@ -57,6 +57,15 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 
 = Installation =
 
+== Minimum Requirements ==
+
+  * Erlang >= !R13B01 (see [FAQ#Known_Issues Known Issues] below)
+
+=== Optional requirements ===
+
+  * Java-API, CLI: Java >= 5, Ant
+  * Storage on disk: Tokycabinet, tcerl, tcerl-drv
+
 == Prebuild packages ==
 
 We build rpm and deb packages using checkouts from svn trunk and the latest tagged version and provide them using the openSUSE !BuildService at http://download.opensuse.org/repositories/home:/tschuett/. The available packages are listed in the following table:
@@ -163,3 +172,9 @@ Discarding message {ping,{{127,0,0,1},14195,<8031.110.0>},4} from <0.99.0> to <0
 in an old incarnation (3) of this node (1)
 }}}
 It is not so much an error but a message by the Erlang runtime, that this particular message was sent to the last "incarnation" of this scalaris node. Here it is the failure detector sending a ping message. After a couple of seconds, the failure detector will notice the change and the messages will stop to appear.
+
+= Known Issues =
+
+== Publishing topics with Erlang !R13B01 may fail ==
+
+The httpc_handler module of the !R13B01 distribution sporadically crashes when a message is published to a web server. This can be seen using our integrated java tests. There have been some changes to that module in !R13B02 which seem to have fixed this bug. We haven't observed this behavior in Erlang !R13B02 - !R13B04.
