@@ -27,7 +27,7 @@
 
 -export([id/1, pidX/1,
          new/2,
-         is_null/1, null/0]).
+         null/0, is_valid/1]).
 
 -include("scalaris.hrl").
 
@@ -51,9 +51,10 @@ pidX(#node{pid=PID}) ->
 id(#node{id=Id}) ->
     Id.
 
--spec(is_null/1 :: (null) -> true
-                  ; (node_type()) -> false).
-is_null(null) ->
+%% @doc Checks whether the given parameter is a valid node.
+-spec is_valid(node_type()) -> true;
+               (null | unknown) -> false.
+is_valid(X) when is_record(X, node) ->
     true;
-is_null(#node{id=_}) ->
+is_valid(_) ->
     false.

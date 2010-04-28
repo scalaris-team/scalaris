@@ -130,8 +130,8 @@ on({stabilize}, {Id, Me, Pred, Succs, TriggerState}) -> % new stabilization inte
     {Id, Me, Pred, Succs, NewTriggerState};
 
 on({get_pred_response, SuccsPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
-    case node:is_null(SuccsPred) of
-        false ->
+    case node:is_valid(SuccsPred) of
+        true ->
             case util:is_between_stab(Id, node:id(SuccsPred), node:id(hd(Succs))) of
                 true ->
                     cs_send:send(node:pidX(SuccsPred), {get_succ_list, cs_send:this()}),
@@ -142,7 +142,7 @@ on({get_pred_response, SuccsPred}, {Id, Me, Pred, Succs, TriggerState} = State) 
                     cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
                     State
             end;
-        true ->
+        false ->
             cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
             State
     end;
@@ -156,12 +156,8 @@ on({get_succ_list_response, Succ, SuccsSuccList}, {Id, Me, Pred, Succs, TriggerS
     {Id, Me, Pred, NewSuccs, TriggerState};
 
 on({notify, NewPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
-    case node:is_null(Pred) of
+    case node:is_valid(Pred) of
         true ->
-            rm_beh:update_succ_and_pred(NewPred, hd(Succs)),
-            fd:subscribe(node:pidX(NewPred)),
-            {Id, Me, NewPred, Succs, TriggerState};
-        false ->
             case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
                 true ->
                     rm_beh:update_succ_and_pred(NewPred, hd(Succs)),
@@ -169,15 +165,19 @@ on({notify, NewPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
                     {Id, Me, NewPred, Succs, TriggerState};
                 false ->
                     State
-            end
+            end;
+        false ->
+            rm_beh:update_succ_and_pred(NewPred, hd(Succs)),
+            fd:subscribe(node:pidX(NewPred)),
+            {Id, Me, NewPred, Succs, TriggerState}
     end;
 
 on({crash, DeadPid}, {Id, Me, Pred, Succs, TriggerState})  ->
-    case node:is_null(Pred) orelse DeadPid == node:pidX(Pred) of
+    case node:is_valid(Pred) andalso (DeadPid =/= node:pidX(Pred)) of
         true ->
-            {Id, Me, node:null(), filter(DeadPid, Succs), TriggerState};
+            {Id, Me, Pred, filter(DeadPid, Succs), TriggerState};
         false ->
-            {Id, Me, Pred, filter(DeadPid, Succs), TriggerState}
+            {Id, Me, node:null(), filter(DeadPid, Succs), TriggerState}
     end;
 
 on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Me, Pred, Succs, _TriggerState} = State)  ->

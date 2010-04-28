@@ -115,17 +115,17 @@ dump(RT) ->
 -spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(),
                       node:node_type()) -> rt()).
 stabilize(Id, Succ, RT, Index, Node) ->
-    case node:is_null(Node)                           % do not add null nodes
-        orelse (node:id(Succ) == node:id(Node))       % there is nothing shorter than succ
-        orelse (util:is_between(Id, node:id(Node), node:id(Succ))) of % there should not be anything shorter than succ
+    case node:is_valid(Node)                           % do not add null nodes
+        andalso (node:id(Succ) =/= node:id(Node))      % there is nothing shorter than succ
+        andalso (not util:is_between(Id, node:id(Node), node:id(Succ))) of % there should not be anything shorter than succ
         true ->
-            RT;
-        false ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
             cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(),
                                               next_index(Index)}),
-            NewRT
+            NewRT;
+        false ->
+            RT
     end.
 %% userdevguide-end rt_chord:stab
 

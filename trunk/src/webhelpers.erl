@@ -448,12 +448,9 @@ renderIndexedRing({failed}, _Ring) ->
 %%%-----------------------------Misc----------------------------------
 
 get_id(Node) ->
-    IsNull = node:is_null(Node),
-    if
-	IsNull ->
-	    null;
-	true ->
-	    node:id(Node)
+    case node:is_valid(Node) of
+        true -> node:id(Node);
+        false -> null  
     end.
 
 get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
@@ -471,9 +468,9 @@ get_indexed_succ_id(Node, Ring, MyIndex, NIndex) ->
     end.
 
 get_indexed_id(Node, Ring) ->
-    case node:is_null(Node) of
-        true -> "null";
-        false -> get_indexed_id(Node, Ring, 0)
+    case node:is_valid(Node) of
+        true  -> get_indexed_id(Node, Ring, 0);
+        false -> "null"
     end.
 
 get_indexed_id(Node, [{ok, Details}|Ring], Index) ->

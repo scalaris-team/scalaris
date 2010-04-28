@@ -105,9 +105,9 @@ check_ring_foldl({ok, Node}, PredsSucc) ->
     end.
 
 get_id(Node) ->
-    case node:is_null(Node) of
-        true -> "null";
-        false -> node:id(Node)
+    case node:is_valid(Node) of
+        true  -> node:id(Node);
+        false -> "null"
     end.
 
 number_of_nodes() ->

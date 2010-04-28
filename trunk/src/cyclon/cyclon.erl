@@ -191,16 +191,20 @@ on({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState}) 
     NewCache = cyclon_cache:merge(Cache, Node, QSubset, PSubset, get_cache_size()),
     {NewCache, Node, Cycles, TriggerState};
 
-on({get_node_details_response, NodeDetails}, {_, Node, Cycles, TriggerState}) ->
+on({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerState}) ->
     Pred = node_details:get(NodeDetails, pred),
     Succ = node_details:get(NodeDetails, succ),
-    Me = case node_details:get(NodeDetails, node) of
-             unknown -> Node;
-             X -> X
+    PotentialMe = node_details:get(NodeDetails, node),
+    Me = case node:is_valid(PotentialMe) of
+             true  -> PotentialMe;
+             false -> Node
          end,
-    Cache = case Pred =/= Node of
+    Cache = case (Pred =/= Node)
+                andalso node:is_valid(Pred)
+                andalso node:is_valid(Succ)
+                andalso (cyclon_cache:size(OldCache) =< 2) of
             true  -> cyclon_cache:new(Pred, Succ);
-            false -> cyclon_cache:new()
+            false -> OldCache
     end,
     {Cache, Me, Cycles, TriggerState};
 
@@ -270,9 +274,9 @@ check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
                      0 -> [pred, succ];
                      _ -> []
                  end,
-    NeedsInfo2 = case Node of
-                     null -> [node];
-                     _ -> []
+    NeedsInfo2 = case node:is_valid(Node) of
+                     false -> [node];
+                     true  -> []
                  end,
     NeedsInfo = NeedsInfo1 ++ NeedsInfo2,
     if 
