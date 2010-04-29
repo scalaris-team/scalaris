@@ -127,10 +127,11 @@ range_read(From, To) ->
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, cs_send:this()}),
-    cs_send:send_local_after(config:read(range_read_timeout), self(), {timeout}),
-    range_read_loop(Interval, [], []).
+    TimerRef =
+        cs_send:send_local_after(config:read(range_read_timeout), self(), {timeout}),
+    range_read_loop(Interval, [], [], TimerRef).
 
-range_read_loop(Interval, Done, Data) ->
+range_read_loop(Interval, Done, Data, TimerRef) ->
     receive
         {timeout} ->
             {timeout, lists:flatten(Data)};
@@ -138,8 +139,9 @@ range_read_loop(Interval, Done, Data) ->
             Done2 = [intervals:new(From, To) | Done],
             case intervals:is_covered(Interval, Done2) of
                 false ->
-                    range_read_loop(Interval, Done2, [NewData | Data]);
+                    range_read_loop(Interval, Done2, [NewData | Data], TimerRef);
                 true ->
+                    erlang:cancel_timer(TimerRef),
                     {ok, lists:flatten([NewData | Data])}
             end
     end.
