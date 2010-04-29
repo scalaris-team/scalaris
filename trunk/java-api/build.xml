@@ -23,6 +23,16 @@
 	<property name="scalaris.dist.filename" value="scalaris" />
 	<!-- directory where the classes are compiled to -->
 	<property name="scalaris.classes.dirname" value="classes" />
+	<!-- version of the OtpErlang jar file to bundle and compile against (OtpErlang-<version>.jar) -->
+	<property name="opterlang.version" value="1.5.3" />
+	<!-- version of the jakarta-commons-cli jar file to bundle and compile against (jakarta-commons-cli-<version>.jar) -->
+	<property name="jakarta.commons.cli.version" value="1.2" />
+	<!-- version of the jetty jar file to bundle and compile the tests against (jetty-<version>.jar, jetty-util-<version>.jar) -->
+	<property name="jetty.version" value="6.1.24" />
+	<!-- version of the servlet api jar file to bundle and compile the tests against (servlet-api-<version>.jar) -->
+	<property name="jetty.servletapi.version" value="2.5-20081211" />
+	<!-- version of the junit jar file to bundle and compile the tests against (junit-<version>.jar) -->
+	<property name="junit.version" value="4.4" />
 	<!-- ########## Build configuration (end) ########## -->
 
 	<property environment="env"/>
@@ -123,16 +133,16 @@
 -->
 
 	<path id="scalaris.classpath">
-		<pathelement path='lib/OtpErlang-1.5.2.jar' />
-		<pathelement path='lib/jakarta-commons-cli-1.2.jar' />
+		<pathelement path='lib/OtpErlang-${opterlang.version}.jar' />
+		<pathelement path='lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar' />
 	</path>
 	<path id="scalaris.test.classpath">
 		<path refid="scalaris.classpath" />
 		<pathelement path="${scalaris.classes.dirname}" />
-		<pathelement path="test-lib/junit-4.4.jar" />
-		<pathelement path="test-lib/jetty-6.1.22.jar" />
-		<pathelement path="test-lib/jetty-util-6.1.22.jar" />
-		<pathelement path="test-lib/servlet-api-2.5-20081211.jar" />
+		<pathelement path="test-lib/junit-${junit.version}.jar" />
+		<pathelement path="test-lib/jetty-${jetty.version}.jar" />
+		<pathelement path="test-lib/jetty-util-${jetty.version}.jar" />
+		<pathelement path="test-lib/servlet-api-${jetty.servletapi.version}.jar" />
 	</path>
 
 	<!-- ########## Public targets (begin) ########## -->
@@ -278,7 +288,7 @@
 				<attribute name="Main-Class" value="de.zib.scalaris.Main" />
 				<!--
 					<attribute name="Class-Path" value=".
-					lib/jakarta-commons-cli-1.2.jar lib/OtpErlang-1.5.2.jar" />
+					lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar lib/OtpErlang-${opterlang.version}.jar" />
 				-->
 			</manifest>
 		</jar>
@@ -293,7 +303,7 @@
 				<attribute name="Bundle-Version" value="2.0.0" />
 				<attribute name="Export-Package" value="de.zib.scalaris.*" />
 				<attribute name="Class-Path"
-					value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-1.2.jar lib/OtpErlang-1.5.2.jar" />
+					value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar lib/OtpErlang-${opterlang.version}.jar" />
 			</manifest>
 		</jar>
 	</target>
