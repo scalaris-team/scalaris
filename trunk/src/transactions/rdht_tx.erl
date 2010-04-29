@@ -114,18 +114,30 @@ initiate_rdht_ops(ReqList) ->
 collect_results_and_do_translogops({TLog, Results, [], [], []}) ->
     {TLog, Results, [], [], []};
 %% single request and empty translog, done separately for optimization only
-collect_results_and_do_translogops({[], [], [_RdhtOpWithReqId], [], []}
-                                   = _Args) ->
+collect_results_and_do_translogops({[], [], [RdhtOpWithReqId], [], []}
+                                   = Args) ->
     Reply = receive_answer(),
-    {_, _RdhtId, RdhtTlog, RdhtResult} = Reply,
+    {_, RdhtId, RdhtTlog, RdhtResult} = Reply,
+    case lists:keyfind(RdhtId, 1, [RdhtOpWithReqId]) of
+        false ->
+            %% Drop outdated result...
+            collect_results_and_do_translogops(Args);
+        _ -> ok
+    end,
     {[RdhtTlog], [{1, RdhtResult}], [], [], []};
 %% all translogops done -> wait for a RdhtOpReply
 collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
-                                    Delayed, []} = _Args) ->
+                                    Delayed, []} = Args) ->
     ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [_Args]),
     Reply = receive_answer(),
     ?TRACE("rdht reply was ~p~n", [Reply]),
     {_, RdhtId, RdhtTlog, RdhtResult} = Reply,
+    case lists:keyfind(RdhtId, 1, RdhtOpsWithReqIds) of
+        false ->
+            %% Drop outdated result...
+            collect_results_and_do_translogops(Args);
+        _ -> ok
+    end,
     %% add TLog entry, as it is guaranteed a new entry
     NewTLog = [RdhtTlog | TLog],
     %% lookup Num for Result entry and add that
