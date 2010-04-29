@@ -163,6 +163,31 @@ public class Main {
 			} catch (UnknownException e) {
 				printException("getSubscribers failed with unknown error", e, verbose);
 			}
+		} else if (line.hasOption("d")) { // delete
+			try {
+				Scalaris sc = new Scalaris();
+				String key = line.getOptionValues("delete")[0];
+				int timeout;
+				try {
+					timeout = Integer.parseInt(line.getOptionValues("delete")[1]);
+				} catch (Exception e) {
+					timeout = 2000;
+				}
+				sc.delete(key, timeout);
+				DeleteResult deleteResult = sc.getLastDeleteResult();
+				System.out.println("delete(" + key + ", " + timeout + "): "
+						+ deleteResult.ok + " ok, "
+						+ deleteResult.locks_set + " locks_set, "
+						+ deleteResult.undef + " undef");
+			} catch (ConnectionException e) {
+				printException("delete failed with connection error", e, verbose);
+			} catch (TimeoutException e) {
+				printException("delete failed with timeout", e, verbose);
+			} catch (NodeNotFoundException e) {
+				printException("delete failed with node not found", e, verbose);
+			} catch (UnknownException e) {
+				printException("delete failed with unknown error", e, verbose);
+			}
 		} else if (line.hasOption("lh")) { // get local host name
 			System.out.println(ConnectionFactory.getLocalhostName());
 		} else {
@@ -215,6 +240,15 @@ public class Main {
 		getSubscribers.setArgName("topic");
 		getSubscribers.setArgs(1);
 		group.addOption(getSubscribers);
+
+		Option delete = new Option("d", "delete", true,
+				"delete an item (default timeout: 2000ms)\n" +
+				"WARNING: This function can lead to inconsistent data (e.g. " +
+				"deleted items can re-appear). Also when re-creating an item " +
+				"the version before the delete can re-appear.");
+		delete.setArgName("key> <[timeout]");
+		delete.setArgs(2);	
+		group.addOption(delete);
 
 		options.addOption(new Option("b", "minibench", false, "run mini benchmark"));
 
