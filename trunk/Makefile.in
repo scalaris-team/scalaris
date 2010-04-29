@@ -19,7 +19,7 @@ SVN = svn
 CD = cd
 MAKE = make
 VERSION=0.0.1
-OTP_ERLANG_VERSION=1.5.2
+OTP_ERLANG_VERSION=1.5.3
 
 .PHONY: all compile test test-vts java clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test
 
