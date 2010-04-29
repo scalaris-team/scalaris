@@ -40,15 +40,7 @@
 -export([]).
 
 % getters
--export([get_avgLoad/1,
-		 get_stddev/1,
-		 get_size/1,
-		 get_size_ldr/1,
-		 get_size_kr/1,
-		 get_minLoad/1,
-		 get_maxLoad/1,
-		 get_triggered/1,
-		 get_msg_exch/1]).
+-export([get/2]).
 
 % setters
 -export([]).
@@ -61,23 +53,11 @@
 		 new_internal/0, new_internal/7]).
 
 % getters
--export([get_avgLoad2/1,
-		 get_size_inv/1,
-		 get_avg_kr/1,
-		 get_round/1,
-		 get_values/1,
-		 is_initialized/1,
-		 get_converge_avg_count/1]).
+-export([]).
 
 % setters
--export([set_avgLoad/2,
-		 set_avgLoad2/2,
-		 set_avg_kr/2,
-		 set_size_inv/2,
-		 set_minLoad/2,
-		 set_maxLoad/2,
-		 set_round/2,
-		 set_values/2,
+-export([set/3,
+         set_values/2,
 		 set_initialized/1,
 		 reset_triggered/1,
 		 inc_triggered/1,
@@ -165,142 +145,125 @@ new_state() -> #state{}.
 new_state(Values) when is_record(Values, values_internal) ->
 	#state{values=Values, initialized=false}.
 
-%%
-%% Getters
-%%
-
-%% @doc Gets the average load from a gossip state's values.
--spec get_avgLoad(values() | values_internal() | state()) -> avg().
-get_avgLoad(#values{avg=Avg}) -> Avg;
-get_avgLoad(#values_internal{avg=Avg}) -> Avg;
-get_avgLoad(#state{values=Values}) -> get_avgLoad(Values).
-
-%% @doc Gets the standard deviation of the loads load from a gossip state's values.
--spec get_stddev(values()) -> stddev().
-get_stddev(#values{stddev=Stddev}) -> Stddev.
-
-%% @doc Gets the best of the two different size values from a gossip state's
-%%      values (favour key range based calculations over leader-based).
--spec get_size(values()) -> size().
-get_size(Values) when is_record(Values, values) ->
-	Size_kr = get_size_kr(Values),
-	case Size_kr of
-		unknown -> get_size_ldr(Values);
-		X       -> X
-	end.
-
-%% @doc Gets the size (based on average with leader=1, others=0) from a gossip
-%%      state's values.
--spec get_size_ldr(values()) -> size().
-get_size_ldr(#values{size_ldr=Size_ldr}) -> Size_ldr.
-
-%% @doc Gets the size (based on average key range calculation) from a gossip
-%%      state's values.
--spec get_size_kr(values()) -> size().
-get_size_kr(#values{size_kr=Size_kr}) -> Size_kr.
-
-%% @doc Gets the minimum load from a gossip state's values.
--spec get_minLoad(values() | values_internal() | state()) -> min().
-get_minLoad(#values{min=Min}) -> Min;
-get_minLoad(#values_internal{min=Min}) -> Min;
-get_minLoad(#state{values=Values}) -> get_minLoad(Values).
-
-%% @doc Gets the maximum load from a gossip state's values.
--spec get_maxLoad(values() | values_internal() | state()) -> max().
-get_maxLoad(#values{max=Max}) -> Max;
-get_maxLoad(#values_internal{max=Max}) -> Max;
-get_maxLoad(#state{values=Values}) -> get_maxLoad(Values).
-
-%% @doc Gets the average load from a gossip state's values.
--spec get_avgLoad2(values_internal() | state()) -> avg2().
-get_avgLoad2(#values_internal{avg2=Avg2}) -> Avg2;
-get_avgLoad2(#state{values=Values}) -> get_avgLoad2(Values).
-
-%% @doc Gets the 1/size value from a gossip state's values.
--spec get_size_inv(values_internal() | state()) -> size_inv().
-get_size_inv(#values_internal{size_inv=Size_inv}) -> Size_inv;
-get_size_inv(#state{values=Values}) -> get_size_inv(Values).
-
-%% @doc Gets the average key range from a gossip state's values.
--spec get_avg_kr(values_internal() | state()) -> avg_kr().
-get_avg_kr(#values_internal{avg_kr=AvgKR}) -> AvgKR;
-get_avg_kr(#state{values=Values}) -> get_avg_kr(Values).
-
-%% @doc Gets the round from a gossip state's values.
--spec get_round(values_internal() | state()) -> round().
-get_round(#values_internal{round=Round}) -> Round;
-get_round(#state{values=Values}) -> get_round(Values).
-
-%% @doc Gets how often the trigger called the module.
--spec get_triggered(values() | state()) -> triggered().
-get_triggered(#values{triggered=Triggered}) -> Triggered;
-get_triggered(#state{triggered=Triggered}) -> Triggered.
-
-%% @doc Gets how many information exchanges have been performed to create a
-%%      gossip state.
--spec get_msg_exch(values() | state()) -> msg_exch().
-get_msg_exch(#values{msg_exch=MessageExchanges}) -> MessageExchanges;
-get_msg_exch(#state{msg_exch=MessageExchanges}) -> MessageExchanges.
-
-%$ @doc Gets the values a gossip state stores.
--spec get_values(state()) -> values_internal().
-get_values(#state{values=Values}) -> Values.
-
-%$ @doc Checks whether local load and key range information have been integrated
-%%      into the values of a gossip state.
--spec is_initialized(state()) -> boolean().
-is_initialized(#state{initialized=Initialized}) -> Initialized.
-
-%$ @doc Returns how often the changes in all average-based values have been less
-%%      than epsilon percent in the given gossip state.
--spec get_converge_avg_count(state()) -> converge_avg_count().
-get_converge_avg_count(#state{converge_avg_count=ConvergeAvgCount}) -> ConvergeAvgCount.
+%% @doc Gets information from a values, values_internal or state record.
+%%      Allowed keys include:
+%%      <ul>
+%%        <li>avgLoad = average load,</li>
+%%        <li>stddev = standard deviation of the load among the nodes,</li>
+%%        <li>size_ldr = leader-based size estimate,</li>
+%%        <li>size_kr = size estimate based on average key range calculation,</li>
+%%        <li>size = size_kr if not unknown, otherwise size_ldr,</li>
+%%        <li>minLoad = minimum load,</li>
+%%        <li>maxLoad = maximum load,</li>
+%%        <li>triggered = how often the trigger called since the node entered/created the round,</li>
+%%        <li>msg_exch = how often messages have been exchanged with other nodes,</li>
+%%        <li>avgLoad2 = average of load^2,</li>
+%%        <li>size_inv = 1 / size_ldr,</li>
+%%        <li>avg_kr = average key range (distance between nodes in the address space),</li>
+%%        <li>round = gossip round the node is in,</li>
+%%        <li>values = internal values stored in a gossip state,</li>
+%%        <li>initialized = load and range information from the local node have been integrated?,</li>
+%%        <li>converge_avg_count = how often all values based on averages have changed less than epsilon percent</li>
+%%      </ul>
+%%      See type spec for details on which keys are allowed on which records.
+-spec get(values() | values_internal() | state(), avgLoad) -> avg();
+          (values()                              , stddev) -> stddev();
+          (values()                              , size_ldr) -> size();
+          (values()                              , size_kr) -> size();
+          (values()                              , size) -> size();
+          (values() | values_internal() | state(), minLoad) -> min();
+          (values() | values_internal() | state(), maxLoad) -> max();
+          (values() | state()                    , triggered) -> triggered();
+          (values() | state()                    , msg_exch) -> msg_exch();
+          (values_internal() | state()           , avgLoad2) -> avg2();
+          (values_internal() | state()           , size_inv) -> size_inv();
+          (values_internal() | state()           , avg_kr) -> avg_kr();
+          (values_internal() | state()           , round) -> round();
+          (state()                               , values) -> values_internal();
+          (state()                               , initialized) -> boolean();
+          (state()                               , converge_avg_count) -> converge_avg_count().
+get(#values{avg=Avg, stddev=Stddev, size_ldr=Size_ldr, size_kr=Size_kr, min=Min,
+            max=Max, triggered=Triggered, msg_exch=MessageExchanges}, Key) ->
+    case Key of
+        avgLoad -> Avg;
+        stddev -> Stddev;
+        size_ldr -> Size_ldr;
+        size_kr -> Size_kr;
+        minLoad -> Min;
+        maxLoad -> Max;
+        triggered -> Triggered;
+        msg_exch -> MessageExchanges;
+        % convenience getters:
+        size ->
+            % favor key range based calculations over leader-based
+            case Size_kr of
+                unknown -> Size_ldr;
+                _       -> Size_kr
+            end
+    end;
+get(#values_internal{avg=Avg, avg2=Avg2, size_inv=Size_inv, avg_kr=AvgKR,
+                     min=Min, max=Max, round=Round}, Key) ->
+    case Key of
+        avgLoad -> Avg;
+        avgLoad2 -> Avg2;
+        size_inv -> Size_inv;
+        avg_kr -> AvgKR;
+        minLoad -> Min;
+        maxLoad -> Max;
+        round -> Round
+    end;
+get(#state{values=InternalValues, initialized=Initialized, triggered=Triggered,
+           msg_exch=MessageExchanges, converge_avg_count=ConvergeAvgCount}, Key) ->
+    case Key of
+        values -> InternalValues;
+        initialized -> Initialized;
+        triggered -> Triggered;
+        msg_exch -> MessageExchanges;
+        converge_avg_count -> ConvergeAvgCount;
+        % convenience getters:
+        avgLoad -> get(InternalValues, avgLoad);
+        minLoad -> get(InternalValues, minLoad);
+        maxLoad -> get(InternalValues, maxLoad);
+        avgLoad2 -> get(InternalValues, avgLoad2);
+        size_inv -> get(InternalValues, size_inv);
+        avg_kr -> get(InternalValues, avg_kr);
+        round -> get(InternalValues, round)
+    end.
 
 %%
 %% Setters
 %%
 
-%% @doc Sets the average load field of a values or state type.
--spec set_avgLoad(values_internal(), avg()) -> values_internal()
-                ; (state(), avg()) -> state().
-set_avgLoad(Values, Avg) when is_record(Values, values_internal) -> Values#values_internal{avg=Avg};
-set_avgLoad(State, Avg) when is_record(State, state) -> State#state{values=set_avgLoad(State#state.values, Avg)}.
-
-%% @doc Sets the minimum load field of a values or state type.
--spec set_minLoad(values_internal(), min()) -> values_internal()
-                ; (state(), min()) -> state().
-set_minLoad(Values, Min) when is_record(Values, values_internal) -> Values#values_internal{min=Min};
-set_minLoad(State, Min) when is_record(State, state) -> State#state{values=set_minLoad(State#state.values, Min)}.
-
-%% @doc Sets the maximum load field of a values or state type.
--spec set_maxLoad(values_internal(), max()) -> values_internal()
-                ; (state(), max()) -> state().
-set_maxLoad(Values, Max) when is_record(Values, values_internal) -> Values#values_internal{max=Max};
-set_maxLoad(State, Max) when is_record(State, state) -> State#state{values=set_maxLoad(State#state.values, Max)}.
-
-%% @doc Sets the average square load field of a values or state type.
--spec set_avgLoad2(values_internal(), avg2()) -> values_internal()
-                 ; (state(), avg2()) -> state().
-set_avgLoad2(Values, Avg2) when is_record(Values, values_internal) -> Values#values_internal{avg2=Avg2};
-set_avgLoad2(State, Avg2) when is_record(State, state) -> State#state{values=set_avgLoad2(State#state.values, Avg2)}.
-
-%% @doc Sets the average size_inv (1/size) field of a values or state type.
--spec set_size_inv(values_internal(), size_inv()) -> values_internal()
-                 ; (state(), size_inv()) -> state().
-set_size_inv(Values, Size_inv) when is_record(Values, values_internal) -> Values#values_internal{size_inv=Size_inv};
-set_size_inv(State, Size_inv) when is_record(State, state) -> State#state{values=set_size_inv(State#state.values, Size_inv)}.
-
-%% @doc Sets the average size (based on key ranges) field of a values or state type.
--spec set_avg_kr(values_internal(), avg_kr()) -> values_internal()
-               ; (state(), avg_kr()) -> state().
-set_avg_kr(Values, AvgKR) when is_record(Values, values_internal) -> Values#values_internal{avg_kr=AvgKR};
-set_avg_kr(State, AvgKR) when is_record(State, state) -> State#state{values=set_avg_kr(State#state.values, AvgKR)}.
-
-%% @doc Sets the round field of a values or state type.
--spec set_round(values_internal(), round()) -> values_internal()
-               ; (state(), round()) -> state().
-set_round(Values, Round) when is_record(Values, values_internal) -> Values#values_internal{round=Round};
-set_round(State, Round) when is_record(State, state) -> State#state{values=set_round(State#state.values, Round)}.
+%% @doc Sets information in a values_internal record.
+%%      Allowed keys include:
+%%      <ul>
+%%        <li>avgLoad = average load,</li>
+%%        <li>avgLoad2 = average of load^2,</li>
+%%        <li>size_inv = 1 / size_ldr,</li>
+%%        <li>avg_kr = average key range (distance between nodes in the address space),</li>
+%%        <li>minLoad = minimum load,</li>
+%%        <li>maxLoad = maximum load,</li>
+%%        <li>round = gossip round the node is in,</li>
+%%      </ul>
+-spec set(values_internal() | state(), avgLoad, avg()) -> values_internal();
+          (values_internal() | state(), minLoad, min()) -> values_internal();
+          (values_internal() | state(), maxLoad, max()) -> values_internal();
+          (values_internal() | state(), avgLoad2, avg2()) -> values_internal();
+          (values_internal() | state(), size_inv, size_inv()) -> values_internal();
+          (values_internal() | state(), avg_kr, avg_kr()) -> values_internal();
+          (values_internal() | state(), round, round()) -> values_internal().
+set(InternalValues, Key, Value) when is_record(InternalValues, values_internal) ->
+    case Key of
+        avgLoad -> InternalValues#values_internal{avg = Value};
+        avgLoad2 -> InternalValues#values_internal{avg2 = Value};
+        size_inv -> InternalValues#values_internal{size_inv = Value};
+        avg_kr -> InternalValues#values_internal{avg_kr = Value};
+        minLoad -> InternalValues#values_internal{min = Value};
+        maxLoad -> InternalValues#values_internal{max = Value};
+        round -> InternalValues#values_internal{round = Value}
+    end;
+set(State, Key, Value) when is_record(State, state) ->
+    State#state{values=set(State#state.values, Key, Value)}.
 
 %$ @doc Sets the values of a gossip state.
 -spec set_values(state(), values_internal()) -> state().
@@ -322,7 +285,7 @@ reset_triggered(State) when is_record(State, state) ->
 %% @doc Increases how often the trigger called the module by 1.
 -spec inc_triggered(state()) -> state().
 inc_triggered(State) when is_record(State, state) ->
-	State#state{triggered=(get_triggered(State) + 1)}.
+	State#state{triggered=(get(State, triggered) + 1)}.
 
 %% @doc Resets how many information exchanges have been performed to 0.
 -spec reset_msg_exch(state()) -> state().
@@ -332,7 +295,7 @@ reset_msg_exch(State) when is_record(State, state) ->
 %% @doc Increases how many information exchanges have been performed by 1.
 -spec inc_msg_exch(state()) -> state().
 inc_msg_exch(State) when is_record(State, state) ->
-	State#state{msg_exch=(get_msg_exch(State) + 1)}.
+	State#state{msg_exch=(get(State, msg_exch) + 1)}.
 
 %% @doc Resets how many information exchanges have been performed to 0.
 -spec reset_converge_avg_count(state()) -> state().
@@ -342,63 +305,64 @@ reset_converge_avg_count(State) when is_record(State, state) ->
 %% @doc Increases how many information exchanges have been performed by 1.
 -spec inc_converge_avg_count(state()) -> state().
 inc_converge_avg_count(State) when is_record(State, state) ->
-	State#state{converge_avg_count=(get_converge_avg_count(State) + 1)}.
+	State#state{converge_avg_count=(get(State, converge_avg_count) + 1)}.
 
 %%
 %% Miscellaneous
 %%
 
-%% @doc extracts and calculates the size field from the internal record of
-%%      values
+%% @doc Extracts and calculates the size field from the internal record of
+%%      values.
 -spec calc_size_ldr(values_internal() | state()) -> size().
 calc_size_ldr(State) when is_record(State, values_internal) ->
-	Size_inv = gossip_state:get_size_inv(State),
+	Size_inv = get(State, size_inv),
 	if
 		Size_inv =< 0        -> 1.0;
 		Size_inv =:= unknown -> unknown;
 		true                 -> 1.0 / Size_inv
 	end;
 calc_size_ldr(State) when is_record(State, state) ->
-	calc_size_ldr(get_values(State)).
+	calc_size_ldr(get(State, values)).
 
+%% @doc Gets the size of the address space.
 -spec get_addr_size() -> number().
 get_addr_size() ->
 	rt_simple:n().
 
-%% @doc extracts and calculates the size_kr field from the internal record of
-%%      values
+%% @doc Extracts and calculates the size_kr field from the internal record of
+%%      values.
 -spec calc_size_kr(values_internal() | state()) -> size().
 calc_size_kr(State) when is_record(State, values_internal) ->
-	AvgKR = gossip_state:get_avg_kr(State),
+	AvgKR = get(State, avg_kr),
 	if
 		AvgKR =< 0        -> 1.0;
 		AvgKR =:= unknown -> unknown;
-		true                -> get_addr_size() / AvgKR
+		true              -> get_addr_size() / AvgKR
 	end;
 calc_size_kr(State) when is_record(State, state) ->
-	calc_size_kr(get_values(State)).
+	calc_size_kr(get(State, values)).
 
-%% @doc extracts and calculates the standard deviation from the internal record
-%%      of values
+%% @doc Extracts and calculates the standard deviation from the internal record
+%%      of values.
 -spec calc_stddev(values_internal() | state()) -> avg().
 calc_stddev(State) when is_record(State, values_internal) ->
-	Avg = gossip_state:get_avgLoad(State),
-	Avg2 = gossip_state:get_avgLoad2(State),
+	Avg = get(State, avgLoad),
+	Avg2 = get(State, avgLoad2),
 	case (Avg =:= unknown) or (Avg2 =:= unknown) of
 		true -> unknown;
 		false -> math:sqrt(Avg2 - (Avg * Avg))
 	end;
 calc_stddev(State) when is_record(State, state) ->
-	calc_stddev(get_values(State)).
+	calc_stddev(get(State, values)).
 
-%% @doc converts the internal value record to the external one
+%% @doc Converts the internal value record to the external one.
 -spec conv_state_to_extval(state()) -> values().
 conv_state_to_extval(State) when is_record(State, state) ->
-	#values{avg       = get_avgLoad(State),
+	#values{avg       = get(State, avgLoad),
             stddev    = calc_stddev(State),
             size_ldr  = calc_size_ldr(State),
             size_kr   = calc_size_kr(State),
-            min       = get_minLoad(State),
-            max       = get_maxLoad(State),
-            triggered = get_triggered(State),
-            msg_exch  = get_msg_exch(State)}.
+            min       = get(State, minLoad),
+            max       = get(State, maxLoad),
+            triggered = get(State, triggered),
+            msg_exch  = get(State, msg_exch)}.

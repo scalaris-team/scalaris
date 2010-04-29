@@ -166,9 +166,9 @@ get_values_all(Pid) ->
 %%      converged yet otherwise returns the current state.
 -spec previous_or_current(state(), state()) -> state().
 previous_or_current(PreviousState, CurrentState) ->
-    CurrentInitialized = gossip_state:is_initialized(CurrentState),
+    CurrentInitialized = gossip_state:get(CurrentState, initialized),
     MinConvergeAvgCount = get_converge_avg_count(),
-    CurrentEpsilonCount_Avg = gossip_state:get_converge_avg_count(CurrentState),
+    CurrentEpsilonCount_Avg = gossip_state:get(CurrentState, converge_avg_count),
     _BestValue =
         case (not CurrentInitialized) or (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
             true -> PreviousState;
@@ -211,8 +211,8 @@ on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 	% request a check whether we are the leader and can thus decide whether to
 	% start a new round
     request_new_round_if_leader(NewState),
-	Round = gossip_state:get_round(NewState),
-	Initialized = gossip_state:is_initialized(State),
+	Round = gossip_state:get(NewState, round),
+	Initialized = gossip_state:get(State, initialized),
 	% only participate in (active) gossiping if we entered some valid round and
 	% we have information about our node's load and key range
     case (Round > 0) andalso (Initialized) of
@@ -230,7 +230,7 @@ on({{get_node_details_response, NodeDetails}, local_info},
 	% this message is received when the (local) node was asked to tell us its
 	% load and key range
 %%     io:format("gossip: got get_node_details_response: ~p~n",[NodeDetails]),
-	Initialized = gossip_state:is_initialized(State),
+	Initialized = gossip_state:get(State, initialized),
 	{NewQueuedMessages, NewState} =
 		case Initialized of
 			true -> {[], State};
@@ -270,7 +270,7 @@ on({get_state, Source_PID, OtherValues} = Msg,
 	% The piggy-backed other node's state will be used to update our own state
 	% if we have already initialized it (otherwise postpone the message). A
 	% get_state_response message is sent with our state in the first case.
-	Initialized = gossip_state:is_initialized(MyState),
+	Initialized = gossip_state:get(MyState, initialized),
 	{NewQueuesMessages, {MyNewPreviousState, MyNewState}} =
 		case Initialized of
 			true -> {QueuedMessages, integrate_state(OtherValues, MyPreviousState, MyState, true, Source_PID)};
@@ -309,7 +309,7 @@ on({cy_cache, [Node] = _Cache},
         (NodePid =/= SelfPid) ->
             cs_send:send_to_group_member(node:pidX(Node), gossip,
                                          {get_state, cs_send:this(),
-                                          gossip_state:get_values(State)});
+                                          gossip_state:get(State, values)});
         true -> ok
     end,
     FullState;
@@ -340,37 +340,37 @@ on({get_values_all, SourcePid},
 
 on({'$gen_cast', {debug_info, Requestor}},
    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-    BestState = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
+    BestValues = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
     KeyValueList =
-        [{"prev_round",          gossip_state:get_round(PreviousState)},
-         {"prev_triggered",      gossip_state:get_triggered(PreviousState)},
-         {"prev_msg_exch",       gossip_state:get_msg_exch(PreviousState)},
-         {"prev_conv_avg_count", gossip_state:get_converge_avg_count(PreviousState)},
-         {"prev_avg",            gossip_state:get_avgLoad(PreviousState)},
-         {"prev_min",            gossip_state:get_minLoad(PreviousState)},
-         {"prev_max",            gossip_state:get_maxLoad(PreviousState)},
+        [{"prev_round",          gossip_state:get(PreviousState, round)},
+         {"prev_triggered",      gossip_state:get(PreviousState, triggered)},
+         {"prev_msg_exch",       gossip_state:get(PreviousState, msg_exch)},
+         {"prev_conv_avg_count", gossip_state:get(PreviousState, converge_avg_count)},
+         {"prev_avg",            gossip_state:get(PreviousState, avgLoad)},
+         {"prev_min",            gossip_state:get(PreviousState, minLoad)},
+         {"prev_max",            gossip_state:get(PreviousState, maxLoad)},
          {"prev_stddev",         gossip_state:calc_stddev(PreviousState)},
          {"prev_size_ldr",       gossip_state:calc_size_ldr(PreviousState)},
          {"prev_size_kr",        gossip_state:calc_size_kr(PreviousState)},
          
-         {"cur_round",           gossip_state:get_round(State)},
-         {"cur_triggered",       gossip_state:get_triggered(State)},
-         {"cur_msg_exch",        gossip_state:get_msg_exch(State)},
-         {"cur_conv_avg_count",  gossip_state:get_converge_avg_count(State)},
-         {"cur_avg",             gossip_state:get_avgLoad(State)},
-         {"cur_min",             gossip_state:get_minLoad(State)},
-         {"cur_max",             gossip_state:get_maxLoad(State)},
+         {"cur_round",           gossip_state:get(State, round)},
+         {"cur_triggered",       gossip_state:get(State, triggered)},
+         {"cur_msg_exch",        gossip_state:get(State, msg_exch)},
+         {"cur_conv_avg_count",  gossip_state:get(State, converge_avg_count)},
+         {"cur_avg",             gossip_state:get(State, avgLoad)},
+         {"cur_min",             gossip_state:get(State, minLoad)},
+         {"cur_max",             gossip_state:get(State, maxLoad)},
          {"cur_stddev",          gossip_state:calc_stddev(State)},
          {"cur_size_ldr",        gossip_state:calc_size_ldr(State)},
          {"cur_size_kr",         gossip_state:calc_size_kr(State)},
          
-         {"best_avg",             gossip_state:get_avgLoad(BestState)},
-         {"best_min",             gossip_state:get_minLoad(BestState)},
-         {"best_max",             gossip_state:get_maxLoad(BestState)},
-         {"best_stddev",          gossip_state:get_stddev(BestState)},
-         {"best_size",            gossip_state:get_size(BestState)},
-         {"best_size_ldr",        gossip_state:get_size_ldr(BestState)},
-         {"best_size_kr",         gossip_state:get_size_kr(BestState)}],
+         {"best_avg",             gossip_state:get(BestValues, avgLoad)},
+         {"best_min",             gossip_state:get(BestValues, minLoad)},
+         {"best_max",             gossip_state:get(BestValues, maxLoad)},
+         {"best_stddev",          gossip_state:get(BestValues, stddev)},
+         {"best_size",            gossip_state:get(BestValues, size)},
+         {"best_size_ldr",        gossip_state:get(BestValues, size_ldr)},
+         {"best_size_kr",         gossip_state:get(BestValues, size_kr)}],
     cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
     FullState;
 
@@ -395,10 +395,10 @@ on(_Message, _State) ->
                        any()) -> {state(), state()}.
 integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 %%     io:format("gossip:integrate_state: ~p~n",[{OtherValues, MyState}]),
-	MyValues = gossip_state:get_values(MyState),
-	Initialized = gossip_state:is_initialized(MyState),
-	MyRound = gossip_state:get_round(MyValues),
-	OtherRound = gossip_state:get_round(OtherValues),
+	MyValues = gossip_state:get(MyState, values),
+	Initialized = gossip_state:get(MyState, initialized),
+	MyRound = gossip_state:get(MyValues, round),
+	OtherRound = gossip_state:get(OtherValues, round),
 	{MyNewPreviousState, MyNewState} =
         if
 		    % The other node's round is higher -> enter this (new) round (use
@@ -446,16 +446,16 @@ integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 -spec update(state(), values_internal()) -> state().
 update(MyState, OtherValues) ->
 %%     io:format("gossip:update ~p~n",[{MyState, OtherValues}]),
-	MyValues = gossip_state:get_values(MyState),
+	MyValues = gossip_state:get(MyState, values),
 	MyNewValues = 
-		case gossip_state:get_round(MyValues) =:= gossip_state:get_round(OtherValues) of
+		case gossip_state:get(MyValues, round) =:= gossip_state:get(OtherValues, round) of
 			true ->
-				V1 = update_avg(MyValues, OtherValues),
-				V2 = update_min(V1, OtherValues),
-				V3 = update_max(V2, OtherValues),
-				V4 = update_size_inv(V3, OtherValues),
-				V5 = update_avg2(V4, OtherValues),
-				_V6 = update_avg_kr(V5, OtherValues);
+				V1 = update_value(avgLoad, MyValues, OtherValues),
+				V2 = update_value(minLoad, V1, OtherValues),
+				V3 = update_value(maxLoad, V2, OtherValues),
+				V4 = update_value(size_inv, V3, OtherValues),
+				V5 = update_value(avgLoad2, V4, OtherValues),
+				_V6 = update_value(avg_kr, V5, OtherValues);
 			false ->
 				% this case should not happen since the on/2 handlers should only
 				% call update/2 if the rounds match
@@ -464,95 +464,70 @@ update(MyState, OtherValues) ->
 		end,
 	% now check whether all average-based values changed less than epsilon percent:
 	Epsilon_Avg = get_converge_avg_epsilon(),
-	AvgChanged = calc_change(gossip_state:get_avgLoad(MyValues), gossip_state:get_avgLoad(MyNewValues)),
-	SizeNChanged = calc_change(gossip_state:get_size_inv(MyValues), gossip_state:get_size_inv(MyNewValues)),
-	Avg2Changed = calc_change(gossip_state:get_avgLoad2(MyValues), gossip_state:get_avgLoad2(MyNewValues)),
-	AvgKRChanged = calc_change(gossip_state:get_avg_kr(MyValues), gossip_state:get_avg_kr(MyNewValues)),
 	MyNewState =
-		case (AvgChanged < Epsilon_Avg) and
-             (SizeNChanged < Epsilon_Avg) and
-             (Avg2Changed < Epsilon_Avg) and
-             (AvgKRChanged < Epsilon_Avg) of
-			true -> gossip_state:inc_converge_avg_count(MyState); 
+		case (calc_change(avgLoad, MyValues, MyNewValues) < Epsilon_Avg) andalso
+                 (calc_change(size_inv, MyValues, MyNewValues) < Epsilon_Avg) andalso
+                 (calc_change(avgLoad2, MyValues, MyNewValues) < Epsilon_Avg) andalso
+                 (calc_change(avg_kr, MyValues, MyNewValues)  < Epsilon_Avg) of
+            true -> gossip_state:inc_converge_avg_count(MyState); 
 			false -> gossip_state:reset_converge_avg_count(MyState)
 		end,
 	Result = gossip_state:set_values(MyNewState, MyNewValues),
 	Result.
 
 %% @doc Calculates the change in percent from the Old value to the New value.
--spec calc_change(Old::number() | unknown, New::number() | unknown) -> Change::float().
-calc_change(Old, New) ->
+-spec calc_change(Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2,
+                   OldValues::values_internal(), NewValues::values_internal()) -> Change::float().
+calc_change(Key, OldValues, NewValues) ->
+    Old = gossip_state:get(OldValues, Key),
+    New = gossip_state:get(NewValues, Key),
 	if
 		(Old =/= unknown) and (Old =:= New) -> 0.0;
 		(Old =:= unknown) orelse (New =:= unknown) orelse (Old == 0) -> 100.0;
 		true -> ((Old + abs(New - Old)) * 100.0 / Old) - 100
 	end.
 
-%% @doc Updates the min load field of the state record with the min load
-%%      of an other node's state.
--spec update_min(values_internal(), values_internal()) -> values_internal().
-update_min(MyValues, OtherValues) ->
-	MyMinLoad = gossip_state:get_minLoad(MyValues),
-	OtherMinLoad = gossip_state:get_minLoad(OtherValues),
-	MyNewMinLoad =
-		if
-			MyMinLoad =:= unknown
-				-> OtherMinLoad;
-			(MyMinLoad < OtherMinLoad) orelse (OtherMinLoad =:= unknown)
-				-> MyMinLoad;
-			true
-				-> OtherMinLoad
-		end,
-	gossip_state:set_minLoad(MyValues, MyNewMinLoad).
+%% @doc Updates a node's new value of the given key using its old value and
+%%      another node's value.
+%% @see calc_new_value/3
+-spec update_value(Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2,
+                    values_internal(), values_internal()) -> values_internal().
+update_value(Key, MyValues, OtherValues) ->
+    MyValue = gossip_state:get(MyValues, Key),
+    OtherValue = gossip_state:get(OtherValues, Key),
+    MyNewValue = calc_new_value(Key, MyValue, OtherValue),
+    gossip_state:set(MyValues, Key, MyNewValue).
 
-%% @doc Updates the max load field of the state record with the max load
-%%      of an other node's state.
--spec update_max(values_internal(), values_internal()) -> values_internal().
-update_max(MyValues, OtherValues) ->
-	MyMaxLoad = gossip_state:get_maxLoad(MyValues),
-	OtherMaxLoad = gossip_state:get_maxLoad(OtherValues),
-	MyNewMaxLoad =
-		if
-			MyMaxLoad =:= unknown
-				-> OtherMaxLoad;
-			(MyMaxLoad > OtherMaxLoad) orelse (OtherMaxLoad =:= unknown)
-				-> MyMaxLoad;
-			true
-				-> OtherMaxLoad
-		end,
-	gossip_state:set_maxLoad(MyValues, MyNewMaxLoad).
+%% @doc Calculates a node's new value of the given key using its old value and
+%%      another node's value.
+%% @see update_value/3
+-spec calc_new_value(Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2, MyValue::T, OtherValue::T) -> MyNewValue::T.
+calc_new_value(minLoad, unknown, OtherMinLoad) ->
+    OtherMinLoad;
+calc_new_value(minLoad, MyMinLoad, unknown) ->
+    MyMinLoad;
+calc_new_value(minLoad, MyMinLoad, OtherMinLoad) when (MyMinLoad < OtherMinLoad) ->
+    MyMinLoad;
+calc_new_value(minLoad, _MyMinLoad, OtherMinLoad) ->
+    OtherMinLoad;
 
-%% @doc Updates the average load field of the state record with the average load
-%%      of an other node's state.
--spec update_avg(values_internal(), values_internal()) -> values_internal().
-update_avg(MyValues, OtherValues) ->
-	MyAvg = gossip_state:get_avgLoad(MyValues), 
-	OtherAvg = gossip_state:get_avgLoad(OtherValues),
-	gossip_state:set_avgLoad(MyValues, calc_avg(MyAvg, OtherAvg)).
+calc_new_value(maxLoad, unknown, OtherMaxLoad) ->
+    OtherMaxLoad;
+calc_new_value(maxLoad, MyMaxLoad, unknown) ->
+    MyMaxLoad;
+calc_new_value(maxLoad, MyMaxLoad, OtherMaxLoad) when (MyMaxLoad > OtherMaxLoad) ->
+    MyMaxLoad;
+calc_new_value(maxLoad, _MyMaxLoad, OtherMaxLoad) ->
+    OtherMaxLoad;
 
-%% @doc Updates the size_inv field of the state record with the size_inv field
-%%      of an other node's state.
--spec update_size_inv(values_internal(), values_internal()) -> values_internal().
-update_size_inv(MyValues, OtherValues) ->
-	MySize_inv = gossip_state:get_size_inv(MyValues), 
-	OtherSize_inv = gossip_state:get_size_inv(OtherValues),
-	gossip_state:set_size_inv(MyValues, calc_avg(MySize_inv, OtherSize_inv)).
-
-%% @doc Updates the avg_kr field of the state record with the avg_kr field of
-%%      an other node's state.
--spec update_avg_kr(values_internal(), values_internal()) -> values_internal().
-update_avg_kr(MyValues, OtherValues) ->
-	MyAvg_kr = gossip_state:get_avg_kr(MyValues), 
-	OtherAvg_kr = gossip_state:get_avg_kr(OtherValues),
-	gossip_state:set_avg_kr(MyValues, calc_avg(MyAvg_kr, OtherAvg_kr)).
-
-%% @doc Updates the avg2 field of the state record with the avg2 field of an
-%%      other node's state.
--spec update_avg2(values_internal(), values_internal()) -> values_internal().
-update_avg2(MyValues, OtherValues) ->
-	MyAvg2 = gossip_state:get_avgLoad2(MyValues), 
-	OtherAvg2 = gossip_state:get_avgLoad2(OtherValues),
-	gossip_state:set_avgLoad2(MyValues, calc_avg(MyAvg2, OtherAvg2)).
+calc_new_value(avgLoad, MyAvg, OtherAvg) ->
+    calc_avg(MyAvg, OtherAvg);
+calc_new_value(size_inv, MySize_inv, OtherSize_inv) ->
+    calc_avg(MySize_inv, OtherSize_inv);
+calc_new_value(avg_kr, MyAvg_kr, OtherAvg_kr) ->
+    calc_avg(MyAvg_kr, OtherAvg_kr);
+calc_new_value(avgLoad2, MyAvg2, OtherAvg2) ->
+    calc_avg(MyAvg2, OtherAvg2).
 
 %% @doc Calculates the average of the two given values. If MyValue is unknown,
 %%      OtherValue will be returned.
@@ -575,7 +550,7 @@ calc_avg(MyValue, OtherValue) ->
 %%      for the first time in a round.
 -spec integrate_local_info(state(), load(), avg_kr()) -> state().
 integrate_local_info(MyState, Load, Avg_kr) ->
-	MyValues = gossip_state:get_values(MyState),
+	MyValues = gossip_state:get(MyState, values),
 	ValuesWithNewInfo =
 		gossip_state:new_internal(Load, % Avg
 								  Load*Load, % Avg2
@@ -583,12 +558,12 @@ integrate_local_info(MyState, Load, Avg_kr) ->
 								  Avg_kr, % average key range
 								  Load, % Min
 								  Load, % Max
-								  gossip_state:get_round(MyValues)),
-	V1 = update_avg(MyValues, ValuesWithNewInfo),
-	V2 = update_avg2(V1, ValuesWithNewInfo),
-	V3 = update_min(V2, ValuesWithNewInfo),
-	V4 = update_max(V3, ValuesWithNewInfo),
-	MyNewValues = update_avg_kr(V4, ValuesWithNewInfo),
+								  gossip_state:get(MyValues, round)),
+	V1 = update_value(avgLoad, MyValues, ValuesWithNewInfo),
+	V2 = update_value(avgLoad2, V1, ValuesWithNewInfo),
+	V3 = update_value(minLoad, V2, ValuesWithNewInfo),
+	V4 = update_value(maxLoad, V3, ValuesWithNewInfo),
+	MyNewValues = update_value(avg_kr, V4, ValuesWithNewInfo),
 	S1 = gossip_state:set_values(MyState, MyNewValues),
 	_MyNewState = gossip_state:set_initialized(S1).
 
@@ -601,11 +576,11 @@ integrate_local_info(MyState, Load, Avg_kr) ->
 new_round(OldState) ->
 %%     io:format("gossip: start new round, I am the leader ~n"),
 	% the leader must set the size_inv to 1 (and only the leader)
-	NewValues1 = gossip_state:set_size_inv(gossip_state:new_internal(), 1.0),
-	OldRound = gossip_state:get_round(OldState),
+	NewValues1 = gossip_state:set(gossip_state:new_internal(), size_inv, 1.0),
+	OldRound = gossip_state:get(OldState, round),
 	NewState =
 		gossip_state:new_state(
-		  gossip_state:set_round(NewValues1, (OldRound+1))),
+		  gossip_state:set(NewValues1, round, (OldRound+1))),
     request_local_info(),
 	{OldState, NewState}.
 
@@ -614,15 +589,15 @@ new_round(OldState) ->
 %%      load and key range to integrate into its own state.
 -spec enter_round(state(), state(), values_internal()) -> {state(), state()}.
 enter_round(OldPreviousState, OldState, OtherValues) ->
-	MyRound = gossip_state:get_round(OldState),
-	OtherRound = gossip_state:get_round(OtherValues),
+	MyRound = gossip_state:get(OldState, round),
+	OtherRound = gossip_state:get(OtherValues, round),
 	case (MyRound =:= OtherRound) of 
 		true -> {OldPreviousState, OldState};
 		false ->
 			% set a size_inv value of 0 (only the leader sets 1)
 			S1 = gossip_state:new_state(),
-			NewState = gossip_state:set_size_inv(
-						 gossip_state:set_round(S1, OtherRound), 0.0),
+			NewState = gossip_state:set(gossip_state:set(S1, round, OtherRound),
+                                        size_inv, 0.0),
     		request_local_info(),
 			{OldState, NewState}
 	end.
@@ -639,18 +614,15 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 %%      message.
 -spec request_new_round_if_leader(state()) -> ok.
 request_new_round_if_leader(State) ->
-	Round = gossip_state:get_round(State),
-	TriggerCount = gossip_state:get_triggered(State),
-	ConvAvgCount = gossip_state:get_converge_avg_count(State),
-	TPR_max = get_max_tpr(), % max triggers per round
-	TPR_min = get_min_tpr(), % min triggers per round
+	Round = gossip_state:get(State, round),
+	TriggerCount = gossip_state:get(State, triggered),
+	ConvAvgCount = gossip_state:get(State, converge_avg_count),
 	ConvAvgCountNewRound = get_converge_avg_count_start_new_round(),
 	% decides when to ask whether we are the leader
 	case (Round =:= 0) orelse
-         ((TriggerCount > TPR_min) andalso (
-             (TriggerCount > TPR_max) orelse
-             (ConvAvgCount >= ConvAvgCountNewRound)))
-		of
+         ((TriggerCount > get_min_tpr()) andalso (
+             (TriggerCount > get_max_tpr()) orelse
+             (ConvAvgCount >= ConvAvgCountNewRound))) of
 		true ->
 			DHT_Node = process_dictionary:get_group_member(dht_node),
     		cs_send:send_local(DHT_Node, {get_node_details, cs_send:this_with_cookie(leader_start_new_round), [my_range]}),
