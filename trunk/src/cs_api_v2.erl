@@ -33,7 +33,7 @@
 -type(value() :: term()).
 
 process_request_list([], [{commit}]) ->
-    {[], {results, [{commit}]}};
+    {[], {results, [commit]}};
 process_request_list(TLog, ReqList) ->
     %% @todo should choose a dht_node in the local VM at random or even
     %% better round robin.
