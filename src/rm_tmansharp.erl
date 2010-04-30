@@ -27,10 +27,7 @@
 -behavior(rm_beh).
 -behavior(gen_component).
 
--export([start_link/1,
-	 get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1,
-         update_succ/1, update_pred/1,
-	 get_as_list/0, check_config/0]).
+-export([start_link/1, check_config/0]).
 
 % unit testing
 -export([merge/2, rank/2, get_pred/1, get_succ/1, get_preds/1, get_succs/1]).
@@ -55,47 +52,10 @@ init(_Args) ->
     uninit.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Public Interface
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_successorlist() ->
-    cs_send:send_local(get_pid() , {get_successorlist, self()}).
-
-get_predlist() ->
-    cs_send:send_local(get_pid() , {get_predlist, self()}).
-
-%% @doc notification that my succ left
-%%      parameter is his current succ list
-succ_left(_Succ) ->
-    %% @TODO
-    ok.
-
-%% @doc notification that my pred left
-%%      parameter is his current pred
-pred_left(_PredsPred) ->
-    %% @TODO
-    ok.
-
-%% @doc notification that my succ changed
-%%      parameter is potential new succ
-update_succ(_Succ) ->
-    %% @TODO
-    ok.
-
-%% @doc notification that my pred changed
-%%      parameter is potential new pred
-update_pred(_Pred) ->
-    %% @TODO
-    ok.
-
-
-get_as_list() ->
-    get_successorlist().
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({init, NewId, NewMe, NewPred, NewSuccList, _DHTNode},uninit) ->
-        rm_beh:update_succ_and_pred(NewPred, hd(NewSuccList)),
+        rm_beh:update_preds_and_succs([NewPred], NewSuccList),
         fd:subscribe(lists:usort([node:pidX(Node) || Node <- [NewPred | NewSuccList]])),
         Token = 0,
         cs_send:send_local_after(0, self(), {stabilize,Token}),
@@ -104,9 +64,9 @@ on(_,uninit) ->
         uninit;
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
-on({get_successorlist, Pid},
+on({get_succlist, Pid},
    {_Id, Me, [], _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
-    cs_send:send_local(Pid, {get_successorlist_response,[Me]}),
+    cs_send:send_local(Pid, {get_succlist_response,[Me]}),
     State;
 
 on({get_predlist, Pid},
@@ -114,9 +74,9 @@ on({get_predlist, Pid},
     cs_send:send_local(Pid, {get_predlist_response, [Me]}),
     State;
 
-on({get_successorlist, Pid},
+on({get_succlist, Pid},
    {_Id, _Me, View, _RandViewSize, _Interval, _AktToken, _AktPred, _AktSucc, _RandomCache} = State) ->
-    cs_send:send_local(Pid, {get_successorlist_response, get_succs(View)}),
+    cs_send:send_local(Pid, {get_succlist_response, get_succs(View)}),
     State;
 
 on({get_predlist, Pid},
@@ -135,8 +95,8 @@ on({stabilize, AktToken},
     %Test for being alone
     case (P == Me) of
         true ->
-            rm_beh:update_pred(Me),
-            rm_beh:update_succ(Me);
+            rm_beh:update_preds([Me]),
+            rm_beh:update_succs([Me]);
         false ->
             cs_send:send_to_group_member(node:pidX(P), ring_maintenance, {rm_buffer,Me,extractMessage(View++[Me]++RndView,P)})
     end,
@@ -228,6 +188,14 @@ on({check_ring, Token, Master},
 on({init_check_ring, Token},
    {_Id, Me, _View, _RandViewSize, _Interval, _AktToken, AktPred, _AktSucc, _RandomCache} = State) ->
     cs_send:send_to_group_member(node:pidX(AktPred), ring_maintenance, {check_ring,Token-1,Me}),
+    State;
+
+on({notify_new_pred, _NewPred}, State) ->
+    %% @TODO use the new predecessor info
+    State;
+
+on({notify_new_succ, _NewSucc}, State) ->
+    %% @TODO use the new successor info
     State;
 
 on(_, _State) ->
@@ -373,8 +341,8 @@ update_fd(Nodes, F) ->
 update_dht_node(View,_AktPred,_AktSucc) ->
         NewAktPred=get_pred(View),
         NewAktSucc=get_succ(View),
-      	rm_beh:update_pred(NewAktPred),
-      	rm_beh:update_succ(NewAktSucc),
+      	rm_beh:update_preds([NewAktPred]),
+      	rm_beh:update_succs([NewAktSucc]),
 {NewAktPred,NewAktSucc}.
 
 % @doc adapt the Tman-interval
@@ -398,8 +366,6 @@ new_interval(View,NewView,Interval) ->
 %     io:format("~n").
 
 % @private
-get_pid() ->
-    process_dictionary:get_group_member(ring_maintenance).
 
 % get Pid of assigned dht_node
 get_cs_pid() ->

@@ -43,6 +43,10 @@
 on(Msg, State) when element(1, State) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 
+on({get_node, Source_PID, Key}, State) ->
+    cs_send:send(Source_PID, {get_node_response, Key, dht_node_state:me(State)}),
+    State;
+
 %% Kill Messages
 on({kill}, _State) ->
     kill;
@@ -95,8 +99,14 @@ on({update_succ, Succ}, State) ->
 on({rt_update, RoutingTable}, State) ->
     dht_node_state:set_rt(State, RoutingTable);
 
+%% userdevguide-begin dht_node:rt_get_node
+on({rt_get_node, Source_PID, Index}, State) ->
+    cs_send:send(Source_PID, {rt_get_node_response, Index, dht_node_state:me(State)}),
+    State;
+%% userdevguide-end dht_node:rt_get_node
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Transactions (see transstore/*.erl)
+% Transactions (see transstore/*.erl, transactions/*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({read, SourcePID, Key}, State) ->
     transaction:quorum_read(Key, SourcePID),
@@ -158,50 +168,6 @@ on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
     NewTID_TM_Mapping = dict:erase(TransID, TID_TM_Mapping),
     dht_node_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Ring Maintenance (rm_chord)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({get_pred, Source_Pid}, State) ->
-    cs_send:send(Source_Pid, {get_pred_response, dht_node_state:pred(State)}),
-    State;
-
-on({get_succ_list, Source_Pid}, State) ->
-    rm_chord:get_successorlist(Source_Pid),
-    State;
-
-on({get_successorlist_response, SuccList,Source_Pid}, State) ->
-    cs_send:send(Source_Pid, {get_succ_list_response, dht_node_state:me(State),SuccList}),
-    State;
-
-on({notify, Pred}, State) ->
-    rm_chord:notify(Pred),
-    State;
-
-%% Finger Maintenance
-on({lookup_pointer, Source_Pid, Index}, State) ->
-    RT = process_dictionary:get_group_member(routing_table),
-    cs_send:send_local(RT, {lookup_pointer, Source_Pid, Index}),
-    State;
-
-%% userdevguide-begin dht_node:rt_get_node
-on({rt_get_node, Source_PID, Index}, State) ->
-    cs_send:send(Source_PID, {rt_get_node_response, Index, dht_node_state:me(State)}),
-    State;
-%% userdevguide-end dht_node:rt_get_node
-
-%% Lookup (see lookup.erl)
-on({lookup_aux, Key, Hops, Msg}, State) ->
-    dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
-    State;
-
-on({lookup_fin, _Hops, Msg}, State) ->
-    cs_send:send_local(self(), Msg),
-    State;
-
-on({get_node, Source_PID, Key}, State) ->
-    cs_send:send(Source_PID, {get_node_response, Key, dht_node_state:me(State)}),
-    State;
-
 on({get_process_in_group, Source_PID, Key, Process}, State) ->
     Pid = process_dictionary:get_group_member(Process),
     GPid = cs_send:make_global(Pid),
@@ -229,13 +195,20 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
     cs_send:send(Source_PID, {get_rtm_reply, Key, GPid}),
     State;
 
-%% Cyclon (see cyclon/*.erl)
-on({get_cyclon_pid, Pid,Me}, State) ->
-    CyclonPid = cs_send:make_global(get_local_cyclon_pid()),
-    cs_send:send(Pid,{cyclon_pid, Me, CyclonPid}),
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Lookup (see lookup.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({lookup_aux, Key, Hops, Msg}, State) ->
+    dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-%% database
+on({lookup_fin, _Hops, Msg}, State) ->
+    cs_send:send_local(self(), Msg),
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Database
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_key, Source_PID, Key}, State) ->
     {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
     case util:is_between(RangeBeg, Key, RangeEnd) of
@@ -283,8 +256,9 @@ on({drop_data, Data, Sender}, State) ->
     DB = ?DB:add_data(dht_node_state:get_db(State), Data),
     dht_node_state:set_db(State, DB);
 
-
-% bulk owner messages (see bulkowner.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bulk owner messages (see bulkowner.erl) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({bulk_owner, I, Msg}, State) ->
     bulkowner:bulk_owner(State, I, Msg),
     State;
@@ -298,7 +272,9 @@ on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
                           ?DB:get_range_with_version(dht_node_state:get_db(State), Range)}),
     State;
 
-% load balancing messages (see dht_node_lb.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Load balancing messages (see dht_node_lb.erl) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_load, Source_PID}, State) ->
     cs_send:send(Source_PID, {get_load_response, cs_send:this(), dht_node_state:load(State)}),
     State;
@@ -322,7 +298,9 @@ on({stabilize_loadbalance}, State) ->
     dht_node_lb:balance_load(State),
     State;
 
-%% misc.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Misc. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_node_details, Pid}, State) ->
     cs_send:send(Pid, {get_node_details_response, dht_node_state:details(State)}),
     State;
@@ -413,9 +391,6 @@ start_link(InstanceId, Options) ->
                              [{register, InstanceId, dht_node}]).
 %% userdevguide-end dht_node:start_link
 
-get_local_cyclon_pid() ->
-    process_dictionary:get_group_member(cyclon).
-
 % @doc find existing nodes and initialize the comm_layer
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
@@ -434,4 +409,3 @@ trigger_known_nodes() ->
 is_unittest() ->
     code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
     lists:member(ct_logs, registered()).
-
