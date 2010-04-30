@@ -59,7 +59,10 @@ behaviour_info(callbacks) ->
      % update pred/succ in routing stored in dht_node
      {update_pred_succ_in_dht_node, 3},
      % for web interface
-     {to_html, 1}
+     {to_html, 1},
+     % handle messages specific to a certain routing-table implementation
+     {handle_custom_message, 2},
+     {check_config, 0}
     ];
 %% userdevguide-end routingtable:behaviour
 
