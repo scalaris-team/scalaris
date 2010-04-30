@@ -27,7 +27,8 @@
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          dump/1, to_dict/1, export_rt_to_dht_node/4,
-         update_pred_succ_in_dht_node/3, to_html/1, check_config/0]).
+         update_pred_succ_in_dht_node/3, to_html/1, handle_custom_message/2,
+         check_config/0]).
 
 % stabilize for Chord
 -export([stabilize/5]).
@@ -38,7 +39,6 @@
 -type(external_rt()::gb_tree()).
 -type(dict_type() :: dict()).
 -type(index() :: {pos_integer(), pos_integer()}).
-
 %% userdevguide-end rt_chord:types
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -238,3 +238,7 @@ to_html(RT) ->
 check_config() ->
     config:is_integer(chord_base) and
         config:is_greater_than_equal(chord_base, 2).
+
+%% @doc There are no custom messages here.
+handle_custom_message(_Message, _State) ->
+    unknown_event.

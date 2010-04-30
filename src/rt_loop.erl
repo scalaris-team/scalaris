@@ -42,7 +42,6 @@
      | {stabilize}
      | {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ}
      | {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}
-     | {lookup_pointer_response, Index::pos_integer(), Node::node:node_type()}
      | {crash, DeadPid::cs_send:mypid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -109,11 +108,6 @@ on({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState})
     check(RTState, NewRTState, Id, Pred, Succ),
     {Id, Pred, Succ, NewRTState, TriggerState};
 
-%
-on({lookup_pointer_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    NewRTState = ?RT:stabilize_pointer(Id, RTState, Index, Node),
-    check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState, TriggerState};
 
 % failure detector reported dead node
 on({crash, DeadPid}, {Id, Pred, Succ, RTState, TriggerState}) ->
@@ -131,14 +125,9 @@ on({dump, Pid}, {Id, Pred, Succ, RTState, TriggerState}) ->
     cs_send:send_local(Pid , {dump_response, RTState}),
     {Id, Pred, Succ, RTState, TriggerState};
 
-on({lookup_pointer, Source_Pid, Index}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    cs_send:send(Source_Pid, {lookup_pointer_response, Index,
-                              ?RT:lookup(RTState, Index)}),
-    {Id, Pred, Succ, RTState, TriggerState};
-
 % unknown message
-on(_UnknownMessage, _State) ->
-    unknown_event.
+on(Message, State) ->
+    ?RT:handle_custom_message(Message, State).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec(check/5 :: (Old::?RT:rt(), New::?RT:rt(), ?RT:key(), node:node_type(),

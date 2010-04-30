@@ -27,7 +27,8 @@
 -export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          dump/1, to_dict/1, export_rt_to_dht_node/4, n/0, to_html/1,
-         update_pred_succ_in_dht_node/3]).
+         update_pred_succ_in_dht_node/3, handle_custom_message/2,
+         check_config/0]).
 
 -export([normalize/1]).
 
@@ -149,3 +150,13 @@ to_html({Succ, _}) ->
       -> external_rt()).
 update_pred_succ_in_dht_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
     {Succ, Tree}.
+
+%% @doc Checks whether config parameters of the rt_simple process exist and are
+%%      valid (there are no config parameters).
+-spec check_config() -> true.
+check_config() ->
+    true.
+
+%% @doc There are no custom messages here.
+handle_custom_message(_Message, _State) ->
+    unknown_event.
