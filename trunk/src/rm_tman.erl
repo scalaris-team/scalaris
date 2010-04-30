@@ -48,7 +48,7 @@
 % accepted messages
 -type(message() ::
     {init, Id::?RT:key(), Me::node_details:node_type(), Predecessor::node_details:node_type(), SuccList::[node:node_type(),...]} |
-    {get_successorlist, Pid::cs_send:erl_local_pid()} |
+    {get_succlist, Pid::cs_send:erl_local_pid()} |
     {get_predlist, Pid::cs_send:erl_local_pid()} |
     {trigger} |
     {cy_cache, Cache::[node:node_type()]} |
@@ -100,14 +100,14 @@ on(Msg, {uninit, _TriggerState} = State) ->
     cs_send:send_local_after(100, self(), Msg),
     State;
 
-on({get_successorlist, Pid},
+on({get_succlist, Pid},
    {_Id, Me, _Preds, [], _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
-    cs_send:send_local(Pid , {get_successorlist_response, [Me]}),
+    cs_send:send_local(Pid , {get_succlist_response, [Me]}),
     State;
 
-on({get_successorlist, Pid},
+on({get_succlist, Pid},
    {_Id, _Me, _Preds, Succs, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
-    cs_send:send_local(Pid, {get_successorlist_response, Succs}),
+    cs_send:send_local(Pid, {get_succlist_response, Succs}),
     State;
 
 on({get_predlist, Pid},
@@ -244,11 +244,12 @@ on({init_check_ring,Token},
                                  {check_ring, Token - 1, Me}),
     State;
 
-% @TODO: handle information properly
-on({notify_new_pred, _Pred}, State) ->
+on({notify_new_pred, _NewPred}, State) ->
+    %% @TODO use the new predecessor info
     State;
 
-on({notify_new_succ, _Succ}, State) ->
+on({notify_new_succ, _NewSucc}, State) ->
+    %% @TODO use the new successor info
     State;
 
 on(_, _State) ->

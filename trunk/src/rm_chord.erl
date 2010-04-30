@@ -27,10 +27,7 @@
 
 -export([init/1,on/2]).
 
--export([start_link/1,
-	 get_successorlist/1, succ_left/1, pred_left/1,
-	 notify/1, update_succ/1, update_pred/1,
-	 get_predlist/0, check_config/0]).
+-export([start_link/1, check_config/0]).
 
 % unit testing
 -export([merge/3]).
@@ -55,43 +52,17 @@ init(Trigger) ->
     TriggerState2 = trigger:next(TriggerState),
     {uninit, TriggerState2}.
 
-get_successorlist(Source) ->
-    cs_send:send_local(get_pid(), {get_successorlist, Source, Source}).
+%% @doc Sends a message to the remote node's ring_maintenance process asking for
+%%      it list of successors.
+-spec get_successorlist(cs_send:mypid()) -> ok.
+get_successorlist(RemoteDhtNodePid) ->
+    cs_send:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {get_succlist, cs_send:this()}).
 
-get_predlist() ->
-    log:log(error, "[ RM-CHORD] OLD FUNCTION use broke with gen_component"),
-    cs_send:send_local(get_pid(), {get_predlist, self()}),
-    receive
-        {get_predlist_response, PredList} ->
-            PredList
-    end.
-
-%% @doc notification that my succ left
-%%      parameter is his current succ list
-succ_left(_Succ) ->
-    %% @TODO
-    ok.
-
-%% @doc notification that my pred left
-%%      parameter is his current pred
-pred_left(_PredsPred) ->
-    %% @TODO
-    ok.
-
-%% @doc notification that my succ changed
-%%      parameter is potential new succ
-update_succ(_Succ) ->
-    %% @TODO
-    ok.
-
-%% @doc notification that my pred changed
-%%      parameter is potential new pred
-update_pred(_Pred) ->
-    %% @TODO
-    ok.
-
-notify(Pred) ->
-    cs_send:send_local(get_pid(), {notify, Pred}).
+%% @doc Sends a message to the remote node's ring_maintenance process notifying
+%%      it of a new predecessor.
+-spec notify_new_pred(cs_send:mypid(), node:node_type()) -> ok.
+notify_new_pred(RemoteDhtNodePid, NewPred) ->
+    cs_send:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {notify_new_pred, NewPred}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
@@ -99,78 +70,78 @@ notify(Pred) ->
 
 %set info for dht_node
 on({init, NewId, NewMe, NewPred, NewSuccList, _DHTNode}, {uninit, TriggerState}) ->
-    rm_beh:update_succ_and_pred(NewPred, hd(NewSuccList)),
-    cs_send:send(node:pidX(hd(NewSuccList)), {get_succ_list, cs_send:this()}),
+    rm_beh:update_preds_and_succs([NewPred], NewSuccList),
+    get_successorlist(node:pidX(hd(NewSuccList))),
     fd:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
     {NewId, NewMe, NewPred, NewSuccList, TriggerState};
 
 on(_, {uninit, _TriggerState} = State) ->
     State;
 
-on({get_successorlist, Pid}, {_Id, _Me, _Pred, Succs, _TriggerState} = State) ->
-    cs_send:send_local(Pid, {get_successorlist_response, Succs}),
-    State;
-
-on({get_successorlist, Pid, S}, {_Id, _Me, _Pred, Succs, _TriggerState} = State) ->
-    cs_send:send_local(Pid, {get_successorlist_response, Succs, S}),
+on({get_succlist, Source_Pid}, {_Id, Me, _Pred, Succs, _TriggerState} = State) ->
+    % note: Source_Pid can be local or remote here
+    % see get_successorlist/1
+    cs_send:send(Source_Pid, {get_succlist_response, Me, Succs}),
     State;
 
 on({get_predlist, Pid}, {_Id, _Me, Pred, _Succs, _TriggerState} = State) ->
     cs_send:send_local(Pid, {get_predlist_response, [Pred]}),
     State;
 
-on({stabilize}, {Id, Me, Pred, Succs, TriggerState}) -> % new stabilization interval
-    case Succs of
-        [] ->
-            ok;
-        _  ->
-            cs_send:send(node:pidX(hd(Succs)), {get_pred, cs_send:this()})
-    end,
-    NewTriggerState = trigger:next(TriggerState),
-    {Id, Me, Pred, Succs, NewTriggerState};
+on({stabilize}, {Id, Me, Pred, [] = Succs, TriggerState}) -> % new stabilization interval
+    {Id, Me, Pred, Succs, trigger:next(TriggerState)};
 
-on({get_pred_response, SuccsPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
+on({stabilize}, {Id, Me, Pred, Succs, TriggerState}) -> % new stabilization interval
+    cs_send:send(node:pidX(hd(Succs)), {get_node_details, cs_send:this(), [pred]}),
+    {Id, Me, Pred, Succs, trigger:next(TriggerState)};
+
+on({get_node_details_response, NodeDetails}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
+    SuccsPred = node_details:get(NodeDetails, pred),
     case node:is_valid(SuccsPred) of
         true ->
             case util:is_between_stab(Id, node:id(SuccsPred), node:id(hd(Succs))) of
                 true ->
-                    cs_send:send(node:pidX(SuccsPred), {get_succ_list, cs_send:this()}),
-                    rm_beh:update_succ_and_pred(Pred, SuccsPred),
+                    get_successorlist(node:pidX(SuccsPred)),
+                    rm_beh:update_preds_and_succs([Pred], [SuccsPred]),
                     fd:subscribe(node:pidX(SuccsPred)),
                     {Id, Me, Pred, [SuccsPred | Succs], TriggerState};
                 false ->
-                    cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
+                    get_successorlist(node:pidX(hd(Succs))),
                     State
             end;
         false ->
-            cs_send:send(node:pidX(hd(Succs)), {get_succ_list, cs_send:this()}),
+            get_successorlist(node:pidX(hd(Succs))),
             State
     end;
 
-on({get_succ_list_response, Succ, SuccsSuccList}, {Id, Me, Pred, Succs, TriggerState}) ->
+on({get_succlist_response, Succ, SuccsSuccList}, {Id, Me, Pred, Succs, TriggerState}) ->
     NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), succListLength()),
     %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
-    cs_send:send(node:pidX(hd(NewSuccs)), {notify, Me}),
-    rm_beh:update_succ_and_pred(Pred, hd(NewSuccs)),
+    notify_new_pred(node:pidX(hd(NewSuccs)), Me),
+    rm_beh:update_preds_and_succs([Pred], NewSuccs),
     fd:subscribe([node:pidX(Node) || Node <- NewSuccs]),
     {Id, Me, Pred, NewSuccs, TriggerState};
 
-on({notify, NewPred}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
+on({notify_new_pred, NewPred}, {Id, Me, Pred, Succs, TriggerState} = State) ->
     case node:is_valid(Pred) of
         true ->
             case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
                 true ->
-                    rm_beh:update_succ_and_pred(NewPred, hd(Succs)),
+                    rm_beh:update_preds_and_succs([NewPred], Succs),
                     fd:subscribe(node:pidX(NewPred)),
                     {Id, Me, NewPred, Succs, TriggerState};
                 false ->
                     State
             end;
         false ->
-            rm_beh:update_succ_and_pred(NewPred, hd(Succs)),
+            rm_beh:update_preds_and_succs([NewPred], Succs),
             fd:subscribe(node:pidX(NewPred)),
             {Id, Me, NewPred, Succs, TriggerState}
     end;
+
+on({notify_new_succ, _NewSucc}, State) ->
+    %% @TODO use the new successor info
+    State;
 
 on({crash, DeadPid}, {Id, Me, Pred, Succs, TriggerState})  ->
     case node:is_valid(Pred) andalso (DeadPid =/= node:pidX(Pred)) of
@@ -230,8 +201,6 @@ filter(Pid, [Succ | Rest]) ->
 
 
 % @private
-get_pid() ->
-    process_dictionary:get_group_member(ring_maintenance).
 
 % get Pid of assigned dht_node
 get_cs_pid() ->
