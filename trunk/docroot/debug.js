@@ -1,16 +1,16 @@
-function updateTable(id, group, tablePanel){
-    tablePanel.reconfigure(createStore(id, group), 
+function updateTable(group, id, tablePanel){
+    tablePanel.reconfigure(createStore(group, id), 
 			   new Ext.grid.ColumnModel([
 		{header: 'Key', width: 120, sortable: false, dataIndex: 'key'},
-		    {header: 'Value', width: 90, sortable: false, dataIndex: 'value'}
+		    {header: 'Value', width: 555, sortable: false, dataIndex: 'value'}
 		    ]));
     tablePanel.render();
 }
 
-function createStore(P0, P1){
+function createStore(group, id){
     return new Ext.data.JsonStore({
 	    autoLoad: true,
-		url: 'processinfo.yaws?p0=' + P0 + '&p1=' + P1,
+		url: 'processinfo.yaws?group=' + group + '&id=' + id,
 		root: 'pairs',
 		fields: ['key', 'value']
 		});
@@ -32,14 +32,15 @@ Ext.onReady(function() {
 		      title : 'Process Tree',
 		      loader: processTreeLoader,
 		      animate: true,
-		      autoScoll: true,
+		      autoScroll: true,
 		      containerScroll: true
 		});
 
 	      var processTreeRoot = new Ext.tree.AsyncTreeNode({
 		      text : 'Erlang VM',
 		      draggable: false,
-		      id : 'processTreeRoot'
+		      id : 'processTreeRoot',
+		      expanded: true
 		});
 
 	      treePanel.setRootNode(processTreeRoot);
@@ -59,7 +60,7 @@ var myReader = new Ext.data.ArrayReader({}, [
 
 var myJSONStore = new Ext.data.JsonStore({
 	autoLoad: true,
-	url: 'processinfo.yaws?p0=&p1=',
+	url: 'processinfo.yaws?group=&id=',
 	root: 'pairs',
 	fields: ['key', 'value']
     });
@@ -72,20 +73,20 @@ var tablePanel = new Ext.grid.GridPanel({
 	store: myJSONStore,
 	columns: [
 {header: 'Key', width: 120, sortable: false, dataIndex: 'key'},
-{header: 'Value', width: 90, sortable: false, dataIndex: 'value'}
+{header: 'Value', width: 555, sortable: false, dataIndex: 'value'}
 		  ],
 	viewConfig: {
 	    forceFit: true
 	},
-	width: 500,
+	width: 675,
 	title: 'Process Properties',
 	autoExpandColumn: 'Value',
 	frame: true
     });
 
-treePanel.addListener( "dblclick", function(node, e){
+treePanel.addListener( "click", function(node, e){
 	if(node.leaf){
-	    updateTable(node.parentNode.id, node.id, tablePanel);
+	    updateTable(node.parentNode.id, node.text, tablePanel);
 	}
     });
 
