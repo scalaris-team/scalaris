@@ -54,6 +54,8 @@ parse_expression({op, _, _, Value}, ParseState) ->
     parse_expression(Value, ParseState);
 parse_expression({op, _, _, Left, Right}, ParseState) ->
     parse_expression(Left, parse_expression(Right, ParseState));
+parse_expression({'receive', _, Clauses}, ParseState) ->
+    lists:foldl(fun parse_expression/2, ParseState, Clauses);
 parse_expression({'receive', _, Clauses, Timeout, AfterBody}, ParseState) ->
     ParseState2 = lists:foldl(fun parse_expression/2, ParseState, Clauses),
     ParseState3 = parse_expression(Timeout, ParseState2),
