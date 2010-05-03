@@ -142,6 +142,21 @@ For changing the yaws port of the boot server add "-boot_cs yaws_port XXXX" to t
 
 For changing the yaws port of a normal server change in bin/cs_local?.sh "-chordsharp yaws_port XXXX", where XXXX is the port.
 
+== The Java-client cannot connect to Scalaris. What is wrong? ==
+
+Probably your hostname configuration needs some adjustments. Erlang and Java use different mechanisms to determine the full qualified domain name (FQDN), but both have to come to the same result.
+
+You may check your installation using:
+
+`scalarisctl checkinstallation`
+
+For getting the node name Erlang uses, call:
+
+`erl -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt()."`
+
+For getting the hostname java uses, call:
+
+`hostname -f`
 
 
 = Usage =
