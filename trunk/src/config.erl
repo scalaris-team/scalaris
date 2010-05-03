@@ -32,7 +32,7 @@
          check_config/0,
 
          exists/1, is_atom/1, is_bool/1, is_mypid/1, is_ip/1, is_integer/1,
-         is_float/1, is_list/1, is_string/1, is_in_range/3,
+         is_float/1, is_list/1, is_list/3, is_string/1, is_in_range/3,
          is_greater_than/2, is_greater_than_equal/2,
          is_less_than/2, is_less_than_equal/2, is_in/2
         ]).
@@ -221,6 +221,18 @@ is_list(Key) ->
     Pred = fun erlang:is_list/1,
     Msg = "is not a valid list",
     test_and_error(Key, Pred, Msg).
+
+-spec is_list(Key::atom(), Pred::fun((any()) -> boolean()), PredDescr::string()) -> boolean().
+is_list(Key, Pred, PredDescr) ->
+    IsListWithPred = fun(Value) ->
+                             case Value of
+                                 X when is_list(X) ->
+                                     lists:all(Pred, X);
+                                 _X -> false
+                             end
+                     end,
+    Msg = io_lib:format("is not a valid list with elements satisfying ~p", [PredDescr]),
+    test_and_error(Key, IsListWithPred, Msg).
 
 -spec is_string(Key::atom()) -> boolean().
 is_string(Key) ->
