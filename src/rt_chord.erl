@@ -15,10 +15,10 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc Routing Table
 %% @end
-%% @version $Id$
+%% @version $Id: rt_chord.erl 758 2010-04-30 15:06:20Z kruber@zib.de $
 -module(rt_chord).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id: rt_chord.erl 758 2010-04-30 15:06:20Z kruber@zib.de $ ').
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
@@ -39,6 +39,8 @@
 -type(external_rt()::gb_tree()).
 -type(dict_type() :: dict()).
 -type(index() :: {pos_integer(), pos_integer()}).
+-type(custom_message() ::
+       {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}).
 %% userdevguide-end rt_chord:types
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -239,6 +241,15 @@ check_config() ->
     config:is_integer(chord_base) and
         config:is_greater_than_equal(chord_base, 2).
 
+-define(MyRT, ?MODULE). % for rt_generic.hrl
+-include("rt_generic.hrl").
+
 %% @doc There are no custom messages here.
+-spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
+handle_custom_message({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
+    NewRTState = stabilize(Id, Succ, RTState, Index, Node),
+    check(RTState, NewRTState, Id, Pred, Succ),
+    {Id, Pred, Succ, NewRTState, TriggerState};
+
 handle_custom_message(_Message, _State) ->
     unknown_event.

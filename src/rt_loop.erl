@@ -29,20 +29,21 @@
 -export([init/1, on/2, get_base_interval/0, check_config/0]).
 
 % state of the routing table loop
--type(state() :: {Id           :: ?RT:key(),
+-type(state_init() :: {Id           :: ?RT:key(),
                   Pred         :: node:node_type(),
                   Succ         :: node:node_type(),
                   RTState      :: ?RT:rt(),
-                  TriggerState :: trigger:state()} |
-                 {uninit, TriggerState :: trigger:state()}).
+                  TriggerState :: trigger:state()}).
+-type(state_uninit() :: {uninit, TriggerState :: trigger:state()}).
+-type(state() :: state_init() | state_uninit()).
 
 % accepted messages of rt_loop processes
 -type(message() ::
       {init, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()}
      | {stabilize}
      | {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ}
-     | {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}
-     | {crash, DeadPid::cs_send:mypid()}).
+     | {crash, DeadPid::cs_send:mypid()}
+     | ?RT:custom_message()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -66,6 +67,10 @@ init(Trigger) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Private Code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-define(MyRT, ?RT). % for rt_generic.hrl 
+-include("rt_generic.hrl").
+
 %% @doc message handler
 -spec on(message(), state()) -> state() | unknown_event.
 
@@ -102,13 +107,6 @@ on({{get_node_details_response, NewNodeDetails}, pred_succ}, {Id, _, _, RTState,
     NewSucc = node_details:get(NewNodeDetails, succ),
     {Id, NewPred, NewSucc, RTState, TriggerState};
 
-%
-on({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    NewRTState = ?RT:stabilize(Id, Succ, RTState, Index, Node),
-    check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState, TriggerState};
-
-
 % failure detector reported dead node
 on({crash, DeadPid}, {Id, Pred, Succ, RTState, TriggerState}) ->
     NewRT = ?RT:filterDeadNode(RTState, DeadPid),
@@ -130,33 +128,6 @@ on(Message, State) ->
     ?RT:handle_custom_message(Message, State).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(check/5 :: (Old::?RT:rt(), New::?RT:rt(), ?RT:key(), node:node_type(),
-                  node:node_type()) -> any()).
-check(Old, New, Id, Pred, Succ) ->
-    check(Old, New, Id, Pred, Succ, true).
-
-% OldRT, NewRT, CheckFD
--spec(check/6 :: (Old::?RT:rt(), New::?RT:rt(), ?RT:key(), node:node_type(),
-                  node:node_type(), ReportFD::boolean() | any()) -> any()).
-check(X, X, _Id, _Pred, _Succ, _) ->
-    ok;
-check(OldRT, NewRT, Id, Pred, Succ, true) ->
-    Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_dht_node(NewRT, Id, Pred, Succ)}),
-    check_fd(NewRT, OldRT);
-check(_OldRT, NewRT, Id, Pred, Succ, false) ->
-    Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid ,  {rt_update, ?RT:export_rt_to_dht_node(NewRT, Id, Pred, Succ)}).
-
-check_fd(X, X) ->
-    ok;
-check_fd(NewRT, OldRT) ->
-    NewView = ?RT:to_pid_list(NewRT),
-    OldView = ?RT:to_pid_list(OldRT),
-    NewNodes = util:minus(NewView,OldView),
-    OldNodes = util:minus(OldView,NewView),
-    fd:unsubscribe(OldNodes),
-    fd:subscribe(NewNodes).
 
 get_base_interval() ->
     config:read(pointer_base_stabilization_interval).
