@@ -15,10 +15,10 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc sample routing table
 %% @end
-%% @version $Id$
+%% @version $Id: rt_simple.erl 758 2010-04-30 15:06:20Z kruber@zib.de $
 -module(rt_simple).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id: rt_simple.erl 758 2010-04-30 15:06:20Z kruber@zib.de $ ').
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
@@ -38,6 +38,7 @@
 % @type rt(). Routing Table.
 -type(rt()::{node:node_type(), gb_tree()}).
 -type(external_rt()::{node:node_type(), gb_tree()}).
+-type(custom_message() :: any()).
 %% userdevguide-end rt_simple:types
 
 %% userdevguide-begin rt_simple:empty
@@ -158,5 +159,6 @@ check_config() ->
     true.
 
 %% @doc There are no custom messages here.
+-spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
 handle_custom_message(_Message, _State) ->
     unknown_event.
