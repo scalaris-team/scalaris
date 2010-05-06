@@ -370,7 +370,7 @@ greater_equals_than(minus_infinity, minus_infinity) ->
     true;
 greater_equals_than(minus_infinity, _) ->
     false;
-greater_equals_than(plus_infinity, plus_infinity) ->
+greater_equals_than(plus_infinity, _) ->
     true;
 greater_equals_than(_, plus_infinity) ->
     false;
