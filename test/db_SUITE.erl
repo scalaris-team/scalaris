@@ -68,7 +68,7 @@ init_per_suite(Config) ->
 	    Config;
         db_tcerl ->
 	    Pid = spawn(fun () ->
-                                config:start_link(["scalaris.cfg"]),
+                                config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
 				timer:sleep(10000)
 			end),
             tcerl:start(),

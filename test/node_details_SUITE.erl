@@ -45,7 +45,7 @@ init_per_suite(Config) ->
     Pid = spawn(fun () ->
                         crypto:start(),
                         process_dictionary:start_link(),
-                        config:start_link(["scalaris.cfg"]),
+                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                         comm_port:start_link(),
                         timer:sleep(1000),
                         comm_port:set_local_address({127,0,0,1},14195),
