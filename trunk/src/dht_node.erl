@@ -388,7 +388,7 @@ start_link(InstanceId) ->
 -spec start_link(instanceid(), [any()]) -> {ok, pid()}.
 start_link(InstanceId, Options) ->
     gen_component:start_link(?MODULE, [InstanceId, Options],
-                             [{register, InstanceId, dht_node}]).
+                             [{register, InstanceId, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
 
 % @doc find existing nodes and initialize the comm_layer
