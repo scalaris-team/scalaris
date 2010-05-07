@@ -31,8 +31,7 @@
 -include_lib("unittest.hrl").
 
 all() ->
-    [test_start_link,
-     test_init,
+    [test_init,
      test_on_trigger1,
      test_on_trigger2,
      test_on_trigger3,
@@ -59,8 +58,22 @@ all() ->
      test_on_cy_cache1,
      test_on_cy_cache2,
      test_on_cy_cache3,
-     test_on_get_values_best,
-     test_on_get_values_all].
+     test_on_get_values_best1,
+     test_on_get_values_best2,
+     test_on_get_values_best3,
+     test_on_get_values_best4,
+     test_on_get_values_best5,
+     test_on_get_values_best6,
+     test_on_get_values_all1,
+     test_on_get_values_all2,
+     test_on_get_values_all3,
+     test_on_get_values_all4,
+     test_on_get_values_all5,
+     test_on_get_values_all6,
+     test_get_values_best0,
+     test_get_values_best1,
+     test_get_values_all0,
+     test_get_values_all1].
 
 suite() ->
     [
@@ -106,11 +119,6 @@ end_per_testcase(_TestCase, Config) ->
     reset_config(),
     Config.
 
-test_start_link(Config) ->
-%%     {ok, Pid} = gossip:start_link('gossip_group'),
-%%     exit(Pid, kill),
-    Config.
-
 test_init(Config) ->
     config:write(gossip_interval, 100),
     InitialState1 = gossip:init('trigger_periodic'),
@@ -121,9 +129,43 @@ test_init(Config) ->
     ?expect_no_message(),
     Config.
 
+test_get_values_best0(Config) ->
+    process_dictionary:register_process("gossip_group", gossip, self()),
+
+    gossip:get_values_best(),
+    ?expect_message({get_values_best, _Pid}),
+    ?expect_no_message(),
+    Config.
+
+test_get_values_best1(Config) ->
+    process_dictionary:register_process("gossip_group", gossip, self()),
+
+    SelfPid = self(),
+    gossip:get_values_best(self()),
+    ?expect_message({get_values_best, SelfPid}),
+    ?expect_no_message(),
+    Config.
+
+test_get_values_all0(Config) ->
+    process_dictionary:register_process("gossip_group", gossip, self()),
+
+    gossip:get_values_all(),
+    ?expect_message({get_values_all, _Pid}),
+    ?expect_no_message(),
+    Config.
+
+test_get_values_all1(Config) ->
+    process_dictionary:register_process("gossip_group", gossip, self()),
+
+    SelfPid = self(),
+    gossip:get_values_all(self()),
+    ?expect_message({get_values_all, SelfPid}),
+    ?expect_no_message(),
+    Config.
+
 test_on_trigger1(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
-    process_dictionary:register_process(gossip_group, cyclon, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
+    process_dictionary:register_process("gossip_group", cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
 %%     Self = self(),
@@ -157,8 +199,8 @@ test_on_trigger1(Config) ->
     Config.
 
 test_on_trigger2(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
-    process_dictionary:register_process(gossip_group, cyclon, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
+    process_dictionary:register_process("gossip_group", cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
 %%     Self = self(),
@@ -192,8 +234,8 @@ test_on_trigger2(Config) ->
     Config.
 
 test_on_trigger3(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
-    process_dictionary:register_process(gossip_group, cyclon, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
+    process_dictionary:register_process("gossip_group", cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -228,8 +270,8 @@ test_on_trigger3(Config) ->
     Config.
 
 test_on_trigger4(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
-    process_dictionary:register_process(gossip_group, cyclon, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
+    process_dictionary:register_process("gossip_group", cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -264,8 +306,8 @@ test_on_trigger4(Config) ->
     Config.
 
 test_on_trigger5(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
-    process_dictionary:register_process(gossip_group, cyclon, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
+    process_dictionary:register_process("gossip_group", cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -300,8 +342,8 @@ test_on_trigger5(Config) ->
     Config.
 
 test_on_trigger6(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
-    process_dictionary:register_process(gossip_group, cyclon, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
+    process_dictionary:register_process("gossip_group", cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -336,8 +378,8 @@ test_on_trigger6(Config) ->
     Config.
 
 test_on_trigger7(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
-    process_dictionary:register_process(gossip_group, cyclon, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
+    process_dictionary:register_process("gossip_group", cyclon, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -554,7 +596,7 @@ test_on_get_node_details_response_local_info7(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round1(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -577,7 +619,7 @@ test_on_get_node_details_response_leader_start_new_round1(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round2(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -601,7 +643,7 @@ test_on_get_node_details_response_leader_start_new_round2(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round3(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -625,7 +667,7 @@ test_on_get_node_details_response_leader_start_new_round3(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round4(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -657,7 +699,7 @@ test_on_get_node_details_response_leader_start_new_round4(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round5(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -689,7 +731,7 @@ test_on_get_node_details_response_leader_start_new_round5(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round6(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -721,7 +763,7 @@ test_on_get_node_details_response_leader_start_new_round6(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round7(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -782,7 +824,7 @@ test_on_cy_cache1(Config) ->
     Config.
 
 test_on_cy_cache2(Config) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
 
     GossipNewValues = gossip_state:new_internal(),
     
@@ -805,7 +847,7 @@ test_on_cy_cache2(Config) ->
     Config.
 
 test_on_cy_cache3(Config) ->
-    erlang:put(instance_id, gossip_group),
+    erlang:put(instance_id, "gossip_group"),
     % register some other process as the dht_node
     DHT_Node = fake_dht_node(),
 %%     ?equals(process_dictionary:get_group_member(dht_node), DHT_Node),
@@ -835,12 +877,292 @@ test_on_cy_cache3(Config) ->
     exit(DHT_Node, kill),
     Config.
 
-test_on_get_values_best(Config) ->
-    % TODO: implement unit test
+test_on_get_values_best1(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, true, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_best, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    BestVal = gossip_state:conv_state_to_extval(State),
+    ?expect_message({gossip_get_values_best_response, BestVal}),
+
     Config.
 
-test_on_get_values_all(Config) ->
-    % TODO: implement unit test
+test_on_get_values_best2(Config) ->
+    config:write(gossip_converge_avg_count, 20),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, true, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_best, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    BestVal = gossip_state:conv_state_to_extval(State),
+    ?expect_message({gossip_get_values_best_response, BestVal}),
+
+    Config.
+
+test_on_get_values_best3(Config) ->
+    config:write(gossip_converge_avg_count, 21),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, true, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_best, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    BestVal = gossip_state:conv_state_to_extval(PreviousState),
+    ?expect_message({gossip_get_values_best_response, BestVal}),
+
+    Config.
+
+test_on_get_values_best4(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, false, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_best, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    BestVal = gossip_state:conv_state_to_extval(PreviousState),
+    ?expect_message({gossip_get_values_best_response, BestVal}),
+
+    Config.
+
+test_on_get_values_best5(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
+    State = create_gossip_state(Values, false, 20, 20, 2),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_best, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    BestVal = gossip_state:conv_state_to_extval(PreviousState),
+    ?expect_message({gossip_get_values_best_response, BestVal}),
+
+    Config.
+
+test_on_get_values_best6(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
+    State = create_gossip_state(Values, true, 20, 20, 2),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_best, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    BestVal = gossip_state:conv_state_to_extval(PreviousState),
+    ?expect_message({gossip_get_values_best_response, BestVal}),
+
+    Config.
+
+test_on_get_values_all1(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, true, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_all, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    PreviousVal = gossip_state:conv_state_to_extval(PreviousState),
+    CurrentVal = gossip_state:conv_state_to_extval(State),
+    BestVal = CurrentVal,
+    ?expect_message({gossip_get_values_all_response, PreviousVal, CurrentVal, BestVal}),
+
+    Config.
+
+test_on_get_values_all2(Config) ->
+    config:write(gossip_converge_avg_count, 20),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, true, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_all, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    PreviousVal = gossip_state:conv_state_to_extval(PreviousState),
+    CurrentVal = gossip_state:conv_state_to_extval(State),
+    BestVal = CurrentVal,
+    ?expect_message({gossip_get_values_all_response, PreviousVal, CurrentVal, BestVal}),
+
+    Config.
+
+test_on_get_values_all3(Config) ->
+    config:write(gossip_converge_avg_count, 21),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, true, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_all, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    PreviousVal = gossip_state:conv_state_to_extval(PreviousState),
+    CurrentVal = gossip_state:conv_state_to_extval(State),
+    BestVal = PreviousVal,
+    ?expect_message({gossip_get_values_all_response, PreviousVal, CurrentVal, BestVal}),
+
+    Config.
+
+test_on_get_values_all4(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
+    State = create_gossip_state(Values, false, 20, 20, 20),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_all, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    PreviousVal = gossip_state:conv_state_to_extval(PreviousState),
+    CurrentVal = gossip_state:conv_state_to_extval(State),
+    BestVal = PreviousVal,
+    ?expect_message({gossip_get_values_all_response, PreviousVal, CurrentVal, BestVal}),
+
+    Config.
+
+test_on_get_values_all5(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
+    State = create_gossip_state(Values, false, 20, 20, 2),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_all, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    PreviousVal = gossip_state:conv_state_to_extval(PreviousState),
+    CurrentVal = gossip_state:conv_state_to_extval(State),
+    BestVal = PreviousVal,
+    ?expect_message({gossip_get_values_all_response, PreviousVal, CurrentVal, BestVal}),
+
+    Config.
+
+test_on_get_values_all6(Config) ->
+    config:write(gossip_converge_avg_count, 10),
+    TriggerNoDelay = get_ptrigger_nodelay(),
+    
+    PreviousValues = gossip_state:new_internal(1.0, 1.0, 1.0, 1.0, 1, 1, 1),
+    % initialized, triggers = 10, msg_exchg = 10, conv_avg_count = 10
+    PreviousState = create_gossip_state(PreviousValues, true, 10, 10, 10),
+    Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
+    % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
+    State = create_gossip_state(Values, true, 20, 20, 2),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on({get_values_all, self()},
+                  {PreviousState, State, [], TriggerNoDelay}),
+
+    ?equals(NewState, State),
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals(NewTriggerState, TriggerNoDelay),
+    PreviousVal = gossip_state:conv_state_to_extval(PreviousState),
+    CurrentVal = gossip_state:conv_state_to_extval(State),
+    BestVal = PreviousVal,
+    ?expect_message({gossip_get_values_all_response, PreviousVal, CurrentVal, BestVal}),
+
     Config.
 
 % helper functions:
@@ -885,7 +1207,7 @@ fake_dht_node() ->
     end.
 
 fake_dht_node_start(Supervisor) ->
-    process_dictionary:register_process(gossip_group, dht_node, self()),
+    process_dictionary:register_process("gossip_group", dht_node, self()),
     Supervisor ! {started, self()},
     fake_process().
 
