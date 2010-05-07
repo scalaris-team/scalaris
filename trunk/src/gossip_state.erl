@@ -350,7 +350,12 @@ calc_stddev(State) when is_record(State, values_internal) ->
 	Avg2 = get(State, avgLoad2),
 	case (Avg =:= unknown) or (Avg2 =:= unknown) of
 		true -> unknown;
-		false -> math:sqrt(Avg2 - (Avg * Avg))
+		false ->
+            Tmp = Avg2 - (Avg * Avg),
+            case (Tmp >= 0) of
+                true  -> math:sqrt(Tmp);
+                false -> unknown
+            end
 	end;
 calc_stddev(State) when is_record(State, state) ->
 	calc_stddev(get(State, values)).
