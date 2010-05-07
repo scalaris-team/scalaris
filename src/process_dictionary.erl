@@ -95,9 +95,9 @@ lookup_process(InstanceId, Name) ->
         [{{InstanceId, Name}, Value}] ->
             Value;
         [] ->
-            log:log(error, "[ PD ] lookup_process failed in Pid ~p: InstanceID:  "
-                    "~p  For: ~p StacK: ~p~n",[self(), InstanceId, Name,
-                                               util:get_stacktrace()]),
+            %log:log(error, "[ PD ] lookup_process failed in Pid ~p: InstanceID:  "
+            %        "~p  For: ~p StacK: ~p~n",[self(), InstanceId, Name,
+            %                                   util:get_stacktrace()]),
             failed
     end.
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
@@ -198,7 +198,7 @@ get_group_member(Name) ->
     Pid = process_dictionary:lookup_process(InstanceId, Name),
     case Pid of
         failed ->
-            log:log(error,"[ Node | ~w ] process ~w not found: ~p", [self(),Name,util:get_stacktrace()]),
+            %log:log(error,"[ Node | ~w ] process ~w not found: ~p", [self(),Name,util:get_stacktrace()]),
             failed;
         _ -> Pid
     end.
