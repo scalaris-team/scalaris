@@ -87,8 +87,12 @@ my_process_list(InstanceId, SupervisorType) ->
     Config =
         util:sup_worker_desc(config, config, start_link,
                              [[preconfig:config(), preconfig:local_config()]]),
+    DHTNodeOptions = case SupervisorType of
+                         boot -> [first, wait_for_init];
+                         node -> [wait_for_init]
+                     end,
     DHTNode =
-        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [[first]]),
+        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
     FailureDetector =
         util:sup_worker_desc(fd, fd, start_link),
     Ganglia =

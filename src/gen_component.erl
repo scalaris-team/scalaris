@@ -121,36 +121,47 @@ start(Module, Args, Options) ->
 
 -spec(start/4 :: (module(), any(), list(), cs_send:erl_local_pid()) -> ok).
 start(Module, Args, Options, Supervisor) ->
-    %io:format("Sarting ~p~n",[Module]),
+    %io:format("Starting ~p~n",[Module]),
     case lists:keysearch(register, 1, Options) of
         {value, {register, InstanceId, Name}} ->
             process_dictionary:register_process(InstanceId, Name, self()),
-            ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
-            Supervisor ! {started, self()};
+            ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self());
         false ->
             case lists:keysearch(register_native, 1, Options) of
             {value, {register_native,Name}} ->
-                register(Name, self()),
-                Supervisor ! {started, self()};
+                register(Name, self());
             false ->
                 ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
-                Supervisor ! {started, self()},
                 ok
             end
+    end,
+    case lists:member(wait_for_init, Options) of
+        true ->
+            ok;
+        false ->
+            Supervisor ! {started, self()},
+            ok
     end,
     try
         InitialComponentState = {Options, _Slowest = 0.0,
                                  {_BPs = [], _BPActive = false,
                                   _BP_HB_Q = []}},
-        case Module:init(Args) of
-            {'$gen_component', Config, InitialState} ->
-                {value, {on_handler, NewHandler}} =
-                    lists:keysearch(on_handler, 1, Config),
-                loop(Module, NewHandler, InitialState, InitialComponentState);
-            InitialState ->
-                loop(Module, on, InitialState, InitialComponentState)
-        end
+        Handler = case Module:init(Args) of
+                      {'$gen_component', Config, InitialState} ->
+                          {value, {on_handler, NewHandler}} =
+                              lists:keysearch(on_handler, 1, Config),
+                          NewHandler;
+                      InitialState ->
+                          on
+                  end,
+        case lists:member(wait_for_init, Options) of
+            false -> ok;
+            true -> Supervisor ! {started, self()}, ok
+        end,
+        loop(Module, Handler, InitialState, InitialComponentState)
     catch
+        % note: if init throws up, we will not send 'started' to the supervisor
+        % this process will die and the supervisor will try to restart it
         throw:Term ->
             log:log(error,"exception in init/loop of ~p: ~p~n",
                     [Module, Term]),
