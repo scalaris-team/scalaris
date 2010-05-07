@@ -466,7 +466,8 @@ on_init({get_rtm_reply, InKey, InPid},
 
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg,
    State) ->
-    cs_send:send_local_after(1000, self(), Msg);
+    cs_send:send_local_after(1000, self(), Msg),
+    State;
 
 on_init(_, _State) ->
     unknown_event.

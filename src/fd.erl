@@ -120,7 +120,7 @@ start_pinger(Pid) ->
 %% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
 %% Description: Starts the server
 start_link() ->
-    gen_component:start_link(?MODULE, [], [{register_native, ?MODULE}]).
+    gen_component:start_link(?MODULE, [], [wait_for_init, {register_native, ?MODULE}]).
 
 init(_Args) ->
     fd_db:init(),

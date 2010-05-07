@@ -187,13 +187,19 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
                      case supervisor:start_child(SupTx, RTM_desc) of
                          {ok, TmpPid} -> TmpPid;
                          {ok, TmpPid, _} -> TmpPid;
-                         {error, _} -> msg_delay:send_local(1, self(), {get_rtm, Source_PID, Key, Process})
+                         {error, _} ->
+                             msg_delay:send_local(1, self(), {get_rtm, Source_PID, Key, Process}),
+                             failed
                      end;
                  _ -> Pid
              end,
-    GPid = cs_send:make_global(NewPid),
-    cs_send:send(Source_PID, {get_rtm_reply, Key, GPid}),
-    State;
+    case NewPid of
+        failed -> State;
+        _ ->
+            GPid = cs_send:make_global(NewPid),
+            cs_send:send(Source_PID, {get_rtm_reply, Key, GPid}),
+            State
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lookup (see lookup.erl)
