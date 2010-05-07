@@ -187,7 +187,7 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
                      case supervisor:start_child(SupTx, RTM_desc) of
                          {ok, TmpPid} -> TmpPid;
                          {ok, TmpPid, _} -> TmpPid;
-                         {error, _} -> Pid
+                         {error, _} -> msg_delay:send_local(1, self(), {get_rtm, Source_PID, Key, Process})
                      end;
                  _ -> Pid
              end,
