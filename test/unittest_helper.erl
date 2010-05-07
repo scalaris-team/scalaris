@@ -24,6 +24,7 @@
 
 -export([make_ring/1, stop_ring/1]).
 
+-spec make_ring(pos_integer()) -> pid().
 make_ring(Size) ->
     error_logger:tty(true),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
@@ -60,6 +61,7 @@ make_ring(Size) ->
 %    timer:sleep(30000),
     Pid.
 
+-spec stop_ring(pid()) -> ok.
 stop_ring(Pid) ->
     try
         begin
@@ -84,6 +86,7 @@ stop_ring(Pid) ->
             throw(Reason)
     end.
 
+-spec wait_for_process_to_die(pid()) -> ok.
 wait_for_process_to_die(Pid) ->
     case is_process_alive(Pid) of
         true ->
@@ -93,6 +96,7 @@ wait_for_process_to_die(Pid) ->
             ok
     end.
 
+-spec wait_for_table_to_disappear(tid() | atom()) -> ok.
 wait_for_table_to_disappear(Table) ->
     case ets:info(Table) of
         undefined ->
@@ -102,6 +106,7 @@ wait_for_table_to_disappear(Table) ->
             wait_for_table_to_disappear(Table)
     end.
 
+-spec wait_for_stable_ring() -> ok.
 wait_for_stable_ring() ->
     R = admin:check_ring(),
     ct:pal("CheckRing: ~p~n",[R]),
@@ -113,6 +118,7 @@ wait_for_stable_ring() ->
             wait_for_stable_ring()
     end.
 
+-spec check_ring_size(non_neg_integer()) -> ok.
 check_ring_size(Size) ->
     erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     boot_server:number_of_nodes(),

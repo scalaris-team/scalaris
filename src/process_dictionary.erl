@@ -52,7 +52,7 @@
 -include("scalaris.hrl").
 
 %% API
--export([start_link/0, start/0]).
+-export([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1,on/2,
@@ -73,21 +73,28 @@
          %for fprof
          get_all_pids/0]).
 
+-type(name() :: atom()).
+
+-type(message() ::
+    {register_process, instanceid(), name(), pid()} |
+    {drop_state} |
+    {'EXIT', pid(), Reason::any()}).
+
 %%====================================================================
 %% public functions
 %%====================================================================
 
 %% @doc register a process with InstanceId and Name and stores the
 %%      process group info with put/2
--spec(register_process/3 :: (instanceid(), term(), pid()) -> ok).
+-spec register_process(instanceid(), name(), pid()) -> ok.
 register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
-    cs_send:send_local(get_pid() , {register_process, InstanceId, Name, Pid}),
+    cs_send:send_local(get_pid(), {register_process, InstanceId, Name, Pid}),
     receive {process_registered} -> ok end.
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
--spec(lookup_process/2 :: (instanceid(), term()) -> pid() | failed).
+-spec lookup_process(instanceid(), name()) -> pid() | failed.
 lookup_process(InstanceId, Name) ->
 %%     [Counter] = ets:lookup(call_counter, lookup_process_by_group),
 %%     ets:insert(call_counter, {lookup_process_by_group, Counter + 1}),
@@ -103,7 +110,7 @@ lookup_process(InstanceId, Name) ->
     %gen_server:call(?MODULE, {lookup_process, InstanceId, Name}, 20000).
 
 %% @doc find the process group and name of a process by pid
--spec(lookup_process/1 :: (pid()) -> {any(), any()} | failed).
+-spec lookup_process(pid()) -> {instanceid(), name()} | failed.
 lookup_process(Pid) ->
 %%     [Counter] = ets:lookup(call_counter, lookup_process_by_name),
 %%     ets:insert(call_counter, {lookup_process_by_name, Counter + 1}),
@@ -115,23 +122,32 @@ lookup_process(Pid) ->
     end.
 
 %% @doc tries to find a dht_node process
--spec(find_dht_node/0 :: () -> {ok, pid()} | failed).
+-spec find_dht_node() -> {ok, pid()} | failed.
 find_dht_node() ->
     find_process(dht_node).
 
 %% @doc tries to find all dht_node processes
--spec(find_all_dht_nodes/0 :: () -> list()).
+-spec find_all_dht_nodes() -> [pid()].
 find_all_dht_nodes() ->
     find_all_processes(dht_node).
 
--spec(find_all_processes/1 :: (any()) -> list()).
+-spec find_process(name()) -> {ok, pid()} | failed.
+find_process(Name) ->
+    case ets:match(?MODULE, {{'_', Name}, '$1'}) of
+         [[Value] | _] ->
+             {ok, Value};
+         [] ->
+             failed
+         end.
+
+-spec find_all_processes(name()) -> [pid()].
 find_all_processes(Name) ->
     %ct:pal("ets:info: ~p~n",[ets:info(?MODULE)]),
     Result = ets:match(?MODULE, {{'_', Name}, '$1'}),
     lists:flatten(Result).
 
 %% @doc tries to find a process group with a specific process inside
-%% @spec find_group(term()) -> term()
+-spec find_group(ProcessName::name()) -> instanceid() | failed.
 find_group(ProcessName) ->
     case ets:match(?MODULE, {{'$1', ProcessName}, '_'}) of
         [[Value] | _] ->
@@ -140,6 +156,7 @@ find_group(ProcessName) ->
             failed
     end.
 
+-spec find_all_groups(ProcessName::name()) -> [instanceid(),...] | failed.
 find_all_groups(ProcessName) ->
     case ets:match(?MODULE, {{'$1', ProcessName}, '_'}) of
         [] ->
@@ -149,7 +166,7 @@ find_all_groups(ProcessName) ->
     end.
 
 %% @doc find groups for web interface
-%% @spec get_groups() -> term()
+-spec get_groups() -> {array, [{struct, [{id | text, instanceid()} | {leaf, false}]}]}.
 get_groups() ->
     AllGroups = find_all_groups(ets:tab2list(?MODULE), gb_sets:new()),
     GroupsAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, El}, {text, El}, {leaf, false}]} | Rest] end, [], gb_sets:to_list(AllGroups))},
@@ -157,13 +174,14 @@ get_groups() ->
 
 %% @doc find processes in a group (for web interface)
 %% @spec get_processes_in_group(term()) -> term()
+-spec get_processes_in_group(instanceid()) -> {array, [{struct, [{id | text, nonempty_string()} | {leaf, true}]}]}.
 get_processes_in_group(Group) ->
     AllProcesses = find_processes_in_group(ets:tab2list(?MODULE), gb_sets:new(), Group),
     ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(Group) ++ "." ++ toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
     ProcessesAsJson.
 
 %% @doc get info about process (for web interface)
--spec get_info(instanceid(), term()) -> term().
+-spec get_info(instanceid(), nonempty_string()) -> {struct, [{pairs, {array, {struct, [{key | value, nonempty_string()}]}}}]}.
 get_info(InstanceId, Name) ->
     KVs =
         case lookup_process(InstanceId, list_to_atom(Name)) of
@@ -186,7 +204,7 @@ get_info(InstanceId, Name) ->
     {struct, [{pairs, {array, JsonKVs}}]}.
 
 %% @doc Gets the Pid of the current process' group member with the given name.
--spec(get_group_member/1 :: (atom()) -> pid() | failed).
+-spec get_group_member(name()) -> pid() | failed.
 get_group_member(Name) ->
     InstanceId = erlang:get(instance_id),
     if
@@ -203,42 +221,26 @@ get_group_member(Name) ->
         _ -> Pid
     end.
 
+-spec get_all_pids() -> [pid()].
 get_all_pids() ->
     [X || [X]<- ets:match(?MODULE, {'_','$1'})].
 
 %%====================================================================
 %% API
 %%====================================================================
-%%--------------------------------------------------------------------
-%% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the server
-%%--------------------------------------------------------------------
-%@doc Starts the server
+%% @doc Starts the server
+-spec start_link() -> {ok, pid()}.
 start_link() ->
     gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
-
-%%--------------------------------------------------------------------
-%% Function: start() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the server; for use with the test framework
-%%--------------------------------------------------------------------
-%@doc Starts the server; for use with the test framework
-start() ->
-    gen_component:start_link(?MODULE, [], [{register_native, process_dictionary}]).
-
 
 
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% Function: init(Args) -> {ok, State} |
-%%                         {ok, State, Timeout} |
-%%                         ignore               |
-%%                         {stop, Reason}
-%% Description: Initiates the server
-%%--------------------------------------------------------------------
-%@private
+%% @doc Initiates the server
+%% @private
+-spec init([]) -> null.
 init(_Args) ->
     ets:new(?MODULE, [set, protected, named_table]),
      ets:new(call_counter, [set, public, named_table]),
@@ -251,19 +253,9 @@ init(_Args) ->
     State = null,
     State.
 
-%%--------------------------------------------------------------------
-%% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
-%%                                      {reply, Reply, State, Timeout} |
-%%                                      {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, Reply, State} |
-%%                                      {stop, Reason, State}
-%% Description: Handling call messages
-%%--------------------------------------------------------------------
-
-%@private
-
--spec(on/2 :: (any(), null) -> null).
+%% @doc Handling call messages
+%% @private
+-spec on(message(), null) -> null | unknown_event.
 on({register_process, InstanceId, Name, Pid}, State) ->
     case ets:insert_new(?MODULE, {{InstanceId, Name}, Pid}) of
         true ->
@@ -276,6 +268,7 @@ on({register_process, InstanceId, Name, Pid}, State) ->
     end,
     cs_send:send_local(Pid , {process_registered}),
     State;
+
 on({drop_state}, State) ->
     % only for unit tests
     Links = ets:match(?MODULE, {'_', '$1'}),
@@ -291,28 +284,13 @@ on({'EXIT', FromPid, _Reason}, State) ->
 on(_, _State) ->
     unknown_event.
 
-%% lookup_process2(InstanceId, Name) ->
-%%     Result = case ets:lookup(?MODULE, {InstanceId, Name}) of
-%%         [{{InstanceId, Name}, Value}] ->
-%%             {ok, Value};
-%%         [] ->
-%%             failed
-%%     end,
-%%     Result.
-
-find_process(Name) ->
-    case ets:match(?MODULE, {{'_', Name}, '$1'}) of
-         [[Value] | _] ->
-             {ok, Value};
-         [] ->
-             failed
-         end.
-
+-spec find_all_groups([{{instanceid(), name()}, pid()}], gb_set()) -> gb_set().
 find_all_groups([], Set) ->
     Set;
 find_all_groups([{{InstanceId, _}, _} | Rest], Set) ->
     find_all_groups(Rest, gb_sets:add_element(InstanceId, Set)).
 
+-spec find_processes_in_group([{{instanceid(), name()}, pid()}], gb_set(), instanceid()) -> gb_set().
 find_processes_in_group([], Set, _Group) ->
     Set;
 find_processes_in_group([{{InstanceId, TheName}, _} | Rest], Set, Group) ->
@@ -323,6 +301,7 @@ find_processes_in_group([{{InstanceId, TheName}, _} | Rest], Set, Group) ->
             find_processes_in_group(Rest, Set, Group)
     end.
 
+-spec toString(atom() | nonempty_string()) -> nonempty_string().
 toString(X) when is_atom(X) ->
     atom_to_list(X);
 toString(X) ->
@@ -331,11 +310,13 @@ toString(X) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-
+%% @doc Returns the pid of the process dictionary.
+-spec get_pid() -> pid() | failed.
 get_pid() ->
     case whereis(process_dictionary) of
         undefined ->
-            log:log(error, "[ PD ] call of get_pid undefined");
+            log:log(error, "[ PD ] call of get_pid undefined"),
+            failed;
         PID ->
             %log:log(info, "[ PD ] find right pid"),
             PID
