@@ -162,7 +162,7 @@ test_set_get_node(NodeTest) ->
     node_details_equals(NodeDetails1_new, unknown, unknown, NodeTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, unknown, PredList, NodeTest, unknown, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_my_range(MyRange::node_details:node_range()) -> true.
+-spec test_set_get_my_range(MyRange::node_details:my_range()) -> true.
 test_set_get_my_range(MyRangeTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(cs_send:this(), 0), SuccList = [],
