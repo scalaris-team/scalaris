@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,73 +13,83 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : fd_pinger.erl
-%%% Author  : Christian Hennig <hennig@zib.de>
-%%% Description : 
-%% Author: christian
-%% Created: Jun 16, 2009
-%% Description: TODO: Add description to fd_pinger
+%%% File    fd_pinger.erl
+%%% @author Christian Hennig <hennig@zib.de>
+%%% @doc    Ping process for fd.erl.
+%%% @end
 %%%
 %%% Created :  12 Jan 2009 by Christian Hennig <hennig@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Christian Hennig <hennig@zib.de>
-%% @copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-
+%% @version $Id$
 -module(fd_pinger).
 -author('hennig@zib.de').
+-vsn('$Id$ ').
 
 -behavior(gen_component).
--export([init/1,on/2,start_link/1]).
 
--export([]).
+-include("scalaris.hrl").
 
+-export([init/1, on/2, start_link/1, check_config/0]).
 
+-type(state() :: {module(), cs_send:mypid(), Count::non_neg_integer()}).
+-type(message() ::
+    {stop} |
+    {pong} |
+    {timeout, OldCount::non_neg_integer()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc spawns a fd_pinger instance
-%% @spec start_link(term()) -> {ok, pid()}
+-spec start_link([module() | cs_send:mypid()]) -> {ok, pid()}.
+start_link([Module, Pid]) ->
+   gen_component:start_link(?MODULE, [Module, Pid], []).
 
-start_link([Module,Pid]) ->
-   gen_component:start_link(?MODULE, [Module,Pid], []).
-
-init([Module,Pid]) ->
+-spec init([module() | cs_send:mypid()]) -> state().
+init([Module, Pid]) ->
     log:log(info,"[ fd_pinger ~p ] starting Node", [self()]),
     cs_send:send(Pid, {ping, cs_send:this()}),
-    cs_send:send_local_after(failureDetectorInterval(), self(), {timeout,0}), 
-    {Module,Pid,0}.
+    cs_send:send_local_after(failureDetectorInterval(), self(), {timeout, 0}),
+    {Module, Pid, 0}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-on({stop},{_Module,_Pid,_Count}) ->
+-spec on(message(), state()) -> state() | unknown_event.
+on({stop}, {_Module, _Pid, _Count}) ->
     kill;
-on({pong},{Module,Pid,Count}) ->
-    {Module,Pid,Count+1};
-on({timeout,OldCount},{Module,Pid,Count}) ->
+on({pong}, {Module, Pid, Count}) ->
+    {Module, Pid, Count+1};
+on({timeout, OldCount}, {Module, Pid, Count}) ->
     case OldCount < Count of 
         true -> 
             cs_send:send(Pid, {ping, cs_send:this()}),
-            cs_send:send_local_after(failureDetectorInterval(), self(), {timeout,Count}),
-            {Module,Pid,Count};
+            cs_send:send_local_after(failureDetectorInterval(), self(), {timeout, Count}),
+            {Module, Pid, Count};
         false ->    
-           report_crash(Pid,Module),
+           report_crash(Pid, Module),
            kill
     end;
  on(_, _State) ->
     unknown_event.
-% @private
 
-%-spec(report_crash/1 :: (cs_send:mypid()) -> ok).
-report_crash(Pid,Module) ->
+%% @doc Checks whether config parameters of the gossip process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(failure_detector_interval) and
+    config:is_greater_than(failure_detector_interval, 0).
+
+%% @doc Reports the crash of the given pid to the given module.
+%% @private
+-spec report_crash(cs_send:mypid(), module()) -> ok.
+report_crash(Pid, Module) ->
     log:log(warn,"[ FD ] ~p crashed",[Pid]),
-    cs_send:send_local(Module , {crash, Pid}).
+    cs_send:send_local(Module, {crash, Pid}).
 
-%% @doc the interval between two failure detection runs
-%% @spec failureDetectorInterval() -> integer() | failed
+%% @doc The interval between two failure detection runs.
+-spec failureDetectorInterval() -> pos_integer().
 failureDetectorInterval() ->
     config:read(failure_detector_interval).
