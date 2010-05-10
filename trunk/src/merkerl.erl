@@ -89,7 +89,7 @@
 % @spec build_tree([{userdata(), hash()}]) -> tree()
 % @doc Build a Merkle tree from a list of pairs representing objects'
 %      names (keys) and hashes of their values.
--spec(build_tree/1 :: (list({userdata(), hash()})) -> tree()).
+-spec(build_tree/1 :: (list({userdata(), hash()})) -> #merk{}).
 build_tree([{K,H}]) ->
     insert({K,H},undefined);
 build_tree([{K,H}|KHL]) ->
@@ -362,7 +362,7 @@ mi_contains({Offset, MI}, Tree) ->
 % @doc A test function and example code.
 %
 % This should be changed into a proper unit test suite.
--spec(test_merkle/0 :: () -> boolean()).
+-spec(test_merkle/0 :: () -> true).
 test_merkle() ->
     A = [{one,"one data"},{two,"two data"},{three,"three data"},
 	 {four,"four data"},{five,"five data"}],
