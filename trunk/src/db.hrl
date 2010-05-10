@@ -38,7 +38,7 @@
          {NewDB::db(), Status::ok | failed}.
 
 -spec get_locks(DB::db(), Key::key()) ->
-         {DB::db(), {WriteLock::boolean(), ReadLock::integer(), Version::version()} | failed}.
+         {DB::db(), {WriteLock::boolean(), ReadLock::integer(), Version::version()} | {true, 0, -1} | failed}.
 
 -spec read(DB::db(), Key::key()) ->
          {ok, Value::value(), Version::version()} | {ok, empty_val, -1}.
@@ -47,7 +47,7 @@
          NewDB::db().
 
 -spec get_version(DB::db(), Key::key()) ->
-         {ok, Version::version()} | failed.
+         {ok, Version::version() | -1} | failed.
 
 -spec delete(DB::db(), Key::key()) ->
          {NewDB::db(), Status::ok | locks_set | undef}.
@@ -57,10 +57,10 @@
 -spec get_middle_key(DB::db()) -> {ok, MiddleKey::key()} | failed.
 
 -spec split_data(DB::db(), MyKey::key(), HisKey::key()) ->
-         {NewDB::db(), [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}}]}.
+         {NewDB::db(), [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()} | {empty_val, true, 0, -1}}]}.
 
 -spec get_data(DB::db()) ->
-         [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}}].
+         [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()} | {empty_val, true, 0, -1}}].
 
 -spec add_data(DB::db(), [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}}]) ->
          NewDB::db().
