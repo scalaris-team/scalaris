@@ -35,14 +35,6 @@
 
 -export([tp_validate/3, tp_commit/2, tp_abort/2]).
 
--import(?DB).
--import(gb_trees).
--import(lists).
--import(io).
--import(cs_send).
--import(timer).
-
-
 
 %% TP method:
 %%     validate operation on a certain item

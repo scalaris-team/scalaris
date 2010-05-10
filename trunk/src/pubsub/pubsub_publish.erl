@@ -28,11 +28,6 @@
 
 -export([publish/3, publish_internal/3]).
 
--import(json).
--import(io).
--import(http).
--import(jsonrpc).
-
 %%====================================================================
 %% public functions
 %%====================================================================

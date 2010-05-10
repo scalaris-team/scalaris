@@ -34,17 +34,6 @@
 
 -export([write2_read2/0]).
 
--import(cs_send).
--import(util).
--import(ct).
--import(boot_server).
--import(boot_logger).
--import(io).
--import(io_lib).
--import(lists).
--import(ioutils).
--import(timer).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

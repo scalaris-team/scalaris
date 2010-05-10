@@ -27,14 +27,6 @@
 
 -export([send/3, tcp_options/0, open_new/4, new/3, open_new_async/4]).
 
--import(config).
--import(gen_tcp).
--import(inet).
--import(io).
--import(io_lib).
--import(log).
--import(timer).
-
 -include("scalaris.hrl").
 
 %% @doc new accepted connection. called by comm_acceptor

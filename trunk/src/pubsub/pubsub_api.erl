@@ -28,10 +28,6 @@
 
 -export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
 
--import(transaction_api).
--import(io).
--import(lists).
-
 %%====================================================================
 %% public functions
 %%====================================================================

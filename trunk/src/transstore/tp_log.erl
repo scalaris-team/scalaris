@@ -31,9 +31,6 @@
 
 -export([get_log/1, new_item/6, new_logentry/3, add_to_undecided/3, remove_from_undecided/4]).
 
--import(gb_trees).
--import(lists).
-
 
 %%% Structure of the transaction log:
 %%% top gb_tree:  key: TransID

@@ -29,14 +29,6 @@
 
 -export([start_link/1, init/2]).
 
--import(comm_connection).
--import(config).
--import(gen_tcp).
--import(inet).
--import(log).
--import(lists).
--import(process_dictionary).
-
 -spec start_link(instanceid()) -> {ok, pid()}.
 start_link(InstanceId) ->
     Pid = spawn_link(comm_acceptor, init, [InstanceId, self()]),

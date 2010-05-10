@@ -30,15 +30,6 @@
 	 do_transaction/3, do_transaction_wo_rp/3, commit/1, jWrite/3, 
      jRead/2, jParallel_reads/2, delete/2]).
 
--import(crypto).
--import(cs_send).
--import(erlang).
--import(io).
--import(ct).
--import(lists).
--import(process_dictionary).
--import(random).
-
 %%===================================================================
 %% HOWTO do a transaction:
 %% To execute a transaction including a readphase use do_transaction

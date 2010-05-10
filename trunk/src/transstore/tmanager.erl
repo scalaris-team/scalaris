@@ -29,19 +29,6 @@
 -include("trecords.hrl").
 -include("scalaris.hrl").
 
--import(boot_logger).
--import(config).
--import(cs_send).
--import(ct).
--import(dict).
--import(erlang).
--import(io_lib).
--import(io).
--import(lists).
--import(?RT).
--import(timer).
--import(txlog).
-
 -export([start_manager/6, start_manager_commit/6, start_replicated_manager/2]).
 
 %% for timer module

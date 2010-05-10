@@ -31,14 +31,6 @@
 
 -export([process_vote/2, process_vote_ack/5, process_read_vote/2, collect_rv_ack/5, vote_for_suspected/1]).
 
--import(config).
--import(cs_send).
--import(dict).
--iport(erlang).
--import(io).
--import(lists).
--import(?RT).
-
 %%--------------------------------------------------------------------
 %% Function: check_vote/2
 %% Purpose:  check whether the vote can be accepted or there has been
