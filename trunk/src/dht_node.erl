@@ -319,7 +319,20 @@ on({dump}, State) ->
     State;
 
 on({'$gen_cast', {debug_info, Requestor}}, State) ->
-    cs_send:send_local(Requestor , {debug_info_response, [{"rt_size", ?RT:get_size(dht_node_state:rt(State))}]}),
+    KeyValueList =
+        [{"rt_size", ?RT:get_size(dht_node_state:rt(State))},
+         {"succs", lists:flatten(io_lib:format("~p", [dht_node_state:succs(State)]))},
+         {"preds", lists:flatten(io_lib:format("~p", [dht_node_state:preds(State)]))},
+         {"me", lists:flatten(io_lib:format("~p", [dht_node_state:me(State)]))},
+         {"my_range", lists:flatten(io_lib:format("~p", [dht_node_state:get_my_range(State)]))},
+%%          {"lb", lists:flatten(io_lib:format("~p", [dht_node_state:get_lb(State)]))},
+%%          {"deadnodes", lists:flatten(io_lib:format("~p", [dht_node_state:???(State)]))},
+         {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get_join_time(State))]))},
+%%          {"db", lists:flatten(io_lib:format("~p", [dht_node_state:get_db(State)]))},
+%%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get_trans_log(State)]))},
+%%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get_my_proposer(State)]))},
+         {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get_tx_tp_db(State)]))}],
+    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 
 

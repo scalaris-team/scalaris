@@ -23,8 +23,8 @@
 
 -export([new/6, new/7,
          id/1, me/1,
-         succ/1, succ_pid/1, succ_id/1,
-         pred_pid/1, pred_id/1, pred/1,
+         succs/1, succ/1, succ_pid/1, succ_id/1,
+         preds/1, pred/1, pred_pid/1, pred_id/1,
          load/1,
          update_preds_succs/3,
          update_succs/2,
@@ -38,6 +38,7 @@
          get_my_proposer/1,
          get_tx_tp_db/1, set_tx_tp_db/2,
          next_interval/1,
+         get_join_time/1,
          %%transactions
          get_trans_log/1,
          set_trans_log/2]).
@@ -210,6 +211,11 @@ get_trans_log(#state{trans_log=Log}) ->
 -spec set_trans_log(state(), #translog{}) -> state().
 set_trans_log(State, NewLog) ->
     State#state{trans_log=NewLog}.
+
+%% @doc Gets the time the node was created, i.e. joined the system.
+-spec get_join_time(State::state()) -> join_time().
+get_join_time(#state{join_time=JoinTime}) ->
+    JoinTime.
 
 %% @doc Sets the predecessor and successor lists.
 -spec update_preds_succs(state(), [node:node_type(),...], [node:node_type(),...]) -> state().
