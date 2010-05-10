@@ -115,25 +115,25 @@ pdb_set(_Config) ->
 
 erlang_send(_Config) ->
     Pid = spawn(?MODULE, helper_rec, [count(), self()]),
-    iter(count(), fun() -> Pid ! ping end, "erlang:send"),
-    receive pong -> ok end,
+    iter(count(), fun() -> Pid ! {ping} end, "erlang:send"),
+    receive {pong} -> ok end,
     ok.
 
 cs_send_local(_Config) ->
     Pid = spawn(?MODULE, helper_rec, [count(), self()]),
-    iter(count(), fun() -> cs_send:send_local(Pid, ping) end, "cs_send_local"),
-    receive pong -> ok end,
+    iter(count(), fun() -> cs_send:send_local(Pid, {ping}) end, "cs_send_local"),
+    receive {pong} -> ok end,
     ok.
 
-helper_rec(0, Pid) -> Pid ! pong;
+helper_rec(0, Pid) -> Pid ! {pong};
 helper_rec(Iter, Pid) ->
     receive _Any -> ok end,
     helper_rec(Iter - 1, Pid).
 
 erlang_send_after(_Config) ->
     Pid = spawn(?MODULE, helper_rec, [count(), self()]),
-    iter(count(), fun() -> cs_send:send_local_after(5000, Pid, ping) end, "cs_send:send_after"),
-    receive pong -> ok end,
+    iter(count(), fun() -> cs_send:send_local_after(5000, Pid, {ping}) end, "cs_send:send_after"),
+    receive {pong} -> ok end,
     ok.
 
 erlang_spawn(_Config) ->
@@ -168,8 +168,8 @@ md5(_Config) ->
 
 next_hop(_Config) ->
     {ok, _Pid} = process_dictionary:start_link(),
-    process_dictionary:register_process(?MODULE, "process_dictionary", self()),
-    proposer:start_link(?MODULE),
+    process_dictionary:register_process(atom_to_list(?MODULE), process_dictionary, self()),
+    proposer:start_link(atom_to_list(?MODULE)),
     RT = gb_trees:enter(1, succ,
           gb_trees:enter(2, pred,
            gb_trees:enter(3, succ,
@@ -184,15 +184,15 @@ next_hop(_Config) ->
     gen_component:kill(process_dictionary),
     catch unregister(process_dictionary),
     iter(count(), fun () ->
-                          rt_chord:next_hop(State, 42)
-               end, "next_hop"),
+                           rt_chord:next_hop(State, 42)
+         end, "next_hop"),
     ok.
 
 process_dictionary_lookup(_Config) ->
     {ok, _Pid} = process_dictionary:start_link(),
-    process_dictionary:register_process(?MODULE, process_dictionary, self()),
+    process_dictionary:register_process(atom_to_list(?MODULE), process_dictionary, self()),
     iter(count(), fun () ->
-                          process_dictionary:lookup_process(?MODULE,
+                          process_dictionary:lookup_process(atom_to_list(?MODULE),
                                                             process_dictionary)
                   end, "lookup_process by instance_id"),
     gen_component:kill(process_dictionary),
@@ -201,7 +201,7 @@ process_dictionary_lookup(_Config) ->
 
 process_dictionary_lookup_by_pid(_Config) ->
     {ok, _Pid} = process_dictionary:start_link(),
-    process_dictionary:register_process(?MODULE, process_dictionary, self()),
+    process_dictionary:register_process(atom_to_list(?MODULE), process_dictionary, self()),
     iter(count(), fun () ->
                           process_dictionary:lookup_process(self())
                   end, "lookup_process by pid"),

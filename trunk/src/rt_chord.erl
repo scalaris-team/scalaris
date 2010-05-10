@@ -34,7 +34,7 @@
 -export([stabilize/5]).
 
 %% userdevguide-begin rt_chord:types
--type(key()::pos_integer()).
+-type(key()::non_neg_integer()).
 -type(rt()::gb_tree()).
 -type(external_rt()::gb_tree()).
 -type(dict_type() :: dict()).

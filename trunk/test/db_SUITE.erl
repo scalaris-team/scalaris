@@ -54,26 +54,19 @@ init_per_suite(Config) ->
     ct:pal("DB suite running with: ~p~n", [?DB]),
     file:set_cwd("../bin"),
     case ?DB of
-	cs_db_otp ->
-	    Pid = spawn(fun () ->
-				process_dictionary:start_link(),
-				?DB:start_link("db_SUITE.erl"),
-				timer:sleep(30000)
-			end),
-	    timer:sleep(100),
-	    [{wrapper_pid, Pid} | Config];
-	db_gb_trees ->
-	    Config;
-	db_ets ->
-	    Config;
+        db_gb_trees ->
+            Config;
+        db_ets ->
+            Config;
         db_tcerl ->
-	    Pid = spawn(fun () ->
-                                config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-				timer:sleep(10000)
-			end),
+            Pid = 
+                spawn(fun () ->
+                               config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                               timer:sleep(10000)
+                      end),
             tcerl:start(),
-	    timer:sleep(100),
-	    [{wrapper_pid, Pid} | Config]
+            timer:sleep(100),
+            [{wrapper_pid, Pid} | Config]
     end.
 
 end_per_suite(Config) ->
@@ -214,5 +207,3 @@ get_load_and_middle(_Config) ->
     DB8 = ?DB:add_data(DB7, HisList),
     ?assert(OrigFullList == ?DB:get_data(DB8)),
     ?DB:close(DB).
-
-

@@ -41,7 +41,7 @@ init_per_suite(Config) ->
 			config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
 			crypto:start(),
 			process_dictionary:start_link(),
-			idholder:start_link(foo),
+			idholder:start_link("foo"),
 			timer:sleep(5000)
 		end),
     timer:sleep(1000),
@@ -55,7 +55,7 @@ end_per_suite(Config) ->
 
 getset_key(_Config) ->
     util:dump2(),
-    process_dictionary:register_process(foo, foo, self()),
+    process_dictionary:register_process("foo", foo, self()),
     idholder:get_key(),
     _X = receive
 	{get_key_response_keyholder, D} ->

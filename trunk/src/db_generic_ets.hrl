@@ -170,21 +170,14 @@ split_data(DB, MyKey, HisKey) ->
 % update only if no locks are taken and version number is higher
 update_if_newer(OldDB, KVs) ->
     F = fun ({Key, Value, Version}, DB) ->
-                case ?ETS:lookup(DB, Key) of
-                    [] ->
-                        ?ETS:insert(DB, {Key, {Value, false, 0, Version}}),
-                        DB;
-                    [{_Value, WriteLock, ReadLock, OldVersion}] ->
-                        case not WriteLock andalso
-                            ReadLock == 0 andalso
-                            OldVersion < Version of
-                            true ->
-                                ?ETS:insert(DB, {Key, {Value, WriteLock,
-                                                       ReadLock, Version}}),
-                                DB;
-                            false -> DB
-                        end
-                end
+                 case ?ETS:lookup(DB, Key) of
+                     [] ->
+                         ?ETS:insert(DB, {Key, {Value, false, 0, Version}});
+                     [{_Value, false, 0, OldVersion}] when OldVersion < Version ->
+                         ?ETS:insert(DB, {Key, {Value, false, 0, Version}});
+                     _ -> ok
+                 end,
+                 DB
         end,
     lists:foldl(F, OldDB, KVs).
 

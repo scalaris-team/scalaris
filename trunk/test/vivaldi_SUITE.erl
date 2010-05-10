@@ -77,8 +77,8 @@ test_init(Config) ->
     Config.
 
 test_on_trigger(Config) ->
-    process_dictionary:register_process(vivaldi_group, cyclon, self()),
-    Coordinate = [1, 1],
+    process_dictionary:register_process(atom_to_list(?MODULE), cyclon, self()),
+    Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     {NewCoordinate, NewConfidence, NewTriggerState} =
@@ -96,7 +96,7 @@ test_on_trigger(Config) ->
 test_on_vivaldi_shuffle(Config) ->
     config:write(vivaldi_count_measurements, 1),
     config:write(vivaldi_measurements_delay, 0),
-    Coordinate = [1, 1],
+    Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     _NewState = vivaldi:on({vivaldi_shuffle, cs_send:this(), [0.0, 0.0], 1.0},
@@ -111,7 +111,7 @@ test_on_vivaldi_shuffle(Config) ->
     Config.
 
 test_on_cy_cache1(Config) ->
-    Coordinate = [1, 1],
+    Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % empty node cache
@@ -125,9 +125,9 @@ test_on_cy_cache1(Config) ->
     Config.
 
 test_on_cy_cache2(Config) ->
-    process_dictionary:register_process(vivaldi_group, dht_node, self()),
+    process_dictionary:register_process(atom_to_list(?MODULE), dht_node, self()),
 
-    Coordinate = [1, 1],
+    Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
@@ -141,12 +141,12 @@ test_on_cy_cache2(Config) ->
     Config.
 
 test_on_cy_cache3(Config) ->
-    erlang:put(instance_id, vivaldi_group),
+    erlang:put(instance_id, atom_to_list(?MODULE)),
     % register some other process as the dht_node
     DHT_Node = fake_dht_node(),
 %%     ?equals(process_dictionary:get_group_member(dht_node), DHT_Node),
 
-    Coordinate = [1, 1],
+    Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
@@ -186,7 +186,7 @@ fake_dht_node() ->
     end.
 
 fake_dht_node_start(Supervisor) ->
-    process_dictionary:register_process(vivaldi_group, dht_node, self()),
+    process_dictionary:register_process(atom_to_list(?MODULE), dht_node, self()),
     Supervisor ! {started, self()},
     fake_process().
 

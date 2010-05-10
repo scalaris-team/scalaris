@@ -249,18 +249,12 @@ build_merkle_tree(DB, Range) ->
 % update only if no locks are taken and version number is higher
 update_if_newer(OldDB,  KVs) ->
     F = fun ({Key, Value, Version}, DB) ->
-                case gb_trees:lookup(Key, DB) of
-                    none ->
-                        gb_trees:insert(Key, {Value, false, 0, Version}, DB);
-                    {value, {_Value, WriteLock, ReadLock, OldVersion}} ->
-                        case not WriteLock andalso ReadLock == 0 andalso OldVersion < Version of
-                            true ->
-                                gb_trees:update(Key,
-                                                {Value, WriteLock, ReadLock, Version},
-                                                DB);
-                            false ->
-                                DB
-                        end
+                 case gb_trees:lookup(Key, DB) of
+                     none ->
+                         gb_trees:insert(Key, {Value, false, 0, Version}, DB);
+                     {value, {_Value, false, 0, OldVersion}} when OldVersion < Version ->
+                         gb_trees:update(Key, {Value, false, 0, Version}, DB);
+                     _ -> DB
                 end
         end,
     lists:foldl(F, OldDB, KVs).
