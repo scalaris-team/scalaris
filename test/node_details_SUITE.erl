@@ -70,17 +70,17 @@ end_per_suite(Config) ->
     Config.
 
 -spec node_details_equals(NodeDetails::node_details:node_details(),
-                          Pred::node_details:node_type(),
-                          PredList::node_details:nodelist(),
-                          Node::node_details:node_type(),
-                          MyRange::node_details:my_range(),
-                          Succ::node_details:node_type(),
-                          SuccList::node_details:nodelist(),
-                          Load::node_details:load(),
-                          Hostname::node_details:hostname(),
-                          RTSize::node_details:rt_size(),
-                          MsgLog::node_details:message_log(),
-                          Memory::node_details:memory()) -> true.
+                          Pred::node_details:node_type() | unknown,
+                          PredList::node_details:nodelist() | unknown,
+                          Node::node_details:node_type() | unknown,
+                          MyRange::node_details:my_range() | unknown,
+                          Succ::node_details:node_type() | unknown,
+                          SuccList::node_details:nodelist() | unknown,
+                          Load::node_details:load() | unknown,
+                          Hostname::node_details:hostname() | unknown,
+                          RTSize::node_details:rt_size() | unknown,
+                          MsgLog::node_details:message_log() | unknown,
+                          Memory::node_details:memory() | unknown) -> true.
 node_details_equals(NodeDetails, Pred, PredList, Node, MyRange, Succ, SuccList, Load, Hostname, RTSize, MsgLog, Memory) ->
     ?equals(node_details:get(NodeDetails, pred), Pred),
     ?equals(node_details:get(NodeDetails, predlist), PredList),

@@ -73,3 +73,6 @@
 
 -spec build_merkle_tree(DB::db(), Range::intervals:interval()) ->
          MerkerlTree::merkerl:tree().
+
+-spec update_if_newer(OldDB::db(), KVs::[{Key::key(), Value::value(), Version::version()}]) ->
+         NewDB::db().
