@@ -313,7 +313,7 @@ toString(X) ->
 %% @doc Returns the pid of the process dictionary.
 -spec get_pid() -> pid() | failed.
 get_pid() ->
-    case whereis(process_dictionary) of
+    case whereis(?MODULE) of
         undefined ->
             log:log(error, "[ PD ] call of get_pid undefined"),
             failed;
