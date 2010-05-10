@@ -1,4 +1,6 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+%             2002-2007 Alexey Shchepin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -11,16 +13,13 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%----------------------------------------------------------------------
-%%% File    : randoms.erl
-%%% Author  : Thorsten Schuett
-%%% Purpose :
-%%% Created : 13 Dec 2002 by Alexey Shchepin <alexey@sevcom.net>
-%%% Id      : $Id$
-%%%----------------------------------------------------------------------
-
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2002-2007 Alexey Shchepin
+%%%-------------------------------------------------------------------
+%%% File    randoms.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    
+%%% @end
+%%% Created :  13 Dec 2002 by Alexey Shchepin <alexey@sevcom.net>
+%%%-------------------------------------------------------------------
 %% @version $Id$
 -module(randoms).
 
@@ -29,75 +28,15 @@
 
 -include("scalaris.hrl").
 
--export([getRandomId/0, start/0, rand_uniform/2, init/2]).
+-export([start/0, getRandomId/0, rand_uniform/2]).
 
-
-
-
-
--ifdef(SIMULATION).
-
--export([start_seed/1]).
-
-start() -> 
-    crypto:start().
-
-start_seed(Seed) ->
-    spawn_link(?MODULE,init,[Seed,self()]),
-    receive 
-        {ok} ->
-                ok
-    end.
-
-getRandomId() ->
-    random ! {getRandomId,self()},
-    receive
-         {getRandomId_response,T} ->
-               T
-    end.
-    
-rand_uniform(L,H) ->
-  
-    random ! {rand_uniform,L,H,self()},
-    receive
-         {rand_uniform_response,T} ->
-               
-               T
-    end.
-    
-
-    
-
--else.
-
-
+-spec start() -> ok.
 start() -> crypto:start().
+
+-spec getRandomId() -> string().
 getRandomId() ->
-    integer_to_list(crypto:rand_uniform(1, 65536 * 65536)).
-rand_uniform(L,H) ->
-    crypto:rand_uniform(L, H).
+    integer_to_list(rand_uniform(1, 65536 * 65536)).
 
-
--endif.
-
-init({A,B,C},Sup) ->
-    random:seed(A,B,C),
-    register(random,self()),
-    Sup ! {ok},
-    loop().
-
-loop() ->
-    
-    receive
-        {rand_uniform,L,H,S} ->
-            %S ! crypto:rand_uniform(L, H),
-            S !  {rand_uniform_response,random:uniform(H-L)+L-1},
-            loop();
-        {getRandomId,S} ->
-            S ! {getRandomId_response,integer_to_list(random:uniform(65536 * 65536))},
-            loop();
-        _ -> 
-            io:format("Randoms unhadle message"),
-             halt(-1)
-     end.
-
+-spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
+rand_uniform(Lo, Hi) ->
+    crypto:rand_uniform(Lo, Hi).

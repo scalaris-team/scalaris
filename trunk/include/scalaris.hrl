@@ -56,7 +56,6 @@
 
 -define(TCP_LAYER, true). % TCP communication
 %-define(BUILTIN, true).   % distributed Erlang native communication
-%-define(SIMULATION, true).
 
 
 % enable logging of message statistics
