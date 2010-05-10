@@ -13,7 +13,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : cs_send.erl
+%%% File    cs_send.erl
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    Message Sending.
 %%%  
@@ -61,9 +61,6 @@
 -type mypid_plain() :: {inet:ip_address(), integer(), erl_pid_plain()}.
 -endif.
 -ifdef(BUILTIN).
--type mypid_plain() :: erl_pid_plain().
--endif.
--ifdef(SIMULATION).
 -type mypid_plain() :: erl_pid_plain().
 -endif.
 
@@ -219,56 +216,6 @@ get(Name, Pid = _Node) ->
     Name.
 
 %% @doc BUILTIN: Checks if the given pid is valid. 
-is_valid({Pid, c, _Cookie}) ->
-    is_valid(Pid);
-%% -type erl_pid_plain() :: pid() | reg_name() | port() | {reg_name(), node()}.
-is_valid(Pid) when is_pid(Pid) or is_atom(Pid) or is_port(Pid) ->
-    true;
-is_valid({RegName, _Node}) when is_atom(RegName) ->
-    true;
-is_valid(_) ->
-    false.
-
--endif.
--ifdef(SIMULATION).
-
-%% @doc SIMULATION: Returns the pid of the current process.
--spec this() -> pid().
-this() ->
-    self().
-
-%% @doc SIMULATION: Sends a message to a process given by its pid.
-send({Pid, c, Cookie}, Message) ->
-    send(Pid, {Message, Cookie});
-send(Pid, Message) ->
-    %Pid ! Message.
-    scheduler:send(Pid,Message).
-
-%% @doc SIMULATION: Sends a message to a local process given by its local pid
-%%      (as returned by self()).
-send_local({Pid, c, Cookie}, Message) ->
-    send_local(Pid, {Message, Cookie});
-send_local(Pid, Message) ->
-    scheduler:send(0, Pid , Message).
-
-%% @doc SIMULATION: Sends a message to a local process given by its local pid
-%%      (as returned by self()) after the given delay in milliseconds.
-%%      TODO: since no timer reference is returned, methods using them will fail!
-send_local_after(Delay, {Pid, c, Cookie}, Message) ->
-    send_local_after(Delay, Pid, {Message, Cookie});
-send_local_after(Delay, Pid, Message) ->
-    scheduler:send(Delay, Pid, Message).
-
-%% @doc SIMULATION: Creates the pid a process with name Name would have on node
-%%      _Node.
-get(Name, {Pid, c, Cookie} = _Node) ->
-    {get(Name, Pid), c, Cookie};
-get(Name, {_Pid,Host} = _Node) ->
-    {Name, Host};
-get(Name, Pid = _Node) ->
-    Name.
-
-%% @doc SIMULATION: Checks if the given pid is valid. 
 is_valid({Pid, c, _Cookie}) ->
     is_valid(Pid);
 %% -type erl_pid_plain() :: pid() | reg_name() | port() | {reg_name(), node()}.
