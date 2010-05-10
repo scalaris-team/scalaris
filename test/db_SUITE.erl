@@ -27,8 +27,6 @@
 
 -include("../include/scalaris.hrl").
 
--import(?DB).
-
 -include("unittest.hrl").
 
 all() ->

@@ -28,9 +28,6 @@
 
 -behaviour(gen_server).
 
--import(gb_trees).
--import(gen_server).
-
 %% API
 -export([start_link/0]).
 

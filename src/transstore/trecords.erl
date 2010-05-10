@@ -45,11 +45,6 @@
 -export([items_get_keys/1]).
 -export([items_get_item_by_key/2, items_update_item/3]).
 
--import(dict).
--import(lists).
--import(?RT).
--import(txlog).
-
 %%--------------------------------------------------------------------
 %% Function: new_tm_state/4
 %% Purpose:  create a record with the state of the tm

@@ -32,10 +32,6 @@
 
 -export([start_link/0, send/2, this/0, here/1, is_valid/1]).
 
--import(io).
--import(util).
--import(log).
-
 -include("scalaris.hrl").
 
 %% @type process_id() = {inet:ip_address(), int(), pid()}.

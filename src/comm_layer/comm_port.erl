@@ -31,11 +31,6 @@
 
 -include("scalaris.hrl").
 
--import(ets).
--import(gen_server).
--import(io).
--import(log).
-
 -define(ASYNC, true).
 %-define(SYNC, true).
 

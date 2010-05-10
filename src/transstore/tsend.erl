@@ -42,16 +42,6 @@
          send_prepare_item/2,
          send_vote_to_rtms/2]).
 
--import(cs_lookup).
--import(cs_send).
--import(dict).
--import(erlang).
--import(io).
--import(lists).
--import(process_dictionary).
--import(?RT).
--import(util).
-
 send_to_rtms_with_lookup(TID, Message)->
     RTMKeys = transaction:getRTMKeys(TID),
     ?TLOG("sent_to_rtms_with_lookup"),

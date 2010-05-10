@@ -46,18 +46,6 @@
 %        write_read_receive/3
          ]).
 
--import(config).
--import(cs_lookup).
--import(cs_send).
--import(dict).
--import(erlang).
--import(io).
--import(lists).
--import(node).
--import(process_dictionary).
--import(?RT).
--import(txlog).
-
 
 %%--------------------------------------------------------------------
 %% Function: do_transaction(State,

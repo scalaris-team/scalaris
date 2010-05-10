@@ -28,8 +28,6 @@
 -vsn('$Id$').
 
 -include("trecords.hrl").
--import(io).
--import(lists).
 
 %% Operations on TransLogs
 -export([new/0]).
