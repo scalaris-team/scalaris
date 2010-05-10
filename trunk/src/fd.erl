@@ -128,10 +128,6 @@ start_pinger(Pid) ->
    {ok, Pid2} = fd_pinger:start_link([my_fd_pid(), Pid]),
    Pid2.
 
-%% start_linker() ->
-%%    fd_linker:start_link(randoms:getRandomId(),
-%%                         [my_fd_pid(),{process_flag(trap_exit, true)}]).
-
 
 %% gen_component functions
 %% @doc Starts the failure detector server
