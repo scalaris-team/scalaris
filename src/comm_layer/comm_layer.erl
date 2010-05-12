@@ -57,7 +57,8 @@ send({{_IP1, _IP2, _IP3, _IP4} = IP, Port, Pid} = Target, Message) ->
     if
         IsLocal ->
             ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
-            Pid ! Message;
+            Pid ! Message,
+            ok;
         true ->
             comm_port:send(Target, Message)
     end;

@@ -141,7 +141,6 @@ this() ->
 send({Pid, c, Cookie}, Message) ->
     send(Pid, {Message, Cookie});
 send(Pid, Message) ->
-    %Pid ! Message.
     comm_layer:send(Pid, Message).
 
 %% @doc TCP_LAYER: Sends a message to a local process given by its local pid
@@ -149,7 +148,8 @@ send(Pid, Message) ->
 send_local({Pid, c, Cookie}, Message) ->
     send_local(Pid, {Message, Cookie});
 send_local(Pid, Message) ->
-    Pid ! Message.
+    Pid ! Message,
+    ok.
 
 %% @doc TCP_LAYER: Sends a message to a local process given by its local pid
 %%      (as returned by self()) after the given delay in milliseconds.
@@ -180,17 +180,16 @@ this() ->
     self().
 
 %% @doc BUILTIN: Sends a message to a process given by its pid.
-send({Pid, c, Cookie}, Message) ->
-    send(Pid, {Message, Cookie});
 send(Pid, Message) ->
-    Pid ! Message.
+    send_local(Pid, Message).
 
 %% @doc BUILTIN: Sends a message to a local process given by its local pid
 %%      (as returned by self()).
 send_local({Pid, c, Cookie}, Message) ->
     send_local(Pid, {Message, Cookie});
 send_local(Pid, Message) ->
-    Pid ! Message.
+    Pid ! Message,
+    ok.
 
 %% @doc BUILTIN: Sends a message to a local process given by its local pid
 %%      (as returned by self()) after the given delay in milliseconds.
