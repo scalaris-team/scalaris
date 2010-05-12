@@ -362,7 +362,7 @@ update_dht_node(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
         RndView::[node:node_type()], Me::node:node_type()) ->
               {Pred::node:node_type(), Succ::node:node_type()}.
 get_safe_pred_succ(Preds, Succs, RndView, Me) ->
-    case (Preds =:= []) or (Succs =:= []) of
+    case (Preds =:= []) orelse (Succs =:= []) of
         true ->
             Buffer = merge(Preds ++ Succs, RndView,node:id(Me)),
             %io:format("Buffer: ~p~n",[Buffer]),

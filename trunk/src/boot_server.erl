@@ -21,7 +21,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
-%% @doc The boot server maintains a list of chord# nodes and checks the 
+%% @doc The boot server maintains a list of scalaris nodes and checks the 
 %%  availability using a failure_detector. It also exports a webpage 
 %%  on port 8000 containing some statistics. Its main purpose is to 
 %%  give new chord# nodes a list of nodes already in the system.

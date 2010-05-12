@@ -114,11 +114,11 @@ make_global(Pid) ->
 %% @doc Gets the tag of a message (the first element of its tuple - should be an
 %%      atom).
 -spec get_msg_tag(message() | group_message()) -> atom().
-get_msg_tag({Message, _Cookie}) when is_tuple(Message) and is_atom(erlang:element(1, Message)) ->
+get_msg_tag({Message, _Cookie}) when is_tuple(Message) andalso is_atom(erlang:element(1, Message)) ->
     get_msg_tag(Message);
-get_msg_tag({send_to_group_member, _ProcessName, Message}) when is_tuple(Message) and is_atom(erlang:element(1, Message)) ->
+get_msg_tag({send_to_group_member, _ProcessName, Message}) when is_tuple(Message) andalso is_atom(erlang:element(1, Message)) ->
     get_msg_tag(Message);
-get_msg_tag(Message) when is_tuple(Message) and is_atom(erlang:element(1, Message)) ->
+get_msg_tag(Message) when is_tuple(Message) andalso is_atom(erlang:element(1, Message)) ->
     erlang:element(1, Message).
 
 % specs for the functions below which differ depending on the currently defined
@@ -219,7 +219,7 @@ get(Name, Pid = _Node) ->
 is_valid({Pid, c, _Cookie}) ->
     is_valid(Pid);
 %% -type erl_pid_plain() :: pid() | reg_name() | port() | {reg_name(), node()}.
-is_valid(Pid) when is_pid(Pid) or is_atom(Pid) or is_port(Pid) ->
+is_valid(Pid) when is_pid(Pid) orelse is_atom(Pid) orelse is_port(Pid) ->
     true;
 is_valid({RegName, _Node}) when is_atom(RegName) ->
     true;

@@ -268,7 +268,7 @@ set(State, Key, Value) when is_record(State, state) ->
 %$ @doc Sets the values of a gossip state.
 -spec set_values(state(), values_internal()) -> state().
 set_values(State, Values)
-  when (is_record(State, state) and is_record(Values, values_internal)) ->
+  when (is_record(State, state) andalso is_record(Values, values_internal)) ->
 	State#state{values=Values}.
 
 %$ @doc Sets that local load and key range information have been integrated into
@@ -348,7 +348,7 @@ calc_size_kr(State) when is_record(State, state) ->
 calc_stddev(State) when is_record(State, values_internal) ->
 	Avg = get(State, avgLoad),
 	Avg2 = get(State, avgLoad2),
-	case (Avg =:= unknown) or (Avg2 =:= unknown) of
+	case (Avg =:= unknown) orelse (Avg2 =:= unknown) of
 		true -> unknown;
 		false ->
             Tmp = Avg2 - (Avg * Avg),

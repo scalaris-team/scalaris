@@ -181,7 +181,7 @@ write_read_receive(ReplicaKeys, Operation, State)->
     if (NumOk >= Quorum) ->
             {value, Result};
        (NumFailed >= Quorum)
-       and (Operation =:= write) ->
+       andalso (Operation =:= write) ->
             % Assume a new key
             {value, {0, -1}};
        (NumFailed >= Quorum) ->

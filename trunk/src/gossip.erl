@@ -170,7 +170,7 @@ previous_or_current(PreviousState, CurrentState) ->
     MinConvergeAvgCount = get_converge_avg_count(),
     CurrentEpsilonCount_Avg = gossip_state:get(CurrentState, converge_avg_count),
     _BestValue =
-        case (not CurrentInitialized) or (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
+        case (not CurrentInitialized) orelse (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
             true -> PreviousState;
             false -> CurrentState
         end.

@@ -75,13 +75,13 @@ is_valid(_) ->
 equals(Node1, Node2) when ((Node1 =:= null) orelse (Node1 =:= unknown) orelse
                            (Node2 =:= null) orelse (Node2 =:= unknown)) ->
     false;
-equals(Node1, Node2) when is_record(Node1, node) and is_record(Node2, node) ->
+equals(Node1, Node2) when is_record(Node1, node) andalso is_record(Node2, node) ->
     pidX(Node1) =:= pidX(Node2);
-equals(Pid1, Node2) when is_record(Node2, node) and is_pid(Pid1) ->
+equals(Pid1, Node2) when is_record(Node2, node) andalso is_pid(Pid1) ->
     cs_send:make_global(Pid1) =:= pidX(Node2);
 equals(Pid1, Node2) when is_record(Node2, node) ->
     Pid1 =:= pidX(Node2);
-equals(Node1, Pid2) when is_record(Node1, node) and is_pid(Pid2)->
+equals(Node1, Pid2) when is_record(Node1, node) andalso is_pid(Pid2)->
     pidX(Node1) =:= cs_send:make_global(Pid2);
 equals(Node1, Pid2) when is_record(Node1, node) ->
     pidX(Node1) =:= Pid2.

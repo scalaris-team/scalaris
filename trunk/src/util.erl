@@ -59,29 +59,29 @@ is_between(plus_infinity, plus_infinity, _) ->
 is_between(plus_infinity, minus_infinity, _) ->
     true;
 is_between(Begin, Id, End) when Begin < End ->
-    (Begin < Id) and (Id =< End);
+    (Begin < Id) andalso (Id =< End);
 is_between(Begin, Id, End) ->
-    (Begin < Id) or (Id =< End).
+    (Begin < Id) orelse (Id =< End).
 
 
 is_between_stab(Begin, Id, End) ->
     if
         Begin < End ->
-            (Begin < Id) and (Id < End);
+            (Begin < Id) andalso (Id < End);
         Begin == End ->
             true;
         true ->
-            (Begin < Id) or (Id < End)
+            (Begin < Id) orelse (Id < End)
     end.
 
 is_between_closed(Begin, Id, End) ->
     if
         Begin < End ->
-            (Begin < Id) and (Id < End);
+            (Begin < Id) andalso (Id < End);
         Begin == End ->
             Id =/= End;
         true ->
-            (Begin < Id) or (Id < End)
+            (Begin < Id) orelse (Id < End)
     end.
 
 
