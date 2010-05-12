@@ -128,7 +128,7 @@ tester_normalize_well_formed(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec(prop_cut/3 :: (intervals:interval(), intervals:interval(), intervals:key()) -> boolean()).
 prop_cut(A, B, X) ->
-    ?implies(intervals:in(X, A) and intervals:in(X, B),
+    ?implies(intervals:in(X, A) andalso intervals:in(X, B),
              intervals:in(X, intervals:cut(A, B))).
 
 -spec(prop_cut_well_formed/2 :: (intervals:interval(), intervals:interval()) -> boolean()).
@@ -144,7 +144,7 @@ prop_not_cut(A, B, X) ->
 -spec(prop_not_cut2/3 :: (intervals:interval(), intervals:interval(), intervals:key()) -> boolean()).
 prop_not_cut2(A, B, X) ->
     ?implies(not intervals:in(X, A)
-             and not intervals:in(X, B),
+             andalso not intervals:in(X, B),
              not intervals:in(X, intervals:cut(A, B))).
 
 tester_cut(_Config) ->

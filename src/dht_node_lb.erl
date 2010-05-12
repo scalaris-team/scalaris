@@ -47,7 +47,7 @@ balance_load(State) ->
 check_balance(State, Source_PID, Load) ->
     MyLoad = dht_node_state:load(State),
     if
-	(MyLoad * 2 < Load) and (Load > 1) ->
+	(MyLoad * 2 < Load) andalso (Load > 1) ->
 	    cs_send:send(Source_PID, {get_middle_key, cs_send:this()}),
 	    ok;
 	true ->
@@ -60,7 +60,7 @@ get_middle_key(State) ->
     LastKeys = last_keys(LB),
     Load = dht_node_state:load(State),
     if
-	AmLoadbalancing or (Load < 20) ->
+	AmLoadbalancing orelse (Load < 20) ->
 	    {nil, State};
 	true ->
 	    %Keys = gb_trees:keys(dht_node_state:get_data(State)),

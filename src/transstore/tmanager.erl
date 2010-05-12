@@ -169,7 +169,7 @@ receive_lookup_rtms_tps_repl(TMState)->
                           rtms = [{RKey, Address, Ballot}
                                   | TMState#tm_state.rtms]},
             if (NumRTMs >= Limit)
-               and (TMState1#tm_state.tps_found >= TMState1#tm_state.numitems)
+               andalso (TMState1#tm_state.tps_found >= TMState1#tm_state.numitems)
                -> {ok, TMState1};
                true -> receive_lookup_rtms_tps_repl(TMState1)
             end;
@@ -179,7 +179,7 @@ receive_lookup_rtms_tps_repl(TMState)->
             Limit = config:read(replication_factor),
             TMState1 = add_tp(TMState, ItemKey, OrigKey, Address, Limit),
             if (TMState1#tm_state.tps_found >= TMState1#tm_state.numitems)
-               and (TMState1#tm_state.rtms_found >= Limit)
+               andalso (TMState1#tm_state.rtms_found >= Limit)
                -> {ok, TMState1};
                true -> receive_lookup_rtms_tps_repl(TMState1)
             end;
@@ -187,7 +187,7 @@ receive_lookup_rtms_tps_repl(TMState)->
 %            io:format("lookup timeout ~n"),
             Limit = config:read(quorum_factor),
             if (TMState#tm_state.tps_found >= TMState#tm_state.numitems)
-               and (TMState#tm_state.rtms_found >= Limit)
+               andalso (TMState#tm_state.rtms_found >= Limit)
                -> {ok, TMState};
                true ->
                     ?TLOGN("Found not enough RTMs and TPs~n", []),
