@@ -42,9 +42,9 @@ end_per_suite(_Config) ->
     ok.
 
 merge(_Config) ->
-    N8 = node:new(pid,   8),
-    N14 = node:new(pid, 14),
-    N33 = node:new(pid, 33),
+    N8 = node:new(pid,   8, 0),
+    N14 = node:new(pid, 14, 0),
+    N33 = node:new(pid, 33, 0),
     ?equals(rm_chord:merge([N8, N14, N8], [N8, N14, N8], 26), [N8, N14]),
     ?equals(rm_chord:merge([N8, N14, N33], [N8, N14, N33], 26), [N33, N8, N14]),
     ok.

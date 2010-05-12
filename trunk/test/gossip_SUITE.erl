@@ -833,7 +833,7 @@ test_on_cy_cache2(Config) ->
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
     % non-empty node cache
-    Cache = [node:new(cs_send:make_global(self()), 10)],
+    Cache = [node:new(cs_send:make_global(self()), 10, 0)],
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
         gossip:on({cy_cache, Cache},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
@@ -859,7 +859,7 @@ test_on_cy_cache3(Config) ->
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
     % non-empty node cache
-    Cache = [node:new(cs_send:this(), 10)],
+    Cache = [node:new(cs_send:this(), 10, 0)],
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
         gossip:on({cy_cache, Cache},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),

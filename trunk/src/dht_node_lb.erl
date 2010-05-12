@@ -86,7 +86,8 @@ move_load(State, _, NewId) ->
     Pred = dht_node_state:pred(State),
     % TODO: needs to be fixed
     drop_data(State),
-    idholder:set_key(NewId),
+    OldIdVersion = node:id_version(dht_node_state:me(State)),
+    idholder:set_id(NewId, OldIdVersion + 1),
     cs_send:send_local(self() , {kill}),
     cs_send:send(Succ, {pred_left, Pred}),
     PredPid = dht_node_state:pred_pid(State),
