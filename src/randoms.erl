@@ -30,13 +30,17 @@
 
 -export([start/0, getRandomId/0, rand_uniform/2]).
 
+%% @doc Starts the crypto module's server.
 -spec start() -> ok.
 start() -> crypto:start().
 
+%% @doc Generates a random Id in the range 1 =< Id < 2^32
 -spec getRandomId() -> string().
 getRandomId() ->
-    integer_to_list(rand_uniform(1, 65536 * 65536)).
+    integer_to_list(rand_uniform(1, 16#100000000)).
 
+%% @doc Generates a random number N, Lo =< N < Hi using the crypto library
+%%      pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
 rand_uniform(Lo, Hi) ->
     crypto:rand_uniform(Lo, Hi).

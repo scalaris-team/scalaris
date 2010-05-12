@@ -29,11 +29,13 @@
 -include("scalaris.hrl").
 
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
-         trunc/2, min/2, max/2, randomelem/1, logged_exec/1,
+         trunc/2, min/2, max/2, logged_exec/1,
+         randomelem/1, pop_randomelem/1, pop_randomelem/2,
          wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0,
          find/2, logger/0, dump3/0, uniq/1, get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
-         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2]).
+         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2,
+         ssplit_unique/2, ssplit_unique/3, ssplit_unique/4]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
@@ -111,10 +113,28 @@ min(A, B) ->
         false -> B
     end.
 
+%% @doc Returns a random element from the given (non-empty!) list according to
+%%      a uniform distribution.
+-spec randomelem(List::[X,...]) -> X.
 randomelem(List)->
-    Length= length(List),
+    Length = length(List) + 1,
     RandomNum = randoms:rand_uniform(1, Length),
     lists:nth(RandomNum, List).
+    
+%% @doc Removes a random element from the (non-empty!) list and returns the
+%%      resulting list and the removed element.
+-spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}.
+pop_randomelem(List) ->
+    pop_randomelem(List, length(List)).
+    
+%% @doc Removes a random element from the first Size elements of a (non-empty!)
+%%      list and returns the resulting list and the removed element. 
+-spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}.
+pop_randomelem(List, Size) ->
+    N = randoms:rand_uniform(0, Size),
+    {Head, [Element | Tail]} = lists:split(N, List),
+    NewList = Head ++ Tail,
+    {NewList, Element}.
 
 logged_exec(Cmd) ->
     Output = os:cmd(Cmd),
@@ -364,3 +384,61 @@ get_global_uid() ->
     _Result = {get_pids_uid(), cs_send:this()}
     %% , term_to_binary(_Result)
     .
+
+%% @doc Splits L1 into a list of elements that are not contained in L2, a list
+%%      of elements that both lists share and a list of elements unique to L2.
+%%      Both lists must be sorted.
+-spec ssplit_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+ssplit_unique(L1, L2) ->
+    ssplit_unique(L1, L2, fun(A, B) -> A =< B end).
+
+%% @doc Splits L1 into a list of elements that are not contained in L2, a list
+%%      of elements that are equal in both lists (according to the ordering
+%%      function Lte) and a list of elements unique to L2.
+%%      When two elements compare equal, the element from List1 is picked.
+%%      Both lists must be sorted according to Lte. Lte(A, B) should return
+%%      true if A compares less than or equal to B in the ordering, false
+%%      otherwise.
+-spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+ssplit_unique(L1, L2, Lte) ->
+    ssplit_unique(L1, L2, Lte, fun(E1, _E2) -> E1 end).
+
+%% @doc Splits L1 into a list of elements that are not contained in L2, a list
+%%      of elements that are equal in both lists (according to the ordering
+%%      function Lte) and a list of elements unique to L2.
+%%      When two elements compare equal, EqSelect(element(L1), element(L2))
+%%      chooses which of them to take.
+%%      Both lists must be sorted according to Lte. Lte(A, B) should return true
+%%      if A compares less than or equal to B in the ordering, false otherwise.
+-spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X)) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+ssplit_unique(L1, L2, Lte, EqSelect) ->
+    ssplit_unique_helper(L1, L2, Lte, EqSelect, {[], [], []}).
+
+%% @doc Helper function for ssplit_unique/3.
+-spec ssplit_unique_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X), {UniqueOldL1::[X], SharedOld::[X], UniqueOldL2::[X]}) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+ssplit_unique_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, UniqueL2}) ->
+    LteH1H2 = Lte(H1, H2),
+    LteH2H1 = Lte(H2, H1),
+    case LteH1H2 andalso LteH2H1 of
+        true ->
+            ssplit_unique_helper(T1, L2, Lte, EqSelect, {UniqueL1, [EqSelect(H1, H2) | Shared], UniqueL2});
+        false when LteH1H2 ->
+            ssplit_unique_helper(T1, L2, Lte, EqSelect, {[H1 | UniqueL1], Shared, UniqueL2});
+        false when LteH2H1 ->
+            % the top of the shared list could be the same as the top of L2!
+            case (Shared =:= []) orelse not (Lte(hd(Shared), H2) andalso Lte(H2, hd(Shared))) of
+                true  -> ssplit_unique_helper(L1, T2, Lte, EqSelect, {UniqueL1, Shared, [H2 | UniqueL2]});
+                false -> ssplit_unique_helper(L1, T2, Lte, EqSelect, {UniqueL1, Shared, UniqueL2})
+            end
+    end;
+ssplit_unique_helper(L1, [], _Lte, _EqSelect, {UniqueL1, Shared, UniqueL2}) ->
+    {lists:reverse(UniqueL1, L1), lists:reverse(Shared), lists:reverse(UniqueL2)};
+ssplit_unique_helper([], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, UniqueL2}) ->
+    % the top of the shared list could be the same as the top of L2 since
+    % elements are only removed from L2 if an element of L1 is larger
+    case Shared =:= [] orelse not (Lte(hd(Shared), H2) andalso Lte(H2, hd(Shared))) of
+        true ->
+            {lists:reverse(UniqueL1), lists:reverse(Shared), lists:reverse(UniqueL2, L2)};
+        false ->
+            ssplit_unique_helper([], T2, Lte, EqSelect, {UniqueL1, Shared, UniqueL2})
+    end.
