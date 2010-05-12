@@ -43,26 +43,24 @@
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc trigger a message with  the number of nodes known to the boot server
-%% @spec number_of_nodes() -> ok
--spec(number_of_nodes/0 :: () -> ok).
+-spec number_of_nodes() -> ok.
 number_of_nodes() ->
     cs_send:send(bootPid(), {get_list_length, cs_send:this()}),
     ok.
 
+-spec be_the_first() -> ok.
 be_the_first() ->
-    cs_send:send(bootPid(), {be_the_first, cs_send:this()}),
-    ok.
+    cs_send:send(bootPid(), {be_the_first, cs_send:this()}).
 
+-spec connect() -> ok.
 connect() ->
     % @todo we have to improve the startup process!
     cs_send:send(bootPid(), {connect}).
 
 %% @doc trigger a message with all nodes known to the boot server
-%% @spec node_list() -> ok
--spec(node_list/0 :: () -> ok).
+-spec node_list() -> ok.
 node_list() ->
-    cs_send:send(bootPid(), {get_list, cs_send:this()}),
-    ok.
+    cs_send:send(bootPid(), {get_list, cs_send:this()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation

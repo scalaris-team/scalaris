@@ -59,19 +59,11 @@ new(Node1, Node2) ->
 size(Cache) ->
     length(Cache).
 
-%% @doc Returns a random node from the cache.
--spec get_random_node(cache()) -> node:node_type().
+%% @doc Returns a random node from the (non-empty!) cache.
+-spec get_random_node(Cache::[element(),...]) -> node:node_type().
 get_random_node(Cache) ->
-    {Node, _Age} = get_random_element(Cache),
+    {Node, _Age} = util:randomelem(Cache),
     Node.
-
-%% @doc Returns a random element (node and age) from the cache.
--spec get_random_element(cache()) -> element().
-get_random_element(Cache) ->
-    Size = cyclon_cache:size(Cache),
-    N = randoms:rand_uniform(0, Size) + 1,
-    % picks nth element of state
-    lists:nth(N, Cache).
 
 %% @doc Removes a random element from the (non-empty!) cache and returns the
 %%      resulting cache and the removed node.
@@ -83,28 +75,18 @@ pop_random_node(Cache) ->
 %%      resulting cache and the removed node.
 -spec pop_random_node(Cache::[element(),...], CacheSize::non_neg_integer()) -> {NewCache::cache(), PoppedNode::node_details:node_type()}.
 pop_random_node(Cache, CacheSize) ->
-    {NewCache, {Node, _Age}} = pop_random_element(Cache, CacheSize),
+    {NewCache, {Node, _Age}} = util:pop_randomelem(Cache, CacheSize),
     {NewCache, Node}.
 
-%% @doc Removes a random element from the (non-empty!) cache and returns the
-%%      resulting cache and the removed element.
--spec pop_random_element(Cache::[element(),...], CacheSize::non_neg_integer()) -> {NewCache::cache(), PoppedElement::element()}.
-pop_random_element(Cache, CacheSize) ->
-    N = randoms:rand_uniform(0, CacheSize),
-    % picks nth element of state
-    {CacheHead, [Element | CacheTail]} = lists:split(N, Cache),
-    NewCache = CacheHead ++ CacheTail,
-    {NewCache, Element}.
-
-%% @doc Returns a random subset of size N elements from the cache.
+%% @doc Returns a random subset of N elements from the cache.
 -spec get_random_subset(N::non_neg_integer(), Cache::cache()) -> RandomSubset::cache().
 get_random_subset(0, _Cache) ->
     % having this special case here prevents unnecessary calls to cyclon_cache:size()
     new();
 get_random_subset(N, Cache) ->
-    get_random_subset_helper(N, new(), Cache, cyclon_cache:size(Cache), fun pop_random_element/2).
+    get_random_subset_helper(N, new(), Cache, cyclon_cache:size(Cache), fun util:pop_randomelem/2).
 
-%% @doc Returns a random subset of size N nodes from the cache.
+%% @doc Returns a random subset of N nodes from the cache.
 -spec get_random_nodes(N::non_neg_integer(), Cache::cache()) -> Nodes::[node_details:node_type()].
 get_random_nodes(0, _Cache) ->
     % having this special case here prevents unnecessary calls to cyclon_cache:size()
@@ -173,18 +155,32 @@ get_nodes(Cache) ->
 %%      replace/5.
 -spec merge(MyCache::cache(), MyNode::node_details:node_type(), ReceivedCache::cache(), SendCache::cache(), TargetSize::pos_integer()) -> NewCache::cache().
 merge(MyCache, MyNode, ReceivedCache, SendCache, TargetSize) ->
-    MyCacheSize = cyclon_cache:size(MyCache),
+    % first sort the two lists to allow transformation into 3 lists containing
+    % the received entries without the already known nodes, a list of entries
+    % from both caches (with updated IDVersions) and a list of entries from my
+    % cache without the updated entries
+    MyCacheSortPid = lists:usort(fun({N1, _}, {N2, _}) -> node:pidX(N1) =< node:pidX(N2) end, MyCache),
+    RcvCacheSortPid = lists:usort(fun({N1, _}, {N2, _}) -> node:pidX(N1) =< node:pidX(N2) end, ReceivedCache),
+    {EntriesInReceivedCacheOnly, EntriesInBoth_Updated, EntriesInMyCacheOnly} =
+        util:ssplit_unique(RcvCacheSortPid, MyCacheSortPid,
+                           fun({N1, _}, {N2, _}) -> node:pidX(N1) =< node:pidX(N2) end,
+                           fun({N1, _}, {N2, MyAge}) -> {node:newer(N1, N2), MyAge} end),
+    MyC1 = EntriesInMyCacheOnly ++ EntriesInBoth_Updated,
+    MyC1Size = cyclon_cache:size(MyC1),
+
+    % remove eventually existing references to the node itself
     ReceivedCache_Filtered =
-        [Elem || {Node, _Age} = Elem <- ReceivedCache,
-                 not contains_node(Node, MyCache),
+        [Elem || {Node, _Age} = Elem <- EntriesInReceivedCacheOnly,
                  not node:equals(Node, MyNode)],
     SendCache_Filtered =
         [Elem || {Node, _Age} = Elem <- SendCache,
                  not node:equals(Node, MyNode)],
-    {MyC1, ReceivedCacheRest, AddedElements} =
-        fillup(MyCache, ReceivedCache_Filtered, TargetSize - MyCacheSize),
-    MyC1Size = MyCacheSize + AddedElements,
-    replace(MyC1, MyC1Size, ReceivedCacheRest, SendCache_Filtered, TargetSize).
+    % finally fill up my cache to the full size (if necessary) and start
+    % replacing entries
+    {MyC2, ReceivedCacheRest, AddedElements} =
+        fillup(MyC1, ReceivedCache_Filtered, TargetSize - MyC1Size),
+    MyC2Size = MyC1Size + AddedElements,
+    replace(MyC2, MyC2Size, ReceivedCacheRest, SendCache_Filtered, TargetSize).
 
 %% @doc Trims the cache to size TargetSize (if necessary) by deleting random
 %%      entries as long as the cache is larger than the given TargetSize.
@@ -194,7 +190,7 @@ trim(Cache, CacheSize, TargetSize) ->
         true ->
             Cache;
         false ->
-            {NewCache, _Element} = pop_random_element(Cache, CacheSize),
+            {NewCache, _Element} = util:pop_randomelem(Cache, CacheSize),
             trim(NewCache, CacheSize - 1, TargetSize)
     end.
 
