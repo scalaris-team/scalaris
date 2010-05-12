@@ -20,12 +20,12 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([join_request/3, process_join_msg/2]).
+-export([join_request/4, process_join_msg/2]).
 
 -include("scalaris.hrl").
 
 -type(join_message() ::
-    {get_key_response_keyholder, Key::?RT:key()} |
+    {idholder_get_id_response, Id::?RT:key(), IdVersion::non_neg_integer()} |
     {known_hosts_timeout} |
     {get_dht_nodes_response, Nodes::[node:node_type()]} |
     {lookup_timeout} |
@@ -44,11 +44,15 @@
 %%   Id = term()
 
 %% userdevguide-begin dht_node_join:join_request
--spec join_request(dht_node_state:state(), cs_send:mypid(), ?RT:key()) -> dht_node_state:state().
-join_request(State, Source_PID, Id) ->
-    Pred = node:new(Source_PID, Id),
+-spec join_request(dht_node_state:state(), cs_send:mypid(), Id::?RT:key(), IdVersion::non_neg_integer()) -> dht_node_state:state().
+join_request(State, Source_PID, Id, IdVersion) ->
+    Pred = node:new(Source_PID, Id, IdVersion),
     {DB, HisData} = ?DB:split_data(dht_node_state:get_db(State), dht_node_state:id(State), Id),
+    
+    %%TODO: split data [{Key, Value, Version}], schedule transfer
+    
     cs_send:send(Source_PID, {join_response, dht_node_state:pred(State), HisData}),
+    % TODO: better update our range here directly instead of rm_beh sending dht_node a message?
     rm_beh:update_preds([Pred]),
     dht_node_state:set_db(State, DB).
 %% userdevguide-end dht_node_join:join_request
@@ -59,11 +63,11 @@ join_request(State, Source_PID, Id) ->
 %% @doc Processes a DHT node's join messages (the node joining a Scalaris DHT).
 -spec process_join_msg(join_message() | any(), join_state()) -> dht_node_state:state().
 % first node
-process_join_msg({get_key_response_keyholder, Key}, {join, {as_first}, QueuedMessages}) ->
-    log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Key]),
-    Me = node:new(cs_send:this(), Key),
-    rt_beh:initialize(Key, Me, Me),
-    NewState = dht_node_state:new(?RT:empty(Me), Me, Me, Me, {Key, Key}, dht_node_lb:new(), ?DB:new(Key)),
+process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {as_first}, QueuedMessages}) ->
+    log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Id]),
+    Me = node:new(cs_send:this(), Id, IdVersion),
+    rt_beh:initialize(Id, Me, Me),
+    NewState = dht_node_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, dht_node_lb:new(), ?DB:new(Id)),
     cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
     send_queued_messages(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
@@ -73,15 +77,15 @@ process_join_msg({get_key_response_keyholder, Key}, {join, {as_first}, QueuedMes
 
 % !first node
 % 1. get my key
-process_join_msg({get_key_response_keyholder, Key}, {join, {phase1}, QueuedMessages}) ->
+process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {phase1}, QueuedMessages}) ->
     %io:format("p1: got key~n"),
     log:log(info,"[ Node ~w ] joining",[self()]),
     % send message to avoid code duplication
     cs_send:send_local(self(), {known_hosts_timeout}),
-    {join, {phase2, Key}, QueuedMessages};
+    {join, {phase2, Id, IdVersion}, QueuedMessages};
 
 % 2. Find known hosts
-process_join_msg({known_hosts_timeout}, {join, {phase2, _Key}, _QueuedMessages} = State) ->
+process_join_msg({known_hosts_timeout}, {join, {phase2, _Id, _IdVersion}, _QueuedMessages} = State) ->
     %io:format("p2: known hosts timeout~n"),
     KnownHosts = config:read(known_hosts),
     % contact all known VMs
@@ -92,39 +96,40 @@ process_join_msg({known_hosts_timeout}, {join, {phase2, _Key}, _QueuedMessages} 
     cs_send:send_local_after(1000, self(), {known_hosts_timeout}),
     State;
 
-process_join_msg({get_dht_nodes_response, []}, {join, {phase2, _Key}, _QueuedMessages} = State) ->
+process_join_msg({get_dht_nodes_response, []}, {join, {phase2, _Id, _IdVersion}, _QueuedMessages} = State) ->
     %io:format("p2: got empty dht_nodes_response~n"),
     % there is a VM with no nodes
     State;
 
-process_join_msg({get_dht_nodes_response, Nodes}, {join, {phase2, Key}, QueuedMessages} = State) ->
+process_join_msg({get_dht_nodes_response, Nodes}, {join, {phase2, Id, IdVersion}, QueuedMessages} = State) ->
     %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(cs_send:this(), Nodes)]),
     case lists:delete(cs_send:this(), Nodes) of
         [] ->
             State;
         [First | Rest] ->
-            cs_send:send(First, {lookup_aux, Key, 0, {get_node, cs_send:this(), Key}}),
+            cs_send:send(First, {lookup_aux, Id, 0, {get_node, cs_send:this(), Id}}),
             cs_send:send_local_after(3000, self(), {lookup_timeout}),
-            {join, {phase3, Rest, Key}, QueuedMessages}
+            {join, {phase3, Rest, Id, IdVersion}, QueuedMessages}
     end;
 
 % 3. lookup my position
-process_join_msg({lookup_timeout}, {join, {phase3, [], Key}, QueuedMessages}) ->
+process_join_msg({lookup_timeout}, {join, {phase3, [], Id, IdVersion}, QueuedMessages}) ->
     %io:format("p3: lookup_timeout~n"),
     % no more nodes left, go back to step 2
     cs_send:send_local(self(), {known_hosts_timeout}),
-    {join, {phase2, Key}, QueuedMessages};
+    {join, {phase2, Id, IdVersion}, QueuedMessages};
 
-process_join_msg({get_node_response, Key, Succ}, {join, {phase3, _DHTNodes, Key}, QueuedMessages}) ->
+process_join_msg({get_node_response, Id, Succ}, {join, {phase3, _DHTNodes, Id, IdVersion}, QueuedMessages}) ->
     %io:format("p3: lookup success~n"),
     % got my successor
-    Me = node:new(cs_send:this(), Key),
+    Me = node:new(cs_send:this(), Id, IdVersion),
     % announce join request
-    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Key}),
-    {join, {phase4, Key, Succ, Me}, QueuedMessages};
+    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Id, IdVersion}),
+    {join, {phase4, Succ, Me}, QueuedMessages};
 
 % 4. joining my neighbors
-process_join_msg({join_response, Pred, Data}, {join, {phase4, Id, Succ, Me}, QueuedMessages}) ->
+process_join_msg({join_response, Pred, Data}, {join, {phase4, Succ, Me}, QueuedMessages}) ->
+    Id = node:id(Me),
     %io:format("p4: join_response~n"),
     % @TODO data shouldn't be moved here, might be large
     log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),

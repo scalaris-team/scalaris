@@ -79,7 +79,7 @@ init(Trigger) ->
     log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [cs_send:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     cs_send:send_local(get_pid_dnc() , {subscribe, self()}),
-    cs_send:send_local(get_cs_pid(), {init_rm,self()}),
+    cs_send:send_local(get_cs_pid(), {init_rm, self()}),
     {uninit, TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

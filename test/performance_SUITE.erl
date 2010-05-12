@@ -179,8 +179,8 @@ next_hop(_Config) ->
                gb_trees:enter(102, succ,
                 gb_trees:enter(103, pred,
                  rt_chord:empty(succ))))))))),
-    State = dht_node_state:new(RT, node:new(succ, 3), node:new(pred, 1),
-                         node:new(me, 2), my_range, lb, db),
+    State = dht_node_state:new(RT, node:new(succ, 3, 0), node:new(pred, 1, 0),
+                         node:new(me, 2, 0), my_range, lb, db),
     gen_component:kill(process_dictionary),
     catch unregister(process_dictionary),
     iter(count(), fun () ->

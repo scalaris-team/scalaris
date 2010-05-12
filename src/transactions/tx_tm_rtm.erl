@@ -73,7 +73,7 @@ init([InstanceID, Name]) ->
     %% start getting rtms and maintain them.
     case Name of
         tx_tm ->
-            idholder:get_key(),
+            idholder:get_id(),
             gen_component:change_handler(State, on_init);
         _ -> State
     end.
@@ -439,9 +439,9 @@ on(_, _State) ->
     unknown_event.
 
 %% While initializing
-on_init({get_key_response_keyholder, IdSelf},
+on_init({idholder_get_id_response, IdSelf, _IdSelfVersion},
    {_RTMs, TableName, Role, LAcceptor, LLearner} = _State) ->
-    ?TRACE("tx_tm_rtm:on_init:get_key_response_keyholder State; ~p~n", [_State]),
+    ?TRACE("tx_tm_rtm:on_init:idholder_get_id_response State; ~p~n", [_State]),
     RTM_ids = my_get_RTM_ids(IdSelf),
     NewRTMs = lists:zip3(RTM_ids,
                          [ unknown || _X <- lists:seq(1, length(RTM_ids))],

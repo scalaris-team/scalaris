@@ -63,7 +63,7 @@ on({die}, _State) ->
 
 %% Ring Maintenance (see rm_beh.erl)
 on({init_rm,Pid},State) ->
-    cs_send:send_local(Pid , {init, dht_node_state:id(State), dht_node_state:me(State),dht_node_state:pred(State), [dht_node_state:succ(State)]}),
+    cs_send:send_local(Pid, {init, dht_node_state:id(State), dht_node_state:me(State),dht_node_state:pred(State), [dht_node_state:succ(State)]}),
     State;
 
 on({rm_update_preds_succs, Preds, Succs}, State) ->
@@ -353,8 +353,8 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 
 %% join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
-on({join, Source_PID, Id}, State) ->
-    dht_node_join:join_request(State, Source_PID, Id);
+on({join, Source_PID, Id, IdVersion}, State) ->
+    dht_node_join:join_request(State, Source_PID, Id, IdVersion);
 %% userdevguide-end dht_node:join_message
 
 on({known_hosts_timeout}, State) ->
@@ -390,10 +390,10 @@ init([_InstanceId, Options]) ->
           application:get_env(boot_cs, first) == {ok, true}) of
         true ->
             trigger_known_nodes(),
-            idholder:get_key(),
+            idholder:get_id(),
             {join, {as_first}, []};
         _ ->
-            idholder:get_key(),
+            idholder:get_id(),
             {join, {phase1}, []}
     end.
 %% userdevguide-end dht_node:start

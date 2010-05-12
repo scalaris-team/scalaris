@@ -25,31 +25,38 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([id/1, pidX/1,
-         new/2,
+-export([id/1, id_version/1, pidX/1,
+         new/3,
          null/0, is_valid/1]).
 
 -include("scalaris.hrl").
 
--record(node, {pid :: cs_send:mypid(), id :: ?RT:key()}).
+-record(node, {pid :: cs_send:mypid(), id :: ?RT:key(), id_version :: non_neg_integer()}).
 -type(node_type() :: #node{}).
 
--spec(new/2 :: (cs_send:mypid(), ?RT:key()) -> node_type()).
-new(PID, Id) ->
-    #node{
-     pid = PID,
-     id = Id}.
+%% @doc Creates a new node.
+-spec new(Pid::cs_send:mypid(), Id::?RT:key(), IdVersion::non_neg_integer()) -> node_type().
+new(Pid, Id, IdVersion) ->
+    #node{pid = Pid, id = Id, id_version = IdVersion}.
 
+%% @doc Creates an invalid node.
 null() ->
     null.
 
--spec(pidX/1 :: (node_type()) -> cs_send:mypid()).
+%% @doc Gets the pid of the node.
+-spec pidX(node_type()) -> cs_send:mypid().
 pidX(#node{pid=PID}) ->
     PID.
 
--spec(id/1 :: (node_type()) -> ?RT:key()).
+%% @doc Gets the node's ID.
+-spec id(node_type()) -> ?RT:key().
 id(#node{id=Id}) ->
     Id.
+
+%% @doc Gets the version of the node's ID.
+-spec id_version(node_type()) -> ?RT:key().
+id_version(#node{id_version=IdVersion}) ->
+    IdVersion.
 
 %% @doc Checks whether the given parameter is a valid node.
 -spec is_valid(node_type()) -> true;

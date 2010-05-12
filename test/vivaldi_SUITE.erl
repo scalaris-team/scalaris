@@ -131,7 +131,7 @@ test_on_cy_cache2(Config) ->
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
-    Cache = [node:new(cs_send:make_global(self()), 10)],
+    Cache = [node:new(cs_send:make_global(self()), 10, 0)],
     NewState =
         vivaldi:on({cy_cache, Cache}, InitialState),
 
@@ -150,7 +150,7 @@ test_on_cy_cache3(Config) ->
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
-    Cache = [node:new(cs_send:make_global(self()), 10)],
+    Cache = [node:new(cs_send:make_global(self()), 10, 0)],
     NewState =
         vivaldi:on({cy_cache, Cache}, InitialState),
 

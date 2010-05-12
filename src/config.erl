@@ -32,8 +32,8 @@
          check_config/0,
 
          exists/1, is_atom/1, is_bool/1, is_mypid/1, is_ip/1, is_integer/1,
-         is_float/1, is_list/1, is_list/3, is_string/1, is_in_range/3,
-         is_greater_than/2, is_greater_than_equal/2,
+         is_float/1, is_tuple/2, is_tuple/4, is_list/1, is_list/3, is_string/1,
+         is_in_range/3, is_greater_than/2, is_greater_than_equal/2,
          is_less_than/2, is_less_than_equal/2, is_in/2
         ]).
 
@@ -148,7 +148,8 @@ check_config() ->
         vivaldi:check_config() and
         vivaldi_latency:check_config() and
         ?RM:check_config() and
-        fd_pinger:check_config().
+        fd_pinger:check_config() and
+        idholder:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->
@@ -216,6 +217,25 @@ is_float(Key) ->
     Pred = fun erlang:is_float/1,
     Msg = "is not a valid float",
     test_and_error(Key, Pred, Msg).
+
+-spec is_tuple(Key::atom(), TupleSize::pos_integer()) -> boolean().
+is_tuple(Key, Size) ->
+    Pred = fun(Value) ->
+                   erlang:is_tuple(Value) and
+                       (erlang:tuple_size(Value) =:= Size)
+           end,
+    Msg = io_lib:format("is not a valid tuple of size ~p", [Size]),
+    test_and_error(Key, Pred, Msg).
+
+-spec is_tuple(Key::atom(), TupleSize::pos_integer(), Pred::fun((any()) -> boolean()), PredDescr::string()) -> boolean().
+is_tuple(Key, Size, Pred, PredDescr) ->
+    CompletePred = fun(Value) ->
+                           erlang:is_tuple(Value) and
+                               (erlang:tuple_size(Value) =:= Size) and
+                               Pred(Value)
+                   end,
+    Msg = io_lib:format("is not a valid tuple of size ~p satisfying ~p", [Size, PredDescr]),
+    test_and_error(Key, CompletePred, Msg).
 
 -spec is_list(Key::atom()) -> boolean().
 is_list(Key) ->
