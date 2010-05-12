@@ -185,9 +185,9 @@ cut_iter({interval, A0, A1}, {interval, B0, B1}) ->
     A0_in_B = is_between(B0, A0, B1),
     A1_in_B = is_between(B0, A1, B1),
     if
-        (A1 == B0) and not A0_in_B ->
+        (A1 =:= B0) and not A0_in_B ->
             {element,A1};
-        (B1 == A0) and not B0_in_A ->
+        (B1 =:= A0) and not B0_in_A ->
             {element,B1};
         B0_in_A or B1_in_A or A0_in_B or A1_in_B ->
             new(util:max(A0, B0), util:min(A1, B1));

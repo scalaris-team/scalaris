@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$ ').
 
--export([join_request/4, process_join_msg/2]).
+-export([join_request/2, process_join_msg/2]).
 
 -include("scalaris.hrl").
 
@@ -44,16 +44,15 @@
 %%   Id = term()
 
 %% userdevguide-begin dht_node_join:join_request
--spec join_request(dht_node_state:state(), cs_send:mypid(), Id::?RT:key(), IdVersion::non_neg_integer()) -> dht_node_state:state().
-join_request(State, Source_PID, Id, IdVersion) ->
-    Pred = node:new(Source_PID, Id, IdVersion),
-    {DB, HisData} = ?DB:split_data(dht_node_state:get_db(State), dht_node_state:id(State), Id),
+-spec join_request(dht_node_state:state(), NewPred::node:node_type()) -> dht_node_state:state().
+join_request(State, NewPred) ->
+    {DB, HisData} = ?DB:split_data(dht_node_state:get_db(State), dht_node_state:id(State), node:id(NewPred)),
     
     %%TODO: split data [{Key, Value, Version}], schedule transfer
     
-    cs_send:send(Source_PID, {join_response, dht_node_state:pred(State), HisData}),
+    cs_send:send(node:pidX(NewPred), {join_response, dht_node_state:pred(State), HisData}),
     % TODO: better update our range here directly instead of rm_beh sending dht_node a message?
-    rm_beh:update_preds([Pred]),
+    rm_beh:update_preds([NewPred]),
     dht_node_state:set_db(State, DB).
 %% userdevguide-end dht_node_join:join_request
 
@@ -124,7 +123,7 @@ process_join_msg({get_node_response, Id, Succ}, {join, {phase3, _DHTNodes, Id, I
     % got my successor
     Me = node:new(cs_send:this(), Id, IdVersion),
     % announce join request
-    cs_send:send(node:pidX(Succ), {join, cs_send:this(), Id, IdVersion}),
+    cs_send:send(node:pidX(Succ), {join, Me}),
     {join, {phase4, Succ, Me}, QueuedMessages};
 
 % 4. joining my neighbors

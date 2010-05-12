@@ -85,7 +85,7 @@ init_stabilize(Id, _Succ, RT) ->
 -spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
 filterDeadNode(RT, DeadPid) ->
     DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
-                           node:pidX(Node) == DeadPid],
+                           node:equals(Node, DeadPid)],
     lists:foldl(fun (Index, Tree) -> gb_trees:delete(Index, Tree) end,
                 RT, DeadIndices).
 %% userdevguide-end rt_chord:filterDeadNode
@@ -211,7 +211,7 @@ export_rt_to_dht_node(RT, Id, Pred, Succ) ->
                                          gb_trees:empty())),
     util:gb_trees_foldl(fun (_K, V, Acc) ->
                                 % only store the ring id and pid
-                                case node:id(V) == Id of
+                                case node:id(V) =:= Id of
                                     true ->
                                         Acc;
                                     false ->

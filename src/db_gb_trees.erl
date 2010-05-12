@@ -230,7 +230,7 @@ get_range_only_with_version(DB, Interval) ->
     {From, To} = intervals:unpack(Interval),
     [ {Key, Value, Vers}
       || {Key, {Value, WLock, _RLock, Vers}} <- gb_trees:to_list(DB),
-         WLock == false andalso util:is_between(From, Key, To), Value =/= empty_val ].
+         WLock =:= false andalso util:is_between(From, Key, To), Value =/= empty_val ].
 
 
 build_merkle_tree(DB, Range) ->

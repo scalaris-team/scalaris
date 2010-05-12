@@ -53,8 +53,8 @@ cut(_Config) ->
     ?assert(intervals:is_empty(intervals:cut(Empty, NotEmpty))),
     ?assert(intervals:is_empty(intervals:cut(NotEmpty, Empty))),
     ?assert(not intervals:is_empty(intervals:cut(NotEmpty, NotEmpty))),
-    ?assert(intervals:cut(NotEmpty, NotEmpty) == NotEmpty),
-    ?assert(intervals:cut(all, all) == all),
+    ?assert(intervals:cut(NotEmpty, NotEmpty) =:= NotEmpty),
+    ?assert(intervals:cut(all, all) =:= all),
     ok.
 
 tc1(_Config) ->
@@ -75,7 +75,7 @@ tc1(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec(prop_make/2 :: (intervals:key(), intervals:key()) -> boolean()).
 prop_make(X, Y) ->
-    intervals:make({X,Y}) == intervals:new(X, Y).
+    intervals:make({X,Y}) =:= intervals:new(X, Y).
 
 tester_make(_Config) ->
     tester:test(intervals_SUITE, prop_make, 2, 100).
@@ -169,7 +169,7 @@ prop_is_covered(_X, _Y) ->
     X = intervals:normalize(_X),
     Y = intervals:normalize(_Y),
     % Y covers X iff X \cup Y covers X
-    intervals:is_covered(X, Y) == intervals:is_covered(X, intervals:cut(X, Y)).
+    intervals:is_covered(X, Y) =:= intervals:is_covered(X, intervals:cut(X, Y)).
 
 tester_is_covered(_Config) ->
     tester:test(?MODULE, prop_is_covered, 2, 1000).

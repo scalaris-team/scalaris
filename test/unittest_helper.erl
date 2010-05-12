@@ -127,7 +127,7 @@ check_ring_size(Size) ->
             L
     end,
     ct:pal("Size: ~p~n",[RSize]),
-    case (RSize == Size) of
+    case (RSize =:= Size) of
         true ->
             ok;
         _ ->

@@ -92,8 +92,8 @@ on({stabilize, AktToken},
     %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
     P = selectPeer(rank(View++RndView,node:id(Me)),Me),
     %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
-    %Test for being alone
-    case (P == Me) of
+    % Test for being alone:
+    case node:equals(P, Me) of
         true ->
             rm_beh:update_preds([Me]),
             rm_beh:update_succs([Me]);
@@ -234,7 +234,7 @@ rank(MergedList,Id) ->
             %A=<B
         end,
     Larger  = lists:usort(Order, [X || X <- MergedList, node:id(X) >  Id]),
-    Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) == Id]),
+    Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) =:= Id]),
     Smaller = lists:usort(Order, [X || X <- MergedList, node:id(X) <  Id]),
 
     H1 = Larger++Smaller,
@@ -303,9 +303,8 @@ get_every_nth([H|T],Nth,Offset) ->
 filter(_Pid, []) ->
     [];
 filter(Pid, [Succ | Rest]) ->
-    case Pid == node:pidX(Succ) of
+    case node:equals(Pid, Succ) of
 	true ->
-
         %Hook for DeadNodeCache
         dn_cache:add_zombie_candidate(Succ),
 
@@ -320,7 +319,7 @@ get_RndView(N,Cache) ->
 
 % @doc Check if change of failuredetector is necessary
 update_failuredetector(OldView,NewView) ->
-    case (NewView /= OldView) of
+    case (NewView =/= OldView) of
         true ->
             NewNodes = util:minus(NewView,OldView),
             OldNodes = util:minus(OldView,NewView),

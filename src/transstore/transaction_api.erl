@@ -93,7 +93,7 @@ parallel_quorum_reads(Keys, _Par)->
     {Flag, LocalDHTNode} = process_dictionary:find_dht_node(),
     RTO = config:read(parallel_quorum_read_timeout),
     if 
-	Flag /= ok->
+	Flag =/= ok->
 	    fail;
 	true ->
 	    LocalDHTNode ! {parallel_reads, cs_send:this(), Keys, []},
@@ -143,7 +143,7 @@ do_transaction_wo_rp([], _SuccessFun, _FailureFun)->
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
     {Flag, LocalDHTNode} = process_dictionary:find_dht_node(),
     if
-	Flag /= ok->
+	Flag =/= ok->
 	    fail;
 	true ->
 	    LocalDHTNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, cs_send:this()},

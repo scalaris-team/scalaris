@@ -138,17 +138,17 @@ test_and_set(Key, OldValue, NewValue) ->
                            %% same as not found
                            {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog),
                            if
-                               Result2 == ok ->
+                               Result2 =:= ok ->
                                    {{ok, done}, TransLog2};
                                true ->
                                    {{fail, write}, TransLog2}
                            end;
                        {value, ReadValue} ->
                            if
-                               ReadValue == OldValue ->
+                               ReadValue =:= OldValue ->
                                    {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog1),
                                    if
-                                       Result2 == ok ->
+                                       Result2 =:= ok ->
                                            {{ok, done}, TransLog2};
                                        true ->
                                            {{fail, write}, TransLog2}
@@ -159,7 +159,7 @@ test_and_set(Key, OldValue, NewValue) ->
                        {fail, not_found} ->
                            {Result2, TransLog2} = transaction_api:write(Key, NewValue, TransLog),
                            if
-                               Result2 == ok ->
+                               Result2 =:= ok ->
                                    {{ok, done}, TransLog2};
                                true ->
                                    {{fail, write}, TransLog2}

@@ -79,7 +79,7 @@ is_between_closed(Begin, Id, End) ->
         Begin < End ->
             (Begin < Id) and (Id < End);
         Begin == End ->
-            Id /= End;
+            Id =/= End;
         true ->
             (Begin < Id) or (Id < End)
     end.

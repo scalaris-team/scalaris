@@ -120,7 +120,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
             erlang:send_after(config:read(transaction_lookup_timeout), self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
             {Flag, Result} = write_read_receive(ReplicaKeys, Operation),
-            if Flag == fail ->
+            if Flag =:= fail ->
                     NewTransLog =
                         txlog:add_entry(TransLog,
                           txlog:new_entry(Operation, Key, fail, 0, 0)),
@@ -163,7 +163,7 @@ do_quorum_read(Key, SourcePID, InstanceId)->
                       {write_read_receive_timeout, hd(ReplicaKeys)}),
     {Flag, Result} = write_read_receive(ReplicaKeys, read),
     if
-        Flag == fail ->
+        Flag =:= fail ->
             cs_send:send(SourcePID, {single_read_return, {fail, Result}});
         true ->
             {Value, Version} = Result,
@@ -181,7 +181,7 @@ write_read_receive(ReplicaKeys, Operation, State)->
     if (NumOk >= Quorum) ->
             {value, Result};
        (NumFailed >= Quorum)
-       and (Operation == write) ->
+       and (Operation =:= write) ->
             % Assume a new key
             {value, {0, -1}};
        (NumFailed >= Quorum) ->
@@ -238,7 +238,7 @@ do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
     erlang:put(instance_id, InstanceId),
     {Flag, NewTransLog} = parallel_reads(Keys, TransLog),
     if
-        Flag == fail->
+        Flag =:= fail->
             cs_send:send(SourcePID, {parallel_reads_return, fail});
         true ->
             cs_send:send(SourcePID, {parallel_reads_return, NewTransLog})
@@ -256,7 +256,7 @@ do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
 parallel_reads(Keys, TransLog)->
     TLogCheck = check_trans_log(Keys, TransLog, [], []),
 
-    if TLogCheck == fail->
+    if TLogCheck =:= fail->
             {fail, TransLog};
        true ->
             {ok, {_Result, ToLookup}} = TLogCheck,
@@ -281,7 +281,7 @@ parallel_reads(Keys, TransLog)->
                               {write_read_receive_timeout, hd(hd(ReplicaKeysAll))}),
             {Flag, WRResult} = write_read_receive_parallel(ResultsInit, ReplicaKeysAll),
             if
-                Flag == fail ->
+                Flag =:= fail ->
                     {fail, TransLog};
                 true ->
                     NewTranslog = build_translog(WRResult),
@@ -303,7 +303,7 @@ check_trans_log([], _TransLog, ResultAccum, ToLookupAccum)->
 
 check_trans_log([Key | Rest], TransLog, ResultAccum, ToLookupAccum)->
     ElementsInTransLog = [ X || {_, ElemKey, _, _, _} = X <- TransLog,
-                                Key == ElemKey ],
+                                Key =:= ElemKey ],
     NumInLog = length(ElementsInTransLog),
     %% check whether we have already logged the item
     if
@@ -314,10 +314,10 @@ check_trans_log([Key | Rest], TransLog, ResultAccum, ToLookupAccum)->
         %% retrieve the information from the log if already there
         %% for a read operation we do not have to add further info in the log
         %% as it has the same validation conditions than previous operations
-        NumInLog == 1 ->
+        NumInLog =:= 1 ->
             [{_,_,Success,Value,_}] =  ElementsInTransLog,
             if
-                Success == ok ->
+                Success =:= ok ->
                     NewResultAccum = [{Key, Value}|ResultAccum],
                     check_trans_log(Rest, TransLog, NewResultAccum, ToLookupAccum);
                 true ->
@@ -359,7 +359,7 @@ add_result([Head | Results], Key, Result, AllResults)->
     {CurrKey, ResultsForKey, EndResult} = Head,
     OrigKey = ?RT:get_original_key(Key),
     if
-        CurrKey == OrigKey ->
+        CurrKey =:= OrigKey ->
             NewAllResults = lists:delete(Head, AllResults),
             [{CurrKey, [Result | ResultsForKey], EndResult} | NewAllResults];
         true ->
@@ -375,11 +375,11 @@ check_results_parallel([], AllResults)->
 check_results_parallel([Head |Results], AllResults)->
     {Key, ResKey, EndRes} = Head,
     if
-        EndRes /= undecided ->
+        EndRes =/= undecided ->
             check_results_parallel(Results, AllResults);
         true ->
-            TMPResults = [ Elem || Elem <- ResKey, Elem /= fail ],
-            TMPResultsFailed = [ Elem || Elem <- ResKey, Elem == fail ],
+            TMPResults = [ Elem || Elem <- ResKey, Elem =/= fail ],
+            TMPResultsFailed = [ Elem || Elem <- ResKey, Elem =:= fail ],
 
             ReplFactor = config:read(replication_factor),
             QuorumFactor = config:read(quorum_factor),
@@ -399,7 +399,7 @@ check_results_parallel([Head |Results], AllResults)->
                 true ->
                     NumResponses = length(ResKey),
                     if
-                        NumResponses == ReplFactor ->
+                        NumResponses =:= ReplFactor ->
                             NewAllResults = lists:delete(Head, AllResults),
                             NewAllResults2 = [{Key, ResKey, {0, -1}} | NewAllResults],
                             check_results_parallel(Results, NewAllResults2);
@@ -422,7 +422,7 @@ build_translog(Results)->
     lists:foldl(fun(Elem, Acc)->
                         {CurrKey, _ResultsForKey, {Value, Version}} = Elem,
                         if
-                            Version == -1 ->
+                            Version =:= -1 ->
                                 [{read, CurrKey, fail, Value, Version}| Acc];
                             true ->
                                 [{read, CurrKey, ok, Value, Version}| Acc]
@@ -492,7 +492,7 @@ do_delete(Key, SourcePID, InstanceId)->
 				   list()) -> any()).
 delete_collect_results([], SourcePID, Results) ->
     cs_send:send(SourcePID, {delete_result, {ok,
-					     length([ok || R <- Results, R == ok]),
+					     length([ok || R <- Results, R =:= ok]),
 					     Results}});
 delete_collect_results(ReplicaKeys, Source_PID, Results) ->
     receive
@@ -510,7 +510,7 @@ delete_collect_results(ReplicaKeys, Source_PID, Results) ->
 	{timeout} ->
 	    cs_send:send(Source_PID, {delete_result,
 				      {fail, timeout,
-				       length([ok || R <- Results, R == ok]),
+				       length([ok || R <- Results, R =:= ok]),
 				       Results}})
     end.
 

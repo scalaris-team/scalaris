@@ -39,7 +39,7 @@ new(MaxLength) ->
 -spec add(Element :: term(), Queue :: fix_queue()) -> fix_queue().
 add(Elem, {MaxLength, Length, Queue}) ->
     {_, NewQueue} =
-        case Length == MaxLength of
+        case Length =:= MaxLength of
             true ->
                 NewLength = Length,
                 queue:out(queue:in(Elem, Queue));

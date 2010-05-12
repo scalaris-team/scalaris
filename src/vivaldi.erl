@@ -130,11 +130,9 @@ on({cy_cache, []}, State)  ->
 on({cy_cache, [Node] = _Cache},
    {Coordinate, Confidence, _TriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
-    NodePid = node:pidX(Node),
-    SelfPid = cs_send:make_global(process_dictionary:get_group_member(dht_node)),
     % do not exchange states with itself
-    if
-        (NodePid =/= SelfPid) ->
+    case node:is_me(Node) of
+        false ->
             cs_send:send_to_group_member(node:pidX(Node), vivaldi,
                                          {vivaldi_shuffle, cs_send:this(),
                                           Coordinate, Confidence});
