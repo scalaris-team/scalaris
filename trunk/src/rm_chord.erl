@@ -144,11 +144,11 @@ on({notify_new_succ, _NewSucc}, State) ->
     State;
 
 on({crash, DeadPid}, {Id, Me, Pred, Succs, TriggerState})  ->
-    case node:is_valid(Pred) andalso (DeadPid =/= node:pidX(Pred)) of
+    case node:equals(Pred, DeadPid) of
         true ->
-            {Id, Me, Pred, filter(DeadPid, Succs), TriggerState};
+            {Id, Me, node:null(), filter(DeadPid, Succs), TriggerState};
         false ->
-            {Id, Me, node:null(), filter(DeadPid, Succs), TriggerState}
+            {Id, Me, Pred, filter(DeadPid, Succs), TriggerState}
     end;
 
 on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Me, Pred, Succs, _TriggerState} = State)  ->
@@ -184,18 +184,18 @@ merge(L1, L2, Id) ->
 		    node:id(A) =< node:id(B)
 	    end,
     Larger  = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) >  Id])),
-    Equal   = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) == Id])),
+    Equal   = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) =:= Id])),
     Smaller = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) <  Id])),
     lists:append([Larger, Smaller, Equal]).
 
 filter(_Pid, []) ->
     [];
 filter(Pid, [Succ | Rest]) ->
-    case Pid == node:pidX(Succ) of
-	true ->
-	    filter(Pid, Rest);
-	false ->
-	    [Succ | filter(Pid, Rest)]
+    case node:equals(Pid, Succ) of
+        true ->
+            filter(Pid, Rest);
+        false ->
+            [Succ | filter(Pid, Rest)]
     end.
 
 

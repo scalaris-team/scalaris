@@ -199,7 +199,7 @@ code_change(_OldVsn, State, _Extra) ->
 send(Address, Port, Pid, Message, State) ->
     {DepAddr,DepPort} = get_local_address_port(),
     if
-        DepAddr == undefined ->
+        DepAddr =:= undefined ->
             open_sync_connection(Address, Port, Pid, Message, State);
         true ->
             case ets:lookup(?MODULE, {Address, Port}) of

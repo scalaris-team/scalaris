@@ -67,34 +67,34 @@ is_between_closed(_Config) ->
     ok.
 
 trunc(_Config) ->
-    ?assert(util:trunc([1, 2, 3], 1) == [1]),
-    ?assert(util:trunc([1, 2, 3], 2) == [1, 2]),
-    ?assert(util:trunc([1, 2, 3], 3) == [1, 2, 3]),
-    ?assert(util:trunc([1, 2, 3], 4) == [1, 2, 3]),
+    ?assert(util:trunc([1, 2, 3], 1) =:= [1]),
+    ?assert(util:trunc([1, 2, 3], 2) =:= [1, 2]),
+    ?assert(util:trunc([1, 2, 3], 3) =:= [1, 2, 3]),
+    ?assert(util:trunc([1, 2, 3], 4) =:= [1, 2, 3]),
     ok.
 
 min_max(_Config) ->
-    ?assert(util:min(1, 2) == 1),
-    ?assert(util:min(2, 1) == 1),
-    ?assert(util:min(1, 1) == 1),
-    ?assert(util:max(1, 2) == 2),
-    ?assert(util:max(2, 1) == 2),
-    ?assert(util:max(1, 1) == 1),
+    ?assert(util:min(1, 2) =:= 1),
+    ?assert(util:min(2, 1) =:= 1),
+    ?assert(util:min(1, 1) =:= 1),
+    ?assert(util:max(1, 2) =:= 2),
+    ?assert(util:max(2, 1) =:= 2),
+    ?assert(util:max(1, 1) =:= 1),
     ok.
 
 largest_smaller_than(_Config) ->
     KVs = [{1, 1}, {2, 2}, {4, 4}, {8, 8}, {16, 16}, {32, 32}, {64, 64}],
     Tree = gb_trees:from_orddict(KVs),
-    ?assert(util:gb_trees_largest_smaller_than(0, Tree) == {value, 64, 64}),
-    ?assert(util:gb_trees_largest_smaller_than(1, Tree) == {value, 64, 64}),
-    ?assert(util:gb_trees_largest_smaller_than(2, Tree) == {value, 1, 1}),
-    ?assert(util:gb_trees_largest_smaller_than(3, Tree) == {value, 2, 2}),
-    ?assert(util:gb_trees_largest_smaller_than(7, Tree) == {value, 4, 4}),
-    ?assert(util:gb_trees_largest_smaller_than(9, Tree) == {value, 8, 8}),
-    ?assert(util:gb_trees_largest_smaller_than(31, Tree) == {value, 16, 16}),
-    ?assert(util:gb_trees_largest_smaller_than(64, Tree) == {value, 32, 32}),
-    ?assert(util:gb_trees_largest_smaller_than(65, Tree) == {value, 64, 64}),
-    ?assert(util:gb_trees_largest_smaller_than(1000, Tree) == {value, 64, 64}),
+    ?assert(util:gb_trees_largest_smaller_than(0, Tree) =:= {value, 64, 64}),
+    ?assert(util:gb_trees_largest_smaller_than(1, Tree) =:= {value, 64, 64}),
+    ?assert(util:gb_trees_largest_smaller_than(2, Tree) =:= {value, 1, 1}),
+    ?assert(util:gb_trees_largest_smaller_than(3, Tree) =:= {value, 2, 2}),
+    ?assert(util:gb_trees_largest_smaller_than(7, Tree) =:= {value, 4, 4}),
+    ?assert(util:gb_trees_largest_smaller_than(9, Tree) =:= {value, 8, 8}),
+    ?assert(util:gb_trees_largest_smaller_than(31, Tree) =:= {value, 16, 16}),
+    ?assert(util:gb_trees_largest_smaller_than(64, Tree) =:= {value, 32, 32}),
+    ?assert(util:gb_trees_largest_smaller_than(65, Tree) =:= {value, 64, 64}),
+    ?assert(util:gb_trees_largest_smaller_than(1000, Tree) =:= {value, 64, 64}),
     ok.
 
 gb_trees_foldl(_Config) ->
@@ -104,4 +104,4 @@ gb_trees_foldl(_Config) ->
                                         Acc + K
                                 end,
                                 0,
-                                Tree) == 127).
+                                Tree) =:= 127).

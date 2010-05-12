@@ -72,7 +72,7 @@ on(_, _State) ->
     unknown_event.
 
 get_live_dht_nodes() ->
-    [cs_send:make_global(Pid) || Pid <- process_dictionary:find_all_dht_nodes(), element(1, gen_component:get_state(Pid)) == state].
+    [cs_send:make_global(Pid) || Pid <- process_dictionary:find_all_dht_nodes(), element(1, gen_component:get_state(Pid)) =:= state].
 
 get_round_trip(GPid, Iterations) ->
     Start = erlang:now(),

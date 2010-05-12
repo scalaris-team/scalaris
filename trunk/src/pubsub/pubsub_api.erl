@@ -66,7 +66,7 @@ subscribe(Topic, URL) ->
                                end
                        end,
                    if
-		       Result2 == ok ->
+		       Result2 =:= ok ->
 			   {{ok, ok}, TransLog2};
 		       true ->
 			   {Result2, TransLog2}
@@ -97,9 +97,9 @@ get_subscribers(Topic) ->
     {Res, _Value} = transaction_api:quorum_read(Topic),
     if
         %% Fl is either empty/fail or the Value/Subscribers
-	Res == empty_val ->
+	Res =:= empty_val ->
 	    [];
-        Res == fail ->
+        Res =:= fail ->
             [];
 	true ->
 	    Res

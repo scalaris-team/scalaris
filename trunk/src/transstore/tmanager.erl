@@ -204,7 +204,7 @@ add_tp(TMState, ItemKey, OriginalKey, Address, Limit) ->
     NewItem = Item#tm_item
                 {tps = NewTPs,
                  tps_found = Item#tm_item.tps_found + 1},
-    NewTPsReady = if (NewItem#tm_item.tps_found == Limit)
+    NewTPsReady = if (NewItem#tm_item.tps_found =:= Limit)
                      -> TMState#tm_state.tps_found + 1;
                      true -> TMState#tm_state.tps_found
                   end,
@@ -288,7 +288,7 @@ loop(TMState)->
             %% ?TLOGN("unknown message ~p", [X]),
             loop(TMState)
     after config:read(tmanager_timeout)->
-            if TMState#tm_state.rtms_found == 1
+            if TMState#tm_state.rtms_found =:= 1
                -> ?TLOGN("Tmanager Timeout: in init phase", []),
                   %% loop(TMState);
                   ?TLOGN("Kill myself, an init phase must have failed", []),

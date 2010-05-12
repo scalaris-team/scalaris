@@ -68,7 +68,7 @@ process_vote_ack(#tm_state{decision = undecided} = TMState, Key, RKey, Dec, TS) 
     Decision = check_acks(TMState2),
     %io:format("~p ~p~n", [self(), process_vote_ack]),
     if
-	Decision == undecided ->
+	Decision =:= undecided ->
 	    TMState2;
 	true -> %% Decision == commit/abort
 	    Message = {decision, 
@@ -187,7 +187,7 @@ count_acks_replica(_LastTimeStamp, _LastDecision, _Count, Limit, [{NewDecision, 
 process_read_vote(TMState, Vote)->
     CheckResult = check_read_vote(TMState, Vote),
     if
-	CheckResult == nack ->
+	CheckResult =:= nack ->
 	    TMState;
 	true ->
 	    {Val, _TS, WTS} = CheckResult,
@@ -236,7 +236,7 @@ collect_rv_ack(TMState, Key, RKey, Timestamp, StoredVote) ->
     RVAcks = trecords:get_read_vote_acks(TMState2, Key, RKey),
     WriteVote = check_rv_acks(RVAcks),
     if
-	WriteVote == not_enough ->
+	WriteVote =:= not_enough ->
 	    TMState2;
 	true ->
 	    {VoteToAdopt, TSForWriteVote} = WriteVote,
@@ -252,7 +252,7 @@ check_rv_acks(RVAcksList)->
     NewCounterList = lists:foldl(fun({{Value, Timestamp}, AckTimestamp}, CAcc)->
 					CurrCounter = lists:keysearch(AckTimestamp, 1, CAcc),
 					if
-					    false == CurrCounter ->
+					    false =:= CurrCounter ->
 						NewCounter = {AckTimestamp, {Value, Timestamp}, 1},
 						[NewCounter|CAcc];
 					    true ->
@@ -280,7 +280,7 @@ check_counter_fh([{Ts, {VoteToAdopt, _VTs}, Count} | Rest], Limit) ->
     if
 	Count >= Limit ->
 	    if
-		VoteToAdopt == bottom ->
+		VoteToAdopt =:= bottom ->
 		    {abort, Ts};
 		true ->
 		    {VoteToAdopt, Ts}
@@ -313,7 +313,7 @@ filter_undecided_items(TMState)->
     lists:filter(fun(Ack)->
 			 DecAck = check_acks_item([Ack]),
 			 if
-			     DecAck == undecided ->
+			     DecAck =:= undecided ->
 				 true;
 			     true ->
 					     false

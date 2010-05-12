@@ -128,10 +128,10 @@ on({trigger},
     RndView= get_RndView(RandViewSize, Cache),
     %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
     {Pred,Succ} = get_safe_pred_succ(Preds,Succs,RndView,Me),
-            %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
-            %Test for being alone
+    %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
+    % Test for being alone:
     NewTriggerState =
-        case ((Pred == Me) and (Succ == Me)) of
+        case (node:equals(Pred, Me) andalso node:equals(Succ, Me)) of
             true ->
                 rm_beh:update_preds([Me]),
                 rm_beh:update_succs([Me]),
@@ -295,7 +295,7 @@ merge(L1, L2, Id) ->
                     node:id(A) =< node:id(B)
             end,
     Larger  = lists:usort(Order, [X || X <- MergedList, node:id(X) >  Id]),
-    Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) == Id]),
+    Equal   = lists:usort(Order, [X || X <- MergedList, node:id(X) =:= Id]),
     Smaller = lists:usort(Order, [X || X <- MergedList, node:id(X) <  Id]),
     A = lists:append([Larger, Smaller]),
     case A of
@@ -307,7 +307,7 @@ merge(L1, L2, Id) ->
 filter(_Pid, []) ->
     [];
 filter(Pid, [Succ | Rest]) ->
-    case Pid == node:pidX(Succ) of
+    case node:equals(Pid, Succ) of
         true ->
             %Hook for DeadNodeCache
             dn_cache:add_zombie_candidate(Succ),
@@ -329,7 +329,7 @@ get_RndView(N, Cache) ->
 update_failuredetector(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
     OldView=lists:usort(OldPreds++OldSuccs),
     NewView=lists:usort(NewPreds++NewSuccs),
-    case (NewView /= OldView) of
+    case (NewView =/= OldView) of
         true ->
             NewNodes = util:minus(NewView,OldView),
             OldNodes = util:minus(OldView,NewView),
@@ -362,11 +362,11 @@ update_dht_node(OldPreds, NewPreds, OldSuccs, NewSuccs) ->
         RndView::[node:node_type()], Me::node:node_type()) ->
               {Pred::node:node_type(), Succ::node:node_type()}.
 get_safe_pred_succ(Preds, Succs, RndView, Me) ->
-    case (Preds == []) or (Succs == []) of
+    case (Preds =:= []) or (Succs =:= []) of
         true ->
             Buffer = merge(Preds ++ Succs, RndView,node:id(Me)),
             %io:format("Buffer: ~p~n",[Buffer]),
-            case Buffer == [] of
+            case Buffer =:= [] of
                 false ->
                     SuccsNew = lists:sublist(Buffer, 1, config:read(succ_list_length)),
                     PredsNew = lists:sublist(lists:reverse(Buffer), 1, config:read(pred_list_length)),

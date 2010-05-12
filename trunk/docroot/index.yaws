@@ -76,7 +76,7 @@ out(A) ->
       	IsPost ->
                {ok, Type} = postvar(A,"type"),
                if 
-                 Type == "addkey" -> 
+                 Type =:= "addkey" -> 
                     case {postvar(A, "key"),postvar(A, "value")} of
 		      {{ok, Key},{ok, Value}} ->
                          {Time, Result} = webhelpers:set_key(Key, Value),
@@ -115,7 +115,7 @@ out(A) ->
       	IsPost ->
               {ok, Type} = postvar(A,"type"),
               if 
-                Type == "querykey" ->
+                Type =:= "querykey" ->
                   case postvar(A, "key") of
                    {ok, Key} ->
                       {Time, Result} = webhelpers:lookup(Key),

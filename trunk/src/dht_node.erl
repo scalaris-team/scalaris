@@ -136,7 +136,7 @@ on({lookup_tp, Message}, State) ->
     {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
     Responsible = util:is_between(RangeBeg, Message#tp_message.item_key, RangeEnd),
     if
-        Responsible == true ->
+        Responsible =:= true ->
             cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
             State;
         true ->
@@ -156,7 +156,7 @@ on({validate, TransID, Item}, State) ->
 on({decision, Message}, State) ->
     {_, TransID, Decision} = Message#tp_message.message,
     if
-        Decision == commit ->
+        Decision =:= commit ->
             tparticipant:tp_commit(State, TransID);
         true ->
             tparticipant:tp_abort(State, TransID)
@@ -353,8 +353,8 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
 
 %% join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
-on({join, Source_PID, Id, IdVersion}, State) ->
-    dht_node_join:join_request(State, Source_PID, Id, IdVersion);
+on({join, NewPred}, State) ->
+    dht_node_join:join_request(State, NewPred);
 %% userdevguide-end dht_node:join_message
 
 on({known_hosts_timeout}, State) ->
@@ -387,7 +387,7 @@ init([_InstanceId, Options]) ->
     % or unit-test
     case lists:member(first, Options) andalso
           (is_unittest() orelse
-          application:get_env(boot_cs, first) == {ok, true}) of
+          application:get_env(boot_cs, first) =:= {ok, true}) of
         true ->
             trigger_known_nodes(),
             idholder:get_id(),

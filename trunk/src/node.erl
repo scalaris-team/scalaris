@@ -26,8 +26,8 @@
 -vsn('$Id$ ').
 
 -export([id/1, id_version/1, pidX/1,
-         new/3,
-         null/0, is_valid/1]).
+         new/3, null/0, is_valid/1,
+         equals/2, newer/2, is_me/1]).
 
 -include("scalaris.hrl").
 
@@ -65,3 +65,37 @@ is_valid(X) when is_record(X, node) ->
     true;
 is_valid(_) ->
     false.
+
+%% @doc Checks whether two nodes are the same, i.e. contain references to the.
+%%      same process.
+-spec equals(node_type() | cs_send:mypid() | pid(), node_type()) -> boolean();
+            (node_type(), cs_send:mypid() | pid()) -> boolean();
+            (null | unknown, node_type() | cs_send:mypid() | pid()) -> false;
+            (node_type() | cs_send:mypid() | pid(), null | unknown) -> false.
+equals(Node1, Node2) when ((Node1 =:= null) orelse (Node1 =:= unknown) orelse
+                           (Node2 =:= null) orelse (Node2 =:= unknown)) ->
+    false;
+equals(Node1, Node2) when is_record(Node1, node) and is_record(Node2, node) ->
+    pidX(Node1) =:= pidX(Node2);
+equals(Pid1, Node2) when is_record(Node2, node) and is_pid(Pid1) ->
+    cs_send:make_global(Pid1) =:= pidX(Node2);
+equals(Pid1, Node2) when is_record(Node2, node) ->
+    Pid1 =:= pidX(Node2);
+equals(Node1, Pid2) when is_record(Node1, node) and is_pid(Pid2)->
+    pidX(Node1) =:= cs_send:make_global(Pid2);
+equals(Node1, Pid2) when is_record(Node1, node) ->
+    pidX(Node1) =:= Pid2.
+
+%% @doc Checks whether the given node is the same as the node associated with
+%%      the requesting process.
+-spec is_me(node_type() | null | unknown) -> boolean().
+is_me(Node) ->
+    equals(Node, process_dictionary:get_group_member(dht_node)).
+
+%% @doc Determines the newer instance of two equal node representations.
+-spec newer(node_type(), node_type()) -> node_type().
+newer(Node1 = #node{pid=PID, id_version=IdVersion1}, Node2 = #node{pid=PID, id_version=IdVersion2}) ->
+    if
+        (IdVersion1 >= IdVersion2) -> Node1;
+        true                       -> Node2
+    end.

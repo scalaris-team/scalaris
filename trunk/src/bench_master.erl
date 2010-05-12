@@ -79,7 +79,7 @@ check_ring_size(Size) ->
             L
     end,
     
-    case (RSize == Size) of
+    case (RSize =:= Size) of
 	true ->
 	    ok;
 	_ ->

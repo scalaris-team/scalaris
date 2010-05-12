@@ -40,7 +40,7 @@
 %%   A = http_request
 isPost(A) ->
     Method = (A#arg.req)#http_request.method,
-    Method == 'POST'.
+    Method =:= 'POST'.
 
 %%%-----------------------------Lookup/Put---------------------------
 
@@ -228,9 +228,9 @@ getRingChart() ->
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
     RingSize = length(Ring),
     if
-	RingSize == 0 ->
+	RingSize =:= 0 ->
 	    {p, [], "empty ring"};
-	RingSize == 1 ->
+	RingSize =:= 1 ->
 	    {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
 	true ->
             try
@@ -253,7 +253,7 @@ renderRingChart(Ring) ->
                        Me_tmp = get_id(node_details:get(Node, node)),
                        Pred_tmp = get_id(hd(node_details:get(Node, predlist))),
                        if
-                           (null == Me_tmp) orelse (null == Pred_tmp) ->
+                           (null =:= Me_tmp) orelse (null =:= Pred_tmp) ->
                                io_lib:format("1.0", []); % guess the size
                            true ->
                                Tmp = (Me_tmp - Pred_tmp) * 100 /
@@ -287,7 +287,7 @@ getRingRendered() ->
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
     RingSize = length(Ring),
     if
-	RingSize == 0 ->
+	RingSize =:= 0 ->
 	    {p, [], "empty ring"};
 	true ->
 	    {p, [],
@@ -361,7 +361,7 @@ getIndexedRingRendered() ->
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
     RingSize = length(Ring),
     if
-	RingSize == 0 ->
+	RingSize =:= 0 ->
 	    {p, [], "empty ring"};
 	true ->
 	    {p, [],
@@ -419,7 +419,7 @@ renderIndexedRing({ok, Details}, Ring) ->
     {tr, [],
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
-       case hd(PredIndex) == -1 of
+       case hd(PredIndex) =:= -1 of
            true->
                {td, [], io_lib:format('~p', [PredIndex])};
            false ->

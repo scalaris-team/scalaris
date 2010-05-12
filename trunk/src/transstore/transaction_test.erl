@@ -112,7 +112,7 @@ run_test_increment(State, Source_PID)->
 		   {Result, TransLog1} = transaction_api:read(Key, TransLog),
 		   {Result2, TransLog2} = 
 		       if
-			   Result == fail ->
+			   Result =:= fail ->
 			       Value = 0,
 			       transaction_api:write(Key, Value, TransLog);
 			   true ->
@@ -121,7 +121,7 @@ run_test_increment(State, Source_PID)->
 			       transaction_api:write(Key, Value, TransLog1)
 		   end,
 		   if
-		       Result2 == ok ->
+		       Result2 =:= ok ->
 			   {{ok, Value}, TransLog2};
 		       true ->
 			   {{fail, abort}, TransLog2}
@@ -329,7 +329,7 @@ do_transtest_write_read(InstanceId, Value)->
     
     
     if 
-	Result == success->
+	Result =:= success->
 	    io:format("transtest_write_read: writing was successful~n", []),
 	    ReadResult = transaction_api:parallel_quorum_reads(WriteList, nothing),
 	    io:format("transtest_write_read: read  ~p ~n", [ReadResult]);
@@ -350,10 +350,10 @@ do_test_reads_writes_init(Rate, Value)->
     spawn(transaction_test, initiator_writer, [Dict, Value, self(), Rate]),
     timer:send_after(400000, self(), {tresult}),
     Result = test_reads_writes_loop([], Dict, tresult),
-    SuccList = lists:filter(fun({S,_It})-> if S == success-> true; true -> false end end, Result),
+    SuccList = lists:filter(fun({S,_It})-> if S =:= success-> true; true -> false end end, Result),
     FailList = lists:filter(fun({S,_It})-> 
 				    if
-					S == success->
+					S =:= success->
 					    false;
 					true ->
 					    true
@@ -432,7 +432,7 @@ writer(Word, Iteration, Owner)->
 %%  	fun(TLog)->
 %% 		{Res, TLog2} = transaction_api:write(Word, Iteration, TLog),
 %% 		if
-%% 		    Res == ok ->
+%% 		    Res =:= ok ->
 %% 			{{ok, Iteration}, TLog2};
 %% 		    true ->
 %% 			{Res, TLog2}
@@ -450,9 +450,9 @@ writer(Word, Iteration, Owner)->
 %%     Owner ! {trresult, Result, Message, Word}
     Result = transaction_api:single_write(Word, Iteration),
     if
-	Result == commit ->
+	Result =:= commit ->
 	    Owner ! {tresult, success, {Word, Iteration}, Word};
-	Result == userabort ->
+	Result =:= userabort ->
 	    Owner ! {tresult, userabort, {Word, Iteration}, Word};
 	true->
 	    {_F, Reason} = Result,
@@ -465,7 +465,7 @@ spawn_reader(Word, Owner)->
 reader(Word, Owner)->
     {RF, RR} = transaction_api:quorum_read(Word),
     if
-	RF == fail->
+	RF =:= fail->
 	    Result = fail,
 	    Message = RR;
 	true->

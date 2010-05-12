@@ -43,13 +43,13 @@ end_per_suite(_Config) ->
 
 read(_Config) ->
     DB = db_gb_trees:new(1),
-    ?assert(db_gb_trees:read(DB, "Unknown") == {ok, empty_val, -1}),
+    ?assert(db_gb_trees:read(DB, "Unknown") =:= {ok, empty_val, -1}),
     ok.
 
 write(_Config) ->
     DB = db_gb_trees:new(1),
     DB2 = db_gb_trees:write(DB, "Key1", "Value1", 1),
-    ?assert(db_gb_trees:read(DB2, "Key1") == {ok, "Value1", 1}),
+    ?assert(db_gb_trees:read(DB2, "Key1") =:= {ok, "Value1", 1}),
     ok.
 
 write_lock(_Config) ->

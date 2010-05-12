@@ -295,7 +295,7 @@ find_processes_in_group([], Set, _Group) ->
     Set;
 find_processes_in_group([{{InstanceId, TheName}, _} | Rest], Set, Group) ->
     if
-        InstanceId == Group ->
+        InstanceId =:= Group ->
             find_processes_in_group(Rest, gb_sets:add_element(TheName, Set), Group);
         true ->
             find_processes_in_group(Rest, Set, Group)

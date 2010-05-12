@@ -212,7 +212,7 @@ diff(TreeA,TreeB) when is_record(TreeA,merk),is_record(TreeB,merk) ->
     lists:usort(diff1(TreeA,TreeB)).
 diff1(TreeA,TreeB) ->
     % precondition: TreeA and TreeB are both merks at same offset
-    case TreeA#merk.hashval == TreeB#merk.hashval of
+    case TreeA#merk.hashval =:= TreeB#merk.hashval of
  	true ->
  	    [];
  	false ->
@@ -221,8 +221,8 @@ diff1(TreeA,TreeB) ->
 diff2(TreeA,TreeB) ->
     % precondition: TreeA and TreeB are both merks at same offset
     % precondition: TreeA and TreeB have different hashval
-    case TreeA#merk.nodetype == TreeB#merk.nodetype andalso
-	TreeA#merk.nodetype == leaf of
+    case TreeA#merk.nodetype =:= TreeB#merk.nodetype andalso
+	TreeA#merk.nodetype =:= leaf of
 	true ->
 	    [TreeA#merk.userdata,TreeB#merk.userdata];
 	false ->
@@ -232,11 +232,11 @@ diff3(TreeA,TreeB) ->
     % precondition: TreeA and TreeB are both merks at same offset
     % precondition: TreeA and TreeB have different hashval
     % precondition: at least one of TreeA and TreeB is not a leaf
-    case TreeA#merk.nodetype == leaf of
+    case TreeA#merk.nodetype =:= leaf of
 	true ->
 	    allbutmaybe(TreeB,TreeA);
 	false ->
-	    case TreeB#merk.nodetype == leaf of
+	    case TreeB#merk.nodetype =:= leaf of
 		true ->
 		    allbutmaybe(TreeA,TreeB);
 		false ->
@@ -273,9 +273,9 @@ diff4b(KidsA,KidsB,Idx,Acc) ->
     % precondition: neither KidsA nor KidsB is empty
     [{OkeyA,NodeA}|RestA] = KidsA,
     [{OkeyB,NodeB}|RestB] = KidsB,
-    case OkeyA == Idx of
+    case OkeyA =:= Idx of
 	true ->
-	    case OkeyB == Idx of
+	    case OkeyB =:= Idx of
 		true ->
 		    diff4a(RestA,RestB,Idx+1,
 			   lists:append(Acc,diff1(
@@ -286,7 +286,7 @@ diff4b(KidsA,KidsB,Idx,Acc) ->
 					      NodeA)))
 	    end;
 	false ->
-	    case OkeyB == Idx of
+	    case OkeyB =:= Idx of
 		true ->
 		    diff4a(KidsA,RestB,Idx+1,
 			   lists:append(Acc,allkeys(
@@ -321,7 +321,7 @@ allbutmaybe(Tree,Leaf) when is_record(Tree, merk),is_record(Leaf,merk) ->
 contains_node(Tree,Node) ->
     case Tree#merk.nodetype of
 	leaf ->
-	    Tree#merk.hashval == Node#merk.hashval;
+	    Tree#merk.hashval =:= Node#merk.hashval;
 	_ ->
 	    lists:any(fun(T) -> contains_node(T,Node) end, getkids(Tree))
     end.
@@ -345,7 +345,7 @@ mi_contains({Offset, MI}, Tree) ->
     HKey = MI#merkitem.hkey,
     case Tree#merk.nodetype of
 	leaf ->
-	    Tree#merk.key == HKey;
+	    Tree#merk.key =:= HKey;
 	inner ->
             Kids = Tree#merk.children,
             OKey = offset_key(Offset,HKey),

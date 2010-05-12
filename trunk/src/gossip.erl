@@ -302,11 +302,9 @@ on({cy_cache, [Node] = _Cache},
     % cyclon process and should contain a random node. We will then contact this
     % random node and ask for a state exchange.
 %%     io:format("gossip: got random node from Cyclon: ~p~n",[_Cache]),
-    NodePid = node:pidX(Node),
-    SelfPid = cs_send:make_global(process_dictionary:get_group_member(dht_node)),
     % do not exchange states with itself
-    if
-        (NodePid =/= SelfPid) ->
+    case node:is_me(Node) of
+        false ->
             cs_send:send_to_group_member(node:pidX(Node), gossip,
                                          {get_state, cs_send:this(),
                                           gossip_state:get(State, values)});
@@ -482,7 +480,7 @@ calc_change(Key, OldValues, NewValues) ->
     Old = gossip_state:get(OldValues, Key),
     New = gossip_state:get(NewValues, Key),
 	if
-		(Old =/= unknown) and (Old =:= New) -> 0.0;
+		(Old =/= unknown) andalso (Old =:= New) -> 0.0;
 		(Old =:= unknown) orelse (New =:= unknown) orelse (Old == 0) -> 100.0;
 		true -> ((Old + abs(New - Old)) * 100.0 / Old) - 100
 	end.

@@ -199,7 +199,7 @@ on({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerSta
              true  -> PotentialMe;
              false -> Node
          end,
-    Cache = case (Pred =/= Node)
+    Cache = case not node:equals(Pred, Node)
                 andalso node:is_valid(Pred)
                 andalso node:is_valid(Succ)
                 andalso (cyclon_cache:size(OldCache) =< 2) of

@@ -206,7 +206,7 @@ get_range_with_version(DB, Interval) ->
 
 get_range_only_with_version(DB, Interval) ->
     F = fun ({Key, {Value, WLock, _, Version}}, Data) ->
-                case WLock == false
+                case WLock =:= false
                     andalso Value =/= empty_val
                     andalso intervals:in(Key, Interval) of
                     true -> [{Key, Value, Version} | Data];

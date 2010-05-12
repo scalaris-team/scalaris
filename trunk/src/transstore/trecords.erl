@@ -290,7 +290,7 @@ items_get_keys(Items) ->
 
 items_get_item_by_key(Items, Key) ->
     [Item] = [ X || X <- Items,
-                    Key == X#tm_item.key ],
+                    Key =:= X#tm_item.key ],
     Item.
 
 items_update_item(Items, OldItem, NewItem) ->

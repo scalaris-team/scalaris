@@ -49,8 +49,8 @@ new() ->
 %% @doc Creates a new node cache with the given two nodes and ages 0.
 -spec new(node_details:node_type(), node_details:node_type()) -> cache().
 new(Node1, Node2) ->
-    case Node1 =:= Node2 of
-        true -> [{Node1, 0}];
+    case node:equals(Node1, Node2) of
+        true  -> [{Node1, 0}];
         false -> [{Node2, 0}, {Node1, 0}]
     end.
 
@@ -152,7 +152,7 @@ inc_age(Cache) ->
 %% @doc Checks whether the cache contains an element with the given Node.
 -spec contains_node(Node::node:node_type(), Cache::cache()) -> Result::boolean().
 contains_node(Node, Cache) ->
-    lists:any(fun({SomeNode, _Age}) -> SomeNode =:= Node end, Cache).
+    lists:any(fun({SomeNode, _Age}) -> node:equals(SomeNode, Node) end, Cache).
 
 %% @doc Returns the ages of all nodes in the cache.
 -spec get_ages(Cache::cache()) -> Ages::[age()].
@@ -177,10 +177,10 @@ merge(MyCache, MyNode, ReceivedCache, SendCache, TargetSize) ->
     ReceivedCache_Filtered =
         [Elem || {Node, _Age} = Elem <- ReceivedCache,
                  not contains_node(Node, MyCache),
-                 Node =/= MyNode],
+                 not node:equals(Node, MyNode)],
     SendCache_Filtered =
         [Elem || {Node, _Age} = Elem <- SendCache,
-                 Node =/= MyNode],
+                 not node:equals(Node, MyNode)],
     {MyC1, ReceivedCacheRest, AddedElements} =
         fillup(MyCache, ReceivedCache_Filtered, TargetSize - MyCacheSize),
     MyC1Size = MyCacheSize + AddedElements,
@@ -280,7 +280,7 @@ add_node(Node, Age, Cache) ->
 %% @doc Removes any element with the given Node from the Cache.
 -spec remove_node(Node::node:node_type(), Cache::cache()) -> NewCache::cache().
 remove_node(Node, Cache) ->
-    [Element || {SomeNode, _Age} = Element <- Cache, SomeNode =/= Node].
+    [Element || {SomeNode, _Age} = Element <- Cache, not node:equals(SomeNode, Node)].
 
 %% @doc Trims the cache to size TargetSize (if necessary) by deleting random
 %%      entries as long as the cache is larger than the given TargetSize.

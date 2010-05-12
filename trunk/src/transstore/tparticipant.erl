@@ -92,7 +92,7 @@ check_version(#item{operation=read} = TransactionItem, Version)->
      end;
 check_version(#item{operation=write} = TransactionItem, Version)-> 
     if
-	TransactionItem#item.version == (Version + 1) ->
+	TransactionItem#item.version =:= (Version + 1) ->
 	    success;
 	true ->
 	    fail

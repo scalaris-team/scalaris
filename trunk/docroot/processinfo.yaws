@@ -4,11 +4,11 @@ out(A) ->
     {value, {_, Group}} = lists:keysearch("group", 1, yaws_api:parse_query(A)),
     {value, {_, Id}} = lists:keysearch("id", 1, yaws_api:parse_query(A)),
     if 
-	Group == undefined -> 
+	Group =:= undefined -> 
 	  {ehtml, 
        	    {pre, [], 
             ""}}; 
-	Id == undefined ->
+	Id =:= undefined ->
       	  {ehtml, 
        		{pre, [], 
         	""}};

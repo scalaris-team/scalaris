@@ -54,7 +54,7 @@
 on({pong}, {Owner, RemotePid, Token, Start, Latencies}) ->
     Stop = erlang:now(),
     NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
-    case length(NewLatencies) == config:read(vivaldi_count_measurements) of
+    case length(NewLatencies) =:= config:read(vivaldi_count_measurements) of
         true ->
             cs_send:send_local(Owner, {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
             kill;

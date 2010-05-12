@@ -51,7 +51,7 @@ make_tfun(Key) ->
 	    {Result, TransLog1} = transaction_api:read(Key, TransLog),
 	    {Result2, TransLog2} =
 		if
-		    Result == fail ->
+		    Result =:= fail ->
 			Value = 0,
 			transaction_api:write(Key, Value, TransLog);
 		    true ->
@@ -60,7 +60,7 @@ make_tfun(Key) ->
 			transaction_api:write(Key, Value, TransLog1)
 		end,
 	    if
-		Result2 == ok ->
+		Result2 =:= ok ->
 		    {{ok, Value}, TransLog2};
 		true ->
 		    {{fail, abort}, TransLog2}
