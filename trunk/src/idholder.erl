@@ -24,7 +24,6 @@
 %%% Created : 24 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @version $Id$
-%% @doc 
 -module(idholder).
 
 -author('schuett@zib.de').

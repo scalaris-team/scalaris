@@ -40,9 +40,6 @@
     {join, {phase4, MyKey::?RT:key(), Succ::node:node_type(), Me::node:node_type()}, QueuedMessages::list()}).
 
 %% @doc handle the join request of a new node
-%% @spec join_request(state:state(), pid(), Id) -> state:state()
-%%   Id = term()
-
 %% userdevguide-begin dht_node_join:join_request
 -spec join_request(dht_node_state:state(), NewPred::node:node_type()) -> dht_node_state:state().
 join_request(State, NewPred) ->
