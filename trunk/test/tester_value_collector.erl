@@ -42,6 +42,10 @@ parse_expression({cons, _, Head, Tail}, ParseState) ->
     parse_expression(Tail, parse_expression(Head, ParseState));
 parse_expression({'fun', _, {clauses, Clauses}}, ParseState) ->
     lists:foldl(fun parse_expression/2, ParseState, Clauses);
+parse_expression({'fun', _, {function, _Name, _Arity}}, ParseState) ->
+    ParseState;
+parse_expression({'fun', _, {function, _Module, _Name, _Arity}}, ParseState) ->
+    ParseState;
 parse_expression({generate, _, Expression, L}, ParseState) ->
     parse_expression(L, parse_expression(Expression, ParseState));
 parse_expression({'if', _, Clauses}, ParseState) ->
