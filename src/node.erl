@@ -23,7 +23,7 @@
 -module(node).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([id/1, id_version/1, pidX/1,
          new/3, null/0, is_valid/1,

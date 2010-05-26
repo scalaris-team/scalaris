@@ -23,7 +23,7 @@
 -module(dht_node_lookup).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

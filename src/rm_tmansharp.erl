@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(rm_tmansharp).
 -author('hennig@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

@@ -21,7 +21,7 @@
 -module(cs_api_SUITE).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -compile(export_all).
 

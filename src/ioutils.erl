@@ -22,6 +22,7 @@
 -module(ioutils).
 
 -author('schuett@zib.de').
+-vsn('$Id$').
 
 -export([for_each_line_in_file/4]).
 

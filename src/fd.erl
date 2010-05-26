@@ -24,7 +24,7 @@
 %% @version $Id$
 -module(fd).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

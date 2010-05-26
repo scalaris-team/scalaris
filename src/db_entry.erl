@@ -17,9 +17,11 @@
 %% @doc Abstract datatype of a single DB entry.
 %% @version $Id$
 -module(db_entry).
+-author('schintke@onscale.de').
+-vsn('$Id$').
+
 -define(TRACE(X,Y), io:format(X,Y)).
 %-define(TRACE(X,Y), ok).
--author('schintke@onscale.de').
 
 -export([new/1]).
 -export([set_value/2]).

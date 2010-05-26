@@ -18,6 +18,9 @@
 %%           The role of a learner.
 %% @end
 -module(learner).
+-author('schintke@onscale.de').
+-vsn('$Id$').
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).

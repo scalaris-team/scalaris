@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(rm_beh).
 -author('schuett@zib.de').
--vsn('$Id').
+-vsn('$Id$').
 
 -export([behaviour_info/1, update_preds_and_succs/2,
         get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1,

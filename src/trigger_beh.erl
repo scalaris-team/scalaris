@@ -24,7 +24,7 @@
 -module(trigger_beh).
 
 -author('hennig@zib.de').
--vsn('$Id').
+-vsn('$Id$').
 
 % for behaviour
 -export([behaviour_info/1]).

@@ -24,6 +24,8 @@
 %% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id $
 -module(comm_acceptor).
+-author('schuett@zib.de').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

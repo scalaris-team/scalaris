@@ -18,7 +18,7 @@
 %% @version $Id: rt_simple.erl 758 2010-04-30 15:06:20Z kruber@zib.de $
 -module(rt_simple).
 -author('schuett@zib.de').
--vsn('$Id: rt_simple.erl 758 2010-04-30 15:06:20Z kruber@zib.de $ ').
+-vsn('$Id$').
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").

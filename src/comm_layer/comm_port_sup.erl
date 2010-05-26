@@ -24,7 +24,7 @@
 -module(comm_port_sup).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(supervisor).
 

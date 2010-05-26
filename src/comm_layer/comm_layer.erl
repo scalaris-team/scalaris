@@ -28,7 +28,7 @@
 -module(comm_layer).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([start_link/0, send/2, this/0, here/1, is_valid/1]).
 

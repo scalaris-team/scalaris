@@ -24,7 +24,7 @@
 -module(util).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

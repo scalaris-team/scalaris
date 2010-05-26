@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(cs_api).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).

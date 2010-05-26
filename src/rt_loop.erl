@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(rt_loop).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

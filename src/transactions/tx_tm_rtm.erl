@@ -18,11 +18,13 @@
 %%      the roles of the (replicated) transaction manager TM and RTM.
 %% @end
 -module(tx_tm_rtm).
+-author('schintke@onscale.de').
+-vsn('$Id$').
+
 %%-define(TRACE_RTM_MGMT(X,Y), io:format(X,Y)).
 -define(TRACE_RTM_MGMT(X,Y), ok).
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(_X,_Y), ok).
--author('schintke@onscale.de').
 -behaviour(gen_component).
 -include("scalaris.hrl").
 

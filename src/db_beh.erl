@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(db_beh).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([behaviour_info/1]).
 

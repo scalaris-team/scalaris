@@ -45,7 +45,7 @@
 -module(process_dictionary).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

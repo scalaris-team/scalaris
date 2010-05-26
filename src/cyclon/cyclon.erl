@@ -28,7 +28,7 @@
 
 -module(cyclon).
 -author('hennig@zib.de').
--vsn('$Id $ ').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

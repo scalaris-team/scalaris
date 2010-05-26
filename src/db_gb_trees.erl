@@ -18,7 +18,7 @@
 %%% @version $Id$
 -module(db_gb_trees).
 -author('schuett@zib.de').
--vsn('$Id').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

@@ -24,7 +24,7 @@
 -module(yaws_wrapper).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("yaws.hrl").
 

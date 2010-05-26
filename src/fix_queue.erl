@@ -21,6 +21,8 @@
 %%%-------------------------------------------------------------------
 %% @version $Id$
 -module(fix_queue).
+-author('hennig@zib.de').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

@@ -24,7 +24,7 @@
 -module(comm_logger).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(gen_server).
 

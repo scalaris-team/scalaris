@@ -18,9 +18,11 @@
 %%           The state for a transaction in a tp (transaction participant).
 %% @version $Id$
 -module(tx_tp_state).
+-author('schintke@onscale.de').
+-vsn('$Id$').
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
--author('schintke@onscale.de').
 
 %% Operations on tx_tm_state
 %% -export([new/5, new/6]).

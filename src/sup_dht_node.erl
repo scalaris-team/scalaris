@@ -26,7 +26,7 @@
 %% @version $Id$
 -module(sup_dht_node).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(supervisor).
 -include("scalaris.hrl").

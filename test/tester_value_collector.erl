@@ -24,7 +24,7 @@
 -module(tester_value_collector).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include_lib("unittest.hrl").
 

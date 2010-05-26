@@ -24,7 +24,7 @@
 -module(pubsub_api).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
 

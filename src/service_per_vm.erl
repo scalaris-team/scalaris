@@ -25,7 +25,7 @@
 -module(service_per_vm).
 
 -author('schuett@zib.de').
--vsn('$Id').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

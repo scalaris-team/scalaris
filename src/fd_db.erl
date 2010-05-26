@@ -24,7 +24,7 @@
 %% @version $Id$
 -module(fd_db).
 -author('hennig@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

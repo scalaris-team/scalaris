@@ -23,6 +23,9 @@
 %% @version $Id$
 
 -module(ganglia).
+-author('hoffmann@zib.de').
+-vsn('$Id$').
+
 -export([start_link/0, start/0]).
 
 start_link() ->

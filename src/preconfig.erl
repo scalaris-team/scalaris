@@ -1,4 +1,5 @@
 -module(preconfig).
+-vsn('$Id$').
 
 -export([get_env/2]).
 

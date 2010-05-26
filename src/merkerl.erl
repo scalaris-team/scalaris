@@ -42,6 +42,8 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 -module(merkerl).
+-author('justin@basho.com').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

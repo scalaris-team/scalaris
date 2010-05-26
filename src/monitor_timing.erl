@@ -24,7 +24,7 @@
 -module(monitor_timing).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

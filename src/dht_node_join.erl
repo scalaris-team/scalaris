@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(dht_node_join).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([join_request/2, process_join_msg/2]).
 

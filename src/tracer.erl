@@ -12,7 +12,7 @@
 -module(tracer).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([tracer/1, start/0, dump/0]).
 

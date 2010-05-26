@@ -23,7 +23,7 @@
 -module(node_details).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 % constructors
 -export([new/0, new/7]).

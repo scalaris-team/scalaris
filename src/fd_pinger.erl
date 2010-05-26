@@ -23,7 +23,7 @@
 %% @version $Id$
 -module(fd_pinger).
 -author('hennig@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behavior(gen_component).
 

@@ -18,6 +18,8 @@
 %%       The state needed for a single proposer instance.
 %% @end
 -module(proposer_state).
+-author('schintke@onscale.de').
+-vsn('$Id$').
 
 %% Operations on proposer_state
 -export([new/6, new/7]).

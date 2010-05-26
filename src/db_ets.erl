@@ -20,7 +20,7 @@
 %% @version $Id$
 -module(db_ets).
 -author('schintke@onscale.de').
--vsn('$Id').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

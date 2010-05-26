@@ -24,7 +24,7 @@
 -module(transaction).
 
 -author('moser@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("trecords.hrl").
 -include("scalaris.hrl").

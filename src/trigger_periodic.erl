@@ -32,7 +32,7 @@
 -module(trigger_periodic).
 
 -author('hennig@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(trigger_beh).
 

@@ -18,6 +18,8 @@
 %% @version $Id$
 -module(rdht_tx_read).
 -author('schintke@onscale.de').
+-vsn('$Id$').
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
