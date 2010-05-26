@@ -16,6 +16,8 @@
 %%% @doc    T-Man ring maintenance
 %%% @end
 %% @version $Id$
+%% @reference Mark Jelasity, Ozalp Babaoglu. T-Man: Gossip-Based Overlay
+%% Topology Management. Engineering Self-Organising Systems 2005:1-15
 -module(rm_tman).
 -author('hennig@zib.de').
 -vsn('$Id$').
