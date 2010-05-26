@@ -94,8 +94,13 @@ is_me(Node) ->
 
 %% @doc Determines the newer instance of two equal node representations.
 -spec newer(node_type(), node_type()) -> node_type().
-newer(Node1 = #node{pid=PID, id_version=IdVersion1}, Node2 = #node{pid=PID, id_version=IdVersion2}) ->
+newer(Node1 = #node{pid=PID, id=Id1, id_version=IdVersion1}, Node2 = #node{pid=PID, id=Id2, id_version=IdVersion2}) ->
     if
-        (IdVersion1 >= IdVersion2) -> Node1;
+        (IdVersion1 > IdVersion2) ->
+            Node1;
+        (IdVersion1 =:= IdVersion2) andalso (Id1 =:= Id2) ->
+            Node1;
+        IdVersion1 =:= IdVersion2 ->
+            throw('got two nodes with same IDversion but different ID');
         true                       -> Node2
     end.
