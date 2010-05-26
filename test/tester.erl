@@ -68,7 +68,7 @@ collect_fun_info(Module, Func, Arity, ParseState) ->
         [] ->
             ParseState2;
         UnknownTypes ->
-            collect_unknown_type_infos(UnknownTypes, ParseState2)
+            collect_unknown_type_infos(UnknownTypes, ParseState2, 100)
     end,
     case tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState3) of
         {value, _} ->
@@ -77,8 +77,11 @@ collect_fun_info(Module, Func, Arity, ParseState) ->
             ?ct_fail("unknown function ~p:~p/~p~n", [Module, Func, Arity])
     end.
 
--spec collect_unknown_type_infos/2 :: (list(type_name()), #parse_state{}) -> #parse_state{}.
-collect_unknown_type_infos(UnknownTypes, ParseState) ->
+-spec collect_unknown_type_infos/3 :: (list(type_name()), #parse_state{}, non_neg_integer()) -> #parse_state{}.
+collect_unknown_type_infos(UnknownTypes, ParseState, 0) ->
+    ct:pal("warning still looking for unknown types: ~p~n", [tester_parse_state:get_unknown_types(ParseState)]),
+    collect_unknown_type_infos(UnknownTypes, ParseState, 100);
+collect_unknown_type_infos(UnknownTypes, ParseState, Counter) ->
     ParseState2 = tester_parse_state:reset_unknown_types(ParseState),
     ParseState3 = lists:foldl(fun ({type, Module, TypeName}, InnerParseState) ->
                                         collect_type_info(Module, TypeName, InnerParseState)
@@ -87,7 +90,7 @@ collect_unknown_type_infos(UnknownTypes, ParseState) ->
         [] ->
             ParseState3;
         NewUnknownTypes ->
-            collect_unknown_type_infos(NewUnknownTypes, ParseState3)
+            collect_unknown_type_infos(NewUnknownTypes, ParseState3, Counter - 1)
     end.
 
 -spec collect_type_info/3 :: (module(), atom(), #parse_state{}) -> #parse_state{}.
@@ -178,6 +181,8 @@ parse_type({type, _Line, binary, []}, _Module, ParseState) ->
     {binary, ParseState};
 parse_type({type, _Line, pid, []}, _Module, ParseState) ->
     {pid, ParseState};
+parse_type({type, _Line, tid, []}, _Module, ParseState) ->
+    {tid, ParseState};
 parse_type({type, _Line, port, []}, _Module, ParseState) ->
     {port, ParseState};
 parse_type({type, _Line, float, []}, _Module, ParseState) ->
