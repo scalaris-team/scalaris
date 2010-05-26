@@ -33,7 +33,7 @@
 -include_lib("tester.hrl").
 -include_lib("unittest.hrl").
 
-list_length_min() -> 1.
+list_length_min() -> 0.
 list_length_max() -> 5.
 
 integer_min() -> 1.
@@ -340,6 +340,12 @@ create_value({list, Type}, Size, ParseState) ->
             NewSize = erlang:max(1, (Size - ListLength) div ListLength),
             [create_value(Type, NewSize, ParseState) || _ <- lists:seq(1, ListLength)]
     end;
+create_value({nonempty_list, Type}, Size, ParseState) ->
+    ListLength = 
+        erlang:max(1, erlang:min(Size,
+                                 crypto:rand_uniform(1, list_length_max() + 1))),
+    NewSize = erlang:max(1, (Size - ListLength) div ListLength),
+    [create_value(Type, NewSize, ParseState) || _ <- lists:seq(1, ListLength)];
 create_value(nonempty_string, Size, ParseState) ->
     ListLength = erlang:max(1, erlang:min(Size, crypto:rand_uniform(list_length_min(),
                                                                     list_length_max() + 1))),
