@@ -50,7 +50,7 @@
                 end
         end()).
 
--define(equals(Actual, Expected, Note),
+-define(equals_w_note(Actual, Expected, Note),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 % Expected might be a function call which is not allowed in case statements
@@ -81,7 +81,7 @@
                 end
         end()).
 
--define(equals_pattern(Actual, ExpectedPattern, Note),
+-define(equals_pattern_w_note(Actual, ExpectedPattern, Note),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 case Actual of
