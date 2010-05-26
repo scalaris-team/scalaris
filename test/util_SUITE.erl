@@ -28,7 +28,7 @@
 -include("unittest.hrl").
 
 all() ->
-    [is_between, is_between_closed, trunc, min_max, largest_smaller_than,
+    [is_between, is_between_closed, min_max, largest_smaller_than,
      gb_trees_foldl].
 
 suite() ->
@@ -64,13 +64,6 @@ is_between_closed(_Config) ->
 
     ?assert(not util:is_between_closed("2", "1", "1")),
     ?assert(not util:is_between_closed("2", "2", "1")),
-    ok.
-
-trunc(_Config) ->
-    ?assert(util:trunc([1, 2, 3], 1) =:= [1]),
-    ?assert(util:trunc([1, 2, 3], 2) =:= [1, 2]),
-    ?assert(util:trunc([1, 2, 3], 3) =:= [1, 2, 3]),
-    ?assert(util:trunc([1, 2, 3], 4) =:= [1, 2, 3]),
     ok.
 
 min_max(_Config) ->

@@ -52,7 +52,7 @@ bulk_owner(State, I, Msg) ->
 	true ->
 	    ok;
 	false ->
-	    cs_send:send(dht_node_state:succ_pid(State), {bulkowner_deliver, Range, Msg})
+	    cs_send:send(dht_node_state:get(State, succ_pid), {bulkowner_deliver, Range, Msg})
     end,
     U = ?RT:to_dict(State),
     case intervals:is_covered(I, Range) of

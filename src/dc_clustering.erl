@@ -51,7 +51,7 @@
     {start_clustering_shuffle} |
     {reset_clustering} |
     {vivaldi_get_coordinate_response, vivaldi:network_coordinate(), vivaldi:error()} |
-    {cy_cache, [node:node_type()]} |
+    {cy_cache, nodelist:nodelist()} |
     {clustering_shuffle, cs_send:mypid(), centroids(), sizes()} |
     {clustering_shuffle_reply, cs_send:mypid(), centroids(), sizes()} |
     {query_clustering, cs_send:mypid()}).

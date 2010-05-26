@@ -52,7 +52,7 @@
 % accepted messages of vivaldi processes
 -type(message() ::
     {trigger} |
-    {cy_cache, [node:node_type()]} |
+    {cy_cache, nodelist:nodelist()} |
     {vivaldi_shuffle, cs_send:mypid(), network_coordinate(), error()} |
     {vivaldi_shuffle_reply, cs_send:mypid(), network_coordinate(), error()} |
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |

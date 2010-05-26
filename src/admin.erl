@@ -90,7 +90,7 @@ check_ring() ->
     end.
 
 check_ring_foldl({ok, Node}, first) ->
-    get_id(hd(node_details:get(Node, succlist)));
+    get_id(nodelist:succ(node_details:get(Node, succlist)));
 check_ring_foldl({failed}, Last) ->
     Last;
 check_ring_foldl(_, {error, Message}) ->
@@ -99,7 +99,7 @@ check_ring_foldl({ok, Node}, PredsSucc) ->
     MyId = get_id(node_details:get(Node, node)),
     if
         MyId =:= PredsSucc ->
-            get_id(hd(node_details:get(Node, succlist)));
+            get_id(nodelist:succ(node_details:get(Node, succlist)));
         true ->
             {error, lists:flatten(io_lib:format("~p didn't match ~p", [MyId, PredsSucc]))}
     end.
@@ -200,7 +200,7 @@ nodes() ->
     boot_server:node_list(),
     Nodes = receive
                 {get_list_response, List} ->
-                    util:uniq([IP || {IP, _, _} <- lists:sort(List)])
+                    lists:usort([IP || {IP, _, _} <- List])
             end,
     Nodes.
 

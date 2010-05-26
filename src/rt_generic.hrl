@@ -44,9 +44,6 @@ check(_OldRT, NewRT, Id, Pred, Succ, false) ->
 check_fd(X, X) ->
     ok;
 check_fd(NewRT, OldRT) ->
-    NewView = ?MyRT:to_pid_list(NewRT),
-    OldView = ?MyRT:to_pid_list(OldRT),
-    NewNodes = util:minus(NewView, OldView),
-    OldNodes = util:minus(OldView, NewView),
-    fd:unsubscribe(OldNodes),
-    fd:subscribe(NewNodes).
+    NewPids = ?MyRT:to_pid_list(NewRT),
+    OldPids = ?MyRT:to_pid_list(OldRT),
+    fd:update_subscriptions(OldPids, NewPids).

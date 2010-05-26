@@ -39,13 +39,13 @@ new() ->
     #lb{loadbalance_flag=true, reset_ref=ResetRef, last_keys=gb_sets:new()}.
 
 balance_load(State) ->
-    RT = dht_node_state:rt(State),
+    RT = dht_node_state:get(State, rt),
     Fingers = ?RT:to_pid_list(RT),
     lists:foreach(fun(Node) -> cs_send:send(Node, {get_load, cs_send:this()}) end, Fingers),    
     cs_send:send_local_after(loadBalanceInterval(), self(), {stabilize_loadbalance}).
 
 check_balance(State, Source_PID, Load) ->
-    MyLoad = dht_node_state:load(State),
+    MyLoad = dht_node_state:get(State, load),
     if
 	(MyLoad * 2 < Load) andalso (Load > 1) ->
 	    cs_send:send(Source_PID, {get_middle_key, cs_send:this()}),
@@ -55,10 +55,10 @@ check_balance(State, Source_PID, Load) ->
     end.
 
 get_middle_key(State) ->
-    LB = dht_node_state:get_lb(State),
+    LB = dht_node_state:get(State, lb),
     AmLoadbalancing = get_loadbalance_flag(LB),
     LastKeys = last_keys(LB),
-    Load = dht_node_state:load(State),
+    Load = dht_node_state:get(State, load),
     if
 	AmLoadbalancing orelse (Load < 20) ->
 	    {nil, State};
@@ -66,7 +66,7 @@ get_middle_key(State) ->
 	    %Keys = gb_trees:keys(dht_node_state:get_data(State)),
 	    %Middle = length(Keys) div 2 + 1,
 	    %lists:nth(Middle, Keys),
-	    MiddleKey = ?DB:get_middle_key(dht_node_state:get_db(State)),
+	    MiddleKey = ?DB:get_middle_key(dht_node_state:get(State, db)),
 	    IsReservedKey = gb_sets:is_element(MiddleKey, LastKeys),
 	    if
 		IsReservedKey ->
@@ -81,21 +81,21 @@ move_load(State, _, nil) ->
     State;
 
 move_load(State, _, NewId) ->
-    cancel_reset(dht_node_state:get_lb(State)),
-    Succ = dht_node_state:succ_pid(State),
-    Pred = dht_node_state:pred(State),
+    cancel_reset(dht_node_state:get(State, lb)),
+    Succ = dht_node_state:get(State, succ_pid),
+    Pred = dht_node_state:get(State, pred),
     % TODO: needs to be fixed
     drop_data(State),
-    OldIdVersion = node:id_version(dht_node_state:me(State)),
+    OldIdVersion = node:id_version(dht_node_state:get(State, node)),
     idholder:set_id(NewId, OldIdVersion + 1),
     cs_send:send_local(self() , {kill}),
     cs_send:send(Succ, {pred_left, Pred}),
-    PredPid = dht_node_state:pred_pid(State),
-    cs_send:send(PredPid, {succ_left, dht_node_state:me(State)}),
+    PredPid = dht_node_state:get(State, pred_pid),
+    cs_send:send(PredPid, {succ_left, dht_node_state:get(State, node)}),
     State.
 
 drop_data(State) ->
-    cs_send:send(dht_node_state:succ_pid(State), {drop_data, ?DB:get_data(dht_node_state:get_db(State)), cs_send:this()}),
+    cs_send:send(dht_node_state:get(State, succ_pid), {drop_data, ?DB:get_data(dht_node_state:get(State, db)), cs_send:this()}),
     receive
 	{drop_data_ack} ->
 	    ok
@@ -105,7 +105,7 @@ drop_data(State) ->
     end.
     
 reset_loadbalance_flag(State) ->
-    LB = dht_node_state:get_lb(State),
+    LB = dht_node_state:get(State, lb),
     NewLB = LB#lb{loadbalance_flag=false},
     dht_node_state:set_lb(State, NewLB).
     
@@ -120,7 +120,7 @@ get_loadbalance_flag(#lb{loadbalance_flag=Bool}) ->
     Bool;
 
 get_loadbalance_flag(State) ->
-    get_loadbalance_flag(dht_node_state:get_lb(State)).
+    get_loadbalance_flag(dht_node_state:get(State, lb)).
 
 set_loadbalance_flag(LB) ->
     ResetRef=cs_send:send_local_after(loadBalanceFlagResetInterval(), self(), {reset_loadbalance_flag}),

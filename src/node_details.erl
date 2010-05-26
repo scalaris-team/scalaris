@@ -36,7 +36,6 @@
 
 -include("scalaris.hrl").
 
--type(nodelist() :: [node:node_type()]).
 -type(node_type() :: node:node_type()).
 -type(load() :: integer()).
 -type(hostname() :: string()).
@@ -49,9 +48,9 @@
                              succlist | load | hostname | rt_size |
                              message_log | memory).
 
--record(node_details, {predlist    :: nodelist(),
+-record(node_details, {predlist    :: nodelist:non_empty_nodelist(),
                        node        :: node_type(),
-                       succlist    :: nodelist(),
+                       succlist    :: nodelist:non_empty_nodelist(),
                        load        :: load(),
                        hostname    :: hostname(),
                        rt_size     :: rt_size(),
@@ -59,12 +58,12 @@
 -type(node_details_record() :: #node_details{}).
 
 -type(node_details_list() ::
-    [{predlist, nodelist()} |
+    [{predlist, nodelist:non_empty_nodelist()} |
      {pred, node_type()} |
      {node, node_type()} |
      {my_range, my_range()} |
      {succ, node_type()} |
-     {succlist, nodelist()} |
+     {succlist, nodelist:non_empty_nodelist()} |
      {load, load()} |
      {hostname, hostname()} |
      {rt_size, rt_size()} |
@@ -76,7 +75,7 @@
 -spec new() -> node_details_list().
 new() -> [].
 
--spec new(nodelist(), node_type(), nodelist(), load(), hostname(), rt_size(), memory()) -> node_details_record().
+-spec new(PredList::nodelist:non_empty_nodelist(), Node::node_type(), SuccList::nodelist:non_empty_nodelist(), Load::load(), Hostname::hostname(), RTSize::rt_size(), Memory::memory()) -> node_details_record().
 new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     #node_details{
      predlist = PredList,
@@ -99,12 +98,12 @@ record_to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load
      {rt_size, RTSize},
      {memory, Memory}].
 
--spec set(node_details(), predlist, nodelist()) -> node_details();
+-spec set(node_details(), predlist, nodelist:non_empty_nodelist()) -> node_details();
           (node_details(), pred, node_type()) -> node_details();
           (node_details(), node, node_type()) -> node_details();
           (node_details(), my_range, my_range()) -> node_details();
           (node_details(), succ, node_type()) -> node_details();
-          (node_details(), succlist, nodelist()) -> node_details();
+          (node_details(), succlist, nodelist:non_empty_nodelist()) -> node_details();
           (node_details(), load, load()) -> node_details();
           (node_details(), hostname, hostname()) -> node_details();
           (node_details(), rt_size, rt_size()) -> node_details();
@@ -129,15 +128,15 @@ set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
 set(NodeDetails, Key, Value) when is_list(NodeDetails) ->
     lists:keystore(Key, 1, NodeDetails, {Key, Value}).
 
--spec get(node_details_record(), predlist) -> nodelist();
-          (node_details_list(), predlist) -> nodelist() | unknown;
+-spec get(node_details_record(), predlist) -> nodelist:non_empty_nodelist();
+          (node_details_list(), predlist) -> nodelist:non_empty_nodelist() | unknown;
           (node_details(), pred) -> node_type() | unknown;
           (node_details_record(), node) -> node_type();
           (node_details_list(), node) -> node_type() | unknown;
           (node_details(), my_range) -> my_range() | unknown;
           (node_details(), succ) -> node_type() | unknown;
-          (node_details_record(), succlist) -> nodelist();
-          (node_details_list(), succlist) -> nodelist() | unknown;
+          (node_details_record(), succlist) -> nodelist:non_empty_nodelist();
+          (node_details_list(), succlist) -> nodelist:non_empty_nodelist() | unknown;
           (node_details_record(), load) -> load();
           (node_details_list(), load) -> load() | unknown;
           (node_details_record(), hostname) -> hostname();

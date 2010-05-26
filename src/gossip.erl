@@ -101,7 +101,7 @@
 	{{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
 	{get_state, cs_send:mypid(), values_internal()} |
 	{get_state_response, values_internal()} |
-	{cy_cache, [node:node_type()]} |
+	{cy_cache, nodelist:nodelist()} |
 	{get_values_all, cs_send:erl_local_pid()} | 
     {get_values_best, cs_send:erl_local_pid()} |
     {'$gen_cast', {debug_info, Requestor::cs_send:erl_local_pid()}}).
@@ -235,7 +235,7 @@ on({{get_node_details_response, NodeDetails}, local_info},
 		case Initialized of
 			true -> {[], State};
 			false ->
-                send_queued_messages(QueuedMessages),
+                cs_send:send_queued_messages(QueuedMessages),
 				{[], integrate_local_info(State, node_details:get(NodeDetails, load), calc_initial_avg_kr(node_details:get(NodeDetails, my_range)))}
 			end,
     {PreviousState, NewState, NewQueuedMessages, TriggerState};
@@ -649,12 +649,6 @@ request_random_node() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc Sends queued messages to the gossip process itself in the order they
-%%      have been received.
--spec send_queued_messages(list()) -> ok.
-send_queued_messages(QueuedMessages) ->
-    lists:foldr(fun(Msg, _) -> cs_send:send_local(self(), Msg) end, ok, QueuedMessages).
 
 %% @doc Gets the total number of keys available.
 -spec get_addr_size() -> number().

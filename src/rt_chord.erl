@@ -160,22 +160,30 @@ next_index({I, J}) ->
 % n -> me
 -spec(to_dict/1 :: (dht_node_state:state()) -> dict_type()).
 to_dict(State) ->
-    RT = dht_node_state:rt(State),
-    Succ = dht_node_state:succ(State),
-    Fingers = util:uniq(flatten(RT, 127)),
+    RT = dht_node_state:get(State, rt),
+    Succ = dht_node_state:get(State, succ),
+    Fingers = uflatten(RT, 127),
     {Dict, Next} = lists:foldl(fun(Finger, {Dict, Index}) ->
                                        {dict:store(Index, Finger, Dict), Index + 1}
                                end,
                                {dict:store(0, Succ, dict:new()), 1}, lists:reverse(Fingers)),
-    dict:store(Next, dht_node_state:me(State), Dict).
+    dict:store(Next, dht_node_state:get(State, node), Dict).
 
 % @private
-flatten(RT, Index) ->
+%% @doc Flatten the RT from Index down and return a unique lists of node fingers.
+-spec uflatten(rt(), pos_integer()) -> [node:node_type()].
+uflatten(RT, Index) ->
+    uflatten_helper(RT, Index, []).
+
+-spec uflatten_helper(rt(), pos_integer(), [node:node_type()]) -> [node:node_type()].
+uflatten_helper(RT, Index, Result) ->
     case gb_trees:lookup(Index, RT) of
+        {value, Entry} when (Result =/= []) andalso (Entry =:= hd(Result)) ->
+            uflatten_helper(RT, Index - 1, Result);
         {value, Entry} ->
-            [Entry | flatten(RT, Index - 1)];
+            uflatten_helper(RT, Index - 1, [Entry | Result]);
         none ->
-            []
+            lists:reverse(Result)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -188,15 +196,15 @@ flatten(RT, Index) ->
 %%      it will have an external_rt!
 -spec(next_hop/2 :: (dht_node_state:state(), key()) -> cs_send:mypid()).
 next_hop(State, Id) ->
-    case util:is_between(dht_node_state:id(State), Id, dht_node_state:succ_id(State)) of
+    case util:is_between(dht_node_state:get(State, node_id), Id, dht_node_state:get(State, succ_id)) of
         %succ is responsible for the key
         true ->
-            dht_node_state:succ_pid(State);
+            dht_node_state:get(State, succ_pid);
         % check routing table
         false ->
-            case util:gb_trees_largest_smaller_than(Id, dht_node_state:rt(State)) of
+            case util:gb_trees_largest_smaller_than(Id, dht_node_state:get(State, rt)) of
                 nil ->
-                    dht_node_state:succ_pid(State);
+                    dht_node_state:get(State, succ_pid);
                 {value, _Key, Value} ->
                     Value
             end

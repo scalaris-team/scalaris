@@ -438,7 +438,7 @@ build_translog(Results)->
 
 
 generateTID(State)->
-    Node = dht_node_state:me(State),
+    Node = dht_node_state:get(State, node),
     {node:id(Node), now()}.
 
 
@@ -465,7 +465,7 @@ initRTM(State, Message)->
     ERTMPID = spawn(tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
     RTMPID = cs_send:make_global(ERTMPID),
     %% update transaction log: store mapping between transaction ID and local TM
-    TransLog = dht_node_state:get_trans_log(State),
+    TransLog = dht_node_state:get(State, trans_log),
     New_TID_TM_Mapping = dict:store(TransID, RTMPID, TransLog#translog.tid_tm_mapping),
     NewTransLog = TransLog#translog{tid_tm_mapping = New_TID_TM_Mapping},
     dht_node_state:set_trans_log(State, NewTransLog).

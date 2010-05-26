@@ -29,13 +29,15 @@
 -include("scalaris.hrl").
 
 -export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
-         trunc/2, min/2, max/2, logged_exec/1,
+         min/2, max/2, logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
-         wait_for_unregister/1, get_stacktrace/0, ksplit/2, dump/0, dump2/0,
-         find/2, logger/0, dump3/0, uniq/1, get_nodes/0, minus/2,
+         wait_for_unregister/1, get_stacktrace/0, dump/0, dump2/0, dump3/0,
+         get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2,
-         ssplit_unique/2, ssplit_unique/3, ssplit_unique/4]).
+         split_unique/2, split_unique/3, split_unique/4,
+         ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
+         smerge2/2, smerge2/3, smerge2/4]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
@@ -43,13 +45,35 @@
 parameterized_start_link(Module, Parameters) ->
     apply(Module, start_link, Parameters).
 
+sup_worker_desc(Name, Module, Function) ->
+    sup_worker_desc(Name, Module, Function, []).
+
+sup_worker_desc(Name, Module, Function, Options) ->
+    {Name, {Module, Function, Options},
+      permanent,
+      brutal_kill,
+      worker,
+      []
+     }.
+
+sup_supervisor_desc(Name, Module, Function) ->
+    sup_supervisor_desc(Name, Module, Function, []).
+
+sup_supervisor_desc(Name, Module, Function, Options) ->
+    {Name, {Module, Function, Options},
+      permanent,
+      brutal_kill,
+      supervisor,
+      []
+     }.
+
 escape_quotes(String) ->
     lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).
 
 escape_quotes_($", Rest) -> [$",$\\|Rest];
 escape_quotes_(Ch, Rest) -> [Ch|Rest].
 
-
+-spec is_between(intervals:key(), intervals:key(), intervals:key()) -> boolean().
 is_between(X, _, X) ->
     true;
 is_between(minus_infinity, _, plus_infinity) ->
@@ -65,7 +89,7 @@ is_between(Begin, Id, End) when Begin < End ->
 is_between(Begin, Id, End) ->
     (Begin < Id) orelse (Id =< End).
 
-
+-spec is_between_stab(?RT:key(), ?RT:key(), ?RT:key()) -> boolean().
 is_between_stab(Begin, Id, End) ->
     if
         Begin < End ->
@@ -76,6 +100,7 @@ is_between_stab(Begin, Id, End) ->
             (Begin < Id) orelse (Id < End)
     end.
 
+-spec is_between_closed(?RT:key(), ?RT:key(), ?RT:key()) -> boolean().
 is_between_closed(Begin, Id, End) ->
     if
         Begin < End ->
@@ -86,13 +111,9 @@ is_between_closed(Begin, Id, End) ->
             (Begin < Id) orelse (Id < End)
     end.
 
-
-trunc(L, K) ->
-    case length(L) =< K of
-        true -> L;
-        false -> element(1, lists:split(K, L))
-    end.
-
+-spec max(plus_infinity, ?RT:key()) -> plus_infinity;
+         (?RT:key(), plus_infinity) -> plus_infinity;
+         (?RT:key(), ?RT:key()) -> ?RT:key().
 max(plus_infinity, _) -> plus_infinity;
 max(_, plus_infinity) -> plus_infinity;
 max(minus_infinity, X) -> X;
@@ -103,6 +124,9 @@ max(A, B) ->
         false -> B
     end.
 
+-spec min(minus_infinity, ?RT:key()) -> minus_infinity;
+         (?RT:key(), minus_infinity) -> minus_infinity;
+         (?RT:key(), ?RT:key()) -> ?RT:key().
 min(minus_infinity, _) -> minus_infinity;
 min(_, minus_infinity) -> minus_infinity;
 min(plus_infinity, X) -> X;
@@ -113,40 +137,40 @@ min(A, B) ->
         false -> B
     end.
 
-%% @doc Returns a random element from the given (non-empty!) list according to
-%%      a uniform distribution.
--spec randomelem(List::[X,...]) -> X.
-randomelem(List)->
-    Length = length(List) + 1,
-    RandomNum = randoms:rand_uniform(1, Length),
-    lists:nth(RandomNum, List).
-    
-%% @doc Removes a random element from the (non-empty!) list and returns the
-%%      resulting list and the removed element.
--spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}.
-pop_randomelem(List) ->
-    pop_randomelem(List, length(List)).
-    
-%% @doc Removes a random element from the first Size elements of a (non-empty!)
-%%      list and returns the resulting list and the removed element. 
--spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}.
-pop_randomelem(List, Size) ->
-    N = randoms:rand_uniform(0, Size),
-    {Head, [Element | Tail]} = lists:split(N, List),
-    NewList = Head ++ Tail,
-    {NewList, Element}.
+-spec pow(integer(), non_neg_integer()) -> integer();
+         (float(), non_neg_integer()) -> number().
+pow(_X, 0) ->
+    1;
+pow(X, 1) ->
+    X;
+pow(X, 2) ->
+    X * X;
+pow(X, 3) ->
+    X * X * X;
+pow(X, Y) ->
+    case Y rem 2 of
+        0 ->
+            Half = pow(X, Y div 2),
+            Half * Half;
+        1 ->
+            Half = pow(X, Y div 2),
+            Half * Half * X
+    end.
 
+-spec logged_exec(Cmd::string() | atom()) -> ok.
 logged_exec(Cmd) ->
     Output = os:cmd(Cmd),
     OutputLength = length(Output),
     if
         OutputLength > 10 ->
             log:log(info, "exec", Cmd),
-            log:log(info, "exec", Output);
+            log:log(info, "exec", Output),
+            ok;
         true ->
             ok
     end.
 
+-spec wait_for_unregister(atom()) -> ok.
 wait_for_unregister(PID) ->
     case whereis(PID) of
         undefined ->
@@ -155,17 +179,9 @@ wait_for_unregister(PID) ->
             wait_for_unregister(PID)
     end.
 
+-spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::integer() | [term()]}].
 get_stacktrace() ->
     erlang:get_stacktrace().
-
-ksplit(List, K) ->
-    N = length(List),
-    PartitionSizes = lists:duplicate(N rem K, N div K + 1) ++ lists:duplicate(K - (N rem K), N div K),
-    {Result, []} = lists:foldl(fun(Size, {Result, RestList}) ->
-                                       {SubList, RestList2} = lists:split(Size, RestList),
-                                       {[SubList|Result], RestList2}
-                               end, {[], List}, PartitionSizes),
-    Result.
 
 dump() ->
     lists:reverse(
@@ -211,78 +227,80 @@ dump3() ->
      {X, Mem, Msgs, Stack, Heap, lists:map(fun(Y) -> element(1, Y) end, Messages), CurFun}
      end, processes()))).
 
-find(Elem, [Elem | _]) ->
-    1;
-find(Elem, [_ | Tail]) ->
-    1 + find(Elem, Tail).
-
-logger() ->
-    spawn(fun () -> log() end).
-
-log() ->
-    {ok, F} = file:open(preconfig:mem_log_file(), [write]),
-    log(F).
-
-log(F) ->
-    io:format(F, "~p: ~p~n", [dump3(), time()]),
-    timer:sleep(300000),
-    log(F).
-
 %% @doc minus(M,N) : { x | x in M and x notin N}
-minus([],_N) ->
+-spec minus([T], [T]) -> [T].
+minus([], _ExcludeList) ->
     [];
-minus([H|T],N) ->
-    case lists:member(H,N) of
-        true -> minus(T,N);
-        false -> [H]++minus(T,N)
-    end.
+minus([_|_] = L, ExcludeList) ->
+    ExcludeSet = ordsets:from_list(ExcludeList),
+    [E || E <- L, not ordsets:is_element(E, ExcludeSet)].
 
-%% @doc omit repeated entries in a sorted list
--spec(uniq/1 :: (list()) -> list()).
-uniq([First | Rest]) ->
-    lists:reverse(uniq(First, Rest, [First]));
-uniq([]) ->
-    [].
-
-uniq(Current, [Current | Rest], Uniq) ->
-    uniq(Current, Rest, Uniq);
-uniq(_, [Head | Rest], Uniq) ->
-    uniq(Head, Rest, [Head | Uniq]);
-uniq(_, [], Uniq) ->
-    Uniq.
-
--spec(get_nodes/0 :: () -> list()).
+-spec get_nodes() -> [cs_send:mypid()].
 get_nodes() ->
     get_proc_in_vms(bench_server).
 
--spec(get_proc_in_vms/1 :: (atom()) -> list()).
+-spec get_proc_in_vms(atom()) -> [cs_send:mypid()].
 get_proc_in_vms(Proc) ->
     boot_server:node_list(),
     Nodes =
         receive
-            {get_list_response,X} ->
-            X
+            {get_list_response, X} -> X
         after 2000 ->
             {failed}
         end,
     lists:usort([cs_send:get(Proc, DHTNode) || DHTNode <- Nodes]).
 
+-spec sleep_for_ever() -> none().
 sleep_for_ever() ->
     timer:sleep(5000),
     sleep_for_ever().
 
--spec(random_subset/2 :: (pos_integer(), list()) -> list()).
-random_subset(Size, List) -> shuffle(List, [], Size).
+%% @doc Returns a random element from the given (non-empty!) list according to
+%%      a uniform distribution.
+-spec randomelem(List::[X,...]) -> X.
+randomelem(List)->
+    Length = length(List) + 1,
+    RandomNum = randoms:rand_uniform(1, Length),
+    lists:nth(RandomNum, List).
+    
+%% @doc Removes a random element from the (non-empty!) list and returns the
+%%      resulting list and the removed element.
+-spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}.
+pop_randomelem(List) ->
+    pop_randomelem(List, length(List)).
+    
+%% @doc Removes a random element from the first Size elements of a (non-empty!)
+%%      list and returns the resulting list and the removed element. 
+-spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}.
+pop_randomelem(List, Size) ->
+    {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, Size), List),
+    {lists:append(Leading, T), H}.
 
-%% @doc Fisher-Yates shuffling for lists
--spec(shuffle/1 :: (list()) -> list()).
-shuffle(List) -> shuffle(List, [], length(List)).
+%% @doc Returns a random subset of Size elements from the given list.
+-spec random_subset(Size::pos_integer(), [T]) -> [T].
+random_subset(0, _List) ->
+    % having this special case here prevents unnecessary calls to erlang:length()
+    [];
+random_subset(Size, List) ->
+    ListSize = length(List),
+    shuffle_helper(List, [], Size, ListSize).
 
-shuffle([], Acc, _Size) -> Acc;
-shuffle(_List, Acc, 0) -> Acc;
-shuffle(List, Acc, Size) ->
-    {Leading, [H | T]} = lists:split(random:uniform(length(List)) - 1, List),
-    shuffle(Leading ++ T, [H | Acc], Size - 1).
+%% @doc Fisher-Yates shuffling for lists.
+-spec shuffle([T]) -> [T].
+shuffle(List) ->
+    ListSize = length(List),
+    shuffle_helper(List, [], ListSize, ListSize).
+
+%% @doc Fisher-Yates shuffling for lists helper function: creates a shuffled
+%%      list of length ShuffleSize.
+-spec shuffle_helper(List::[T], AccResult::[T], ShuffleSize::non_neg_integer(), ListSize::non_neg_integer()) -> [T].
+shuffle_helper([], Acc, _Size, _ListSize) ->
+    Acc;
+shuffle_helper([_|_] = _List, Acc, 0, _ListSize) ->
+    Acc;
+shuffle_helper([_|_] = List, Acc, Size, ListSize) ->
+    {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, ListSize), List),
+    shuffle_helper(lists:append(Leading, T), [H | Acc], Size - 1, ListSize - 1).
 
 -spec(gb_trees_largest_smaller_than/2 :: (any(), gb_tree()) -> {value, any(), any()} | nil).
 gb_trees_largest_smaller_than(_Key, {0, _Tree}) ->
@@ -325,46 +343,6 @@ gb_trees_foldl_iter(F, Accu, {Key, Value, Smaller, Bigger}) ->
     Res2 = F(Key, Value, Res1),
     gb_trees_foldl_iter(F, Res2, Bigger).
 
-pow(_X, 0) ->
-    1;
-pow(X, 1) ->
-    X;
-pow(X, 2) ->
-    X * X;
-pow(X, 3) ->
-    X * X * X;
-pow(X, Y) ->
-    case Y rem 2 of
-        0 ->
-            Half = pow(X, Y div 2),
-            Half * Half;
-        1 ->
-            Half = pow(X, Y div 2),
-            Half * Half * X
-    end.
-
-sup_worker_desc(Name, Module, Function) ->
-    sup_worker_desc(Name, Module, Function, []).
-
-sup_worker_desc(Name, Module, Function, Options) ->
-    {Name, {Module, Function, Options},
-      permanent,
-      brutal_kill,
-      worker,
-      []
-     }.
-
-sup_supervisor_desc(Name, Module, Function) ->
-    sup_supervisor_desc(Name, Module, Function, []).
-
-sup_supervisor_desc(Name, Module, Function, Options) ->
-    {Name, {Module, Function, Options},
-      permanent,
-      brutal_kill,
-      supervisor,
-      []
-     }.
-
 -spec(tc/3 :: (atom(), atom(), [_]) -> {timer:time(), any()}).
 tc(M, F, A) ->
     Before = erlang:now(),
@@ -387,7 +365,39 @@ get_global_uid() ->
 
 %% @doc Splits L1 into a list of elements that are not contained in L2, a list
 %%      of elements that both lists share and a list of elements unique to L2.
-%%      Both lists must be sorted.
+%%      Returned lists are sorted and contain no duplicates.
+-spec split_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+split_unique(L1, L2) ->
+    split_unique(L1, L2, fun(A, B) -> A =< B end).
+
+%% @doc Splits L1 into a list of elements that are not contained in L2, a list
+%%      of elements that are equal in both lists (according to the ordering
+%%      function Lte) and a list of elements unique to L2.
+%%      When two elements compare equal, the element from List1 is picked.
+%%      Lte(A, B) should return true if A compares less than or equal to B in
+%%      the ordering, false otherwise.
+%%      Returned lists are sorted according to Lte and contain no duplicates.
+-spec split_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+split_unique(L1, L2, Lte) ->
+    split_unique(L1, L2, Lte, fun(E1, _E2) -> E1 end).
+
+%% @doc Splits L1 into a list of elements that are not contained in L2, a list
+%%      of elements that are equal in both lists (according to the ordering
+%%      function Lte) and a list of elements unique to L2.
+%%      When two elements compare equal, EqSelect(element(L1), element(L2))
+%%      chooses which of them to take.
+%%      Lte(A, B) should return true if A compares less than or equal to B in
+%%      the ordering, false otherwise.
+%%      Returned lists are sorted according to Lte and contain no duplicates.
+-spec split_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X)) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+split_unique(L1, L2, Lte, EqSelect) ->
+    L1Sorted = lists:usort(Lte, L1),
+    L2Sorted = lists:usort(Lte, L2),
+    ssplit_unique_helper(L1Sorted, L2Sorted, Lte, EqSelect, {[], [], []}).
+
+%% @doc Splits L1 into a list of elements that are not contained in L2, a list
+%%      of elements that both lists share and a list of elements unique to L2.
+%%      Both lists must be sorted. Returned lists are sorted as well.
 -spec ssplit_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
 ssplit_unique(L1, L2) ->
     ssplit_unique(L1, L2, fun(A, B) -> A =< B end).
@@ -399,6 +409,7 @@ ssplit_unique(L1, L2) ->
 %%      Both lists must be sorted according to Lte. Lte(A, B) should return
 %%      true if A compares less than or equal to B in the ordering, false
 %%      otherwise.
+%%      Returned lists are sorted according to Lte.
 -spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
 ssplit_unique(L1, L2, Lte) ->
     ssplit_unique(L1, L2, Lte, fun(E1, _E2) -> E1 end).
@@ -410,11 +421,12 @@ ssplit_unique(L1, L2, Lte) ->
 %%      chooses which of them to take.
 %%      Both lists must be sorted according to Lte. Lte(A, B) should return true
 %%      if A compares less than or equal to B in the ordering, false otherwise.
+%%      Returned lists are sorted according to Lte.
 -spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X)) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
 ssplit_unique(L1, L2, Lte, EqSelect) ->
     ssplit_unique_helper(L1, L2, Lte, EqSelect, {[], [], []}).
 
-%% @doc Helper function for ssplit_unique/3.
+%% @doc Helper function for ssplit_unique/4.
 -spec ssplit_unique_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X), {UniqueOldL1::[X], SharedOld::[X], UniqueOldL2::[X]}) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
 ssplit_unique_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, UniqueL2}) ->
     LteH1H2 = Lte(H1, H2),
@@ -437,8 +449,52 @@ ssplit_unique_helper([], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, Uniqu
     % the top of the shared list could be the same as the top of L2 since
     % elements are only removed from L2 if an element of L1 is larger
     case Shared =:= [] orelse not (Lte(hd(Shared), H2) andalso Lte(H2, hd(Shared))) of
-        true ->
+        true  ->
             {lists:reverse(UniqueL1), lists:reverse(Shared), lists:reverse(UniqueL2, L2)};
         false ->
             ssplit_unique_helper([], T2, Lte, EqSelect, {UniqueL1, Shared, UniqueL2})
+    end.
+
+-spec smerge2(L1::[X], L2::[X]) -> MergedList::[X].
+smerge2(L1, L2) ->
+    smerge2(L1, L2, fun(A, B) -> A =< B end).
+
+-spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> MergedList::[X].
+smerge2(L1, L2, Lte) ->
+    smerge2(L1, L2, Lte, fun(E1, _E2) -> [E1] end).
+
+-spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X])) -> MergedList::[X].
+smerge2(L1, L2, Lte, EqSelect) ->
+    smerge2_helper(L1, L2, Lte, EqSelect, []).
+
+%% @doc Helper function for merge2/4.
+-spec smerge2_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X]), OldMergedList::[X]) -> MergedList::[X].
+smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, ML) ->
+    LteH1H2 = Lte(H1, H2),
+    LteH2H1 = Lte(H2, H1),
+    case LteH1H2 andalso LteH2H1 of
+        true ->
+            smerge2_helper(T1, L2, Lte, EqSelect, lists:reverse(EqSelect(H1, H2)) ++ ML);
+        false when LteH1H2 ->
+            smerge2_helper(T1, L2, Lte, EqSelect, [H1 | ML]);
+        false when LteH2H1 ->
+            % the top of ML could be equal to the top of L2 (if so, the decision
+            % about H2 has already been made and we omit it here, otherwise H2
+            % needs to be added)
+            case (ML =:= []) orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
+                true  -> smerge2_helper(L1, T2, Lte, EqSelect, [H2 | ML]);
+                false -> smerge2_helper(L1, T2, Lte, EqSelect, ML) 
+            end
+    end;
+smerge2_helper(L1, [], _Lte, _EqSelect, ML) ->
+    lists:reverse(ML, L1);
+smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
+    % The top of ML could be equal to the top of L2 (if so, the decision about
+    % H2 has already been made and we omit it here, otherwise H2 needs to be
+    % added).
+    % This is because elements are only removed from L2 if an element of L1 is
+    % larger.
+    case ML =:= [] orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
+        true  -> lists:reverse(ML, L2);
+        false -> smerge2_helper([], T2, Lte, EqSelect, ML)
     end.

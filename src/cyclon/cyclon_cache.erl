@@ -80,30 +80,13 @@ pop_random_node(Cache, CacheSize) ->
 
 %% @doc Returns a random subset of N elements from the cache.
 -spec get_random_subset(N::non_neg_integer(), Cache::cache()) -> RandomSubset::cache().
-get_random_subset(0, _Cache) ->
-    % having this special case here prevents unnecessary calls to cyclon_cache:size()
-    new();
 get_random_subset(N, Cache) ->
-    get_random_subset_helper(N, new(), Cache, cyclon_cache:size(Cache), fun util:pop_randomelem/2).
+    util:random_subset(N, Cache).
 
 %% @doc Returns a random subset of N nodes from the cache.
 -spec get_random_nodes(N::non_neg_integer(), Cache::cache()) -> Nodes::[node_details:node_type()].
-get_random_nodes(0, _Cache) ->
-    % having this special case here prevents unnecessary calls to cyclon_cache:size()
-    [];
 get_random_nodes(N, Cache) ->
-    get_random_subset_helper(N, new(), Cache, cyclon_cache:size(Cache), fun pop_random_node/2).
-
-%% @doc Extracts a random element one-by-one from the Cache until a Subset of
-%%      size N is created or all elements of the cache have been taken.
--spec get_random_subset_helper(N::non_neg_integer(), Result::[X], Cache::cache(), CacheSize::non_neg_integer(), PopFun::fun((Cache1::cache(), Cache1Size::non_neg_integer()) -> X)) -> cache().
-get_random_subset_helper(0, Subset, _Cache, _CacheSize, _PopFun) ->
-    Subset;
-get_random_subset_helper(_N, Subset, [] = _Cache, _CacheSize, _PopFun) ->
-    Subset;
-get_random_subset_helper(N, Subset, Cache, CacheSize, PopFun) ->
-    {NewCache, Element} = PopFun(Cache, CacheSize),
-    get_random_subset_helper(N - 1, [Element | Subset], NewCache, CacheSize - 1, PopFun).
+    [Node || {Node, _Age} <- util:random_subset(N, Cache)].
 
 %% @doc Finds the oldest element (randomized if multiple oldest elements) and
 %%      removes it from the cache returning the new cache and this node.
@@ -159,10 +142,8 @@ merge(MyCache, MyNode, ReceivedCache, SendCache, TargetSize) ->
     % the received entries without the already known nodes, a list of entries
     % from both caches (with updated IDVersions) and a list of entries from my
     % cache without the updated entries
-    MyCacheSortPid = lists:usort(fun({N1, _}, {N2, _}) -> node:pidX(N1) =< node:pidX(N2) end, MyCache),
-    RcvCacheSortPid = lists:usort(fun({N1, _}, {N2, _}) -> node:pidX(N1) =< node:pidX(N2) end, ReceivedCache),
     {EntriesInReceivedCacheOnly, EntriesInBoth_Updated, EntriesInMyCacheOnly} =
-        util:ssplit_unique(RcvCacheSortPid, MyCacheSortPid,
+        util:split_unique(ReceivedCache, MyCache,
                            fun({N1, _}, {N2, _}) -> node:pidX(N1) =< node:pidX(N2) end,
                            fun({N1, _}, {N2, MyAge}) -> {node:newer(N1, N2), MyAge} end),
     MyC1 = EntriesInMyCacheOnly ++ EntriesInBoth_Updated,

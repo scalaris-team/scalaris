@@ -15,7 +15,7 @@
 %%%-------------------------------------------------------------------
 %%% File    node_details_SUITE.erl
 %%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    TODO: Add description to node_details_SUITE
+%%% @doc    Test suites for the node_details module.
 %%% @end
 %%% Created : 7 Apr 2010 by Nico Kruber <kruber@zib.de>
 %%%-------------------------------------------------------------------
@@ -71,11 +71,11 @@ end_per_suite(Config) ->
 
 -spec node_details_equals(NodeDetails::node_details:node_details(),
                           Pred::node_details:node_type() | unknown,
-                          PredList::node_details:nodelist() | unknown,
+                          PredList::nodelist:non_empty_nodelist() | unknown,
                           Node::node_details:node_type() | unknown,
                           MyRange::node_details:my_range() | unknown,
                           Succ::node_details:node_type() | unknown,
-                          SuccList::node_details:nodelist() | unknown,
+                          SuccList::nodelist:non_empty_nodelist() | unknown,
                           Load::node_details:load() | unknown,
                           Hostname::node_details:hostname() | unknown,
                           RTSize::node_details:rt_size() | unknown,
@@ -114,7 +114,7 @@ tester_new0(Config) ->
 % node_details:new/7
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec test_new7(node_details:nodelist(), node_details:node_type(), node_details:nodelist(), node_details:load(), node_details:hostname(), node_details:rt_size(), node_details:memory()) -> true.
+-spec test_new7(nodelist:non_empty_nodelist(), node_details:node_type(), nodelist:non_empty_nodelist(), node_details:load(), node_details:hostname(), node_details:rt_size(), node_details:memory()) -> true.
 test_new7(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     NodeDetails = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     node_details_equals(NodeDetails, unknown, PredList, Node, unknown, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
@@ -140,7 +140,7 @@ test_set_get_pred(PredTest) ->
     node_details_equals(NodeDetails1_new, PredTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, PredTest, PredList, Node, unknown, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_predlist(PredList::node_details:nodelist()) -> true.
+-spec test_set_get_predlist(PredList::nodelist:non_empty_nodelist()) -> true.
 test_set_get_predlist(PredListTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
@@ -184,7 +184,7 @@ test_set_get_succ(SuccTest) ->
     node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, SuccTest, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, unknown, PredList, Node, unknown, SuccTest, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_succlist(SuccList::node_details:nodelist()) -> true.
+-spec test_set_get_succlist(SuccList::nodelist:non_empty_nodelist()) -> true.
 test_set_get_succlist(SuccListTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],

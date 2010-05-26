@@ -35,10 +35,10 @@
 -define(LOG(S, L), ok).
 
 lookup_aux(State, Key, Hops, Msg) ->
-    Terminate = util:is_between(dht_node_state:id(State), Key, dht_node_state:succ_id(State)),
+    Terminate = util:is_between(dht_node_state:get(State, node_id), Key, dht_node_state:get(State, succ_id)),
     if
         Terminate ->
-            cs_send:send(dht_node_state:succ_pid(State), {lookup_fin, Hops + 1, Msg});
+            cs_send:send(dht_node_state:get(State, succ_pid), {lookup_fin, Hops + 1, Msg});
         true ->
             P = ?RT:next_hop(State, Key),
             cs_send:send(P, {lookup_aux, Key, Hops + 1, Msg})
@@ -46,15 +46,15 @@ lookup_aux(State, Key, Hops, Msg) ->
 
 get_key(State, Source_PID, HashedKey, Key) ->
     ?LOG("[ ~w | I | Node   | ~w ] get_key ~s~n",[calendar:universal_time(), self(), Key]),
-    cs_send:send(Source_PID, {get_key_response, Key, ?DB:read(dht_node_state:get_db(State), HashedKey)}).
+    cs_send:send(Source_PID, {get_key_response, Key, ?DB:read(dht_node_state:get(State, db), HashedKey)}).
 
 set_key(State, Source_PID, Key, Value, Versionnr) ->
     ?LOG("[ ~w | I | Node   | ~w ] set_key ~s ~s~n",[calendar:universal_time(), self(), Key, Value]),
     cs_send:send(Source_PID, {set_key_response, Key, Value, Versionnr}),
-    DB = ?DB:write(dht_node_state:get_db(State), Key, Value, Versionnr),
+    DB = ?DB:write(dht_node_state:get(State, db), Key, Value, Versionnr),
     dht_node_state:set_db(State, DB).
 
 delete_key(State, Source_PID, Key) ->
-    {DB2, Result} = ?DB:delete(dht_node_state:get_db(State), Key),
+    {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), Key),
     cs_send:send(Source_PID, {delete_key_response, Key, Result}),
     dht_node_state:set_db(State, DB2).
