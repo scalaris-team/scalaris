@@ -52,14 +52,14 @@ end_per_suite(_Config) ->
 -define(compare_neighborhood(Neighborhood, Node, NodeId, Pred, Preds, Succ, Succs, RealPred, RealSucc),
     fun() ->
             N = Neighborhood, % may be a command -> assigning it to a variable prevents it from being called multiple times
-            ?equals(nodelist:node(N), Node, io_lib:format("N = ~p", [??Neighborhood])),
-            ?equals(nodelist:nodeid(N), NodeId, io_lib:format("N = ~p", [??Neighborhood])),
-            ?equals(nodelist:pred(N), Pred, io_lib:format("N = ~p", [??Neighborhood])),
-            ?equals(nodelist:preds(N), Preds, io_lib:format("N = ~p", [??Neighborhood])),
-            ?equals(nodelist:succ(N), Succ, io_lib:format("N = ~p", [??Neighborhood])),
-            ?equals(nodelist:succs(N), Succs, io_lib:format("N = ~p", [??Neighborhood])),
-            ?equals(nodelist:has_real_pred(N), RealPred, io_lib:format("N = ~p", [??Neighborhood])),
-            ?equals(nodelist:has_real_succ(N), RealSucc, io_lib:format("N = ~p", [??Neighborhood]))
+            ?equals_w_note(nodelist:node(N), Node, io_lib:format("N = ~p", [??Neighborhood])),
+            ?equals_w_note(nodelist:nodeid(N), NodeId, io_lib:format("N = ~p", [??Neighborhood])),
+            ?equals_w_note(nodelist:pred(N), Pred, io_lib:format("N = ~p", [??Neighborhood])),
+            ?equals_w_note(nodelist:preds(N), Preds, io_lib:format("N = ~p", [??Neighborhood])),
+            ?equals_w_note(nodelist:succ(N), Succ, io_lib:format("N = ~p", [??Neighborhood])),
+            ?equals_w_note(nodelist:succs(N), Succs, io_lib:format("N = ~p", [??Neighborhood])),
+            ?equals_w_note(nodelist:has_real_pred(N), RealPred, io_lib:format("N = ~p", [??Neighborhood])),
+            ?equals_w_note(nodelist:has_real_succ(N), RealSucc, io_lib:format("N = ~p", [??Neighborhood]))
     end()).
 
 %% @doc Tests neighborhood creation with new_neighborhood and compares the
