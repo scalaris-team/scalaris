@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Module>
-  <ModulePrefs title="Scalaris User & Developers Guide" />
+  <ModulePrefs title="Scalaris User and Developers Guide" />
   <Content type="url"
 href="http://docs.google.com/gview?url=http://scalaris.googlecode.com/svn/trunk/user-dev-guide/main.pdf&embedded=true"
 style="width:600px; height:500px;" frameborder="0" />
