@@ -20,7 +20,7 @@
 %%%-------------------------------------------------------------------
 -module(unittest_helper).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([make_ring/1, stop_ring/1]).
 

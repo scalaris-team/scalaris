@@ -22,6 +22,8 @@
 %% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 -module(mathlib).
+-author('ozymandiaz147@googlemail.com').
+-vsn('$Id$').
 
 -export([closestPoints/1, euclideanDistance/1, euclideanDistance/2, max/2, u/1,
          vecAdd/2, vecSub/2, vecMult/2, vecWeightedAvg/4, zeros/1, median/1,

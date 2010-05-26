@@ -20,9 +20,11 @@
 %% @end
 %% @version $Id$
 -module(pdb).
+-author('schintke@onscale.de').
+-vsn('$Id$').
+
 -define(TRACE(X,Y), io:format(X,Y)).
 %-define(TRACE(X,Y), ok).
--author('schintke@onscale.de').
 
 -export([new/2, get/2, set/2, delete/2]).
 

@@ -21,7 +21,7 @@
 -module(tx_req_list_v2_SUITE).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -compile(export_all).
 

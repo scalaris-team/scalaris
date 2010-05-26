@@ -22,9 +22,6 @@
 %% @copyright 2007 Thorsten Schuett
 %% @version $Id$
 
--author('schuett@zib.de').
--vsn('$Id$ ').
-
 %% @doc Fails the currently run unit test with a reason that is made of the
 %%      given Date formatted using the Format string (see io_lib:format/2).
 % -spec ct_fail(Format::atom() | string() | binary(), Data::[term()]) -> none().

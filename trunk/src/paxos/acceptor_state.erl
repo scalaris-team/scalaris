@@ -19,6 +19,7 @@
 %% @end
 -module(acceptor_state).
 -author('schintke@onscale.de').
+-vsn('$Id$').
 
 %% Operations on acceptor_state
 -export([new/1]).

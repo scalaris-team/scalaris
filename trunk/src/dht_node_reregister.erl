@@ -23,7 +23,7 @@
 -module(dht_node_reregister).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behavior(gen_component).
 

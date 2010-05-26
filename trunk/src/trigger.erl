@@ -44,7 +44,7 @@
 -module(trigger).
 
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

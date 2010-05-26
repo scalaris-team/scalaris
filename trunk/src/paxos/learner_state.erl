@@ -18,6 +18,8 @@
 %%      The state needed for a single learner instance.
 %% @end
 -module(learner_state).
+-author('schintke@onscale.de').
+-vsn('$Id$').
 
 %% Operations on learner_state
 -export([new/4]).

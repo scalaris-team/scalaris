@@ -19,6 +19,7 @@
 %% @version $Id$
 -module(tx_item_state).
 -author('schintke@onscale.de').
+-vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).

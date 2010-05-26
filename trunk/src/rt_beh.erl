@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(rt_beh).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 % for behaviour
 -export([behaviour_info/1]).

@@ -19,7 +19,7 @@
 -module(gen_component).
 -include("scalaris.hrl").
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %% breakpoint tracing
 %-define(TRACE_BP(X,Y), io:format(X,Y)).

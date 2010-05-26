@@ -24,6 +24,8 @@
 %% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id $
 -module(comm_connection).
+-author('schuett@zib.de').
+-vsn('$Id$').
 
 -export([send/3, tcp_options/0, open_new/4, new/3, open_new_async/4]).
 

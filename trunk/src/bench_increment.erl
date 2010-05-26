@@ -21,7 +21,7 @@
 -module(bench_increment).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -import(transaction_api, [read2/2, write2/3]).
 

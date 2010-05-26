@@ -15,6 +15,8 @@
 %% Created: Feb 12, 2009
 %% Description: TODO: Add description to experiments
 -module(bench_master).
+-author('hennig@zib.de').
+-vsn('$Id$').
 
 %%
 %% Include files

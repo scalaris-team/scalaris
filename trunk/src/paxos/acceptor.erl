@@ -18,9 +18,11 @@
 %%      The role of a acceptor.
 %% @end
 -module(acceptor).
+-author('schintke@onscale.de').
+-vsn('$Id$').
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
--author('schintke@onscale.de').
 -behaviour(gen_component).
 
 -include("scalaris.hrl").

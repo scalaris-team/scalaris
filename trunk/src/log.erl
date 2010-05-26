@@ -24,7 +24,7 @@
 -module(log).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("log4erl.hrl").
 

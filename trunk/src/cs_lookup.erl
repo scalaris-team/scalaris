@@ -23,7 +23,7 @@
 %% @version $Id$
 -module(cs_lookup).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([unreliable_lookup/2,
          unreliable_get_key/1, unreliable_get_key/3]).

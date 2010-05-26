@@ -24,7 +24,7 @@
 -module(cs_replica_stabilization).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

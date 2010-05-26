@@ -25,7 +25,7 @@
 -module(boot).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([start/0, stop/0]).
 

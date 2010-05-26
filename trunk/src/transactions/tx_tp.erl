@@ -18,9 +18,11 @@
 %%           The role of a transaction participant.
 %% @version $Id$
 -module(tx_tp).
+-author('schintke@onscale.de').
+-vsn('$Id$').
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
--author('schintke@onscale.de').
 
 %%% public interface
 

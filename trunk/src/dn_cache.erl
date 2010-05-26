@@ -23,7 +23,7 @@
 -module(dn_cache).
 
 -author('hennig@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behavior(gen_component).
 

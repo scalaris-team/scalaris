@@ -23,7 +23,7 @@
 %% @version $Id$
 -module(admin).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([add_nodes/1, del_nodes/1, check_ring/0, nodes/0,
          start_link/0, start/0, get_dump/0, get_dump_bw/0,

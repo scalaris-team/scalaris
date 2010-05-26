@@ -23,7 +23,7 @@
 
 -module(cyclon_cache).
 -author('hennig@zib.de').
--vsn('$Id $ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

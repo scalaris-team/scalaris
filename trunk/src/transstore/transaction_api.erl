@@ -21,7 +21,7 @@
 -module(transaction_api).
 
 -author('moser@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("trecords.hrl").
 

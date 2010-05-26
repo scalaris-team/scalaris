@@ -36,7 +36,7 @@
 -module(trigger_dynamic).
 
 -author('hennig@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(trigger_beh).
 

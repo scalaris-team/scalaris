@@ -24,7 +24,7 @@
 -module(scalaris_ctl).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([start/0, process/1]).
 

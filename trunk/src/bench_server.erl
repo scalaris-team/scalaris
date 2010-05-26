@@ -25,7 +25,7 @@
 -module(bench_server).
 
 -author('schuett@zib.de').
--vsn('$Id').
+-vsn('$Id$').
 
 -export([start_link/0, start/0]).
 -export([run_increment/2, run_increment_v2/2, run_increment/3, run_increment_locally/2]).

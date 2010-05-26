@@ -17,7 +17,7 @@
 %% @version $Id$
 -module(cs_api_v2).
 -author('schintke@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([process_request_list/2,
          read/1, write/2, delete/1,

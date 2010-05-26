@@ -25,7 +25,7 @@
 -module(webhelpers).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("yaws_api.hrl").
 -include("scalaris.hrl").

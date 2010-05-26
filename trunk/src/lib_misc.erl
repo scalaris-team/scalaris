@@ -24,7 +24,7 @@
 -module(lib_misc).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([pmap1/2, make_workers/2, submit_task/2, wait/1]).
 

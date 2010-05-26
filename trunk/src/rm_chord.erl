@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(rm_chord).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

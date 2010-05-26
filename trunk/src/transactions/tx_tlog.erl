@@ -17,7 +17,7 @@
 % @version $Id$
 -module(tx_tlog).
 -author('schintke@onscale.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %-include("trecords.hrl").
 

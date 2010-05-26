@@ -24,7 +24,7 @@
 -module(tester_parse_state).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([new_parse_state/0,
 

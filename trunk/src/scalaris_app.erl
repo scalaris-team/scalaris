@@ -24,7 +24,7 @@
 -module(scalaris_app).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(application).
 

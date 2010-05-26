@@ -24,7 +24,7 @@
 -module(gossip_SUITE).
 
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -compile(export_all).
 

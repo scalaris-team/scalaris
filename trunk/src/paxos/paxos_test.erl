@@ -18,6 +18,8 @@
 %%      Tests.
 %% @end
 -module(paxos_test).
+-author('schintke@onscale.de').
+-vsn('$Id$').
 
 -export([run/0]).
 -export([make/3]).

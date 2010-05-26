@@ -24,7 +24,7 @@
 -module(cs_debug).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([new/0, debug/3, dump/4]).
 

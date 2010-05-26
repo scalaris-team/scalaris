@@ -16,7 +16,7 @@
 %% @version $Id$
 -module(dht_node_state).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("transstore/trecords.hrl").
 -include("scalaris.hrl").

@@ -25,7 +25,7 @@
 -module(cs_xmlrpc).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([start_link/0]).
 -export([handler/2]).
