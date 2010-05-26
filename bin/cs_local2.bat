@@ -13,13 +13,19 @@
 ::    See the License for the specific language governing permissions and
 ::    limitations under the License.
 
+set ID=2
+set NODE_NAME=node%ID%
+set /a CSPORT=14195+%ID%
+set /a YAWSPORT=8000+%ID%
+set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris cs_port %CSPORT% -scalaris yaws_port %YAWSPORT%
+
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: set path to erlang installation
 set ERLANG="c:\program files\erl5.7.5\bin"
 :: scalaris configuration parameters
 set SCALARIS_COOKIE=chocolate chip cookie
 set SCALARISDIR=%~dp0..
 set BEAMDIR=%SCALARISDIR%\ebin
-set NODE_NAME=boot
 set BACKGROUND=
 ::set BACKGROUND=-detached
 set TCERLFLAGS=
@@ -28,7 +34,6 @@ set LOGDIR=%SCALARISDIR:\=\\%\\log
 set DOCROOTDIR=%SCALARISDIR:\=\\%\\docroot
 set NODEDOCROOTDIR=%SCALARISDIR:\=\\%\\docroot_node
 set ETCDIR=%SCALARISDIR:\=\\%\\bin
-set SCALARIS_ADDITIONAL_PARAMETERS=
 
 @echo on
 pushd %BEAMDIR%
@@ -37,13 +42,12 @@ pushd %BEAMDIR%
   -pa "%SCALARISDIR%\contrib\log4erl\ebin" ^
   -pa "%BEAMDIR%" %TCERLFLAGS% %BACKGROUND% ^
   -yaws embedded true ^
-  -boot_cs log_path "\"%LOGDIR%\"" ^
-  -boot_cs docroot "\"%DOCROOTDIR%\"" ^
-  -boot_cs config "\"%ETCDIR%\\scalaris.cfg\"" ^
-  -boot_cs local_config "\"%ETCDIR%\\scalaris.local.cfg\"" ^
-  -boot_cs first true ^
+  -scalaris log_path "\"%LOGDIR%\"" ^
+  -scalaris docroot "\"%NODEDOCROOTDIR%\"" ^
+  -scalaris config "\"%ETCDIR%\\scalaris.cfg\"" ^
+  -scalaris local_config "\"%ETCDIR%\\scalaris.local.cfg\"" ^
   -connect_all false -hidden -name %NODE_NAME% ^
   %SCALARIS_ADDITIONAL_PARAMETERS% ^
-  -s boot %*
+  -s scalaris %*
 popd
 @echo off
