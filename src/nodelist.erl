@@ -50,6 +50,17 @@
 -type(non_empty_nodelist() :: [node:node_type(),...]).
 -type(neighborhood() :: {Preds::non_empty_nodelist(), Node::node:node_type(), Succs::non_empty_nodelist()}).
 
+%% @doc Helper function that throws an exception if the given neighbor is newer
+%%      than the BaseNode (requires that both are equal!).
+-spec throw_if_newer(Neighbor::node:node_type(), BaseNode::node:node_type()) -> ok.
+throw_if_newer(Neighbor, BaseNode) ->
+    case BaseNode =/= node:newer(Neighbor, BaseNode) of
+        true ->
+            throw('cannot create a neighborhood() with a neighbor newer than the node itself');
+        false ->
+            ok
+    end.
+
 %% @doc Creates a new neighborhood structure for the given node.
 -spec new_neighborhood(Node::node:node_type()) -> neighborhood().
 new_neighborhood(Node) ->
@@ -63,7 +74,7 @@ new_neighborhood(Node, Neighbor) ->
         true ->
             % the node should always be the first to get a new ID!
             % if not, something went wrong
-            Node = node:newer(Neighbor, Node),
+            throw_if_newer(Neighbor, Node),
             {[Node], Node, [Node]};
         false ->
             {[Neighbor], Node, [Neighbor]}
@@ -78,12 +89,12 @@ new_neighborhood(Pred, Node, Succ) ->
         true ->
             % the node should always be the first to get a new ID!
             % if not, something went wrong
-            Node = node:newer(Pred, Node),
+            throw_if_newer(Pred, Node),
             new_neighborhood(Node, Succ);
         false ->
             case node:equals(Succ, Node) of
                 true ->
-                    Node = node:newer(Succ, Node),
+                    throw_if_newer(Succ, Node),
                     {[Pred], Node, [Pred]};
                 false ->
                     case node:equals(Pred, Succ) of
@@ -104,13 +115,15 @@ new_neighborhood(Pred, Node, Succ) ->
 %%      non-empty predecessor and successor lists (fills them with itself if
 %%      necessary).
 -spec ensure_lists_not_empty(Neighborhood::{Preds::nodelist(), Node::node:node_type(), Succs::nodelist()}) -> neighborhood().
+ensure_lists_not_empty({[], Node, []}) ->
+    {[Node], Node, [Node]};
 ensure_lists_not_empty({Preds, Node, Succs}) ->
     NewPreds = case Preds of
-                   [] -> [Node];
+                   [] -> [lists:last(Succs)];
                    _  -> Preds
                end,
     NewSuccs = case Succs of
-                   [] -> [Node];
+                   [] -> [lists:last(Preds)];
                    _  -> Succs
                end,
     {NewPreds, Node, NewSuccs}.
@@ -196,9 +209,10 @@ usplit_nodelist(NodeList, Node) ->
     {Smaller, LargerOrEqual} =
         lists:partition(
           fun(N) ->
-                  case node:equals(N, Node) andalso (node:newer(N, Node)) =/= Node of
+                  case node:equals(N, Node) of
                       true ->
-                          throw('cannot create a neighborhood() with a neighbor newer than the node itself');
+                          throw_if_newer(N, Node),
+                          false;
                       false ->
                           node:id(N) < node:id(Node)
                   end
@@ -239,6 +253,7 @@ mk_neighborhood(NodeList, Node) ->
 
 %% @doc Removes the given node (or node with the given Pid) from a neighborhood
 %%      or node list.
+%%      Note: A neighborhood's base node is never removed!
 -spec remove(NodeOrPid::node:node_type() | cs_send:mypid() | pid(), neighborhood()) -> neighborhood();
             (NodeOrPid::node:node_type() | cs_send:mypid() | pid(), nodelist()) -> nodelist().
 remove(NodeOrPid, NodeList) when is_list(NodeList) ->
@@ -249,28 +264,29 @@ remove(NodeOrPid, {Preds, Node, Succs}) ->
 
 %% @doc Removes the given node (or node with the given Pid) from a neighborhood
 %%      or node list and executes EvalFun for any such occurrence.
+%%      Note: A neighborhood's base node is never removed!
 -spec remove(NodeOrPid::node:node_type() | cs_send:mypid() | pid(), neighborhood(), EvalFun::fun((node:node_type()) -> any())) -> neighborhood();
             (NodeOrPid::node:node_type() | cs_send:mypid() | pid(), nodelist(), EvalFun::fun((node:node_type()) -> any())) -> nodelist().
 remove(Node, NodeList, EvalFun) when is_list(NodeList) ->
     FilterFun = fun(N) -> not node:equals(Node, N) end,
     remove_helper(NodeList, EvalFun, FilterFun, []);
-remove(Node, {Preds, Node, Succs}, EvalFun) ->
-    NewNeighbors = {remove(Node, Preds, EvalFun), Node, remove(Node, Succs, EvalFun)},
+remove(Node, {Preds, BaseNode, Succs}, EvalFun) ->
+    NewNeighbors = {remove(Node, Preds, EvalFun), BaseNode, remove(Node, Succs, EvalFun)},
     ensure_lists_not_empty(NewNeighbors).
 
 %% @doc Removes any node for which FilterFun returns false from a neighborhood
 %%      or node list and executes EvalFun for any such occurrence.
+%%      Note: A neighborhood's base node is never removed!
 -spec remove2(neighborhood(), EvalFun::fun((node:node_type()) -> any()), FilterFun::fun((node:node_type()) -> boolean())) -> neighborhood();
              (nodelist(), EvalFun::fun((node:node_type()) -> any()), FilterFun::fun((node:node_type()) -> boolean())) -> nodelist().
 remove2(NodeList, EvalFun, FilterFun) when is_list(NodeList) ->
     remove_helper(NodeList, EvalFun, FilterFun, []);
-remove2({Preds, Node, Succs}, EvalFun, FilterFun) when is_function(EvalFun, 1) ->
+remove2({Preds, Node, Succs}, EvalFun, FilterFun) ->
     NewNeighbors = {remove2(Preds, EvalFun, FilterFun), Node, remove2(Succs, EvalFun, FilterFun)},
     ensure_lists_not_empty(NewNeighbors).
 
 %% @doc Remove node helper that removes any node for which FilterFun returns
-%%      false from a neighborhood or node list and executes EvalFun for any such
-%%      occurrence.
+%%      false from a given node list. Executes EvalFun for any such occurrence.
 -spec remove_helper(NodeList::nodelist(), EvalFun::fun((node:node_type()) -> any()), FilterFun::fun((node:node_type()) -> boolean()), OldResult::nodelist()) -> nodelist().
 remove_helper([], _EvalFun, _FilterFun, Result) ->
     lists:reverse(Result);
@@ -454,7 +470,7 @@ remove_outdated(NodeList, Node) ->
                              (node:newer(N, NInTab) =:= N)
                      end,
     NodeListUpd = [N || N <- NodeList, node:is_valid(N),
-                        not node:equals(N, Node), NodeIsUpToDate(N)],
+                        not (node:equals(N, Node) andalso (node:newer(N, Node) =:= Node)), NodeIsUpToDate(N)],
     ets:delete(Tab),
     NodeListUpd.
 
