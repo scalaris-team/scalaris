@@ -62,11 +62,11 @@ new_logentry(Status, TransID, Item)->
 
 
 get_log(State)->
-    dht_node_state:get_trans_log(State).
+    dht_node_state:get(State, trans_log).
 
 
 add_to_undecided(State, TransID, LogEntry)->
-    TransLog = dht_node_state:get_trans_log(State),
+    TransLog = dht_node_state:get(State, trans_log),
     NewTransInLogList = case gb_trees:lookup(TransID, TransLog#translog.undecided) of
 			    {value, TransInLogList} ->
 				lists:append([LogEntry], TransInLogList);

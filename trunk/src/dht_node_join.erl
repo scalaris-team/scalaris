@@ -43,13 +43,14 @@
 %% userdevguide-begin dht_node_join:join_request
 -spec join_request(dht_node_state:state(), NewPred::node:node_type()) -> dht_node_state:state().
 join_request(State, NewPred) ->
-    {DB, HisData} = ?DB:split_data(dht_node_state:get_db(State), dht_node_state:id(State), node:id(NewPred)),
+    {DB, HisData} = ?DB:split_data(dht_node_state:get(State, db), dht_node_state:get(State, node_id), node:id(NewPred)),
     
     %%TODO: split data [{Key, Value, Version}], schedule transfer
     
-    cs_send:send(node:pidX(NewPred), {join_response, dht_node_state:pred(State), HisData}),
-    % TODO: better update our range here directly instead of rm_beh sending dht_node a message?
-    rm_beh:update_preds([NewPred]),
+    cs_send:send(node:pidX(NewPred), {join_response, dht_node_state:get(State, pred), HisData}),
+    % TODO: better already update our range here directly than waiting for an
+    % updated state from the ring_maintenance!
+    rm_beh:notify_new_pred(cs_send:this(), NewPred),
     dht_node_state:set_db(State, DB).
 %% userdevguide-end dht_node_join:join_request
 
@@ -63,9 +64,9 @@ process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {as_first}, Q
     log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Id]),
     Me = node:new(cs_send:this(), Id, IdVersion),
     rt_beh:initialize(Id, Me, Me),
-    NewState = dht_node_state:new(?RT:empty(Me), Me, Me, Me, {Id, Id}, dht_node_lb:new(), ?DB:new(Id)),
+    NewState = dht_node_state:new(?RT:empty(Me), nodelist:new_neighborhood(Me), dht_node_lb:new(), ?DB:new(Id)),
     cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
-    send_queued_messages(QueuedMessages),
+    cs_send:send_queued_messages(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
     NewState;  % join complete, State is the first "State"
 
@@ -131,19 +132,21 @@ process_join_msg({join_response, Pred, Data}, {join, {phase4, Succ, Me}, QueuedM
     log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),
     DB = ?DB:add_data(?DB:new(Id), Data),
     rt_beh:initialize(Id, Pred, Succ),
-    State = case node:is_valid(Pred) of
-                true ->
-                    cs_send:send(node:pidX(Pred), {update_succ, Me}),
-                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                       {node:id(Pred), Id}, dht_node_lb:new(),
-                                       DB);
-                false ->
-                    dht_node_state:new(?RT:empty(Succ), Succ, Pred, Me,
-                                       {Id, Id}, dht_node_lb:new(), DB)
-            end,
-    cs_replica_stabilization:recreate_replicas(dht_node_state:get_my_range(State)),
+    State = 
+        case node:is_valid(Pred) of
+            true ->
+                rm_beh:notify_new_succ(node:pidX(Pred), Me),
+                dht_node_state:new(?RT:empty(Succ),
+                                   nodelist:new_neighborhood(Pred, Me, Succ),
+                                   dht_node_lb:new(), DB);
+            false ->
+                dht_node_state:new(?RT:empty(Succ),
+                                   nodelist:new_neighborhood(Me, Succ),
+                                   dht_node_lb:new(), DB)
+        end,
+    cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
     cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
-    send_queued_messages(QueuedMessages),
+    cs_send:send_queued_messages(QueuedMessages),
     State;
 
 % ignore some messages that appear too late for them to be used, e.g. if a new
@@ -162,12 +165,6 @@ process_join_msg({lookup_timeout}, State) ->
 process_join_msg(Msg, {join, Details, QueuedMessages}) ->
     %log:log(info("[dhtnode] [~p] postponed delivery of ~p~n", [self(), Msg]),
     {join, Details, [Msg | QueuedMessages]}.
-
-%% @doc Sends queued messages to the dht node itself in the order they have been
-%%      received.
--spec send_queued_messages(list()) -> ok.
-send_queued_messages(QueuedMessages) ->
-    lists:foldr(fun(Msg, _) -> cs_send:send_local(self(), Msg) end, ok, QueuedMessages).
 
 -spec get_local_dht_node_reregister_pid() -> pid().
 get_local_dht_node_reregister_pid() ->

@@ -21,14 +21,13 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([behaviour_info/1, update_preds_and_succs/2,
-        get_successorlist/0, get_predlist/0, succ_left/1, pred_left/1,
-        update_succs/1, update_preds/1,
-        notify_new_pred/1, notify_new_succ/1]).
+-export([behaviour_info/1,
+         succ_left/1, pred_left/1,
+         update_neighbors/1,
+         notify_new_pred/2, notify_new_succ/2]).
 
 behaviour_info(callbacks) ->
     [
-     % start
      {start_link, 1},
      {check_config, 0}
     ];
@@ -40,29 +39,17 @@ behaviour_info(_Other) ->
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Sends the current process' ring_maintenance process a request for its
-%%      successor list.
--spec get_successorlist() -> ok.
-get_successorlist() ->
-    cs_send:send_local(get_my_rm_pid(), {get_succlist, self()}).
+%% @doc Sends a message to the remote node's ring_maintenance process notifying
+%%      it of a new successor.
+-spec notify_new_succ(Node::cs_send:mypid(), NewSucc::node:node_type()) -> ok.
+notify_new_succ(Node, NewSucc) ->
+    cs_send:send_to_group_member(Node, ring_maintenance, {notify_new_succ, NewSucc}).
 
-%% @doc Sends the current process' ring_maintenance process a request for its
-%%      predecessor list.
--spec get_predlist() -> ok.
-get_predlist() ->
-    cs_send:send_local(get_my_rm_pid(), {get_predlist, self()}).
-
-%% @doc Notifies the current process' ring_maintenance process of a changed
-%%      predecessor.
--spec notify_new_pred(node:node_type()) -> ok.
-notify_new_pred(Pred) ->
-    cs_send:send_local(get_my_rm_pid(), {notify_new_pred, Pred}).
-
-%% @doc Notifies the current process' ring_maintenance process of a changed
-%%      successor.
--spec notify_new_succ(node:node_type()) -> ok.
-notify_new_succ(Succ) ->
-    cs_send:send_local(get_my_rm_pid(), {notify_new_succ, Succ}).
+%% @doc Sends a message to the remote node's ring_maintenance process notifying
+%%      it of a new predecessor.
+-spec notify_new_pred(Node::cs_send:mypid(), NewPred::node:node_type()) -> ok.
+notify_new_pred(Node, NewPred) ->
+    cs_send:send_to_group_member(Node, ring_maintenance, {notify_new_pred, NewPred}).
 
 
 %% @doc notification that my succ left
@@ -77,29 +64,9 @@ pred_left(_PredsPred) ->
     %% @TODO implement notification
     ok.
 
-
-%% @doc Notifies the dht_node that his predecessors and successors changed
+%% @doc Notifies the dht_node that (at least one of) his neighbors changed
 %%      (to be used in the rm_*.erl modules).
--spec update_preds_and_succs(Preds::[node:node_type(),...], Succs::[node:node_type(),...]) -> ok.
-update_preds_and_succs(Preds, Succs) ->
+-spec update_neighbors(Neighbors::nodelist:neighborhood()) -> ok.
+update_neighbors(Neighbors) ->
     Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rm_update_preds_succs, Preds, Succs}),
-    ok.
-
-%% @doc Notifies the dht_node that his predecessors changed
-%%      (to be used in the rm_*.erl modules).
--spec update_preds(Preds::[node:node_type(),...]) -> ok.
-update_preds(Preds) ->
-    Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rm_update_preds, Preds}).
-
-%% @doc Notifies the dht_node that his successors changed
-%%      (to be used in the rm_*.erl modules).
--spec update_succs(Succs::[node:node_type(),...]) -> ok.
-update_succs(Succs) ->
-    Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rm_update_succs, Succs}).
-
-% @private
-get_my_rm_pid() ->
-    process_dictionary:get_group_member(ring_maintenance).
+    cs_send:send_local(Pid, {rm_update_neighbors, Neighbors}).

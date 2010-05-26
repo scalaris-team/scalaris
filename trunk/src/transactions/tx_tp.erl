@@ -45,17 +45,17 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% need Acceptors (given via RTMs), Learner,
     %% validate locally via callback
-    DB = dht_node_state:get_db(DHT_Node_State),
+    DB = dht_node_state:get(DHT_Node_State, db),
     {NewDB, Proposal} = apply(element(1, RTLogEntry),
                               validate,
                               [DB, RTLogEntry]),
 
     %% remember own proposal for lock release
-    TP_DB = dht_node_state:get_tx_tp_db(DHT_Node_State),
+    TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
     pdb:set({PaxId, Proposal}, TP_DB),
 
     %% initiate a paxos proposer round 0 with the proposal
-    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(DHT_Node_State)),
+    Proposer = cs_send:make_global(dht_node_state:get(DHT_Node_State, proposer)),
     proposer:start_paxosid_with_proxy(cs_send:this(), Proposer, PaxId,
                                      _Acceptors = RTMs, Proposal,
                                      _Maj = 3, _MaxProposers = 4, 0),
@@ -68,15 +68,15 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
 on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     ?TRACE("tx_tp:on_tx_commitreply({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.
-    DB = dht_node_state:get_db(DHT_Node_State),
+    DB = dht_node_state:get(DHT_Node_State, db),
 
     % get own proposal for lock release
-    TP_DB = dht_node_state:get_tx_tp_db(DHT_Node_State),
+    TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
     {PaxosId, Proposal} = pdb:get(PaxosId, TP_DB),
 
     NewDB = apply(element(1, RTLogEntry), Result, [DB, RTLogEntry, Proposal]),
     %% delete corresponding proposer state
-    Proposer = cs_send:make_global(dht_node_state:get_my_proposer(DHT_Node_State)),
+    Proposer = cs_send:make_global(dht_node_state:get(DHT_Node_State, proposer)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
     pdb:delete(PaxosId, TP_DB),
     dht_node_state:set_db(DHT_Node_State, NewDB).

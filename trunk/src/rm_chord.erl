@@ -29,8 +29,22 @@
 
 -export([start_link/1, check_config/0]).
 
-% unit testing
--export([merge/3]).
+-type(state() :: {Id             :: ?RT:key(),
+                  Neighborhood   :: nodelist:neighborhood(),
+                  TriggerState   :: trigger:state()}
+     | {uninit, QueuedMessages::[cs_send:message()], TriggerState :: trigger:state()}).
+
+% accepted messages
+-type(message() ::
+    {init, Id::?RT:key(), Me::node_details:node_type(), Predecessor::node_details:node_type(), Successor::node:node_type()} |
+    {get_succlist, Source_Pid::cs_send:mypid()} |
+    {stabilize} |
+    {get_node_details_response, NodeDetails::node_details:node_details()} |
+    {get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_nodelist()} |
+    {notify_new_pred, Pred::node:node_type()} |
+    {notify_new_succ, Succ::node:node_type()} |
+    {crash, DeadPid::cs_send:mypid()} |
+    {'$gen_cast', {debug_info, Requestor::cs_send:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -44,13 +58,13 @@ start_link(InstanceId) ->
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, ring_maintenance}]).
 
 %% @doc Initialises the module with an uninitialized state.
--spec init(module()) -> {uninit, TriggerState::trigger:state()}.
+-spec init(module()) -> {uninit, QueuedMessages::[], TriggerState::trigger:state()}.
 init(Trigger) ->
     log:log(info,"[ RM ~p ] starting ring maintainer chord~n", [cs_send:this()]),
     TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, stabilize),
-    cs_send:send_local(get_cs_pid(), {init_rm,self()}),
+    cs_send:send_local(get_cs_pid(), {init_rm, self()}),
     TriggerState2 = trigger:next(TriggerState),
-    {uninit, TriggerState2}.
+    {uninit, [], TriggerState2}.
 
 %% @doc Sends a message to the remote node's ring_maintenance process asking for
 %%      it list of successors.
@@ -58,104 +72,95 @@ init(Trigger) ->
 get_successorlist(RemoteDhtNodePid) ->
     cs_send:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {get_succlist, cs_send:this()}).
 
-%% @doc Sends a message to the remote node's ring_maintenance process notifying
-%%      it of a new predecessor.
--spec notify_new_pred(cs_send:mypid(), node:node_type()) -> ok.
-notify_new_pred(RemoteDhtNodePid, NewPred) ->
-    cs_send:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {notify_new_pred, NewPred}).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec on(message(), state()) -> state().
 %set info for dht_node
-on({init, NewId, NewMe, NewPred, NewSuccList, _DHTNode}, {uninit, TriggerState}) ->
-    rm_beh:update_preds_and_succs([NewPred], NewSuccList),
-    get_successorlist(node:pidX(hd(NewSuccList))),
-    fd:subscribe([node:pidX(Node) || Node <- [NewPred | NewSuccList]]),
-    {NewId, NewMe, NewPred, NewSuccList, TriggerState};
+on({init, Id, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
+    Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
+    get_successorlist(node:pidX(Successor)),
+    fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
+    cs_send:send_queued_messages(QueuedMessages),
+    {Id, Neighborhood, TriggerState};
 
-on(_, {uninit, _TriggerState} = State) ->
+on(Msg, {uninit, QueuedMessages, TriggerState}) ->
+    {uninit, [Msg | QueuedMessages], TriggerState};
+
+on({get_succlist, Source_Pid}, {_Id, Neighborhood, _TriggerState} = State) ->
+    cs_send:send(Source_Pid, {get_succlist_response,
+                              nodelist:node(Neighborhood),
+                              nodelist:succs(Neighborhood)}),
     State;
 
-on({get_succlist, Source_Pid}, {_Id, Me, _Pred, Succs, _TriggerState} = State) ->
-    % note: Source_Pid can be local or remote here
-    % see get_successorlist/1
-    cs_send:send(Source_Pid, {get_succlist_response, Me, Succs}),
-    State;
+on({stabilize}, {Id, Neighborhood, TriggerState}) ->
+    % new stabilization interval
+    case nodelist:has_real_succ(Neighborhood) of
+        true ->
+            cs_send:send(node:pidX(nodelist:succ(Neighborhood)),
+                         {get_node_details, cs_send:this(), [pred]});
+        _ -> ok
+    end,
+    {Id, Neighborhood, trigger:next(TriggerState)};
 
-on({get_predlist, Pid}, {_Id, _Me, Pred, _Succs, _TriggerState} = State) ->
-    cs_send:send_local(Pid, {get_predlist_response, [Pred]}),
-    State;
-
-on({stabilize}, {Id, Me, Pred, [] = Succs, TriggerState}) -> % new stabilization interval
-    {Id, Me, Pred, Succs, trigger:next(TriggerState)};
-
-on({stabilize}, {Id, Me, Pred, Succs, TriggerState}) -> % new stabilization interval
-    cs_send:send(node:pidX(hd(Succs)), {get_node_details, cs_send:this(), [pred]}),
-    {Id, Me, Pred, Succs, trigger:next(TriggerState)};
-
-on({get_node_details_response, NodeDetails}, {Id, Me, Pred, Succs, TriggerState} = State)  ->
+on({get_node_details_response, NodeDetails}, {Id, Neighborhood, TriggerState} = State)  ->
     SuccsPred = node_details:get(NodeDetails, pred),
     case node:is_valid(SuccsPred) of
         true ->
-            case util:is_between_stab(Id, node:id(SuccsPred), node:id(hd(Succs))) of
+            case util:is_between_stab(Id, node:id(SuccsPred), node:id(nodelist:succ(Neighborhood))) of
                 true ->
                     get_successorlist(node:pidX(SuccsPred)),
-                    rm_beh:update_preds_and_succs([Pred], [SuccsPred]),
+                    NewNeighborhood = nodelist:add_nodes(Neighborhood, [SuccsPred], 1, succListLength()),
+                    rm_beh:update_neighbors(NewNeighborhood),
                     fd:subscribe(node:pidX(SuccsPred)),
-                    {Id, Me, Pred, [SuccsPred | Succs], TriggerState};
+                    {Id, NewNeighborhood, TriggerState};
                 false ->
-                    get_successorlist(node:pidX(hd(Succs))),
+                    get_successorlist(node:pidX(nodelist:succ(Neighborhood))),
                     State
             end;
         false ->
-            get_successorlist(node:pidX(hd(Succs))),
+            get_successorlist(node:pidX(nodelist:succ(Neighborhood))),
             State
     end;
 
-on({get_succlist_response, Succ, SuccsSuccList}, {Id, Me, Pred, Succs, TriggerState}) ->
-    NewSuccs = util:trunc(merge([Succ | SuccsSuccList], Succs, Id), succListLength()),
+on({get_succlist_response, Succ, SuccsSuccList}, {Id, Neighborhood, TriggerState}) ->
+    NewNeighborhood = nodelist:add_nodes(Neighborhood, [Succ | SuccsSuccList], 1, succListLength()),
     %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
-    notify_new_pred(node:pidX(hd(NewSuccs)), Me),
-    rm_beh:update_preds_and_succs([Pred], NewSuccs),
-    fd:subscribe([node:pidX(Node) || Node <- NewSuccs]),
-    {Id, Me, Pred, NewSuccs, TriggerState};
+    rm_beh:notify_new_pred(node:pidX(nodelist:succ(NewNeighborhood)), nodelist:node(NewNeighborhood)),
+    rm_beh:update_neighbors(NewNeighborhood),
+    % the predecessor might also have changed if the successor knew about a better predecessor
+    OldPids = [nodelist:pred(Neighborhood)] ++ [node:pidX(Node) || Node <- nodelist:succs(Neighborhood)],
+    NewPids = [nodelist:pred(NewNeighborhood)] ++ [node:pidX(Node) || Node <- nodelist:succs(NewNeighborhood)],
+    fd:update_subscriptions(OldPids, NewPids),
+    {Id, NewNeighborhood, TriggerState};
 
-on({notify_new_pred, NewPred}, {Id, Me, Pred, Succs, TriggerState} = State) ->
-    case node:is_valid(Pred) of
+on({notify_new_pred, NewPred}, {Id, Neighborhood, TriggerState} = State) ->
+    Pred = nodelist:pred(Neighborhood),
+    case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
         true ->
-            case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
-                true ->
-                    rm_beh:update_preds_and_succs([NewPred], Succs),
-                    fd:subscribe(node:pidX(NewPred)),
-                    {Id, Me, NewPred, Succs, TriggerState};
-                false ->
-                    State
-            end;
+            NewNeighborhood = nodelist:add_nodes(Neighborhood, [NewPred], 1, succListLength()),
+            rm_beh:update_neighbors(NewNeighborhood),
+            fd:update_subscriptions([node:pidX(Pred)], [node:pidX(NewPred)]),
+            {Id, NewNeighborhood, TriggerState};
         false ->
-            rm_beh:update_preds_and_succs([NewPred], Succs),
-            fd:subscribe(node:pidX(NewPred)),
-            {Id, Me, NewPred, Succs, TriggerState}
+            State
     end;
 
 on({notify_new_succ, _NewSucc}, State) ->
     %% @TODO use the new successor info
     State;
 
-on({crash, DeadPid}, {Id, Me, Pred, Succs, TriggerState})  ->
-    case node:equals(Pred, DeadPid) of
-        true ->
-            {Id, Me, node:null(), filter(DeadPid, Succs), TriggerState};
-        false ->
-            {Id, Me, Pred, filter(DeadPid, Succs), TriggerState}
-    end;
+on({crash, DeadPid}, {Id, Neighborhood, TriggerState})  ->
+    NewNeighborhood = nodelist:remove(DeadPid, Neighborhood),
+    {Id, NewNeighborhood, TriggerState};
 
-on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Me, Pred, Succs, _TriggerState} = State)  ->
+on({'$gen_cast', {debug_info, Requestor}}, {_Id, Neighborhood, _TriggerState} = State)  ->
     cs_send:send_local(Requestor,
                        {debug_info_response,
-                        [{"pred", lists:flatten(io_lib:format("~p", [Pred]))},
-                         {"succs", lists:flatten(io_lib:format("~p", [Succs]))}]}),
+                        [{"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
+                         {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},
+                         {"succs", lists:flatten(io_lib:format("~p", [nodelist:succs(Neighborhood)]))}]}),
     State;
 
 on(_, _State) ->
@@ -171,47 +176,25 @@ check_config() ->
     config:is_greater_than(stabilization_interval_max, 0) and
     
     config:is_integer(succ_list_length) and
-    config:is_greater_than_equal(succ_list_length, 0).
+    config:is_greater_than(succ_list_length, 0).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc merge two successor lists into one
-%%      and sort by identifier
-merge(L1, L2, Id) ->
-    MergedList = lists:append(L1, L2),
-    Order = fun(A, B) ->
-		    node:id(A) =< node:id(B)
-	    end,
-    Larger  = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) >  Id])),
-    Equal   = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) =:= Id])),
-    Smaller = util:uniq(lists:sort(Order, [X || X <- MergedList, node:id(X) <  Id])),
-    lists:append([Larger, Smaller, Equal]).
-
-filter(_Pid, []) ->
-    [];
-filter(Pid, [Succ | Rest]) ->
-    case node:equals(Pid, Succ) of
-        true ->
-            filter(Pid, Rest);
-        false ->
-            [Succ | filter(Pid, Rest)]
-    end.
-
-
 
 % @private
 
-% get Pid of assigned dht_node
+%% @doc get Pid of assigned dht_node
+-spec get_cs_pid() -> pid().
 get_cs_pid() ->
     process_dictionary:get_group_member(dht_node).
 
 %% @doc the length of the successor list
-%% @spec succListLength() -> integer() | failed
+-spec succListLength() -> pos_integer().
 succListLength() ->
     config:read(succ_list_length).
 
 %% @doc the interval between two stabilization runs Max
-%% @spec stabilizationInterval() -> integer() | failed
+-spec stabilizationInterval() -> pos_integer().
 stabilizationInterval() ->
     config:read(stabilization_interval_max).

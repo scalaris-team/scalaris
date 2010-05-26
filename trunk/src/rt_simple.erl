@@ -72,7 +72,7 @@ getRandomNodeId() ->
 %% @doc returns the next hop to contact for a lookup
 -spec(next_hop/2 :: (dht_node_state:state(), key()) -> cs_send:mypid()).
 next_hop(State, _Key) ->
-    dht_node_state:succ_pid(State).
+    dht_node_state:get(State, succ_pid).
 %% userdevguide-end rt_simple:next_hop
 
 %% userdevguide-begin rt_simple:init_stabilize
@@ -135,8 +135,8 @@ dump(_State) ->
 % n -> me
 % @spec to_dict(dht_node_state:state()) -> dict:dictionary()
 to_dict(State) ->
-    Succ = dht_node_state:succ(State),
-    dict:store(0, Succ, dict:store(1, dht_node_state:me(State), dict:new())).
+    Succ = dht_node_state:get(State, succ),
+    dict:store(0, Succ, dict:store(1, dht_node_state:get(State, node), dict:new())).
 
 -spec(export_rt_to_dht_node/4 :: (rt(), key(), node:node_type(), node:node_type()) -> external_rt()).
 export_rt_to_dht_node(RT, _Id, _Pred, _Succ) ->

@@ -251,7 +251,7 @@ renderRingChart(Ring) ->
     Sizes = lists:map(
               fun ({ok,Node}) ->
                        Me_tmp = get_id(node_details:get(Node, node)),
-                       Pred_tmp = get_id(hd(node_details:get(Node, predlist))),
+                       Pred_tmp = get_id(nodelist:pred(node_details:get(Node, predlist))),
                        if
                            (null =:= Me_tmp) orelse (null =:= Pred_tmp) ->
                                io_lib:format("1.0", []); % guess the size

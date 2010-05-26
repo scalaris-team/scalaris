@@ -43,7 +43,7 @@
 tp_validate(State, Tid, Item)->
     %?TLOGN("validating item ~p", [Item]),
     %% Check whether the version is still valid
-    StateDB = dht_node_state:get_db(State),
+    StateDB = dht_node_state:get(State, db),
     {DB, LockRes} = case ?DB:read(StateDB, Item#item.rkey) of
 			 {ok, _Value, Version} ->
 			     set_lock(StateDB, check_version(Item, Version), Item);
@@ -105,7 +105,7 @@ tp_commit(State, TransactionID)->
     case gb_trees:lookup(TransactionID, TransLogUndecided) of
 	{value, LogEntries} ->
 	    %LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
-	    DB = tp_commit_store_unlock(dht_node_state:get_db(State), LogEntries),
+	    DB = tp_commit_store_unlock(dht_node_state:get(State, db), LogEntries),
 	    State2 = dht_node_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);
@@ -135,7 +135,7 @@ tp_abort(State, TransactionID)->
     case gb_trees:lookup(TransactionID, TransLogUndecided) of
 	{value, LogEntries} ->
 	    LogEntries = gb_trees:get(TransactionID, TransLogUndecided),
-	    DB = tp_abort_unlock(dht_node_state:get_db(State), LogEntries),
+	    DB = tp_abort_unlock(dht_node_state:get(State, db), LogEntries),
 	    State2 = dht_node_state:set_db(State, DB),
 	    NewTransLog = tp_log:get_log(State2),
 	    tp_log:remove_from_undecided(State2, TransactionID, NewTransLog, TransLogUndecided);

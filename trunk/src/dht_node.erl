@@ -44,7 +44,7 @@ on(Msg, State) when element(1, State) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 
 on({get_node, Source_PID, Key}, State) ->
-    cs_send:send(Source_PID, {get_node_response, Key, dht_node_state:me(State)}),
+    cs_send:send(Source_PID, {get_node_response, Key, dht_node_state:get(State, node)}),
     State;
 
 %% Kill Messages
@@ -61,22 +61,25 @@ on({halt}, _State) ->
 on({die}, _State) ->
     kill;
 
-%% Ring Maintenance (see rm_beh.erl)
-on({init_rm,Pid},State) ->
-    cs_send:send_local(Pid, {init, dht_node_state:id(State), dht_node_state:me(State),dht_node_state:pred(State), [dht_node_state:succ(State)]}),
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Ring Maintenance (see rm_beh.erl) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% {init_rm, pid()}
+on({init_rm, Pid}, State) ->
+    cs_send:send_local(Pid, {init, dht_node_state:get(State, node_id),
+                                   dht_node_state:get(State, node),
+                                   dht_node_state:get(State, pred),
+                                   dht_node_state:get(State, succ)}),
     State;
 
-on({rm_update_preds_succs, Preds, Succs}, State) ->
-    dht_node_state:set_rt(dht_node_state:update_preds_succs(State, Preds, Succs),
-                    ?RT:update_pred_succ_in_dht_node(hd(Preds), hd(Succs), dht_node_state:rt(State)));
-
-on({rm_update_preds, Preds}, State) ->
-    dht_node_state:set_rt(dht_node_state:update_preds(State, Preds),
-                    ?RT:update_pred_succ_in_dht_node(hd(Preds), dht_node_state:succ(State), dht_node_state:rt(State)));
-
-on({rm_update_succs, Succs}, State) ->
-    dht_node_state:set_rt(dht_node_state:update_succs(State, Succs),
-                    ?RT:update_pred_succ_in_dht_node(dht_node_state:pred(State), hd(Succs), dht_node_state:rt(State)));
+%% {rm_update_neighbors, Neighbors::nodelist:neighborhood()}
+on({rm_update_neighbors, Neighbors}, State) ->
+    OldRT = dht_node_state:get(State, rt),
+    NewRT = ?RT:update_pred_succ_in_dht_node(nodelist:pred(Neighbors),
+                                             nodelist:succ(Neighbors),
+                                             OldRT),
+    State_NewNeighbors = dht_node_state:set_neighbors(State, Neighbors),
+    dht_node_state:set_rt(State_NewNeighbors, NewRT);
 
 %% @doc notification that my successor left
 on({succ_left, Succ}, State) ->
@@ -88,11 +91,6 @@ on({pred_left, Pred}, State) ->
     rm_beh:pred_left(Pred),
     State;
 
-%% @doc notify the dht_node his successor changed
-on({update_succ, Succ}, State) ->
-    rm_beh:notify_new_succ(Succ),
-    State;
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -101,7 +99,7 @@ on({rt_update, RoutingTable}, State) ->
 
 %% userdevguide-begin dht_node:rt_get_node
 on({rt_get_node, Source_PID, Index}, State) ->
-    cs_send:send(Source_PID, {rt_get_node_response, Index, dht_node_state:me(State)}),
+    cs_send:send(Source_PID, {rt_get_node_response, Index, dht_node_state:get(State, node)}),
     State;
 %% userdevguide-end dht_node:rt_get_node
 
@@ -133,7 +131,7 @@ on({do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Own
 %% answer - lookup for transaction participant
 on({lookup_tp, Message}, State) ->
     {Leader} = Message#tp_message.message,
-    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
     Responsible = util:is_between(RangeBeg, Message#tp_message.item_key, RangeEnd),
     if
         Responsible =:= true ->
@@ -164,7 +162,7 @@ on({decision, Message}, State) ->
 
 %% remove tm->tid mapping after transaction manager stopped
 on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
-    {translog, TID_TM_Mapping, Decided, Undecided} = dht_node_state:get_trans_log(State),
+    {translog, TID_TM_Mapping, Decided, Undecided} = dht_node_state:get(State, trans_log),
     NewTID_TM_Mapping = dict:erase(TransID, TID_TM_Mapping),
     dht_node_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
 
@@ -216,7 +214,7 @@ on({lookup_fin, _Hops, Msg}, State) ->
 % Database
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_key, Source_PID, Key}, State) ->
-    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
     case util:is_between(RangeBeg, Key, RangeEnd) of
         true ->
             dht_node_lookup:get_key(State, Source_PID, Key, Key),
@@ -233,12 +231,12 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
 %          false ->
     cs_send:send(Source_PID,
                  {get_key_with_id_reply, SourceId, HashedKey,
-                  ?DB:read(dht_node_state:get_db(State), HashedKey)}),
+                  ?DB:read(dht_node_state:get(State, db), HashedKey)}),
 %    end,
     State;
 
 on({set_key, Source_PID, Key, Value, Versionnr}, State) ->
-    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
     case util:is_between(RangeBeg, Key, RangeEnd) of
         true ->
             dht_node_lookup:set_key(State, Source_PID, Key, Value, Versionnr);
@@ -248,7 +246,7 @@ on({set_key, Source_PID, Key, Value, Versionnr}, State) ->
     end;
 
 on({delete_key, Source_PID, Key}, State) ->
-    {RangeBeg, RangeEnd} = dht_node_state:get_my_range(State),
+    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
     case util:is_between(RangeBeg, Key, RangeEnd) of
         true ->
             dht_node_lookup:delete_key(State, Source_PID, Key);
@@ -259,7 +257,7 @@ on({delete_key, Source_PID, Key}, State) ->
 
 on({drop_data, Data, Sender}, State) ->
     cs_send:send(Sender, {drop_data_ack}),
-    DB = ?DB:add_data(dht_node_state:get_db(State), Data),
+    DB = ?DB:add_data(dht_node_state:get(State, db), Data),
     dht_node_state:set_db(State, DB);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -274,15 +272,15 @@ on({start_bulk_owner, I, Msg}, State) ->
     State;
 
 on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
-    cs_send:send(Issuer, {bulk_read_with_version_response, dht_node_state:get_my_range(State),
-                          ?DB:get_range_with_version(dht_node_state:get_db(State), Range)}),
+    cs_send:send(Issuer, {bulk_read_with_version_response, dht_node_state:get(State, my_range),
+                          ?DB:get_range_with_version(dht_node_state:get(State, db), Range)}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Load balancing messages (see dht_node_lb.erl) 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_load, Source_PID}, State) ->
-    cs_send:send(Source_PID, {get_load_response, cs_send:this(), dht_node_state:load(State)}),
+    cs_send:send(Source_PID, {get_load_response, cs_send:this(), dht_node_state:get(State, load)}),
     State;
 
 on({get_load_response, Source_PID, Load}, State) ->
@@ -320,18 +318,18 @@ on({dump}, State) ->
 
 on({'$gen_cast', {debug_info, Requestor}}, State) ->
     KeyValueList =
-        [{"rt_size", ?RT:get_size(dht_node_state:rt(State))},
-         {"succs", lists:flatten(io_lib:format("~p", [dht_node_state:succs(State)]))},
-         {"preds", lists:flatten(io_lib:format("~p", [dht_node_state:preds(State)]))},
-         {"me", lists:flatten(io_lib:format("~p", [dht_node_state:me(State)]))},
-         {"my_range", lists:flatten(io_lib:format("~p", [dht_node_state:get_my_range(State)]))},
-%%          {"lb", lists:flatten(io_lib:format("~p", [dht_node_state:get_lb(State)]))},
+        [{"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
+         {"succs", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, succlist)]))},
+         {"preds", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, predlist)]))},
+         {"me", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, node)]))},
+         {"my_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, my_range)]))},
+%%          {"lb", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, lb)]))},
 %%          {"deadnodes", lists:flatten(io_lib:format("~p", [dht_node_state:???(State)]))},
-         {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get_join_time(State))]))},
-%%          {"db", lists:flatten(io_lib:format("~p", [dht_node_state:get_db(State)]))},
-%%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get_trans_log(State)]))},
-%%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get_my_proposer(State)]))},
-         {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get_tx_tp_db(State)]))}],
+         {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))]))},
+%%          {"db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db)]))},
+%%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
+%%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
+         {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))}],
     cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 
@@ -343,8 +341,8 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
                     end,
                     lists:filter(fun ({Key, _}) ->
                                          intervals:in(Key, Range)
-                                 end, ?DB:get_data(dht_node_state:get_db(State)))),
-    cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, dht_node_state:id(State)}),
+                                 end, ?DB:get_data(dht_node_state:get(State, db)))),
+    cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, dht_node_state:get(State, node_id)}),
     State;
 
 %% @TODO buggy ...

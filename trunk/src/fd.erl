@@ -31,8 +31,9 @@
 -include("scalaris.hrl").
 
 % API
--export([subscribe/1,subscribe/2]).
--export([unsubscribe/1,unsubscribe/2]).
+-export([subscribe/1, subscribe/2,
+         unsubscribe/1, unsubscribe/2,
+         update_subscriptions/2]).
 -export([get_subscribers/1,get_subscribers/2]).
 -export([get_subscriptions/0]).
 -export([remove_subscriber/1]).
@@ -88,6 +89,14 @@ unsubscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
     ok;
 unsubscribe(GlobalPid, Cookie) ->
     unsubscribe([GlobalPid], Cookie).
+
+%% @doc Unsubscribes from the pids in OldPids but not in NewPids and subscribes
+%%      to the pids in NewPids but not in OldPids.
+-spec update_subscriptions(OldPids::[cs_send:mypid()], NewPids::[cs_send:mypid()]) -> ok.
+update_subscriptions(OldPids, NewPids) ->
+    {OnlyOldPids, _Same, OnlyNewPids} = util:split_unique(OldPids, NewPids),
+    fd:unsubscribe(OnlyOldPids),
+    fd:subscribe(OnlyNewPids).
 
 %% @doc who is informed on events on a given Pid?
 -spec get_subscribers(cs_send:mypid()) -> ok.

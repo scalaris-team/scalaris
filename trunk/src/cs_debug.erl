@@ -32,7 +32,7 @@ new() ->
     [].
 
 debug(Debug, NewState, Message) ->
-    NewDebug = util:trunc([ {calendar:universal_time(), NewState, Message} | Debug], debugQueueLength()),
+    NewDebug = lists:sublist([{calendar:universal_time(), NewState, Message} | Debug], debugQueueLength()),
     check(NewDebug, assert(NewState, checks())),
     NewDebug.
 	    

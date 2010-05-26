@@ -21,62 +21,45 @@
 -include("transstore/trecords.hrl").
 -include("scalaris.hrl").
 
--export([new/6, new/7,
-         id/1, me/1,
-         succs/1, succ/1, succ_pid/1, succ_id/1,
-         preds/1, pred/1, pred_pid/1, pred_id/1,
-         load/1,
-         update_preds_succs/3,
-         update_succs/2,
-         update_preds/2,
+-export([new/3, new/4,
+         get/2,
+         set_neighbors/2,
          dump/1,
-         set_rt/2, rt/1,
-         get_db/1, set_db/2,
-         get_lb/1, set_lb/2,
+         set_rt/2,
+         set_db/2,
+         set_lb/2,
          details/1, details/2,
-         get_my_range/1,
-         get_my_proposer/1,
-         get_tx_tp_db/1, set_tx_tp_db/2,
          next_interval/1,
-         get_join_time/1,
          %%transactions
-         get_trans_log/1,
-         set_trans_log/2]).
+         set_trans_log/2,
+         set_tx_tp_db/2]).
 
 -type my_range() :: {?RT:key(), ?RT:key()}.
 -type join_time() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}. % {MegaSecs, Secs, MicroSecs}
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {routingtable :: ?RT:rt(),
-                successors   :: [node:node_type(),...],
-                predecessors :: [node:node_type(),...],
-                me           :: node:node_type(),
-                my_range     :: my_range(),
-                lb           :: dht_node_lb:lb(),
-                deadnodes    :: gb_set(),
-                join_time    :: join_time(),
-                trans_log    :: #translog{},
-                db           :: ?DB:db(),
-                tx_tp_db     :: any(),
-                proposer     :: pid()}).
+-record(state, {rt :: ?RT:rt(),
+                neighbors  :: nodelist:neighborhood(),
+                lb         :: dht_node_lb:lb(),
+                join_time  :: join_time(),
+                trans_log  :: #translog{},
+                db         :: ?DB:db(),
+                tx_tp_db   :: any(),
+                proposer   :: pid()}).
 -type state() :: #state{}.
 
--spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), dht_node_lb:lb()) -> state().
-new(RT, Successor, Predecessor, Me, MyRange, LB) ->
-    new(RT, Successor, Predecessor, Me, MyRange, LB, ?DB:new(node:id(Me))).
+-spec new(?RT:rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb()) -> state().
+new(RT, Neighbors, LB) ->
+    new(RT, Neighbors, LB, ?DB:new(nodelist:nodeid(Neighbors))).
 
 %% userdevguide-begin dht_node_state:state
--spec new(?RT:rt(), node:node_type(), node:node_type(), node:node_type(), my_range(), dht_node_lb:lb(), ?DB:db()) -> state().
-new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
+-spec new(?RT:rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb(), ?DB:db()) -> state().
+new(RT, Neighbors, LB, DB) ->
     #state{
-     routingtable = RT,
-     successors = [Successor],
-     predecessors = [Predecessor],
-     me = Me,
-     my_range = MyRange,
+     rt = RT,
+     neighbors = Neighbors,
      lb = LB,
      join_time = now(),
-     deadnodes = gb_sets:new(),
      trans_log = #translog{
        tid_tm_mapping = dict:new(),
        decided        = gb_trees:empty(),
@@ -89,79 +72,107 @@ new(RT, Successor, Predecessor, Me, MyRange, LB, DB) ->
 %% userdevguide-end dht_node_state:state
 
 -spec next_interval(state()) -> intervals:simple_interval().
-next_interval(State) -> intervals:new(id(State), succ_id(State)).
+next_interval(State) -> intervals:new(get(State, node_id), get(State, succ_id)).
 
--spec get_my_range(state()) -> my_range().
-get_my_range(#state{my_range=MyRange}) -> MyRange.
+%% @doc Gets the given property from the dht_node state.
+%%      Allowed keys include:
+%%      <ul>
+%%        <li>rt = routing table,</li>
+%%        <li>rt_size = size of the routing table (provided for convenience),</li>
+%%        <li>succlist = successor list,</li>
+%%        <li>succ = successor (provided for convenience),</li>
+%%        <li>succ_id = ID of the successor (provided for convenience),</li>
+%%        <li>succ_pid = PID of the successor (provided for convenience),</li>
+%%        <li>predlist = predecessor list,</li>
+%%        <li>pred = predecessor (provided for convenience),</li>
+%%        <li>pred_id = ID of the predecessor (provided for convenience),</li>
+%%        <li>pred_pid = PID of the predecessor (provided for convenience),</li>
+%%        <li>node = the own node,</li>
+%%        <li>node_id = the ID of the own node (provided for convenience),</li>
+%%        <li>my_range = the range of the own node,</li>
+%%        <li>lb = load balancing state,</li>
+%%        <li>join_time = the time the node was created, i.e. joined the system,</li>
+%%        <li>trans_log = transaction log,</li>
+%%        <li>db = DB storing the items,</li>
+%%        <li>tx_tp_db = transaction participant DB,</li>
+%%        <li>proposer = paxos proposer PID,</li>
+%%        <li>load = the load of the own node (provided for convenience).</li>
+%%      </ul>
+-spec get(state(), rt) -> ?RT:rt();
+          (state(), rt_size) -> non_neg_integer();
+          (state(), succlist) -> nodelist:non_empty_nodelist();
+          (state(), succ) -> node:node_type();
+          (state(), succ_id) -> ?RT:key();
+          (state(), succ_pid) -> cs_send:mypid();
+          (state(), predlist) -> nodelist:non_empty_nodelist();
+          (state(), pred) -> node:node_type();
+          (state(), pred_id) -> ?RT:key();
+          (state(), pred_pid) -> cs_send:mypid();
+          (state(), node) -> node:node_type();
+          (state(), node_id) -> ?RT:key();
+          (state(), my_range) -> my_range();
+          (state(), lb) -> dht_node_lb:lb();
+          (state(), join_time) -> join_time();
+          (state(), trans_log) -> #translog{};
+          (state(), db) -> ?DB:db();
+          (state(), tx_tp_db) -> any();
+          (state(), proposer) -> pid();
+          (state(), load) -> integer().
+get(#state{rt=RT, neighbors=Neighbors, lb=LB, join_time=JoinTime,
+           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer}, Key) ->
+    case Key of
+        rt        -> RT;
+        rt_size   -> ?RT:get_size(RT);
+        succlist  -> nodelist:succs(Neighbors);
+        succ      -> nodelist:succ(Neighbors);
+        succ_id   -> node:id(nodelist:succ(Neighbors));
+        succ_pid  -> node:pidX(nodelist:succ(Neighbors));
+        predlist  -> nodelist:preds(Neighbors);
+        pred      -> nodelist:pred(Neighbors);
+        pred_id   -> node:id(nodelist:pred(Neighbors));
+        pred_pid  -> node:pidX(nodelist:pred(Neighbors));
+        node      -> nodelist:node(Neighbors);
+        node_id   -> nodelist:nodeid(Neighbors);
+        my_range  -> {node:id(nodelist:pred(Neighbors)),
+                      node:id(nodelist:node(Neighbors))};
+        lb        -> LB;
+        join_time -> JoinTime;
+        trans_log -> TransLog;
+        db        -> DB;
+        tx_tp_db  -> TxTpDb;
+        proposer  -> Proposer;
+        load      -> ?DB:get_load(DB)
+    end.
 
-get_my_proposer(#state{proposer=Proposer}) -> Proposer.
+%% @doc Sets the neighborhood of the current node.
+-spec set_neighbors(State::state(), Neighbors::nodelist:neighborhood()) -> state().
+set_neighbors(State, Neighbors) ->
+    State#state{neighbors = Neighbors}.
 
-get_tx_tp_db(#state{tx_tp_db=TX_TP_DB}) -> TX_TP_DB.
+-spec set_tx_tp_db(state(), any()) -> state().
 set_tx_tp_db(State, DB) -> State#state{tx_tp_db = DB}.
-
--spec get_db(state()) -> ?DB:db().
-get_db(#state{db=DB}) -> DB.
 
 -spec set_db(state(), ?DB:db()) -> state().
 set_db(State, DB) -> State#state{db=DB}.
 
--spec get_lb(state()) -> dht_node_lb:lb().
-get_lb(#state{lb=LB}) -> LB.
-
 -spec set_lb(state(), dht_node_lb:lb()) -> state().
 set_lb(State, LB) -> State#state{lb=LB}.
 
--spec me(state()) -> node_details:node_type().
-me(#state{me=Me}) -> Me.
-
--spec id(state()) -> ?RT:key().
-id(#state{me=Me}) -> node:id(Me).
-
-%%% Successor
--spec succs(state()) -> [node:node_type(),...].
-succs(#state{successors=Succs}) -> Succs.
-
--spec succ(state()) -> node:node_type().
-succ(State) -> hd(succs(State)).
-
--spec succ_pid(state()) -> cs_send:mypid().
-succ_pid(State) -> node:pidX(succ(State)).
-
--spec succ_id(state()) -> ?RT:key().
-succ_id(State) -> node:id(succ(State)).
-
-%%% Predecessor
--spec preds(state()) -> [node:node_type(),...].
-preds(#state{predecessors=Preds}) -> Preds.
-
--spec pred(state()) -> node:node_type().
-pred(State) -> hd(preds(State)).
-
--spec pred_pid(state()) -> cs_send:mypid().
-pred_pid(State) -> node:pidX(pred(State)).
-
--spec pred_id(state()) -> ?RT:key().
-pred_id(State) -> node:id(pred(State)).
-
-%%% Load
--spec load(state()) -> integer().
-load(State) -> ?DB:get_load(get_db(State)).
-
-%%% Routing Table
--spec rt(state()) -> ?RT:rt().
-rt(#state{routingtable=RT}) -> RT.
-
 -spec set_rt(state(), ?RT:rt()) -> state().
-set_rt(State, RT) -> State#state{routingtable=RT}.
+set_rt(State, RT) -> State#state{rt=RT}.
 
--spec rt_size(state()) -> integer().
-rt_size(State) -> ?RT:get_size(rt(State)).
+%% @doc Sets the transaction log.
+-spec set_trans_log(state(), #translog{}) -> state().
+set_trans_log(State, NewLog) ->
+    State#state{trans_log=NewLog}.
 
 %%% util
 -spec dump(state()) -> ok.
 dump(State) ->
-    io:format("dump <~s,~w> <~s,~w> <~s,~w>~n", [id(State), self()
-                                                 , pred_id(State), pred_pid(State), succ_id(State), succ_pid(State)]),
+    io:format("dump <~s,~w> <~s,~w> <~s,~w>~n",
+              [get(State, node_id), self(),
+               get(State, pred_id), get(State, pred_pid),
+               get(State, succ_id), get(State, succ_pid)]),
     ok.
 
 %% @doc Gets the requested details about the current node.
@@ -170,64 +181,23 @@ details(State, Which) ->
     ExtractValues =
         fun(Elem, NodeDetails) ->
                 case Elem of
-                    predlist    -> node_details:set(NodeDetails, predlist, preds(State));
-                    pred        -> node_details:set(NodeDetails, pred, pred(State));
-                    node        -> node_details:set(NodeDetails, node, me(State));
-                    my_range    -> node_details:set(NodeDetails, my_range, get_my_range(State));
-                    succ        -> node_details:set(NodeDetails, succ, succ(State));
-                    succlist    -> node_details:set(NodeDetails, succlist, succs(State));
-                    load        -> node_details:set(NodeDetails, load, load(State));
                     hostname    -> node_details:set(NodeDetails, hostname, net_adm:localhost());
-                    rt_size     -> node_details:set(NodeDetails, rt_size, rt_size(State));
                     message_log -> node_details:set(NodeDetails, message_log, ok);
-                    memory      -> node_details:set(NodeDetails, memory, erlang:memory(total))
+                    memory      -> node_details:set(NodeDetails, memory, erlang:memory(total));
+                    Tag         -> node_details:set(NodeDetails, Tag, get(State, Tag))
                 end
         end,
     lists:foldl(ExtractValues, node_details:new(), Which).
 
 %% @doc Gets the following details about the current node:
-%%      predecessor and successor lists, the node itself, its load, hostname and
-%%      routing table size
+%%      predecessor and successor lists, the node itself, its load, hostname,
+%%      routing table size, memory usage.
 -spec details(state()) -> node_details:node_details_record().
 details(State) ->
-    PredList = preds(State),
-    SuccList = succs(State),
-    Node = me(State),
-    %SuccList = [succ(State)],
-    Load = load(State),
+    PredList = get(State, predlist),
+    SuccList = get(State, succlist),
+    Node = get(State, node),
+    Load = get(State, load),
     Hostname = net_adm:localhost(),
-    RTSize = rt_size(State),
+    RTSize = get(State, rt_size),
     node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, erlang:memory(total)).
-
-%%% Transactions
-%%% Information on transactions that all possible TMs and TPs share
-
--spec get_trans_log(state()) -> #translog{}.
-%% @doc Gets the transaction log.
-get_trans_log(#state{trans_log=Log}) ->
-    Log.
-
-%% @doc Sets the transaction log.
--spec set_trans_log(state(), #translog{}) -> state().
-set_trans_log(State, NewLog) ->
-    State#state{trans_log=NewLog}.
-
-%% @doc Gets the time the node was created, i.e. joined the system.
--spec get_join_time(State::state()) -> join_time().
-get_join_time(#state{join_time=JoinTime}) ->
-    JoinTime.
-
-%% @doc Sets the predecessor and successor lists.
--spec update_preds_succs(state(), [node:node_type(),...], [node:node_type(),...]) -> state().
-update_preds_succs(State, Preds, Succs) ->
-    State#state{predecessors=Preds, successors=Succs, my_range={node:id(hd(Preds)), id(State)}}.
-
-%% @doc Sets the predecessor list.
--spec update_preds(state(), [node:node_type(),...]) -> state().
-update_preds(State, Preds) ->
-    State#state{predecessors=Preds, my_range={node:id(hd(Preds)), id(State)}}.
-
-%% @doc Sets the successor list.
--spec update_succs(state(), [node:node_type(),...]) -> state().
-update_succs(State, Succs) ->
-    State#state{successors=Succs}.
