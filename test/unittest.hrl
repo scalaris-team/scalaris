@@ -50,6 +50,23 @@
                 end
         end()).
 
+-define(equals(Actual, Expected, Note),
+        % wrap in function so that the internal variables are out of the calling function's scope
+        fun() ->
+                % Expected might be a function call which is not allowed in case statements
+                ExpectedVal = Expected,
+                case Actual of
+                    ExpectedVal -> ok;
+                    Any ->
+                        ct:pal("Failed: Stacktrace ~p~n",
+                               [erlang:get_stacktrace()]),
+                        ?ct_fail("~p evaluated to \"~p\" which is "
+                               "not the expected ~p that evaluates to \"~p\~n"
+                               "(~p)",
+                               [??Actual, Any, ??Expected, ExpectedVal, lists:flatten(Note)])
+                end
+        end()).
+
 -define(equals_pattern(Actual, ExpectedPattern),
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
@@ -61,6 +78,42 @@
                         ?ct_fail("~p evaluated to \"~p\" which is "
                                "not the expected ~p",
                                [??Actual, Any, ??ExpectedPattern])
+                end
+        end()).
+
+-define(equals_pattern(Actual, ExpectedPattern, Note),
+        % wrap in function so that the internal variables are out of the calling function's scope
+        fun() ->
+                case Actual of
+                    ExpectedPattern -> ok;
+                    Any ->
+                        ct:pal("Failed: Stacktrace ~p~n",
+                               [erlang:get_stacktrace()]),
+                        ?ct_fail("~p evaluated to \"~p\" which is "
+                               "not the expected ~p~n"
+                               "(~p)",
+                               [??Actual, Any, ??ExpectedPattern, lists:flatten(Note)])
+                end
+        end()).
+
+-define(expect_exception(Cmd, ExceptionType, ExceptionPattern),
+        % wrap in function so that the internal variables are out of the calling function's scope
+        fun() ->
+                try Cmd of
+                    Any -> 
+                        ct:pal("Failed: Stacktrace ~p~n",
+                               [erlang:get_stacktrace()]),
+                        ?ct_fail("~p evaluated to \"~p\"; exception "
+                               "~p:~p was expected",
+                               [??Cmd, Any, ??ExceptionType, ??ExceptionPattern])
+                catch
+                    ExceptionType: ExceptionPattern -> ok;
+                    OtherType: OtherException ->
+                        ct:pal("Failed: Stacktrace ~p~n",
+                               [erlang:get_stacktrace()]),
+                        ?ct_fail("~p threw exception \"~p:~p\" but exception "
+                               "~p:~p was expected",
+                               [??Cmd, OtherType, OtherException, ??ExceptionType, ??ExceptionPattern])
                 end
         end()).
 
