@@ -1582,7 +1582,6 @@ test_add_node(_Config) ->
     N14 = node:new(pid2, 14, 0),
     N15 = node:new(pid2, 15, 1), % N14 updated
     N20 = node:new(pid3, 20, 0),
-    N21 = node:new(pid3, 21, 1), % N20 updated
     N33 = node:new(pid4, 33, 0),
     N42 = node:new(pid5, 42, 0),
     N50 = node:new(pid6, 50, 0),
