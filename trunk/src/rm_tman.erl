@@ -47,7 +47,7 @@
     {init, Id::?RT:key(), Me::node_details:node_type(), Predecessor::node_details:node_type(), Successor::node:node_type()} |
     {trigger} |
     {cy_cache, Cache::nodelist:nodelist()} |
-    {rm_buffer, OtherNeighbors::nodelist:neighborhood()} |
+    {rm_buffer, OtherNeighbors::nodelist:neighborhood(), LastPredId::?RT:key(), LastSuccId::?RT:key(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()} |
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::cs_send:mypid()} |
@@ -112,7 +112,19 @@ on({trigger},
                 rm_beh:update_neighbors(Neighborhood),
                 TriggerState;
             false ->
-                Message = {rm_buffer, Neighborhood},
+                LastPredId = node:id(lists:last(nodelist:preds(Neighborhood))),
+                LastSuccId = node:id(lists:last(nodelist:succs(Neighborhood))),
+                RequestPredsMinCount =
+                    case nodelist:has_real_pred(Neighborhood) of
+                        true  -> get_pred_list_length() - length(nodelist:preds(Neighborhood));
+                        false -> get_pred_list_length()
+                    end,
+                RequestSuccsMinCount =
+                    case nodelist:has_real_succ(Neighborhood) of
+                        true  -> get_succ_list_length() - length(nodelist:succs(Neighborhood));
+                        false -> get_succ_list_length()
+                    end,
+                Message = {rm_buffer, Neighborhood, LastPredId, LastSuccId, RequestPredsMinCount, RequestSuccsMinCount},
                 cs_send:send_to_group_member(node:pidX(Succ), ring_maintenance,
                                              Message),
                 case Pred =/= Succ of
@@ -153,12 +165,28 @@ on({cy_cache, NewCache},
     {Id, NewNeighborhood, RandViewSizeNew, NewInterval, TriggerState, NewCache, NewChurn};
 
 % got shuffle request
-on({rm_buffer, OtherNeighbors},
-   {Id, Neighborhood, RandViewSize, Interval, TriggerState ,Cache, Churn}) ->
+on({rm_buffer, OtherNeighbors, OtherLastPredId, OtherLastSuccId, RequestPredsMinCount, RequestSuccsMinCount},
+   {Id, Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
     MyRndView = get_RndView(RandViewSize, Cache),
+    MyView = lists:append(nodelist:to_list(Neighborhood), MyRndView),
+    OtherNode = nodelist:node(OtherNeighbors),
+    OtherNodeId = node:id(OtherNode),
+    NeighborsToSendTmp = nodelist:mk_neighborhood(MyView, OtherNode, get_pred_list_length(), get_succ_list_length()),
+    NeighborsToSend = 
+        case (OtherNodeId =:= OtherLastPredId) orelse (OtherNodeId =:= OtherLastSuccId) of
+            true  -> NeighborsToSendTmp;
+            false ->
+                nodelist:filter_min_length(NeighborsToSendTmp,
+                                           fun(N) ->
+                                                   util:is_between_stab(OtherNodeId, node:id(N), OtherLastSuccId) orelse
+                                                   util:is_between_stab(OtherLastPredId, node:id(N), OtherNodeId)
+                                           end,
+                                           RequestPredsMinCount,
+                                           RequestSuccsMinCount)
+        end,
     cs_send:send_to_group_member(node:pidX(nodelist:node(OtherNeighbors)),
                                  ring_maintenance,
-                                 {rm_buffer_response, Neighborhood}),
+                                 {rm_buffer_response, NeighborsToSend}),
     {NewNeighborhood, NewInterval, NewChurn} =
         update_view(Neighborhood, MyRndView, OtherNeighbors, Interval, Churn),
     NewTriggerState = trigger:next(TriggerState, NewInterval),
@@ -230,13 +258,20 @@ on({init_check_ring, Token},
                                  {check_ring, Token - 1, Me}),
     State;
 
-on({notify_new_pred, _NewPred}, State) ->
-    %% @TODO use the new predecessor info
-    State;
+on({notify_new_pred, NewPred},
+   {Id, Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
+    NewNeighborhood = nodelist:add_node(Neighborhood, NewPred, get_pred_list_length(), get_succ_list_length()),
+    update_dht_node(Neighborhood, NewNeighborhood),
+    update_failuredetector(Neighborhood, NewNeighborhood),
+    {Id, NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
 
-on({notify_new_succ, _NewSucc}, State) ->
-    %% @TODO use the new successor info
-    State;
+on({notify_new_succ, NewSucc},
+   {Id, Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
+    NewNeighborhood = nodelist:add_node(Neighborhood, NewSucc, get_pred_list_length(), get_succ_list_length()),
+    update_dht_node(Neighborhood, NewNeighborhood),
+    update_failuredetector(Neighborhood, NewNeighborhood),
+    NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
+    {Id, NewNeighborhood, RandViewSize, Interval, NewTriggerState, Cache, Churn};
 
 on(_, _State) ->
     unknown_event.
