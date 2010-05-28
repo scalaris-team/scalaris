@@ -177,7 +177,7 @@ get_groups() ->
 -spec get_processes_in_group(instanceid()) -> {array, [{struct, [{id | text, nonempty_string()} | {leaf, true}]}]}.
 get_processes_in_group(Group) ->
     AllProcesses = find_processes_in_group(ets:tab2list(?MODULE), gb_sets:new(), Group),
-    ProcessesAsJson = {array, lists:foldl(fun(El, Rest) -> [{struct, [{id, toString(Group) ++ "." ++ toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
+    ProcessesAsJson = {array, lists:foldr(fun(El, Rest) -> [{struct, [{id, toString(Group) ++ "." ++ toString(El)}, {text, toString(El)}, {leaf, true}]} | Rest] end, [], gb_sets:to_list(AllProcesses))},
     ProcessesAsJson.
 
 %% @doc get info about process (for web interface)
