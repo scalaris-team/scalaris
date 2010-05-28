@@ -106,12 +106,6 @@ this_with_cookie(Cookie) ->
 self_with_cookie(Cookie) ->
     {self(), c, Cookie}.
 
-%% @doc Converts a local erlang pid to a global pid of type mypid() for use in
-%%      send/2.
--spec make_global(erl_pid_plain()) -> mypid().
-make_global(Pid) ->
-    get(Pid, cs_send:this()).
-
 %% @doc Gets the tag of a message (the first element of its tuple - should be an
 %%      atom).
 -spec get_msg_tag(message() | group_message()) -> atom().
@@ -133,6 +127,7 @@ send_queued_messages(QueuedMessages) ->
 -spec send(Dest::mypid(), Message::message() | group_message()) -> ok.
 -spec send_local(Dest::erl_local_pid(), Message::message()) -> ok.
 -spec send_local_after(Delay::non_neg_integer(), Dest::erl_local_pid() , Message::message()) -> reference().
+-spec make_global(erl_pid_plain()) -> mypid().
 -spec get(erl_pid_plain(), mypid()) -> mypid().
 -spec is_valid(mypid()) -> boolean().
 
@@ -164,6 +159,11 @@ send_local_after(Delay, {Pid, c, Cookie}, Message) ->
     send_local_after(Delay, Pid, {Message, Cookie});
 send_local_after(Delay, Pid, Message) ->
     erlang:send_after(Delay, Pid, Message).
+
+%% @doc TCP_LAYER: Converts a local erlang pid to a global pid of type mypid()
+%%      for use in send/2.
+make_global(Pid) ->
+    get(Pid, cs_send:this()).
 
 %% @doc TCP_LAYER: Creates the pid a process with name Name would have on node
 %%      _Node.
@@ -204,6 +204,11 @@ send_local_after(Delay, {Pid, c, Cookie}, Message) ->
     send_local_after(Delay, Pid, {Message, Cookie});
 send_local_after(Delay, Pid, Message) ->
     erlang:send_after(Delay, Pid, Message).
+
+%% @doc BUILTIN: Returns the given pid (with BUILTIN communication, global pids
+%%      are the same as local pids) for use in send/2.
+make_global(Pid) ->
+    Pid.
 
 %% @doc BUILTIN: Creates the pid a process with name Name would have on node
 %%      _Node.
