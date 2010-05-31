@@ -31,7 +31,7 @@
 -include("scalaris.hrl").
 
 -export([getLoadRendered/0, getRingChart/0, getRingRendered/0,
-         getIndexedRingRendered/0, lookup/1, set_key/2, isPost/1,
+         getIndexedRingRendered/0, lookup/1, set_key/2, delete_key/2, isPost/1,
          getVivaldiMap/0]).
 
 
@@ -42,7 +42,7 @@ isPost(A) ->
     Method = (A#arg.req)#http_request.method,
     Method =:= 'POST'.
 
-%%%-----------------------------Lookup/Put---------------------------
+%%%-----------------------------Lookup/Put/delete---------------------
 
 lookup(Key) ->
 %%    timer:tc(cs_api, read, [Key]).
@@ -50,6 +50,9 @@ lookup(Key) ->
 
 set_key(Key, Value) ->
     timer:tc(transaction_api, single_write, [Key, Value]).
+
+delete_key(Key, Timeout) ->
+    timer:tc(transaction_api, delete, [Key, Timeout]).
 
 %%%-----------------------------Load----------------------------------
 
