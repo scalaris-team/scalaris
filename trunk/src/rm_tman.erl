@@ -47,7 +47,7 @@
     {init, Id::?RT:key(), Me::node_details:node_type(), Predecessor::node_details:node_type(), Successor::node:node_type()} |
     {trigger} |
     {cy_cache, Cache::nodelist:nodelist()} |
-    {rm_buffer, OtherNeighbors::nodelist:neighborhood(), LastPredId::?RT:key(), LastSuccId::?RT:key(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
+    {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()} |
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::cs_send:mypid()} |
@@ -112,8 +112,6 @@ on({trigger},
                 rm_beh:update_neighbors(Neighborhood),
                 TriggerState;
             false ->
-                LastPredId = node:id(lists:last(nodelist:preds(Neighborhood))),
-                LastSuccId = node:id(lists:last(nodelist:succs(Neighborhood))),
                 RequestPredsMinCount =
                     case nodelist:has_real_pred(Neighborhood) of
                         true  -> get_pred_list_length() - length(nodelist:preds(Neighborhood));
@@ -124,7 +122,7 @@ on({trigger},
                         true  -> get_succ_list_length() - length(nodelist:succs(Neighborhood));
                         false -> get_succ_list_length()
                     end,
-                Message = {rm_buffer, Neighborhood, LastPredId, LastSuccId, RequestPredsMinCount, RequestSuccsMinCount},
+                Message = {rm_buffer, Neighborhood, RequestPredsMinCount, RequestSuccsMinCount},
                 cs_send:send_to_group_member(node:pidX(Succ), ring_maintenance,
                                              Message),
                 case Pred =/= Succ of
@@ -165,12 +163,14 @@ on({cy_cache, NewCache},
     {Id, NewNeighborhood, RandViewSizeNew, NewInterval, TriggerState, NewCache, NewChurn};
 
 % got shuffle request
-on({rm_buffer, OtherNeighbors, OtherLastPredId, OtherLastSuccId, RequestPredsMinCount, RequestSuccsMinCount},
+on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
    {Id, Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
     MyRndView = get_RndView(RandViewSize, Cache),
     MyView = lists:append(nodelist:to_list(Neighborhood), MyRndView),
     OtherNode = nodelist:node(OtherNeighbors),
     OtherNodeId = node:id(OtherNode),
+    OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
+    OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
     NeighborsToSendTmp = nodelist:mk_neighborhood(MyView, OtherNode, get_pred_list_length(), get_succ_list_length()),
     NeighborsToSend = 
         case (OtherNodeId =:= OtherLastPredId) orelse (OtherNodeId =:= OtherLastSuccId) of
