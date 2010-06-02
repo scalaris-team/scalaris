@@ -52,7 +52,8 @@
       dict
     | gb_tree
     | gb_set
-    | module).
+    | module
+    | iodata).
 
 -type(type_name() ::
       {'fun', Module :: module(), FunName :: atom(), FunArity :: non_neg_integer()}

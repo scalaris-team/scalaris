@@ -213,6 +213,8 @@ parse_type({type, _Line, gb_tree, []}, _Module, ParseState) ->
     {{builtin_type, gb_tree}, ParseState};
 parse_type({type, _Line, module, []}, _Module, ParseState) ->
     {{builtin_type, module}, ParseState};
+parse_type({type, _Line, iodata, []}, _Module, ParseState) ->
+    {{builtin_type, iodata}, ParseState};
 parse_type({remote_type, _Line, [{atom, _Line2, TypeModule}, {atom, _line3, TypeName}, []]}, _Module, ParseState) ->
     case tester_parse_state:is_known_type(TypeModule, TypeName, ParseState) of
         true ->
