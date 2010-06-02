@@ -37,7 +37,7 @@
 behaviour_info(callbacks) ->
     [
      % create a default routing table
-     {empty, 1},
+     {empty, 1}, {empty_ext, 1},
      % mapping: key space -> identifier space
      {hash_key, 1}, {getRandomNodeId, 0},
      % routing
@@ -53,7 +53,7 @@ behaviour_info(callbacks) ->
      % for debugging
      {dump, 1},
      % for bulkowner
-     {to_dict, 1},
+     {to_list, 1},
      % convert from internal representation to version for dht_node
      {export_rt_to_dht_node, 4},
      % update pred/succ in routing stored in dht_node
@@ -62,6 +62,8 @@ behaviour_info(callbacks) ->
      {to_html, 1},
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
+     % common methods, e.g. from rt_generic.hrl
+     {check, 5}, {check, 6}, {check_fd, 2},
      {check_config, 0}
     ];
 %% userdevguide-end routingtable:behaviour

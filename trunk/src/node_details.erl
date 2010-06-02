@@ -42,7 +42,6 @@
 -type(rt_size() :: integer()).
 -type(message_log() :: any()).
 -type(memory() :: non_neg_integer()).
--type(my_range() :: dht_node_state:my_range()). % two node IDs
 
 -type(node_details_name() :: predlist | pred | node | my_range | succ |
                              succlist | load | hostname | rt_size |
@@ -61,7 +60,7 @@
     [{predlist, nodelist:non_empty_nodelist()} |
      {pred, node_type()} |
      {node, node_type()} |
-     {my_range, my_range()} |
+     {my_range, intervals:interval()} |
      {succ, node_type()} |
      {succlist, nodelist:non_empty_nodelist()} |
      {load, load()} |
@@ -101,7 +100,7 @@ record_to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load
 -spec set(node_details(), predlist, nodelist:non_empty_nodelist()) -> node_details();
           (node_details(), pred, node_type()) -> node_details();
           (node_details(), node, node_type()) -> node_details();
-          (node_details(), my_range, my_range()) -> node_details();
+          (node_details(), my_range, intervals:interval()) -> node_details();
           (node_details(), succ, node_type()) -> node_details();
           (node_details(), succlist, nodelist:non_empty_nodelist()) -> node_details();
           (node_details(), load, load()) -> node_details();
@@ -133,7 +132,7 @@ set(NodeDetails, Key, Value) when is_list(NodeDetails) ->
           (node_details(), pred) -> node_type() | unknown;
           (node_details_record(), node) -> node_type();
           (node_details_list(), node) -> node_type() | unknown;
-          (node_details(), my_range) -> my_range() | unknown;
+          (node_details(), my_range) -> intervals:interval() | unknown;
           (node_details(), succ) -> node_type() | unknown;
           (node_details_record(), succlist) -> nodelist:non_empty_nodelist();
           (node_details_list(), succlist) -> nodelist:non_empty_nodelist() | unknown;

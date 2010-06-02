@@ -69,18 +69,5 @@ close(DB) ->
 get_data(DB) ->
     ets:tab2list(DB).
 
-build_merkle_tree(DB, Range) ->
-    {From, To} = intervals:unpack(Range),
-    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
-                                     case util:is_between(From, Key, To) of
-                                         true ->
-                                             merkerl:insert({Key, 0}, Tree);
-                                         false ->
-                                             Tree
-                                     end
-                             end,
-                             undefined, ets:tab2list(DB)),
-    MerkleTree.
-
 -define(ETS, ets).
 -include("db_generic_ets.hrl").

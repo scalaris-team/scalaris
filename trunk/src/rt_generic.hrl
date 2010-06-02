@@ -15,35 +15,35 @@
 %%% @author Nico Kruber <kruber@zib.de>
 %%% @doc    Generic code for routing table implementations.
 %%%         
-%%%         Note: Including modules need to define a MyRT macro with the RT that
-%%%         these functions should be compiled for!
+%%%         Note: Including modules need to provide some types and functions,
+%%%         i.e. rt(), key(), export_rt_to_dht_node/4, to_pid_list/1
 %%% @end
 %% @version $Id$
 
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
--spec check(Old::?MyRT:rt(), New::?MyRT:rt(), ?MyRT:key(), node:node_type(),
+-spec check(Old::rt(), New::rt(), key(), node:node_type(),
             node:node_type()) -> ok.
 check(Old, New, Id, Pred, Succ) ->
     check(Old, New, Id, Pred, Succ, true).
 
 %% @doc Notifies the dht_node if the routing table changed.
--spec check(Old::?MyRT:rt(), New::?MyRT:rt(), MyId::?MyRT:key(), Pred::node:node_type(),
+-spec check(Old::rt(), New::rt(), MyId::key(), Pred::node:node_type(),
             Succ::node:node_type(), ReportFD::boolean()) -> ok.
 check(X, X, _Id, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, Pred, Succ, true) ->
     Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rt_update, ?MyRT:export_rt_to_dht_node(NewRT, Id, Pred, Succ)}),
+    cs_send:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}),
     check_fd(NewRT, OldRT);
 check(_OldRT, NewRT, Id, Pred, Succ, false) ->
     Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rt_update, ?MyRT:export_rt_to_dht_node(NewRT, Id, Pred, Succ)}).
+    cs_send:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}).
 
 %% @doc Updates the failure detector in case the routing table changed.
--spec check_fd(Old::?MyRT:rt(), New::?MyRT:rt()) -> ok.
+-spec check_fd(Old::rt(), New::rt()) -> ok.
 check_fd(X, X) ->
     ok;
 check_fd(NewRT, OldRT) ->
-    NewPids = ?MyRT:to_pid_list(NewRT),
-    OldPids = ?MyRT:to_pid_list(OldRT),
+    NewPids = to_pid_list(NewRT),
+    OldPids = to_pid_list(OldRT),
     fd:update_subscriptions(OldPids, NewPids).

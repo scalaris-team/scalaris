@@ -32,7 +32,8 @@
 
 %% @doc recreates the replicas of the given key range
 %% @spec recreate_replicas({string(), string()}) -> pid()
-recreate_replicas({_From, _To}) ->
+-spec recreate_replicas(Interval::intervals:interval()) -> ok.
+recreate_replicas(_Interval) ->
 %    InstanceId = erlang:get(instance_id),
 %    spawn(fun () -> 
 %		  erlang:put(instance_id, InstanceId),
@@ -84,20 +85,18 @@ on({timeout},{Owner, Index, Interval, Done, FetchedData}) ->
 	    cs_send:send_local_after(5000, self(), {timeout}),
 	    {Owner, Index, Interval, Done, FetchedData};
 on({bulk_read_with_version_response, Interval, NewData},{Owner, Index, Interval, Done, FetchedData}) ->
-	    Done2 = [Interval | Done],
-	    case done(Interval, Done2) of
-		false ->
-		    {Owner, Index, Interval, Done2,[FetchedData| NewData]};
-		true ->
-		    cs_send:send_local(Owner , {fetched_data, Index, FetchedData}),
-		    kill
-	    end;
+	    Done2 = intervals:union(Interval, Done),
+        %TODO: this test is always be true!
+	    case intervals:is_subset(Interval, Done2) of
+            false ->
+                {Owner, Index, Interval, Done2,[FetchedData| NewData]};
+            true ->
+                cs_send:send_local(Owner , {fetched_data, Index, FetchedData}),
+                kill
+        end;
 on(_, _State) ->
     unknown_event.
 
-% @spec done(intervals:interval(), [intervals:interval()]) -> boolean()
-done(Interval, Done) ->
-    intervals:is_covered(Interval, Done).
 
 %%====================================================================
 %% update database functions (TODO)
@@ -116,6 +115,5 @@ update_db(Data) ->
 createReplicatedIntervals(From, To) ->
     FromReplicas = ?RT:get_keys_for_replicas(From),
     ToReplicas   = ?RT:get_keys_for_replicas(To),
-    Zipped = lists:zip(FromReplicas, ToReplicas),
-    lists:map(fun intervals:make/1, Zipped).
+    lists:zipwith(fun intervals:new/2, FromReplicas, ToReplicas).
 

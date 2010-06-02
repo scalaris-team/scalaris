@@ -28,6 +28,7 @@
 -export([% constructors:
          new_neighborhood/1, new_neighborhood/2, new_neighborhood/3,
          mk_neighborhood/2, mk_neighborhood/4,
+         mk_nodelist/2,
          
          % getters:
          node/1, nodeid/1, pred/1, preds/1, succ/1, succs/1,
@@ -224,6 +225,14 @@ usplit_nodelist(NodeList, Node) ->
         lists:splitwith(fun(N) -> node:id(N) =:= node:id(Node) end,
                         lists:usort(fun succ_ord/2, LargerOrEqual)),
     {SmallerSorted, EqualSorted, LargerSorted}.
+
+%% @doc Creates a sorted nodelist starting at the given node an going clockwise
+%%      along the ring (also see succ_ord/3).
+-spec mk_nodelist(NodeList::nodelist(), Node::node:node_type()) -> nodelist().
+mk_nodelist(NodeList, Node) ->
+    {SmallerSorted, EqualSorted, LargerSorted} =
+        split_nodelist(NodeList, Node),
+    lists:append([EqualSorted, LargerSorted, SmallerSorted]).
 
 %% @doc Creates a neighborhood structure for the given node from a given
 %%      (unsorted) node list and limits its predecessor and successor lists to

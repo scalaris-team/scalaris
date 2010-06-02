@@ -70,25 +70,7 @@ close(DB) ->
 
 %% @doc returns all keys
 get_data(DB) ->
-    tcbdbets:traverse(DB, fun (X) -> {continue, X} end).
-
-build_merkle_tree(DB, Range) ->
-    {From, To} = intervals:unpack(Range),
-    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
-                                     case util:is_between(From, Key, To) of
-                                         true ->
-                                             merkerl:insert({Key, 0}, Tree);
-                                         false ->
-                                             Tree
-                                     end
-                             end,
-                             undefined, ets:tab2list(DB)),
-    MerkleTree.
-
-%%====================================================================
-%% internal functions
-%%====================================================================
+    tcbdbets:traverse(DB, fun(X) -> {continue, X} end).
 
 -define(ETS, tcbdbets).
 -include("db_generic_ets.hrl").
-

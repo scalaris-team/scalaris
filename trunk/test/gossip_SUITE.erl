@@ -416,7 +416,12 @@ test_on_trigger7(Config) ->
 test_on_get_node_details_response_local_info1(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
-    NodeDetails = node_details:set(node_details:set(node_details:new(), my_range, {0, 1}), load, 0),
+    NodeDetails = node_details:set(
+                    node_details:set(
+                      node_details:set(
+                        node_details:new(), node, node:new(pid, 1, 0)),
+                      pred, node:new(pid, 0, 0)),
+                    load, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
@@ -434,7 +439,12 @@ test_on_get_node_details_response_local_info1(Config) ->
 test_on_get_node_details_response_local_info2(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
-    NodeDetails = node_details:set(node_details:set(node_details:new(), my_range, {0, 1}), load, 0),
+    NodeDetails = node_details:set(
+                    node_details:set(
+                      node_details:set(
+                        node_details:new(), node, node:new(pid, 1, 0)),
+                      pred, node:new(pid, 0, 0)),
+                    load, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
@@ -454,7 +464,12 @@ test_on_get_node_details_response_local_info2(Config) ->
 test_on_get_node_details_response_local_info3(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
-    NodeDetails = node_details:set(node_details:set(node_details:new(), my_range, {0, 1}), load, 0),
+    NodeDetails = node_details:set(
+                    node_details:set(
+                      node_details:set(
+                        node_details:new(), node, node:new(pid, 1, 0)),
+                      pred, node:new(pid, 0, 0)),
+                    load, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
@@ -480,7 +495,12 @@ test_on_get_node_details_response_local_info3(Config) ->
 test_on_get_node_details_response_local_info4(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
-    NodeDetails = node_details:set(node_details:set(node_details:new(), my_range, {0, 1}), load, 0),
+    NodeDetails = node_details:set(
+                    node_details:set(
+                      node_details:set(
+                        node_details:new(), node, node:new(pid, 1, 0)),
+                      pred, node:new(pid, 0, 0)),
+                    load, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
@@ -509,7 +529,12 @@ test_on_get_node_details_response_local_info4(Config) ->
 test_on_get_node_details_response_local_info5(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
-    NodeDetails = node_details:set(node_details:set(node_details:new(), my_range, {2, 4}), load, 4),
+    NodeDetails = node_details:set(
+                    node_details:set(
+                      node_details:set(
+                        node_details:new(), node, node:new(pid, 4, 0)),
+                      pred, node:new(pid, 2, 0)),
+                    load, 4),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
@@ -539,7 +564,12 @@ test_on_get_node_details_response_local_info6(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     Values = gossip_state:new_internal(2.0, 2.0*2.0, unknown, 6.0, 2, 2, 0),
-    NodeDetails = node_details:set(node_details:set(node_details:new(), my_range, {2, 4}), load, 4),
+    NodeDetails = node_details:set(
+                    node_details:set(
+                      node_details:set(
+                        node_details:new(), node, node:new(pid, 4, 0)),
+                      pred, node:new(pid, 2, 0)),
+                    load, 4),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, false, 0, 0, 0),
@@ -569,7 +599,12 @@ test_on_get_node_details_response_local_info7(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     Values = gossip_state:new_internal(2.0, 2.0*2.0, unknown, 6.0, 6, 6, 0),
-    NodeDetails = node_details:set(node_details:set(node_details:new(), my_range, {2, 4}), load, 4),
+    NodeDetails = node_details:set(
+                    node_details:set(
+                      node_details:set(
+                        node_details:new(), node, node:new(pid, 4, 0)),
+                      pred, node:new(pid, 2, 0)),
+                    load, 4),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, false, 0, 0, 0),
@@ -601,7 +636,7 @@ test_on_get_node_details_response_leader_start_new_round1(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     % not the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, {0, 1}),
+    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 0, 1, ']')),
     Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
@@ -624,7 +659,7 @@ test_on_get_node_details_response_leader_start_new_round2(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     % not the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, {0, 1}),
+    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 0, 1, ']')),
     Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
@@ -648,7 +683,7 @@ test_on_get_node_details_response_leader_start_new_round3(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     % not the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, {1, 10}),
+    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 1, 10, ']')),
     Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
@@ -672,7 +707,7 @@ test_on_get_node_details_response_leader_start_new_round4(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, {10, 1}),
+    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 10, 1, ']')),
     Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
@@ -693,7 +728,7 @@ test_on_get_node_details_response_leader_start_new_round4(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
     ThisWithCookie = cs_send:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [my_range, load]}),
+    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
     Config.
@@ -704,7 +739,7 @@ test_on_get_node_details_response_leader_start_new_round5(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, {10, 1}),
+    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 10, 1, ']')),
     Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
@@ -725,7 +760,7 @@ test_on_get_node_details_response_leader_start_new_round5(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
     ThisWithCookie = cs_send:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [my_range, load]}),
+    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
     Config.
@@ -736,7 +771,7 @@ test_on_get_node_details_response_leader_start_new_round6(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, {10, 0}),
+    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 10, 0, ']')),
     Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
@@ -757,7 +792,7 @@ test_on_get_node_details_response_leader_start_new_round6(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
     ThisWithCookie = cs_send:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [my_range, load]}),
+    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
     Config.
@@ -768,7 +803,7 @@ test_on_get_node_details_response_leader_start_new_round7(Config) ->
     GossipNewValues = gossip_state:new_internal(),
     
     % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, {0, 0}),
+    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 0, 0, ']')),
     Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
@@ -789,7 +824,7 @@ test_on_get_node_details_response_leader_start_new_round7(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
     ThisWithCookie = cs_send:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [my_range, load]}),
+    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
     Config.

@@ -29,16 +29,14 @@
          set_db/2,
          set_lb/2,
          details/1, details/2,
-         next_interval/1,
          %%transactions
          set_trans_log/2,
          set_tx_tp_db/2]).
 
--type my_range() :: {?RT:key(), ?RT:key()}.
 -type join_time() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}. % {MegaSecs, Secs, MicroSecs}
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {rt :: ?RT:rt(),
+-record(state, {rt :: ?RT:external_rt(),
                 neighbors  :: nodelist:neighborhood(),
                 lb         :: dht_node_lb:lb(),
                 join_time  :: join_time(),
@@ -48,12 +46,12 @@
                 proposer   :: pid()}).
 -type state() :: #state{}.
 
--spec new(?RT:rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb()) -> state().
+-spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb()) -> state().
 new(RT, Neighbors, LB) ->
     new(RT, Neighbors, LB, ?DB:new(nodelist:nodeid(Neighbors))).
 
 %% userdevguide-begin dht_node_state:state
--spec new(?RT:rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb(), ?DB:db()) -> state().
+-spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb(), ?DB:db()) -> state().
 new(RT, Neighbors, LB, DB) ->
     #state{
      rt = RT,
@@ -71,9 +69,6 @@ new(RT, Neighbors, LB, DB) ->
     }.
 %% userdevguide-end dht_node_state:state
 
--spec next_interval(state()) -> intervals:simple_interval().
-next_interval(State) -> intervals:new(get(State, node_id), get(State, succ_id)).
-
 %% @doc Gets the given property from the dht_node state.
 %%      Allowed keys include:
 %%      <ul>
@@ -90,6 +85,7 @@ next_interval(State) -> intervals:new(get(State, node_id), get(State, succ_id)).
 %%        <li>node = the own node,</li>
 %%        <li>node_id = the ID of the own node (provided for convenience),</li>
 %%        <li>my_range = the range of the own node,</li>
+%%        <li>succ_range = the range of the successor,</li>
 %%        <li>lb = load balancing state,</li>
 %%        <li>join_time = the time the node was created, i.e. joined the system,</li>
 %%        <li>trans_log = transaction log,</li>
@@ -98,7 +94,7 @@ next_interval(State) -> intervals:new(get(State, node_id), get(State, succ_id)).
 %%        <li>proposer = paxos proposer PID,</li>
 %%        <li>load = the load of the own node (provided for convenience).</li>
 %%      </ul>
--spec get(state(), rt) -> ?RT:rt();
+-spec get(state(), rt) -> ?RT:external_rt();
           (state(), rt_size) -> non_neg_integer();
           (state(), succlist) -> nodelist:non_empty_nodelist();
           (state(), succ) -> node:node_type();
@@ -110,7 +106,8 @@ next_interval(State) -> intervals:new(get(State, node_id), get(State, succ_id)).
           (state(), pred_pid) -> cs_send:mypid();
           (state(), node) -> node:node_type();
           (state(), node_id) -> ?RT:key();
-          (state(), my_range) -> my_range();
+          (state(), my_range) -> intervals:interval();
+          (state(), succ_range) -> intervals:interval();
           (state(), lb) -> dht_node_lb:lb();
           (state(), join_time) -> join_time();
           (state(), trans_log) -> #translog{};
@@ -121,27 +118,29 @@ next_interval(State) -> intervals:new(get(State, node_id), get(State, succ_id)).
 get(#state{rt=RT, neighbors=Neighbors, lb=LB, join_time=JoinTime,
            trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer}, Key) ->
     case Key of
-        rt        -> RT;
-        rt_size   -> ?RT:get_size(RT);
-        succlist  -> nodelist:succs(Neighbors);
-        succ      -> nodelist:succ(Neighbors);
-        succ_id   -> node:id(nodelist:succ(Neighbors));
-        succ_pid  -> node:pidX(nodelist:succ(Neighbors));
-        predlist  -> nodelist:preds(Neighbors);
-        pred      -> nodelist:pred(Neighbors);
-        pred_id   -> node:id(nodelist:pred(Neighbors));
-        pred_pid  -> node:pidX(nodelist:pred(Neighbors));
-        node      -> nodelist:node(Neighbors);
-        node_id   -> nodelist:nodeid(Neighbors);
-        my_range  -> {node:id(nodelist:pred(Neighbors)),
-                      node:id(nodelist:node(Neighbors))};
-        lb        -> LB;
-        join_time -> JoinTime;
-        trans_log -> TransLog;
-        db        -> DB;
-        tx_tp_db  -> TxTpDb;
-        proposer  -> Proposer;
-        load      -> ?DB:get_load(DB)
+        rt         -> RT;
+        rt_size    -> ?RT:get_size(RT);
+        succlist   -> nodelist:succs(Neighbors);
+        succ       -> nodelist:succ(Neighbors);
+        succ_id    -> node:id(nodelist:succ(Neighbors));
+        succ_pid   -> node:pidX(nodelist:succ(Neighbors));
+        predlist   -> nodelist:preds(Neighbors);
+        pred       -> nodelist:pred(Neighbors);
+        pred_id    -> node:id(nodelist:pred(Neighbors));
+        pred_pid   -> node:pidX(nodelist:pred(Neighbors));
+        node       -> nodelist:node(Neighbors);
+        node_id    -> nodelist:nodeid(Neighbors);
+        my_range   -> intervals:new('(', node:id(nodelist:pred(Neighbors)),
+                                   node:id(nodelist:node(Neighbors)), ']');
+        succ_range -> intervals:new('(', node:id(nodelist:node(Neighbors)),
+                                   node:id(nodelist:succ(Neighbors)), ']');
+        lb         -> LB;
+        join_time  -> JoinTime;
+        trans_log  -> TransLog;
+        db         -> DB;
+        tx_tp_db   -> TxTpDb;
+        proposer   -> Proposer;
+        load       -> ?DB:get_load(DB)
     end.
 
 %% @doc Sets the neighborhood of the current node.
@@ -158,7 +157,7 @@ set_db(State, DB) -> State#state{db=DB}.
 -spec set_lb(state(), dht_node_lb:lb()) -> state().
 set_lb(State, LB) -> State#state{lb=LB}.
 
--spec set_rt(state(), ?RT:rt()) -> state().
+-spec set_rt(state(), ?RT:external_rt()) -> state().
 set_rt(State, RT) -> State#state{rt=RT}.
 
 %% @doc Sets the transaction log.

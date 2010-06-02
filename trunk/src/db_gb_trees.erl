@@ -218,30 +218,27 @@ get_range(DB, From, To) ->
 
 %% @doc get keys and versions in a range
 get_range_with_version(DB, Interval) ->
-    {From, To} = intervals:unpack(Interval),
     [ {Key, Value, WriteLock, ReadLock, Version}
       || {Key, {Value, WriteLock, ReadLock, Version}} <- gb_trees:to_list(DB),
-         util:is_between(From, Key, To), Value =/= empty_val ].
+         intervals:in(Key, Interval), Value =/= empty_val ].
 
 % get_range_with_version
 %@private
 
 get_range_only_with_version(DB, Interval) ->
-    {From, To} = intervals:unpack(Interval),
     [ {Key, Value, Vers}
       || {Key, {Value, WLock, _RLock, Vers}} <- gb_trees:to_list(DB),
-         WLock =:= false andalso util:is_between(From, Key, To), Value =/= empty_val ].
+         WLock =:= false andalso intervals:in(Key, Interval), Value =/= empty_val ].
 
 
 build_merkle_tree(DB, Range) ->
-    {From, To} = intervals:unpack(Range),
     MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
-                                     case util:is_between(From, Key, To) of
-                                         true ->
-                                             merkerl:insert({Key, 0}, Tree);
-                                         false ->
-                                             Tree
-                                     end
+                                      case intervals:in(Key, Range) of
+                                          true ->
+                                              merkerl:insert({Key, 0}, Tree);
+                                          false ->
+                                              Tree
+                                      end
                              end,
                 undefined, gb_trees:to_list(DB)),
     MerkleTree.

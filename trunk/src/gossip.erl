@@ -236,7 +236,12 @@ on({{get_node_details_response, NodeDetails}, local_info},
 			true -> {[], State};
 			false ->
                 cs_send:send_queued_messages(QueuedMessages),
-				{[], integrate_local_info(State, node_details:get(NodeDetails, load), calc_initial_avg_kr(node_details:get(NodeDetails, my_range)))}
+				{[], integrate_local_info(State,
+                                          node_details:get(NodeDetails, load),
+                                          calc_initial_avg_kr(
+                                            node_details:get(NodeDetails, pred),
+                                            node_details:get(NodeDetails, node))
+                                         )}
 			end,
     {PreviousState, NewState, NewQueuedMessages, TriggerState};
 
@@ -250,9 +255,8 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 	% request_new_round_if_leader/1 which only asks for this if the condition to
 	% start a new round has already been met
 %%     io:format("gossip: got get_node_details_response, leader_start_new_round: ~p~n",[NodeDetails]),
-	{PredId, MyId} = node_details:get(NodeDetails, my_range),
 	{NewPreviousState, NewState} = 
-		case util:is_between(PredId, 0, MyId) of
+		case intervals:in(0, node_details:get(NodeDetails, my_range)) of
 	        % not the leader -> continue as normal with the old state
 			false -> {PreviousState, State};
 			% leader -> start a new round
@@ -637,7 +641,7 @@ request_new_round_if_leader(State) ->
 request_local_info() ->
 	% ask for local load and key range:
 	DHT_Node = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(DHT_Node, {get_node_details, cs_send:this_with_cookie(local_info), [my_range, load]}).
+    cs_send:send_local(DHT_Node, {get_node_details, cs_send:this_with_cookie(local_info), [pred, node, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
 %%      on({cy_cache, Cache},State) will handle the response
@@ -659,8 +663,10 @@ get_addr_size() ->
 %%      predecessor. If the second is larger than the first it wraps around and
 %%      thus the difference is the number of keys from the predecessor to the
 %%      end (of the ring) and from the start to the current node.
--spec calc_initial_avg_kr({T, T}) -> avg_kr().
-calc_initial_avg_kr({PredKey, MyKey} = _Range) ->
+-spec calc_initial_avg_kr(Pred::node:node_type(), Me::node:node_type()) -> avg_kr().
+calc_initial_avg_kr(Pred, Me) ->
+    PredKey = node:id(Pred),
+    MyKey = node:id(Me),
     try
 		if
 			PredKey =:= MyKey -> get_addr_size(); % I am the only node

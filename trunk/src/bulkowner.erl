@@ -1,4 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,18 +13,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    : bulkowner.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : bulk owner operation TODO
-%%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
+%%% File    bulkowner.erl
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Bulk owner operations (for now only broadcasting).
+%%% @end
+%%% Created : 3 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @version $Id$
-
-%% @doc This implements the bulk owner algorithm.
-%% @reference Ali Ghodsi, <em> Distributed k-ary System: Algorithms for Distributed Hash Tables</em>, PhD Thesis, page 129.
+%% @reference Ali Ghodsi, <em>Distributed k-ary System: Algorithms for Distributed Hash Tables</em>, PhD Thesis, page 129.
 -module(bulkowner).
 
 -author('schuett@zib.de').
@@ -31,52 +28,48 @@
 
 -include("scalaris.hrl").
 
--export([issue_bulk_owner/2, start_bulk_owner/2, bulk_owner/3]).
+-export([issue_bulk_owner/2, bulk_owner/3]).
 
-%% @doc start a bulk owner operation.
-%%      sends the message to all nodes in the given interval
-%% @spec issue_bulk_owner(intervals:interval(), term()) -> ok
+%% @doc Start a bulk owner operation to send the message to all nodes in the
+%%      given interval.
+-spec issue_bulk_owner(I::intervals:interval(), Msg::cs_send:message()) -> ok.
 issue_bulk_owner(I, Msg) ->
     {ok, DHTNode} = process_dictionary:find_dht_node(),
     cs_send:send_local(DHTNode , {start_bulk_owner, I, Msg}).
 
-start_bulk_owner(I, Msg) ->
-    cs_send:send_local(self() , {bulk_owner, I, Msg}).
-
 %% @doc main routine. It spans a broadcast tree over the nodes in I
-%% @spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), 
-%%                 Msg::term()) -> ok
+-spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), Msg::cs_send:message()) -> ok.
 bulk_owner(State, I, Msg) ->
-    Range = intervals:normalize(intervals:cut(I, dht_node_state:next_interval(State))),
-    case intervals:is_empty(Range) of
-	true ->
-	    ok;
-	false ->
-	    cs_send:send(dht_node_state:get(State, succ_pid), {bulkowner_deliver, Range, Msg})
+%%     ct:pal("bulk_owner:~n self:~p,~n int :~p,~n rt  :~p~n", [dht_node_state:get(State, node), I, ?RT:to_list(State)]),
+    SuccInt = intervals:intersection(I, dht_node_state:get(State, succ_range)),
+    case intervals:is_empty(SuccInt) of
+        true  -> ok;
+        false ->
+            cs_send:send(dht_node_state:get(State, succ_pid),
+                         {bulkowner_deliver, SuccInt, Msg})
     end,
-    U = ?RT:to_dict(State),
-    case intervals:is_covered(I, Range) of
-	true ->
-	    ok;
-	false ->
-	    bulk_owner_iter(State, U, 1, I, Msg)
+    case intervals:is_subset(I, SuccInt) of
+        true  -> ok;
+        false ->
+            RTList = lists:reverse(?RT:to_list(State)),
+            bulk_owner_iter(RTList, I, Msg, dht_node_state:get(State, node_id))
     end.
 
-% @spec bulk_owner_iter(State::dht_node_state:state(), U::dict:dictionary(), 
-%       Index::int(), I::intervals:interval(), Msg::term()) -> ok
-bulk_owner_iter(State, U, Index, I, Msg) ->
-    case dict:find(Index, U) of
-	{ok, U_of_Index} ->
-	    U_of_IndexM1 = dict:fetch(Index - 1, U),
-	    Range = intervals:normalize(intervals:cut(I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)))),
-	    %ct:pal("iter: ~p ~p ~p ~n", [I, intervals:new(node:id(U_of_IndexM1), node:id(U_of_Index)), Range]),
-	    case intervals:is_empty(Range) of
-		false ->
-		    cs_send:send(node:pidX(U_of_IndexM1), {bulk_owner, Range, Msg});
-		true ->
-		    ok
-	    end,
-	    bulk_owner_iter(State, U, Index + 1, I, Msg);
-	error ->
-	    ok
-    end.
+%% @doc Iterates through the list of (unique) nodes in the routing table and
+%%      sends them the according bulkowner messages for sub-intervals of I.
+-spec bulk_owner_iter(RTList::nodelist:nodelist(), I::intervals:interval(),
+                      Msg::cs_send:message(), Limit::?RT:key()) -> ok.
+bulk_owner_iter([], _I, _Msg, _Limit) ->
+    ok;
+bulk_owner_iter([Head | Tail], I, Msg, Limit) ->
+    Interval_Head_Limit = intervals:new(node:id(Head), Limit),
+    Range = intervals:intersection(I, Interval_Head_Limit),
+%%     ct:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
+    NewLimit = case intervals:is_empty(Range) of
+                   false ->
+                       cs_send:send(node:pidX(Head), {bulk_owner, Range, Msg}),
+                       node:id(Head);
+                   true ->
+                       Limit
+               end,
+    bulk_owner_iter(Tail, I, Msg, NewLimit).

@@ -24,35 +24,40 @@
 -include("scalaris.hrl").
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
+-export([empty/1, empty_ext/1,
+         hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_dht_node/4, n/0, to_html/1,
+         dump/1, to_list/1, export_rt_to_dht_node/4, n/0, to_html/1,
          update_pred_succ_in_dht_node/3, handle_custom_message/2,
+         check/6, check/5, check_fd/2,
          check_config/0]).
 
 -export([normalize/1]).
 
 %% userdevguide-begin rt_simple:types
 % @type key(). Identifier.
--type(key()::pos_integer()).
+-type(key()::non_neg_integer()).
 % @type rt(). Routing Table.
 -type(rt()::{node:node_type(), gb_tree()}).
 -type(external_rt()::{node:node_type(), gb_tree()}).
 -type(custom_message() :: any()).
 %% userdevguide-end rt_simple:types
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Key Handling
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %% userdevguide-begin rt_simple:empty
-%% @doc creates an empty routing table.
-%%      per default the empty routing should already include
-%%      the successor
--spec(empty/1 :: (node:node_type()) -> rt()).
+%% @doc Creates an empty routing table.
+%%      Per default the empty routing should already include the successor.
+-spec empty(node:node_type()) -> rt().
 empty(Succ) ->
     {Succ, gb_trees:empty()}.
 %% userdevguide-end rt_simple:empty
 
 %% userdevguide-begin rt_simple:hash_key
-%% @doc hashes the key to the identifier space.
--spec(hash_key/1 :: (any()) -> key()).
+%% @doc Hashes the key to the identifier space.
+-spec hash_key(iodata() | integer()) -> key().
 hash_key(Key) when is_integer(Key) ->
     <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
     N;
@@ -61,44 +66,40 @@ hash_key(Key) ->
     N.
 %% userdevguide-end rt_simple:hash_key
 
-%% @doc generates a random node id
+%% @doc Generates a random node id
 %%      In this case it is a random 128-bit string.
--spec(getRandomNodeId/0 :: () -> key()).
+-spec getRandomNodeId() -> key().
 getRandomNodeId() ->
-    % generates 128 bits of randomness
     hash_key(randoms:getRandomId()).
 
-%% userdevguide-begin rt_simple:next_hop
-%% @doc returns the next hop to contact for a lookup
--spec(next_hop/2 :: (dht_node_state:state(), key()) -> cs_send:mypid()).
-next_hop(State, _Key) ->
-    dht_node_state:get(State, succ_pid).
-%% userdevguide-end rt_simple:next_hop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% RT Management
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_simple:init_stabilize
-%% @doc triggered by a new stabilization round
--spec(init_stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
+%% @doc Triggered by a new stabilization round.
+-spec init_stabilize(key(), node:node_type(), rt()) -> rt().
 init_stabilize(_Id, Succ, _RT) ->
     % renew routing table
     empty(Succ).
 %% userdevguide-end rt_simple:init_stabilize
 
 %% userdevguide-begin rt_simple:filterDeadNode
-%% @doc removes dead nodes from the routing table
--spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
+%% @doc Removes dead nodes from the routing table.
+-spec filterDeadNode(rt(), cs_send:mypid()) -> rt().
 filterDeadNode(RT, _DeadPid) ->
     RT.
 %% userdevguide-end rt_simple:filterDeadNode
 
 %% userdevguide-begin rt_simple:to_pid_list
-%% @doc returns the pids of the routing table entries .
--spec(to_pid_list/1 :: (rt()) -> [cs_send:mypid()]).
+%% @doc Returns the pids of the routing table entries.
+-spec to_pid_list(rt() | external_rt()) -> [cs_send:mypid()].
 to_pid_list({Succ, _RoutingTable} = _RT) ->
     [node:pidX(Succ)].
 %% userdevguide-end rt_simple:to_pid_list
 
-%% @doc returns the size of the routing table.
--spec(get_size/1 :: (rt()) -> pos_integer()).
+%% @doc Returns the size of the routing table.
+-spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(_RT) ->
     1.
 
@@ -109,8 +110,8 @@ normalize(Key) ->
 n() ->
     16#100000000000000000000000000000000.
 
-%% @doc returns the replicas of the given key
--spec(get_keys_for_replicas/1 :: (key() | string()) -> [key()]).
+%% @doc Returns the replicas of the given key.
+-spec get_keys_for_replicas(key()) -> [key()].
 get_keys_for_replicas(Key) ->
     HashedKey = hash_key(Key),
     [HashedKey,
@@ -122,35 +123,16 @@ get_keys_for_replicas(Key) ->
 
 
 %% userdevguide-begin rt_simple:dump
-%% @doc
--spec(dump/1 :: (rt()) -> ok).
+%% @doc Dumps the RT state for output in the web interface.
+-spec dump(rt()) -> ok.
 dump(_State) ->
     ok.
 %% userdevguide-end rt_simple:dump
 
-% 0 -> succ
-% 1 -> shortest finger
-% 2 -> next longer finger
-% 3 -> ...
-% n -> me
-% @spec to_dict(dht_node_state:state()) -> dict:dictionary()
-to_dict(State) ->
-    Succ = dht_node_state:get(State, succ),
-    dict:store(0, Succ, dict:store(1, dht_node_state:get(State, node), dict:new())).
-
--spec(export_rt_to_dht_node/4 :: (rt(), key(), node:node_type(), node:node_type()) -> external_rt()).
-export_rt_to_dht_node(RT, _Id, _Pred, _Succ) ->
-    RT.
-
-%% @doc prepare routing table for printing in web interface
--spec(to_html/1 :: (rt()) -> list()).
+%% @doc Prepare routing table for printing in web interface.
+-spec to_html(rt()) -> [char(),...].
 to_html({Succ, _}) ->
     io_lib:format("succ: ~p", [Succ]).
-
--spec(update_pred_succ_in_dht_node/3 :: (node:node_type(), node:node_type(), external_rt())
-      -> external_rt()).
-update_pred_succ_in_dht_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
-    {Succ, Tree}.
 
 %% @doc Checks whether config parameters of the rt_simple process exist and are
 %%      valid (there are no config parameters).
@@ -158,7 +140,40 @@ update_pred_succ_in_dht_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
 check_config() ->
     true.
 
+-include("rt_generic.hrl").
+
 %% @doc There are no custom messages here.
 -spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
 handle_custom_message(_Message, _State) ->
     unknown_event.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Communication with dht_node
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec empty_ext(node:node_type()) -> external_rt().
+empty_ext(Succ) ->
+    empty(Succ).
+
+%% userdevguide-begin rt_simple:next_hop
+%% @doc Returns the next hop to contact for a lookup.
+-spec next_hop(dht_node_state:state(), key()) -> cs_send:mypid().
+next_hop(State, _Key) ->
+    dht_node_state:get(State, succ_pid).
+%% userdevguide-end rt_simple:next_hop
+
+-spec export_rt_to_dht_node(rt(), key(), node:node_type(), node:node_type()) -> external_rt().
+export_rt_to_dht_node(RT, _Id, _Pred, _Succ) ->
+    RT.
+
+-spec update_pred_succ_in_dht_node(node:node_type(), node:node_type(), external_rt())
+      -> external_rt().
+update_pred_succ_in_dht_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
+    {Succ, Tree}.
+
+%% @doc Converts the (external) representation of the routing table to a list
+%%      in the order of the fingers, i.e. first=succ, second=shortest finger,
+%%      third=next longer finger,...
+-spec to_list(dht_node_state:state()) -> nodelist:nodelist().
+to_list(State) ->
+    [dht_node_state:get(State, node), dht_node_state:get(State, succ)].
