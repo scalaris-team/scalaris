@@ -73,7 +73,7 @@ end_per_suite(Config) ->
                           Pred::node_details:node_type() | unknown,
                           PredList::nodelist:non_empty_nodelist() | unknown,
                           Node::node_details:node_type() | unknown,
-                          MyRange::node_details:my_range() | unknown,
+                          MyRange::intervals:interval() | unknown,
                           Succ::node_details:node_type() | unknown,
                           SuccList::nodelist:non_empty_nodelist() | unknown,
                           Load::node_details:load() | unknown,
@@ -162,7 +162,7 @@ test_set_get_node(NodeTest) ->
     node_details_equals(NodeDetails1_new, unknown, unknown, NodeTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, unknown, PredList, NodeTest, unknown, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_my_range(MyRange::node_details:my_range()) -> true.
+-spec test_set_get_my_range(MyRange::intervals:interval()) -> true.
 test_set_get_my_range(MyRangeTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],

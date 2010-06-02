@@ -202,18 +202,19 @@ range_read(From, To) ->
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, cs_send:this()}),
     cs_send:send_local_after(config:read(range_read_timeout), self(), {timeout}),
-    range_read_loop(Interval, [], []).
+    range_read_loop(Interval, intervals:empty(), []).
 
+-spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[any()]) -> {timeout | ok, Data::[any()]}.
 range_read_loop(Interval, Done, Data) ->
     receive
         {timeout} ->
             {timeout, lists:flatten(Data)};
-        {bulk_read_with_version_response, {From, To}, NewData} ->
-            Done2 = [intervals:new(From, To) | Done],
-            case intervals:is_covered(Interval, Done2) of
+        {bulk_read_with_version_response, NowDone, NewData} ->
+            Done2 = intervals:union(NowDone, Done),
+            case intervals:is_subset(Interval, Done2) of
                 false ->
                     range_read_loop(Interval, Done2, [NewData | Data]);
                 true ->
-                    {ok, lists:flatten([NewData | Data])}
+                    {ok, lists:flatten([NewData, Data])}
             end
     end.

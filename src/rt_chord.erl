@@ -24,10 +24,12 @@
 -include("scalaris.hrl").
 
 % routingtable behaviour
--export([empty/1, hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
+-export([empty/1, empty_ext/1,
+         hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_dict/1, export_rt_to_dht_node/4,
+         dump/1, to_list/1, export_rt_to_dht_node/4,
          update_pred_succ_in_dht_node/3, to_html/1, handle_custom_message/2,
+         check/6, check/5, check_fd/2,
          check_config/0]).
 
 % stabilize for Chord
@@ -37,7 +39,6 @@
 -type(key()::non_neg_integer()).
 -type(rt()::gb_tree()).
 -type(external_rt()::gb_tree()).
--type(dict_type() :: dict()).
 -type(index() :: {pos_integer(), pos_integer()}).
 -type(custom_message() ::
        {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}).
@@ -48,20 +49,20 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_chord:empty
-%% @doc creates an empty routing table.
--spec(empty/1 :: (node:node_type()) -> rt()).
+%% @doc Creates an empty routing table.
+-spec empty(node:node_type()) -> rt().
 empty(_Succ) ->
     gb_trees:empty().
 %% userdevguide-end rt_chord:empty
 
-%% @doc hashes the key to the identifier space.
--spec(hash_key/1 :: (any()) -> key()).
+%% @doc Hashes the key to the identifier space.
+-spec hash_key(iodata() | integer()) -> key().
 hash_key(Key) ->
     rt_simple:hash_key(Key).
 
-%% @doc generates a random node id
+%% @doc Generates a random node id.
 %%      In this case it is a random 128-bit string.
--spec(getRandomNodeId/0 :: () -> key()).
+-spec getRandomNodeId() -> key().
 getRandomNodeId() ->
     rt_simple:getRandomNodeId().
 
@@ -70,8 +71,8 @@ getRandomNodeId() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_chord:init_stab
-%% @doc starts the stabilization routine
--spec(init_stabilize/3 :: (key(), node:node_type(), rt()) -> rt()).
+%% @doc Starts the stabilization routine.
+-spec init_stabilize(key(), node:node_type(), rt()) -> rt().
 init_stabilize(Id, _Succ, RT) ->
     % calculate the longest finger
     Key = calculateKey(Id, first_index()),
@@ -81,41 +82,39 @@ init_stabilize(Id, _Succ, RT) ->
 %% userdevguide-end rt_chord:init_stab
 
 %% userdevguide-begin rt_chord:filterDeadNode
-%% @doc remove all entries
--spec(filterDeadNode/2 :: (rt(), cs_send:mypid()) -> rt()).
+%% @doc Removes dead nodes from the routing table.
+-spec filterDeadNode(rt(), cs_send:mypid()) -> rt().
 filterDeadNode(RT, DeadPid) ->
     DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
                            node:equals(Node, DeadPid)],
-    lists:foldl(fun (Index, Tree) -> gb_trees:delete(Index, Tree) end,
+    lists:foldl(fun(Index, Tree) -> gb_trees:delete(Index, Tree) end,
                 RT, DeadIndices).
 %% userdevguide-end rt_chord:filterDeadNode
 
-%% @doc returns the pids of the routing table entries .
--spec(to_pid_list/1 :: (rt()) -> list(cs_send:mypid())).
+%% @doc Returns the pids of the routing table entries.
+-spec to_pid_list(rt()) -> [cs_send:mypid()].
 to_pid_list(RT) ->
-    lists:map(fun ({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
+    lists:map(fun({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
 
-%% @doc returns the size of the routing table.
-%%      inefficient standard implementation
--spec(get_size/1 :: (rt()) -> non_neg_integer()).
+%% @doc Returns the size of the routing table.
+-spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(RT) ->
     gb_trees:size(RT).
 
-%% @doc returns the replicas of the given key
--spec(get_keys_for_replicas/1 :: (key()) -> list(key())).
+%% @doc Returns the replicas of the given key.
+-spec get_keys_for_replicas(key()) -> [key()].
 get_keys_for_replicas(Key) ->
     rt_simple:get_keys_for_replicas(Key).
 
-%% @doc
--spec(dump/1 :: (rt()) -> any()).
+%% @doc Dumps the RT state for output in the web interface.
+-spec dump(rt()) -> [char(),...].
 dump(RT) ->
     lists:flatten(io_lib:format("~p", [gb_trees:to_list(RT)])).
 
 %% userdevguide-begin rt_chord:stab
-%% @doc updates one entry in the routing table
-%%      and triggers the next update
--spec(stabilize/5 :: (key(), node:node_type(), rt(), pos_integer(),
-                      node:node_type()) -> rt()).
+%% @doc Updates one entry in the routing table and triggers the next update.
+-spec stabilize(key(), node:node_type(), rt(), pos_integer(), node:node_type())
+      -> rt().
 stabilize(Id, Succ, RT, Index, Node) ->
     case node:is_valid(Node)                           % do not add null nodes
         andalso (node:id(Succ) =/= node:id(Node))      % there is nothing shorter than succ
@@ -135,66 +134,63 @@ stabilize(Id, Succ, RT, Index, Node) ->
 %% Finger calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @private
--spec(calculateKey/2 :: (key(), index()) -> key()).
+-spec calculateKey(key(), index()) -> key().
 calculateKey(Id, {I, J}) ->
     % N / K^I * (J + 1)
     Offset = (rt_simple:n() div util:pow(config:read(chord_base), I)) * (J + 1),
     %io:format("~p: ~p + ~p~n", [{I, J}, Id, Offset]),
     rt_simple:normalize(Id + Offset).
 
+-spec first_index() -> index().
 first_index() ->
    {1, config:read(chord_base) - 2}.
 
+-spec next_index(index()) -> index().
 next_index({I, 1}) ->
     {I + 1, config:read(chord_base) - 2};
 next_index({I, J}) ->
     {I, J - 1}.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 0 -> succ
-% 1 -> shortest finger
-% 2 -> next longer finger
-% 3 -> ...
-% n -> me
--spec(to_dict/1 :: (dht_node_state:state()) -> dict_type()).
-to_dict(State) ->
-    RT = dht_node_state:get(State, rt),
-    Succ = dht_node_state:get(State, succ),
-    Fingers = uflatten(RT, 127),
-    {Dict, Next} = lists:foldl(fun(Finger, {Dict, Index}) ->
-                                       {dict:store(Index, Finger, Dict), Index + 1}
-                               end,
-                               {dict:store(0, Succ, dict:new()), 1}, lists:reverse(Fingers)),
-    dict:store(Next, dht_node_state:get(State, node), Dict).
 
-% @private
-%% @doc Flatten the RT from Index down and return a unique lists of node fingers.
--spec uflatten(rt(), pos_integer()) -> [node:node_type()].
-uflatten(RT, Index) ->
-    uflatten_helper(RT, Index, []).
+%% @doc Prepare routing table for printing in web interface.
+-spec to_html(rt()) -> [char(),...].
+to_html(RT) ->
+    List = [ {Index, Value} || {Index, Value} <- gb_trees:to_list(RT)],
+    io_lib:format("~p", [List]).
 
--spec uflatten_helper(rt(), pos_integer(), [node:node_type()]) -> [node:node_type()].
-uflatten_helper(RT, Index, Result) ->
-    case gb_trees:lookup(Index, RT) of
-        {value, Entry} when (Result =/= []) andalso (Entry =:= hd(Result)) ->
-            uflatten_helper(RT, Index - 1, Result);
-        {value, Entry} ->
-            uflatten_helper(RT, Index - 1, [Entry | Result]);
-        none ->
-            lists:reverse(Result)
-    end.
+%% @doc Checks whether config parameters of the rt_chord process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(chord_base) and
+        config:is_greater_than_equal(chord_base, 2).
+
+-include("rt_generic.hrl").
+
+%% @doc Chord reacts on 'rt_get_node_response' messages in response to its
+%%      'rt_get_node' messages.
+-spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
+handle_custom_message({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
+    NewRTState = stabilize(Id, Succ, RTState, Index, Node),
+    check(RTState, NewRTState, Id, Pred, Succ),
+    {Id, Pred, Succ, NewRTState, TriggerState};
+
+handle_custom_message(_Message, _State) ->
+    unknown_event.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Communication with dht_node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec empty_ext(node:node_type()) -> external_rt().
+empty_ext(_Succ) ->
+    gb_trees:empty().
+
 %% userdevguide-begin rt_chord:next_hop1
-%% @doc returns the next hop to contact for a lookup
+%% @doc Returns the next hop to contact for a lookup.
 %%      Note, that this code will be called from the dht_node process and
-%%      it will have an external_rt!
--spec(next_hop/2 :: (dht_node_state:state(), key()) -> cs_send:mypid()).
+%%      it will thus have an external_rt!
+-spec next_hop(dht_node_state:state(), key()) -> cs_send:mypid().
 next_hop(State, Id) ->
     case util:is_between(dht_node_state:get(State, node_id), Id, dht_node_state:get(State, succ_id)) of
         %succ is responsible for the key
@@ -205,59 +201,36 @@ next_hop(State, Id) ->
             case util:gb_trees_largest_smaller_than(Id, dht_node_state:get(State, rt)) of
                 nil ->
                     dht_node_state:get(State, succ_pid);
-                {value, _Key, Value} ->
-                    Value
+                {value, _Key, Node} ->
+                    node:pidX(Node)
             end
     end.
 %% userdevguide-end rt_chord:next_hop1
 
--spec(export_rt_to_dht_node/4 :: (rt(), key(), node:node_type(), node:node_type())
-      -> external_rt()).
+-spec export_rt_to_dht_node(rt(), key(), node:node_type(), node:node_type())
+      -> external_rt().
 export_rt_to_dht_node(RT, Id, Pred, Succ) ->
-    Tree = gb_trees:enter(node:id(Succ), node:pidX(Succ),
-                          gb_trees:enter(node:id(Pred), node:pidX(Pred),
-                                         gb_trees:empty())),
+    Tree = gb_trees:enter(node:id(Succ), Succ,
+                          gb_trees:enter(node:id(Pred), Pred, gb_trees:empty())),
     util:gb_trees_foldl(fun (_K, V, Acc) ->
-                                % only store the ring id and pid
-                                case node:id(V) =:= Id of
-                                    true ->
-                                        Acc;
-                                    false ->
-                                        gb_trees:enter(node:id(V), node:pidX(V), Acc)
-                                end
-                        end,
-                        Tree,
-                        RT).
+                                 % only store the ring id and the according node structure
+                                 case node:id(V) =:= Id of
+                                     true  -> Acc;
+                                     false -> gb_trees:enter(node:id(V), V, Acc)
+                                 end
+                        end, Tree, RT).
 
--spec(update_pred_succ_in_dht_node/3 :: (node:node_type(), node:node_type(), external_rt())
-      -> external_rt()).
+-spec update_pred_succ_in_dht_node(node:node_type(), node:node_type(), external_rt())
+      -> external_rt().
 update_pred_succ_in_dht_node(Pred, Succ, RT) ->
-    gb_trees:enter(node:id(Succ), node:pidX(Succ),
-                   gb_trees:enter(node:id(Pred), node:pidX(Pred),
-                                  RT)).
+    gb_trees:enter(node:id(Succ), Succ, gb_trees:enter(node:id(Pred), Pred, RT)).
 
-%% @doc prepare routing table for printing in web interface
--spec(to_html/1 :: (rt()) -> list()).
-to_html(RT) ->
-    List = [ {1, Value} || {Key, Value} <- gb_trees:to_list(RT)],
-    List.
-
-%% @doc Checks whether config parameters of the rt_chord process exist and are
-%%      valid.
--spec check_config() -> boolean().
-check_config() ->
-    config:is_integer(chord_base) and
-        config:is_greater_than_equal(chord_base, 2).
-
--define(MyRT, ?MODULE). % for rt_generic.hrl
--include("rt_generic.hrl").
-
-%% @doc There are no custom messages here.
--spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
-handle_custom_message({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    NewRTState = stabilize(Id, Succ, RTState, Index, Node),
-    check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState, TriggerState};
-
-handle_custom_message(_Message, _State) ->
-    unknown_event.
+%% @doc Converts the (external) representation of the routing table to a list
+%%      in the order of the fingers, i.e. first=succ, second=shortest finger,
+%%      third=next longer finger,...
+-spec to_list(dht_node_state:state()) -> nodelist:nodelist().
+to_list(State) ->
+    RT = dht_node_state:get(State, rt),
+    Succ = dht_node_state:get(State, succ),
+    nodelist:mk_nodelist([Succ | gb_trees:values(RT)],
+                         dht_node_state:get(State, node)).

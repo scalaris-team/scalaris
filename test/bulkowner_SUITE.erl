@@ -32,7 +32,7 @@ all() ->
 
 suite() ->
     [
-     {timetrap, {seconds, 120}}
+     {timetrap, {seconds, 10}}
     ].
 
 init_per_suite(Config) ->
@@ -59,6 +59,7 @@ count(_Config) ->
 collect(Sum) ->
     if
 	Sum < 68 ->
+%%         ct:pal("sum: ~p ~p~n", [Sum, Sum]),
 	    receive
 		{unit_test_bulkowner_response, Data, _Owner} ->
 		    collect(Sum + reduce(Data))

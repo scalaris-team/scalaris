@@ -31,10 +31,10 @@ get_entry(DB, Key) ->
 
 set_entry(DB, Entry) ->
 %%  for new storage format
-%%   ets:insert(DB, Entry).
+%%   ?ETS:insert(DB, Entry).
 %% for compatibility with old DB format:
     {Key, A,B,C,D} = Entry,
-    ets:insert(DB, {Key, {A,B,C,D}}),
+    ?ETS:insert(DB, {Key, {A,B,C,D}}),
     DB.
 
 %% @doc sets a write lock on a key.
@@ -109,11 +109,11 @@ read(DB, Key) ->
           end,
 %%     Stop = erlang:now(),
 %%     Span = timer:now_diff(Stop, Start),
-%%     case ets:lookup(profiling, db_read_lookup) of
+%%     case ?ETS:lookup(profiling, db_read_lookup) of
 %%         [] ->
-%%             ets:insert(profiling, {db_read_lookup, Span});
+%%             ?ETS:insert(profiling, {db_read_lookup, Span});
 %%         [{_, Sum}] ->
-%%             ets:insert(profiling, {db_read_lookup, Sum + Span})
+%%             ?ETS:insert(profiling, {db_read_lookup, Sum + Span})
 %%     end,
     Res.
 
@@ -121,7 +121,7 @@ read(DB, Key) ->
 write(DB, Key, Value, Version) ->
     case ?ETS:lookup(DB, Key) of
         [{Key, {_Value, WriteLock, ReadLock, _Version}}] ->
-            % better use ets:update_element?
+            % better use ?ETS:update_element?
             ?ETS:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}});
         [] -> ?ETS:insert(DB, {Key, {Value, false, 0, Version}})
     end,
@@ -231,3 +231,15 @@ nth_key_iter(_DB, Key, 0) ->
     Key;
 nth_key_iter(DB, Key, N) ->
     nth_key_iter(DB, ?ETS:next(DB, Key), N - 1).
+
+build_merkle_tree(DB, Range) ->
+    MerkleTree = ?ETS:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
+                                     case intervals:in(Key, Range) of
+                                         true ->
+                                             merkerl:insert({Key, 0}, Tree);
+                                         false ->
+                                             Tree
+                                     end
+                            end,
+                            undefined, DB),
+    MerkleTree.

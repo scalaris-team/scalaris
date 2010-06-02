@@ -131,14 +131,13 @@ on({do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Own
 %% answer - lookup for transaction participant
 on({lookup_tp, Message}, State) ->
     {Leader} = Message#tp_message.message,
-    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
-    Responsible = util:is_between(RangeBeg, Message#tp_message.item_key, RangeEnd),
-    if
-        Responsible =:= true ->
+    MyRange = dht_node_state:get(State, my_range),
+    case intervals:in(Message#tp_message.item_key, MyRange) of
+        true ->
             cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
             State;
-        true ->
-            log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not between ~p and ~p ~n", [Message#tp_message.item_key, RangeBeg, RangeEnd]),
+        false ->
+            log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not in ~p~n", [Message#tp_message.item_key, MyRange]),
             State
     end;
 
@@ -214,13 +213,13 @@ on({lookup_fin, _Hops, Msg}, State) ->
 % Database
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_key, Source_PID, Key}, State) ->
-    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
-    case util:is_between(RangeBeg, Key, RangeEnd) of
+    MyRange = dht_node_state:get(State, my_range),
+    case intervals:in(Key, MyRange) of
         true ->
             dht_node_lookup:get_key(State, Source_PID, Key, Key),
             State;
         false ->
-            log:log(info,"[ Node ] Get_Key: Got Request for Key ~p, it is not between ~p and ~p", [Key, RangeBeg, RangeEnd]),
+            log:log(info,"[ Node ] get_Key: Got Request for Key ~p, it is not in ~p~n", [Key, MyRange]),
             State
     end;
 
@@ -236,22 +235,22 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
     State;
 
 on({set_key, Source_PID, Key, Value, Versionnr}, State) ->
-    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
-    case util:is_between(RangeBeg, Key, RangeEnd) of
+    MyRange = dht_node_state:get(State, my_range),
+    case intervals:in(Key, MyRange) of
         true ->
             dht_node_lookup:set_key(State, Source_PID, Key, Value, Versionnr);
         false ->
-            log:log(info,"[ Node ] Set_Key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
+            log:log(info,"[ Node ] set_Key: Got Request for Key ~p, it is not in ~p~n", [Key, MyRange]),
             State
     end;
 
 on({delete_key, Source_PID, Key}, State) ->
-    {RangeBeg, RangeEnd} = dht_node_state:get(State, my_range),
-    case util:is_between(RangeBeg, Key, RangeEnd) of
+    MyRange = dht_node_state:get(State, my_range),
+    case intervals:in(Key, MyRange) of
         true ->
             dht_node_lookup:delete_key(State, Source_PID, Key);
         false ->
-            log:log(info,"[ Node ] delete_key: Got Request for Key ~p, it is not between ~p and ~p ", [Key, RangeBeg, RangeEnd]),
+            log:log(info,"[ Node ] delete_Key: Got Request for Key ~p, it is not in ~p~n", [Key, MyRange]),
             State
     end;
 
@@ -268,7 +267,7 @@ on({bulk_owner, I, Msg}, State) ->
     State;
 
 on({start_bulk_owner, I, Msg}, State) ->
-    bulkowner:start_bulk_owner(I, Msg),
+    bulkowner:bulk_owner(State, I, Msg),
     State;
 
 on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->

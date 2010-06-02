@@ -68,9 +68,6 @@ init(Trigger) ->
 % Private Code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(MyRT, ?RT). % for rt_generic.hrl 
--include("rt_generic.hrl").
-
 %% @doc message handler
 -spec on(message(), state()) -> state() | unknown_event.
 
@@ -84,7 +81,7 @@ on(Message, {uninit, TriggerState}) ->
 
 % re-initialize routing table
 on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState,TriggerState}) ->
-    check(RTState, ?RT:empty(NewSucc), Id2, NewPred, NewSucc),
+    ?RT:check(RTState, ?RT:empty(NewSucc), Id2, NewPred, NewSucc),
     {Id2, NewPred, NewSucc, ?RT:empty(NewSucc),TriggerState};
 
 % start new periodic stabilization
@@ -95,7 +92,7 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     cs_send:send_local(Pid , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
     % start periodic stabilization
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
-    check(RTState, NewRTState, Id, Pred, Succ),
+    ?RT:check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
     %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
     TriggerState2 = trigger:next(TriggerState),
@@ -110,7 +107,7 @@ on({{get_node_details_response, NewNodeDetails}, pred_succ}, {Id, _, _, RTState,
 % failure detector reported dead node
 on({crash, DeadPid}, {Id, Pred, Succ, RTState, TriggerState}) ->
     NewRT = ?RT:filterDeadNode(RTState, DeadPid),
-    check(RTState, NewRT, Id, Pred, Succ, false),
+    ?RT:check(RTState, NewRT, Id, Pred, Succ, false),
     {Id, Pred, Succ, NewRT, TriggerState};
 
 % debug_info for web interface
