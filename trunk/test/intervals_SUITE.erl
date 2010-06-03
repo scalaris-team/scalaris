@@ -13,6 +13,7 @@
 -compile(export_all).
 
 -include_lib("unittest.hrl").
+-include("scalaris.hrl").
 
 all() ->
     [new, is_empty, intersection, tc1, normalize,
@@ -20,6 +21,8 @@ all() ->
      tester_new1_well_formed, tester_new1,
      tester_new2_well_formed, tester_new2,
      tester_new4_well_formed, tester_new4,
+     tester_mk_from_node_ids_well_formed, tester_mk_from_node_ids,
+     tester_mk_from_nodes_well_formed, tester_mk_from_nodes,
      tester_normalize_well_formed, tester_normalize,
      tester_intersection_well_formed, tester_intersection,
      tester_not_intersection, tester_not_intersection2,
@@ -179,6 +182,54 @@ prop_new4(XBr, X, Y, YBr) ->
 
 tester_new4(_Config) ->
     tester:test(intervals_SUITE, prop_new4, 4, 1000).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:mk_from_node_ids/2 and intervals:in/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec(prop_mk_from_node_ids_well_formed/2 :: (?RT:key(), ?RT:key()) -> boolean()).
+prop_mk_from_node_ids_well_formed(X, Y) ->
+    intervals:is_well_formed(intervals:mk_from_node_ids(X, Y)).
+
+tester_mk_from_node_ids_well_formed(_Config) ->
+    tester:test(intervals_SUITE, prop_mk_from_node_ids_well_formed, 2, 1000).
+
+-spec(prop_mk_from_node_ids/2 :: (?RT:key(), ?RT:key()) -> boolean()).
+prop_mk_from_node_ids(X, Y) ->
+    intervals:new('(', X, Y, ']') =:= intervals:mk_from_node_ids(X, Y) andalso
+        ?implies(X =/= Y, not intervals:in(X, intervals:mk_from_node_ids(X, Y))) andalso
+        intervals:in(Y, intervals:mk_from_node_ids(X, Y)) andalso
+        not intervals:is_empty(intervals:mk_from_node_ids(X, Y)).
+
+tester_mk_from_node_ids(_Config) ->
+    tester:test(intervals_SUITE, prop_mk_from_node_ids, 2, 1000).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:mk_from_nodes/2 and intervals:in/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec(prop_mk_from_nodes_well_formed/2 :: (node:node_type(), node:node_type()) -> boolean()).
+prop_mk_from_nodes_well_formed(X, Y) ->
+    %TODO: why does the tester create 'undefined' entries for node ids?
+    ?implies(node:id(X) =/= undefined andalso node:id(Y) =/= undefined,
+             intervals:is_well_formed(intervals:mk_from_nodes(X, Y))).
+
+tester_mk_from_nodes_well_formed(_Config) ->
+    tester:test(intervals_SUITE, prop_mk_from_nodes_well_formed, 2, 1000).
+
+-spec(prop_mk_from_nodes/2 :: (node:node_type(), node:node_type()) -> boolean()).
+prop_mk_from_nodes(X, Y) ->
+    %TODO: why does the tester create 'undefined' entries for node ids?
+    ?implies(node:id(X) =/= undefined andalso node:id(Y) =/= undefined,
+             intervals:new('(', node:id(X), node:id(Y), ']') =:= intervals:mk_from_nodes(X, Y) andalso
+                 ?implies(node:id(X) =/= node:id(Y), not intervals:in(node:id(X), intervals:mk_from_nodes(X, Y))) andalso
+                 intervals:in(node:id(Y), intervals:mk_from_nodes(X, Y)) andalso
+                 not intervals:is_empty(intervals:mk_from_nodes(X, Y))).
+
+tester_mk_from_nodes(_Config) ->
+    tester:test(intervals_SUITE, prop_mk_from_nodes, 2, 1000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

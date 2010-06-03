@@ -36,8 +36,8 @@
 -export([delete/2]).
 -export([set_write_lock/2, unset_write_lock/2,
          set_read_lock/2, unset_read_lock/2, get_locks/2]).
--export([get_range/3, get_range_with_version/2]).
--export([get_load/1, get_middle_key/1, split_data/3, get_data/1,
+-export([get_range/2, get_range_with_version/2]).
+-export([get_load/1, get_middle_key/1, split_data/2, get_data/1,
          add_data/2]).
 -export([get_range_only_with_version/2,
          build_merkle_tree/2,

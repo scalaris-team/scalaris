@@ -56,7 +56,7 @@
 
 -spec get_middle_key(DB::db()) -> {ok, MiddleKey::key()} | failed.
 
--spec split_data(DB::db(), MyKey::key(), HisKey::key()) ->
+-spec split_data(DB::db(), MyNewInterval::intervals:interval()) ->
          {NewDB::db(), [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()} | {empty_val, true, 0, -1}}]}.
 
 -spec get_data(DB::db()) ->
@@ -64,6 +64,9 @@
 
 -spec add_data(DB::db(), [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}}]) ->
          NewDB::db().
+
+-spec get_range(DB::db(), Range::intervals:interval()) ->
+         [{Key::key(), Value::value()}].
 
 -spec get_range_with_version(DB::db(), Range::intervals:interval()) ->
          [{Key::key(), Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}].

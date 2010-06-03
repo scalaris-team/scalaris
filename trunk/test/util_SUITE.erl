@@ -28,8 +28,7 @@
 -include("unittest.hrl").
 
 all() ->
-    [is_between, is_between_closed, min_max, largest_smaller_than,
-     gb_trees_foldl].
+    [min_max, largest_smaller_than, gb_trees_foldl].
 
 suite() ->
     [
@@ -40,30 +39,6 @@ init_per_suite(Config) ->
     Config.
 
 end_per_suite(_Config) ->
-    ok.
-
-is_between(_Config) ->
-    ?assert(util:is_between("1", "2", "3")),
-    ?assert(not util:is_between("1", "4", "3")),
-    ?assert(util:is_between("3", "4", "1")),
-    ?assert(not util:is_between("3", "2", "1")),
-    ?assert(util:is_between("1", "2", "2")),
-    ?assert(not util:is_between("1", "1", "2")),
-    ?assert(util:is_between("2", "1", "1")),
-    ?assert(not util:is_between("2", "2", "1")),
-    ok.
-
-
-is_between_closed(_Config) ->
-    ?assert(util:is_between_closed("1", "2", "3")),
-    ?assert(not util:is_between_closed("1", "4", "3")),
-    ?assert(util:is_between_closed("3", "4", "1")),
-    ?assert(not util:is_between_closed("3", "2", "1")),
-    ?assert(not util:is_between_closed("1", "2", "2")),
-    ?assert(not util:is_between_closed("1", "1", "2")),
-
-    ?assert(not util:is_between_closed("2", "1", "1")),
-    ?assert(not util:is_between_closed("2", "2", "1")),
     ok.
 
 min_max(_Config) ->

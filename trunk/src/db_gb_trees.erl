@@ -37,11 +37,11 @@
 -export([delete/2]).
 -export([set_write_lock/2, unset_write_lock/2,
          set_read_lock/2, unset_read_lock/2, get_locks/2]).
--export([get_range/3, get_range_with_version/2]).
--export([get_load/1, get_middle_key/1, split_data/3, get_data/1,
+-export([get_range/2, get_range_with_version/2,
+         get_range_only_with_version/2]).
+-export([get_load/1, get_middle_key/1, split_data/2, get_data/1,
          add_data/2]).
--export([get_range_only_with_version/2,
-         build_merkle_tree/2,
+-export([build_merkle_tree/2,
          update_if_newer/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -197,9 +197,11 @@ get_middle_key(DB) ->
 
 %% @doc returns all keys (and removes them from the db) which belong
 %%      to a new node with id HisKey
-split_data(DB, MyKey, HisKey) ->
+split_data(DB, MyNewInterval) ->
     DataList = gb_trees:to_list(DB),
-    {MyList, HisList} = lists:partition(fun ({Key, _}) -> util:is_between(HisKey, Key, MyKey) end, DataList),
+    {MyList, HisList} =
+        lists:partition(fun({Key, _}) -> intervals:in(Key, MyNewInterval) end,
+                        DataList),
     {gb_trees:from_orddict(MyList), HisList}.
 
 %% @doc returns all keys
@@ -211,10 +213,9 @@ add_data(DB, Data) ->
     lists:foldl(fun ({Key, Value}, Tree) -> gb_trees:enter(Key, Value, Tree) end, DB, Data).
 
 %% @doc get keys in a range
-%% @spec get_range(db(), string(), string()) -> [{string(), string()}]
-get_range(DB, From, To) ->
-    [ {Key, Value} || {Key, {Value, _WLock, _RLock, _Vers}} <- gb_trees:to_list(DB),
-                      util:is_between(From, Key, To), Value =/= empty_val ].
+get_range(DB, Interval) ->
+    [ {Key, Value} ||{Key, {Value, _WLock, _RLock, _Vers}} <- gb_trees:to_list(DB),
+                      intervals:in(Key, Interval), Value =/= empty_val ].
 
 %% @doc get keys and versions in a range
 get_range_with_version(DB, Interval) ->

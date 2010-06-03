@@ -118,7 +118,7 @@ dump(RT) ->
 stabilize(Id, Succ, RT, Index, Node) ->
     case node:is_valid(Node)                           % do not add null nodes
         andalso (node:id(Succ) =/= node:id(Node))      % there is nothing shorter than succ
-        andalso (not util:is_between(Id, node:id(Node), node:id(Succ))) of % there should not be anything shorter than succ
+        andalso (not intervals:in(node:id(Node), intervals:mk_from_node_ids(Id, node:id(Succ)))) of % there should not be anything shorter than succ
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
@@ -185,7 +185,7 @@ empty_ext(_Succ) ->
 %%      it will thus have an external_rt!
 -spec next_hop(dht_node_state:state(), key()) -> cs_send:mypid().
 next_hop(State, Id) ->
-    case util:is_between(dht_node_state:get(State, node_id), Id, dht_node_state:get(State, succ_id)) of
+    case intervals:in(Id, dht_node_state:get(State, succ_range)) of
         %succ is responsible for the key
         true ->
             dht_node_state:get(State, succ_pid);

@@ -29,6 +29,7 @@
 -include("scalaris.hrl").
 
 -export([empty/0, new/1, new/2, new/4, all/0,
+         mk_from_node_ids/2, mk_from_nodes/2,
          is_empty/1,
          intersection/2,
          is_subset/2,
@@ -87,6 +88,20 @@ new(X) ->
 -spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval().
 new(LeftBr, Begin, End, RightBr) ->
     normalize_simple({interval, LeftBr, Begin, End, RightBr}).
+
+%% @doc Creates an interval that covers all keys a node with MyKey is
+%%      responsible for if his predecessor has PredKey, i.e. (PredKey, MyKey]
+%%      (provided for convenience).
+-spec mk_from_node_ids(PredKey::?RT:key(), MyKey::?RT:key()) -> interval().
+mk_from_node_ids(PredKey, MyKey) ->
+    new('(', PredKey, MyKey, ']').
+
+%% @doc Creates an interval that covers all keys a node is responsible for given
+%%      his predecessor, i.e. (node:id(PredKey), node:id(MyKey)]
+%%      (provided for convenience).
+-spec mk_from_nodes(Pred::node:node_type(), Node::node:node_type()) -> interval().
+mk_from_nodes(Pred, Node) ->
+    mk_from_node_ids(node:id(Pred), node:id(Node)).
 
 %% @doc Checks whether the given interval is empty.
 -spec is_empty(interval()) -> boolean().

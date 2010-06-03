@@ -35,7 +35,7 @@
 -define(LOG(S, L), ok).
 
 lookup_aux(State, Key, Hops, Msg) ->
-    Terminate = util:is_between(dht_node_state:get(State, node_id), Key, dht_node_state:get(State, succ_id)),
+    Terminate = intervals:in(Key, dht_node_state:get(State, succ_range)),
     if
         Terminate ->
             cs_send:send(dht_node_state:get(State, succ_pid), {lookup_fin, Hops + 1, Msg});
