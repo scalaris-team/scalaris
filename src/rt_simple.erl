@@ -15,7 +15,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc sample routing table
 %% @end
-%% @version $Id: rt_simple.erl 758 2010-04-30 15:06:20Z kruber@zib.de $
+%% @version $Id$
 -module(rt_simple).
 -author('schuett@zib.de').
 -vsn('$Id$').
@@ -27,7 +27,7 @@
 -export([empty/1, empty_ext/1,
          hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_list/1, export_rt_to_dht_node/4, n/0, to_html/1,
+         dump/1, to_list/1, export_rt_to_dht_node/4, n/0,
          update_pred_succ_in_dht_node/3, handle_custom_message/2,
          check/6, check/5, check_fd/2,
          check_config/0]).
@@ -38,8 +38,8 @@
 % @type key(). Identifier.
 -type(key()::non_neg_integer()).
 % @type rt(). Routing Table.
--type(rt()::{node:node_type(), gb_tree()}).
--type(external_rt()::{node:node_type(), gb_tree()}).
+-type(rt()::Succ::node:node_type()).
+-type(external_rt()::rt()).
 -type(custom_message() :: any()).
 %% userdevguide-end rt_simple:types
 
@@ -52,7 +52,7 @@
 %%      Per default the empty routing should already include the successor.
 -spec empty(node:node_type()) -> rt().
 empty(Succ) ->
-    {Succ, gb_trees:empty()}.
+    Succ.
 %% userdevguide-end rt_simple:empty
 
 %% userdevguide-begin rt_simple:hash_key
@@ -94,12 +94,12 @@ filterDeadNode(RT, _DeadPid) ->
 %% userdevguide-begin rt_simple:to_pid_list
 %% @doc Returns the pids of the routing table entries.
 -spec to_pid_list(rt() | external_rt()) -> [cs_send:mypid()].
-to_pid_list({Succ, _RoutingTable} = _RT) ->
+to_pid_list(Succ) ->
     [node:pidX(Succ)].
 %% userdevguide-end rt_simple:to_pid_list
 
 %% @doc Returns the size of the routing table.
--spec get_size(rt() | external_rt()) -> non_neg_integer().
+-spec get_size(rt() | external_rt()) -> 1.
 get_size(_RT) ->
     1.
 
@@ -124,15 +124,10 @@ get_keys_for_replicas(Key) ->
 
 %% userdevguide-begin rt_simple:dump
 %% @doc Dumps the RT state for output in the web interface.
--spec dump(rt()) -> ok.
-dump(_State) ->
-    ok.
+-spec dump(RT::rt()) -> KeyValueList::[{Index::non_neg_integer(), Node::string()}].
+dump(Succ) ->
+    [{0, lists:flatten(io_lib:format("~p", [Succ]))}].
 %% userdevguide-end rt_simple:dump
-
-%% @doc Prepare routing table for printing in web interface.
--spec to_html(rt()) -> [char(),...].
-to_html({Succ, _}) ->
-    io_lib:format("succ: ~p", [Succ]).
 
 %% @doc Checks whether config parameters of the rt_simple process exist and are
 %%      valid (there are no config parameters).
@@ -168,8 +163,8 @@ export_rt_to_dht_node(RT, _Id, _Pred, _Succ) ->
 
 -spec update_pred_succ_in_dht_node(node:node_type(), node:node_type(), external_rt())
       -> external_rt().
-update_pred_succ_in_dht_node(_Pred, Succ, {_Succ, Tree} = _RT) ->
-    {Succ, Tree}.
+update_pred_succ_in_dht_node(_Pred, Succ, Succ) ->
+    Succ.
 
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,

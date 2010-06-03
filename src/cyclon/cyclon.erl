@@ -223,11 +223,10 @@ on({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
 %%     cs_send:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
 %%     State;
 
-on({'$gen_cast', {debug_info, Requestor}}, {Cache, _Node, _Cycles, _TriggerState} = State)  ->
-    DebugCache = cyclon_cache:debug_format_by_age(Cache),
+on({'$gen_cast', {debug_info, Requestor}}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
     KeyValueList =
-        [{"cache_size",          cyclon_cache:size(Cache)},
-         {"cache (age, node):",              ""} | DebugCache],
+        [{"cache_size", cyclon_cache:size(Cache)},
+         {"cache (age, node):", ""} | cyclon_cache:debug_format_by_age(Cache)],
     cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 

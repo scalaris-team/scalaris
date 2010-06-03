@@ -256,7 +256,7 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 	% start a new round has already been met
 %%     io:format("gossip: got get_node_details_response, leader_start_new_round: ~p~n",[NodeDetails]),
 	{NewPreviousState, NewState} = 
-		case intervals:in(0, node_details:get(NodeDetails, my_range)) of
+		case intervals:in(?RT:hash_key(0), node_details:get(NodeDetails, my_range)) of
 	        % not the leader -> continue as normal with the old state
 			false -> {PreviousState, State};
 			% leader -> start a new round

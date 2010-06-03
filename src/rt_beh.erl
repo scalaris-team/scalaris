@@ -25,7 +25,7 @@
 -export([behaviour_info/1]).
 
 % for routing table implementation
--export([initialize/3, to_html/1]).
+-export([initialize/3]).
 
 -include("scalaris.hrl").
 
@@ -50,7 +50,7 @@ behaviour_info(callbacks) ->
      {to_pid_list, 1}, {get_size, 1},
      % for symmetric replication
      {get_keys_for_replicas, 1},
-     % for debugging
+     % for debugging and web interface
      {dump, 1},
      % for bulkowner
      {to_list, 1},
@@ -58,8 +58,6 @@ behaviour_info(callbacks) ->
      {export_rt_to_dht_node, 4},
      % update pred/succ in routing stored in dht_node
      {update_pred_succ_in_dht_node, 3},
-     % for web interface
-     {to_html, 1},
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
      % common methods, e.g. from rt_generic.hrl
@@ -76,6 +74,3 @@ behaviour_info(_Other) ->
 initialize(Id, Pred, Succ) ->
     Pid = process_dictionary:get_group_member(routing_table),
     cs_send:send_local(Pid , {init, Id, Pred, Succ}).
-
-to_html(RT) ->
-    ?RT:to_html(RT).
