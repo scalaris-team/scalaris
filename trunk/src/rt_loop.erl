@@ -60,7 +60,6 @@ start_link(InstanceId) ->
 -spec init(module()) -> {uninit, trigger:state()}.
 init(Trigger) ->
     log:log(info,"[ RT ~p ] starting routingtable", [cs_send:this()]),
-    %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
     TriggerState = trigger:init(Trigger, ?MODULE),
     {uninit, TriggerState}.
 
@@ -94,9 +93,8 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     ?RT:check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
-    %cs_send:send_local_after(config:pointerStabilizationInterval(), self(), {stabilize}),
-    TriggerState2 = trigger:next(TriggerState),
-    {Id, Pred, Succ, NewRTState,TriggerState2};
+    NewTriggerState = trigger:next(TriggerState),
+    {Id, Pred, Succ, NewRTState, NewTriggerState};
 
 % got new predecessor/successor
 on({{get_node_details_response, NewNodeDetails}, pred_succ}, {Id, _, _, RTState, TriggerState}) ->
@@ -111,14 +109,16 @@ on({crash, DeadPid}, {Id, Pred, Succ, RTState, TriggerState}) ->
     {Id, Pred, Succ, NewRT, TriggerState};
 
 % debug_info for web interface
-on({'$gen_cast', {debug_info, Requestor}}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    cs_send:send_local(Requestor , {debug_info_response, [{"rt_debug", ?RT:dump(RTState)}, 
-                                                          {"rt_size", ?RT:get_size(RTState)}]}),
-    {Id, Pred, Succ, RTState, TriggerState};
+on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
+    KeyValueList =
+        [{"rt_size", ?RT:get_size(RTState)},
+         {"rt (index, node):", ""} | ?RT:dump(RTState)],
+    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
+    State;
 
-on({dump, Pid}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    cs_send:send_local(Pid , {dump_response, RTState}),
-    {Id, Pred, Succ, RTState, TriggerState};
+on({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
+    cs_send:send_local(Pid, {dump_response, RTState}),
+    State;
 
 % unknown message
 on(Message, State) ->

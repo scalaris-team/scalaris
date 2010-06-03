@@ -15,7 +15,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc Routing Table
 %% @end
-%% @version $Id: rt_chord.erl 758 2010-04-30 15:06:20Z kruber@zib.de $
+%% @version $Id$
 -module(rt_chord).
 -author('schuett@zib.de').
 -vsn('$Id$').
@@ -28,7 +28,7 @@
          hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
          filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          dump/1, to_list/1, export_rt_to_dht_node/4,
-         update_pred_succ_in_dht_node/3, to_html/1, handle_custom_message/2,
+         update_pred_succ_in_dht_node/3, handle_custom_message/2,
          check/6, check/5, check_fd/2,
          check_config/0]).
 
@@ -107,9 +107,9 @@ get_keys_for_replicas(Key) ->
     rt_simple:get_keys_for_replicas(Key).
 
 %% @doc Dumps the RT state for output in the web interface.
--spec dump(rt()) -> [char(),...].
+-spec dump(RT::rt()) -> KeyValueList::[{Index::non_neg_integer(), Node::string()}].
 dump(RT) ->
-    lists:flatten(io_lib:format("~p", [gb_trees:to_list(RT)])).
+    [{Index, lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- gb_trees:to_list(RT)].
 
 %% userdevguide-begin rt_chord:stab
 %% @doc Updates one entry in the routing table and triggers the next update.
@@ -150,13 +150,6 @@ next_index({I, 1}) ->
     {I + 1, config:read(chord_base) - 2};
 next_index({I, J}) ->
     {I, J - 1}.
-
-
-%% @doc Prepare routing table for printing in web interface.
--spec to_html(rt()) -> [char(),...].
-to_html(RT) ->
-    List = [ {Index, Value} || {Index, Value} <- gb_trees:to_list(RT)],
-    io_lib:format("~p", [List]).
 
 %% @doc Checks whether config parameters of the rt_chord process exist and are
 %%      valid.

@@ -111,9 +111,9 @@ is_between_closed(Begin, Id, End) ->
             (Begin < Id) orelse (Id < End)
     end.
 
--spec max(plus_infinity, ?RT:key()) -> plus_infinity;
-         (?RT:key(), plus_infinity) -> plus_infinity;
-         (?RT:key(), ?RT:key()) -> ?RT:key().
+-spec max(plus_infinity, any()) -> plus_infinity;
+         (any(), plus_infinity) -> plus_infinity;
+         (T, T) -> T.
 max(plus_infinity, _) -> plus_infinity;
 max(_, plus_infinity) -> plus_infinity;
 max(minus_infinity, X) -> X;
@@ -124,9 +124,9 @@ max(A, B) ->
         false -> B
     end.
 
--spec min(minus_infinity, ?RT:key()) -> minus_infinity;
-         (?RT:key(), minus_infinity) -> minus_infinity;
-         (?RT:key(), ?RT:key()) -> ?RT:key().
+-spec min(minus_infinity, any()) -> minus_infinity;
+         (any(), minus_infinity) -> minus_infinity;
+         (T, T) -> T.
 min(minus_infinity, _) -> minus_infinity;
 min(_, minus_infinity) -> minus_infinity;
 min(plus_infinity, X) -> X;

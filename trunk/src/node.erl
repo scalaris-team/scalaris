@@ -54,7 +54,7 @@ id(#node{id=Id}) ->
     Id.
 
 %% @doc Gets the version of the node's ID.
--spec id_version(node_type()) -> ?RT:key().
+-spec id_version(node_type()) -> non_neg_integer().
 id_version(#node{id_version=IdVersion}) ->
     IdVersion.
 
