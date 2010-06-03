@@ -21,7 +21,7 @@ MAKE = make
 VERSION=0.0.1
 OTP_ERLANG_VERSION=1.5.3
 
-.PHONY: all compile test test-vts java clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test
+.PHONY: all compile test test-vts java clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test test-clean
 
 YAWS_PATH= /usr/local/lib/yaws
 
@@ -102,7 +102,6 @@ java-test: compile java
 	  true ; \
 	fi
 
-
 clean:
 	-rm -f .make-docs
 	-rm -rf bin/*.beam
@@ -119,7 +118,6 @@ clean:
 	-rm -rf doc/edoc-info
 	-rm -rf docroot/graphs/*.png
 
-
 docs: .make-docs
 
 .make-docs: $(SOURCEPATHS_ERL) $(SOURCEPATHS_JAVA)
@@ -129,7 +127,7 @@ docs: .make-docs
 	@touch .make-docs
 
 svn:
-	$(SVN) propset svn:keywords Id src/*.erl src/comm_layer/*.erl  src/cyclon/*.erl  src/pubsub/*.erl  src/transstore/*.erl tests/*.erl bin/*.app bin/*.cfg
+	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl tests/*.erl bin/*.app bin/*.cfg
 
 dialyzer: compile
 	$(DIALYZER) -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ --no_native
@@ -188,7 +186,7 @@ install-java: java
 	install -m 755 -t $(BINDIR) \
 	           java-api/scalaris
 
-install-erlang: all
+install-erlang: compile
 	install -d $(BEAMDIR)
 	install -m 644 -t $(BEAMDIR) \
 	           bin/*.app \

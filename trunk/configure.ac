@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 AC_PREREQ(2.65)
-AC_INIT(scalaris, 0.0.1, schuett@zib.de)
+AC_INIT(scalaris, 0.2, schuett@zib.de)
 
 ###########################################################
 #
