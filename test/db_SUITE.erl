@@ -196,7 +196,7 @@ get_load_and_middle(_Config) ->
     DB6 = ?DB:write(DB5, "Key4", "Value4", 1),
     ?assert(?DB:get_middle_key(DB6) =:= {ok, "Key2"}),
     OrigFullList = ?DB:get_data(DB6),
-    {DB7, HisList} = ?DB:split_data(DB6, "Key4", "Key2"),
+    {DB7, HisList} = ?DB:split_data(DB6, intervals:mk_from_node_ids("Key2", "Key4")),
     ?assert(?DB:read(DB7, "Key3") =:= {ok, "Value3", 1}),
     ?assert(?DB:read(DB7, "Key4") =:= {ok, "Value4", 1}),
     ?assert(?DB:get_load(DB7) =:= 2),

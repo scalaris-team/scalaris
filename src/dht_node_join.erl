@@ -43,7 +43,9 @@
 %% userdevguide-begin dht_node_join:join_request
 -spec join_request(dht_node_state:state(), NewPred::node:node_type()) -> dht_node_state:state().
 join_request(State, NewPred) ->
-    {DB, HisData} = ?DB:split_data(dht_node_state:get(State, db), dht_node_state:get(State, node_id), node:id(NewPred)),
+    MyNewInterval =
+        intervals:mk_from_nodes(dht_node_state:get(State, node), NewPred),
+    {DB, HisData} = ?DB:split_data(dht_node_state:get(State, db), MyNewInterval),
     
     %%TODO: split data [{Key, Value, Version}], schedule transfer
     

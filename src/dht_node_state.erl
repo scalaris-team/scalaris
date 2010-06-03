@@ -130,10 +130,10 @@ get(#state{rt=RT, neighbors=Neighbors, lb=LB, join_time=JoinTime,
         pred_pid   -> node:pidX(nodelist:pred(Neighbors));
         node       -> nodelist:node(Neighbors);
         node_id    -> nodelist:nodeid(Neighbors);
-        my_range   -> intervals:new('(', node:id(nodelist:pred(Neighbors)),
-                                   node:id(nodelist:node(Neighbors)), ']');
-        succ_range -> intervals:new('(', node:id(nodelist:node(Neighbors)),
-                                   node:id(nodelist:succ(Neighbors)), ']');
+        my_range   -> intervals:mk_from_nodes(nodelist:pred(Neighbors),
+                                              nodelist:node(Neighbors));
+        succ_range -> intervals:mk_from_nodes(nodelist:node(Neighbors),
+                                              nodelist:succ(Neighbors));
         lb         -> LB;
         join_time  -> JoinTime;
         trans_log  -> TransLog;

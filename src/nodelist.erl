@@ -418,14 +418,13 @@ rebase_list([First | T], NewFirstNode) ->
     {LastNode, TFilt} = get_last_and_remove(T, NewFirstNode, []),
     case LastNode =/= null of
         true ->
-            LastId = node:id(LastNode),
-            FirstId = node:id(First),
-            NewFirstId = node:id(NewFirstNode),
-            case util:is_between(FirstId, NewFirstId, LastId) of
+            NodeListInterval = intervals:mk_from_nodes(First, LastNode),
+            NewPredsInterval = intervals:mk_from_nodes(First, NewFirstNode),
+            case intervals:in(node:id(NewFirstNode), NodeListInterval) of
                 false ->
                     add_head_if_noteq(First, TFilt, NewFirstNode);
                 true->
-                    {L1T, L2} = lists:splitwith(fun(N) -> util:is_between(FirstId, node:id(N), NewFirstId) end, TFilt),
+                    {L1T, L2} = lists:splitwith(fun(N) -> intervals:in(node:id(N), NewPredsInterval) end, TFilt),
                     L1 = add_head_if_noteq(First, L1T, NewFirstNode),
                     lists:append(L2, L1)
             end;

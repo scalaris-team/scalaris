@@ -178,8 +178,8 @@ on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
             false ->
                 nodelist:filter_min_length(NeighborsToSendTmp,
                                            fun(N) ->
-                                                   util:is_between_stab(OtherNodeId, node:id(N), OtherLastSuccId) orelse
-                                                   util:is_between_stab(OtherLastPredId, node:id(N), OtherNodeId)
+                                                   intervals:in(node:id(N), intervals:new('(', OtherNodeId, OtherLastSuccId, ')')) orelse
+                                                   intervals:in(node:id(N), intervals:new('(', OtherLastPredId, OtherNodeId, ')'))
                                            end,
                                            RequestPredsMinCount,
                                            RequestSuccsMinCount)

@@ -34,10 +34,11 @@
 %%%  scalaris.cfg).
 %%%  
 %%%  New rounds are started by the leader which is identified as the node for
-%%%  which util:is_between(PredId, 0, MyId) is true. It will propagate its
-%%%  round with its state so that gossip processes of other nodes can join this
-%%%  round. Several parameters (added to scalaris.cfg) influence the decision
-%%%  about when to start a new round:
+%%%  which
+%%%  intervals:in(?RT:hash_key(0), node_details:get(NodeDetails, my_range))
+%%%  is true. It will propagate its round with its state so that gossip
+%%%  processes of other nodes can join this round. Several parameters (added
+%%%  to scalaris.cfg) influence the decision about when to start a new round:
 %%%  <ul>
 %%%   <li>gossip_max_triggers_per_round: a new round is started if this many
 %%%       triggers have been received during the round</li>

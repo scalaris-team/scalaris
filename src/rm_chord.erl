@@ -108,7 +108,9 @@ on({get_node_details_response, NodeDetails}, {Id, Neighborhood, TriggerState} = 
     SuccsPred = node_details:get(NodeDetails, pred),
     case node:is_valid(SuccsPred) of
         true ->
-            case util:is_between_stab(Id, node:id(SuccsPred), node:id(nodelist:succ(Neighborhood))) of
+            % check if the predecessor of our successor is correct:
+            SuccId = node:id(nodelist:succ(Neighborhood)),
+            case intervals:in(node:id(SuccsPred), intervals:new('(', Id, SuccId, ')')) of
                 true ->
                     get_successorlist(node:pidX(SuccsPred)),
                     NewNeighborhood = nodelist:add_nodes(Neighborhood, [SuccsPred], 1, succListLength()),
@@ -137,7 +139,8 @@ on({get_succlist_response, Succ, SuccsSuccList}, {Id, Neighborhood, TriggerState
 
 on({notify_new_pred, NewPred}, {Id, Neighborhood, TriggerState} = State) ->
     Pred = nodelist:pred(Neighborhood),
-    case util:is_between_stab(node:id(Pred), node:id(NewPred), Id) of
+    % is the 'new predecessor' really our new predecessor?
+    case intervals:in(node:id(NewPred), intervals:new('(', node:id(Pred), Id, ')')) of
         true ->
             NewNeighborhood = nodelist:add_nodes(Neighborhood, [NewPred], 1, succListLength()),
             rm_beh:update_neighbors(NewNeighborhood),

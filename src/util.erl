@@ -28,7 +28,7 @@
 
 -include("scalaris.hrl").
 
--export([escape_quotes/1, is_between/3, is_between_stab/3, is_between_closed/3,
+-export([escape_quotes/1,
          min/2, max/2, logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
          wait_for_unregister/1, get_stacktrace/0, dump/0, dump2/0, dump3/0,
@@ -72,44 +72,6 @@ escape_quotes(String) ->
 
 escape_quotes_($", Rest) -> [$",$\\|Rest];
 escape_quotes_(Ch, Rest) -> [Ch|Rest].
-
--spec is_between(intervals:key(), intervals:key(), intervals:key()) -> boolean().
-is_between(X, _, X) ->
-    true;
-is_between(minus_infinity, _, plus_infinity) ->
-    true;
-is_between(minus_infinity, plus_infinity, _) ->
-    false;
-is_between(plus_infinity, plus_infinity, _) ->
-    false;
-is_between(plus_infinity, minus_infinity, _) ->
-    true;
-is_between(Begin, Id, End) when Begin < End ->
-    (Begin < Id) andalso (Id =< End);
-is_between(Begin, Id, End) ->
-    (Begin < Id) orelse (Id =< End).
-
--spec is_between_stab(?RT:key(), ?RT:key(), ?RT:key()) -> boolean().
-is_between_stab(Begin, Id, End) ->
-    if
-        Begin < End ->
-            (Begin < Id) andalso (Id < End);
-        Begin == End ->
-            true;
-        true ->
-            (Begin < Id) orelse (Id < End)
-    end.
-
--spec is_between_closed(?RT:key(), ?RT:key(), ?RT:key()) -> boolean().
-is_between_closed(Begin, Id, End) ->
-    if
-        Begin < End ->
-            (Begin < Id) andalso (Id < End);
-        Begin == End ->
-            Id =/= End;
-        true ->
-            (Begin < Id) orelse (Id < End)
-    end.
 
 -spec max(plus_infinity, any()) -> plus_infinity;
          (any(), plus_infinity) -> plus_infinity;

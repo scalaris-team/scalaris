@@ -40,9 +40,10 @@ behaviour_info(callbacks) ->
      % dangerous calls
      {delete, 2},
      %load balancing
-     {get_load, 1}, {get_middle_key, 1}, {split_data, 3},
+     {get_load, 1}, {get_middle_key, 1}, {split_data, 2},
      %
-     {get_data, 1}, {add_data, 2}, {get_range_with_version, 2},
+     {get_data, 1}, {add_data, 2},
+     {get_range, 2}, {get_range_with_version, 2},
      {get_range_only_with_version, 2},
      % merkle tree
      {build_merkle_tree, 2},

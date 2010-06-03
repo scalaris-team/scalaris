@@ -156,15 +156,15 @@ add_data(DB, Data) ->
 
 %% @doc returns all keys (and removes them from the db) which belong
 %%      to a new node with id HisKey
-split_data(DB, MyKey, HisKey) ->
+split_data(DB, MyNewInterval) ->
     F = fun (KV = {Key, _}, HisList) ->
-                case util:is_between(HisKey, Key, MyKey) of
-                    true -> HisList;
+                case intervals:in(Key, MyNewInterval) of
+                    true  -> HisList;
                     false -> [KV | HisList]
                 end
         end,
     HisList = ?ETS:foldl(F, [], DB),
-    [ ?ETS:delete(DB, AKey) || {AKey, _} <- HisList],
+    [?ETS:delete(DB, AKey) || {AKey, _} <- HisList],
     {DB, HisList}.
 
 % update only if no locks are taken and version number is higher
@@ -182,12 +182,11 @@ update_if_newer(OldDB, KVs) ->
     lists:foldl(F, OldDB, KVs).
 
 %% @doc get keys in a range
--spec(get_range/3 :: (db(), key(), key()) -> [{key(), value()}]).
-get_range(DB, From, To) ->
+get_range(DB, Interval) ->
     F = fun ({Key, {Value, _, _, _}}, Data) ->
                 case Value =/= empty_val
-                    andalso util:is_between(From, Key, To) of
-                    true -> [{Key, Value} | Data];
+                    andalso intervals:in(Key, Interval) of
+                    true  -> [{Key, Value} | Data];
                     false -> Data
                 end
         end,
