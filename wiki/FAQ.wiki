@@ -75,6 +75,7 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || Fedora || 10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_10/] ||
 || Fedora || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_11/] ||
 || Fedora || 12 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_12/] ||
+|| Fedora || 13 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_13/] ||
 || Mandriva || 2008 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2008/] ||
 || Mandriva || 2009 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009/] ||
 || Mandriva || 2009.1 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009.1/] ||
@@ -120,16 +121,19 @@ No. Well, maybe.
   # install Erlang (http://www.erlang.org/download.html)
   # install OpenSSL (for crypto module) (http://www.slproweb.com/products/Win32OpenSSL.html)
   # checkout scalaris code from SVN
-  # copy an appropriate EMakefile_for from contrib\win32 to the trunk-directory and name in EMakefile
   # adapt the path to your Erlang installation in build.bat
-  # create an empty autoconf.hrl in include
   # start a cmd.exe
   # go to the scalaris directory
   # run build.bat in the cmd window
   # check that there were no errors during the compilation; warnings are fine
   # go to the bin sub-directory
-  # adapt the path to your Erlang installation in boot.bat
+  # adapt the path to your Erlang installation in boot.bat, cs_local.bat, cs_local2.bat and cs_local3.bat
   # run boot.bat in the cmd window
+
+If you have Erlang < !R13B04, you will need to adapt the Emakefile that build.bat generates if it doesn't find one. There will be empty lines in the first three blocks ending with " ]}." - add the following to these lines (note the first ","!) and try to compile again, using build.bat. It should work now.
+{{{
+, {d, type_forward_declarations_are_not_allowed}, {d, forward_or_recursive_types_are_not_allowed}
+}}}
 
 Note: we do not support Scalaris on Windows at the moment.
 
