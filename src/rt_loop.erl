@@ -42,7 +42,7 @@
       {init, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()}
      | {stabilize}
      | {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ}
-     | {crash, DeadPid::cs_send:mypid()}
+     | {crash, DeadPid::comm:mypid()}
      | ?RT:custom_message()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,7 +59,7 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> {uninit, trigger:state()}.
 init(Trigger) ->
-    log:log(info,"[ RT ~p ] starting routingtable", [cs_send:this()]),
+    log:log(info,"[ RT ~p ] starting routingtable", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     {uninit, TriggerState}.
 
@@ -75,7 +75,7 @@ on({init, Id, Pred, Succ}, {uninit, TriggerState}) ->
     {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
 
 on(Message, {uninit, TriggerState}) ->
-    cs_send:send_local(self() , Message),
+    comm:send_local(self() , Message),
     {uninit, TriggerState};
 
 % re-initialize routing table
@@ -88,7 +88,7 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     %io:format("[ RT ] stabilize~n"),
     Pid = process_dictionary:get_group_member(dht_node),
     % get new pred and succ from dht_node
-    cs_send:send_local(Pid , {get_node_details, cs_send:this_with_cookie(pred_succ), [pred, succ]}),
+    comm:send_local(Pid , {get_node_details, comm:this_with_cookie(pred_succ), [pred, succ]}),
     % start periodic stabilization
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     ?RT:check(RTState, NewRTState, Id, Pred, Succ),
@@ -113,11 +113,11 @@ on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Pred, _Succ, RTState, _Trigger
     KeyValueList =
         [{"rt_size", ?RT:get_size(RTState)},
          {"rt (index, node):", ""} | ?RT:dump(RTState)],
-    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 
 on({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
-    cs_send:send_local(Pid, {dump_response, RTState}),
+    comm:send_local(Pid, {dump_response, RTState}),
     State;
 
 % unknown message

@@ -49,13 +49,13 @@
 %%      a DHT node's ID changed (the version of the ID).
 -spec set_id(NewKey::?RT:key(), Count::non_neg_integer()) -> ok.
 set_id(Key, Count) ->
-    cs_send:send_local(get_pid(), {set_id, Key, Count}).
+    comm:send_local(get_pid(), {set_id, Key, Count}).
 
 %% @doc Reads the key of the dht_node; sends a 'idholder_get_id_response'
 %%      message in response.
 -spec get_id() -> ok.
 get_id() ->
-    cs_send:send_local(get_pid(), {get_id, self()}).
+    comm:send_local(get_pid(), {get_id, self()}).
 
 %% @doc Starts the idholder process, registers it with the process dictionary
 %%      and returns its pid for use by a supervisor.
@@ -73,7 +73,7 @@ init(_Arg) ->
 %%      unrelated to the old one and should only be used if the old DHT node is
 %%      stopped.
 reinit() ->
-    cs_send:send_local(get_pid(), {reinit}).
+    comm:send_local(get_pid(), {reinit}).
 
 %% @doc Checks whether config parameters of the idholder process exist and are
 %%      valid.
@@ -100,7 +100,7 @@ on({reinit}, _State) ->
     {get_initial_key(config:read(key_creator)), 0};
 
 on({get_id, PID}, {Key, Count} = State) ->
-    cs_send:send_local(PID, {idholder_get_id_response, Key, Count}),
+    comm:send_local(PID, {idholder_get_id_response, Key, Count}),
     State;
 
 on({set_id, NewKey, Count}, _State) ->

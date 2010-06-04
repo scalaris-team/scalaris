@@ -90,7 +90,7 @@ monitor_vivaldi_errors(Group, Idx) ->
         failed ->
             ok;
         Vivaldi ->
-            cs_send:send_local(Vivaldi, {get_coordinate, cs_send:this()}),
+            comm:send_local(Vivaldi, {get_coordinate, comm:this()}),
             receive
                 {vivaldi_get_coordinate_response, _, Error} ->
                     gmetric(both, lists:flatten(io_lib:format("vivaldi_error_~p", [Idx])), "float", Error, "error")

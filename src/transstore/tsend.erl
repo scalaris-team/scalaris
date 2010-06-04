@@ -47,7 +47,7 @@ send_to_rtms_with_lookup(TID, Message)->
     ?TLOG("sent_to_rtms_with_lookup"),
     {MessName, TMMessage} = Message,
     F = fun(X) -> NewTMMessage = TMMessage#tm_message{tm_key = X},
-                  cs_lookup:unreliable_lookup(X, {MessName, NewTMMessage})
+                  lookup:unreliable_lookup(X, {MessName, NewTMMessage})
         end,
     [ F(RKey) || RKey <- RTMKeys ].
 
@@ -62,7 +62,7 @@ send_to_replica_with_lookup(Key, Message)->
     {MessName, MessText} = Message,
     F = fun(XKey) -> NewMessText =
                       MessText#tp_message{item_key = XKey, orig_key = Key},
-                  cs_lookup:unreliable_lookup(XKey, {MessName, NewMessText})
+                  lookup:unreliable_lookup(XKey, {MessName, NewMessText})
         end,
     [ F(RKey) || RKey <- ReplKeys ].
 
@@ -70,30 +70,30 @@ send_to_participants(TMState, Message)->
     [ send_to_tp(Item, Message) || Item <- TMState#tm_state.items ].
 
 send_to_rtms(TMState, Message) ->
-    [ cs_send:send(Address, Message)
+    [ comm:send(Address, Message)
       || {_Key, Address, _ } <- TMState#tm_state.rtms ].
 
 send(Address, Message)->
-    cs_send:send(Address, Message).
+    comm:send(Address, Message).
 
 send_vote_to_rtms(RTMS, Vote)->
-    Me = cs_send:this(),
-    [ cs_send:send(Address, {vote, Me, Vote})
+    Me = comm:this(),
+    [ comm:send(Address, {vote, Me, Vote})
       || {_, Address, _} <- RTMS ].
 
 send_to_tp(Item, Message)->
     {MessName, MessText} = Message,
     F = fun(X, Y) -> NewMessText = MessText#tp_message{item_key = X},
-                     cs_send:send(Y, {MessName, NewMessText}) 
+                     comm:send(Y, {MessName, NewMessText}) 
         end,
     [ F(RKey, TP) || {RKey, TP} <- Item#tm_item.tps ].
 
 tell_rtms(TMState)->
-    [ cs_send:send(Address, {rtms, TMState#tm_state.rtms, Ballot})
+    [ comm:send(Address, {rtms, TMState#tm_state.rtms, Ballot})
       ||  {_Key, Address, Ballot} <- TMState#tm_state.rtms ].
 
 send_to_client(Pid, Message)->
-    cs_send:send(Pid, {trans, Message}).
+    comm:send(Pid, {trans, Message}).
 
 send_prepare_item(TMState, Item) ->
     F = fun(XKey,XTP) ->
@@ -104,6 +104,6 @@ send_prepare_item(TMState, Item) ->
                                         Item#tm_item.operation,
                                         TMState#tm_state.rtms),
                 Message = {validate, TMState#tm_state.transID, NItem},
-                cs_send:send(XTP, Message)
+                comm:send(XTP, Message)
         end,
     [ F(RKey, TP) || {RKey, TP} <- Item#tm_item.tps ].

@@ -42,7 +42,7 @@
 
 -type interval() :: trigger:interval().
 -type interval_fun() :: trigger:interval_fun().
--type message_tag() :: cs_send:message_tag().
+-type message_tag() :: comm:message_tag().
 -type state() :: {interval_fun(), message_tag(), reference() | ok}.
 
 %% @doc Initializes the trigger with the given interval functions and the given
@@ -55,21 +55,21 @@ init(BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, MsgTag) when is_function
 %%      its initialization.
 -spec first(state()) -> {interval_fun(), message_tag(), reference()}.
 first({BaseIntervalFun, MsgTag, ok}) ->
-    TimerRef = cs_send:send_local_after(0, self(), {MsgTag}),
+    TimerRef = comm:send_local_after(0, self(), {MsgTag}),
     {BaseIntervalFun, MsgTag, TimerRef}.
 
 %% @doc Sets the trigger to send its message after BaseIntervalFun()
 %%      milliseconds.
 -spec next(state(), _IntervalTag::interval()) -> {interval_fun(), message_tag(), reference()}.
 next({BaseIntervalFun, MsgTag, ok}, _IntervalTag) ->
-    NewTimerRef = cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
+    NewTimerRef = comm:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
     {BaseIntervalFun, MsgTag, NewTimerRef};
 
 next({BaseIntervalFun, MsgTag, TimerRef}, _U) ->
     % timer still running?
     case erlang:read_timer(TimerRef) of
         false ->
-            NewTimerRef = cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag});
+            NewTimerRef = comm:send_local_after(BaseIntervalFun(), self(), {MsgTag});
         _T ->
             NewTimerRef = TimerRef
     end,

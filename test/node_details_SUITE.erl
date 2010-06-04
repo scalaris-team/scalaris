@@ -132,7 +132,7 @@ tester_new7(Config) ->
 -spec test_set_get_pred(Pred::node_details:node_type()) -> true.
 test_set_get_pred(PredTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, pred, PredTest),
@@ -143,7 +143,7 @@ test_set_get_pred(PredTest) ->
 -spec test_set_get_predlist(PredList::nodelist:non_empty_nodelist()) -> true.
 test_set_get_predlist(PredListTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, predlist, PredListTest),
@@ -154,7 +154,7 @@ test_set_get_predlist(PredListTest) ->
 -spec test_set_get_node(Node::node_details:node_type()) -> true.
 test_set_get_node(NodeTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, node, NodeTest),
@@ -165,7 +165,7 @@ test_set_get_node(NodeTest) ->
 -spec test_set_get_my_range(MyRange::intervals:interval()) -> true.
 test_set_get_my_range(MyRangeTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, my_range, MyRangeTest),
@@ -176,7 +176,7 @@ test_set_get_my_range(MyRangeTest) ->
 -spec test_set_get_succ(Succ::node_details:node_type()) -> true.
 test_set_get_succ(SuccTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, succ, SuccTest),
@@ -187,7 +187,7 @@ test_set_get_succ(SuccTest) ->
 -spec test_set_get_succlist(SuccList::nodelist:non_empty_nodelist()) -> true.
 test_set_get_succlist(SuccListTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, succlist, SuccListTest),
@@ -198,7 +198,7 @@ test_set_get_succlist(SuccListTest) ->
 -spec test_set_get_load(Load::node_details:load()) -> true.
 test_set_get_load(LoadTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, load, LoadTest),
@@ -209,7 +209,7 @@ test_set_get_load(LoadTest) ->
 -spec test_set_get_hostname(Hostname::node_details:hostname()) -> true.
 test_set_get_hostname(HostnameTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, hostname, HostnameTest),
@@ -220,7 +220,7 @@ test_set_get_hostname(HostnameTest) ->
 -spec test_set_get_rt_size(RTSize::node_details:rt_size()) -> true.
 test_set_get_rt_size(RTSizeTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, rt_size, RTSizeTest),
@@ -231,7 +231,7 @@ test_set_get_rt_size(RTSizeTest) ->
 -spec test_set_get_message_log(MsgLog::node_details:message_log()) -> true.
 test_set_get_message_log(MsgLogTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, message_log, MsgLogTest),
@@ -242,7 +242,7 @@ test_set_get_message_log(MsgLogTest) ->
 -spec test_set_get_memory(Memory::node_details:memory()) -> true.
 test_set_get_memory(MemoryTest) ->
     NodeDetails1 = node_details:new(),
-    PredList = [], Node = node:new(cs_send:this(), 0, 0), SuccList = [],
+    PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
     Load = 0, Hostname = "localhost", RTSize = 0, Memory = 0,
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, memory, MemoryTest),

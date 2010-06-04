@@ -44,7 +44,7 @@ on(Msg, State) when element(1, State) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 
 on({get_node, Source_PID, Key}, State) ->
-    cs_send:send(Source_PID, {get_node_response, Key, dht_node_state:get(State, node)}),
+    comm:send(Source_PID, {get_node_response, Key, dht_node_state:get(State, node)}),
     State;
 
 %% Kill Messages
@@ -66,7 +66,7 @@ on({die}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% {init_rm, pid()}
 on({init_rm, Pid}, State) ->
-    cs_send:send_local(Pid, {init, dht_node_state:get(State, node_id),
+    comm:send_local(Pid, {init, dht_node_state:get(State, node_id),
                                    dht_node_state:get(State, node),
                                    dht_node_state:get(State, pred),
                                    dht_node_state:get(State, succ)}),
@@ -99,7 +99,7 @@ on({rt_update, RoutingTable}, State) ->
 
 %% userdevguide-begin dht_node:rt_get_node
 on({rt_get_node, Source_PID, Index}, State) ->
-    cs_send:send(Source_PID, {rt_get_node_response, Index, dht_node_state:get(State, node)}),
+    comm:send(Source_PID, {rt_get_node_response, Index, dht_node_state:get(State, node)}),
     State;
 %% userdevguide-end dht_node:rt_get_node
 
@@ -134,7 +134,7 @@ on({lookup_tp, Message}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     case intervals:in(Message#tp_message.item_key, MyRange) of
         true ->
-            cs_send:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, cs_send:this()}),
+            comm:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, comm:this()}),
             State;
         false ->
             log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not in ~p~n", [Message#tp_message.item_key, MyRange]),
@@ -167,8 +167,8 @@ on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
 
 on({get_process_in_group, Source_PID, Key, Process}, State) ->
     Pid = process_dictionary:get_group_member(Process),
-    GPid = cs_send:make_global(Pid),
-    cs_send:send(Source_PID, {get_process_in_group_reply, Key, GPid}),
+    GPid = comm:make_global(Pid),
+    comm:send(Source_PID, {get_process_in_group_reply, Key, GPid}),
     State;
 
 on({get_rtm, Source_PID, Key, Process}, State) ->
@@ -193,8 +193,8 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
     case NewPid of
         failed -> State;
         _ ->
-            GPid = cs_send:make_global(NewPid),
-            cs_send:send(Source_PID, {get_rtm_reply, Key, GPid}),
+            GPid = comm:make_global(NewPid),
+            comm:send(Source_PID, {get_rtm_reply, Key, GPid}),
             State
     end;
 
@@ -206,7 +206,7 @@ on({lookup_aux, Key, Hops, Msg}, State) ->
     State;
 
 on({lookup_fin, _Hops, Msg}, State) ->
-    cs_send:send_local(self(), Msg),
+    comm:send_local(self(), Msg),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -228,7 +228,7 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
 %          true ->
 %              io:format("drop get_key request~n");
 %          false ->
-    cs_send:send(Source_PID,
+    comm:send(Source_PID,
                  {get_key_with_id_reply, SourceId, HashedKey,
                   ?DB:read(dht_node_state:get(State, db), HashedKey)}),
 %    end,
@@ -255,7 +255,7 @@ on({delete_key, Source_PID, Key}, State) ->
     end;
 
 on({drop_data, Data, Sender}, State) ->
-    cs_send:send(Sender, {drop_data_ack}),
+    comm:send(Sender, {drop_data_ack}),
     DB = ?DB:add_data(dht_node_state:get(State, db), Data),
     dht_node_state:set_db(State, DB);
 
@@ -271,7 +271,7 @@ on({start_bulk_owner, I, Msg}, State) ->
     State;
 
 on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
-    cs_send:send(Issuer, {bulk_read_with_version_response, dht_node_state:get(State, my_range),
+    comm:send(Issuer, {bulk_read_with_version_response, dht_node_state:get(State, my_range),
                           ?DB:get_range_with_version(dht_node_state:get(State, db), Range)}),
     State;
 
@@ -279,7 +279,7 @@ on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
 % Load balancing messages (see dht_node_lb.erl) 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_load, Source_PID}, State) ->
-    cs_send:send(Source_PID, {get_load_response, cs_send:this(), dht_node_state:get(State, load)}),
+    comm:send(Source_PID, {get_load_response, comm:this(), dht_node_state:get(State, load)}),
     State;
 
 on({get_load_response, Source_PID, Load}, State) ->
@@ -288,7 +288,7 @@ on({get_load_response, Source_PID, Load}, State) ->
 
 on({get_middle_key, Source_PID}, State) ->
     {MiddleKey, NewState} = dht_node_lb:get_middle_key(State),
-    cs_send:send(Source_PID, {get_middle_key_response, cs_send:this(), MiddleKey}),
+    comm:send(Source_PID, {get_middle_key_response, comm:this(), MiddleKey}),
     NewState;
 
 on({get_middle_key_response, Source_PID, MiddleKey}, State) ->
@@ -305,10 +305,10 @@ on({stabilize_loadbalance}, State) ->
 % Misc. 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_node_details, Pid}, State) ->
-    cs_send:send(Pid, {get_node_details_response, dht_node_state:details(State)}),
+    comm:send(Pid, {get_node_details_response, dht_node_state:details(State)}),
     State;
 on({get_node_details, Pid, Which}, State) ->
-    cs_send:send(Pid, {get_node_details_response, dht_node_state:details(State, Which)}),
+    comm:send(Pid, {get_node_details_response, dht_node_state:details(State, Which)}),
     State;
 
 on({dump}, State) ->
@@ -329,7 +329,7 @@ on({'$gen_cast', {debug_info, Requestor}}, State) ->
 %%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
 %%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
          {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))}],
-    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 
 
@@ -341,7 +341,7 @@ on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
                     lists:filter(fun ({Key, _}) ->
                                          intervals:in(Key, Range)
                                  end, ?DB:get_data(dht_node_state:get(State, db)))),
-    cs_send:send_local(Owner , {unit_test_bulkowner_response, Res, dht_node_state:get(State, node_id)}),
+    comm:send_local(Owner , {unit_test_bulkowner_response, Res, dht_node_state:get(State, node_id)}),
     State;
 
 %% @TODO buggy ...
@@ -410,11 +410,11 @@ start_link(InstanceId, Options) ->
 % @doc find existing nodes and initialize the comm_layer
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
-    % note, cs_send:this() may be invalid at this moment
-    [cs_send:send(KnownHost, {get_dht_nodes, cs_send:this()})
+    % note, comm:this() may be invalid at this moment
+    [comm:send(KnownHost, {get_dht_nodes, comm:this()})
      || KnownHost <- KnownHosts],
     timer:sleep(100),
-    case cs_send:is_valid(cs_send:this()) of
+    case comm:is_valid(comm:this()) of
         true ->
             ok;
         false ->

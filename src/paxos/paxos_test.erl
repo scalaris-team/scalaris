@@ -27,11 +27,11 @@
 make(P, A, L) ->
     NumMDs = lists:max([P,A,L]),
     [ msg_delay:start_link(X) || X <- lists:seq(1,NumMDs)],
-    Ps = [ cs_send:make_global(element(2, proposer:start_link(X)))
+    Ps = [ comm:make_global(element(2, proposer:start_link(X)))
            || X <- lists:seq(1,P)],
-    As = [ cs_send:make_global(element(2, acceptor:start_link(X)))
+    As = [ comm:make_global(element(2, acceptor:start_link(X)))
            || X <- lists:seq(1,A)],
-    Ls = [ cs_send:make_global(element(2, learner:start_link(X)))
+    Ls = [ comm:make_global(element(2, learner:start_link(X)))
            || X <- lists:seq(1,L)],
     {Ps, As, Ls}.
 
@@ -41,7 +41,7 @@ run() ->
 
     {Proposers, Acceptors, Learners} = make(2,4,1),
 
-    [ learner:start_paxosid(X, pid123, 3, cs_send:make_global(self()), mycookie)
+    [ learner:start_paxosid(X, pid123, 3, comm:make_global(self()), mycookie)
       || X <- Learners ],
     [Proposer,Proposer2] = Proposers,
 
@@ -50,7 +50,7 @@ run() ->
     io:format("=================~n"),
     io:format("make a fast paxos~n"),
     io:format("=================~n"),
-    [ learner:start_paxosid(X, pid124, 3, cs_send:make_global(self()), mycookie)
+    [ learner:start_paxosid(X, pid124, 3, comm:make_global(self()), mycookie)
       || X <- Learners ],
     [ acceptor:start_paxosid(X, pid124, Learners) || X <- Acceptors ],
     proposer:start_paxosid(Proposer, pid124, Acceptors, prepared, 3, MaxProposers, 0),
@@ -71,7 +71,7 @@ run() ->
                            MaxProposers, 2),
 %    timer:sleep(1000),
     proposer:trigger(Proposer2, pid123),
-%    Learners = [cs_send:make_global(paxos:get_local_learner())],
+%    Learners = [comm:make_global(paxos:get_local_learner())],
     [ acceptor:start_paxosid(X, pid123, Learners) || X <- Acceptors ],
     timer:sleep(1000),
     proposer:trigger(Proposer2, pid123),

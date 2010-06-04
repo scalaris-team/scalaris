@@ -44,17 +44,17 @@
 -type(cookie() :: '$fd_nil' | any()).
 -type(state() :: {null}).
 -type(message() ::
-    {subscribe_list, Subscriber::pid(), PidList::[cs_send:mypid()], Cookie::cookie()} |
-    {unsubscribe_list, Subscriber::pid(), PidList::[cs_send:mypid()], Cookie::cookie()} |
-    {get_subscribers, Client::pid(), GlobalPid::cs_send:mypid()} |
-    {get_subscribers, Client::pid(), GlobalPid::cs_send:mypid(), Cookie::cookie()} |
+    {subscribe_list, Subscriber::pid(), PidList::[comm:mypid()], Cookie::cookie()} |
+    {unsubscribe_list, Subscriber::pid(), PidList::[comm:mypid()], Cookie::cookie()} |
+    {get_subscribers, Client::pid(), GlobalPid::comm:mypid()} |
+    {get_subscribers, Client::pid(), GlobalPid::comm:mypid(), Cookie::cookie()} |
     {get_subscriptions, Subscriber::pid()} |
     {remove_subscriber, Subscriber::pid()} |
     {crash, Target::pid()}).
 
 %%% Public Interface
 %% @doc generates a failure detector for the calling process on the given pid.
--spec subscribe(cs_send:mypid() | [cs_send:mypid()]) -> ok.
+-spec subscribe(comm:mypid() | [comm:mypid()]) -> ok.
 subscribe([]) ->
     ok;
 subscribe(GlobalPids) when is_list(GlobalPids) ->
@@ -64,16 +64,16 @@ subscribe(GlobalPid) ->
 
 %% @doc generates a failure detector for the calling process and cookie on the
 %%      given pid.
--spec subscribe(cs_send:mypid() | [cs_send:mypid()], cookie()) -> ok.
+-spec subscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.
 subscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
-    cs_send:send_local(my_fd_pid(),
+    comm:send_local(my_fd_pid(),
                        {subscribe_list, self(), GlobalPids, Cookie}),
     ok;
 subscribe(GlobalPid, Cookie) ->
     subscribe([GlobalPid], Cookie).
 
 %% @doc deletes the failure detector for the given pid.
--spec unsubscribe(cs_send:mypid() | [cs_send:mypid()]) -> ok.
+-spec unsubscribe(comm:mypid() | [comm:mypid()]) -> ok.
 unsubscribe([]) ->
     ok;
 unsubscribe(GlobalPids) when is_list(GlobalPids) ->
@@ -82,9 +82,9 @@ unsubscribe(GlobalPid) ->
     unsubscribe([GlobalPid], '$fd_nil').
 
 %% @doc deletes the failure detector for the given pid and cookie.
--spec unsubscribe(cs_send:mypid() | [cs_send:mypid()], cookie()) -> ok.
+-spec unsubscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.
 unsubscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
-    cs_send:send_local(my_fd_pid(),
+    comm:send_local(my_fd_pid(),
                        {unsubscribe_list, self(), GlobalPids, Cookie}),
     ok;
 unsubscribe(GlobalPid, Cookie) ->
@@ -92,47 +92,47 @@ unsubscribe(GlobalPid, Cookie) ->
 
 %% @doc Unsubscribes from the pids in OldPids but not in NewPids and subscribes
 %%      to the pids in NewPids but not in OldPids.
--spec update_subscriptions(OldPids::[cs_send:mypid()], NewPids::[cs_send:mypid()]) -> ok.
+-spec update_subscriptions(OldPids::[comm:mypid()], NewPids::[comm:mypid()]) -> ok.
 update_subscriptions(OldPids, NewPids) ->
     {OnlyOldPids, _Same, OnlyNewPids} = util:split_unique(OldPids, NewPids),
     fd:unsubscribe(OnlyOldPids),
     fd:subscribe(OnlyNewPids).
 
 %% @doc who is informed on events on a given Pid?
--spec get_subscribers(cs_send:mypid()) -> ok.
+-spec get_subscribers(comm:mypid()) -> ok.
 get_subscribers(GlobalPid) ->
-    cs_send:send_local(my_fd_pid(),
+    comm:send_local(my_fd_pid(),
                        {get_subscribers, self(), GlobalPid}),
     ok.
 %% @doc who is informed on events on a given Pid and Cookie?
--spec get_subscribers(cs_send:mypid(), cookie()) -> ok.
+-spec get_subscribers(comm:mypid(), cookie()) -> ok.
 get_subscribers(GlobalPid, Cookie) ->
-    cs_send:send_local(my_fd_pid(),
+    comm:send_local(my_fd_pid(),
                        {get_subscribers, self(), GlobalPid, Cookie}),
     ok.
 
 %% @doc on what am I informed?
 -spec get_subscriptions() -> ok.
 get_subscriptions() ->
-    cs_send:send_local(my_fd_pid() , {get_subscriptions, self()}),
+    comm:send_local(my_fd_pid() , {get_subscriptions, self()}),
     ok.
 
 %% not needed until now
 %%% %% @doc delete all my subscriptions
 %%% unsubscribe_all() ->
-%%%     cs_send:send_local(my_fd_pid() , {unsubscribe_all, self()}),
+%%%     comm:send_local(my_fd_pid() , {unsubscribe_all, self()}),
 %%%     ok.
 %%% unsubscribe_all(Cookie) ->
-%%%     cs_send:send_local(my_fd_pid() , {unsubscribe_all, self(), Cookie}),
+%%%     comm:send_local(my_fd_pid() , {unsubscribe_all, self(), Cookie}),
 %%%     ok.
 
 %% @doc remove all subscriptions of a given Pid
 -spec remove_subscriber(pid()) -> ok.
 remove_subscriber(Pid) ->
-    cs_send:send_local(my_fd_pid() , {remove_subscriber, Pid}).
+    comm:send_local(my_fd_pid() , {remove_subscriber, Pid}).
 
 %% Ping Process
--spec start_pinger(cs_send:mypid()) -> pid().
+-spec start_pinger(comm:mypid()) -> pid().
 start_pinger(Pid) ->
    {ok, Pid2} = fd_pinger:start_link([my_fd_pid(), Pid]),
    Pid2.
@@ -165,12 +165,12 @@ on({unsubscribe_list, Subscriber, PidList, Cookie}, State) ->
 
 on({get_subscribers, Client, GlobalPid}, State) ->
     Subscribers = fd_db:get_subscribers(GlobalPid),
-    cs_send:send_local(Client, {get_subscribers_reply, GlobalPid, Subscribers}),
+    comm:send_local(Client, {get_subscribers_reply, GlobalPid, Subscribers}),
     State;
 
 on({get_subscribers, Client, GlobalPid, Cookie}, State) ->
     Subscribers = fd_db:get_subscribers(GlobalPid, Cookie),
-    cs_send:send_local(Client, {get_subscribers_reply, GlobalPid,
+    comm:send_local(Client, {get_subscribers_reply, GlobalPid,
                                         Cookie, Subscribers}),
     State;
 
@@ -180,7 +180,7 @@ on({get_subscriptions, Subscriber}, State) ->
                     {Target, '$fd_nil'} -> Target;
                     Any -> Any
                 end || X <- TmpTargets ],
-    cs_send:send_local(Subscriber, {get_subscriptions_reply, Targets}),
+    comm:send_local(Subscriber, {get_subscriptions_reply, Targets}),
     State;
 
 %% not used until now
@@ -212,7 +212,7 @@ on({crash, Target}, State) ->
     unknown_event.
 
 %%% Internal functions
--spec make_pinger(Target::cs_send:mypid()) -> ok.
+-spec make_pinger(Target::comm:mypid()) -> ok.
 make_pinger(Target) ->
     case fd_db:get_pinger(Target) of
         none ->
@@ -224,26 +224,26 @@ make_pinger(Target) ->
             ok
     end.
 
--spec kill_pinger(Target::cs_send:mypid()) -> true | failed.
+-spec kill_pinger(Target::comm:mypid()) -> true | failed.
 kill_pinger(Target) ->
     case fd_db:get_pinger(Target) of
         {ok, Pinger} ->
-            cs_send:send_local(Pinger, {stop}),
+            comm:send_local(Pinger, {stop}),
             fd_db:del_pinger(Target);
         none ->
             failed
     end.
 
--spec my_notify(Subscriber::pid(), Target::cs_send:mypid(), Cookie::cookie()) -> ok.
+-spec my_notify(Subscriber::pid(), Target::comm:mypid(), Cookie::cookie()) -> ok.
 my_notify(Subscriber, Target, Cookie) ->
     case Cookie of
         '$fd_nil' ->
-            cs_send:send_local(Subscriber, {crash, Target});
+            comm:send_local(Subscriber, {crash, Target});
         _ ->
-            cs_send:send_local(Subscriber, {crash, Target, Cookie})
+            comm:send_local(Subscriber, {crash, Target, Cookie})
     end.
 
--spec my_unsubscribe(Subscriber::pid(), Target::cs_send:mypid(), cookie()) -> true | failed.
+-spec my_unsubscribe(Subscriber::pid(), Target::comm:mypid(), cookie()) -> true | failed.
 my_unsubscribe(Subscriber, Target, Cookie) ->
     fd_db:del_subscription(Subscriber, Target, Cookie),
     case fd_db:get_subscribers(Target) of

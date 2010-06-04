@@ -43,7 +43,7 @@
 
 send_local(Seconds, Dest, Msg) ->
     Delayer = process_dictionary:get_group_member(msg_delay),
-    cs_send:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
+    comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
 
 %% be startable via supervisor, use gen_component
 -spec start_link(instanceid()) -> {ok, pid()}.
@@ -66,7 +66,7 @@ init([InstanceID, _Options]) ->
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
     pdb:new(TableName, [set, protected, named_table]),
-    cs_send:send_local(self(), {msg_delay_periodic}),
+    comm:send_local(self(), {msg_delay_periodic}),
     _State = {TableName, _Round = 0}.
 
 on({msg_delay_req, Seconds, Dest, Msg}, {TableName, Counter} = State) ->
@@ -86,10 +86,10 @@ on({msg_delay_periodic} = Trigger, {TableName, Counter} = _State) ->
     case pdb:get(Counter, TableName) of
         undefined -> ok;
         {_, Queue} ->
-            [ cs_send:send_local(Dest, Msg) || {Dest, Msg} <- Queue ],
+            [ comm:send_local(Dest, Msg) || {Dest, Msg} <- Queue ],
             pdb:delete(Counter, TableName)
     end,
-    cs_send:send_local_after(1000, self(), Trigger),
+    comm:send_local_after(1000, self(), Trigger),
     {TableName, Counter + 1};
 
 on(_, _State) ->

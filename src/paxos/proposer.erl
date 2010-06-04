@@ -56,12 +56,12 @@
 msg_prepare(Dest, ReplyTo, PaxosID, Round) ->
     ?TRACE("Sending proposer_prepare: ~p, ~p~n", [PaxosID, Round]),
     Msg = {proposer_prepare, ReplyTo, PaxosID, Round},
-    cs_send:send(Dest, Msg).
+    comm:send(Dest, Msg).
 
 msg_accept(Dest, ReplyTo, PaxosID, Round, Value) ->
     ?TRACE("Sending proposer_accept ~p, ~p Proposal ~p~n", [PaxosID, Round, Value]),
     Msg = {proposer_accept, ReplyTo, PaxosID, Round, Value},
-    cs_send:send(Dest, Msg).
+    comm:send(Dest, Msg).
 
 start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
               Majority, MaxProposers) ->
@@ -71,7 +71,7 @@ start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
               Majority, MaxProposers, InitialRound) ->
     Msg = {proposer_initialize, PaxosID, Acceptors, Proposal,
            Majority, MaxProposers, InitialRound},
-    cs_send:send(Proposer, Msg).
+    comm:send(Proposer, Msg).
 
 start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
                          Majority, MaxProposers) ->
@@ -81,13 +81,13 @@ start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
                          Majority, MaxProposers, InitialRound) ->
     Msg = {proposer_initialize, PaxosID, Acceptors, Proposal,
            Majority, MaxProposers, InitialRound, Proxy},
-    cs_send:send(Proposer, Msg).
+    comm:send(Proposer, Msg).
 
 stop_paxosids(Proposer, PaxosIds) ->
-    cs_send:send(Proposer, {proposer_deleteids, PaxosIds}).
+    comm:send(Proposer, {proposer_deleteids, PaxosIds}).
 
 trigger(Proposer, PaxosID) ->
-    cs_send:send(Proposer, {proposer_trigger, PaxosID}).
+    comm:send(Proposer, {proposer_trigger, PaxosID}).
 
 %% be startable via supervisor, use gen_component
 -spec start_link(instanceid()) -> {ok, pid()}.
@@ -116,7 +116,7 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal,
    State) ->
     on({proposer_initialize, PaxosID, Acceptors, Proposal,
         Majority, MaxProposers, InitialRound,
-        _ReplyTo = cs_send:this()},
+        _ReplyTo = comm:this()},
        State);
 
 on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
@@ -233,10 +233,10 @@ start_new_higher_round(PaxosID, Round, ETSTableName) ->
                     %% let other prop. more time (NextRound ms) to achieve consensus
                     TmpState = proposer_state:reset_state(StateForID),
                     pdb:set(proposer_state:set_round(TmpState, NextRound), ETSTableName),
-%%                     cs_send:send_local_after(NextRound, self(),
+%%                     comm:send_local_after(NextRound, self(),
 %%                                              {proposer_trigger, PaxosID,
 %%                                               NextRound});
-                    cs_send:send_local(self(),
+                    comm:send_local(self(),
                                        {proposer_trigger, PaxosID,
                                         NextRound});
                 false -> dropped

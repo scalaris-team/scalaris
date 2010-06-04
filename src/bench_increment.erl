@@ -62,7 +62,7 @@ process_v2(Parent, Key, Count) ->
     process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, 0).
 
 process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
-    cs_send:send_local(Parent , {done, AbortCount});
+    comm:send_local(Parent , {done, AbortCount});
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
 	{success, {commit, _Y}} ->
@@ -78,7 +78,7 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     end.
 
 process_iter_v2(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
-    cs_send:send_local(Parent , {done, AbortCount});
+    comm:send_local(Parent , {done, AbortCount});
 process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
     Result = inc(Key),
     case Result of

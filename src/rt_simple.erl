@@ -86,14 +86,14 @@ init_stabilize(_Id, Succ, _RT) ->
 
 %% userdevguide-begin rt_simple:filterDeadNode
 %% @doc Removes dead nodes from the routing table.
--spec filterDeadNode(rt(), cs_send:mypid()) -> rt().
+-spec filterDeadNode(rt(), comm:mypid()) -> rt().
 filterDeadNode(RT, _DeadPid) ->
     RT.
 %% userdevguide-end rt_simple:filterDeadNode
 
 %% userdevguide-begin rt_simple:to_pid_list
 %% @doc Returns the pids of the routing table entries.
--spec to_pid_list(rt() | external_rt()) -> [cs_send:mypid()].
+-spec to_pid_list(rt() | external_rt()) -> [comm:mypid()].
 to_pid_list(Succ) ->
     [node:pidX(Succ)].
 %% userdevguide-end rt_simple:to_pid_list
@@ -152,7 +152,7 @@ empty_ext(Succ) ->
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop(dht_node_state:state(), key()) -> cs_send:mypid().
+-spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
 next_hop(State, _Key) ->
     dht_node_state:get(State, succ_pid).
 %% userdevguide-end rt_simple:next_hop

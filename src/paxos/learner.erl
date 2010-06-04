@@ -35,14 +35,14 @@
 -export([check_config/0]).
 
 msg_decide(Client, ClientCookie, PaxosID, Val) ->
-    cs_send:send(Client, {learner_decide, ClientCookie, PaxosID, Val}).
+    comm:send(Client, {learner_decide, ClientCookie, PaxosID, Val}).
 
 start_paxosid(Learner, PaxosID, Majority, ProcessToInform, ClientCookie) ->
-    cs_send:send(Learner, {learner_initialize, PaxosID, Majority,
+    comm:send(Learner, {learner_initialize, PaxosID, Majority,
                            ProcessToInform, ClientCookie}).
 
 stop_paxosids(Learner, ListOfPaxosIDs) ->
-    cs_send:send(Learner, {learner_deleteids, ListOfPaxosIDs}).
+    comm:send(Learner, {learner_deleteids, ListOfPaxosIDs}).
 
 %% startable via supervisor, use gen_component
 -spec start_link(instanceid()) -> {ok, pid()}.

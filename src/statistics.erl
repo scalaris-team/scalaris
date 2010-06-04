@@ -85,7 +85,7 @@ compare_node_details({ok, _}, _) ->
     false.
 
 get_node_details(Pid) ->
-    cs_send:send(Pid, {get_node_details, cs_send:this_with_cookie(Pid)}),
+    comm:send(Pid, {get_node_details, comm:this_with_cookie(Pid)}),
     receive
 	{{get_node_details_response, Details}, Pid} -> 
 	    {ok, Details}

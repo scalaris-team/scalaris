@@ -40,11 +40,11 @@
 
 %% @doc log a timespan for a given timer
 log(Timer, Time) ->
-    cs_send:send_local(?MODULE, {log, Timer, Time}).
+    comm:send_local(?MODULE, {log, Timer, Time}).
 
 %% @doc read the statistics about the known timers
 get_timers() ->
-    cs_send:send_local(?MODULE, {get_timers, self()}),
+    comm:send_local(?MODULE, {get_timers, self()}),
     receive
         {get_timers_response, Timers} ->
             Timers
@@ -73,7 +73,7 @@ on({log, Timer, Time}, State) ->
 on({get_timers, From}, State) ->
     Result = [{Timer, Count, Min, Sum / Count, Max} ||
                  {Timer, Sum, Count, Min, Max} <- ets:tab2list(?MODULE)],
-    cs_send:send_local(From, {get_timers_response, Result}),
+    comm:send_local(From, {get_timers_response, Result}),
     ets:delete_all_objects(?MODULE),
     State;
 

@@ -41,15 +41,15 @@ behaviour_info(_Other) ->
 
 %% @doc Sends a message to the remote node's ring_maintenance process notifying
 %%      it of a new successor.
--spec notify_new_succ(Node::cs_send:mypid(), NewSucc::node:node_type()) -> ok.
+-spec notify_new_succ(Node::comm:mypid(), NewSucc::node:node_type()) -> ok.
 notify_new_succ(Node, NewSucc) ->
-    cs_send:send_to_group_member(Node, ring_maintenance, {notify_new_succ, NewSucc}).
+    comm:send_to_group_member(Node, ring_maintenance, {notify_new_succ, NewSucc}).
 
 %% @doc Sends a message to the remote node's ring_maintenance process notifying
 %%      it of a new predecessor.
--spec notify_new_pred(Node::cs_send:mypid(), NewPred::node:node_type()) -> ok.
+-spec notify_new_pred(Node::comm:mypid(), NewPred::node:node_type()) -> ok.
 notify_new_pred(Node, NewPred) ->
-    cs_send:send_to_group_member(Node, ring_maintenance, {notify_new_pred, NewPred}).
+    comm:send_to_group_member(Node, ring_maintenance, {notify_new_pred, NewPred}).
 
 
 %% @doc notification that my succ left
@@ -69,4 +69,4 @@ pred_left(_PredsPred) ->
 -spec update_neighbors(Neighbors::nodelist:neighborhood()) -> ok.
 update_neighbors(Neighbors) ->
     Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rm_update_neighbors, Neighbors}).
+    comm:send_local(Pid, {rm_update_neighbors, Neighbors}).

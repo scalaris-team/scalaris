@@ -52,7 +52,7 @@
 
 -type interval() :: max_interval | base_interval | min_interval | now_and_min_interval.
 -type interval_fun() :: fun(() -> pos_integer()).
--type message_tag() :: cs_send:message_tag().
+-type message_tag() :: comm:message_tag().
 -type state() :: {module(), term()}.
 
 %% @doc Initializes the given trigger with the given base interval function

@@ -59,10 +59,10 @@ init(_Arg) ->
     ok.
 
 on({get_dht_nodes, Pid}, ok) ->
-    case cs_send:is_valid(Pid) of
+    case comm:is_valid(Pid) of
         true ->
             Nodes = get_live_dht_nodes(),
-            cs_send:send(Pid, {get_dht_nodes_response, Nodes});
+            comm:send(Pid, {get_dht_nodes_response, Nodes});
         false ->
             ok
     end,
@@ -72,12 +72,12 @@ on(_, _State) ->
     unknown_event.
 
 get_live_dht_nodes() ->
-    [cs_send:make_global(Pid) || Pid <- process_dictionary:find_all_dht_nodes(), element(1, gen_component:get_state(Pid)) =:= state].
+    [comm:make_global(Pid) || Pid <- process_dictionary:find_all_dht_nodes(), element(1, gen_component:get_state(Pid)) =:= state].
 
 get_round_trip(GPid, Iterations) ->
     Start = erlang:now(),
     [ begin
-          cs_send:send(GPid, {ping, cs_send:this()}),
+          comm:send(GPid, {ping, comm:this()}),
           receive
               _Any -> ok
           end

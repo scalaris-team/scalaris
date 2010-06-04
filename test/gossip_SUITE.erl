@@ -190,7 +190,7 @@ test_on_trigger1(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({trigger}),
     % round = 0 -> request for new round will be send
-    ThisWithCookie = cs_send:this_with_cookie(leader_start_new_round),
+    ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
     % neither initialized nor round > 0 -> no request for random node
 %%     ?expect_message({get_subset_rand, 1, Self}),
@@ -225,7 +225,7 @@ test_on_trigger2(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({trigger}),
     % round = 0 -> request for new round will be send
-    ThisWithCookie = cs_send:this_with_cookie(leader_start_new_round),
+    ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
     % initialized but not round > 0 -> no request for random node
 %%     ?expect_message({get_subset_rand, 1, Self}),
@@ -261,7 +261,7 @@ test_on_trigger3(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({trigger}),
     % round != 0 and triggers (1) <= min_tpr (2) -> request for new round will not be send
-%%     ThisWithCookie = cs_send:this_with_cookie(leader_start_new_round),
+%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
     % initialized and round > 0 -> request for random node will be send
     ?expect_message({get_subset_rand, 1, Self}),
@@ -297,7 +297,7 @@ test_on_trigger4(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({trigger}),
     % round != 0 and triggers (2) <= min_tpr (2) -> request for new round will not be send
-%%     ThisWithCookie = cs_send:this_with_cookie(leader_start_new_round),
+%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
     % initialized and round > 0 -> request for random node will be send
     ?expect_message({get_subset_rand, 1, Self}),
@@ -333,7 +333,7 @@ test_on_trigger5(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({trigger}),
     % round != 0 and triggers (3) > min_tpr (2) and conv_avg_count (0) < conv_avg_count_newround (1) -> request for new round will not be send
-%%     ThisWithCookie = cs_send:this_with_cookie(leader_start_new_round),
+%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
     % initialized and round > 0 -> request for random node will be send
     ?expect_message({get_subset_rand, 1, Self}),
@@ -369,7 +369,7 @@ test_on_trigger6(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({trigger}),
     % round != 0 and triggers (4) > min_tpr (2) and conv_avg_count (0) < conv_avg_count_newround (1) -> request for new round will not be send
-%%     ThisWithCookie = cs_send:this_with_cookie(leader_start_new_round),
+%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
     % initialized and round > 0 -> request for random node will be send
     ?expect_message({get_subset_rand, 1, Self}),
@@ -405,7 +405,7 @@ test_on_trigger7(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({trigger}),
     % round != 0 and triggers (5) > max_tpr (4) -> request for new round will be send
-    ThisWithCookie = cs_send:this_with_cookie(leader_start_new_round),
+    ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
     % initialized and round > 0 -> request for random node will be send
     ?expect_message({get_subset_rand, 1, Self}),
@@ -727,7 +727,7 @@ test_on_get_node_details_response_leader_start_new_round4(Config) ->
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = cs_send:this_with_cookie(local_info),
+    ThisWithCookie = comm:this_with_cookie(local_info),
     ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
@@ -759,7 +759,7 @@ test_on_get_node_details_response_leader_start_new_round5(Config) ->
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = cs_send:this_with_cookie(local_info),
+    ThisWithCookie = comm:this_with_cookie(local_info),
     ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
@@ -791,7 +791,7 @@ test_on_get_node_details_response_leader_start_new_round6(Config) ->
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = cs_send:this_with_cookie(local_info),
+    ThisWithCookie = comm:this_with_cookie(local_info),
     ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
@@ -823,7 +823,7 @@ test_on_get_node_details_response_leader_start_new_round7(Config) ->
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = cs_send:this_with_cookie(local_info),
+    ThisWithCookie = comm:this_with_cookie(local_info),
     ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
     % no further messages
     ?expect_no_message(),
@@ -868,7 +868,7 @@ test_on_cy_cache2(Config) ->
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
     % non-empty node cache
-    Cache = [node:new(cs_send:make_global(self()), 10, 0)],
+    Cache = [node:new(comm:make_global(self()), 10, 0)],
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
         gossip:on({cy_cache, Cache},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
@@ -894,7 +894,7 @@ test_on_cy_cache3(Config) ->
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
     % non-empty node cache
-    Cache = [node:new(cs_send:this(), 10, 0)],
+    Cache = [node:new(comm:this(), 10, 0)],
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
         gossip:on({cy_cache, Cache},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
@@ -904,7 +904,7 @@ test_on_cy_cache3(Config) ->
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if pids don't match, a get_state is send to the cached node's dht_node
-    This = cs_send:this(),
+    This = comm:this(),
     ?expect_message({send_to_group_member, gossip, {get_state, This, Values}}),
     % no further messages
     ?expect_no_message(),

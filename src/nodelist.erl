@@ -264,8 +264,8 @@ mk_neighborhood(NodeList, Node) ->
 %% @doc Removes the given node (or node with the given Pid) from a neighborhood
 %%      or node list (provided for convenience - see filter/2).
 %%      Note: A neighborhood's base node is never removed!
--spec remove(NodeOrPid::node:node_type() | cs_send:mypid() | pid(), neighborhood()) -> neighborhood();
-            (NodeOrPid::node:node_type() | cs_send:mypid() | pid(), nodelist()) -> nodelist().
+-spec remove(NodeOrPid::node:node_type() | comm:mypid() | pid(), neighborhood()) -> neighborhood();
+            (NodeOrPid::node:node_type() | comm:mypid() | pid(), nodelist()) -> nodelist().
 remove(NodeOrPid, NodeList_Neighborhood) ->
     filter(NodeList_Neighborhood, fun(N) -> not node:equals(NodeOrPid, N) end).
 
@@ -273,8 +273,8 @@ remove(NodeOrPid, NodeList_Neighborhood) ->
 %%      or node list and executes EvalFun for any such occurrence (provided for
 %%      convenience - see filter/3).
 %%      Note: A neighborhood's base node is never removed!
--spec remove(NodeOrPid::node:node_type() | cs_send:mypid() | pid(), neighborhood(), EvalFun::fun((node:node_type()) -> any())) -> neighborhood();
-            (NodeOrPid::node:node_type() | cs_send:mypid() | pid(), nodelist(), EvalFun::fun((node:node_type()) -> any())) -> nodelist().
+-spec remove(NodeOrPid::node:node_type() | comm:mypid() | pid(), neighborhood(), EvalFun::fun((node:node_type()) -> any())) -> neighborhood();
+            (NodeOrPid::node:node_type() | comm:mypid() | pid(), nodelist(), EvalFun::fun((node:node_type()) -> any())) -> nodelist().
 remove(NodeOrPid, NodeList_Neighborhood, EvalFun) ->
     filter(NodeList_Neighborhood, fun(N) -> not node:equals(NodeOrPid, N) end, EvalFun).
 

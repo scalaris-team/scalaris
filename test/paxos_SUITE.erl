@@ -49,11 +49,11 @@ end_per_suite(Config) ->
 make(P, A, L, Prefix) ->
     NumMDs = lists:max([P,A,L]),
     [ msg_delay:start_link({Prefix, X}) || X <- lists:seq(1,NumMDs)],
-    Ps = [ cs_send:make_global(element(2, proposer:start_link({Prefix, X})))
+    Ps = [ comm:make_global(element(2, proposer:start_link({Prefix, X})))
            || X <- lists:seq(1,P)],
-    As = [ cs_send:make_global(element(2, acceptor:start_link({Prefix, X})))
+    As = [ comm:make_global(element(2, acceptor:start_link({Prefix, X})))
            || X <- lists:seq(1,A)],
-    Ls = [ cs_send:make_global(element(2, learner:start_link({Prefix, X})))
+    Ls = [ comm:make_global(element(2, learner:start_link({Prefix, X})))
            || X <- lists:seq(1,L)],
     {Ps, As, Ls}.
 
@@ -81,7 +81,7 @@ tester_fast_paxos(CountAcceptors, Count, Prefix) ->
     {Proposers, Acceptors, Learners} =
         make(CountProposers, CountAcceptors, 1, Prefix),
 
-    Collector = cs_send:make_global(collector(Count, self())),
+    Collector = comm:make_global(collector(Count, self())),
 
     [learner:start_paxosid(hd(Learners), Id, Majority, Collector, chocolate_chip_cookie)
      || Id <- lists:seq(1, Count)],
@@ -102,7 +102,7 @@ tester_paxos(CountAcceptors, Count, Prefix) ->
     {Proposers, Acceptors, Learners} =
         make(CountProposers, CountAcceptors, 1, Prefix),
 
-    Collector = cs_send:make_global(collector(Count, self())),
+    Collector = comm:make_global(collector(Count, self())),
 
     spawn(fun() ->
                   [learner:start_paxosid(hd(Learners), Id, Majority, Collector, chocolate_chip_cookie)
@@ -164,7 +164,7 @@ test_two_proposers(_Config) ->
         make(CountProposers, CountAcceptors, 1, two_proposers),
 
     %% start paxosids in the components
-    learner:start_paxosid(hd(Learners), paxid123, Majority, cs_send:this(), cpaxid123),
+    learner:start_paxosid(hd(Learners), paxid123, Majority, comm:this(), cpaxid123),
     [ acceptor:start_paxosid(X, paxid123, Learners) || X <- Acceptors ],
     [ Proposer1, Proposer2 ] = Proposers,
 
@@ -192,7 +192,7 @@ test_two_proposers(_Config) ->
     io:format("Now vice versa~n"),
 
     %% start paxosids in the components
-    learner:start_paxosid(hd(Learners), paxid124, Majority, cs_send:this(), cpaxid124),
+    learner:start_paxosid(hd(Learners), paxid124, Majority, comm:this(), cpaxid124),
     [ acceptor:start_paxosid(X, paxid124, Learners) || X <- Acceptors ],
     [ Proposer1, Proposer2 ] = Proposers,
     %% set some breakpoints

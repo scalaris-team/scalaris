@@ -73,16 +73,16 @@ work_phase(ClientPid, ReqId, Request) ->
     CollectorPid = process_dictionary:get_group_member(?MODULE),
     Key = element(2, Request),
     %% do a quorum read
-    quorum_read(cs_send:make_global(CollectorPid), ReqId, Request),
+    quorum_read(comm:make_global(CollectorPid), ReqId, Request),
     %% inform CollectorPid on whom to inform after quorum reached
-    cs_send:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
+    comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
     ok.
 
 quorum_read(CollectorPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:quorum_read~n", []),
     Key = element(2, Request),
     RKeys = ?RT:get_keys_for_replicas(Key),
-    [ cs_lookup:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
+    [ lookup:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
     ok.
 
 %% May make several ones from a single TransLog item (item replication)
@@ -165,11 +165,11 @@ init([InstanceID]) ->
     %% use 2nd table to record events for timeout handling
     %% rotate tables periodically
     WaitTable = ets:new(?MODULE, [set, private]),
-    cs_send:send_local_after(config:read(transaction_lookup_timeout),
+    comm:send_local_after(config:read(transaction_lookup_timeout),
                              self(), {periodic_timeout}),
     _State = {EmptyEntry, Reps, Maj, WaitTable, ActiveTable}.
 
-%% reply triggered by cs_lookup:unreliable_get_key/3
+%% reply triggered by lookup:unreliable_get_key/3
 on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
    {_CurrEntry, Reps, Maj, WaitTable, ActiveTable} = State) ->
     ?TRACE("rdht_tx_read:on(get_key_with_id_reply)~n", []),
@@ -234,7 +234,7 @@ on({periodic_timeout}, {CurrEntry, Reps, Maj, WaitTable, ActiveTable} = _State) 
     %% inform client on timeout if Id exists and client is not informed
     my_timeout_inform(WaitTable, ActiveTable, ets:first(WaitTable)),
     ets:delete_all_objects(WaitTable),
-    cs_send:send_local_after(config:read(transaction_lookup_timeout),
+    comm:send_local_after(config:read(transaction_lookup_timeout),
                              self(), {periodic_timeout}),
     %% swap the two tables.
     {NewEntry, Reps, Maj, ActiveTable, WaitTable};
@@ -262,7 +262,7 @@ my_inform_client(Client, Entry) ->
     Id = rdht_tx_read_state:get_id(Entry),
     Msg = msg_reply(Id, my_make_tlog_entry(Entry),
                     my_make_result_entry(Entry)),
-    cs_send:send_local(Client, Msg).
+    comm:send_local(Client, Msg).
 
 my_make_tlog_entry(Entry) ->
     {Val, Vers} = rdht_tx_read_state:get_result(Entry),

@@ -77,13 +77,13 @@ init_stabilize(Id, _Succ, RT) ->
     % calculate the longest finger
     Key = calculateKey(Id, first_index()),
     % trigger a lookup for Key
-    cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(), first_index()}),
+    lookup:unreliable_lookup(Key, {rt_get_node, comm:this(), first_index()}),
     RT.
 %% userdevguide-end rt_chord:init_stab
 
 %% userdevguide-begin rt_chord:filterDeadNode
 %% @doc Removes dead nodes from the routing table.
--spec filterDeadNode(rt(), cs_send:mypid()) -> rt().
+-spec filterDeadNode(rt(), comm:mypid()) -> rt().
 filterDeadNode(RT, DeadPid) ->
     DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
                            node:equals(Node, DeadPid)],
@@ -92,7 +92,7 @@ filterDeadNode(RT, DeadPid) ->
 %% userdevguide-end rt_chord:filterDeadNode
 
 %% @doc Returns the pids of the routing table entries.
--spec to_pid_list(rt()) -> [cs_send:mypid()].
+-spec to_pid_list(rt()) -> [comm:mypid()].
 to_pid_list(RT) ->
     lists:map(fun({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
 
@@ -122,7 +122,7 @@ stabilize(Id, Succ, RT, Index, Node) ->
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
-            cs_lookup:unreliable_lookup(Key, {rt_get_node, cs_send:this(),
+            lookup:unreliable_lookup(Key, {rt_get_node, comm:this(),
                                               next_index(Index)}),
             NewRT;
         false ->
@@ -183,7 +183,7 @@ empty_ext(_Succ) ->
 %% @doc Returns the next hop to contact for a lookup.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
--spec next_hop(dht_node_state:state(), key()) -> cs_send:mypid().
+-spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
 next_hop(State, Id) ->
     case intervals:in(Id, dht_node_state:get(State, succ_range)) of
         %succ is responsible for the key

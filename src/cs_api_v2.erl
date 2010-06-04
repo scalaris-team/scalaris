@@ -126,9 +126,9 @@ test_and_set(Key, OldValue, NewValue) ->
 range_read(From, To) ->
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval,
-                               {bulk_read_with_version, cs_send:this()}),
+                               {bulk_read_with_version, comm:this()}),
     TimerRef =
-        cs_send:send_local_after(config:read(range_read_timeout), self(), {timeout}),
+        comm:send_local_after(config:read(range_read_timeout), self(), {timeout}),
     range_read_loop(Interval, intervals:empty(), [], TimerRef).
 
 -spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[any()], TimerRef::reference()) -> {timeout | ok, Data::[any()]}.

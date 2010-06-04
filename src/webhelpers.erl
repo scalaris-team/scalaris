@@ -68,7 +68,7 @@ getLoad() ->
     get_load(Nodes).
     
 get_load([Head | Tail]) ->
-    cs_send:send(Head , {get_load, cs_send:this()}),
+    comm:send(Head , {get_load, comm:this()}),
     receive
 	{get_load_response, Node, Value} -> [{ok, Node, Value} | get_load(Tail)]
     after
@@ -123,7 +123,7 @@ getVivaldiMap() ->
     renderVivaldiMap(CC_list,Nodes).
 
 get_vivaldi(Pid) ->
-    cs_send:send_to_group_member(Pid,vivaldi, {get_coordinate,cs_send:this()}),
+    comm:send_to_group_member(Pid,vivaldi, {get_coordinate,comm:this()}),
     receive
         {vivaldi_get_coordinate_response,Coordinate,_Confidence} ->
             Coordinate

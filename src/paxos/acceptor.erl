@@ -37,16 +37,16 @@
 
 %% Messages to expect from this module
 msg_ack(Proposer, PaxosID, InRound, Val, Raccepted) ->
-    cs_send:send(Proposer, {acceptor_ack, PaxosID, InRound, Val, Raccepted}).
+    comm:send(Proposer, {acceptor_ack, PaxosID, InRound, Val, Raccepted}).
 
 msg_nack(Proposer, PaxosID, NewerRound) ->
-    cs_send:send(Proposer, {acceptor_nack, PaxosID, NewerRound}).
+    comm:send(Proposer, {acceptor_nack, PaxosID, NewerRound}).
 
 msg_naccepted(Proposer, PaxosID, NewerRound) ->
-    cs_send:send(Proposer, {acceptor_naccepted, PaxosID, NewerRound}).
+    comm:send(Proposer, {acceptor_naccepted, PaxosID, NewerRound}).
 
 msg_accepted(Learner, PaxosID, Raccepted, Val) ->
-    cs_send:send(Learner, {acceptor_accepted, PaxosID, Raccepted, Val}).
+    comm:send(Learner, {acceptor_accepted, PaxosID, Raccepted, Val}).
 
 %%% public function to initiate a new paxos instance
 %%% gets a
@@ -63,10 +63,10 @@ start_paxosid(PaxosID, Learners) ->
 start_paxosid_local(LAcceptor, PaxosID, Learners) ->
     %% find the groups acceptor process
     Message = {acceptor_initialize, PaxosID, Learners},
-    cs_send:send_local(LAcceptor, Message).
+    comm:send_local(LAcceptor, Message).
 
 start_paxosid(Acceptor, PaxosID, Learners) ->
-    cs_send:send(Acceptor, {acceptor_initialize, PaxosID, Learners}).
+    comm:send(Acceptor, {acceptor_initialize, PaxosID, Learners}).
 
 %% be startable via supervisor, use gen_component
 -spec start_link(instanceid()) -> {ok, pid()}.

@@ -46,7 +46,7 @@
 
 -type interval() :: trigger:interval().
 -type interval_fun() :: trigger:interval_fun().
--type message_tag() :: cs_send:message_tag().
+-type message_tag() :: comm:message_tag().
 -type state() :: {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference() | ok}.
 
 %% @doc Initializes the trigger with the given interval functions and the given
@@ -59,7 +59,7 @@ init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) when is_function(B
 %%      its initialization.
 -spec first(state()) -> {interval_fun(), interval_fun(), interval_fun(), message_tag(), reference()}.
 first({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}) ->
-    TimerRef = cs_send:send_local_after(0, self(), {MsgTag}),
+    TimerRef = comm:send_local_after(0, self(), {MsgTag}),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}.
 
 %% @doc Sets the trigger to send its message after some delay (in milliseconds).
@@ -90,14 +90,14 @@ next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, Interv
 send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) ->
     case IntervalTag of
         max_interval ->
-            cs_send:send_local_after(MaxIntervalFun(), self(), {MsgTag});
+            comm:send_local_after(MaxIntervalFun(), self(), {MsgTag});
         base_interval ->
-            cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag});
+            comm:send_local_after(BaseIntervalFun(), self(), {MsgTag});
         min_interval ->
-            cs_send:send_local_after(MinIntervalFun(), self(), {MsgTag});
+            comm:send_local_after(MinIntervalFun(), self(), {MsgTag});
         now_and_min_interval ->
-            cs_send:send_local(self(), {MsgTag}),
-            cs_send:send_local_after(MinIntervalFun(), self(), {MsgTag});
+            comm:send_local(self(), {MsgTag}),
+            comm:send_local_after(MinIntervalFun(), self(), {MsgTag});
         _ ->
-            cs_send:send_local_after(BaseIntervalFun(), self(), {MsgTag})
+            comm:send_local_after(BaseIntervalFun(), self(), {MsgTag})
      end.

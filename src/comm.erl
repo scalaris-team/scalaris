@@ -13,7 +13,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    cs_send.erl
+%%% File    comm.erl
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    Message Sending.
 %%%  
@@ -29,7 +29,7 @@
 %%%  
 %%%  Sending messages to so-tagged process identifiers works seamlessly, e.g.
 %%%  a server receiving message {tag, SourcePid} can reply with
-%%%  cs_send:send(SourcePid, {tag_response}). On the receiving side (a client),
+%%%  comm:send(SourcePid, {tag_response}). On the receiving side (a client),
 %%%  a message of the form {Message, Cookie} will then be received, e.g.
 %%%  {{tag_response}, Cookie}. Pids with cookies can be created using 
 %%%  this_with_cookie/1.
@@ -37,7 +37,7 @@
 %%% Created :  15 May 2007 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @version $Id$
--module(cs_send).
+-module(comm).
 
 -author('schuett@zib.de').
 -vsn('$Id$').
@@ -163,7 +163,7 @@ send_local_after(Delay, Pid, Message) ->
 %% @doc TCP_LAYER: Converts a local erlang pid to a global pid of type mypid()
 %%      for use in send/2.
 make_global(Pid) ->
-    get(Pid, cs_send:this()).
+    get(Pid, comm:this()).
 
 %% @doc TCP_LAYER: Creates the pid a process with name Name would have on node
 %%      _Node.

@@ -52,7 +52,7 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, trigger:state()}.
 init(Trigger) ->
-    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [cs_send:this()]),
+    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     {uninit, TriggerState}.
       
@@ -86,10 +86,10 @@ trigger_reregister() ->
     reregister(config:read(register_hosts), RegisterMessage).
 
 reregister(failed, Message)->
-    cs_send:send(bootPid(), Message);
+    comm:send(bootPid(), Message);
 reregister(Hosts, Message) ->
     lists:foreach(
-      fun(Host) -> cs_send:send(Host, Message) end,
+      fun(Host) -> comm:send(Host, Message) end,
       Hosts).
 
 %% @doc Gets the zombie detector interval set in scalaris.cfg.
@@ -98,11 +98,11 @@ get_base_interval() ->
 
 %% @doc Gets the pid of the dht_node process in the same group as the calling
 %%      process.
--spec get_dht_node_this() -> cs_send:mypid().
+-spec get_dht_node_this() -> comm:mypid().
 get_dht_node_this() ->
-    cs_send:make_global(process_dictionary:get_group_member(dht_node)).
+    comm:make_global(process_dictionary:get_group_member(dht_node)).
 
 %% @doc pid of the boot daemon
--spec bootPid() -> cs_send:mypid().
+-spec bootPid() -> comm:mypid().
 bootPid() ->
     config:read(boot_host).

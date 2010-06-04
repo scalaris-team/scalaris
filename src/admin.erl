@@ -124,7 +124,7 @@ number_of_nodes() ->
 %% comm_logger functions
 %%===============================================================================
 get_dump() ->
-    [cs_send:send(cs_send:get(admin_server, Server), {get_comm_layer_dump, cs_send:this()})
+    [comm:send(comm:get(admin_server, Server), {get_comm_layer_dump, comm:this()})
      || Server <- util:get_nodes()],
     %% list({Map, StartTime})
     Dumps = [receive
@@ -184,7 +184,7 @@ loop() ->
         {halt,N} ->
             halt(N);
         {get_comm_layer_dump, Sender} ->
-            cs_send:send(Sender, {get_comm_layer_dump_response,
+            comm:send(Sender, {get_comm_layer_dump_response,
                                   comm_logger:dump()}),
             loop()
     end.
@@ -213,7 +213,7 @@ print_ages() ->
     boot_server:node_list(),
     receive
         {get_list_response, List} ->
-            [ cs_send:send_to_group_member(Node,cyclon,{get_ages,self()}) || Node <- List ]
+            [ comm:send_to_group_member(Node,cyclon,{get_ages,self()}) || Node <- List ]
     end,
     worker_loop(),
     ok.
@@ -232,7 +232,7 @@ check_routing_tables(Port) ->
     boot_server:node_list(),
     receive
         {get_list_response, List} ->
-            [ cs_send:send_to_group_member(Node,routing_table,{check,Port}) || Node <- List ]
+            [ comm:send_to_group_member(Node,routing_table,{check,Port}) || Node <- List ]
     end,
     ok.
 
@@ -241,5 +241,5 @@ dd_check_ring() ->
 
 dd_check_ring(Token) ->
     {ok,One} = process_dictionary:find_dht_node(),
-    cs_send:send_local(One , {send_to_group_member,ring_maintenance,{init_check_ring,Token}}),
+    comm:send_local(One , {send_to_group_member,ring_maintenance,{init_check_ring,Token}}),
     {token_on_the_way}.
