@@ -90,7 +90,7 @@
 register_process(InstanceId, Name, Pid) ->
     erlang:put(instance_id, InstanceId),
     erlang:put(instance_name, Name),
-    cs_send:send_local(get_pid(), {register_process, InstanceId, Name, Pid}),
+    comm:send_local(get_pid(), {register_process, InstanceId, Name, Pid}),
     receive {process_registered} -> ok end.
 
 %% @doc looks up a process with InstanceId and Name in the dictionary
@@ -188,7 +188,7 @@ get_info(InstanceId, Name) ->
             failed ->
                 [{"process", "unknown"}];
             Pid ->
-                cs_send:send_local(Pid , {'$gen_cast', {debug_info, self()}}),
+                comm:send_local(Pid , {'$gen_cast', {debug_info, self()}}),
                 {memory, Memory} = process_info(Pid, memory),
                 {reductions, Reductions} = process_info(Pid, reductions),
                 {message_queue_len, QueueLen} = process_info(Pid, message_queue_len),
@@ -266,7 +266,7 @@ on({register_process, InstanceId, Name, Pid}, State) ->
             link(Pid),
             ets:insert_new(?MODULE, {{InstanceId, Name}, Pid})
     end,
-    cs_send:send_local(Pid , {process_registered}),
+    comm:send_local(Pid , {process_registered}),
     State;
 
 on({drop_state}, State) ->

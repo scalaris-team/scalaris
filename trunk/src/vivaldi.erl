@@ -53,20 +53,20 @@
 -type(message() ::
     {trigger} |
     {cy_cache, nodelist:nodelist()} |
-    {vivaldi_shuffle, cs_send:mypid(), network_coordinate(), error()} |
-    {vivaldi_shuffle_reply, cs_send:mypid(), network_coordinate(), error()} |
+    {vivaldi_shuffle, comm:mypid(), network_coordinate(), error()} |
+    {vivaldi_shuffle_reply, comm:mypid(), network_coordinate(), error()} |
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |
-    {get_coordinate, cs_send:mypid()} |
-    {'$gen_cast', {debug_info, Requestor::cs_send:erl_local_pid()}}).
+    {get_coordinate, comm:mypid()} |
+    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends a response message to a request for the vivaldi coordinate.
--spec msg_get_coordinate_response(cs_send:mypid(), network_coordinate(), error()) -> ok.
+-spec msg_get_coordinate_response(comm:mypid(), network_coordinate(), error()) -> ok.
 msg_get_coordinate_response(Pid, Coordinate, Confidence) ->
-    cs_send:send(Pid, {vivaldi_get_coordinate_response, Coordinate, Confidence}).
+    comm:send(Pid, {vivaldi_get_coordinate_response, Coordinate, Confidence}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getters
@@ -81,17 +81,17 @@ msg_get_coordinate_response(Pid, Coordinate, Confidence) ->
 %%      msg_get_coordinate_response/3
 -spec get_coordinate() -> ok.
 get_coordinate() ->
-    get_coordinate(cs_send:this()).
+    get_coordinate(comm:this()).
 
 %% @doc Sends a (local) message to the vivaldi process of the requesting
 %%      process' group asking for the current coordinate and confidence to
 %%      be send to Pid.
 %%      see on({get_coordinate, Pid}, State) and
 %%      msg_get_coordinate_response/3
--spec get_coordinate(cs_send:mypid()) -> ok.
+-spec get_coordinate(comm:mypid()) -> ok.
 get_coordinate(Pid) ->
     VivaldiPid = process_dictionary:get_group_member(vivaldi),
-    cs_send:send_local(VivaldiPid, {get_coordinate, Pid}).
+    comm:send_local(VivaldiPid, {get_coordinate, Pid}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -104,7 +104,7 @@ start_link(InstanceId) ->
 
 -spec init(module()) -> vivaldi:state().
 init(Trigger) ->
-    log:log(info,"[ Vivaldi ~p ] starting~n", [cs_send:this()]),
+    log:log(info,"[ Vivaldi ~p ] starting~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:first(TriggerState),
     {random_coordinate(), 1.0, TriggerState2}.
@@ -133,8 +133,8 @@ on({cy_cache, [Node] = _Cache},
     % do not exchange states with itself
     case node:is_me(Node) of
         false ->
-            cs_send:send_to_group_member(node:pidX(Node), vivaldi,
-                                         {vivaldi_shuffle, cs_send:this(),
+            comm:send_to_group_member(node:pidX(Node), vivaldi,
+                                         {vivaldi_shuffle, comm:this(),
                                           Coordinate, Confidence});
         true -> ok
     end,
@@ -171,7 +171,7 @@ on({'$gen_cast', {debug_info, Requestor}},
     KeyValueList =
         [{"coordinate", lists:flatten(io_lib:format("~p", [Coordinate]))},
          {"confidence", Confidence}],
-    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 
 on(_, _State) ->

@@ -132,8 +132,8 @@ commit_phase(Items, SuccessFun, ReadPhaseResult, FailureFun, Owner, TID)->
 init_leader_state(TID, Items) ->
     {SelfKey, _TS} = TID,
     LeaderBallot = 2,
-    TMState = trecords:new_tm_state(TID, Items, cs_send:this(),
-                                    {SelfKey, cs_send:this(),
+    TMState = trecords:new_tm_state(TID, Items, comm:this(),
+                                    {SelfKey, comm:this(),
                                      LeaderBallot}),
     TMState#tm_state{myBallot=LeaderBallot}.
 
@@ -141,14 +141,14 @@ init_leader_state(TID, Items) ->
 init_phase(TMState) ->
     TMMessage = {init_rtm,
                  trecords:new_tm_message(TMState#tm_state.transID,
-                                         {cs_send:this(),
+                                         {comm:this(),
                                           TMState#tm_state.items})
                 },
     tsend:send_to_rtms_with_lookup(TMState#tm_state.transID, TMMessage),
 
     TPMessage = {lookup_tp,
                  #tp_message{item_key = unknown,
-                             message={cs_send:this()}
+                             message={comm:this()}
                             }
                 },
     tsend:send_to_participants_with_lookup(TMState, TPMessage),
@@ -224,13 +224,13 @@ start_replicated_manager(Message, InstanceId)->
     RKey = Message#tm_message.tm_key,
     TransID = Message#tm_message.transaction_id,
     erlang:put(instance_id, InstanceId),
-    cs_send:send(Leader, {rtm, cs_send:this(), RKey}),
+    comm:send(Leader, {rtm, comm:this(), RKey}),
     TMState = trecords:new_tm_state(TransID, Items, Leader,
-                                    {RKey, cs_send:this(), unknownballot}),
+                                    {RKey, comm:this(), unknownballot}),
     loop(TMState),
     % done: remove tid_tm_mapping.
     DHTNodePid = process_dictionary:get_group_member(dht_node),
-    DHTNodePid ! {remove_tm_tid_mapping, TransID, cs_send:this()}.
+    DHTNodePid ! {remove_tm_tid_mapping, TransID, comm:this()}.
 
 loop(TMState)->
     receive

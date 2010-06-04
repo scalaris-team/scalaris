@@ -52,7 +52,7 @@ run_1() ->
     timer:sleep(3000),
     bench_server:run_read(Worker, Iterations),
     io:format("~p~n",[util:get_proc_in_vms(admin_server)]),
-    [cs_send:send(Pid,{halt,1}) || Pid <- util:get_proc_in_vms(admin_server)],
+    [comm:send(Pid,{halt,1}) || Pid <- util:get_proc_in_vms(admin_server)],
     halt(1).
     
 

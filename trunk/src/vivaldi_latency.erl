@@ -35,8 +35,8 @@
 -export([measure_latency/3, check_config/0]).
 
 % state of the vivaldi loop
--type(state() :: {cs_send:erl_local_pid(),
-                  cs_send:mypid(),
+-type(state() :: {comm:erl_local_pid(),
+                  comm:mypid(),
                   {vivaldi:network_coordinate(), vivaldi:error()},
                   {integer(), integer(), integer()} | unknown,
                   [vivaldi:latency()]}).
@@ -56,16 +56,16 @@ on({pong}, {Owner, RemotePid, Token, Start, Latencies}) ->
     NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
     case length(NewLatencies) =:= config:read(vivaldi_count_measurements) of
         true ->
-            cs_send:send_local(Owner, {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
+            comm:send_local(Owner, {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
             kill;
         false ->
-            cs_send:send_local_after(config:read(vivaldi_measurements_delay),
+            comm:send_local_after(config:read(vivaldi_measurements_delay),
                               self(), {start_ping}),
             {Owner, RemotePid, Token, unknown, NewLatencies}
     end;
 
 on({start_ping}, {Owner, RemotePid, Token, _, Latencies}) ->
-    cs_send:send(RemotePid, {ping, cs_send:this()}),
+    comm:send(RemotePid, {ping, comm:this()}),
     {Owner, RemotePid, Token, erlang:now(), Latencies};
 
 on({shutdown}, _State) ->
@@ -78,14 +78,14 @@ on(_, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec init({cs_send:erl_local_pid(), cs_send:mypid(), {vivaldi:network_coordinate(), vivaldi:error()}}) -> state().
+-spec init({comm:erl_local_pid(), comm:mypid(), {vivaldi:network_coordinate(), vivaldi:error()}}) -> state().
 init({Owner, RemotePid, Token}) ->
     %io:format("vivaldi_latency start ~n"),
-    cs_send:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
-    cs_send:send_local(self(), {start_ping}),
+    comm:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
+    comm:send_local(self(), {start_ping}),
     {Owner, RemotePid, Token, unknown, []}.
 
--spec measure_latency(cs_send:mypid(), vivaldi:network_coordinate(), vivaldi:error()) -> {ok, pid()}.
+-spec measure_latency(comm:mypid(), vivaldi:network_coordinate(), vivaldi:error()) -> {ok, pid()}.
 measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
     gen_component:start(?MODULE, {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}}, []).
 

@@ -99,10 +99,10 @@ test_on_vivaldi_shuffle(Config) ->
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
-    _NewState = vivaldi:on({vivaldi_shuffle, cs_send:this(), [0.0, 0.0], 1.0},
+    _NewState = vivaldi:on({vivaldi_shuffle, comm:this(), [0.0, 0.0], 1.0},
                                  InitialState),
     receive
-        {ping, SourcePid} -> cs_send:send(SourcePid, {pong})
+        {ping, SourcePid} -> comm:send(SourcePid, {pong})
     end,
 
     ?expect_message({update_vivaldi_coordinate, _Latency, {[0.0, 0.0], 1.0}}),
@@ -131,7 +131,7 @@ test_on_cy_cache2(Config) ->
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
-    Cache = [node:new(cs_send:make_global(self()), 10, 0)],
+    Cache = [node:new(comm:make_global(self()), 10, 0)],
     NewState =
         vivaldi:on({cy_cache, Cache}, InitialState),
 
@@ -150,13 +150,13 @@ test_on_cy_cache3(Config) ->
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
-    Cache = [node:new(cs_send:make_global(self()), 10, 0)],
+    Cache = [node:new(comm:make_global(self()), 10, 0)],
     NewState =
         vivaldi:on({cy_cache, Cache}, InitialState),
 
     ?equals(NewState, InitialState),
     % if pids don't match, a get_state is send to the cached node's dht_node
-    This = cs_send:this(),
+    This = comm:this(),
     ?expect_message({send_to_group_member, vivaldi,
                      {vivaldi_shuffle, This, Coordinate, Confidence}}),
     % no further messages

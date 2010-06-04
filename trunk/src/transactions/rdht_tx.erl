@@ -195,7 +195,7 @@ commit(TLog) ->
     %% some parameters are checked via the individual operations
     %% rdht_tx_read, rdht_tx_write which implement the behaviour tx_op_beh.
     InstanceID = erlang:get(instance_id),
-    Client = cs_send:this(),
+    Client = comm:this(),
     ClientsId = {commit_client_id, util:get_global_uid()},
     case process_dictionary:get_group_member(tx_tm) of
         failed ->

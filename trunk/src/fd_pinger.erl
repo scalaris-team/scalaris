@@ -31,7 +31,7 @@
 
 -export([init/1, on/2, start_link/1, check_config/0]).
 
--type(state() :: {module(), cs_send:mypid(), Count::non_neg_integer()}).
+-type(state() :: {module(), comm:mypid(), Count::non_neg_integer()}).
 -type(message() ::
     {stop} |
     {pong} |
@@ -42,15 +42,15 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc spawns a fd_pinger instance
--spec start_link([module() | cs_send:mypid()]) -> {ok, pid()}.
+-spec start_link([module() | comm:mypid()]) -> {ok, pid()}.
 start_link([Module, Pid]) ->
    gen_component:start_link(?MODULE, [Module, Pid], []).
 
--spec init([module() | cs_send:mypid()]) -> state().
+-spec init([module() | comm:mypid()]) -> state().
 init([Module, Pid]) ->
     log:log(info,"[ fd_pinger ~p ] starting Node", [self()]),
-    cs_send:send(Pid, {ping, cs_send:this()}),
-    cs_send:send_local_after(failureDetectorInterval(), self(), {timeout, 0}),
+    comm:send(Pid, {ping, comm:this()}),
+    comm:send_local_after(failureDetectorInterval(), self(), {timeout, 0}),
     {Module, Pid, 0}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -65,8 +65,8 @@ on({pong}, {Module, Pid, Count}) ->
 on({timeout, OldCount}, {Module, Pid, Count}) ->
     case OldCount < Count of 
         true -> 
-            cs_send:send(Pid, {ping, cs_send:this()}),
-            cs_send:send_local_after(failureDetectorInterval(), self(), {timeout, Count}),
+            comm:send(Pid, {ping, comm:this()}),
+            comm:send_local_after(failureDetectorInterval(), self(), {timeout, Count}),
             {Module, Pid, Count};
         false ->    
            report_crash(Pid, Module),
@@ -84,10 +84,10 @@ check_config() ->
 
 %% @doc Reports the crash of the given pid to the given module.
 %% @private
--spec report_crash(cs_send:mypid(), module()) -> ok.
+-spec report_crash(comm:mypid(), module()) -> ok.
 report_crash(Pid, Module) ->
     log:log(warn,"[ FD ] ~p crashed",[Pid]),
-    cs_send:send_local(Module, {crash, Pid}).
+    comm:send_local(Module, {crash, Pid}).
 
 %% @doc The interval between two failure detection runs.
 -spec failureDetectorInterval() -> pos_integer().

@@ -33,11 +33,11 @@ check(X, X, _Id, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, Pred, Succ, true) ->
     Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}),
+    comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}),
     check_fd(NewRT, OldRT);
 check(_OldRT, NewRT, Id, Pred, Succ, false) ->
     Pid = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}).
+    comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}).
 
 %% @doc Updates the failure detector in case the routing table changed.
 -spec check_fd(Old::rt(), New::rt()) -> ok.

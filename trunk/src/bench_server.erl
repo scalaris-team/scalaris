@@ -38,41 +38,41 @@
 %%==============================================================================
 %% @doc run an increment benchmark (i++) on all nodes
 run_increment(ThreadsPerVM, Iterations) ->
-    Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
+    Msg = {bench_increment, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
 run_increment_v2(ThreadsPerVM, Iterations) ->
-    Msg = {bench_increment_v2, ThreadsPerVM, Iterations, cs_send:this()},
+    Msg = {bench_increment_v2, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
 run_increment_locally(ThreadsPerVM, Iterations) ->
-    Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
+    Msg = {bench_increment, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, [locally, verbose], Msg).
 
 %% @doc run an increment benchmark (i++) on all nodes
 %% profile : enable profiling
 %% {copies, Copies}: run in the benchmark in Copies nodes
 run_increment(ThreadsPerVM, Iterations, Options) ->
-    Msg = {bench_increment, ThreadsPerVM, Iterations, cs_send:this()},
+    Msg = {bench_increment, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, Options, Msg).
 
 %% @doc run an read benchmark on all nodes
 run_read(ThreadsPerVM, Iterations) ->
-    Msg = {bench_read, ThreadsPerVM, Iterations, cs_send:this()},
+    Msg = {bench_read, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
 run_read_v2(ThreadsPerVM, Iterations) ->
-    Msg = {bench_read_v2, ThreadsPerVM, Iterations, cs_send:this()},
+    Msg = {bench_read_v2, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
 run_read(ThreadsPerVM, Iterations, Options) ->
-    Msg = {bench_read, ThreadsPerVM, Iterations, cs_send:this()},
+    Msg = {bench_read, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, Options, Msg).
 
 runner(ThreadsPerVM, Iterations, Options, Message) ->
     ServerList = case lists:member(locally, Options) of
                      true ->
-                         [cs_send:make_global(bench_server)];
+                         [comm:make_global(bench_server)];
                      false ->
                          case lists:keysearch(copies, 1, Options) of
                              {value, {copies, Copies}} ->
@@ -86,11 +86,11 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
     Before = erlang:now(),
     Times = case lists:member(profile, Options) of
                 false ->
-                    [cs_send:send(Server, Message) || Server <- ServerList],
+                    [comm:send(Server, Message) || Server <- ServerList],
                     [receive {done, Time} -> io:format("BS: ~p~n",[Time]),Time end || _Server <- ServerList];
                 true ->
                     Result = fprof:apply(fun () ->
-                                                 [cs_send:send(Server, Message) || Server <- ServerList],
+                                                 [comm:send(Server, Message) || Server <- ServerList],
                                                  [receive {done, Time} -> Time end || _Server <- ServerList]
                                          end,
                                          [], [{procs, process_dictionary:get_all_pids()}]),
@@ -132,7 +132,7 @@ bench_increment(Threads, Iterations, Owner) ->
                                           Iterations) 
 	  end,
     {Time, _} = timer:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    cs_send:send(Owner, {done, Time}),
+    comm:send(Owner, {done, Time}),
     ok.
 
 bench_increment_v2(Threads, Iterations, Owner) ->
@@ -143,7 +143,7 @@ bench_increment_v2(Threads, Iterations, Owner) ->
                                              Iterations) 
 	  end,
     {Time, _} = timer:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    cs_send:send(Owner, {done, Time}),
+    comm:send(Owner, {done, Time}),
     ok.
 
 %% @doc run the read bench locally
@@ -156,7 +156,7 @@ bench_read(Threads, Iterations, Owner) ->
 		             Iterations)
 	  end,
     {Time, _} = timer:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    cs_send:send(Owner, {done, Time}),
+    comm:send(Owner, {done, Time}),
     ok.
 
 bench_read_v2(Threads, Iterations, Owner) ->
@@ -167,7 +167,7 @@ bench_read_v2(Threads, Iterations, Owner) ->
                                     Iterations, 0)
 	  end,
     {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    cs_send:send(Owner, {done, Time}),
+    comm:send(Owner, {done, Time}),
     ok.
 
 -spec(bench_runner/3 :: (integer(), integer(), any()) -> ok).
@@ -185,7 +185,7 @@ bench_runner(Threads, Iterations, Bench) ->
     end.
 
 run_bench_read(Owner, _Key, 0) ->
-    cs_send:send_local(Owner , {done, ok});
+    comm:send_local(Owner , {done, ok});
 run_bench_read(Owner, Key, Iterations) ->
     case transaction_api:quorum_read(Key) of
 	{fail, _Reason} ->
@@ -196,7 +196,7 @@ run_bench_read(Owner, Key, Iterations) ->
 
 run_bench_read_v2(Owner, _Key, 0, Fail) ->
     io:format("repeated requests: ~p~n", [Fail]),
-    cs_send:send_local(Owner , {done, ok});
+    comm:send_local(Owner , {done, ok});
 run_bench_read_v2(Owner, Key, Iterations, Fail) ->
     case cs_api_v2:read(Key) of
 	{fail, _Reason} ->

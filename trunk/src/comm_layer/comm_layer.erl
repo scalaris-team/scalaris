@@ -64,7 +64,7 @@ send({{_IP1, _IP2, _IP3, _IP4} = IP, Port, Pid} = Target, Message) ->
     end;
 
 send(Target, Message) ->
-    log:log(error,"[ CL ] wrong call to cs_send:send: ~w ! ~w", [Target, Message]),
+    log:log(error,"[ CL ] wrong call to comm:send: ~w ! ~w", [Target, Message]),
     log:log(error,"[ CL ] stacktrace: ~w", [util:get_stacktrace()]),
     ok.
 

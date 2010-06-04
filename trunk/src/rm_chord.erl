@@ -32,19 +32,19 @@
 -type(state() :: {Id             :: ?RT:key(),
                   Neighborhood   :: nodelist:neighborhood(),
                   TriggerState   :: trigger:state()}
-     | {uninit, QueuedMessages::[cs_send:message()], TriggerState :: trigger:state()}).
+     | {uninit, QueuedMessages::[comm:message()], TriggerState :: trigger:state()}).
 
 % accepted messages
 -type(message() ::
     {init, Id::?RT:key(), Me::node_details:node_type(), Predecessor::node_details:node_type(), Successor::node:node_type()} |
-    {get_succlist, Source_Pid::cs_send:mypid()} |
+    {get_succlist, Source_Pid::comm:mypid()} |
     {stabilize} |
     {get_node_details_response, NodeDetails::node_details:node_details()} |
     {get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_nodelist()} |
     {notify_new_pred, Pred::node:node_type()} |
     {notify_new_succ, Succ::node:node_type()} |
-    {crash, DeadPid::cs_send:mypid()} |
-    {'$gen_cast', {debug_info, Requestor::cs_send:erl_local_pid()}}).
+    {crash, DeadPid::comm:mypid()} |
+    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -60,17 +60,17 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, QueuedMessages::[], TriggerState::trigger:state()}.
 init(Trigger) ->
-    log:log(info,"[ RM ~p ] starting ring maintainer chord~n", [cs_send:this()]),
+    log:log(info,"[ RM ~p ] starting ring maintainer chord~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, stabilize),
-    cs_send:send_local(get_cs_pid(), {init_rm, self()}),
+    comm:send_local(get_cs_pid(), {init_rm, self()}),
     TriggerState2 = trigger:next(TriggerState),
     {uninit, [], TriggerState2}.
 
 %% @doc Sends a message to the remote node's ring_maintenance process asking for
 %%      it list of successors.
--spec get_successorlist(cs_send:mypid()) -> ok.
+-spec get_successorlist(comm:mypid()) -> ok.
 get_successorlist(RemoteDhtNodePid) ->
-    cs_send:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {get_succlist, cs_send:this()}).
+    comm:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {get_succlist, comm:this()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
@@ -82,14 +82,14 @@ on({init, Id, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState
     Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
     get_successorlist(node:pidX(Successor)),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
-    cs_send:send_queued_messages(QueuedMessages),
+    comm:send_queued_messages(QueuedMessages),
     {Id, Neighborhood, TriggerState};
 
 on(Msg, {uninit, QueuedMessages, TriggerState}) ->
     {uninit, [Msg | QueuedMessages], TriggerState};
 
 on({get_succlist, Source_Pid}, {_Id, Neighborhood, _TriggerState} = State) ->
-    cs_send:send(Source_Pid, {get_succlist_response,
+    comm:send(Source_Pid, {get_succlist_response,
                               nodelist:node(Neighborhood),
                               nodelist:succs(Neighborhood)}),
     State;
@@ -98,8 +98,8 @@ on({stabilize}, {Id, Neighborhood, TriggerState}) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true ->
-            cs_send:send(node:pidX(nodelist:succ(Neighborhood)),
-                         {get_node_details, cs_send:this(), [pred]});
+            comm:send(node:pidX(nodelist:succ(Neighborhood)),
+                         {get_node_details, comm:this(), [pred]});
         _ -> ok
     end,
     {Id, Neighborhood, trigger:next(TriggerState)};
@@ -159,7 +159,7 @@ on({crash, DeadPid}, {Id, Neighborhood, TriggerState})  ->
     {Id, NewNeighborhood, TriggerState};
 
 on({'$gen_cast', {debug_info, Requestor}}, {_Id, Neighborhood, _TriggerState} = State)  ->
-    cs_send:send_local(Requestor,
+    comm:send_local(Requestor,
                        {debug_info_response,
                         [{"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
                          {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},

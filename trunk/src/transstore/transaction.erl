@@ -116,7 +116,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
             %% we do not have any information for the key in the log read the
             %% information from remote
             ReplicaKeys = ?RT:get_keys_for_replicas(Key),
-            [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
+            [ lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
             erlang:send_after(config:read(transaction_lookup_timeout), self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
             {Flag, Result} = write_read_receive(ReplicaKeys, Operation),
@@ -158,16 +158,16 @@ quorum_read(Key, SourcePID)->
 do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_keys_for_replicas(Key),
-    [ cs_lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
+    [ lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
     erlang:send_after(config:read(transaction_lookup_timeout), self(),
                       {write_read_receive_timeout, hd(ReplicaKeys)}),
     {Flag, Result} = write_read_receive(ReplicaKeys, read),
     if
         Flag =:= fail ->
-            cs_send:send(SourcePID, {single_read_return, {fail, Result}});
+            comm:send(SourcePID, {single_read_return, {fail, Result}});
         true ->
             {Value, Version} = Result,
-            cs_send:send(SourcePID, {single_read_return,{value, Value, Version}})
+            comm:send(SourcePID, {single_read_return,{value, Value, Version}})
     end.
 
 write_read_receive(ReplicaKeys, Operation)->
@@ -239,9 +239,9 @@ do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
     {Flag, NewTransLog} = parallel_reads(Keys, TransLog),
     if
         Flag =:= fail->
-            cs_send:send(SourcePID, {parallel_reads_return, fail});
+            comm:send(SourcePID, {parallel_reads_return, fail});
         true ->
-            cs_send:send(SourcePID, {parallel_reads_return, NewTransLog})
+            comm:send(SourcePID, {parallel_reads_return, NewTransLog})
     end.
 
 
@@ -269,7 +269,7 @@ parallel_reads(Keys, TransLog)->
                     Elem <- ToLookup ],
 
             lists:map(fun(ReplicaKeys)->
-                              [ cs_lookup:unreliable_get_key(ReplicaKey) ||
+                              [ lookup:unreliable_get_key(ReplicaKey) ||
                                   ReplicaKey <- ReplicaKeys ]
                       end,
                       ReplicaKeysAll),
@@ -463,7 +463,7 @@ getRTMKeys(TID)->
 initRTM(State, Message)->
     TransID = Message#tm_message.transaction_id,
     ERTMPID = spawn(tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
-    RTMPID = cs_send:make_global(ERTMPID),
+    RTMPID = comm:make_global(ERTMPID),
     %% update transaction log: store mapping between transaction ID and local TM
     TransLog = dht_node_state:get(State, trans_log),
     New_TID_TM_Mapping = dict:store(TransID, RTMPID, TransLog#translog.tid_tm_mapping),
@@ -473,7 +473,7 @@ initRTM(State, Message)->
 %% @doc deletes all replicas of an item, but respects locks
 %%      the return value is the number of successfully deleted items
 %%      WARNING: this function can lead to inconsistencies
--spec(delete/2 :: (cs_send:mypid(), any()) -> ok).
+-spec(delete/2 :: (comm:mypid(), any()) -> ok).
 delete(SourcePID, Key) ->
     InstanceId = erlang:get(instance_id),
     spawn(transaction, do_delete, [Key, SourcePID, InstanceId]), 
@@ -482,16 +482,16 @@ delete(SourcePID, Key) ->
 do_delete(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_keys_for_replicas(Key),
-    [ cs_lookup:unreliable_lookup(Replica, {delete_key, cs_send:this(), Replica}) ||
+    [ lookup:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
 	Replica <- ReplicaKeys],
     erlang:send_after(config:read(transaction_lookup_timeout), self(), {timeout}),
     delete_collect_results(ReplicaKeys, SourcePID, []).
 
 %% @doc collect the response for the delete requests
--spec(delete_collect_results/3 :: (list(?RT:key()), cs_send:mypid(),
+-spec(delete_collect_results/3 :: (list(?RT:key()), comm:mypid(),
 				   list()) -> any()).
 delete_collect_results([], SourcePID, Results) ->
-    cs_send:send(SourcePID, {delete_result, {ok,
+    comm:send(SourcePID, {delete_result, {ok,
 					     length([ok || R <- Results, R =:= ok]),
 					     Results}});
 delete_collect_results(ReplicaKeys, Source_PID, Results) ->
@@ -508,7 +508,7 @@ delete_collect_results(ReplicaKeys, Source_PID, Results) ->
 					   Results)
 	    end;
 	{timeout} ->
-	    cs_send:send(Source_PID, {delete_result,
+	    comm:send(Source_PID, {delete_result,
 				      {fail, timeout,
 				       length([ok || R <- Results, R =:= ok]),
 				       Results}})

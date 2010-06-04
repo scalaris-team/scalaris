@@ -99,11 +99,11 @@ new(RT, Neighbors, LB, DB) ->
           (state(), succlist) -> nodelist:non_empty_nodelist();
           (state(), succ) -> node:node_type();
           (state(), succ_id) -> ?RT:key();
-          (state(), succ_pid) -> cs_send:mypid();
+          (state(), succ_pid) -> comm:mypid();
           (state(), predlist) -> nodelist:non_empty_nodelist();
           (state(), pred) -> node:node_type();
           (state(), pred_id) -> ?RT:key();
-          (state(), pred_pid) -> cs_send:mypid();
+          (state(), pred_pid) -> comm:mypid();
           (state(), node) -> node:node_type();
           (state(), node_id) -> ?RT:key();
           (state(), my_range) -> intervals:interval();

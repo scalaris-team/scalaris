@@ -181,7 +181,7 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
     {NewTLogEntry, NewResultEntry} =
         my_make_tlog_result_entry(TLogEntry, Request),
     Msg = msg_reply(Id, NewTLogEntry, NewResultEntry),
-    cs_send:send_local(ClientPid, Msg),
+    comm:send_local(ClientPid, Msg),
 %%    erlang:yield(),
     State;
 

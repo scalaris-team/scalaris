@@ -42,7 +42,7 @@ all() ->
      pdb_set,
      pdb_get,
      erlang_send,
-     cs_send_local,
+     comm_local,
     erlang_send_after,
     erlang_spawn,
     erlang_now].
@@ -119,9 +119,9 @@ erlang_send(_Config) ->
     receive {pong} -> ok end,
     ok.
 
-cs_send_local(_Config) ->
+comm_local(_Config) ->
     Pid = spawn(?MODULE, helper_rec, [count(), self()]),
-    iter(count(), fun() -> cs_send:send_local(Pid, {ping}) end, "cs_send_local"),
+    iter(count(), fun() -> comm:send_local(Pid, {ping}) end, "comm_local"),
     receive {pong} -> ok end,
     ok.
 
@@ -132,7 +132,7 @@ helper_rec(Iter, Pid) ->
 
 erlang_send_after(_Config) ->
     Pid = spawn(?MODULE, helper_rec, [count(), self()]),
-    iter(count(), fun() -> cs_send:send_local_after(5000, Pid, {ping}) end, "cs_send:send_after"),
+    iter(count(), fun() -> comm:send_local_after(5000, Pid, {ping}) end, "comm:send_after"),
     receive {pong} -> ok end,
     ok.
 

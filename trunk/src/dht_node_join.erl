@@ -49,10 +49,10 @@ join_request(State, NewPred) ->
     
     %%TODO: split data [{Key, Value, Version}], schedule transfer
     
-    cs_send:send(node:pidX(NewPred), {join_response, dht_node_state:get(State, pred), HisData}),
+    comm:send(node:pidX(NewPred), {join_response, dht_node_state:get(State, pred), HisData}),
     % TODO: better already update our range here directly than waiting for an
     % updated state from the ring_maintenance!
-    rm_beh:notify_new_pred(cs_send:this(), NewPred),
+    rm_beh:notify_new_pred(comm:this(), NewPred),
     dht_node_state:set_db(State, DB).
 %% userdevguide-end dht_node_join:join_request
 
@@ -64,11 +64,11 @@ join_request(State, NewPred) ->
 % first node
 process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {as_first}, QueuedMessages}) ->
     log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Id]),
-    Me = node:new(cs_send:this(), Id, IdVersion),
+    Me = node:new(comm:this(), Id, IdVersion),
     rt_beh:initialize(Id, Me, Me),
     NewState = dht_node_state:new(?RT:empty_ext(Me), nodelist:new_neighborhood(Me), dht_node_lb:new(), ?DB:new(Id)),
-    cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
-    cs_send:send_queued_messages(QueuedMessages),
+    comm:send_local(get_local_dht_node_reregister_pid(), {go}),
+    comm:send_queued_messages(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
     NewState;  % join complete, State is the first "State"
 
@@ -80,7 +80,7 @@ process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {phase1}, Que
     %io:format("p1: got key~n"),
     log:log(info,"[ Node ~w ] joining",[self()]),
     % send message to avoid code duplication
-    cs_send:send_local(self(), {known_hosts_timeout}),
+    comm:send_local(self(), {known_hosts_timeout}),
     {join, {phase2, Id, IdVersion}, QueuedMessages};
 
 % 2. Find known hosts
@@ -88,11 +88,11 @@ process_join_msg({known_hosts_timeout}, {join, {phase2, _Id, _IdVersion}, _Queue
     %io:format("p2: known hosts timeout~n"),
     KnownHosts = config:read(known_hosts),
     % contact all known VMs
-    _Res = [cs_send:send(KnownHost, {get_dht_nodes, cs_send:this()})
+    _Res = [comm:send(KnownHost, {get_dht_nodes, comm:this()})
            || KnownHost <- KnownHosts],
     %io:format("~p~n", [_Res]),
     % timeout just in case
-    cs_send:send_local_after(1000, self(), {known_hosts_timeout}),
+    comm:send_local_after(1000, self(), {known_hosts_timeout}),
     State;
 
 process_join_msg({get_dht_nodes_response, []}, {join, {phase2, _Id, _IdVersion}, _QueuedMessages} = State) ->
@@ -101,13 +101,13 @@ process_join_msg({get_dht_nodes_response, []}, {join, {phase2, _Id, _IdVersion},
     State;
 
 process_join_msg({get_dht_nodes_response, Nodes}, {join, {phase2, Id, IdVersion}, QueuedMessages} = State) ->
-    %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(cs_send:this(), Nodes)]),
-    case lists:delete(cs_send:this(), Nodes) of
+    %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(comm:this(), Nodes)]),
+    case lists:delete(comm:this(), Nodes) of
         [] ->
             State;
         [First | Rest] ->
-            cs_send:send(First, {lookup_aux, Id, 0, {get_node, cs_send:this(), Id}}),
-            cs_send:send_local_after(3000, self(), {lookup_timeout}),
+            comm:send(First, {lookup_aux, Id, 0, {get_node, comm:this(), Id}}),
+            comm:send_local_after(3000, self(), {lookup_timeout}),
             {join, {phase3, Rest, Id, IdVersion}, QueuedMessages}
     end;
 
@@ -115,15 +115,15 @@ process_join_msg({get_dht_nodes_response, Nodes}, {join, {phase2, Id, IdVersion}
 process_join_msg({lookup_timeout}, {join, {phase3, [], Id, IdVersion}, QueuedMessages}) ->
     %io:format("p3: lookup_timeout~n"),
     % no more nodes left, go back to step 2
-    cs_send:send_local(self(), {known_hosts_timeout}),
+    comm:send_local(self(), {known_hosts_timeout}),
     {join, {phase2, Id, IdVersion}, QueuedMessages};
 
 process_join_msg({get_node_response, Id, Succ}, {join, {phase3, _DHTNodes, Id, IdVersion}, QueuedMessages}) ->
     %io:format("p3: lookup success~n"),
     % got my successor
-    Me = node:new(cs_send:this(), Id, IdVersion),
+    Me = node:new(comm:this(), Id, IdVersion),
     % announce join request
-    cs_send:send(node:pidX(Succ), {join, Me}),
+    comm:send(node:pidX(Succ), {join, Me}),
     {join, {phase4, Succ, Me}, QueuedMessages};
 
 % 4. joining my neighbors
@@ -147,8 +147,8 @@ process_join_msg({join_response, Pred, Data}, {join, {phase4, Succ, Me}, QueuedM
                                    dht_node_lb:new(), DB)
         end,
     cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
-    cs_send:send_local(get_local_dht_node_reregister_pid(), {go}),
-    cs_send:send_queued_messages(QueuedMessages),
+    comm:send_local(get_local_dht_node_reregister_pid(), {go}),
+    comm:send_queued_messages(QueuedMessages),
     State;
 
 % ignore some messages that appear too late for them to be used, e.g. if a new

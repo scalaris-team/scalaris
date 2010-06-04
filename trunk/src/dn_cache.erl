@@ -37,8 +37,8 @@
     {trigger} |
     {{pong}, node:node_type()} |
     {add_zombie_candidate, node:node_type()} |
-    {subscribe, cs_send:erl_local_pid()} |
-    {unsubscribe, cs_send:erl_local_pid()}).
+    {subscribe, comm:erl_local_pid()} |
+    {unsubscribe, comm:erl_local_pid()}).
 
 -type(state() :: {fix_queue:fix_queue(), gb_set(), trigger:state()}).
 
@@ -48,15 +48,15 @@
 
 -spec add_zombie_candidate(node:node_type()) -> ok.
 add_zombie_candidate(Node) ->
-    cs_send:send_local(get_pid(), {add_zombie_candidate, Node}).
+    comm:send_local(get_pid(), {add_zombie_candidate, Node}).
 
 -spec subscribe() -> ok.
 subscribe() ->
-    cs_send:send_local(get_pid(), {subscribe, self()}).
+    comm:send_local(get_pid(), {subscribe, self()}).
 
 -spec unsubscribe() -> ok.
 unsubscribe() ->
-    cs_send:send_local(get_pid(), {unsubscribe, self()}).
+    comm:send_local(get_pid(), {unsubscribe, self()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -72,7 +72,7 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> state().
 init(Trigger) ->
-    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [cs_send:this()]),
+    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:first(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new(), TriggerState2}.
@@ -85,12 +85,12 @@ init(Trigger) ->
 
 -spec on(message(), state()) -> state() | unknown_event.
 on({trigger}, {Queue, Subscriber, TriggerState}) ->
-        fix_queue:map(fun(X) -> cs_send:send(node:pidX(X), {ping, cs_send:this_with_cookie(X)}) end, Queue), 
+        fix_queue:map(fun(X) -> comm:send(node:pidX(X), {ping, comm:this_with_cookie(X)}) end, Queue), 
         NewTriggerState = trigger:next(TriggerState),
         {Queue, Subscriber, NewTriggerState};
 
 on({{pong}, Zombie}, {Queue, Subscriber, TriggerState}) ->
-        gb_sets:fold(fun(X, _) -> cs_send:send_local(X, {zombie, Zombie}) end, 0, Subscriber),
+        gb_sets:fold(fun(X, _) -> comm:send_local(X, {zombie, Zombie}) end, 0, Subscriber),
         {Queue, Subscriber, TriggerState};
 
 on({add_zombie_candidate, Node}, {Queue, Subscriber, TriggerState}) ->

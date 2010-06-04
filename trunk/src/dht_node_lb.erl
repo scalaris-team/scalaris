@@ -35,20 +35,20 @@
 
 -spec new() -> lb().
 new() ->
-    ResetRef=cs_send:send_local_after(loadBalanceInterval(), self(), {reset_loadbalance_flag}),
+    ResetRef=comm:send_local_after(loadBalanceInterval(), self(), {reset_loadbalance_flag}),
     #lb{loadbalance_flag=true, reset_ref=ResetRef, last_keys=gb_sets:new()}.
 
 balance_load(State) ->
     RT = dht_node_state:get(State, rt),
     Fingers = ?RT:to_pid_list(RT),
-    lists:foreach(fun(Node) -> cs_send:send(Node, {get_load, cs_send:this()}) end, Fingers),    
-    cs_send:send_local_after(loadBalanceInterval(), self(), {stabilize_loadbalance}).
+    lists:foreach(fun(Node) -> comm:send(Node, {get_load, comm:this()}) end, Fingers),    
+    comm:send_local_after(loadBalanceInterval(), self(), {stabilize_loadbalance}).
 
 check_balance(State, Source_PID, Load) ->
     MyLoad = dht_node_state:get(State, load),
     if
 	(MyLoad * 2 < Load) andalso (Load > 1) ->
-	    cs_send:send(Source_PID, {get_middle_key, cs_send:this()}),
+	    comm:send(Source_PID, {get_middle_key, comm:this()}),
 	    ok;
 	true ->
 	    ok
@@ -88,14 +88,14 @@ move_load(State, _, NewId) ->
     drop_data(State),
     OldIdVersion = node:id_version(dht_node_state:get(State, node)),
     idholder:set_id(NewId, OldIdVersion + 1),
-    cs_send:send_local(self() , {kill}),
-    cs_send:send(Succ, {pred_left, Pred}),
+    comm:send_local(self() , {kill}),
+    comm:send(Succ, {pred_left, Pred}),
     PredPid = dht_node_state:get(State, pred_pid),
-    cs_send:send(PredPid, {succ_left, dht_node_state:get(State, node)}),
+    comm:send(PredPid, {succ_left, dht_node_state:get(State, node)}),
     State.
 
 drop_data(State) ->
-    cs_send:send(dht_node_state:get(State, succ_pid), {drop_data, ?DB:get_data(dht_node_state:get(State, db)), cs_send:this()}),
+    comm:send(dht_node_state:get(State, succ_pid), {drop_data, ?DB:get_data(dht_node_state:get(State, db)), comm:this()}),
     receive
 	{drop_data_ack} ->
 	    ok
@@ -123,7 +123,7 @@ get_loadbalance_flag(State) ->
     get_loadbalance_flag(dht_node_state:get(State, lb)).
 
 set_loadbalance_flag(LB) ->
-    ResetRef=cs_send:send_local_after(loadBalanceFlagResetInterval(), self(), {reset_loadbalance_flag}),
+    ResetRef=comm:send_local_after(loadBalanceFlagResetInterval(), self(), {reset_loadbalance_flag}),
     LB#lb{loadbalance_flag=true, reset_ref=ResetRef}.
 
 cancel_reset(#lb{reset_ref=ResetRef}) ->

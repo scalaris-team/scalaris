@@ -55,29 +55,29 @@
 -type(message() ::
     {trigger} |
     {check_state} |
-    {cy_subset, cs_send:mypid(), cyclon_cache:cache()} |
+    {cy_subset, comm:mypid(), cyclon_cache:cache()} |
     {cy_subset_response, cyclon_cache:cache(), cyclon_cache:cache()} |
     {get_node_details_response, node_details:node_details_record() |
         [{pred, node_details:node_type()} |
          {node, node_details:node_type()} |
          {succ, node_details:node_type()}]} |
-    {get_ages, cs_send:erl_local_pid()} |
-    {get_subset_rand, pos_integer(), cs_send:erl_local_pid()} |
-    {'$gen_cast', {debug_info, cs_send:erl_local_pid()}}).
+    {get_ages, comm:erl_local_pid()} |
+    {get_subset_rand, pos_integer(), comm:erl_local_pid()} |
+    {'$gen_cast', {debug_info, comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends a response message to a request for the ages in the cache.
--spec msg_get_ages_response(cs_send:erl_local_pid(), [cyclon_cache:age()]) -> ok.
+-spec msg_get_ages_response(comm:erl_local_pid(), [cyclon_cache:age()]) -> ok.
 msg_get_ages_response(Pid, Ages) ->
-    cs_send:send_local(Pid, {cy_ages, Ages}).
+    comm:send_local(Pid, {cy_ages, Ages}).
 
 %% @doc Sends a response message to a request for (a subset of) the cache.
--spec msg_get_subset_response(cs_send:erl_local_pid(), [cyclon_cache:age()]) -> ok.
+-spec msg_get_subset_response(comm:erl_local_pid(), [cyclon_cache:age()]) -> ok.
 msg_get_subset_response(Pid, Cache) ->
-    cs_send:send_local(Pid, {cy_cache, Cache}).
+    comm:send_local(Pid, {cy_cache, Cache}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getters
@@ -99,10 +99,10 @@ get_subset_rand(N) ->
 %%      send to Pid.
 %%      see on({get_subset_rand, N, SourcePid}, State) and
 %%      msg_get_subset_response/2
--spec get_subset_rand(N::pos_integer(), Pid::cs_send:erl_local_pid()) -> ok.
+-spec get_subset_rand(N::pos_integer(), Pid::comm:erl_local_pid()) -> ok.
 get_subset_rand(N, Pid) ->
     CyclonPid = process_dictionary:get_group_member(cyclon),
-    cs_send:send_local(CyclonPid, {get_subset_rand, N, Pid}).
+    comm:send_local(CyclonPid, {get_subset_rand, N, Pid}).
 
 %% @doc Sends a delayed (local) message to the cyclon process of the requesting
 %%      process' group asking for a random subset of the stored nodes with a
@@ -118,10 +118,10 @@ get_subset_rand_next_interval(N) ->
 %%      send to Pid with a delay equal to the cyclon_interval config parameter.
 %%      see on({get_subset_rand, N, SourcePid}, State) and
 %%      msg_get_subset_response/2
--spec get_subset_rand_next_interval(N::pos_integer(), Pid::cs_send:erl_local_pid()) -> reference().
+-spec get_subset_rand_next_interval(N::pos_integer(), Pid::comm:erl_local_pid()) -> reference().
 get_subset_rand_next_interval(N, Pid) ->
     CyclonPid = process_dictionary:get_group_member(cyclon),
-    cs_send:send_local_after(get_base_interval(), CyclonPid, {get_subset_rand, N, Pid}).
+    comm:send_local_after(get_base_interval(), CyclonPid, {get_subset_rand, N, Pid}).
 
 % only used in admin.erl with hard-coded messages -> special case, don't provide getters
 %% %% @doc Sends a (local) message to the cyclon process of the requesting
@@ -136,10 +136,10 @@ get_subset_rand_next_interval(N, Pid) ->
 %% %%      process' group asking for the age of all stored nodes to be send to Pid.
 %% %%      see on({get_ages, SourcePid}, State) and
 %% %%      msg_get_ages_response/2
-%% -spec get_ages(Pid::cs_send:erl_local_pid()) -> ok.
+%% -spec get_ages(Pid::comm:erl_local_pid()) -> ok.
 %% get_ages(Pid) ->
 %%     CyclonPid = process_dictionary:get_group_member(cyclon),
-%%     cs_send:send_local(CyclonPid, {get_ages, Pid}).
+%%     comm:send_local(CyclonPid, {get_ages, Pid}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -156,10 +156,10 @@ start_link(InstanceId) ->
 -spec init(module()) -> state().
 init(Trigger) ->
     request_node_details([node, pred, succ]),
-    cs_send:send_local_after(100, self(), {check_state}),
+    comm:send_local_after(100, self(), {check_state}),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:first(TriggerState),
-    log:log(info,"[ CY ] Cyclon spawn: ~p~n", [cs_send:this()]),
+    log:log(info,"[ CY ] Cyclon spawn: ~p~n", [comm:this()]),
     {cyclon_cache:new(), null, 0, TriggerState2}.
 
 %% @doc message handler
@@ -181,7 +181,7 @@ on({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
     %io:format("subset~n", []),
     % this is received at node Q -> integrate results of node P
     ForSend = cyclon_cache:get_random_subset(get_shuffle_length(), Cache),
-    cs_send:send(SourcePid, {cy_subset_response, ForSend, PSubset}),
+    comm:send(SourcePid, {cy_subset_response, ForSend, PSubset}),
     NewCache = cyclon_cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
     {NewCache, Node, Cycles, TriggerState};
 
@@ -220,14 +220,14 @@ on({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
 %%     request_node_details([pred, succ]),
 %%     {cyclon_cache:new(), Node, 0, TriggerState};
 %% on({start_shuffling}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
-%%     cs_send:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
+%%     comm:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
 %%     State;
 
 on({'$gen_cast', {debug_info, Requestor}}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
     KeyValueList =
         [{"cache_size", cyclon_cache:size(Cache)},
          {"cache (age, node):", ""} | cyclon_cache:debug_format_by_age(Cache)],
-    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 
 on(_, _State) ->
@@ -240,7 +240,7 @@ enhanced_shuffle(Cache, Node) ->
     Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
     ForSend = cyclon_cache:add_node(Node, 0, Subset),
     %io:format("~p",[length(ForSend)]),
-    cs_send:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, cs_send:this(), ForSend}),
+    comm:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
     NewCache.
 
 %% @doc simple shuffle without age
@@ -249,7 +249,7 @@ simple_shuffle(Cache, Node) ->
     Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
     ForSend = cyclon_cache:add_node(Node, 0, Subset),
     %io:format("~p",[length(ForSend)]),
-    cs_send:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, cs_send:this(), ForSend}),
+    comm:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
     NewCache.
 
 %% @doc Sends the local node's dht_node a request to tell us some information
@@ -259,7 +259,7 @@ simple_shuffle(Cache, Node) ->
 -spec request_node_details([node_details:node_details_name()]) -> ok.
 request_node_details(Details) ->
     DHT_Node = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(DHT_Node, {get_node_details, cs_send:this(), Details}).
+    comm:send_local(DHT_Node, {get_node_details, comm:this(), Details}).
 
 %% @doc Checks the current state. If the cache is empty or the current node is
 %%      unknown, the local dht_node will be asked for these values and the check
@@ -281,7 +281,7 @@ check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
     if 
         length(NeedsInfo) > 0 ->
             request_node_details(NeedsInfo),
-            cs_send:send_local_after(1000, self(), {check_state}),
+            comm:send_local_after(1000, self(), {check_state}),
             fail;
         true ->
             ok

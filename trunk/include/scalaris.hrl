@@ -60,7 +60,7 @@
 
 % enable logging of message statistics
 -define(LOG_MESSAGE(MESSAGE, SIZE), ok).
-%% -define(LOG_MESSAGE(MESSAGE, SIZE), comm_logger:log(cs_send:get_msg_tag(MESSAGE), SIZE).
+%% -define(LOG_MESSAGE(MESSAGE, SIZE), comm_logger:log(comm:get_msg_tag(MESSAGE), SIZE).
 
 
 % enable native register for all processes in gen_component or disable

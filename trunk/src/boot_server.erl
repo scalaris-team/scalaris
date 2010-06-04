@@ -45,22 +45,22 @@
 %% @doc trigger a message with  the number of nodes known to the boot server
 -spec number_of_nodes() -> ok.
 number_of_nodes() ->
-    cs_send:send(bootPid(), {get_list_length, cs_send:this()}),
+    comm:send(bootPid(), {get_list_length, comm:this()}),
     ok.
 
 -spec be_the_first() -> ok.
 be_the_first() ->
-    cs_send:send(bootPid(), {be_the_first, cs_send:this()}).
+    comm:send(bootPid(), {be_the_first, comm:this()}).
 
 -spec connect() -> ok.
 connect() ->
     % @todo we have to improve the startup process!
-    cs_send:send(bootPid(), {connect}).
+    comm:send(bootPid(), {connect}).
 
 %% @doc trigger a message with all nodes known to the boot server
 -spec node_list() -> ok.
 node_list() ->
-    cs_send:send(bootPid(), {get_list, cs_send:this()}).
+    comm:send(bootPid(), {get_list, comm:this()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
@@ -75,15 +75,15 @@ on({get_list, Ping_PID},{Nodes,First,Subscriber}) ->
     case gb_sets:is_empty(Nodes) of
         true ->
             {Nodes,First,[Ping_PID|Subscriber]};
-        _ -> cs_send:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
+        _ -> comm:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
              {Nodes,First,Subscriber}
     end;
 on({be_the_first,Ping_PID},{Nodes,First,Subscriber}) ->
-    cs_send:send(Ping_PID, {be_the_first_response,First}),
+    comm:send(Ping_PID, {be_the_first_response,First}),
     {Nodes,false,Subscriber};
 
 on({get_list_length,Ping_PID},{Nodes,First,Subscriber}) ->
-    cs_send:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
+    comm:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
     {Nodes,First,Subscriber};
 on({register, Ping_PID},{Nodes,First,Subscriber}) ->
     fd:subscribe(Ping_PID),
@@ -92,7 +92,7 @@ on({register, Ping_PID},{Nodes,First,Subscriber}) ->
         [] ->
             ok;
         _ ->
-            [cs_send:send(Node,{get_list_response,gb_sets:to_list(NewNodes)} )|| Node <- Subscriber]
+            [comm:send(Node,{get_list_response,gb_sets:to_list(NewNodes)} )|| Node <- Subscriber]
     end,
     {NewNodes,First,[]};
 on({connect},State) ->
@@ -113,6 +113,6 @@ start_link() ->
      gen_component:start_link(?MODULE, [], [{register_native, boot}]).
 
 %% @doc pid of the boot daemon
--spec bootPid() -> cs_send:mypid().
+-spec bootPid() -> comm:mypid().
 bootPid() ->
     config:read(boot_host).

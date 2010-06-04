@@ -68,7 +68,7 @@
 quorum_read(Key)->
     erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     RTO = config:read(quorum_read_timeout),
-    transaction:quorum_read(Key, cs_send:this()),
+    transaction:quorum_read(Key, comm:this()),
     receive
         {single_read_return, {value, empty_val, _Version}}->
             ?TLOG2("single read return fail", [Page]),
@@ -96,7 +96,7 @@ parallel_quorum_reads(Keys, _Par)->
 	Flag =/= ok->
 	    fail;
 	true ->
-	    LocalDHTNode ! {parallel_reads, cs_send:this(), Keys, []},
+	    LocalDHTNode ! {parallel_reads, comm:this(), Keys, []},
 	    receive
 		{parallel_reads_return, fail}->
 		    {fail};
@@ -130,7 +130,7 @@ do_transaction(TFun, SuccessFun, FailureFun)->
     LocalDHTNodes = process_dictionary:find_all_dht_nodes(),
     LocalDHTNode = lists:nth(random:uniform(length(LocalDHTNodes)), LocalDHTNodes),
     %{_, LocalDHTNode} = process_dictionary:find_dht_node(),
-    LocalDHTNode ! {do_transaction, TFun, SuccessFun, FailureFun, cs_send:this()},
+    LocalDHTNode ! {do_transaction, TFun, SuccessFun, FailureFun, comm:this()},
     receive
         {trans, Message}->
             Message
@@ -146,7 +146,7 @@ do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
 	Flag =/= ok->
 	    fail;
 	true ->
-	    LocalDHTNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, cs_send:this()},
+	    LocalDHTNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, comm:this()},
 	    receive
 		{trans, Message}->
 		    %?TLOGN(" received ~p~n", [Message]),
@@ -246,7 +246,7 @@ abort()->
 delete(Key, Timeout) ->
     case process_dictionary:find_dht_node() of
 	{ok, LocalDHTNode} ->
-	    LocalDHTNode ! {delete, cs_send:this(), Key},
+	    LocalDHTNode ! {delete, comm:this(), Key},
 	    receive
 		{delete_result, Result} ->
 		    Result

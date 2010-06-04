@@ -1,5 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,15 +11,10 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : util.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Utility Functions
-%%%
-%%% Created :  7 May 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
+%%% @author Thorsten Schuett <schuett@zib.de>
+%%% @doc    Utility Functions.
+%%% @end
 %% @version $Id$
 -module(util).
 
@@ -37,7 +32,8 @@
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2,
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
-         smerge2/2, smerge2/3, smerge2/4]).
+         smerge2/2, smerge2/3, smerge2/4,
+         for_each_line_in_file/4]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
@@ -67,9 +63,11 @@ sup_supervisor_desc(Name, Module, Function, Options) ->
       []
      }.
 
+-spec escape_quotes(String::string()) -> string().
 escape_quotes(String) ->
     lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).
 
+-spec escape_quotes_(String::string(), Rest::string()) -> string().
 escape_quotes_($", Rest) -> [$",$\\|Rest];
 escape_quotes_(Ch, Rest) -> [Ch|Rest].
 
@@ -197,11 +195,11 @@ minus([_|_] = L, ExcludeList) ->
     ExcludeSet = ordsets:from_list(ExcludeList),
     [E || E <- L, not ordsets:is_element(E, ExcludeSet)].
 
--spec get_nodes() -> [cs_send:mypid()].
+-spec get_nodes() -> [comm:mypid()].
 get_nodes() ->
     get_proc_in_vms(bench_server).
 
--spec get_proc_in_vms(atom()) -> [cs_send:mypid()].
+-spec get_proc_in_vms(atom()) -> [comm:mypid()].
 get_proc_in_vms(Proc) ->
     boot_server:node_list(),
     Nodes =
@@ -210,7 +208,7 @@ get_proc_in_vms(Proc) ->
         after 2000 ->
             {failed}
         end,
-    lists:usort([cs_send:get(Proc, DHTNode) || DHTNode <- Nodes]).
+    lists:usort([comm:get(Proc, DHTNode) || DHTNode <- Nodes]).
 
 -spec sleep_for_ever() -> none().
 sleep_for_ever() ->
@@ -312,6 +310,7 @@ tc(M, F, A) ->
     After = erlang:now(),
     {timer:now_diff(After, Before), Val}.
 
+-spec get_pids_uid() -> pos_integer().
 get_pids_uid() ->
     Result = case erlang:get(pids_uid_counter) of
                  undefined -> 1;
@@ -320,8 +319,9 @@ get_pids_uid() ->
     erlang:put(pids_uid_counter, Result),
     Result.
 
+-spec get_global_uid() -> {pos_integer(), comm:mypid()}.
 get_global_uid() ->
-    _Result = {get_pids_uid(), cs_send:this()}
+    _Result = {get_pids_uid(), comm:this()}
     %% , term_to_binary(_Result)
     .
 
@@ -459,4 +459,17 @@ smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
     case ML =:= [] orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
         true  -> lists:reverse(ML, L2);
         false -> smerge2_helper([], T2, Lte, EqSelect, ML)
+    end.
+
+for_each_line_in_file(Name, Proc, Mode, Accum0) ->
+    {ok, Device} = file:open(Name, Mode),
+    for_each_line(Device, Proc, Accum0).
+
+for_each_line(Device, Proc, Accum) ->
+    case io:get_line(Device, "") of
+        eof  -> file:close(Device), Accum;
+        Line -> 
+        CleanLine = string:substr(Line, 1, string:len(Line) - 1),
+        NewAccum = Proc(CleanLine, Accum),
+        for_each_line(Device, Proc, NewAccum)
     end.

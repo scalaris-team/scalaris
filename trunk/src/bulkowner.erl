@@ -32,20 +32,20 @@
 
 %% @doc Start a bulk owner operation to send the message to all nodes in the
 %%      given interval.
--spec issue_bulk_owner(I::intervals:interval(), Msg::cs_send:message()) -> ok.
+-spec issue_bulk_owner(I::intervals:interval(), Msg::comm:message()) -> ok.
 issue_bulk_owner(I, Msg) ->
     {ok, DHTNode} = process_dictionary:find_dht_node(),
-    cs_send:send_local(DHTNode , {start_bulk_owner, I, Msg}).
+    comm:send_local(DHTNode , {start_bulk_owner, I, Msg}).
 
 %% @doc main routine. It spans a broadcast tree over the nodes in I
--spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), Msg::cs_send:message()) -> ok.
+-spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), Msg::comm:message()) -> ok.
 bulk_owner(State, I, Msg) ->
 %%     ct:pal("bulk_owner:~n self:~p,~n int :~p,~n rt  :~p~n", [dht_node_state:get(State, node), I, ?RT:to_list(State)]),
     SuccInt = intervals:intersection(I, dht_node_state:get(State, succ_range)),
     case intervals:is_empty(SuccInt) of
         true  -> ok;
         false ->
-            cs_send:send(dht_node_state:get(State, succ_pid),
+            comm:send(dht_node_state:get(State, succ_pid),
                          {bulkowner_deliver, SuccInt, Msg})
     end,
     case intervals:is_subset(I, SuccInt) of
@@ -58,7 +58,7 @@ bulk_owner(State, I, Msg) ->
 %% @doc Iterates through the list of (unique) nodes in the routing table and
 %%      sends them the according bulkowner messages for sub-intervals of I.
 -spec bulk_owner_iter(RTList::nodelist:nodelist(), I::intervals:interval(),
-                      Msg::cs_send:message(), Limit::?RT:key()) -> ok.
+                      Msg::comm:message(), Limit::?RT:key()) -> ok.
 bulk_owner_iter([], _I, _Msg, _Limit) ->
     ok;
 bulk_owner_iter([Head | Tail], I, Msg, Limit) ->
@@ -67,7 +67,7 @@ bulk_owner_iter([Head | Tail], I, Msg, Limit) ->
 %%     ct:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
     NewLimit = case intervals:is_empty(Range) of
                    false ->
-                       cs_send:send(node:pidX(Head), {bulk_owner, Range, Msg}),
+                       comm:send(node:pidX(Head), {bulk_owner, Range, Msg}),
                        node:id(Head);
                    true ->
                        Limit

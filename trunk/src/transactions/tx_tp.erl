@@ -55,12 +55,12 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
     pdb:set({PaxId, Proposal}, TP_DB),
 
     %% initiate a paxos proposer round 0 with the proposal
-    Proposer = cs_send:make_global(dht_node_state:get(DHT_Node_State, proposer)),
-    proposer:start_paxosid_with_proxy(cs_send:this(), Proposer, PaxId,
+    Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
+    proposer:start_paxosid_with_proxy(comm:this(), Proposer, PaxId,
                                      _Acceptors = RTMs, Proposal,
                                      _Maj = 3, _MaxProposers = 4, 0),
     %% send registerTP to each RTM (send with it the learner id)
-    [ cs_send:send(X, {register_TP, {Tid, ItemId, PaxId, cs_send:this()}})
+    [ comm:send(X, {register_TP, {Tid, ItemId, PaxId, comm:this()}})
       || X <- [TM | RTMs]],
     %% (optimized: embed the proposer's accept message in registerTP message)
     dht_node_state:set_db(DHT_Node_State, NewDB).
@@ -76,7 +76,7 @@ on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
 
     NewDB = apply(element(1, RTLogEntry), Result, [DB, RTLogEntry, Proposal]),
     %% delete corresponding proposer state
-    Proposer = cs_send:make_global(dht_node_state:get(DHT_Node_State, proposer)),
+    Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
     pdb:delete(PaxosId, TP_DB),
     dht_node_state:set_db(DHT_Node_State, NewDB).

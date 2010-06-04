@@ -74,7 +74,7 @@ process_vote_ack(#tm_state{decision = undecided} = TMState, Key, RKey, Dec, TS) 
 	    Message = {decision, 
 		       #tp_message{
 			 item_key = unknown, 
-			 message = {cs_send:this(),TMState2#tm_state.transID, Decision}
+			 message = {comm:this(),TMState2#tm_state.transID, Decision}
 			}
 			      },
 	    tsend:send_to_participants(TMState2, Message),
@@ -192,7 +192,7 @@ process_read_vote(TMState, Vote)->
 	true ->
 	    {Val, _TS, WTS} = CheckResult,
 	    TMState2 = trecords:store_vote(TMState, Vote#vote.key, Vote#vote.rkey, CheckResult), 
-	    cs_send:send(TMState2#tm_state.leader, {read_vote_ack, Vote#vote.key, Vote#vote.rkey, Vote#vote.timestamp, {Val, WTS}}),
+	    comm:send(TMState2#tm_state.leader, {read_vote_ack, Vote#vote.key, Vote#vote.rkey, Vote#vote.timestamp, {Val, WTS}}),
 	    TMState2
     end.
 
@@ -242,7 +242,7 @@ collect_rv_ack(TMState, Key, RKey, Timestamp, StoredVote) ->
 	    {VoteToAdopt, TSForWriteVote} = WriteVote,
 	    NewVote = trecords:new_vote(TMState2#tm_state.transID, Key, RKey, VoteToAdopt, TSForWriteVote),
 	    lists:map(fun({_RKey, Address}) ->
-			      tsend:send(Address, {vote, cs_send:this(), NewVote}) end, 
+			      tsend:send(Address, {vote, comm:this(), NewVote}) end, 
 		      TMState2#tm_state.rtms),
 	    TMState2
     end.

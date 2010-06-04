@@ -52,9 +52,9 @@
     {reset_clustering} |
     {vivaldi_get_coordinate_response, vivaldi:network_coordinate(), vivaldi:error()} |
     {cy_cache, nodelist:nodelist()} |
-    {clustering_shuffle, cs_send:mypid(), centroids(), sizes()} |
-    {clustering_shuffle_reply, cs_send:mypid(), centroids(), sizes()} |
-    {query_clustering, cs_send:mypid()}).
+    {clustering_shuffle, comm:mypid(), centroids(), sizes()} |
+    {clustering_shuffle_reply, comm:mypid(), centroids(), sizes()} |
+    {query_clustering, comm:mypid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
@@ -80,7 +80,7 @@ init({ResetTrigger, ClusterTrigger}) ->
     ResetTriggerState2 = trigger:first(ResetTriggerState),
     ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
     ClusterTriggerState2 = trigger:first(ClusterTriggerState),
-    log:log(info,"dc_clustering spawn: ~p~n", [cs_send:this()]),
+    log:log(info,"dc_clustering spawn: ~p~n", [comm:this()]),
     {[], [], ResetTriggerState2, ClusterTriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,8 +117,8 @@ on({cy_cache, []}, State)  ->
 on({cy_cache, [Node] = _Cache},
    {Centroids, Sizes, _ResetTriggerState, _ClusterTriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
-    cs_send:send_to_group_member(node:pidX(Node), dc_clustering,
-                                 {clustering_shuffle, cs_send:this(),
+    comm:send_to_group_member(node:pidX(Node), dc_clustering,
+                                 {clustering_shuffle, comm:this(),
                                   Centroids, Sizes}),
     State;
 
@@ -126,8 +126,8 @@ on({cy_cache, [Node] = _Cache},
 on({clustering_shuffle, RemoteNode, RemoteCentroids, RemoteSizes},
    {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
    %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    cs_send:send(RemoteNode, {clustering_shuffle_reply,
-                              cs_send:this(),
+    comm:send(RemoteNode, {clustering_shuffle_reply,
+                              comm:this(),
                               Centroids, Sizes}),
     {NewCentroids, NewSizes} = cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes),
     {NewCentroids, NewSizes, ResetTriggerState, ClusterTriggerState};
@@ -142,7 +142,7 @@ on({clustering_shuffle_reply, _RemoteNode, RemoteCentroids, RemoteSizes},
 
 % return my clusters
 on({query_clustering, Pid}, {Centroids, Sizes, _ResetTriggerState, _ClusterTriggerState} = State) ->
-    cs_send:send(Pid, {query_clustering_response, {Centroids, Sizes}}),
+    comm:send(Pid, {query_clustering_response, {Centroids, Sizes}}),
     State;
 
 on(_, _State) ->

@@ -59,7 +59,7 @@ read(Key) ->
 %% @doc Writes a config parameter.
 -spec write(atom(), any()) -> ok.
 write(Key, Value) ->
-    cs_send:send_local(config, {write, self(), Key, Value}),
+    comm:send_local(config, {write, self(), Key, Value}),
     receive
         {write_done} -> ok
     end.
@@ -97,7 +97,7 @@ loop() ->
     receive
         {write, Pid, Key, Value} ->
             ets:insert(config_ets, {Key, Value}),
-            cs_send:send_local(Pid, {write_done}),
+            comm:send_local(Pid, {write_done}),
             loop();
         _ ->
             loop()
@@ -187,7 +187,7 @@ is_bool(Key) ->
 
 -spec is_mypid(Key::atom()) -> boolean().
 is_mypid(Key) ->
-    Pred = fun cs_send:is_valid/1,
+    Pred = fun comm:is_valid/1,
     Msg = "is not a valid pid",
     test_and_error(Key, Pred, Msg).
 

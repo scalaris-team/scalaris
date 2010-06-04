@@ -40,7 +40,7 @@
                   TriggerState   :: trigger:state(),
                   Cache          :: [node:node_type()], % random cyclon nodes
                   Churn          :: boolean()}
-     | {uninit, QueuedMessages::[cs_send:message()], TriggerState :: trigger:state()}).
+     | {uninit, QueuedMessages::[comm:message()], TriggerState :: trigger:state()}).
 
 % accepted messages
 -type(message() ::
@@ -50,8 +50,8 @@
     {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()} |
     {zombie, Node::node:node_type()} |
-    {crash, DeadPid::cs_send:mypid()} |
-    {'$gen_cast', {debug_info, Requestor::cs_send:erl_local_pid()}} |
+    {crash, DeadPid::comm:mypid()} |
+    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}} |
     {check_ring, Token::non_neg_integer(), Master::node:node_type()} |
     {init_check_ring, Token::non_neg_integer()} |
     {notify_new_pred, Pred::node:node_type()} |
@@ -71,10 +71,10 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, QueuedMessages::[], TriggerState::trigger:state()}.
 init(Trigger) ->
-    log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [cs_send:this()]),
+    log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    cs_send:send_local(get_pid_dnc() , {subscribe, self()}),
-    cs_send:send_local(get_cs_pid(), {init_rm, self()}),
+    comm:send_local(get_pid_dnc() , {subscribe, self()}),
+    comm:send_local(get_cs_pid(), {init_rm, self()}),
     {uninit, [], TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -88,7 +88,7 @@ on({init, Id, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState
     NewTriggerState = trigger:first(TriggerState),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
     cyclon:get_subset_rand_next_interval(1),
-    cs_send:send_queued_messages(QueuedMessages),
+    comm:send_queued_messages(QueuedMessages),
     {Id, Neighborhood, config:read(cyclon_cache_size),
      stabilizationInterval_min(), NewTriggerState, [], true};
 
@@ -123,11 +123,11 @@ on({trigger},
                         false -> get_succ_list_length()
                     end,
                 Message = {rm_buffer, Neighborhood, RequestPredsMinCount, RequestSuccsMinCount},
-                cs_send:send_to_group_member(node:pidX(Succ), ring_maintenance,
+                comm:send_to_group_member(node:pidX(Succ), ring_maintenance,
                                              Message),
                 case Pred =/= Succ of
                     true ->
-                        cs_send:send_to_group_member(node:pidX(Pred),
+                        comm:send_to_group_member(node:pidX(Pred),
                                                      ring_maintenance,
                                                      Message);
                     false ->
@@ -184,7 +184,7 @@ on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
                                            RequestPredsMinCount,
                                            RequestSuccsMinCount)
         end,
-    cs_send:send_to_group_member(node:pidX(nodelist:node(OtherNeighbors)),
+    comm:send_to_group_member(node:pidX(nodelist:node(OtherNeighbors)),
                                  ring_maintenance,
                                  {rm_buffer_response, NeighborsToSend}),
     {NewNeighborhood, NewInterval, NewChurn} =
@@ -224,7 +224,7 @@ on({crash, DeadPid},
 
 on({'$gen_cast', {debug_info, Requestor}},
    {_Id, Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
-    cs_send:send_local(Requestor,
+    comm:send_local(Requestor,
                        {debug_info_response,
                         [{"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
                          {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},
@@ -244,7 +244,7 @@ on({check_ring, Token, Master},
             io:format(" [RM ] Token back with Value: ~p~n",[Token]);
         {Token, _} ->
             {Pred, _Succ} = get_safe_pred_succ(Neighborhood, []),
-            cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance,
+            comm:send_to_group_member(node:pidX(Pred), ring_maintenance,
                                          {check_ring, Token - 1, Master})
     end,
     State;
@@ -254,7 +254,7 @@ on({init_check_ring, Token},
    {_Id, Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
     Me = nodelist:node(Neighborhood),
     {Pred, _Succ} = get_safe_pred_succ(Neighborhood, []),
-    cs_send:send_to_group_member(node:pidX(Pred), ring_maintenance,
+    comm:send_to_group_member(node:pidX(Pred), ring_maintenance,
                                  {check_ring, Token - 1, Me}),
     State;
 

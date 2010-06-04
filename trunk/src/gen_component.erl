@@ -119,7 +119,7 @@ start(Module, Args, Options) ->
             {ok, Pid}
     end.
 
--spec(start/4 :: (module(), any(), list(), cs_send:erl_local_pid()) -> ok).
+-spec(start/4 :: (module(), any(), list(), comm:erl_local_pid()) -> ok).
 start(Module, Args, Options, Supervisor) ->
     %io:format("Starting ~p~n",[Module]),
     case lists:keysearch(register, 1, Options) of
@@ -195,15 +195,15 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
             loop(Module, On, State, NewComponentState);
         % handle failure detector messages
         {ping, Pid} ->
-            cs_send:send(Pid, {pong}),
+            comm:send(Pid, {pong}),
             loop(Module, On, State, ComponentState);
         %% forward a message to group member by its process name
-        %% initiated via cs_send:send_to_group_member()
+        %% initiated via comm:send_to_group_member()
         {send_to_group_member, Processname, Msg} ->
             Pid = process_dictionary:get_group_member(Processname),
             case Pid of
                 failed -> ok;
-                _ -> cs_send:send_local(Pid , Msg)
+                _ -> comm:send_local(Pid , Msg)
             end,
             loop(Module, On, State, ComponentState);
         Message ->
@@ -274,7 +274,7 @@ handle_gen_component_message(Message, State, ComponentState) ->
             timer:sleep(Time),
             ComponentState;
         {'$gen_component', get_state, Pid} ->
-            cs_send:send_local(
+            comm:send_local(
               Pid, {'$gen_component', get_state_response, State}),
             ComponentState
     end.
@@ -317,7 +317,7 @@ bp_active(Message, State,
         begin
             Decision = case ThisBP of
                            {bp, ThisTag, _BPName} ->
-                               ThisTag =:= cs_send:get_msg_tag(Message);
+                               ThisTag =:= comm:get_msg_tag(Message);
                            {bp_cond, Cond, _BPName} when is_function(Cond) ->
                                Cond(Message, State);
                            {bp_cond, {Module, Fun, Params}, _BPName} ->

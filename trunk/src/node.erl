@@ -31,11 +31,11 @@
 
 -include("scalaris.hrl").
 
--record(node, {pid :: cs_send:mypid(), id :: ?RT:key(), id_version :: non_neg_integer()}).
+-record(node, {pid :: comm:mypid(), id :: ?RT:key(), id_version :: non_neg_integer()}).
 -type(node_type() :: #node{}).
 
 %% @doc Creates a new node.
--spec new(Pid::cs_send:mypid(), Id::?RT:key(), IdVersion::non_neg_integer()) -> node_type().
+-spec new(Pid::comm:mypid(), Id::?RT:key(), IdVersion::non_neg_integer()) -> node_type().
 new(Pid, Id, IdVersion) ->
     #node{pid = Pid, id = Id, id_version = IdVersion}.
 
@@ -44,7 +44,7 @@ null() ->
     null.
 
 %% @doc Gets the pid of the node.
--spec pidX(node_type()) -> cs_send:mypid().
+-spec pidX(node_type()) -> comm:mypid().
 pidX(#node{pid=PID}) ->
     PID.
 
@@ -68,21 +68,21 @@ is_valid(_) ->
 
 %% @doc Checks whether two nodes are the same, i.e. contain references to the.
 %%      same process.
--spec equals(node_type() | cs_send:mypid() | pid(), node_type()) -> boolean();
-            (node_type(), cs_send:mypid() | pid()) -> boolean();
-            (null | unknown, node_type() | cs_send:mypid() | pid()) -> false;
-            (node_type() | cs_send:mypid() | pid(), null | unknown) -> false.
+-spec equals(node_type() | comm:mypid() | pid(), node_type()) -> boolean();
+            (node_type(), comm:mypid() | pid()) -> boolean();
+            (null | unknown, node_type() | comm:mypid() | pid()) -> false;
+            (node_type() | comm:mypid() | pid(), null | unknown) -> false.
 equals(Node1, Node2) when ((Node1 =:= null) orelse (Node1 =:= unknown) orelse
                            (Node2 =:= null) orelse (Node2 =:= unknown)) ->
     false;
 equals(Node1, Node2) when is_record(Node1, node) andalso is_record(Node2, node) ->
     pidX(Node1) =:= pidX(Node2);
 equals(Pid1, Node2) when is_record(Node2, node) andalso is_pid(Pid1) ->
-    cs_send:make_global(Pid1) =:= pidX(Node2);
+    comm:make_global(Pid1) =:= pidX(Node2);
 equals(Pid1, Node2) when is_record(Node2, node) ->
     Pid1 =:= pidX(Node2);
 equals(Node1, Pid2) when is_record(Node1, node) andalso is_pid(Pid2)->
-    pidX(Node1) =:= cs_send:make_global(Pid2);
+    pidX(Node1) =:= comm:make_global(Pid2);
 equals(Node1, Pid2) when is_record(Node1, node) ->
     pidX(Node1) =:= Pid2.
 

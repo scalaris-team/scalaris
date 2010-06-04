@@ -100,26 +100,26 @@
 	{trigger} |
 	{{get_node_details_response, node_details:node_details()}, local_info} |
 	{{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
-	{get_state, cs_send:mypid(), values_internal()} |
+	{get_state, comm:mypid(), values_internal()} |
 	{get_state_response, values_internal()} |
 	{cy_cache, nodelist:nodelist()} |
-	{get_values_all, cs_send:erl_local_pid()} | 
-    {get_values_best, cs_send:erl_local_pid()} |
-    {'$gen_cast', {debug_info, Requestor::cs_send:erl_local_pid()}}).
+	{get_values_all, comm:erl_local_pid()} | 
+    {get_values_best, comm:erl_local_pid()} |
+    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends a response message to a request for the best stored values.
--spec msg_get_values_best_response(cs_send:erl_local_pid(), values()) -> ok.
+-spec msg_get_values_best_response(comm:erl_local_pid(), values()) -> ok.
 msg_get_values_best_response(Pid, BestValues) ->
-    cs_send:send_local(Pid, {gossip_get_values_best_response, BestValues}).
+    comm:send_local(Pid, {gossip_get_values_best_response, BestValues}).
 
 %% @doc Sends a response message to a request for all stored values.
--spec msg_get_values_all_response(cs_send:erl_local_pid(), values(), values(), values()) -> ok.
+-spec msg_get_values_all_response(comm:erl_local_pid(), values(), values(), values()) -> ok.
 msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
-    cs_send:send_local(Pid, {gossip_get_values_all_response, PreviousValues, CurrentValues, BestValues}).
+    comm:send_local(Pid, {gossip_get_values_all_response, PreviousValues, CurrentValues, BestValues}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getters
@@ -141,10 +141,10 @@ get_values_best() ->
 %%      be send to Pid.
 %%      see on({get_values_best, SourcePid}, FullState) and
 %%      msg_get_values_best_response/2
--spec get_values_best(cs_send:erl_local_pid()) -> ok.
+-spec get_values_best(comm:erl_local_pid()) -> ok.
 get_values_best(Pid) ->
     GossipPid = process_dictionary:get_group_member(gossip),
-    cs_send:send_local(GossipPid, {get_values_best, Pid}).
+    comm:send_local(GossipPid, {get_values_best, Pid}).
 
 %% @doc Sends a (local) message to the gossip process of the requesting
 %%      process' group asking for all stored information.
@@ -158,10 +158,10 @@ get_values_all() ->
 %%      process' group asking for all stored information to be send to Pid.
 %%      see on({get_values_all, SourcePid}, FullState) and
 %%      msg_get_values_all_response/4
--spec get_values_all(cs_send:erl_local_pid()) -> ok.
+-spec get_values_all(comm:erl_local_pid()) -> ok.
 get_values_all(Pid) ->
     GossipPid = process_dictionary:get_group_member(gossip),
-    cs_send:send_local(GossipPid, {get_values_all, Pid}).
+    comm:send_local(GossipPid, {get_values_all, Pid}).
 
 %% @doc Returns the previous state if the current state has not sufficiently
 %%      converged yet otherwise returns the current state.
@@ -190,7 +190,7 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> full_state().
 init(Trigger) ->
-    log:log(info,"[ Gossip ~p ] starting~n", [cs_send:this()]),
+    log:log(info,"[ Gossip ~p ] starting~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:first(TriggerState),
 	PreviousState = gossip_state:new_state(),
@@ -236,7 +236,7 @@ on({{get_node_details_response, NodeDetails}, local_info},
 		case Initialized of
 			true -> {[], State};
 			false ->
-                cs_send:send_queued_messages(QueuedMessages),
+                comm:send_queued_messages(QueuedMessages),
 				{[], integrate_local_info(State,
                                           node_details:get(NodeDetails, load),
                                           calc_initial_avg_kr(
@@ -310,8 +310,8 @@ on({cy_cache, [Node] = _Cache},
     % do not exchange states with itself
     case node:is_me(Node) of
         false ->
-            cs_send:send_to_group_member(node:pidX(Node), gossip,
-                                         {get_state, cs_send:this(),
+            comm:send_to_group_member(node:pidX(Node), gossip,
+                                         {get_state, comm:this(),
                                           gossip_state:get(State, values)});
         true -> ok
     end,
@@ -374,7 +374,7 @@ on({'$gen_cast', {debug_info, Requestor}},
          {"best_size",            gossip_state:get(BestValues, size)},
          {"best_size_ldr",        gossip_state:get(BestValues, size_ldr)},
          {"best_size_kr",         gossip_state:get(BestValues, size_kr)}],
-    cs_send:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
     FullState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -393,7 +393,7 @@ on(_Message, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec integrate_state(values_internal(), state(), state(), true,
-                       cs_send:mypid()) -> {state(), state()}
+                       comm:mypid()) -> {state(), state()}
                     ; (values_internal(), state(), state(), false,
                        any()) -> {state(), state()}.
 integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
@@ -439,7 +439,7 @@ integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 	    end,
 	if
 		(ShouldSend andalso SendBack) ->
-			cs_send:send(Source_PID, {get_state_response, MyValues});
+			comm:send(Source_PID, {get_state_response, MyValues});
 		true -> ok
 	end,
 	{MyNewPreviousState, MyNewState}. 
@@ -462,7 +462,7 @@ update(MyState, OtherValues) ->
 			false ->
 				% this case should not happen since the on/2 handlers should only
 				% call update/2 if the rounds match
-            	log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring): ~p", [cs_send:this(),util:get_stacktrace()]),
+            	log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring): ~p", [comm:this(),util:get_stacktrace()]),
     			MyValues
 		end,
 	% now check whether all average-based values changed less than epsilon percent:
@@ -628,7 +628,7 @@ request_new_round_if_leader(State) ->
              (ConvAvgCount >= ConvAvgCountNewRound))) of
 		true ->
 			DHT_Node = process_dictionary:get_group_member(dht_node),
-    		cs_send:send_local(DHT_Node, {get_node_details, cs_send:this_with_cookie(leader_start_new_round), [my_range]}),
+    		comm:send_local(DHT_Node, {get_node_details, comm:this_with_cookie(leader_start_new_round), [my_range]}),
 			ok;
 		false ->
 			ok
@@ -642,7 +642,7 @@ request_new_round_if_leader(State) ->
 request_local_info() ->
 	% ask for local load and key range:
 	DHT_Node = process_dictionary:get_group_member(dht_node),
-    cs_send:send_local(DHT_Node, {get_node_details, cs_send:this_with_cookie(local_info), [pred, node, load]}).
+    comm:send_local(DHT_Node, {get_node_details, comm:this_with_cookie(local_info), [pred, node, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
 %%      on({cy_cache, Cache},State) will handle the response

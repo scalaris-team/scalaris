@@ -186,7 +186,7 @@ test_and_set(Key, OldValue, NewValue) ->
 %@private
 do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
     {ok, PID} = process_dictionary:find_dht_node(),
-    cs_send:send_local(PID , {do_transaction, TransFun, SuccessFun, Failure, cs_send:this()}),
+    comm:send_local(PID , {do_transaction, TransFun, SuccessFun, Failure, comm:this()}),
     receive
         X ->
             X
@@ -200,8 +200,8 @@ range_read(From, To) ->
     ?TRACE("cs_api:range_read(~p, ~p)~n", [From, To]),
     Interval = intervals:new(From, To),
     bulkowner:issue_bulk_owner(Interval,
-                               {bulk_read_with_version, cs_send:this()}),
-    cs_send:send_local_after(config:read(range_read_timeout), self(), {timeout}),
+                               {bulk_read_with_version, comm:this()}),
+    comm:send_local_after(config:read(range_read_timeout), self(), {timeout}),
     range_read_loop(Interval, intervals:empty(), []).
 
 -spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[any()]) -> {timeout | ok, Data::[any()]}.
