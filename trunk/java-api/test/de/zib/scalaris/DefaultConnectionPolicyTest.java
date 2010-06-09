@@ -233,8 +233,10 @@ public class DefaultConnectionPolicyTest {
 		assertTrue(badNodes.contains(p3));
 		assertEquals(3, badNodes.size());
 		assertEquals(0, goodNodes.size());
-		assertEquals(p1, badNodes.get(0));
-		assertEquals(p3, badNodes.get(badNodes.size() - 1));
+		// the actual order now depends on the nodes' hash codes and can't be
+		// checked here
+//		assertEquals(p1, badNodes.get(0));
+//		assertEquals(p3, badNodes.get(badNodes.size() - 1));
 	}
 
 	/**

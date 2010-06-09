@@ -116,7 +116,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
 				// two different nodes have the same fail dates
 				// -> make order dependent on their hash code:
 				int h1 = o1.hashCode();
-				int h2 = o1.hashCode();
+				int h2 = o2.hashCode();
 				if (h1 < h2) {
 					return -1;
 				} else if (h1 > h2){
