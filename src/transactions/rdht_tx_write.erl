@@ -107,9 +107,7 @@ validate(DB, RTLogEntry) ->
             NewDB = ?DB:set_entry(DB, NewEntry),
             {NewDB, prepared};
         false ->
-            %%            io:format("WriteLock: ~p VersionOK: ~p (DB) ~p (Tx) ~n", [Lockable, db_entry:get_version(DBEntry), tx_tlog:get_entry_version(RTLogEntry) ]),
             {DB, abort}
-%%%            end
     end.
 
 commit(DB, RTLogEntry, _OwnProposalWas) ->
@@ -126,8 +124,7 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
                 T2DBEntry = db_entry:set_value(
                               DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
                 T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
-                TEntry = db_entry:reset_locks(T3DBEntry),
-                TEntry
+                db_entry:reset_locks(T3DBEntry)
         end,
     ?DB:set_entry(DB, NewEntry).
 
@@ -182,7 +179,6 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
         my_make_tlog_result_entry(TLogEntry, Request),
     Msg = msg_reply(Id, NewTLogEntry, NewResultEntry),
     comm:send_local(ClientPid, Msg),
-%%    erlang:yield(),
     State;
 
 on(_, _State) ->
@@ -201,7 +197,10 @@ my_make_tlog_result_entry(TLogEntry, Request) ->
              {?MODULE, Key, {value, WriteValue}}};
         value ->
             {{?MODULE, Key, value, WriteValue, Version},
-             {?MODULE, Key, {value, WriteValue}}}
+            {?MODULE, Key, {value, WriteValue}}};
+        timeout ->
+            {{?MODULE, Key, {fail, timeout}, WriteValue, Version},
+             {?MODULE, Key, {fail, timeout}}}
     end.
 
 %% @doc Checks whether used config parameters exist and are valid.
