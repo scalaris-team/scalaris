@@ -1,4 +1,4 @@
-%% @copyright 2009, 2010 onScale solutions GmbH
+%% @copyright 2009-2010 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
+
 -export([start_link/1]).
 -export([check_config/0]).
 
@@ -72,10 +73,10 @@ work_phase(ClientPid, ReqId, Request) ->
 
     CollectorPid = process_dictionary:get_group_member(?MODULE),
     Key = element(2, Request),
-    %% do a quorum read
-    quorum_read(comm:make_global(CollectorPid), ReqId, Request),
     %% inform CollectorPid on whom to inform after quorum reached
     comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
+    %% trigger quorum read
+    quorum_read(comm:make_global(CollectorPid), ReqId, Request),
     ok.
 
 quorum_read(CollectorPid, ReqId, Request) ->
@@ -153,101 +154,85 @@ start_link(InstanceId) ->
 init([InstanceID]) ->
     ?TRACE("rdht_tx_read: Starting rdht_tx_read for instance: ~p~n", [InstanceID]),
     %% For easier debugging, use a named table (generates an atom)
-    ActiveTable =
+    Table =
         list_to_atom(lists:flatten(
                        io_lib:format("~p_rdht_tx_read", [InstanceID]))),
-    ets:new(ActiveTable, [set, private, named_table]),
+    pdb:new(Table, [set, private, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    %% ActiveTable = ets:new(?MODULE, [set, private]),
+    %% Table = ets:new(?MODULE, [set, private]),
     Reps = config:read(replication_factor),
     Maj = config:read(quorum_factor),
-    EmptyEntry = rdht_tx_read_state:new('$_no_curr_entry'),
-    %% use 2nd table to record events for timeout handling
-    %% rotate tables periodically
-    WaitTable = ets:new(?MODULE, [set, private]),
-    comm:send_local_after(config:read(transaction_lookup_timeout),
-                             self(), {periodic_timeout}),
-    _State = {EmptyEntry, Reps, Maj, WaitTable, ActiveTable}.
+    _State = {Reps, Maj, Table}.
 
 %% reply triggered by lookup:unreliable_get_key/3
 on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
-   {_CurrEntry, Reps, Maj, WaitTable, ActiveTable} = State) ->
+   {Reps, Maj, Table} = State) ->
     ?TRACE("rdht_tx_read:on(get_key_with_id_reply)~n", []),
-    Entry = my_get_entry(Id, State),
+    Entry = my_get_entry(Id, Table),
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
     %% @todo got replies from all reps? -> delete ets entry
     TmpEntry = rdht_tx_read_state:add_reply(Entry, Val, Vers, Maj),
-    NewEntry =
-        case {rdht_tx_read_state:is_newly_decided(TmpEntry),
-              rdht_tx_read_state:get_client(TmpEntry)} of
-            {true, unknown} ->
-                %% when we get a client, we inform it
-                TmpEntry;
-            {true, Client} ->
-                my_inform_client(Client, TmpEntry),
-                rdht_tx_read_state:set_client_informed(TmpEntry);
-            {false, unknown} ->
-                TmpEntry;
-            {false, _Client} ->
-                my_delete_if_all_replied(TmpEntry, Reps, WaitTable, ActiveTable)
+    case {rdht_tx_read_state:is_newly_decided(TmpEntry),
+          rdht_tx_read_state:get_client(TmpEntry)} of
+        {true, unknown} ->
+            %% when we get a client, we will inform it
+            pdb:set(TmpEntry, Table);
+        {true, Client} ->
+            my_inform_client(Client, TmpEntry),
+            NewEntry = rdht_tx_read_state:set_client_informed(TmpEntry),
+            pdb:set(NewEntry, Table);
+        {false, unknown} ->
+            pdb:set(TmpEntry, Table);
+        {false, _Client} ->
+            pdb:set(TmpEntry, Table),
+            my_delete_if_all_replied(TmpEntry, Reps, Table)
         end,
-    my_set_entry(NewEntry, State);
+    State;
 
 %% triggered by ?MODULE:work_phase/3
-on({client_is, Id, Pid, Key}, {_CurrEntry, Reps, _Maj, WaitTable, ActiveTable} = State) ->
+on({client_is, Id, Pid, Key}, {Reps, _Maj, Table} = State) ->
     ?TRACE("rdht_tx_read:on(client_is)~n", []),
-    Entry = my_get_entry(Id, State),
+    Entry = my_get_entry(Id, Table),
     Tmp1Entry = rdht_tx_read_state:set_client(Entry, Pid),
     TmpEntry = rdht_tx_read_state:set_key(Tmp1Entry, Key),
-    NewEntry =
-        case rdht_tx_read_state:is_newly_decided(TmpEntry) of
-            true ->
-                my_inform_client(Pid, TmpEntry),
-                Tmp2Entry = rdht_tx_read_state:set_client_informed(TmpEntry),
-                my_delete_if_all_replied(Tmp2Entry, Reps, WaitTable, ActiveTable);
-            false -> TmpEntry
-        end,
-    my_set_entry(NewEntry, State);
+    case rdht_tx_read_state:is_newly_decided(TmpEntry) of
+        true ->
+            my_inform_client(Pid, TmpEntry),
+            Tmp2Entry = rdht_tx_read_state:set_client_informed(TmpEntry),
+            pdb:set(Tmp2Entry, Table),
+            my_delete_if_all_replied(Tmp2Entry, Reps, Table);
+        false -> pdb:set(TmpEntry, Table)
+    end,
+    State;
 
 %% triggered periodically
-on({periodic_timeout}, {CurrEntry, Reps, Maj, WaitTable, ActiveTable} = _State) ->
+on({timeout_id, Id}, {_Reps, _Maj, Table} = State) ->
     ?TRACE("rdht_tx_read:on(timeout)~n", []),
-    %% CurrEntry in WaitTable? -> clean cache, else -> put into next Waittable
-    Id = rdht_tx_read_state:get_id(CurrEntry),
-    NewEntry =
-        case Id of
-            '$_no_curr_entry' -> CurrEntry;
-            _ ->
-                case ets:member(WaitTable, Id) of
-                    true ->
-                        %% write back to WaitTable and delete from cache
-                        ets:insert(WaitTable, CurrEntry),
-                        rdht_tx_read_state:new('$_no_curr_entry');
-                    false ->
-                        %% store in new wait table
-                        ets:insert(ActiveTable, CurrEntry),
-                        CurrEntry
-                end
-        end,
-    %% inform client on timeout if Id exists and client is not informed
-    my_timeout_inform(WaitTable, ActiveTable, ets:first(WaitTable)),
-    ets:delete_all_objects(WaitTable),
-    comm:send_local_after(config:read(transaction_lookup_timeout),
-                             self(), {periodic_timeout}),
-    %% swap the two tables.
-    {NewEntry, Reps, Maj, ActiveTable, WaitTable};
+    case pdb:get(Id, Table) of
+        undefined -> ok;
+        Entry ->
+            %% inform client on timeout if Id exists and client is not informed
+            my_timeout_inform(Entry),
+            pdb:delete(Id, Table)
+    end,
+    State;
 
 on(_, _State) ->
     unknown_event.
 
+my_get_entry(Id, Table) ->
+    case pdb:get(Id, Table) of
+        undefined ->
+            msg_delay:send_local(config:read(transaction_lookup_timeout)/1000,
+                                 self(), {timeout_id, Id}),
+            rdht_tx_read_state:new(Id);
+        Any -> Any
+    end.
+
 %% inform client on timeout if Id exists and client is not informed yet
-my_timeout_inform(_Table, _ActiveTable, '$end_of_table') ->
-    ok;
-my_timeout_inform(Table, ActiveTable, IterKey) ->
-    [Entry] = ets:lookup(Table, IterKey),
-    ets:delete(ActiveTable, rdht_tx_read_state:get_id(Entry)),
+my_timeout_inform(Entry) ->
     case {rdht_tx_read_state:is_client_informed(Entry),
           rdht_tx_read_state:get_client(Entry)} of
         {_, unknown} -> ok;
@@ -255,8 +240,7 @@ my_timeout_inform(Table, ActiveTable, IterKey) ->
             TmpEntry = rdht_tx_read_state:set_decided(Entry, timeout),
             my_inform_client(Client, TmpEntry);
         _ -> ok
-    end,
-    my_timeout_inform(Table, ActiveTable, ets:next(Table,IterKey)).
+    end.
 
 my_inform_client(Client, Entry) ->
     Id = rdht_tx_read_state:get_id(Entry),
@@ -279,44 +263,12 @@ my_make_result_entry(Entry) ->
         value -> {?MODULE, Key, {value, Val}}
     end.
 
-my_get_ets_entry(ActiveTable, WaitTable, Id) ->
-    case ets:lookup(ActiveTable, Id) of
-        [] ->
-            case ets:lookup(WaitTable, Id) of
-                [] -> rdht_tx_read_state:new(Id);
-                [OldEntry] ->
-                    ets:delete(WaitTable, Id),
-                    OldEntry
-            end;
-        [Entry] -> Entry
-    end.
-
-my_get_entry(Id, {CurrEntry, _Reps, _Maj, WaitTable, ActiveTable} = _State) ->
-    %% implement a cache for the current entry
-    %% only write back to ets table, if concurrent requests are handled
-    CachedId = rdht_tx_read_state:get_id(CurrEntry),
-    case CachedId of
-        Id -> CurrEntry;
-        '$_no_curr_entry' -> my_get_ets_entry(ActiveTable, WaitTable, Id);
-        _ ->
-            %% write back the cached entry.
-            %% It would have been already deleted if not needed anymore.
-            ets:insert(ActiveTable, CurrEntry),
-            ets:delete(WaitTable, CurrEntry),
-            my_get_ets_entry(ActiveTable, WaitTable, Id)
-    end.
-
-my_set_entry(NewEntry, {_CurrEntry, Reps, Maj, WaitTable, ActiveTable} = _State) ->
-    {NewEntry, Reps, Maj, WaitTable, ActiveTable}.
-
-my_delete_if_all_replied(Entry, Reps, WaitTable, ActiveTable) ->
+my_delete_if_all_replied(Entry, Reps, Table) ->
     Id = rdht_tx_read_state:get_id(Entry),
     case (Reps =:= rdht_tx_read_state:get_numreplied(Entry))
         andalso (rdht_tx_read_state:is_client_informed(Entry)) of
         true ->
-            ets:delete(ActiveTable, Id),
-            ets:delete(WaitTable, Id),
-            rdht_tx_read_state:new('$_no_curr_entry');
+            pdb:delete(Id, Table);
         false -> Entry
     end.
 
