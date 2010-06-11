@@ -28,7 +28,8 @@
 all() -> [
           test_fast_acceptors_4, test_fast_acceptors_16,
           test_acceptors_4, test_acceptors_16,
-          test_two_proposers
+          test_two_proposers,
+          test_rnd_interleave
          ].
 
 suite() ->
@@ -169,7 +170,7 @@ test_two_proposers(_Config) ->
     [ Proposer1, Proposer2 ] = Proposers,
 
     %% set some breakpoints
-    gen_component:set_breakpoint(element(3, Proposer1), acceptor_ack, bp1),
+    gen_component:bp_set(element(3, Proposer1), acceptor_ack, bp1),
     %% initiate full paxos
     proposer:start_paxosid(Proposer1, paxid123, Acceptors,
                            prepared, Majority, length(Proposers), 3),
@@ -179,9 +180,9 @@ test_two_proposers(_Config) ->
     %% should receive an abort
     receive {learner_decide, cpaxid123, _, Res1} = Any -> io:format("Expected abort Received ~p~n", [Any]) end,
 
-    gen_component:when_in_breakpoint(element(3, Proposer1)),
-    gen_component:del_breakpoint(element(3, Proposer1), bp1),
-    gen_component:breakpoint_cont(element(3, Proposer1)),
+    gen_component:bp_barrier(element(3, Proposer1)),
+    gen_component:bp_del(element(3, Proposer1), bp1),
+    gen_component:bp_cont(element(3, Proposer1)),
 
     %% should receive also an abort as proposer1 was hold
     receive {learner_decide, cpaxid123, _, Res2} = Any2 ->
@@ -196,7 +197,7 @@ test_two_proposers(_Config) ->
     [ acceptor:start_paxosid(X, paxid124, Learners) || X <- Acceptors ],
     [ Proposer1, Proposer2 ] = Proposers,
     %% set some breakpoints
-    gen_component:set_breakpoint(element(3, Proposer2), acceptor_ack, bp2),
+    gen_component:bp_set(element(3, Proposer2), acceptor_ack, bp2),
     %% initiate full paxos
     proposer:start_paxosid(Proposer1, paxid124, Acceptors,
                            prepared, Majority, length(Proposers), 1),
@@ -206,9 +207,9 @@ test_two_proposers(_Config) ->
     %% should receive a prepared as proposer2 was hold
     receive {learner_decide, cpaxid124, _, Res3} = Any3 -> io:format("Expected prepared Received ~p~n", [Any3]) end,
 
-    gen_component:when_in_breakpoint(element(3, Proposer2)),
-    gen_component:del_breakpoint(element(3, Proposer2), bp2),
-    gen_component:breakpoint_cont(element(3, Proposer2)),
+    gen_component:bp_barrier(element(3, Proposer2)),
+    gen_component:bp_del(element(3, Proposer2), bp2),
+    gen_component:bp_cont(element(3, Proposer2)),
 
     %% should receive also an abort
     receive
@@ -218,6 +219,60 @@ test_two_proposers(_Config) ->
     ?assert(Res3 =:= Res4),
     ct:pal("done.~n"),
     ok.
+
+-spec(prop_rnd_interleave/3 :: (1..4, 4..16, {pos_integer(), pos_integer(), pos_integer()}) -> boolean()).
+prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
+    ct:pal("Called with: paxos_SUITE:prop_rnd_interleave(~p, ~p, ~p).~n",
+           [NumProposers, NumAcceptors, Seed]),
+    Majority = NumAcceptors div 2 + 1,
+    {Proposers, Acceptors, Learners} =
+        make(NumProposers, NumAcceptors, 1, rnd_interleave),
+    %% set bp on all processes
+    [ gen_component:bp_set(element(3, X), proposer_initialize, bp)
+      ||  X <- Proposers],
+    [ gen_component:bp_set(element(3, X), acceptor_initialize, bp)
+      ||  X <- Acceptors ],
+    [ gen_component:bp_set(element(3, X), learner_initialize, bp)
+      || X <- Learners],
+    %% start paxos instances
+    [ proposer:start_paxosid(X, paxidrndinterl, Acceptors,
+                             proposal, Majority, NumProposers, Y)
+      || {X,Y} <- lists:zip(Proposers, lists:seq(1, NumProposers)) ],
+    [ acceptor:start_paxosid(X, paxidrndinterl, Learners)
+      || X <- Acceptors ],
+    [ learner:start_paxosid(X, paxidrndinterl, Majority,
+                            comm:this(), cpaxidrndinterl)
+      || X <- Learners],
+    %% randomly step through protocol
+    OldSeed = random:seed(Seed),
+    Steps = step_until_decide(Proposers ++ Acceptors ++ Learners, cpaxidrndinterl, 0),
+    ct:pal("Needed ~p steps~n", [Steps]),
+    case OldSeed of
+        undefined -> ok;
+        _ -> random:seed(OldSeed)
+    end,
+    true.
+
+step_until_decide(Processes, PaxId, SumSteps) ->
+    %% io:format("Step ~p~n", [SumSteps]),
+    Runnable = [ X || X <- Processes, gen_component:runnable(element(3,X)) ],
+    case Runnable of
+        [] ->
+            io:format("No runnable processes of ~p~n", [length(Processes)]),
+            timer:sleep(5), step_until_decide(Processes, PaxId, SumSteps);
+        _ -> ok
+    end,
+    Num = random:uniform(length(Runnable)),
+    gen_component:bp_step(element(3,lists:nth(Num, Runnable))),
+    receive
+        {learner_decide, cpaxidrndinterl, _, _Res} = _Any ->
+            %% io:format("Received ~p~n", [_Any]),
+            SumSteps
+    after 0 -> step_until_decide(Processes, PaxId, SumSteps + 1)
+    end.
+
+test_rnd_interleave(_Config) ->
+    tester:test(paxos_SUITE, prop_rnd_interleave, _Params = 3, _Iter = 100).
 
 wait_for(Name) ->
     case whereis(Name) of
