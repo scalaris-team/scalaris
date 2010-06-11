@@ -89,6 +89,9 @@ parse_expression({atom, _, Atom}, ParseState) ->
 parse_expression({bin, _, _Binary}, ParseState) ->
     % @todo
     ParseState;
+parse_expression({float, _, _Float}, ParseState) ->
+    % @todo
+    ParseState;
 parse_expression({char, _, _Char}, ParseState) ->
     % @todo
     ParseState;

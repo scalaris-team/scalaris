@@ -13,54 +13,66 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc Generic component framework
 %% @end
 %% @version $Id$
 -module(gen_component).
 -include("scalaris.hrl").
--author('schuett@zib.de').
 -vsn('$Id$').
 
 %% breakpoint tracing
-%-define(TRACE_BP(X,Y), io:format(X,Y)).
+%-define(TRACE_BP(X,Y), io:format("~p", [self()]), io:format(X,Y)).
 -define(TRACE_BP(X,Y), ok).
+-define(TRACE_BP_STEPS(X,Y), io:format(X,Y)).
+%-define(TRACE_BP_STEPS(X,Y), ok).
 
 -export([behaviour_info/1]).
 -export([start_link/2, start_link/3,
          start/4, start/2,
          start/3]).
--export([kill/1, sleep/2,
+-export([kill/1, sleep/2, runnable/1,
          get_state/1, change_handler/2]).
--export([set_breakpoint/3, set_breakpoint_cond/3, del_breakpoint/2]).
--export([breakpoint_step/1, breakpoint_cont/1, when_in_breakpoint/1]).
+-export([bp_set/3, bp_set_cond/3, bp_del/2]).
+-export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% behaviour definition
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 behaviour_info(callbacks) ->
     [
-     % init component
-     {init, 1},
-     % handle message
-     {on, 2}
+     {init, 1},     % initialize component
+     {on, 2}        % handle a single message
     ];
 behaviour_info(_Other) ->
     undefined.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% API
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-kill(Pid) ->
-    Pid ! {'$gen_component', kill}.
+%%% API
+kill(Pid) ->        Pid ! {'$gen_component', kill}, ok.
+sleep(Pid, Time) -> Pid ! {'$gen_component', sleep, Time}, ok.
 
-sleep(Pid, Time) ->
-    Pid ! {'$gen_component', time, Time}.
+runnable(Pid) ->
+    {message_queue_len, MQLen} = erlang:process_info(Pid, message_queue_len),
+    MQResult =
+        case MQLen of
+            0 -> false;
+            _ ->
+                %% are there messages which are not gen_component messages?
+                {messages, Msgs} = erlang:process_info(Pid, messages),
+                lists:any(fun(X) -> element(1, X) =/= '$gen_component' end,
+                          Msgs)
+        end,
+    case MQResult of
+        false ->
+            Pid ! {'$gen_component', bp, msg_in_bp_waiting, self()},
+            receive
+                {'$gen_component', bp, msg_in_bp_waiting_response, Runnable} ->
+                    Runnable
+            end;
+        true -> true
+    end.
 
 get_state(Pid) ->
     Pid ! {'$gen_component', get_state, self()},
     receive
-        {'$gen_component', get_state_response, State} ->
-            State
+        {'$gen_component', get_state_response, State} -> State
     end.
 
 %% @doc change the handler for handling messages
@@ -68,26 +80,32 @@ change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 
 %% requests regarding breakpoint processing
-set_breakpoint(Pid, Msg_Tag, BPName) ->
-    Pid ! {'$gen_component', bp, set_breakpoint, Msg_Tag, BPName}.
+bp_set(Pid, Msg_Tag, BPName) ->
+    Pid ! {'$gen_component', bp, bp_set, Msg_Tag, BPName}.
 
 %% @doc Module:Function(Message, State, Params) will be evaluated to decide
 %% whether a BP is reached. Params can be used as a payload.
-set_breakpoint_cond(Pid, {_Module, _Function, _Params} = Cond, BPName) ->
-    Pid ! {'$gen_component', bp, set_breakpoint_cond, Cond, BPName}.
+bp_set_cond(Pid, {_Module, _Function, _Params} = Cond, BPName) ->
+    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName}.
 
-del_breakpoint(Pid, BPName) ->
-    Pid ! {'$gen_component', bp, del_breakpoint, BPName}.
+bp_del(Pid, BPName) ->
+    Pid ! {'$gen_component', bp, bp_del, BPName}.
 
-breakpoint_step(Pid) ->
-    Pid !  {'$gen_component', bp, breakpoint, step}.
+bp_step(Pid) ->
+    Pid !  {'$gen_component', bp, breakpoint, step, self()},
+    receive {'$gen_component', bp, breakpoint, step_done,
+             GCPid, Module, On, Message} ->
+            ?TRACE_BP_STEPS("~p ~p:~p/2 handled message ~w~n",
+                            [GCPid, Module, On, Message]),
+            ok
+    end.
 
-breakpoint_cont(Pid) ->
+bp_cont(Pid) ->
     Pid !  {'$gen_component', bp, breakpoint, cont}.
 
 %% @doc delay further breakpoint requests until a breakpoint actually occurs
-when_in_breakpoint(Pid) ->
-    Pid ! {'$gen_component', bp, when_in_breakpoint}.
+bp_barrier(Pid) ->
+    Pid ! {'$gen_component', bp, barrier}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -121,31 +139,26 @@ start(Module, Args, Options) ->
 
 -spec(start/4 :: (module(), any(), list(), comm:erl_local_pid()) -> ok).
 start(Module, Args, Options, Supervisor) ->
-    %io:format("Starting ~p~n",[Module]),
+    %% io:format("Starting ~p~n",[Module]),
     case lists:keysearch(register, 1, Options) of
         {value, {register, InstanceId, Name}} ->
             process_dictionary:register_process(InstanceId, Name, self()),
             ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self());
         false ->
             case lists:keysearch(register_native, 1, Options) of
-            {value, {register_native,Name}} ->
-                register(Name, self());
-            false ->
-                ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
-                ok
+                {value, {register_native,Name}} ->
+                    register(Name, self());
+                false ->
+                    ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+                    ok
             end
     end,
     case lists:member(wait_for_init, Options) of
-        true ->
-            ok;
-        false ->
-            Supervisor ! {started, self()},
-            ok
+        true -> ok;
+        false -> Supervisor ! {started, self()}
     end,
     try
-        InitialComponentState = {Options, _Slowest = 0.0,
-                                 {_BPs = [], _BPActive = false,
-                                  _BP_HB_Q = []}},
+        InitialComponentState = {Options, _Slowest = 0.0, bp_state_new()},
         Handler = case Module:init(Args) of
                       {'$gen_component', Config, InitialState} ->
                           {value, {on_handler, NewHandler}} =
@@ -209,8 +222,7 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
         Message ->
             TmpComponentState =
                 handle_breakpoint(Message, State, ComponentState),
-
-            %Start = erlang:now(),
+            %% Start = erlang:now(),
             case (try Module:On(Message, State)
                   catch
                       throw:Term -> {exception, Term};
@@ -220,18 +232,20 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                   end) of
                 {exception, Exception} ->
                     log:log(error,"Error: exception ~p during handling of ~p in module ~p in (~p)~n",
-                              [Exception, Message, Module, State]),
-                    loop(Module, On, State, TmpComponentState);
+                            [Exception, Message, Module, State]),
+                    NextComponentState = bp_step_done(Module, On, Message, TmpComponentState),
+                    loop(Module, On, State, NextComponentState);
                 unknown_event ->
                     {NewState, NewComponentState} =
                         handle_unknown_event(Message, State,
                                              TmpComponentState, Module, On),
-                    loop(Module, On, NewState, NewComponentState);
-                kill ->
-                    ok;
+                    NextComponentState = bp_step_done(Module, On, Message, NewComponentState),
+                    loop(Module, On, NewState, NextComponentState);
+                kill -> ok;
                 {'$gen_component', Config, NewState} ->
                     {value, {on_handler, NewHandler}} =
                         lists:keysearch(on_handler, 1, Config),
+                    %% This is not counted as a bp_step
                     loop(Module, NewHandler, NewState, TmpComponentState);
                 NewState ->
                     %%Stop = erlang:now(),
@@ -241,35 +255,41 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                     %% io:format("slow message ~p (~p)~n", [Message, Span]),
                     %% loop(Module, NewState, {Options, Span});
                     %%true ->
-                    loop(Module, On, NewState, TmpComponentState)
+                    NextComponentState = bp_step_done(Module, On, Message, TmpComponentState),
+                    loop(Module, On, NewState, NextComponentState)
                     %%end
-            end
+                end
     end.
 
 handle_gen_component_message(Message, State, ComponentState) ->
-    {_Options, _Slowest, {_BPs, _BPActive, Queue}} = ComponentState,
+    {_Options, _Slowest, BPState} = ComponentState,
     case Message of
-        {'$gen_component', bp, when_in_breakpoint} ->
+        {'$gen_component', bp, barrier} ->
             %% start holding back bp messages for next BP
-            hold_bp_op_back(Message, ComponentState);
-        {'$gen_component', bp, set_breakpoint_cond, Cond, BPName} ->
-            case Queue of
-                [] -> set_bp_cond(Cond, BPName, ComponentState);
-                _ -> hold_bp_op_back(Message, ComponentState)
+            gc_state_bp_hold_back(ComponentState, Message);
+        {'$gen_component', bp, bp_set_cond, Cond, BPName} ->
+            case bp_state_get_queue(BPState) of
+                [] -> gc_state_bp_set_cond(ComponentState, Cond, BPName);
+                _ -> gc_state_bp_hold_back(ComponentState, Message)
             end;
-        {'$gen_component', bp, set_breakpoint, MsgTag, BPName} ->
-            case Queue of
-                [] -> set_bp(MsgTag, BPName, ComponentState);
-                _ -> hold_bp_op_back(Message, ComponentState)
+        {'$gen_component', bp, bp_set, MsgTag, BPName} ->
+            case bp_state_get_queue(BPState) of
+                [] -> gc_state_bp_set(ComponentState, MsgTag, BPName);
+                _ -> gc_state_bp_hold_back(ComponentState, Message)
             end;
-        {'$gen_component', bp, del_breakpoint, BPName} ->
-            case Queue of
-                [] -> del_bp(BPName, ComponentState);
-                _ -> hold_bp_op_back(Message, ComponentState)
+        {'$gen_component', bp, bp_del, BPName} ->
+            case bp_state_get_queue(BPState) of
+                [] -> gc_state_bp_del(ComponentState, BPName);
+                _ -> gc_state_bp_hold_back(ComponentState, Message)
             end;
-        {'$gen_component', bp, breakpoint, _StepOrCont} ->
-            hold_bp_op_back(Message, ComponentState);
+        {'$gen_component', bp, breakpoint, step, _Stepper} ->
+            gc_state_bp_hold_back(ComponentState, Message);
+        {'$gen_component', bp, breakpoint, cont} ->
+            gc_state_bp_hold_back(ComponentState, Message);
 
+        {'$gen_component', bp, msg_in_bp_waiting, Pid} ->
+            Pid ! {'$gen_component', bp, msg_in_bp_waiting_response, false},
+            ComponentState;
         {'$gen_component', sleep, Time} ->
             timer:sleep(Time),
             ComponentState;
@@ -279,38 +299,33 @@ handle_gen_component_message(Message, State, ComponentState) ->
             ComponentState
     end.
 
-set_bp_cond(Cond, BPName, ComponentState) ->
-    {Options, Slowest, {BPs, BPActive, Queue}} = ComponentState,
-    NewBPs = [ {bp_cond, Cond, BPName} | BPs],
-    {Options, Slowest, {NewBPs, BPActive, Queue}}.
+gc_state_bp_set_cond({Options, Slowest, BPState}, Cond, BPName) ->
+    {Options, Slowest, bp_state_bp_set_cond(BPState, Cond, BPName)}.
 
-set_bp(MsgTag, BPName, ComponentState) ->
-    {Options, Slowest, {BPs, BPActive, Queue}} = ComponentState,
-    NewBPs = [ {bp, MsgTag, BPName} | BPs],
-    {Options, Slowest, {NewBPs, BPActive, Queue}}.
+gc_state_bp_set({Options, Slowest, BPState}, MsgTag, BPName) ->
+    {Options, Slowest, bp_state_bp_set(BPState, MsgTag, BPName)}.
 
-del_bp(BPName, ComponentState) ->
-    {Options, Slowest, {BPs, BPActive, Queue}} = ComponentState,
-    NewBPs = lists:keydelete(BPName, 3, BPs),
-    {Options, Slowest, {NewBPs, BPActive, Queue}}.
+gc_state_bp_del({Options, Slowest, BPState}, BPName) ->
+    {Options, Slowest, bp_state_bp_del(BPState, BPName)}.
 
-hold_bp_op_back(Message, ComponentState) ->
-    {Options, Slowest, {BPs, BPActive, Queue}} = ComponentState,
-    NewQueue = lists:append(Queue, [Message]),
-    ?TRACE_BP("Enqueued bp op ~p.~n", [Message]),
-    {Options, Slowest, {BPs, BPActive, NewQueue}}.
+gc_state_bp_hold_back({Options, Slowest, BPState}, Message) ->
+    ?TRACE_BP("Enqueued bp op ~p -> ~p~n", [Message,
+    {Options, Slowest, bp_state_hold_back(BPState, Message)}]),
+    {Options, Slowest, bp_state_hold_back(BPState, Message)}.
+%    NewQueue = lists:append(Queue, [Message]),
 
 handle_breakpoint(Message, State, ComponentState) ->
-    wait_for_bp_leave(Message, State, ComponentState,
-                      bp_active(Message, State, ComponentState)).
+    BPActive = bp_active(Message, State, ComponentState),
+    wait_for_bp_leave(Message, State, ComponentState, BPActive).
 
 bp_active(_Message, _State,
           {_Options, _Slowest,
-           {[] = _BPs, false = _BPActive, _HB_BP_Ops}} = _ComponentState) ->
+           {[] = _BPs, false = _BPActive, _HB_BP_Ops, false = _BPStepped, unknown}}
+          = _ComponentState) ->
     false;
 bp_active(Message, State,
           {Options, Slowest,
-           {BPs, BPActive, HB_BP_Ops}} = _ComponentState) ->
+           {BPs, BPActive, HB_BP_Ops, BPStepped, StepperPid}} = _ComponentState) ->
     [ ThisBP | RemainingBPs ] = BPs,
     BPActive
         orelse
@@ -332,16 +347,17 @@ bp_active(Message, State,
         end
         orelse
         bp_active(Message, State,
-                  {Options, Slowest, {RemainingBPs, BPActive, HB_BP_Ops}}).
+                  {Options, Slowest, {RemainingBPs, BPActive, HB_BP_Ops, BPStepped, StepperPid}}).
 
 wait_for_bp_leave(_Message, _State, ComponentState, _BP_Active = false) ->
     ComponentState;
 wait_for_bp_leave(Message, State, ComponentState, _BP_Active = true) ->
-    {Options, Slowest, {BPs, _BPActive, HB_BP_Ops}} = ComponentState,
+    {Options, Slowest, {BPs, _BPActive, HB_BP_Ops, BPStepped, StepperPid}} = ComponentState,
+    ?TRACE_BP("In wait for bp leave~n", []),
     {Queue, FromQueue} = case HB_BP_Ops of
                 [] ->
                     %% trigger a selective receive
-                    ?TRACE_BP("wait for bp op by receive...", []),
+                    ?TRACE_BP("~p wait for bp op by receive...", [self()]),
                     receive
                         BPMsg when
                               is_tuple(BPMsg),
@@ -351,43 +367,51 @@ wait_for_bp_leave(Message, State, ComponentState, _BP_Active = true) ->
                             {[BPMsg], false}
                     end;
                 _ ->
-                    ?TRACE_BP("process queued bp op ~p.~n", [hd(HB_BP_Ops)]),
+                    ?TRACE_BP("~p process queued bp op ~p.~n", [self(), hd(HB_BP_Ops)]),
                     {HB_BP_Ops, true}
             end,
     handle_bp_request_in_bp(
       Message, State,
-      {Options, Slowest, {BPs, true, tl(Queue)}}, hd(Queue), FromQueue).
+      {Options, Slowest, {BPs, true, tl(Queue), BPStepped, StepperPid}}, hd(Queue), FromQueue).
 
 handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
-    {Options, Slowest, {BPs, _BPActive, Queue}} = ComponentState,
+    ?TRACE_BP("Handle bp request in bp ~p ~n", [BPMsg]),
+    {Options, Slowest, BPState} = ComponentState,
     case BPMsg of
-        {'$gen_component', bp, breakpoint, step} ->
-            {Options, Slowest, {BPs, true, Queue}};
+        {'$gen_component', bp, breakpoint, step, StepperPid} ->
+            TmpBPState = bp_state_set_bpstepped(BPState, true),
+            NewBPState = bp_state_set_bpstepper(TmpBPState, StepperPid),
+            {Options, Slowest, NewBPState};
         {'$gen_component', bp, breakpoint, cont} ->
-            {Options, Slowest, {BPs, false, Queue}};
-
-        {'$gen_component', bp, when_in_breakpoint} ->
+            T1BPState = bp_state_set_bpactive(BPState, false),
+            T2BPState = bp_state_set_bpstepped(T1BPState, false),
+            NewBPState = bp_state_set_bpstepper(T2BPState, unknown),
+            {Options, Slowest, NewBPState};
+        {'$gen_component', bp, msg_in_bp_waiting, Pid} ->
+            Pid ! {'$gen_component', bp, msg_in_bp_waiting_response, true},
+            wait_for_bp_leave(Message, State, ComponentState, true);
+        {'$gen_component', bp, barrier} ->
             %% we are in breakpoint. Consume this bp message
             wait_for_bp_leave(Message, State, ComponentState, true);
-        {'$gen_component', bp, set_breakpoint_cond, Cond, BPName} ->
+        {'$gen_component', bp, bp_set_cond, Cond, BPName} ->
             NextCompState =
-                case {Queue, FromQueue} of
-                    {[_H|_T], false} -> hold_bp_op_back(BPMsg, ComponentState);
-                    _ -> set_bp_cond(Cond, BPName, ComponentState)
+                case {bp_state_get_queue(BPState), FromQueue} of
+                    {[_H|_T], false} -> gc_state_bp_hold_back(ComponentState, BPMsg);
+                    _ -> gc_state_bp_set_cond(ComponentState, Cond, BPName)
                 end,
             wait_for_bp_leave(Message, State, NextCompState, true);
-        {'$gen_component', bp, set_breakpoint, MsgTag, BPName} ->
+        {'$gen_component', bp, bp_set, MsgTag, BPName} ->
             NextCompState =
-                case {Queue, FromQueue} of
-                    {[_H|_T], false} -> hold_bp_op_back(BPMsg, ComponentState);
-                    _ -> set_bp(MsgTag, BPName, ComponentState)
+                case {bp_state_get_queue(BPState), FromQueue} of
+                    {[_H|_T], false} -> gc_state_bp_hold_back(ComponentState, BPMsg);
+                    _ -> gc_state_bp_set(ComponentState, MsgTag, BPName)
                 end,
             wait_for_bp_leave(Message, State, NextCompState, true);
-        {'$gen_component', bp, del_breakpoint, BPName} ->
+        {'$gen_component', bp, bp_del, BPName} ->
             NextCompState =
-                case Queue of
-                    {[_H|_T], false} -> hold_bp_op_back(BPMsg, ComponentState);
-                    _ -> del_bp(BPName, ComponentState)
+                case bp_state_get_queue(BPState) of
+                    {[_H|_T], false} -> gc_state_bp_hold_back(ComponentState, BPMsg);
+                    _ -> gc_state_bp_del(ComponentState, BPName)
                 end,
             wait_for_bp_leave(Message, State, NextCompState, true)
     end.
@@ -395,3 +419,45 @@ handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
 handle_unknown_event(UnknownMessage, State, ComponentState, Module, On) ->
    log:log(error,"unknown message: ~p in Module: ~p and handler ~p~n in State ~p ~n",[UnknownMessage,Module,On,State]),
     {State, ComponentState}.
+
+bp_state_new() ->
+    {_BPs = [], _BPActive = false,
+     _BP_HB_Q = [], _BPStepped = false,
+     _BPStepperPid = unknown}.
+bp_state_get_bps(BPState) -> element(1, BPState).
+bp_state_set_bps(BPState, Val) -> setelement(1, BPState, Val).
+bp_state_get_bpactive(BPState) -> element(2, BPState).
+bp_state_set_bpactive(BPState, Val) -> setelement(2, BPState, Val).
+bp_state_get_queue(BPState) -> element(3, BPState).
+bp_state_set_queue(BPState, Val) -> setelement(3, BPState, Val).
+bp_state_get_bpstepped(BPState) -> element(4, BPState).
+bp_state_set_bpstepped(BPState, Val) -> setelement(4, BPState, Val).
+bp_state_get_bpstepper(BPState) -> element(5, BPState).
+bp_state_set_bpstepper(BPState, Val) -> setelement(5, BPState, Val).
+bp_state_bp_set_cond(BPState, Cond, BPName) ->
+    NewBPs = [ {bp_cond, Cond, BPName} | bp_state_get_bps(BPState)],
+    bp_state_set_bps(BPState, NewBPs).
+bp_state_bp_set(BPState, MsgTag, BPName) ->
+    NewBPs = [ {bp, MsgTag, BPName} | bp_state_get_bps(BPState)],
+    bp_state_set_bps(BPState, NewBPs).
+bp_state_bp_del(BPState, BPName) ->
+    NewBPs = lists:keydelete(BPName, 3, bp_state_get_bps(BPState)),
+    bp_state_set_bps(BPState, NewBPs).
+bp_state_hold_back(BPState, Message) ->
+    NewQueue = lists:append(bp_state_get_queue(BPState), [Message]),
+    bp_state_set_queue(BPState, NewQueue).
+
+%% @doc release the bp_step function when we executed a bp_step
+bp_step_done(Module, On, Message, ComponentState) ->
+    {Options, Slowest, BPState} = ComponentState,
+    case {bp_state_get_bpactive(BPState),
+          bp_state_get_bpstepped(BPState)} of
+        {true, true} ->
+            comm:send_local(bp_state_get_bpstepper(BPState),
+                            {'$gen_component', bp, breakpoint, step_done,
+                             self(), Module, On, Message}),
+            TmpBPState = bp_state_set_bpstepped(BPState, false),
+            NextBPState = bp_state_set_bpstepper(TmpBPState, unknown),
+            {Options, Slowest, NextBPState};
+        _ -> {Options, Slowest, BPState}
+    end.
