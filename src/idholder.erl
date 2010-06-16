@@ -63,11 +63,6 @@ get_id() ->
 start_link(InstanceId) ->
     gen_component:start_link(?MODULE, [], [{register, InstanceId, idholder}]).
 
-%% @doc Initialises the idholder with a random key and a counter of 0.
--spec init([]) -> state().
-init(_Arg) ->
-    {get_initial_key(config:read(key_creator)), 0}.
-
 %% @doc Resets the key to a random key and a counter of 0.
 %%      Warning: This effectively states that a newly created DHT node is
 %%      unrelated to the old one and should only be used if the old DHT node is
@@ -95,19 +90,23 @@ check_config() ->
 % Server process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% userdevguide-begin gen_component:sample
+%% @doc Initialises the idholder with a random key and a counter of 0.
+-spec init([]) -> state().
+init(_Arg) ->
+    {get_initial_key(config:read(key_creator)), 0}.
+
 -spec on(message(), state()) -> state() | unknown_event.
 on({reinit}, _State) ->
     {get_initial_key(config:read(key_creator)), 0};
-
 on({get_id, PID}, {Key, Count} = State) ->
     comm:send_local(PID, {idholder_get_id_response, Key, Count}),
     State;
-
 on({set_id, NewKey, Count}, _State) ->
     {NewKey, Count};
-
 on(_, _State) ->
     unknown_event.
+%% userdevguide-end gen_component:sample
 
 %% @doc Gets the pid of the idholder process in the same group as the calling
 %%      process. 

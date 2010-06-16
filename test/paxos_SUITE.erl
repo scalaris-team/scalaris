@@ -220,7 +220,9 @@ test_two_proposers(_Config) ->
     ct:pal("done.~n"),
     ok.
 
--spec(prop_rnd_interleave/3 :: (1..4, 4..16, {pos_integer(), pos_integer(), pos_integer()}) -> boolean()).
+%% userdevguide-begin paxos_SUITE:random_interleaving_test
+-spec(prop_rnd_interleave/3 :: (1..4, 4..16, {pos_integer(), pos_integer(), pos_integer()})
+ -> boolean()).
 prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
     ct:pal("Called with: paxos_SUITE:prop_rnd_interleave(~p, ~p, ~p).~n",
            [NumProposers, NumAcceptors, Seed]),
@@ -258,7 +260,7 @@ step_until_decide(Processes, PaxId, SumSteps) ->
     Runnable = [ X || X <- Processes, gen_component:runnable(element(3,X)) ],
     case Runnable of
         [] ->
-            io:format("No runnable processes of ~p~n", [length(Processes)]),
+            ct:pal("No runnable processes of ~p~n", [length(Processes)]),
             timer:sleep(5), step_until_decide(Processes, PaxId, SumSteps);
         _ -> ok
     end,
@@ -270,6 +272,7 @@ step_until_decide(Processes, PaxId, SumSteps) ->
             SumSteps
     after 0 -> step_until_decide(Processes, PaxId, SumSteps + 1)
     end.
+%% userdevguide-end paxos_SUITE:random_interleaving_test
 
 test_rnd_interleave(_Config) ->
     tester:test(paxos_SUITE, prop_rnd_interleave, _Params = 3, _Iter = 100).

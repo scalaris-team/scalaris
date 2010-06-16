@@ -14,7 +14,10 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc Generic component framework
+%% @doc Generic component framework. This component and its usage
+%% are described in more detail in the 'User and Developers Guide'
+%% which can be found in user-dev-guide/main.pdf and online at
+%% [http://code.google.com/p/scalaris/wiki/UsersDevelopersGuide].
 %% @end
 %% @version $Id$
 -module(gen_component).
@@ -24,8 +27,11 @@
 %% breakpoint tracing
 %-define(TRACE_BP(X,Y), io:format("~p", [self()]), io:format(X,Y)).
 -define(TRACE_BP(X,Y), ok).
--define(TRACE_BP_STEPS(X,Y), io:format(X,Y)).
-%-define(TRACE_BP_STEPS(X,Y), ok).
+%% userdevguide-begin gen_component:trace_bp_steps
+%-define(TRACE_BP_STEPS(X,Y), io:format(X,Y)). %% output on console
+%-define(TRACE_BP_STEPS(X,Y), ct:pal(X,Y)).    %% output even if called by unittest
+-define(TRACE_BP_STEPS(X,Y), ok).
+%% userdevguide-end gen_component:trace_bp_steps
 
 -export([behaviour_info/1]).
 -export([start_link/2, start_link/3,
@@ -36,11 +42,14 @@
 -export([bp_set/3, bp_set_cond/3, bp_del/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
+%% userdevguide-begin gen_component:behaviour
 behaviour_info(callbacks) ->
     [
      {init, 1},     % initialize component
      {on, 2}        % handle a single message
+                    % on(Msg, State) -> NewState | unknown_event | kill
     ];
+%% userdevguide-end gen_component:behaviour
 behaviour_info(_Other) ->
     undefined.
 
@@ -80,8 +89,8 @@ change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 
 %% requests regarding breakpoint processing
-bp_set(Pid, Msg_Tag, BPName) ->
-    Pid ! {'$gen_component', bp, bp_set, Msg_Tag, BPName}.
+bp_set(Pid, MsgTag, BPName) ->
+    Pid ! {'$gen_component', bp, bp_set, MsgTag, BPName}.
 
 %% @doc Module:Function(Message, State, Params) will be evaluated to decide
 %% whether a BP is reached. Params can be used as a payload.
@@ -94,10 +103,10 @@ bp_del(Pid, BPName) ->
 bp_step(Pid) ->
     Pid !  {'$gen_component', bp, breakpoint, step, self()},
     receive {'$gen_component', bp, breakpoint, step_done,
-             GCPid, Module, On, Message} ->
+             _GCPid, Module, On, Message} ->
             ?TRACE_BP_STEPS("~p ~p:~p/2 handled message ~w~n",
-                            [GCPid, Module, On, Message]),
-            ok
+                            [_GCPid, Module, On, Message]),
+            {Module, On, Message}
     end.
 
 bp_cont(Pid) ->
