@@ -1,0 +1,415 @@
+\section{The \erlmodule{gen\_component}\erlmoduleindex{gen\_component}}
+\svnrev{r832}
+
+The generic component model implemented by
+\erlmodule[noindex]{gen\_component} allows to add some common functionality
+to all the components that build up the \scalaris{} system. It supports:
+
+\begin{description}
+\setlength{\parskip}{0pt}
+\setlength{\itemsep}{0pt}
+\item[event-handlers:] message handling with a similar syntax as used in \cite{rachid-book}.
+\item[FIFO order of messages:] components cannot be inadvertently locked as
+  we do not use selective receive statements in the code.
+\item[sleep and halt:] for testing components can sleep or be halted.
+\item[debugging, breakpoints, stepwise execution:] to debug components
+  execution can be steered via breakpoints, step-wise execution and
+  continuation based on arriving events and user defined component state
+  conditions.
+\item[basic profiling],
+\item[state dependent message handlers:] depending on its state, different
+  message handlers can be used and switched during runtime. Thereby a kind
+  of state-machine based message handling is supported.
+\item[prepared for \erlmodule{process\_dictionary}:] allows to send events to
+  named processes inside the same group as the actual component itself
+  (\code{send_to_group_member}) when just holding a reference to any group
+  member, and
+\item[unit-testing of event-handlers:] as message handling is separated from
+  the main loop of the component, the handling of individual messages and
+  thereby performed state manipulation can easily tested in unit-tests by
+  directly calling message handlers.
+\end{description}
+
+In \scalaris{} all Erlang processes should be implemented as
+\erlmodule{gen\_component}. The only exception are functions interfacing to
+the client, where a transition from asynchronous to synchronous request
+handling is necessary and that are executed in the context of a client's
+process or a process that behaves as a proxy for a client
+(\erlmodule{cs\_api}).
+
+\subsection{A basic \erlmodule{gen\_component} including a message handler}
+
+To implement a \erlmodule{gen\_component}, the component has to provide the
+\erlmodule{gen\_component} behaviour:
+
+\codesnippet{gen_component.erl}{gen_component:behaviour}{../src/gen_component.erl}
+
+This is illustrated by the following example:
+
+\codesnippet{idholder.erl}{gen_component:sample}{../src/idholder.erl}
+
+\erlfun{your\_gen\_component}{init}{/1} is called during start-up of a
+\erlmodule{gen\_component} and should return the initial state to be used for
+this \erlmodule{gen\_component}.
+
+To react on messages / events, a message handler is used. The default
+message handler is called \erlfun{your\_gen\_component}{on}{/2}. This can be
+changed by calling \erlfun{gen\_component}{change\_handler}{/2} (see
+Section~\ref{sec:gen_component:change_handler}). When an event / message for
+the component arrives, this handler is called with the event itself and the
+current state of the component. In the handler, the state of the component
+may be adjusted depending upon the event. The handler itself may trigger new
+events / messages for itself or other components and has finally to return
+the updated state of the component or the atoms \texttt{unknown\_event} or
+\texttt{kill}. It must neither call \code{receive} nor
+\erlfun{timer}{sleep}{/1} nor \erlfun{erlang}{exit}{/1}.
+
+\subsection{How to start a \erlmodule{gen\_component}?}
+
+A \erlmodule{gen\_component} can be started using one of:
+
+\erlfun{gen\_component}{start}{Module, Args, GenCOptions = []}\\
+\erlfun{gen\_component}{start\_link}{Module, Args, GenCOptions = []}
+\begin{erlfunparams}
+\erlparam{Module}{the the name of the module your component is
+   implemented in}
+\erlparam{Args}{List of parameters passed to \code{Module:init/1}
+   for initialization}
+\erlparam{GenCOptions}{optional parameter.
+   List of options for \erlmodule{gen\_component}
+\begin{description}
+\setlength{\parskip}{0pt}
+\setlength{\itemsep}{0pt}
+\item[\texttt{\{register, ProcessGroup, ProcessName\}}:] registers the new
+  process with the given process group (also called instanceid) and name in
+  the \erlmodule{process\_dictionary}.
+\item[\texttt{\{register\_native, ProcessName\}}:] registers the process as
+  a named Erlang process.
+\item[\texttt{wait\_for\_init}:] wait for \code{Module:init/1} to return
+  before returning to the caller.
+\end{description}
+}
+\end{erlfunparams}
+
+These functions are compatible to the Erlang/OTP supervisors.  They spawn a
+new process for the component which itself calls \code{Module:init/1} with
+the given \code{Args} to initialize the component. \code{Module:init/1}
+should return the initial state for your component. For each message sent to
+this component, the default message handler
+\erlfun[noindex]{Module}{on}{Message, State} will be called, which should
+react on the message and return the updated state of your component.
+
+\erlfun{gen\_component}{start}{} and \erlfun{gen\_component}{start\_link}{}
+return the pid of the spawned process as \code{\{ok, Pid\}}.
+
+
+\subsection{When does a \erlmodule{gen\_component} terminate?}
+
+A \erlmodule{gen\_component} can be stopped using:
+
+\erlfun{gen\_component}{kill}{Pid} or by returning \code{kill} from the
+current message handler.
+
+\subsection{What happens when unexpected events / messages arrive?}
+
+Your message handler (default is \erlfun{your\_gen\_component}{on}{/2})
+should return \code{unknown_event} in the final clause
+(\erlfun{your\_gen\_component}{on}{\_,\_}).  \erlmodule{gen\_component} then
+will nicely report on the unhandled message, the component's name, its state
+and currently active message handler, as shown in the following example:
+
+\begin{lstlisting}[language=bash]
+# bin/boot.sh
+[...]
+(boot@localhost)10> process_dictionary ! {no_message}.
+{no_message}
+[error] unknown message: {no_message} in Module: process_dictionary and
+handler on in State null
+(boot@localhost)11>
+\end{lstlisting}
+
+The \erlmodule{process\_dictionary} (see
+Section~\ref{sec:process_dictionary}) is a \erlmodule{gen\_component} which
+registers itself as named Erlang process with the \erlmodule{gen\_component}
+option \code{register_native} and therefore can be addressed by its name in
+the Erlang shell. We send it a \code{\{no_message\}} and
+\erlmodule{gen\_component} reports on the unhandled message. The
+\erlmodule{process\_dictionary} itself continues to run and waits for
+further messages.
+
+\subsection{What if my message handler generates an exception or
+ crashes the process?}
+
+\erlmodule{gen\_component} catches exceptions generated by message handlers
+and reports them with a stack trace, the message, that generated the
+exception, and the current state of the component.
+
+If a message handler terminates the process via \erlfun{erlang}{exit}{/1},
+this is out of the responsibility scope of \erlmodule{gen\_component}. As
+usual in Erlang, all linked processes will be informed. If for example
+\erlfun{gen\_component}{start\_link}{/2} or \texttt{/3} was used for
+starting the \erlmodule{gen\_component}, the spawning process will be
+informed, which may be an Erlang supervisor process taking further actions.
+
+\subsection{Changing message handlers and implementing state dependent
+ message responsiveness as a state-machine}
+\label{sec:gen_component:change_handler}
+\erlfunindex{gen\_component}{change\_handler}
+
+Sometimes it is beneficial to handle messages depending on the state of a
+component. One possibility to express this is implementing different clauses
+depending on the state variable, another is introducing case clauses inside
+message handlers to distinguish between current states. Both approaches may
+become tedious, error prone, and may result in confusing source code.
+
+Sometimes the use of several different message handlers for different states
+of the component leads to clearer arranged code, especially if the set of
+handled messages changes from state to state. For example, if we have a
+component with an initialization phase and a production phase afterwards, we
+can handle in the first message handler messages relevant during the
+initialization phase and simply queue all other requests for later
+processing using a common default clause.
+
+When initialization is done, we handle the queued user requests and switch
+to the message handler for the production phase. The message handler for the
+initialization phase does not need to know about messages occurring during
+production phase and the message handler for the production phase does not
+need to care about messages used during initialization. Both handlers can be
+made independent and may be extended later on without any adjustments to the
+other.
+
+One can also use this scheme to implement complex state-machines by changing
+the message handler from state to state.
+
+To switch the message handler
+\erlfun{gen\_component}{change\_handler}{State, new\_handler} is called as
+the last operation after a message in the active message handler was
+handled, so that the return value of
+\erlfun{gen\_component}{change\_handler}{/2} is propagated to
+\erlmodule{gen\_component}.  The new handler is given as an atom, which is
+the name of the 2-ary function in your component module to be called.
+
+\paragraph{Starting with non-default message handler.}
+It is also possible to change the message handler right from the beginning
+in your \erlfun{your\_gen\_component}{init}{/1} to avoid the default message
+handler \erlfun{your\_gen\_component}{on}{/2}. Just create your initial
+state as usual and call \erlfun{gen\_component}{change\_handler}{State,
+  my\_handler} as the final call in your
+\erlfun{your\_gen\_component}{init}{/1}. We prepared
+\erlfun{gen\_component}{change\_handler}{/2} to return \code{State} itself,
+so this will work properly.
+
+\subsection{Halting and pausing a \erlmodule{gen\_component}}
+
+Using \erlfun{gen\_component}{kill}{Pid} and
+\erlfun{gen\_component}{sleep}{Pid, Time} components can be terminated or
+paused.
+
+\subsection{Integration with \erlmodule{process\_dictionary}:
+  Redirecting events / messages  to other \erlmodule{gen\_component}s}
+
+Each \erlmodule{gen\_component} by itself is prepared to support
+\erlfun{comm}{send\_to\_group\_member}{/3} which forwards messages inside a
+group of processes registered via the \erlmodule{process\_dictionary} (see
+Section~\ref{sec:process_dictionary}) by their name. So, if you hold a Pid
+of one member of a process group, you can send messages to other members of
+this group, if you know their registered Erlang name. You do not necessarily
+have to know their individual Pid.
+
+\emph{In consequence, no \erlmodule{gen\_component} can individually handle
+  messages of the form: \code{\{send_to_group_member,} \code{_, _\}} as such
+  messages are consumed by \erlmodule{gen\_component} itself.}
+
+\subsection{Integration with \erlmodule{fd\_pinger}:
+Replying to failure detectors}
+
+Each \erlmodule{gen\_component} replies automatically to \code{\{ping,
+  Pid\}} requests with a \code{\{pong\}} send to the given \code{Pid}.  Such
+messages are generated, for example, by \erlmodule{fd\_pinger} which is used
+by our \erlmodule{fd} failure detectors.
+
+\emph{In consequence, no \erlmodule{gen\_component} can individually handle
+messages of the form: \code{\{ping, _\}} as such messages are consumed by
+\erlmodule{gen\_component} itself.}
+
+
+\subsection{The debugging interface of \erlmodule{gen\_component}:
+  Breakpoints and step-wise execution}
+
+
+We equipped \erlmodule{gen\_component} with a debugging interface, which
+especially is beneficial, when testing the interplay between several
+\erlmodule{gen\_component}s. It supports breakpoints which can pause the
+\erlmodule{gen\_component} depending on the arriving messages or depending
+on user defined conditions. If a breakpoint is reached, the execution can be
+continued step-wise (message by message) or until the next breakpoint is
+reached.
+
+We use it in our unit tests to steer protocol interleavings and to perform
+tests using random protocol interleavings between several processes
+(see~\erlmodule{paxos\_SUITE}). It allows also to reproduce given protocol
+interleavings for better testing.
+
+\subsubsection{Managing breakpoints.}
+
+Breakpoints are managed by the following functions:
+
+\begin{description}
+\item[\erlfun{gen\_component}{bp\_set}{Pid, MsgTag, BPName}:] For the
+  component running under \code{Pid} a breakpoint \code{BPName} is set. It
+  is reached, when a message with a message tag \code{MsgTag} is next to be
+  handled by the component (See \erlfun{comm}{get\_msg\_tag}{/1} and
+  Section~\ref{sec:comm} for more information on message tags). The
+  \code{BPName} is used as a reference for this breakpoint, for example to
+  delete it later.
+\item[\erlfun{gen\_component}{bp\_set\_cond}{Pid, Cond, BPName}:]
+  The same as \erlfun{gen\_component}{bp\_set}{/3} but a user defined
+  condition implemented in \code{\{Module, Function, Params = 2\} = Cond} is
+  checked by calling \code{Module:Function(Message, State)} to decide
+  whether a breakpoint is reached or not. \code{Message} is the next message
+  to be handled by the component and \code{State} is the current state of
+  the component. \code{Module:Function/2} should return a \code{boolean}.
+\item[\erlfun{gen\_component}{bp\_del}{Pid, BPName}:] The breakpoint
+  \code{BPName} is deleted. If the component is in this breakpoint, it will
+  not be released by this call. This has to be done separately by
+  \erlfun{gen\_component}{cont}{/1}. But the deleted breakpoint will no
+  longer be considered for newly entering a breakpoint.
+\item[\erlfun{gen\_component}{bp\_barrier}{Pid}:]
+  Delay all further handling of breakpoint requests until a breakpoint is
+  actually entered.
+
+  Note, that the following call sequence may not catch the breakpoint at
+  all, as during the sleep the component not necessarily consumes a
+  \code{ping} message and the set breakpoint may already be deleted before a
+  ping arrives.
+
+  \begin{lstlisting}
+  gen_component:bp_set(Pid, ping, bp_ping),
+  timer:sleep(10),
+  gen_component:bp_del(Pid, bp_ping),
+  gen_component:cont(Pid).
+  \end{lstlisting}
+
+  This is where \erlfun{gen\_component}{bp\_barrier}{/1} can be used:
+
+  \begin{lstlisting}
+  gen_component:bp_set(Pid, ping, bp_ping),
+  gen_component:bp_barrier(Pid),
+  %% the following breakpoint requests will not be handled before a
+  %% breakpoint is reached.
+  %% the gen_component itself is still active and handles messages as usual
+  %% up to the next breakpoint
+  gen_component:bp_del(Pid, bp_ping),
+  % the breakpoint was entered once, so we delete.
+  % next we leave the breakpoint and continue the gen_component
+  gen_component:cont(Pid).
+  \end{lstlisting}
+\end{description}
+
+None of the calls in the sample listing above is blocking. It just schedules
+all the operations, including the \code{bp_barrier}, for the
+\erlmodule{gen\_component} and immediately finishes. The actual events of
+entering and continuing the breakpoint in the \erlmodule{gen\_component} can
+happen independently later on, when the next \code{ping} message arrives.
+
+\subsubsection{Managing execution.}
+
+The execution of a \erlmodule{gen\_component} can be managed by the
+following functions:
+
+\begin{description}
+\item[\erlfun{gen\_component}{bp\_step}{Pid}:] This is the only blocking
+  breakpoint function. It waits until the \erlmodule{gen\_component} is in a
+  breakpoint and has handled a single message.  It returns the module, the
+  active message handler, and the handled message as a tuple \code{\{Module,
+    On, Message\}}.  This function does not actually finish the breakpoint,
+  but just lets a single message pass through. For further messages, no
+  breakpoint condition has to be valid, the original breakpoint is still
+  active. To leave a breakpoint, use \erlfun{gen\_component}{bp\_cont}{/1}.
+
+\item[\erlfun{gen\_component}{bp\_cont}{Pid}:]
+  Leaves a breakpoint. \erlmodule{gen\_component} runs as usual until the
+  next breakpoint is reached.
+
+  If no further breakpoints should be entered after continuation, you should
+  delete the registered breakpoint using \erlfun{gen\_component}{bp\_del}{/2}
+  before continuing the execution with
+  \erlfun{gen\_component}{bp\_cont}{/1}. To ensure, that the breakpoint is
+  entered at least once, \erlfun{gen\_component}{bp\_barrier}{/1} should be
+  used before deleting the breakpoint (see the example above). Otherwise it
+  could happen, that the delete request arrives at your
+  \erlmodule{gen\_component} before it was actually triggered. The following
+  continuation request would then unintentional apply to an unrelated
+  breakpoint that may be entered later on.
+
+\item[\erlfun{gen\_component}{runnable}{Pid}:] Returns whether a
+  \erlmodule{gen\_component} has messages to handle and is runnable. If you
+  know, that a \erlmodule{gen\_component} is in a breakpoint, you can use
+  this to check, whether a \erlfun{gen\_component}{bp\_step}{/1} or
+  \erlfun{gen\_component}{bp\_cont}{/1} is applicable to the component.
+
+\end{description}
+
+\subsubsection{Tracing handled messages -- getting a message  interleaving protocol.}
+
+We use the debugging interface of \erlmodule{gen\_component} to test
+protocols with random interleaving. First we start all the components
+involved, set breakpoints on the initialization messages for a new Paxos
+consensus and then start a single Paxos instance on all of them. The outcome
+of the Paxos consensus is a \code{learner_decide} message. So, in
+\erlfun{paxos\_SUITE}{step\_until\_decide}{/3} we look for runnable processes
+and select randomly one of them to perform a single step until the protocol
+finishes with a decision.
+
+\codesnippet{paxos_SUITE.erl}{paxos_SUITE:random_interleaving_test}{../test/paxos_SUITE.erl}
+
+To get a message interleaving protocol, we either can output the results
+of each \erlfun{gen\_component}{bp\_step}{/1} call together with the
+Pid we selected for stepping, or alter the definition of the macro
+\code{TRACE_BP_STEPS} in \erlmodule{gen\_component}, when we execute all
+\erlmodule{gen\_components} locally in the same Erlang virtual machine.
+
+\codesnippet{gen_component.erl}{gen_component:trace_bp_steps}{../src/gen_component.erl}
+
+% \todo{Should we also explain \code{common_test} and its suppression of
+%   io:format? Should we make it configurable whether \code{ct:pal} or
+%   \code{io:format} should be used for this?}
+
+
+%% \subsection{Profiling \erlmodule{gen\_component}s.}
+%% 
+%% Using the profiling feature, see also Section~\ref{sec:digging} into the
+%% details'
+%% 
+%% The profiling currently measures global time, which is actually not a
+%% good metric for profiling, as it depends on the scheduling and not all
+%% time recorded is actually used by the handler. Additionally
+%% \erlfun{erlang}{now}{} seems to be slow, as it involves a system call to
+%% get a monotonic clock information (which internally triggers a lock
+%% across all Erlang execution threads at least in the Erlang runtime
+%% environment up to R1304).
+%% 
+%% \todo{The metric should be changed to something more
+%%   appropriate. Probably the number of reductions this process has done
+%%   (via \erlfun{erlang}{process\_info}{}).}
+%% 
+%% \todo{
+%%   Maybe we should add some functions as interface to read the
+%%   profiling results instead of expecting the user to know how to read
+%%   it directly from the \erlmodule{ets} table.}
+
+\subsection{Future use and planned extensions for \erlmodule{gen\_component}}
+
+\erlmodule{gen\_component} could be further extended. For example it could
+support hot-code upgrade or could be used to implement algorithms that
+have to be run across several components of \scalaris{} like snapshot
+algorithms or similar extensions.
+
+%% \subsection{The \erlmodule{gen\_component} API for reference}
+
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% End: 
+
