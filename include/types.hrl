@@ -41,6 +41,10 @@
 -type boolean() :: bool().
 -endif.
 
+-ifdef(tid_not_builtin).
+-type tid() :: ets:tid().
+-endif.
+
 -ifdef(types_not_builtin).
 -type reference() :: erlang:reference().
 -type gb_set() :: gb_sets:gb_set().
