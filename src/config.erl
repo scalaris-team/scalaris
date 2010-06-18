@@ -260,7 +260,7 @@ is_string(Key) ->
     IsChar = fun(X) -> (X >= 0) andalso (X =< 255) end,
     IsString = fun(Value) ->
                    case Value of
-                       X when is_list(X) ->
+                       X when erlang:is_list(X) ->
                            lists:all(IsChar, X);
                        _X -> false
                    end
