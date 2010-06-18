@@ -63,8 +63,8 @@ on({log, Timer, Time}, State) ->
             ets:insert(?MODULE, {Timer,
                                  Sum + Time,
                                  Count + 1,
-                                 min(Min, Time),
-                                 max(Max, Time)});
+                                 erlang:min(Min, Time),
+                                 erlang:max(Max, Time)});
         [] ->
             ets:insert(?MODULE, {Timer, Time, 1, Time, Time})
     end,

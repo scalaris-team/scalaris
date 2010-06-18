@@ -247,7 +247,7 @@ is_list(Key) ->
 is_list(Key, Pred, PredDescr) ->
     IsListWithPred = fun(Value) ->
                              case Value of
-                                 X when is_list(X) ->
+                                 X when erlang:is_list(X) ->
                                      lists:all(Pred, X);
                                  _X -> false
                              end
