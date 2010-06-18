@@ -117,6 +117,11 @@ AC_RUN_IFELSE(
        [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; AC_MSG_NOTICE([boolean() is not built-in])])
 
 AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::tid()).], [ok])],
+       [BOOLEANISBUILTIN=""; AC_MSG_NOTICE([tid() is a built-in type])],
+       [BOOLEANISBUILTIN=", {d, tid_not_builtin}"; AC_MSG_NOTICE([tid() is not built-in])])
+
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype()} | ok).], [ok])],
        [RECURSIVETYPESALLOWED=""; AC_MSG_NOTICE([recursive types are supported])],
        [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; AC_MSG_NOTICE([recursive types are not supported])])
