@@ -276,7 +276,7 @@ is_in_range(Key, Min, Max) ->
     test_and_error(Key, IsInRange, Msg).
 
 -spec is_greater_than(Key::atom(), Min::number() | atom()) -> boolean().
-is_greater_than(Key, Min) when is_atom(Min) ->
+is_greater_than(Key, Min) when erlang:is_atom(Min) ->
     is_greater_than(Key, read(Min));
 is_greater_than(Key, Min) ->
     IsGreaterThan = fun(Value) -> (Value > Min) end,
@@ -284,7 +284,7 @@ is_greater_than(Key, Min) ->
     test_and_error(Key, IsGreaterThan, Msg).
 
 -spec is_greater_than_equal(Key::atom(), Min::number() | atom()) -> boolean().
-is_greater_than_equal(Key, Min) when is_atom(Min) ->
+is_greater_than_equal(Key, Min) when erlang:is_atom(Min) ->
     is_greater_than_equal(Key, read(Min));
 is_greater_than_equal(Key, Min) ->
     IsGreaterThanEqual = fun(Value) -> (Value >= Min) end,
@@ -292,7 +292,7 @@ is_greater_than_equal(Key, Min) ->
     test_and_error(Key, IsGreaterThanEqual, Msg).
 
 -spec is_less_than(Key::atom(), Max::number() | atom()) -> boolean().
-is_less_than(Key, Max) when is_atom(Max) ->
+is_less_than(Key, Max) when erlang:is_atom(Max) ->
     is_less_than(Key, read(Max));
 is_less_than(Key, Max) ->
     IsLessThan = fun(Value) -> (Value < Max) end,
@@ -300,7 +300,7 @@ is_less_than(Key, Max) ->
     test_and_error(Key, IsLessThan, Msg).
 
 -spec is_less_than_equal(Key::atom(), Max::number() | atom()) -> boolean().
-is_less_than_equal(Key, Max) when is_atom(Max) ->
+is_less_than_equal(Key, Max) when erlang:is_atom(Max) ->
     is_less_than_equal(Key, read(Max));
 is_less_than_equal(Key, Max) ->
     IsLessThanEqual = fun(Value) -> (Value =< Max) end,
