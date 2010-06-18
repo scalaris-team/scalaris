@@ -24,6 +24,8 @@
 
 -export([make_ring/1, stop_ring/1]).
 
+-include("scalaris.hrl").
+
 -spec make_ring(pos_integer()) -> pid().
 make_ring(Size) ->
     error_logger:tty(true),
