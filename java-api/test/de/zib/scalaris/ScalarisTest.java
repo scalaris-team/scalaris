@@ -1534,20 +1534,22 @@ public class ScalarisTest {
 			
 			// wait max 'notifications_timeout' seconds for notifications:
 			for (int i = 0; i < notifications_timeout
-					&& (notifications_server1.get(topic) == null || notifications_server1.get(topic).size() < testData.length); ++i) {
+					&& (notifications_server1.get(topic) == null ||
+						notifications_server1.get(topic).size() < testData.length); ++i) {
 				TimeUnit.SECONDS.sleep(1);
 			}
 			
-			Vector<String> successfullNotifications1 = notifications_server1.get(topic);
+			Vector<String> notifications1_succ = notifications_server1.get(topic);
 			for (int i = 0; i < testData.length; ++i) {
 				assertTrue("subscription (" + topic + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications1
-						.contains(testData[i]));
-				successfullNotifications1.remove(testData[i]);
+						+ ") not received by server)",
+						notifications1_succ != null
+								&& notifications1_succ.contains(testData[i]));
+				notifications1_succ.remove(testData[i]);
 			}
-			if (successfullNotifications1.size() > 0) {
+			if (notifications1_succ.size() > 0) {
 				fail("Received element (" + topic + ", "
-						+ successfullNotifications1.get(0)
+						+ notifications1_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
@@ -1601,42 +1603,45 @@ public class ScalarisTest {
 				TimeUnit.SECONDS.sleep(1);
 			}
 			
-			Vector<String> successfullNotifications1 = notifications_server1.get(topic);
+			Vector<String> notifications1_succ = notifications_server1.get(topic);
 			for (int i = 0; i < testData.length; ++i) {
 				assertTrue("subscription (" + topic + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications1
-						.contains(testData[i]));
-				successfullNotifications1.remove(testData[i]);
+						+ ") not received by server)",
+						notifications1_succ != null
+								&& notifications1_succ.contains(testData[i]));
+				notifications1_succ.remove(testData[i]);
 			}
-			if (successfullNotifications1.size() > 0) {
+			if (notifications1_succ.size() > 0) {
 				fail("Received element (" + topic + ", "
-						+ successfullNotifications1.get(0)
+						+ notifications1_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
-			Vector<String> successfullNotifications2 = notifications_server2.get(topic);
+			Vector<String> notifications2_succ = notifications_server2.get(topic);
 			for (int i = 0; i < testData.length; ++i) {
 				assertTrue("subscription (" + topic + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications2
-						.contains(testData[i]));
-				successfullNotifications2.remove(testData[i]);
+						+ ") not received by server)",
+						notifications2_succ != null
+								&& notifications2_succ.contains(testData[i]));
+				notifications2_succ.remove(testData[i]);
 			}
-			if (successfullNotifications2.size() > 0) {
+			if (notifications2_succ.size() > 0) {
 				fail("Received element (" + topic + ", "
-						+ successfullNotifications2.get(0)
+						+ notifications2_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
-			Vector<String> successfullNotifications3 = notifications_server3.get(topic);
+			Vector<String> notifications3_succ = notifications_server3.get(topic);
 			for (int i = 0; i < testData.length; ++i) {
 				assertTrue("subscription (" + topic + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications3
-						.contains(testData[i]));
-				successfullNotifications3.remove(testData[i]);
+						+ ") not received by server)",
+						notifications3_succ != null
+								&& notifications3_succ.contains(testData[i]));
+				notifications3_succ.remove(testData[i]);
 			}
-			if (successfullNotifications3.size() > 0) {
+			if (notifications3_succ.size() > 0) {
 				fail("Received element (" + topic + ", "
-						+ successfullNotifications3.get(0)
+						+ notifications3_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
@@ -1709,44 +1714,47 @@ public class ScalarisTest {
 				TimeUnit.SECONDS.sleep(1);
 			}
 			
-			Vector<String> successfullNotifications1 = notifications_server1.get(topic1);
+			Vector<String> notifications1_succ = notifications_server1.get(topic1);
 			for (int i = 0; i < testData.length; i += 2) {
 				assertTrue("subscription (" + topic1 + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications1
-						.contains(testData[i]));
-				successfullNotifications1.remove(testData[i]);
+						+ ") not received by server)",
+						notifications1_succ != null
+								&& notifications1_succ.contains(testData[i]));
+				notifications1_succ.remove(testData[i]);
 			}
-			if (successfullNotifications1.size() > 0) {
+			if (notifications1_succ.size() > 0) {
 				fail("Received element (" + topic1 + ", "
-						+ successfullNotifications1.get(0)
+						+ notifications1_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
-			Vector<String> successfullNotifications2 = notifications_server2.get(topic2);
+			Vector<String> notifications2_succ = notifications_server2.get(topic2);
 			for (int i = 0; i < testData.length; i += 3) {
 				assertTrue("subscription (" + topic2 + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications2
-						.contains(testData[i]));
-				successfullNotifications2.remove(testData[i]);
+						+ ") not received by server)",
+						notifications2_succ != null
+								&& notifications2_succ.contains(testData[i]));
+				notifications2_succ.remove(testData[i]);
 			}
-			if (successfullNotifications2.size() > 0) {
+			if (notifications2_succ.size() > 0) {
 				fail("Received element (" + topic2 + ", "
-						+ successfullNotifications2.get(0)
+						+ notifications2_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
 			
-			Vector<String> successfullNotifications3 = notifications_server3.get(topic3);
+			Vector<String> notifications3_succ = notifications_server3.get(topic3);
 			for (int i = 0; i < testData.length; i += 5) {
 				assertTrue("subscription (" + topic3 + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications3
-						.contains(testData[i]));
-				successfullNotifications3.remove(testData[i]);
+						+ ") not received by server)",
+						notifications3_succ != null
+								&& notifications3_succ.contains(testData[i]));
+				notifications3_succ.remove(testData[i]);
 			}
 
-			if (successfullNotifications3.size() > 0) {
+			if (notifications3_succ.size() > 0) {
 				fail("Received element (" + topic3 + ", "
-						+ successfullNotifications3.get(0)
+						+ notifications3_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 		} finally {
@@ -1817,37 +1825,39 @@ public class ScalarisTest {
 				TimeUnit.SECONDS.sleep(1);
 			}
 			
-			Vector<String> successfullNotifications1 = notifications_server1.get(topic1);
+			Vector<String> notifications1_succ = notifications_server1.get(topic1);
 			for (int i = 0; i < testData.length; i += 2) {
 				assertTrue("subscription (" + topic1 + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications1
-						.contains(testData[i]));
-				successfullNotifications1.remove(testData[i]);
+						+ ") not received by server)",
+						notifications1_succ != null
+								&& notifications1_succ.contains(testData[i]));
+				notifications1_succ.remove(testData[i]);
 			}
-			if (successfullNotifications1.size() > 0) {
+			if (notifications1_succ.size() > 0) {
 				fail("Received element (" + topic1 + ", "
-						+ successfullNotifications1.get(0)
+						+ notifications1_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
-			Vector<String> successfullNotifications2 = notifications_server2.get(topic2);
-			if (successfullNotifications2 != null && successfullNotifications2.size() > 0) {
+			Vector<String> notifications2_succ = notifications_server2.get(topic2);
+			if (notifications2_succ != null && notifications2_succ.size() > 0) {
 				fail("Received element (" + topic2 + ", "
-						+ successfullNotifications2.get(0)
+						+ notifications2_succ.get(0)
 						+ ") although the server was unsubscribed.");
 			}
 			
-			Vector<String> successfullNotifications3 = notifications_server3.get(topic3);
+			Vector<String> notifications3_succ = notifications_server3.get(topic3);
 			for (int i = 0; i < testData.length; i += 5) {
 				assertTrue("subscription (" + topic3 + ", " + testData[i]
-						+ ") not received by server)", successfullNotifications3
-						.contains(testData[i]));
-				successfullNotifications3.remove(testData[i]);
+						+ ") not received by server)",
+						notifications3_succ != null
+								&& notifications3_succ.contains(testData[i]));
+				notifications3_succ.remove(testData[i]);
 			}
 
-			if (successfullNotifications3.size() > 0) {
+			if (notifications3_succ.size() > 0) {
 				fail("Received element (" + topic3 + ", "
-						+ successfullNotifications3.get(0)
+						+ notifications3_succ.get(0)
 						+ ") which is not part of the subscription.");
 			}
 			
