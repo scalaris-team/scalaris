@@ -33,7 +33,7 @@
 % Behaviour definition
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% userdevguide-begin routingtable:behaviour
+%% userdevguide-begin rt_beh:behaviour
 behaviour_info(callbacks) ->
     [
      % create a default routing table
@@ -64,7 +64,7 @@ behaviour_info(callbacks) ->
      {check, 5}, {check, 6}, {check_fd, 2},
      {check_config, 0}
     ];
-%% userdevguide-end routingtable:behaviour
+%% userdevguide-end rt_beh:behaviour
 
 behaviour_info(_Other) ->
     undefined.

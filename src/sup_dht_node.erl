@@ -33,14 +33,18 @@
 
 -export([start_link/1, start_link/0, init/1]).
 
--spec start_link([any()]) -> {ok, Pid::pid()} | ignore | {error, Error::{already_started, Pid::pid()} | term()}.
+-spec start_link([any()]) -> {ok, Pid::pid()} | ignore |
+                             {error, Error::{already_started, Pid::pid()} |
+                                             shutdown | term()}.
 start_link(Options) ->
     supervisor:start_link(?MODULE, [Options]).
 start_link() ->
     supervisor:start_link(?MODULE, [[]]).
 
 %% userdevguide-begin sup_dht_node:init
--spec init([[any()]]) -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
+-spec init([[any()]]) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                                PeriodInSeconds::pos_integer()},
+                               [ProcessDescr::any()]}}.
 init([Options]) ->
     InstanceId = string:concat("dht_node_", randoms:getRandomId()),
     process_dictionary:register_process(InstanceId, sup_dht_node, self()),

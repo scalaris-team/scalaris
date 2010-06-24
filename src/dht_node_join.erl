@@ -41,7 +41,8 @@
 
 %% @doc handle the join request of a new node
 %% userdevguide-begin dht_node_join:join_request
--spec join_request(dht_node_state:state(), NewPred::node:node_type()) -> dht_node_state:state().
+-spec join_request(dht_node_state:state(), NewPred::node:node_type()) ->
+        dht_node_state:state().
 join_request(State, NewPred) ->
     MyNewInterval =
         intervals:mk_from_nodes(dht_node_state:get(State, node), NewPred),
@@ -49,7 +50,8 @@ join_request(State, NewPred) ->
     
     %%TODO: split data [{Key, Value, Version}], schedule transfer
     
-    comm:send(node:pidX(NewPred), {join_response, dht_node_state:get(State, pred), HisData}),
+    comm:send(node:pidX(NewPred),
+              {join_response, dht_node_state:get(State, pred), HisData}),
     % TODO: better already update our range here directly than waiting for an
     % updated state from the ring_maintenance!
     rm_beh:notify_new_pred(comm:this(), NewPred),
@@ -62,21 +64,28 @@ join_request(State, NewPred) ->
 %% @doc Processes a DHT node's join messages (the node joining a Scalaris DHT).
 -spec process_join_msg(join_message() | any(), join_state()) -> dht_node_state:state().
 % first node
-process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {as_first}, QueuedMessages}) ->
+%% userdevguide-begin dht_node_join:join_first
+process_join_msg({idholder_get_id_response, Id, IdVersion},
+                 {join, {as_first}, QueuedMessages}) ->
     log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Id]),
     Me = node:new(comm:this(), Id, IdVersion),
     rt_beh:initialize(Id, Me, Me),
-    NewState = dht_node_state:new(?RT:empty_ext(Me), nodelist:new_neighborhood(Me), dht_node_lb:new(), ?DB:new(Id)),
+    NewState = dht_node_state:new(?RT:empty_ext(Me),
+                                  nodelist:new_neighborhood(Me),
+                                  dht_node_lb:new(), ?DB:new(Id)),
     comm:send_local(get_local_dht_node_reregister_pid(), {go}),
     comm:send_queued_messages(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
     NewState;  % join complete, State is the first "State"
+%% userdevguide-end dht_node_join:join_first
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % !first node
+%% userdevguide-begin dht_node_join:join_other_p12
 % 1. get my key
-process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {phase1}, QueuedMessages}) ->
+process_join_msg({idholder_get_id_response, Id, IdVersion},
+                 {join, {phase1}, QueuedMessages}) ->
     %io:format("p1: got key~n"),
     log:log(info,"[ Node ~w ] joining",[self()]),
     % send message to avoid code duplication
@@ -84,7 +93,8 @@ process_join_msg({idholder_get_id_response, Id, IdVersion}, {join, {phase1}, Que
     {join, {phase2, Id, IdVersion}, QueuedMessages};
 
 % 2. Find known hosts
-process_join_msg({known_hosts_timeout}, {join, {phase2, _Id, _IdVersion}, _QueuedMessages} = State) ->
+process_join_msg({known_hosts_timeout},
+                 {join, {phase2, _Id, _IdVersion}, _QueuedMessages} = State) ->
     %io:format("p2: known hosts timeout~n"),
     KnownHosts = config:read(known_hosts),
     % contact all known VMs
@@ -95,12 +105,14 @@ process_join_msg({known_hosts_timeout}, {join, {phase2, _Id, _IdVersion}, _Queue
     comm:send_local_after(1000, self(), {known_hosts_timeout}),
     State;
 
-process_join_msg({get_dht_nodes_response, []}, {join, {phase2, _Id, _IdVersion}, _QueuedMessages} = State) ->
+process_join_msg({get_dht_nodes_response, []},
+                 {join, {phase2, _Id, _IdVersion}, _QueuedMessages} = State) ->
     %io:format("p2: got empty dht_nodes_response~n"),
     % there is a VM with no nodes
     State;
 
-process_join_msg({get_dht_nodes_response, Nodes}, {join, {phase2, Id, IdVersion}, QueuedMessages} = State) ->
+process_join_msg({get_dht_nodes_response, Nodes = [_|_]},
+                 {join, {phase2, Id, IdVersion}, QueuedMessages} = State) ->
     %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(comm:this(), Nodes)]),
     case lists:delete(comm:this(), Nodes) of
         [] ->
@@ -110,24 +122,31 @@ process_join_msg({get_dht_nodes_response, Nodes}, {join, {phase2, Id, IdVersion}
             comm:send_local_after(3000, self(), {lookup_timeout}),
             {join, {phase3, Rest, Id, IdVersion}, QueuedMessages}
     end;
+%% userdevguide-end dht_node_join:join_other_p12
 
+%% userdevguide-begin dht_node_join:join_other_p3
 % 3. lookup my position
-process_join_msg({lookup_timeout}, {join, {phase3, [], Id, IdVersion}, QueuedMessages}) ->
+process_join_msg({lookup_timeout},
+                 {join, {phase3, [], Id, IdVersion}, QueuedMessages}) ->
     %io:format("p3: lookup_timeout~n"),
     % no more nodes left, go back to step 2
     comm:send_local(self(), {known_hosts_timeout}),
     {join, {phase2, Id, IdVersion}, QueuedMessages};
 
-process_join_msg({get_node_response, Id, Succ}, {join, {phase3, _DHTNodes, Id, IdVersion}, QueuedMessages}) ->
+process_join_msg({get_node_response, Id, Succ},
+                 {join, {phase3, _DHTNodes, Id, IdVersion}, QueuedMessages}) ->
     %io:format("p3: lookup success~n"),
     % got my successor
     Me = node:new(comm:this(), Id, IdVersion),
     % announce join request
     comm:send(node:pidX(Succ), {join, Me}),
     {join, {phase4, Succ, Me}, QueuedMessages};
+%% userdevguide-end dht_node_join:join_other_p3
 
+%% userdevguide-begin dht_node_join:join_other_p4
 % 4. joining my neighbors
-process_join_msg({join_response, Pred, Data}, {join, {phase4, Succ, Me}, QueuedMessages}) ->
+process_join_msg({join_response, Pred, Data},
+                 {join, {phase4, Succ, Me}, QueuedMessages}) ->
     Id = node:id(Me),
     %io:format("p4: join_response~n"),
     % @TODO data shouldn't be moved here, might be large
@@ -150,6 +169,7 @@ process_join_msg({join_response, Pred, Data}, {join, {phase4, Succ, Me}, QueuedM
     comm:send_local(get_local_dht_node_reregister_pid(), {go}),
     comm:send_queued_messages(QueuedMessages),
     State;
+%% userdevguide-end dht_node_join:join_other_p4
 
 % ignore some messages that appear too late for them to be used, e.g. if a new
 % phase has already been started

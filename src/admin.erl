@@ -35,10 +35,6 @@
 %%====================================================================
 
 %% userdevguide-begin admin:add_nodes
-%%--------------------------------------------------------------------
-%% Function: add_nodes(int()) -> ok
-%% Description: add new Scalaris nodes
-%%--------------------------------------------------------------------
 % @doc add new Scalaris nodes on the local node
 -spec(add_nodes/1 :: (non_neg_integer()) -> ok).
 add_nodes(0) ->
@@ -52,10 +48,10 @@ add_nodes(Count) ->
     ok.
 %% userdevguide-end admin:add_nodes
 
-%% deletes nodes started with add_nodes()
-%% detects them by their random names (which is a list)
-%% other processes in main_sup must not be started with
-%% a list as their name!
+%% @doc Deletes nodes started with add_nodes();
+%%      detects them by their random names (which is a list).
+%%      Beware: Other processes in main_sup must not be started with
+%%      a list as their name!
 -spec(del_nodes/1 :: (integer()) -> ok).
 del_nodes(Count) ->
     [ del_single_node(supervisor:which_children(main_sup))
@@ -73,10 +69,6 @@ del_single_node([H|T]) ->
         false -> del_single_node(T)
     end.
 
-%%--------------------------------------------------------------------
-%% Function: check_ring() -> term()
-%% Description: contact boot server and check ring
-%%--------------------------------------------------------------------
 % @doc contact boot server and check ring
 -spec(check_ring/0 :: () -> {error, string()} | ok).
 check_ring() ->
@@ -189,12 +181,7 @@ loop() ->
             loop()
     end.
 
-%%--------------------------------------------------------------------
-%% Function: nodes() -> list()
-%% Description: contact boot server and list the known ip addresses
-%%--------------------------------------------------------------------
 % @doc contact boot server and list the known ip addresses
-% @spec nodes() -> list()
 -spec(nodes/0 :: () -> list()).
 nodes() ->
     boot_server:node_list(),
