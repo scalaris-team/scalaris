@@ -1,5 +1,6 @@
 /doc
 /doc-devel
+/doc-doxygen
 /.classpath
 /.project
 /scalaris-examples.jar

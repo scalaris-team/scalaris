@@ -3,3 +3,8 @@
 /main.idx
 /main.toc
 /main.out
+.project
+.settings
+.texlipse
+tmp
+/Thumbs.db
