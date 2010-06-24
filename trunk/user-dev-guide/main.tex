@@ -15,7 +15,7 @@
 \usepackage{typearea}
 \areaset[1cm]{165mm}{240mm}
 
-\usepackage[OT1]{fontenc}
+\usepackage[T1]{fontenc}
 \usepackage[latin1]{inputenc}
 
 \usepackage{relsize}
@@ -45,8 +45,8 @@
 \pagestyle{fancy}
 \fancyhf{} % clear all header and footer fields
 %\fancyhead[RE,LO]{}
-\fancyhead[RO]{}%
-\fancyfoot[LE,RO]{\bfseries\thepage\ / \pageref{LastPage}}%
+\fancyhead[R]{}%
+\fancyfoot[R]{\bfseries\thepage\ / \pageref{LastPage}}%
 \chead{}%
 \cfoot{}%
 
@@ -54,8 +54,8 @@
 \fancypagestyle{plain}{%
 \fancyhf{} % clear all header and footer fields
 %\fancyhead[RE,LO]{}
-\fancyhead[RO]{}%
-\fancyfoot[LE,RO]{\bfseries\thepage\ / \pageref{LastPage}}%
+\fancyhead[R]{}%
+\fancyfoot[R]{\bfseries\thepage\ / \pageref{LastPage}}%
 \chead{}%
 \cfoot{}%
 }
@@ -120,7 +120,7 @@
   framexbottommargin=3pt,
 %  framexrightmargin=5pt,
   rulecolor=\color{codebackground},
-  language=Erlang,
+  language=erlang,
 %  fillcolor=\color{red},
 %  rulesepcolor=\color{black}
 %  rulesep=1cm,
@@ -130,8 +130,8 @@
 \lstset{includerangemarker=false}
 
 % \codesnippet[lstsettings]{filename-label}{range-label}{src-file with path}
-% \codesnippet[language=Erlang]{admin.erl}{admin:add_nodes}{../src/admin.erl}
-\newcommand{\codesnippet}[4][language=Erlang]{
+% \codesnippet[language=erlang]{admin.erl}{admin:add_nodes}{../src/admin.erl}
+\newcommand{\codesnippet}[4][language=erlang]{
 {%% File: \url{#4}
 \lstset{numbers=left}
 \lstinputlisting[
@@ -143,9 +143,9 @@
 }
 }
 
-% \codesfile[lstsettings]{filename-label}{src-file with path}
-% \codesfile[language=Erlang]{admin.erl}{../src/admin.erl}
-\newcommand{\codefile}[3][language=Erlang]{
+% \codefile[lstsettings]{filename-label}{src-file with path}
+% \codefile[language=erlang]{admin.erl}{../src/admin.erl}
+\newcommand{\codefile}[3][language=erlang]{
 {
 \lstinputlisting[
   title=\filetitle{#2},
@@ -153,7 +153,7 @@
 {#3}
 }
 }
-\newcommand\bfref[1]{\textbf{\hyperpage{#1}}}
+\newcommand{\bfref}[1]{\textbf{\hyperpage{#1}}}
 \newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
 \newcommand{\code}[1]{\lstinline[basicstyle=\small\ttfamily]!#1!}
 \newcommand{\filetitle}[1]{\hbox to \linewidth{~~File \code{#1:}\hfill}}
@@ -286,9 +286,9 @@ XtreemOS. Additional information (papers, videos) can be found at
 
 \section{Brewer's CAP Theorem}
 
-In distributed computing there exist the so called CAP theorem. It
-basically says that in distributed systems there are three desirable
-properties for such systems but can have only any two of them.
+In distributed computing there exists the so called CAP theorem. It
+basically says that there are three desirable properties for distributed
+systems but one can only have any two of them.
 
 \begin{description}
 \item {Strict Consistency.} Any read operation has to return the
@@ -298,13 +298,12 @@ properties for such systems but can have only any two of them.
 
 \item {Partition Tolerance.} The network on which the service is
   running may split into several partitions which cannot communicate
-  with each other. Lateron the may rejoin again.
+  with each other. Later on the networks may re-join again.
 
   For example, a service is hosted on one machine in Seattle and one
   machine in Berlin. This service is partition tolerant if it can
   tolerate that all Internet connections over the Atlantic (and
-  Pacific) are interrupted for a few hours and then get repaired
-  afterwards.
+  Pacific) are interrupted for a few hours and then get repaired.
 \end{description}
 
 The goal of \scalaris{} is to provide strict consistency and partition
@@ -327,12 +326,9 @@ required which are not included in the \scalaris{} sources:
 \begin{itemize}
 \setlength{\itemsep}{0pt}
 \setlength{\parskip}{0pt}
-\item Erlang R12 or newer
+\item Erlang R13B01 or newer
 \item GNU-like Make
 \end{itemize}
-
-Note, the Version 13 of Erlang is required. \scalaris{} will not
-work with older versions.
 
 To build the Java API (and the command-line client) the following
 modules are required additionally:
@@ -340,19 +336,18 @@ modules are required additionally:
 \begin{itemize}
 \setlength{\itemsep}{0pt}
 \setlength{\parskip}{0pt}
-\item Java Development Kit 1.6
+\item Java Development Kit 6
 \item Apache Ant
 \end{itemize}
 
 Before building the Java API, make sure that \code{JAVA\_HOME} and
 \code{ANT\_HOME} are set. \code{JAVA\_HOME} has to point to a JDK
-1.6 installation, and \code{ANT\_HOME} has to point to an Ant
-installation.
+installation, and \code{ANT\_HOME} has to point to an Ant installation.
 
 \section{Download}
 
 The sources can be obtained from
-\url{http://code.google.com/p/scalaris}. RPMs are available from
+\url{http://code.google.com/p/scalaris}. RPMs and DEBs are available from
 \url{http://download.opensuse.org/repositories/home:/tschuett/}.
 
 \subsection{Development Branch}
@@ -374,12 +369,13 @@ Releases can be found under the 'Download' tab on the web-page.
 \code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
 (optional). The former defines default settings and is included in the
 release. The latter can be created by the user to alter settings.  A
-sample file is \code{bin/scalaris.local.cfg.example}. To run \scalaris{}
-distributed over several nodes, each node requires a \code{bin/scalaris.local.cfg}:
+sample file is provided as \code{bin/scalaris.local.cfg.example}. To run
+\scalaris{} distributed over several nodes, each node requires a
+\code{bin/scalaris.local.cfg}:
 
 \codefile{scalaris.local.cfg}{../bin/scalaris.local.cfg.example}
 
-\scalaris{} distinguishes currently two different kinds of nodes: (a)
+\scalaris{} currently distinguishes two different kinds of nodes: (a)
 the boot-server and (b) regular nodes. For the moment, we limit the
 number of boot-servers to exactly one. The remaining nodes are regular
 nodes. The boot-server is contacted to join the system. On all servers,
@@ -405,23 +401,40 @@ directory.
 \subsection{Windows}
 
 We are currently not supporting \scalaris{} on Windows. However, we
-have two small {\tt bat} files for building and running a boot
-server. It seems to work but we make no guarantees.
+have two small {\tt bat} files for building and running scalaris
+nodes. It seems to work but we make no guarantees.
+
+\begin{itemize}
+\item Install Erlang\\
+       \url{http://www.erlang.org/download.html}
+\item Install OpenSSL (for crypto module)\\
+       \url{http://www.slproweb.com/products/Win32OpenSSL.html}
+\item Checkout scalaris code from SVN
+\item adapt the path to your Erlang installation in \code{build.bat}
+\item start a \code{cmd.exe}
+\item go to the scalaris directory
+\item run \code{build.bat} in the cmd window
+\item check that there were no errors during the compilation;
+       warnings are fine
+\item go to the bin sub-directory
+\item adapt the path to your Erlang installation in \code{boot.bat},
+       \code{cs_local.bat}, \code{cs_local2.bat} and \code{cs_local3.bat}
+\item run \code{boot.bat} or one of the other start scripts in the cmd window
+\end{itemize}
+
+\code{build.bat} will generate a \code{Emakefile} if there is none yet.
+If you have Erlang $<$ R13B04, you will need to adapt the \code{Emakefile}.
+There will be empty lines in the first three blocks ending with
+``\code{ ]\}.}'': add the following to these lines and try to compile again.
+It should work now.
+
+\begin{lstlisting}[language=erlang]
+, {d, type_forward_declarations_are_not_allowed}
+, {d, forward_or_recursive_types_are_not_allowed}
+\end{lstlisting}
 
 For the most recent description please see the FAQ at
 \url{http://code.google.com/p/scalaris/wiki/FAQ}.
-
-% \begin{itemize}
-% \item Install Erlang
-% \item Install OpenSSL (for crypto module)
-% \item Checkout scalaris code from SVN
-% \item copy an appropriate EMakefile\_for from \code{contrib/win32} to the trunk-directory
-% \item Adapt the path to your Erlang installation in build.bat
-% \item run build.bat
-% \item Go to the bin sub-directory
-% \item Adapt the path to your Erlang installation in boot.bat
-% \item run boot.bat
-% \end{itemize}
 
 \subsection{Java-API}
 
@@ -449,7 +462,7 @@ As mentioned above, in \scalaris{} there are two kinds of nodes:
 \end{itemize}
 
 In every \scalaris{}, at least one boot server is required. It will
-maintain a list of nodes taken part in the system and allows other
+maintain a list of nodes taking part in the system and allows other
 nodes to join the ring. For redundancy, it is also possible to have
 several boot servers. In the future, we want to eliminate this
 distinction, so any node is also a boot-server.
@@ -457,10 +470,10 @@ distinction, so any node is also a boot-server.
 \subsection{Running on a local machine}
 \label{sec.boot}
 
-Open at least two shells. In the first, go into the bin directory:
+Open at least two shells. In the first, inside the \scalaris{} directory,
+start the boot script (\code{boot.bat} on Windows):
 \begin{lstlisting}[language=sh]
-%> cd bin
-%> ./boot.sh
+%> ./bin/boot.sh
 \end{lstlisting}
 
 This will start the boot server. On success \url{http://localhost:8000}
@@ -468,7 +481,9 @@ should point to the management interface page of the boot server. The main
 page will show you the number of nodes currently in the system. After a
 couple of seconds a first \scalaris{} should have started in the boot server
 and the number should increase to one. The main page will also allow you to
-store and retrieve key-value pairs.
+store and retrieve key-value pairs but should not be used by applications
+to access \scalaris{}. See Chapter~\sieheref{chapter.apis} for application
+APIs.
 
 %The boot server should show output similar to the following, when
 %starting the first \scalaris{} nodes. The first line is printed when
@@ -483,43 +498,43 @@ store and retrieve key-value pairs.
 %\end{lstlisting}
 
 In a second shell, you can now start a second \scalaris{} node. This
-will be a `regular server'. Go in the bin directory:
+will be a `regular server':
 \begin{lstlisting}[language=sh]
-%> cd bin
-%> ./cs_local.sh
+%> ./bin/cs_local.sh
 \end{lstlisting}
 
 The second node will read the configuration file and use this
-information to contact the boot server and will join the ring. The
+information to contact the boot server and join the ring. The
 number of nodes on the web page should have increased to two by now.
 
 Optionally, a third and fourth node can be started on the same
 machine. In a third shell:
 \begin{lstlisting}[language=sh]
-%> cd bin
-%> ./cs_local2.sh
+%> ./bin/cs_local2.sh
 \end{lstlisting}
 
 
 In a fourth shell:
 \begin{lstlisting}[language=sh]
-%> cd bin
-%> ./cs_local3.sh
+%> ./bin/cs_local3.sh
 \end{lstlisting}
 
 
 This will add 3 nodes to the network. The web pages at
 \url{http://localhost:8000} should show the additional nodes.
 
+On linux you can also use the \code{scalarisctl} script to start boot and
+`regular' nodes.
+
 \subsection{Running distributed}
 
 \scalaris{} can be installed on other machines in the same way as
-described in Sect.~\ref{sec:install}. In the default configuration,
-nodes will look for the boot server on localhost on port 14195. You
+described in Section~\ref{sec:install}. In the default configuration,
+nodes will look for the boot server on \code{localhost} on port 14195. You
 should create a \code{scalaris.local.cfg} pointing to the node running
 the boot server.
 
-\begin{lstlisting}[language=Erlang]
+\begin{lstlisting}[language=erlang]
 % Insert the appropriate IP-addresses for your setup
 % as comma separated integers:
 % IP Address, Port, and label of the boot server
@@ -544,8 +559,9 @@ configured boot server.
 
 For simple tests, you do not need to install \scalaris{}. You can run
 it directly from the source directory. Note: \code{make install} will
-install scalaris into \code{/usr/local}. But is more convenient to
-build RPMs and install those.
+install scalaris into \code{/usr/local} and place \code{scalarisctl}
+into \code{/usr/local/bin}. But is more convenient to build an RPM and
+install it.
 
 \begin{lstlisting}{language=sh}
 svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
@@ -554,33 +570,35 @@ cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
 rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
 \end{lstlisting}
 
-Your source and binary rpm will be generated in
-/usr/src/packages/SRPMS and RPMS.  We also build rpms using checkouts
-from svn and provide them using the openSUSE BuildService at
-http://download.opensuse.org/repositories/home:/tschuett/. RPM
-packages are available for
+Your source and binary RPM will be generated in
+\code{/usr/src/packages/SRPMS} and \code{RPMS}. We build RPMs and Debs
+using checkouts from svn and provide them using the openSUSE BuildService at
+\url{http://download.opensuse.org/repositories/home:/tschuett/}. Packages
+are available for
 
 \begin{itemize}
-\item Fedora 9, 10,
-\item Mandriva 2008, 2009,
-\item openSUSE 11.0, 11.1,
+\item Fedora 9, 10, 11, 12, 13,
+\item Mandriva 2008, 2009, 2009.1, 2010,
+\item openSUSE 11.0, 11.1, 11.2, 11.3, Factory,
 \item SLE 10, 11,
-\item CentOS 5 and
-\item RHEL 5.
+\item CentOS 5.4,
+\item RHEL 5,
+\item Debian 5.0 and
+\item Ubuntu 9.04, 9.10.
 \end{itemize}
 
-Inside those repositories you will also find an erlang rpm - you don't
+Inside those repositories you will also find an erlang RPM - you don't
 need this if you already have a recent enough erlang version!
 
 \section{Logging}
 \label{sec:logging}
 
-\scalaris{} uses the log4erl library (see \code{contrib/log4erl} for
+\scalaris{} uses the log4erl library (see \code{contrib/log4erl}) for
 logging status information and error messages. The log level can be
-configured in \code{bin/scalaris.cfg}.  The default value is {\tt
-  error}; only errors and severe problems are logged.
+configured in \code{bin/scalaris.cfg}. The default value is
+{\tt error}; only errors and severe problems are logged.
 
-\begin{lstlisting}[language=Erlang]
+\begin{lstlisting}[language=erlang]
 %% @doc Loglevel: debug < info < warn < error < fatal < none
 {log_level, error}.
 \end{lstlisting}
@@ -590,24 +608,26 @@ information, e.g. for debugging. In \sieheref{sec:start-addit-local},
 we are explaining the startup process of \scalaris{} nodes in more
 detail, here the {\tt info} level provides more detailed information.
 
-\begin{lstlisting}[language=Erlang]
+\begin{lstlisting}[language=erlang]
 %% @doc Loglevel: debug < info < warn < error < fatal < none
 {log_level, info}.
 \end{lstlisting}
 
 \chapter{Using the system}
+\label{chapter.apis}
 
 \section{JSON API}
 
 \scalaris{} supports a JSON API for transactions. To minimize the necessary
 round trips between a client and \scalaris{}, it uses request lists, which
 contain all requests that can be done in parallel. The request list is then
-send over to a \scalaris{} node with a POST message. The result is an opaque
+send to a \scalaris{} node with a POST message. The result is an opaque
 TransLog and a list containing the results of the requests. To add further
 requests to the transaction, the TransLog and another list of requests may
-be send to \scalaris{}.  This process may be repeated as necessary. To finish
-the transaction, the request list can contain a 'commit' request as last
-element, which triggers the validation phase of the transaction processing.
+be send to \scalaris{}. This process may be repeated as often as necessary.
+To finish the transaction, the request list can contain a 'commit' request
+as the last element, which triggers the validation phase of the transaction
+processing.
 
 The JSON-API can be accessed via the \scalaris{}-Web-Server running on port
 8000 by default and the page \code{jsonrpc.yaws} (For example at:
@@ -699,7 +719,7 @@ In a second transaction: Read the two keys
 \end{lstlisting}\\
 
 Calculate something with the read values and make further requests, here a
-write and the commit for the whole transaction. Include also the latest
+write and the commit for the whole transaction. Also include the latest
 translog we got from \scalaris{} (named \code{TLOG} here).
 
 \begin{lstlisting}[language=java]
@@ -708,7 +728,7 @@ translog we got from \scalaris{} (named \code{TLOG} here).
   "version":"1.1",
   "params":
     [
-      TLOG, // translog from prev. result.
+      TLOG, // translog from prev. result
       [
         { "write":{"keyA":"valueA2"} },
         { "commit":"commit" }
@@ -805,47 +825,66 @@ Two sample results
 
 The jar file contains a small command line interface client. For
 convenience, we provide a wrapper script called \code{scalaris} which
-setups the Java environment:
+sets up the Java environment:
 
-\begin{lstlisting}[language=sh]
-%> cd java-api
-%> ./scalaris -help
-usage: scalaris
- -g,--getsubscribers <topic>   get subscribers of a topic
- -help                         print this message
- -minibench                    run mini benchmark
- -p,--publish <params>         publish a new message for a topic: <topic>
-                               <message>
- -r,--read <key>               read an item
- -s,--subscribe <params>       subscribe to a topic: <topic> <url>
- -u,--unsubscribe <params>     unsubscribe from a topic: <topic> <url>
- -w,--write <params>           write an item: <key> <value>
+\begin{lstlisting}[language=]
+%> ./java-api/scalaris -help
+Script Options:
+  --help, --h            print this message and scalaris help
+  --noconfig             suppress sourcing of /etc/scalaris/scalaris-java.conf
+                         and $HOME/.scalaris/scalaris-java.conf config files
+  --execdebug            print scalaris exec line generated by this
+                         launch script
+  
+usage: scalaris [Options]
+ -b,--minibench                   run mini benchmark
+ -d,--delete <key> <[timeout]>    delete an item (default timeout: 2000ms)
+                                  WARNING: This function can lead to inconsistent data
+                                  (e.g. deleted items can re-appear). Also when
+                                  re-creating an item the version before the delete can
+                                  re-appear.
+ -g,--getsubscribers <topic>      get subscribers of a topic
+ -h,--help                        print this message
+ -lh,--localhost                  gets the local host's name as known to
+                                  Java (for debugging purposes)
+ -p,--publish <topic> <message>   publish a new message for the given
+                                  topic
+ -r,--read <key>                  read an item
+ -s,--subscribe <topic> <url>     subscribe to a topic
+ -u,--unsubscribe <topic> <url>   unsubscribe from a topic
+ -v,--verbose                     print verbose information, e.g. the
+                                  properties read
+ -w,--write <key> <value>         write an item
 \end{lstlisting}
 
-Read and write can be used to read resp. write from/to the
-overlay. getsubscribers, publish, and subscribe are the PubSub
-functions.
+\code{read}, \code{write} and \code{delete} can be used to read, write
+and delete from/to the overlay, respectively. \code{getsubscribers},
+\code{publish}, and \code{subscribe} are the PubSub functions. The others
+provide debugging and testing functionality.
 
-\begin{lstlisting}[language=sh]
-%> ./scalaris -write foo bar
+\begin{lstlisting}[language=]
+%> ./java-api/scalaris -write foo bar
 write(foo, bar)
-%> ./scalaris -read foo
+%> ./java-api/scalaris -read foo
 read(foo) == bar
 \end{lstlisting}
 
-The scalaris library requires that you are running a `regular server' on
-the same node. Having a boot server running on the same node is not
-sufficient.
+Per default, the \code{scalaris} script tries to connect to a boot server
+at \code{localhost}. You can change the node it connects to (and further
+connection properties) by adapting the values defined in
+\code{java-api/scalaris.properties}.
 
 \section{Java API}
 
 The \code{scalaris.jar} provides the command line client as well as a
-library for Java programs to access \scalaris{}. The library provides two classes:
+library for Java programs to access \scalaris{}. The library provides two
+classes:
 
 \begin{itemize}
-\item \code{Scalaris} provides a high-level API similar to the command line client.
+\item \code{Scalaris} provides a high-level API similar to the command line
+       client.
 \item \code{Transaction} provides a low-level API to the transaction
-  mechanism.
+       mechanism.
 \end{itemize}
 
 For details we refer the reader to the Javadoc:
@@ -865,8 +904,8 @@ in a local \code{index.html} file.
 
 The tests are implemented with the \code{common-test} package from the
 Erlang system. For running the tests we rely on \code{run\_test},
-which is part of the \code{common-test} package, but is not installed
-by default. \code{configure} will check whether \code{run\_test} is
+which is part of the \code{common-test} package, but (on erlang $<$ R14) is not
+installed by default. \code{configure} will check whether \code{run\_test} is
 available. If it is not installed, it will show a warning and a short
 description of how to install the missing file.
 
@@ -874,8 +913,8 @@ Note: for the unit tests, we are setting up and shutting down several
 overlay networks. During the shut down phase, the runtime environment
 will print extensive error messages. These error messages do not
 indicate that tests failed! Running the complete test suite takes
-about 5 minutes. Only when the complete suite finished, it will
-present statistics on failed and successful tests.
+about 3 minutes, depending on your machine. Only if the complete suite
+finishes, it will present statistics on failed and successful tests.
 
 \chapter{Troubleshooting}
 
@@ -915,18 +954,20 @@ firewalls.
 \section{Testing Your Modifications and Extensions}
 
 \begin{itemize}
-\item Run the testsuites using make test
-\item Run the java api test using make java-test
-      (or if you want to see the scalaris output during the tests, start a
-      bin/boot.sh and run the tests by cd java; ant test)
-\item Run the Ruby client by starting Scalaris and running cd contrib; ./jsonrpc.rb
+\item Run the testsuites using \code{make test}
+\item Run the java api test using \code{make java-test}
+      (\scalaris{} output will be printed if a test fails; if you want to see
+      it during the tests, start a \code{bin/boot.sh} and run the tests by
+      \code{cd java; ant test})
+\item Run the Ruby client by starting Scalaris and running
+      \code{cd contrib; ./jsonrpc.rb}
 \end{itemize}
 
 \section{Help with Digging into the System}
 \label{sec:digging}
 
 \begin{itemize}
-\item use ets:i() to get details on the local state of some processes
+\item use \erlfun{ets}{i} to get details on the local state of some processes
 \item consider changing pdb.erl to use ets instead of erlang:put/get
 \item Have a look at strace -f -p PID of beam process
 \item Get message statistics via the Web-interface
@@ -952,12 +993,13 @@ firewalls.
 
 \begin{itemize}
 \item What is it? How to distinguish from Erlangs internal process dictionary?
-\item Joining a process group (InstanceId id a group name)
-\item Why we do this... (managing several independent nodes inside a single
+\item Joining a process group (InstanceId is a group name)
+\item Why do we do this... (managing several independent nodes inside a single
   Erlang VM)
 \end{itemize}
 
-\section{The Communication Layer \erlmodule{comm}}
+\section{\texorpdfstring{The Communication Layer \erlmodule{comm}}
+          {The Communication Layer comm}}
 \label{sec:comm}
 \erlmoduleindex{comm}
 
@@ -999,8 +1041,8 @@ firewalls.
 Each node of the ring can perform searches in the overlay.
 
 A search is done by a lookup in the overlay, but there are several
-other demands for communication between peers, so \scalaris{} provides
-a general interface to route a message to another peer, that is
+other demands for communication between peers. \scalaris{} provides
+a general interface to route a message to the (other) peer, which is
 currently responsible for a given \code{key}.
 
 \begin{lstlisting}[title=\filetitle{cs_lookup.erl}]
@@ -1041,12 +1083,12 @@ lookup_aux(State, Key, Msg) ->
 \end{lstlisting}
 
 Each node is responsible for a certain key interval.  The function
-\code{util:is_between} is used to decide, whether the key is between
+\erlfun{util}{is\_between} is used to decide, whether the key is between
 the current node and its successor. If that is the case, final step is
 done using \code{lookup_fin()}, which delivers the message to the
 local node. Otherwise, the message is forwarded to the next nearest
 known peer (listed in the routing table) determined by
-\code{?RT:next_hop}.
+\erlfun{?RT}{next\_hop}.
 
 
 % \begin{lstlisting}[language=Java]
@@ -1061,10 +1103,10 @@ can be compared to interfaces in Java. In Erlang interfaces can be
 defined using a so called `behaviour'.  The files \code{rt_simple} and
 \code{rt_chord} implement the behaviour `rt\_beh'.
 
-The macro ?RT is used to select the current implementation of routing
+The macro \code{?RT} is used to select the current implementation of routing
 tables. It is defined in \code{include/scalaris.hrl}.
 
-\codesnippet{scalaris.hrl}{chordsharp:rt}{../include/scalaris.hrl}
+\codesnippet{scalaris.hrl}{scalaris:rt}{../include/scalaris.hrl}
 
 The functions, that have to be implemented for a routing mechanism are
 defined in the following file:
@@ -1240,6 +1282,12 @@ participate in the system, it may happen earlier.
 
 \section{Vivaldi Coordinates}
 
+\section{Estimated Global Information (Gossiping)}
+
+\section{Load Balancing}
+
+\section{Broadcast Trees}
+
 
 
 \chapter{Transactions in \scalaris{}}
@@ -1261,8 +1309,8 @@ Introduces transaction processing on top of a Overlay
 Servers in Erlang often use the following structure to maintain a state
 while processing received messages:
 
-\lstset{language=Erlang}
-\begin{lstlisting}%[title=\filetitle{foo.erl}]
+\lstset{language=erlang}
+\begin{lstlisting}
 loop(State) ->
   receive
     Message ->
@@ -1282,10 +1330,10 @@ After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
 by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the boot
 process opened~\footnote{Increase the log level to {\tt info} to get
-  the detailed startup logs. See Sect.~\sieheref{sec:logging}}.
+the detailed startup logs. See Section~\sieheref{sec:logging}}.
 
 
-\lstset{language=Erlang}
+\lstset{language=erlang}
 \begin{lstlisting}
 scalaris/bin> ./boot.sh
 [...]
@@ -1306,7 +1354,7 @@ Yaws: Listening to 0.0.0.0:8000 for servers
 (boot@csr-pc9)1> admin:add_nodes(10)
 \end{lstlisting}
 
-In the following we will trace, what this function does to join
+In the following we will trace what this function does in order to add
 additional nodes to the system.
 
 The function \code{admin:add_nodes(int)} is defined as follows.
@@ -1316,9 +1364,9 @@ The function \code{admin:add_nodes(int)} is defined as follows.
 It calls \code{add_nodes_loop(Count, Delay)} with a delay of 0. This
 function starts a new child for the main supervisor \code{main_sup}.
 As defined by the parameters, to actually perform the start, the
-function \code{sup_dht_node:start_link} is called by the Erlang
+function \erlfun{sup\_dht\_node}{start\_link} is called by the Erlang
 supervisor mechanism.  For more details on the OTP supervisor
-mechanism see Chapter 18 of the Erlang book~\cite{erlang-book} or the
+mechanism see Chapter~18 of the Erlang book~\cite{erlang-book} or the
 online documentation at
 \url{http://www.erlang.org/doc/man/supervisor.html}.
 
@@ -1334,10 +1382,10 @@ created:
 
 Starting supervisors is a two step process: the supervisor mechanism
 first calls the \code{init()} function of the defined module
-(\code{sup_dht_node:init()} in this case) and then calls the start
+(\erlfun{sup\_dht\_node}{init} in this case) and then calls the start
 function (\code{start_link} here.
 
-So, lets have a look at \code{sup_dht_node:init}, the 'Scalaris
+So, lets have a look at \erlfun{sup\_dht\_node}{init}, the 'Scalaris
 \emph{or} supervisor'.
 
 \codesnippet{sup_dht_node.erl}{sup_dht_node:init}{../src/sup_dht_node.erl}
@@ -1397,59 +1445,43 @@ section.
 Note: \code{?MODULE} is a predefined Erlang macro, which expands to the
 module name, the code belongs to (here: \code{dht_node}).
 
-\subsection{Initializing a \code{dht_node}-process}
+\subsection{\texorpdfstring{Initializing a \code{dht_node}-process}
+             {Initializing a dht\_node-process}}
 
 \codesnippet{dht_node.erl}{dht_node:start}{../src/dht_node.erl}
 
 The \code{gen_component} behaviour registers the \code{dht_node} in the
-process dictionary. Formerly, the process had to do this himself, but
+process dictionary. Formerly, the process had to do this itself, but
 we moved this code into the behaviour. If the \code{dht_node} is the
-first node, he will start immediately. Otherwise, the process sleeps
-for a random amount of time. If you would start 1000 processes with
-\erlfun{admin}{add\_nodes}{1000}, the boot-server would receive many join
-requests at the same time, which is not intended. It will also make
-the ring stabilization process more complicated. Adding 100s of nodes
-within a short period of time induces more churn into the system, than
-the ring maintenance can handle.
-
-Then, the node retrieves its \code{Id} from the keyholder: \code{Id =
-  cs_keyholder:get_key()}. In the first call, a random identifier is
+first node, it will start immediately by triggering all known nodes
+(to initialize the comm layer) and entering the join process
+accordingly. The node also retrieves its \code{Id} from the idholder:
+\code{idholder:get_id()}. In the first call, a random identifier is
 returned, otherwise the latest set value. If the \code{dht_node}-process
-failed and is restarted by its supervisor, this call to the keyholder
+failed and is restarted by its supervisor, this call to the idholder
 ensures, that the node still keeps its \code{Id}, assuming that the
-keyholder process is not failing.  This is important for the load-balancing
+idholder process is not failing. This is important for the load-balancing
 and for consistent responsibility of nodes to ensure consistent lookup in
-the structured overlay. Note: the name \code{Key-holder} actually is an
-id-holder.
+the structured overlay.
 
 If a node changes its position in the ring for load-balancing, the
-key-holder will be informed and the \code{dht_node} finishes itself. This
+idholder will be informed and the \code{dht_node} finishes itself. This
 triggers a restart of the corresponding database process via the
-and-supervisor.  When the supervisor restarts both processes, they will
-retrieve the new position in the ring from the key-holder and join the ring
+and-supervisor. When the supervisor restarts both processes, they will
+retrieve the new position in the ring from the idholder and join the ring
 there.
 
 \todo{The supervisor was configured to restart a node at most 10 times. Does
   that mean, that a node can only change its position in the ring 10 times
   (caused by load-balancing)?}
 
-%Next, the \code{dht_node} registers itself as the owner of the
-%failuredetector \code{failuredetector:set_owner(self())} to become informed,
-%when the failuredetector detects failing nodes.
-
-%With \code{boot_server:connect()} a connection to the boot-server is
-%established.
-
 \subsection{Actually joining the ring}
 
-After retrieving its identifier, the node starts the join process
-(\erlfun{dht\_node\_join}{join}{}).
+After retrieving its identifier, the node starts the join protocol
+which processes the appropriate messages calling
+\erlfun{dht\_node\_join}{process\_join\_msg}{Message, State}.
 
-\codesnippet{dht_node_join.erl}{dht_node_join:join1}{../src/dht_node_join.erl}
-
-The boot-server is contacted to retrieve the known number of nodes in the
-ring. If the ring is empty, \code{join_first} is called. Otherwise,
-\code{join_ring} is called.
+\codesnippet{dht_node_join.erl}{dht_node_join:join_first}{../src/dht_node_join.erl}
 
 If the ring is empty, the joining node is the only node in the ring
 and will be responsible for the whole key space. \code{join_first}
@@ -1458,76 +1490,63 @@ routing table, a successorlist containing itself, itself as its
 predecessor, a reference to itself, its responsibility area from
 \code{Id} to \code{Id} (the full ring), and a load balancing schema.
 
-\codesnippet{dht_node_join.erl}{dht_node_join:join_first}{../src/dht_node_join.erl}
+The state is defined in
+
+\codesnippet{dht_node_state.erl}{dht_node_state:state}{../src/dht_node_state.erl}
+
+If a node joins an existing ring, it will at first try to contact all
+\code{dht_node} processes in any VM configured in \code{known_hosts}.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p12}{../src/dht_node_join.erl}
+
+These nodes will be send a lookup request for the node currently responsible
+for the new node's id -- the successor for the joining node. If this lookup
+fails for some reason, it is tried again.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p3}{../src/dht_node_join.erl}
+
+If its (future) successor is found, this new node will send a \code{join}
+message including a reference to itself and the chosen \code{Id}.
+This message is received by the old node in \code{dht_node.erl}:
+
+\codesnippet{dht_node.erl}{dht_node:join_message}{../src/dht_node.erl}
+
+This triggers a call to \erlfun{dht\_node\_join}{join\_request}{/2} on the
+old node.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_request}{../src/dht_node_join.erl}
+
+The \code{dht_node} will update the interval it is responsible for and
+notify the ring maintenance of its new predecessor. It will also remove all
+key-value pairs from its database which are now in the responsibility of
+the joining node and send a \code{join_response} message to the new node
+with its former predecessor and the data the new node has to host.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p4}{../src/dht_node_join.erl}
+
+Back on the joining node: it waits for the \code{join_response}
+message in phase 4 of the join protocol. The next steps after the
+message is received from the old node are to initialize the
+maintenance components for the ring and routing table, the database
+and the state of the \code{dht_node}.
+The \erlfun{cs\_replica\_stabilization}{recreate\_replicas}{} function is
+called, which is not yet implemented. It would recreat necessary replicas
+that were lost due to load-balancing, node failures and lost updates during
+the data transfer.
 
 The macro \code{?RT} maps to the configured routing algorithm and
 \code{?RM} to the configured ring maintenance algorithm. It is defined
 in \code{include/scalaris.hrl}. For further details on the routing see
 Chapter~\sieheref{chapter.routing}.
 
-The state is defined in
-
-\codesnippet{dht_node_state.erl}{dht_node_state:state}{../src/dht_node_state.erl}
-
-If a node joins an existing ring, \code{reliable_get_node} is called for the
-own \code{Id} in \erlfun{dht\_node\_join}{join}{}. This lookup delivers the
-node who is currently responsible for the new node's identifier -- the
-successor for the joining node. If this lookup fails for some reason, it is
-tried again, by recursively calling the \code{join()}.
+Note that join-related messages arriving in other phases than those handling
+them will be ignored. Any other messages during a \code{dht_node}'s join will
+be queued and re-send when the join is complete.
 
 \todo{What, if the \code{Id} is exactly the same as that of the existing
   node? This could lead to lookup and responsibility inconsistency? Can this
   be triggered by the load-balancing? This is a bug, that should be
   fixed!!!}
-
-Then, \erlfun{dht\_node\_join}{join\_ring}{} is called:
-
-\codesnippet{dht_node_join.erl}{dht_node_join:join_ring}{../src/dht_node_join.erl}
-
-First the node is initialized. Then it sends a \code{join} message to the
-successor including a reference to itself and the chosen \code{Id}.
-
-The message is received by the old node in \code{dht_node.erl}. There exists
-a \code{\{join, X\}} handler.
-
-\codesnippet{dht_node.erl}{dht_node:join_message}{../src/dht_node.erl}
-
-This triggers a call to \code{join_request} on the old node.
-
-\codesnippet{dht_node_join.erl}{dht_node_join:join_request}{../src/dht_node_join.erl}
-
-The \code{dht_node} notifies the ring maintenance, that he has a new
-predecessor. Then he removes the key-value pairs from his database
-which are now in the responsibility of the joining node. Then it
-sends a \code{join_response} to the new node with its former
-predecessor, the data, it has to host, and its successorlist.
-
-%Note: Here, the observation of the former predecessor could be deleted from
-%the failure detector. But periodically, all known hosts are reregistered
-%with the failure detector, and then all other nodes are thrown away from the
-%list of nodes to observe in the failure detector. So, we do not care here.
-
-%Finally, the new predecessor is set and the \code{join_request()} is finished.
-
-
-Back on the joining node: it waits for the \code{join_response}
-message in \erlfun{dht\_node\_join}{join\_ring}{}. The next steps after the
-message was received from the old node are to initialize the
-maintenance components for the ring and routing table, the database
-and the state of the \code{dht_node}.
-
-\subsection{Beginning to serve requests}
-
-\erlfun{dht\_node\_join}{join}{} was called from \erlfun{dht\_node}{start}{},
-which now continues
-
-\codesnippet{dht_node.erl}{dht_node:start}{../src/dht_node.erl}
-
-The \erlfun{cs\_replica\_stabilization}{recreate\_replicas}{} function is
-called, which is not yet implemented. It would recreated necessary replicas
-that were lost due to load-balancing and node failures.
-
-Finally, the loop for request handling is started.
 
 % \subsection{FAQ}
 
@@ -1536,22 +1555,23 @@ Finally, the loop for request handling is started.
 
 %   \paragraph{Answer:} They are currently not implemented as separate Erlang
 %   processes. All the requests are handled by the loop started by
-%   \code{dht_node:start()}. Nevertheless, they could be implemented as
+%   \erlfun{dht_node}{start}. Nevertheless, they could be implemented as
 %   separate processes to make the software architecture cleaner.
 
 \chapter{Directory Structure of the Source Code}
 
-The directory tree of \scalaris{} is structured as follows: \\
+The directory tree of \scalaris{} is structured as follows:
 
+\vspace*{1em}
 \begin{tabular}{|r|p{11.5cm}|}
  \hline
  \code{bin} & contains shell scripts needed to work with \scalaris{} (e.g.\ start the boot services, start a node, \dots)\\
  \code{contrib} & necessary third party packages (yaws and log4erl) \\
- \code{doc} & generated erlang documentation \\
- \code{docroot} & root directory of the bootserver's webserver \\
+ \code{doc} & generated Erlang documentation \\
+ \code{docroot} & root directory of the boot server's webserver \\
  \code{docroot_node} & root directory of the normal node's webserver \\
  \code{ebin} & the compiled Erlang code (beam files)\\
- \code{java-api} & a java api to \scalaris{} \\
+ \code{java-api} & a Java API to \scalaris{} \\
  \code{log} & log files \\
  \code{src} & contains the \scalaris{} source code\\
  \code{test} & unit tests for \scalaris{} \\
@@ -1571,8 +1591,9 @@ The directory tree of \scalaris{} is structured as follows: \\
 
 \chapter{Java API}
 
-For the Java API documentation, we refer the reader to Javadoc
-resp. doxygen. The following commands create the documentation:
+For the Java API documentation, we refer the reader to the documentation
+generated by javadoc or doxygen. The following commands create the
+documentation:
 
 \begin{lstlisting}[language=sh]
 %> cd java-api
@@ -1580,8 +1601,8 @@ resp. doxygen. The following commands create the documentation:
 %> doxygen
 \end{lstlisting}
 
-The Javadoc can be found in \code{java-api/doc/index.html}. The
-doxygen is in \\ \code{doc-doxygen/html/index.html}.
+The documentation can then be found in \code{java-api/doc/index.html}
+(javadoc) and\\ \code{java-api/doc-doxygen/html/index.html} (doxygen).
 
 We provide two kinds of APIs:
 
@@ -1590,9 +1611,9 @@ We provide two kinds of APIs:
 \item low-level access with \code{de.zib.scalaris.Transaction}
 \end{itemize}
 
-The former provides general functions for reading and writing single
-key-value pairs and an API for the built-in PubSub-service. The latter
-allows the user to write custom transactions which can modify an
+The former provides general functions for reading, writing and deleting
+single key-value pairs and an API for the built-in PubSub-service. The
+latter allows the user to write custom transactions which can modify an
 arbitrary number of key-value pairs within one transaction.
 
 \bibliographystyle{plainnat}

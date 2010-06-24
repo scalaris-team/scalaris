@@ -1,4 +1,6 @@
-\section{The \erlmodule{gen\_component}\erlmoduleindex{gen\_component}}
+\section{\texorpdfstring{The \erlmodule{gen\_component}}
+         {The gen\_component}}
+\erlmoduleindex{gen\_component}
 \svnrev{r832}
 
 The generic component model implemented by
@@ -37,7 +39,8 @@ handling is necessary and that are executed in the context of a client's
 process or a process that behaves as a proxy for a client
 (\erlmodule{cs\_api}).
 
-\subsection{A basic \erlmodule{gen\_component} including a message handler}
+\subsection{\texorpdfstring{A basic \erlmodule{gen\_component} including a message handler}
+             {A basic gen\_component including a message handler}}
 
 To implement a \erlmodule{gen\_component}, the component has to provide the
 \erlmodule{gen\_component} behaviour:
@@ -64,7 +67,8 @@ the updated state of the component or the atoms \texttt{unknown\_event} or
 \texttt{kill}. It must neither call \code{receive} nor
 \erlfun{timer}{sleep}{/1} nor \erlfun{erlang}{exit}{/1}.
 
-\subsection{How to start a \erlmodule{gen\_component}?}
+\subsection{\texorpdfstring{How to start a \erlmodule{gen\_component}?}
+             {How to start a gen\_component?}}
 
 A \erlmodule{gen\_component} can be started using one of:
 
@@ -103,7 +107,8 @@ react on the message and return the updated state of your component.
 return the pid of the spawned process as \code{\{ok, Pid\}}.
 
 
-\subsection{When does a \erlmodule{gen\_component} terminate?}
+\subsection{\texorpdfstring{When does a \erlmodule{gen\_component} terminate?}
+             {When does a gen\_component terminate?}}
 
 A \erlmodule{gen\_component} can be stopped using:
 
@@ -189,8 +194,8 @@ handled, so that the return value of
 \erlmodule{gen\_component}.  The new handler is given as an atom, which is
 the name of the 2-ary function in your component module to be called.
 
-\paragraph{Starting with non-default message handler.}
-It is also possible to change the message handler right from the beginning
+\subsubsection{Starting with non-default message handler.}
+It is also possible to change the message handler right from the start
 in your \erlfun{your\_gen\_component}{init}{/1} to avoid the default message
 handler \erlfun{your\_gen\_component}{on}{/2}. Just create your initial
 state as usual and call \erlfun{gen\_component}{change\_handler}{State,
@@ -199,14 +204,17 @@ state as usual and call \erlfun{gen\_component}{change\_handler}{State,
 \erlfun{gen\_component}{change\_handler}{/2} to return \code{State} itself,
 so this will work properly.
 
-\subsection{Halting and pausing a \erlmodule{gen\_component}}
+\subsection{\texorpdfstring{Halting and pausing a \erlmodule{gen\_component}}
+{Halting and pausing a gen\_component}}
 
 Using \erlfun{gen\_component}{kill}{Pid} and
 \erlfun{gen\_component}{sleep}{Pid, Time} components can be terminated or
 paused.
 
-\subsection{Integration with \erlmodule{process\_dictionary}:
+\subsection{\texorpdfstring{Integration with \erlmodule{process\_dictionary}:
   Redirecting events / messages  to other \erlmodule{gen\_component}s}
+  {Integration with process\_dictionary:
+  Redirecting events / messages  to other gen\_components}}
 
 Each \erlmodule{gen\_component} by itself is prepared to support
 \erlfun{comm}{send\_to\_group\_member}{/3} which forwards messages inside a
@@ -217,11 +225,12 @@ this group, if you know their registered Erlang name. You do not necessarily
 have to know their individual Pid.
 
 \emph{In consequence, no \erlmodule{gen\_component} can individually handle
-  messages of the form: \code{\{send_to_group_member,} \code{_, _\}} as such
+  messages of the form \code{\{send_to_group_member,} \code{_, _\}} as such
   messages are consumed by \erlmodule{gen\_component} itself.}
 
-\subsection{Integration with \erlmodule{fd\_pinger}:
-Replying to failure detectors}
+\subsection{\texorpdfstring{Integration with \erlmodule{fd\_pinger}:
+  Replying to failure detectors}
+  {Integration with fd\_pinger: Replying to failure detectors}}
 
 Each \erlmodule{gen\_component} replies automatically to \code{\{ping,
   Pid\}} requests with a \code{\{pong\}} send to the given \code{Pid}.  Such
@@ -233,9 +242,9 @@ messages of the form: \code{\{ping, _\}} as such messages are consumed by
 \erlmodule{gen\_component} itself.}
 
 
-\subsection{The debugging interface of \erlmodule{gen\_component}:
+\subsection{\texorpdfstring{The debugging interface of \erlmodule{gen\_component}:
   Breakpoints and step-wise execution}
-
+  {The debugging interface of gen\_component: Breakpoints and step-wise execution}}
 
 We equipped \erlmodule{gen\_component} with a debugging interface, which
 especially is beneficial, when testing the interplay between several
@@ -398,7 +407,8 @@ Pid we selected for stepping, or alter the definition of the macro
 %%   profiling results instead of expecting the user to know how to read
 %%   it directly from the \erlmodule{ets} table.}
 
-\subsection{Future use and planned extensions for \erlmodule{gen\_component}}
+\subsection{\texorpdfstring{Future use and planned extensions for \erlmodule{gen\_component}}
+             {Future use and planned extensions for gen\_component}}
 
 \erlmodule{gen\_component} could be further extended. For example it could
 support hot-code upgrade or could be used to implement algorithms that

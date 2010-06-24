@@ -51,22 +51,21 @@ new(RT, Neighbors, LB) ->
     new(RT, Neighbors, LB, ?DB:new(nodelist:nodeid(Neighbors))).
 
 %% userdevguide-begin dht_node_state:state
--spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb(), ?DB:db()) -> state().
+-spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(),
+          dht_node_lb:lb(), ?DB:db()) -> state().
 new(RT, Neighbors, LB, DB) ->
-    #state{
-     rt = RT,
-     neighbors = Neighbors,
-     lb = LB,
-     join_time = now(),
-     trans_log = #translog{
-       tid_tm_mapping = dict:new(),
-       decided        = gb_trees:empty(),
-       undecided      = gb_trees:empty()
-      },
-     db = DB,
-     tx_tp_db = tx_tp:init(),
-     proposer = process_dictionary:get_group_member(paxos_proposer)
-    }.
+    #state{rt = RT,
+           neighbors = Neighbors,
+           lb = LB,
+           join_time = now(),
+           trans_log = #translog{tid_tm_mapping = dict:new(),
+                                 decided        = gb_trees:empty(),
+                                 undecided      = gb_trees:empty()
+                                },
+           db = DB,
+           tx_tp_db = tx_tp:init(),
+           proposer = process_dictionary:get_group_member(paxos_proposer)
+          }.
 %% userdevguide-end dht_node_state:state
 
 %% @doc Gets the given property from the dht_node state.
