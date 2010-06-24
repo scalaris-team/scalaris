@@ -30,6 +30,10 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([cookie/0]).
+-endif.
+
 % API
 -export([subscribe/1, subscribe/2,
          unsubscribe/1, unsubscribe/2,

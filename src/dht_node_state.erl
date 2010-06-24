@@ -33,6 +33,10 @@
          set_trans_log/2,
          set_tx_tp_db/2]).
 
+-ifdef(with_export_type_support).
+-export_type([state/0]).
+-endif.
+
 -type join_time() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}. % {MegaSecs, Secs, MicroSecs}
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node

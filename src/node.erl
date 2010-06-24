@@ -31,6 +31,10 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([node_type/0]).
+-endif.
+
 -record(node, {pid :: comm:mypid(), id :: ?RT:key(), id_version :: non_neg_integer()}).
 -type(node_type() :: #node{}).
 

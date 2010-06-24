@@ -2945,6 +2945,35 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
+CODE='-export_type([mytype/0]). -type(mytype()::ok).'
+echo $CODE
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "cannot run test program while cross compiling
+See \`config.log' for more details." "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+-export_type([mytype/0]). -type(mytype()::ok).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  EXPORTTYPESUPPORT=", {d, with_export_type_support}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is supported" >&5
+$as_echo "$as_me: export_type is supported" >&6;}
+else
+  EXPORTTYPESUPPORT=""; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is not supported" >&5
+$as_echo "$as_me: export_type is not supported" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
 if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
    { $as_echo "$as_me:${as_lineno-$LINENO}: forward declarations or recursive types are not allowed" >&5
 $as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
@@ -2980,7 +3009,7 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN"
+EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
 
 
 

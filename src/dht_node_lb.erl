@@ -30,6 +30,10 @@
 -export([new/0, balance_load/1, check_balance/3, get_middle_key/1, move_load/3, 
 	 get_loadbalance_flag/1, reset_loadbalance_flag/1]).
 
+-ifdef(with_export_type_support).
+-export_type([lb/0]).
+-endif.
+
 -record(lb, {loadbalance_flag, reset_ref, last_keys}).
 -type lb() :: #lb{}.
 

@@ -41,6 +41,10 @@
 % helpers for creating getter messages:
 -export([get_coordinate/0, get_coordinate/1]).
 
+-ifdef(with_export_type_support).
+-export_type([error/0, latency/0, network_coordinate/0, state/0]).
+-endif.
+
 % vivaldi types
 -type(network_coordinate() :: [float()]).
 -type(error() :: float()).

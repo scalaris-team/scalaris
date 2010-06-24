@@ -45,6 +45,10 @@
          build_merkle_tree/2,
          update_if_newer/2]).
 
+-ifdef(with_export_type_support).
+-export_type([db/0]).
+-endif.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

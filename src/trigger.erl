@@ -50,6 +50,10 @@
 
 -export([init/2, init/3, init/4, init/5, first/1, next/2, next/1]).
 
+-ifdef(with_export_type_support).
+-export_type([interval/0, interval_fun/0, state/0]).
+-endif.
+
 -type interval() :: max_interval | base_interval | min_interval | now_and_min_interval.
 -type interval_fun() :: fun(() -> pos_integer()).
 -type message_tag() :: comm:message_tag().

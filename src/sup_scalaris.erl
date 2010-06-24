@@ -35,6 +35,10 @@
 
 -export([start_link/1, init/1]).
 
+-ifdef(with_export_type_support).
+-export_type([supervisor_type/0]).
+-endif.
+
 -type supervisor_type() :: boot | node.
 
 -spec start_link(supervisor_type()) -> {ok, Pid::pid()}

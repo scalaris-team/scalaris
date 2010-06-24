@@ -28,6 +28,10 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([avg_kr/0, state/0, values/0, values_internal/0]).
+-endif.
+
 %%
 %% Exported Functions
 %%

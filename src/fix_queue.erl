@@ -26,6 +26,10 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([fix_queue/0]).
+-endif.
+
 -export([new/1, add/2, map/2]).
 
 -type(fix_queue() :: {MaxLength :: pos_integer(),

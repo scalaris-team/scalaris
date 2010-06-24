@@ -28,6 +28,10 @@
 -export([start_link/1]).
 -export([init/1, on/2, get_base_interval/0, check_config/0]).
 
+-ifdef(with_export_type_support).
+-export_type([state_init/0]).
+-endif.
+
 % state of the routing table loop
 -type(state_init() :: {Id           :: ?RT:key(),
                   Pred         :: node:node_type(),

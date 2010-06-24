@@ -50,6 +50,10 @@
          this_with_cookie/1, self_with_cookie/1,
          send_queued_messages/1]).
 
+-ifdef(with_export_type_support).
+-export_type([message/0, message_tag/0, mypid/0]).
+-endif.
+
 -type cookie() :: any().
 -type reg_name() :: atom().
 -type erl_local_pid_plain() :: pid() | reg_name().
