@@ -2880,10 +2880,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  BOOLEANISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is a built-in type" >&5
+  TIDISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is a built-in type" >&5
 $as_echo "$as_me: tid() is a built-in type" >&6;}
 else
-  BOOLEANISBUILTIN=", {d, tid_not_builtin}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dtid_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is not built-in" >&5
+  TIDISBUILTIN=", {d, tid_not_builtin}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dtid_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is not built-in" >&5
 $as_echo "$as_me: tid() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2980,7 +2980,7 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
+EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN"
 
 
 
