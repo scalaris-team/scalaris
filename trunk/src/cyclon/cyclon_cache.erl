@@ -37,6 +37,10 @@
          pop_random_node/1, pop_oldest_node/1,
          debug_format_by_age/1]).
 
+-ifdef(with_export_type_support).
+-export_type([age/0, cache/0]).
+-endif.
+
 -type age() :: non_neg_integer().
 -type element() :: {node:node_type(), age()}.
 -type cache() :: [ element() ].

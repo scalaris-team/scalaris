@@ -48,6 +48,10 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([neighborhood/0, nodelist/0, non_empty_nodelist/0]).
+-endif.
+
 -type(nodelist() :: [node:node_type()]).
 -type(non_empty_nodelist() :: [node:node_type(),...]).
 -type(neighborhood() :: {Preds::non_empty_nodelist(), Node::node:node_type(), Succs::non_empty_nodelist()}).

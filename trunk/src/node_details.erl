@@ -36,6 +36,11 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([node_details/0, node_details_name/0, node_details_record/0,
+              node_type/0]).
+-endif.
+
 -type(node_type() :: node:node_type()).
 -type(load() :: integer()).
 -type(hostname() :: string()).

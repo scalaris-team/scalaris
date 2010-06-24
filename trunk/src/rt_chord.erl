@@ -35,6 +35,10 @@
 % stabilize for Chord
 -export([stabilize/5]).
 
+-ifdef(with_export_type_support).
+-export_type([key/0, rt/0, custom_message/0, external_rt/0]).
+-endif.
+
 %% userdevguide-begin rt_chord:types
 -type(key()::non_neg_integer()).
 -type(rt()::gb_tree()).

@@ -47,6 +47,10 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([tree/0]).
+-endif.
+
 -export([insert/2,delete/2,build_tree/1,diff/2,test_merkle/0,allkeys/1, contains/2]).
 
 % NOTE: userdata is the user-exposed key, 'key' is internal-only

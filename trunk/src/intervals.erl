@@ -40,6 +40,10 @@
          normalize/1
         ]).
 
+-ifdef(with_export_type_support).
+-export_type([interval/0]).
+-endif.
+
 -type(left_bracket() :: '(' | '[').
 -type(right_bracket() :: ')' | ']').
 -type(key() :: ?RT:key() | minus_infinity | plus_infinity).
