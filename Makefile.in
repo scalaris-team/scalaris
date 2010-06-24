@@ -130,7 +130,7 @@ svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl tests/*.erl bin/*.app bin/*.cfg
 
 dialyzer: compile
-	$(DIALYZER) -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ --no_native
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ --no_native
 
 rrd-init:
 	@echo This target is deprecated
