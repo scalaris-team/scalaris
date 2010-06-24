@@ -98,6 +98,8 @@ AC_CHECK_FILE($ac_cv_erlang_lib_dir_common_test/priv/bin/run_test,
                   AC_MSG_NOTICE([run_test not found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
                fi])])
 
+DIALYZER_FLAGS=""
+
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
        [GBTREESISBUILTIN=""; AC_MSG_NOTICE([gb_tree() is a built-in type])],
@@ -126,7 +128,7 @@ AC_RUN_IFELSE(
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::tid()).], [ok])],
        [BOOLEANISBUILTIN=""; AC_MSG_NOTICE([tid() is a built-in type])],
-       [BOOLEANISBUILTIN=", {d, tid_not_builtin}"; AC_MSG_NOTICE([tid() is not built-in])])
+       [BOOLEANISBUILTIN=", {d, tid_not_builtin}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dtid_not_builtin"; AC_MSG_NOTICE([tid() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype()} | ok).], [ok])],
@@ -151,7 +153,7 @@ AC_RUN_IFELSE(
 EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE"
 
 AC_SUBST(EMAKEFILEDEFINES)
-
+AC_SUBST(DIALYZER_FLAGS)
 ###########################################################
 #
 # check MACOSX vs. Linux for flexbisonparse driver
