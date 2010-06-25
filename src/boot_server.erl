@@ -16,7 +16,7 @@
 %% @doc The boot server maintains a list of scalaris nodes and checks the 
 %%  availability using a failure_detector. It also exports a webpage 
 %%  on port 8000 containing some statistics. Its main purpose is to 
-%%  give new chord# nodes a list of nodes already in the system.
+%%  give new scalaris nodes a list of nodes already in the system.
 %% @end
 -module(boot_server).
 -author('schuett@zib.de').

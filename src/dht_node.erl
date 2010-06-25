@@ -377,7 +377,7 @@ on(_, _State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec init([instanceid() | [any()]]) -> {join, {as_first}, []} | {join, {phase1}, []}.
+-spec init([instanceid() | [any()]]) -> {join, {as_first}, msg_queue:msg_queue()} | {join, {phase1}, msg_queue:msg_queue()}.
 init([_InstanceId, Options]) ->
     %io:format("~p~n", [Options]),
     % first node in this vm and also vm is marked as first
@@ -388,10 +388,10 @@ init([_InstanceId, Options]) ->
         true ->
             trigger_known_nodes(),
             idholder:get_id(),
-            {join, {as_first}, []};
+            {join, {as_first}, msg_queue:new()};
         _ ->
             idholder:get_id(),
-            {join, {phase1}, []}
+            {join, {phase1}, msg_queue:new()}
     end.
 %% userdevguide-end dht_node:start
 

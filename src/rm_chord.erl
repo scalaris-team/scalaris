@@ -32,7 +32,7 @@
 -type(state() :: {Id             :: ?RT:key(),
                   Neighborhood   :: nodelist:neighborhood(),
                   TriggerState   :: trigger:state()}
-     | {uninit, QueuedMessages::[comm:message()], TriggerState :: trigger:state()}).
+     | {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState :: trigger:state()}).
 
 % accepted messages
 -type(message() ::
@@ -58,13 +58,13 @@ start_link(InstanceId) ->
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, ring_maintenance}]).
 
 %% @doc Initialises the module with an uninitialized state.
--spec init(module()) -> {uninit, QueuedMessages::[], TriggerState::trigger:state()}.
+-spec init(module()) -> {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState::trigger:state()}.
 init(Trigger) ->
     log:log(info,"[ RM ~p ] starting ring maintainer chord~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, stabilize),
     comm:send_local(get_cs_pid(), {init_rm, self()}),
     TriggerState2 = trigger:next(TriggerState),
-    {uninit, [], TriggerState2}.
+    {uninit, msg_queue:new(), TriggerState2}.
 
 %% @doc Sends a message to the remote node's ring_maintenance process asking for
 %%      it list of successors.
@@ -82,11 +82,11 @@ on({init, Id, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState
     Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
     get_successorlist(node:pidX(Successor)),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
-    comm:send_queued_messages(QueuedMessages),
+    msg_queue:send(QueuedMessages),
     {Id, Neighborhood, TriggerState};
 
 on(Msg, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, [Msg | QueuedMessages], TriggerState};
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState};
 
 on({get_succlist, Source_Pid}, {_Id, Neighborhood, _TriggerState} = State) ->
     comm:send(Source_Pid, {get_succlist_response,
