@@ -47,8 +47,7 @@
 
 -export([send/2, send_local_after/3 , this/0, get/2, send_to_group_member/3,
          send_local/2, make_global/1, is_valid/1, get_msg_tag/1,
-         this_with_cookie/1, self_with_cookie/1,
-         send_queued_messages/1]).
+         this_with_cookie/1, self_with_cookie/1]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0, message_tag/0, mypid/0]).
@@ -119,12 +118,6 @@ get_msg_tag({send_to_group_member, _ProcessName, Message}) when is_tuple(Message
     get_msg_tag(Message);
 get_msg_tag(Message) when is_tuple(Message) andalso is_atom(erlang:element(1, Message)) ->
     erlang:element(1, Message).
-
-%% @doc Sends queued messages to the process calling the method, i.e. self(), in
-%%      reverse order of the given list.
--spec send_queued_messages([message()]) -> ok.
-send_queued_messages(QueuedMessages) ->
-    lists:foldr(fun(Msg, _) -> send_local(self(), Msg) end, ok, QueuedMessages).
 
 % specs for the functions below which differ depending on the currently defined
 % macros

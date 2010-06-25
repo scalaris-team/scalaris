@@ -54,7 +54,7 @@
 %%
 % constructors
 -export([new_state/0, new_state/1,
-		 new_internal/0, new_internal/7]).
+         new_internal/0, new_internal/7]).
 
 % getters
 -export([]).
@@ -62,18 +62,18 @@
 % setters
 -export([set/3,
          set_values/2,
-		 set_initialized/1,
-		 reset_triggered/1,
-		 inc_triggered/1,
-		 reset_msg_exch/1,
-		 inc_msg_exch/1,
-		 reset_converge_avg_count/1,
-		 inc_converge_avg_count/1]).
+         set_initialized/1,
+         reset_triggered/1,
+         inc_triggered/1,
+         reset_msg_exch/1,
+         inc_msg_exch/1,
+         reset_converge_avg_count/1,
+         inc_converge_avg_count/1]).
 
 -export([conv_state_to_extval/1,
-		 calc_size_ldr/1,
-		 calc_size_kr/1,
-		 calc_stddev/1]).
+         calc_size_ldr/1,
+         calc_size_kr/1,
+         calc_stddev/1]).
 
 %%
 %% Gossip types
@@ -110,7 +110,7 @@
                           avg_kr    = unknown :: avg_kr(), % average key range (distance between nodes in the address space)
                           min       = unknown :: min(),
                           max       = unknown :: max(),
-						  round     = 0 :: round()
+                          round     = 0 :: round()
 }).
 -type(values_internal() :: #values_internal{}).
 
@@ -135,8 +135,8 @@ new_internal() -> #values_internal{}.
 -spec new_internal(avg(), avg2(), size_inv(), avg_kr(), min(), max(), round())
                     -> values_internal().
 new_internal(Avg, Avg2, Size_inv, AvgKR, Min, Max, Round) ->
-	#values_internal{avg=Avg, avg2=Avg2, size_inv=Size_inv, avg_kr=AvgKR,
-					 min=Min, max=Max, round=Round}.
+    #values_internal{avg=Avg, avg2=Avg2, size_inv=Size_inv, avg_kr=AvgKR,
+                     min=Min, max=Max, round=Round}.
 
 %% @doc creates a new record holding the (internal) state of the gossip module
 %%      (only use in gossip.erl!)
@@ -147,7 +147,7 @@ new_state() -> #state{}.
 %%      (only use in gossip.erl!)
 -spec new_state(values_internal()) -> state().
 new_state(Values) when is_record(Values, values_internal) ->
-	#state{values=Values, initialized=false}.
+    #state{values=Values, initialized=false}.
 
 %% @doc Gets information from a values, values_internal or state record.
 %%      Allowed keys include:
@@ -273,43 +273,43 @@ set(State, Key, Value) when is_record(State, state) ->
 -spec set_values(state(), values_internal()) -> state().
 set_values(State, Values)
   when (is_record(State, state) andalso is_record(Values, values_internal)) ->
-	State#state{values=Values}.
+    State#state{values=Values}.
 
 %$ @doc Sets that local load and key range information have been integrated into
 %%      the values of a gossip state.
 -spec set_initialized(state()) -> state().
 set_initialized(State) when is_record(State, state) ->
-	State#state{initialized=true}.
+    State#state{initialized=true}.
 
 %% @doc Resets how often the trigger called the module to 0.
 -spec reset_triggered(state()) -> state().
 reset_triggered(State) when is_record(State, state) ->
-	State#state{triggered=0}.
+    State#state{triggered=0}.
 
 %% @doc Increases how often the trigger called the module by 1.
 -spec inc_triggered(state()) -> state().
 inc_triggered(State) when is_record(State, state) ->
-	State#state{triggered=(get(State, triggered) + 1)}.
+    State#state{triggered=(get(State, triggered) + 1)}.
 
 %% @doc Resets how many information exchanges have been performed to 0.
 -spec reset_msg_exch(state()) -> state().
 reset_msg_exch(State) when is_record(State, state) ->
-	State#state{msg_exch=0}.
+    State#state{msg_exch=0}.
 
 %% @doc Increases how many information exchanges have been performed by 1.
 -spec inc_msg_exch(state()) -> state().
 inc_msg_exch(State) when is_record(State, state) ->
-	State#state{msg_exch=(get(State, msg_exch) + 1)}.
+    State#state{msg_exch=(get(State, msg_exch) + 1)}.
 
 %% @doc Resets how many information exchanges have been performed to 0.
 -spec reset_converge_avg_count(state()) -> state().
 reset_converge_avg_count(State) when is_record(State, state) ->
-	State#state{converge_avg_count=0}.
+    State#state{converge_avg_count=0}.
 
 %% @doc Increases how many information exchanges have been performed by 1.
 -spec inc_converge_avg_count(state()) -> state().
 inc_converge_avg_count(State) when is_record(State, state) ->
-	State#state{converge_avg_count=(get(State, converge_avg_count) + 1)}.
+    State#state{converge_avg_count=(get(State, converge_avg_count) + 1)}.
 
 %%
 %% Miscellaneous
@@ -319,55 +319,55 @@ inc_converge_avg_count(State) when is_record(State, state) ->
 %%      values.
 -spec calc_size_ldr(values_internal() | state()) -> size().
 calc_size_ldr(State) when is_record(State, values_internal) ->
-	Size_inv = get(State, size_inv),
-	if
-		Size_inv =< 0        -> 1.0;
-		Size_inv =:= unknown -> unknown;
-		true                 -> 1.0 / Size_inv
-	end;
+    Size_inv = get(State, size_inv),
+    if
+        Size_inv =< 0        -> 1.0;
+        Size_inv =:= unknown -> unknown;
+        true                 -> 1.0 / Size_inv
+    end;
 calc_size_ldr(State) when is_record(State, state) ->
-	calc_size_ldr(get(State, values)).
+    calc_size_ldr(get(State, values)).
 
 %% @doc Gets the size of the address space.
 -spec get_addr_size() -> number().
 get_addr_size() ->
-	rt_simple:n().
+    rt_simple:n().
 
 %% @doc Extracts and calculates the size_kr field from the internal record of
 %%      values.
 -spec calc_size_kr(values_internal() | state()) -> size().
 calc_size_kr(State) when is_record(State, values_internal) ->
-	AvgKR = get(State, avg_kr),
-	if
-		AvgKR =< 0        -> 1.0;
-		AvgKR =:= unknown -> unknown;
-		true              -> get_addr_size() / AvgKR
-	end;
+    AvgKR = get(State, avg_kr),
+    if
+        AvgKR =< 0        -> 1.0;
+        AvgKR =:= unknown -> unknown;
+        true              -> get_addr_size() / AvgKR
+    end;
 calc_size_kr(State) when is_record(State, state) ->
-	calc_size_kr(get(State, values)).
+    calc_size_kr(get(State, values)).
 
 %% @doc Extracts and calculates the standard deviation from the internal record
 %%      of values.
 -spec calc_stddev(values_internal() | state()) -> avg().
 calc_stddev(State) when is_record(State, values_internal) ->
-	Avg = get(State, avgLoad),
-	Avg2 = get(State, avgLoad2),
-	case (Avg =:= unknown) orelse (Avg2 =:= unknown) of
-		true -> unknown;
-		false ->
+    Avg = get(State, avgLoad),
+    Avg2 = get(State, avgLoad2),
+    case (Avg =:= unknown) orelse (Avg2 =:= unknown) of
+        true -> unknown;
+        false ->
             Tmp = Avg2 - (Avg * Avg),
             case (Tmp >= 0) of
                 true  -> math:sqrt(Tmp);
                 false -> unknown
             end
-	end;
+    end;
 calc_stddev(State) when is_record(State, state) ->
-	calc_stddev(get(State, values)).
+    calc_stddev(get(State, values)).
 
 %% @doc Converts the internal value record to the external one.
 -spec conv_state_to_extval(state()) -> values().
 conv_state_to_extval(State) when is_record(State, state) ->
-	#values{avg       = get(State, avgLoad),
+    #values{avg       = get(State, avgLoad),
             stddev    = calc_stddev(State),
             size_ldr  = calc_size_ldr(State),
             size_kr   = calc_size_kr(State),

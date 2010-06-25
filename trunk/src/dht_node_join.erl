@@ -33,11 +33,11 @@
     {join_response, Pred::node:node_type(), Data::any()}).
 
 -type(join_state() ::
-    {join, {as_first}, QueuedMessages::list()} |
-    {join, {phase1}, QueuedMessages::list()} |
-    {join, {phase2, MyKey::?RT:key()}, QueuedMessages::list()} |
-    {join, {phase3, Nodes::[node:node_type()], MyKey::?RT:key()}, QueuedMessages::list()} |
-    {join, {phase4, MyKey::?RT:key(), Succ::node:node_type(), Me::node:node_type()}, QueuedMessages::list()}).
+    {join, {as_first}, QueuedMessages::msg_queue:msg_queue()} |
+    {join, {phase1}, QueuedMessages::msg_queue:msg_queue()} |
+    {join, {phase2, MyKey::?RT:key()}, QueuedMessages::msg_queue:msg_queue()} |
+    {join, {phase3, Nodes::[node:node_type()], MyKey::?RT:key()}, QueuedMessages::msg_queue:msg_queue()} |
+    {join, {phase4, MyKey::?RT:key(), Succ::node:node_type(), Me::node:node_type()}, QueuedMessages::msg_queue:msg_queue()}).
 
 %% @doc handle the join request of a new node
 %% userdevguide-begin dht_node_join:join_request
@@ -74,7 +74,7 @@ process_join_msg({idholder_get_id_response, Id, IdVersion},
                                   nodelist:new_neighborhood(Me),
                                   dht_node_lb:new(), ?DB:new(Id)),
     comm:send_local(get_local_dht_node_reregister_pid(), {go}),
-    comm:send_queued_messages(QueuedMessages),
+    msg_queue:send(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
     NewState;  % join complete, State is the first "State"
 %% userdevguide-end dht_node_join:join_first
@@ -167,7 +167,7 @@ process_join_msg({join_response, Pred, Data},
         end,
     cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
     comm:send_local(get_local_dht_node_reregister_pid(), {go}),
-    comm:send_queued_messages(QueuedMessages),
+    msg_queue:send(QueuedMessages),
     State;
 %% userdevguide-end dht_node_join:join_other_p4
 
@@ -186,7 +186,7 @@ process_join_msg({lookup_timeout}, State) ->
 % Catch all other messages until the join procedure is complete
 process_join_msg(Msg, {join, Details, QueuedMessages}) ->
     %log:log(info("[dhtnode] [~p] postponed delivery of ~p~n", [self(), Msg]),
-    {join, Details, [Msg | QueuedMessages]}.
+    {join, Details, msg_queue:add(QueuedMessages, Msg)}.
 
 -spec get_local_dht_node_reregister_pid() -> pid().
 get_local_dht_node_reregister_pid() ->

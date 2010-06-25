@@ -40,7 +40,7 @@
                   TriggerState   :: trigger:state(),
                   Cache          :: [node:node_type()], % random cyclon nodes
                   Churn          :: boolean()}
-     | {uninit, QueuedMessages::[comm:message()], TriggerState :: trigger:state()}).
+     | {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState :: trigger:state()}).
 
 % accepted messages
 -type(message() ::
@@ -69,13 +69,13 @@ start_link(InstanceId) ->
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, ring_maintenance}]).
 
 %% @doc Initialises the module with an uninitialized state.
--spec init(module()) -> {uninit, QueuedMessages::[], TriggerState::trigger:state()}.
+-spec init(module()) -> {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState::trigger:state()}.
 init(Trigger) ->
     log:log(info,"[ RM ~p ] starting ring maintainer TMAN~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     comm:send_local(get_pid_dnc() , {subscribe, self()}),
     comm:send_local(get_cs_pid(), {init_rm, self()}),
-    {uninit, [], TriggerState}.
+    {uninit, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Loop
@@ -88,12 +88,12 @@ on({init, Id, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState
     NewTriggerState = trigger:first(TriggerState),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
     cyclon:get_subset_rand_next_interval(1),
-    comm:send_queued_messages(QueuedMessages),
+    msg_queue:send(QueuedMessages),
     {Id, Neighborhood, config:read(cyclon_cache_size),
      stabilizationInterval_min(), NewTriggerState, [], true};
 
 on(Msg, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, [Msg | QueuedMessages], TriggerState};
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState};
 
 on({trigger},
    {Id, Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->

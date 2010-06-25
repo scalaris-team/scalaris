@@ -79,7 +79,7 @@
 
 % helpers for creating getter messages:
 -export([get_values_best/0, get_values_best/1,
-		 get_values_all/0, get_values_all/1]).
+         get_values_all/0, get_values_all/1]).
 
 -type(load() :: integer()).
 
@@ -93,17 +93,17 @@
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
 %% -> previous and current state, queued messages (get_state messages received
 %% before local values are known) and the state of the trigger.
--type(full_state() :: {state(), state(), list(), trigger:state()}).
+-type(full_state() :: {state(), state(), msg_queue:msg_queue(), trigger:state()}).
 
 % accepted messages of gossip processes
 -type(message() ::
-	{trigger} |
-	{{get_node_details_response, node_details:node_details()}, local_info} |
-	{{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
-	{get_state, comm:mypid(), values_internal()} |
-	{get_state_response, values_internal()} |
-	{cy_cache, nodelist:nodelist()} |
-	{get_values_all, comm:erl_local_pid()} | 
+    {trigger} |
+    {{get_node_details_response, node_details:node_details()}, local_info} |
+    {{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
+    {get_state, comm:mypid(), values_internal()} |
+    {get_state_response, values_internal()} |
+    {cy_cache, nodelist:nodelist()} |
+    {get_values_all, comm:erl_local_pid()} | 
     {get_values_best, comm:erl_local_pid()} |
     {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
@@ -193,8 +193,8 @@ init(Trigger) ->
     log:log(info,"[ Gossip ~p ] starting~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:first(TriggerState),
-	PreviousState = gossip_state:new_state(),
-	State = gossip_state:new_state(),
+    PreviousState = gossip_state:new_state(),
+    State = gossip_state:new_state(),
     {PreviousState, State, [], TriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -204,18 +204,18 @@ init(Trigger) ->
 %% @doc message handler
 -spec on(message(), full_state()) -> full_state() | unknown_event.
 on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
-	% this message is received continuously when the Trigger calls
-	% see gossip_trigger and gossip_interval in the scalaris.cfg file
-%% 	io:format("{trigger_gossip}: ~p~n", [State]),
+    % this message is received continuously when the Trigger calls
+    % see gossip_trigger and gossip_interval in the scalaris.cfg file
+%%     io:format("{trigger_gossip}: ~p~n", [State]),
     NewTriggerState = trigger:next(TriggerState),
-	NewState = gossip_state:inc_triggered(State),
-	% request a check whether we are the leader and can thus decide whether to
-	% start a new round
+    NewState = gossip_state:inc_triggered(State),
+    % request a check whether we are the leader and can thus decide whether to
+    % start a new round
     request_new_round_if_leader(NewState),
-	Round = gossip_state:get(NewState, round),
-	Initialized = gossip_state:get(State, initialized),
-	% only participate in (active) gossiping if we entered some valid round and
-	% we have information about our node's load and key range
+    Round = gossip_state:get(NewState, round),
+    Initialized = gossip_state:get(State, initialized),
+    % only participate in (active) gossiping if we entered some valid round and
+    % we have information about our node's load and key range
     case (Round > 0) andalso (Initialized) of
         true -> request_random_node();
         false -> ok
@@ -228,22 +228,23 @@ on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 
 on({{get_node_details_response, NodeDetails}, local_info},
    {PreviousState, State, QueuedMessages, TriggerState}) ->
-	% this message is received when the (local) node was asked to tell us its
-	% load and key range
+    % this message is received when the (local) node was asked to tell us its
+    % load and key range
 %%     io:format("gossip: got get_node_details_response: ~p~n",[NodeDetails]),
-	Initialized = gossip_state:get(State, initialized),
-	{NewQueuedMessages, NewState} =
-		case Initialized of
-			true -> {[], State};
-			false ->
-                comm:send_queued_messages(QueuedMessages),
-				{[], integrate_local_info(State,
-                                          node_details:get(NodeDetails, load),
-                                          calc_initial_avg_kr(
-                                            node_details:get(NodeDetails, pred),
-                                            node_details:get(NodeDetails, node))
-                                         )}
-			end,
+    Initialized = gossip_state:get(State, initialized),
+    {NewQueuedMessages, NewState} =
+        case Initialized of
+            true -> {msg_queue:new(), State};
+            false ->
+                msg_queue:send(QueuedMessages),
+                {msg_queue:new(),
+                 integrate_local_info(State,
+                                      node_details:get(NodeDetails, load),
+                                      calc_initial_avg_kr(
+                                        node_details:get(NodeDetails, pred),
+                                        node_details:get(NodeDetails, node))
+                                     )}
+        end,
     {PreviousState, NewState, NewQueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -252,17 +253,17 @@ on({{get_node_details_response, NodeDetails}, local_info},
 
 on({{get_node_details_response, NodeDetails}, leader_start_new_round},
    {PreviousState, State, QueuedMessages, TriggerState}) ->
-	% this message can only be received after being requested by
-	% request_new_round_if_leader/1 which only asks for this if the condition to
-	% start a new round has already been met
+    % this message can only be received after being requested by
+    % request_new_round_if_leader/1 which only asks for this if the condition to
+    % start a new round has already been met
 %%     io:format("gossip: got get_node_details_response, leader_start_new_round: ~p~n",[NodeDetails]),
-	{NewPreviousState, NewState} = 
-		case intervals:in(?RT:hash_key(0), node_details:get(NodeDetails, my_range)) of
-	        % not the leader -> continue as normal with the old state
-			false -> {PreviousState, State};
-			% leader -> start a new round
-			true -> new_round(State)
-	end,
+    {NewPreviousState, NewState} = 
+        case intervals:in(?RT:hash_key(0), node_details:get(NodeDetails, my_range)) of
+            % not the leader -> continue as normal with the old state
+            false -> {PreviousState, State};
+            % leader -> start a new round
+            true -> new_round(State)
+    end,
     {NewPreviousState, NewState, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -271,26 +272,29 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 
 on({get_state, Source_PID, OtherValues} = Msg,
    {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
-	% This message is received when a node asked our node for its state.
-	% The piggy-backed other node's state will be used to update our own state
-	% if we have already initialized it (otherwise postpone the message). A
-	% get_state_response message is sent with our state in the first case.
-	Initialized = gossip_state:get(MyState, initialized),
-	{NewQueuesMessages, {MyNewPreviousState, MyNewState}} =
-		case Initialized of
-			true -> {QueuedMessages, integrate_state(OtherValues, MyPreviousState, MyState, true, Source_PID)};
-			false ->
-				{[Msg | QueuedMessages], enter_round(MyPreviousState, MyState, OtherValues)}
-			end,
+    % This message is received when a node asked our node for its state.
+    % The piggy-backed other node's state will be used to update our own state
+    % if we have already initialized it (otherwise postpone the message). A
+    % get_state_response message is sent with our state in the first case.
+    Initialized = gossip_state:get(MyState, initialized),
+    {NewQueuesMessages, {MyNewPreviousState, MyNewState}} =
+        case Initialized of
+            true ->
+                {QueuedMessages,
+                 integrate_state(OtherValues, MyPreviousState, MyState, true, Source_PID)};
+            false ->
+                {msg_queue:add(QueuedMessages, Msg),
+                 enter_round(MyPreviousState, MyState, OtherValues)}
+            end,
     {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState};
 
 on({get_state_response, OtherValues},
    {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
-	% This message is received as a response to a get_state message and contains
+    % This message is received as a response to a get_state message and contains
     % another node's state. We will use it to update our own state
-	% if both are valid.
-	{MyNewPreviousState, MyNewState} =
-		integrate_state(OtherValues, MyPreviousState, MyState, false, none),
+    % if both are valid.
+    {MyNewPreviousState, MyNewState} =
+        integrate_state(OtherValues, MyPreviousState, MyState, false, none),
     {MyNewPreviousState, MyNewState, QueuedMessages, TriggerState};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -323,19 +327,19 @@ on({cy_cache, [Node] = _Cache},
 
 on({get_values_best, SourcePid},
     {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	BestState = previous_or_current(PreviousState, State),
-	BestValues = gossip_state:conv_state_to_extval(BestState),
-	msg_get_values_best_response(SourcePid, BestValues),
-	FullState;
+    BestState = previous_or_current(PreviousState, State),
+    BestValues = gossip_state:conv_state_to_extval(BestState),
+    msg_get_values_best_response(SourcePid, BestValues),
+    FullState;
 
 on({get_values_all, SourcePid},
     {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
-	PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
-	CurrentValues = gossip_state:conv_state_to_extval(State),
-	BestState = previous_or_current(PreviousState, State),
-	BestValues = gossip_state:conv_state_to_extval(BestState),
-	msg_get_values_all_response(SourcePid, PreviousValues, CurrentValues, BestValues),
-	FullState;
+    PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
+    CurrentValues = gossip_state:conv_state_to_extval(State),
+    BestState = previous_or_current(PreviousState, State),
+    BestValues = gossip_state:conv_state_to_extval(BestState),
+    msg_get_values_all_response(SourcePid, PreviousValues, CurrentValues, BestValues),
+    FullState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web interface
@@ -398,85 +402,85 @@ on(_Message, _State) ->
                        any()) -> {state(), state()}.
 integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 %%     io:format("gossip:integrate_state: ~p~n",[{OtherValues, MyState}]),
-	MyValues = gossip_state:get(MyState, values),
-	Initialized = gossip_state:get(MyState, initialized),
-	MyRound = gossip_state:get(MyValues, round),
-	OtherRound = gossip_state:get(OtherValues, round),
-	{MyNewPreviousState, MyNewState} =
+    MyValues = gossip_state:get(MyState, values),
+    Initialized = gossip_state:get(MyState, initialized),
+    MyRound = gossip_state:get(MyValues, round),
+    OtherRound = gossip_state:get(OtherValues, round),
+    {MyNewPreviousState, MyNewState} =
         if
-		    % The other node's round is higher -> enter this (new) round (use
-			% the other node's values until the own load and key range are
-			% received).
-		    (OtherRound > MyRound) ->
-				ShouldSend = false,
-    			enter_round(MyPreviousState, MyState, OtherValues);
-		    
-		    % We are in a higher round than the requesting node -> send it our
-		    % values if we have information about our own node. Do not update
-			% using the other node's state! 
-		    OtherRound < MyRound ->
-				% only send if we have full information!
-				ShouldSend = Initialized,
-			    {MyPreviousState, MyState};
+            % The other node's round is higher -> enter this (new) round (use
+            % the other node's values until the own load and key range are
+            % received).
+            (OtherRound > MyRound) ->
+                ShouldSend = false,
+                enter_round(MyPreviousState, MyState, OtherValues);
+            
+            % We are in a higher round than the requesting node -> send it our
+            % values if we have information about our own node. Do not update
+            % using the other node's state! 
+            OtherRound < MyRound ->
+                % only send if we have full information!
+                ShouldSend = Initialized,
+                {MyPreviousState, MyState};
 
-		    % Same rounds but we haven't got any load information yet ->
-		    % update estimates with the other values but do not send them until
-			% the own load and key range are received).
-		    (not Initialized) ->
-				ShouldSend = false,
-				MyTempState1 = update(MyState, OtherValues),
-				MyTempState2 = gossip_state:inc_msg_exch(MyTempState1),
-			    {MyPreviousState, MyTempState2};
+            % Same rounds but we haven't got any load information yet ->
+            % update estimates with the other values but do not send them until
+            % the own load and key range are received).
+            (not Initialized) ->
+                ShouldSend = false,
+                MyTempState1 = update(MyState, OtherValues),
+                MyTempState2 = gossip_state:inc_msg_exch(MyTempState1),
+                {MyPreviousState, MyTempState2};
     
             % Both nodes have load information and are in the same round
             % -> send the other node our state and update our state with the
             % information from the other node's state.
-		    true ->
-				ShouldSend = true,
-				MyTempState3 = update(MyState, OtherValues),
-				MyTempState4 = gossip_state:inc_msg_exch(MyTempState3),
-			    {MyPreviousState, MyTempState4}
-	    end,
-	if
-		(ShouldSend andalso SendBack) ->
-			comm:send(Source_PID, {get_state_response, MyValues});
-		true -> ok
-	end,
-	{MyNewPreviousState, MyNewState}. 
+            true ->
+                ShouldSend = true,
+                MyTempState3 = update(MyState, OtherValues),
+                MyTempState4 = gossip_state:inc_msg_exch(MyTempState3),
+                {MyPreviousState, MyTempState4}
+        end,
+    if
+        (ShouldSend andalso SendBack) ->
+            comm:send(Source_PID, {get_state_response, MyValues});
+        true -> ok
+    end,
+    {MyNewPreviousState, MyNewState}. 
 
 %% @doc Updates MyState with the information from OtherState if both share the
 %%      same round, otherwise MyState is used as is.
 -spec update(state(), values_internal()) -> state().
 update(MyState, OtherValues) ->
 %%     io:format("gossip:update ~p~n",[{MyState, OtherValues}]),
-	MyValues = gossip_state:get(MyState, values),
-	MyNewValues = 
-		case gossip_state:get(MyValues, round) =:= gossip_state:get(OtherValues, round) of
-			true ->
-				V1 = update_value(avgLoad, MyValues, OtherValues),
-				V2 = update_value(minLoad, V1, OtherValues),
-				V3 = update_value(maxLoad, V2, OtherValues),
-				V4 = update_value(size_inv, V3, OtherValues),
-				V5 = update_value(avgLoad2, V4, OtherValues),
-				_V6 = update_value(avg_kr, V5, OtherValues);
-			false ->
-				% this case should not happen since the on/2 handlers should only
-				% call update/2 if the rounds match
-            	log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring): ~p", [comm:this(),util:get_stacktrace()]),
-    			MyValues
-		end,
-	% now check whether all average-based values changed less than epsilon percent:
-	Epsilon_Avg = get_converge_avg_epsilon(),
-	MyNewState =
-		case (calc_change(avgLoad, MyValues, MyNewValues) < Epsilon_Avg) andalso
+    MyValues = gossip_state:get(MyState, values),
+    MyNewValues = 
+        case gossip_state:get(MyValues, round) =:= gossip_state:get(OtherValues, round) of
+            true ->
+                V1 = update_value(avgLoad, MyValues, OtherValues),
+                V2 = update_value(minLoad, V1, OtherValues),
+                V3 = update_value(maxLoad, V2, OtherValues),
+                V4 = update_value(size_inv, V3, OtherValues),
+                V5 = update_value(avgLoad2, V4, OtherValues),
+                _V6 = update_value(avg_kr, V5, OtherValues);
+            false ->
+                % this case should not happen since the on/2 handlers should only
+                % call update/2 if the rounds match
+                log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring): ~p", [comm:this(),util:get_stacktrace()]),
+                MyValues
+        end,
+    % now check whether all average-based values changed less than epsilon percent:
+    Epsilon_Avg = get_converge_avg_epsilon(),
+    MyNewState =
+        case (calc_change(avgLoad, MyValues, MyNewValues) < Epsilon_Avg) andalso
                  (calc_change(size_inv, MyValues, MyNewValues) < Epsilon_Avg) andalso
                  (calc_change(avgLoad2, MyValues, MyNewValues) < Epsilon_Avg) andalso
                  (calc_change(avg_kr, MyValues, MyNewValues)  < Epsilon_Avg) of
             true -> gossip_state:inc_converge_avg_count(MyState); 
-			false -> gossip_state:reset_converge_avg_count(MyState)
-		end,
-	Result = gossip_state:set_values(MyNewState, MyNewValues),
-	Result.
+            false -> gossip_state:reset_converge_avg_count(MyState)
+        end,
+    Result = gossip_state:set_values(MyNewState, MyNewValues),
+    Result.
 
 %% @doc Calculates the change in percent from the Old value to the New value.
 -spec calc_change(Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2,
@@ -484,11 +488,11 @@ update(MyState, OtherValues) ->
 calc_change(Key, OldValues, NewValues) ->
     Old = gossip_state:get(OldValues, Key),
     New = gossip_state:get(NewValues, Key),
-	if
-		(Old =/= unknown) andalso (Old =:= New) -> 0.0;
-		(Old =:= unknown) orelse (New =:= unknown) orelse (Old == 0) -> 100.0;
-		true -> ((Old + abs(New - Old)) * 100.0 / Old) - 100
-	end.
+    if
+        (Old =/= unknown) andalso (Old =:= New) -> 0.0;
+        (Old =:= unknown) orelse (New =:= unknown) orelse (Old == 0) -> 100.0;
+        true -> ((Old + abs(New - Old)) * 100.0 / Old) - 100
+    end.
 
 %% @doc Updates a node's new value of the given key using its old value and
 %%      another node's value.
@@ -536,15 +540,15 @@ calc_new_value(avgLoad2, MyAvg2, OtherAvg2) ->
 %%      OtherValue will be returned.
 -spec calc_avg(number() | unknown, number() | unknown) -> number() | unknown.
 calc_avg(MyValue, OtherValue) -> 
-	_MyNewValue =
-		case MyValue of
-			unknown -> OtherValue;
-			X when is_number(X) ->
-				case OtherValue of
-					unknown -> unknown;
-					Y when is_number(Y) -> (X + Y) / 2.0
-				end
-		end.
+    _MyNewValue =
+        case MyValue of
+            unknown -> OtherValue;
+            X when is_number(X) ->
+                case OtherValue of
+                    unknown -> unknown;
+                    Y when is_number(Y) -> (X + Y) / 2.0
+                end
+        end.
 
 %% @doc Creates a (temporary) state a node would have by knowing its own load
 %%      and key range and updates the according fields (avg, avg2, min, max,
@@ -553,22 +557,22 @@ calc_avg(MyValue, OtherValue) ->
 %%      for the first time in a round.
 -spec integrate_local_info(state(), load(), avg_kr()) -> state().
 integrate_local_info(MyState, Load, Avg_kr) ->
-	MyValues = gossip_state:get(MyState, values),
-	ValuesWithNewInfo =
-		gossip_state:new_internal(Load, % Avg
-								  Load*Load, % Avg2
-								  unknown, % 1/size (will be set when entering/creating a round)
-								  Avg_kr, % average key range
-								  Load, % Min
-								  Load, % Max
-								  gossip_state:get(MyValues, round)),
-	V1 = update_value(avgLoad, MyValues, ValuesWithNewInfo),
-	V2 = update_value(avgLoad2, V1, ValuesWithNewInfo),
-	V3 = update_value(minLoad, V2, ValuesWithNewInfo),
-	V4 = update_value(maxLoad, V3, ValuesWithNewInfo),
-	MyNewValues = update_value(avg_kr, V4, ValuesWithNewInfo),
-	S1 = gossip_state:set_values(MyState, MyNewValues),
-	_MyNewState = gossip_state:set_initialized(S1).
+    MyValues = gossip_state:get(MyState, values),
+    ValuesWithNewInfo =
+        gossip_state:new_internal(Load, % Avg
+                                  Load*Load, % Avg2
+                                  unknown, % 1/size (will be set when entering/creating a round)
+                                  Avg_kr, % average key range
+                                  Load, % Min
+                                  Load, % Max
+                                  gossip_state:get(MyValues, round)),
+    V1 = update_value(avgLoad, MyValues, ValuesWithNewInfo),
+    V2 = update_value(avgLoad2, V1, ValuesWithNewInfo),
+    V3 = update_value(minLoad, V2, ValuesWithNewInfo),
+    V4 = update_value(maxLoad, V3, ValuesWithNewInfo),
+    MyNewValues = update_value(avg_kr, V4, ValuesWithNewInfo),
+    S1 = gossip_state:set_values(MyState, MyNewValues),
+    _MyNewState = gossip_state:set_initialized(S1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Round handling
@@ -578,32 +582,32 @@ integrate_local_info(MyState, Load, Avg_kr) ->
 -spec new_round(state()) -> {state(), state()}.
 new_round(OldState) ->
 %%     io:format("gossip: start new round, I am the leader ~n"),
-	% the leader must set the size_inv to 1 (and only the leader)
-	NewValues1 = gossip_state:set(gossip_state:new_internal(), size_inv, 1.0),
-	OldRound = gossip_state:get(OldState, round),
-	NewState =
-		gossip_state:new_state(
-		  gossip_state:set(NewValues1, round, (OldRound+1))),
+    % the leader must set the size_inv to 1 (and only the leader)
+    NewValues1 = gossip_state:set(gossip_state:new_internal(), size_inv, 1.0),
+    OldRound = gossip_state:get(OldState, round),
+    NewState =
+        gossip_state:new_state(
+          gossip_state:set(NewValues1, round, (OldRound+1))),
     request_local_info(),
-	{OldState, NewState}.
+    {OldState, NewState}.
 
 %% @doc Enters the given round and thus resets the current state with
 %%      information from another node's state. Also requests the own node's
 %%      load and key range to integrate into its own state.
 -spec enter_round(state(), state(), values_internal()) -> {state(), state()}.
 enter_round(OldPreviousState, OldState, OtherValues) ->
-	MyRound = gossip_state:get(OldState, round),
-	OtherRound = gossip_state:get(OtherValues, round),
-	case (MyRound =:= OtherRound) of 
-		true -> {OldPreviousState, OldState};
-		false ->
-			% set a size_inv value of 0 (only the leader sets 1)
-			S1 = gossip_state:new_state(),
-			NewState = gossip_state:set(gossip_state:set(S1, round, OtherRound),
+    MyRound = gossip_state:get(OldState, round),
+    OtherRound = gossip_state:get(OtherValues, round),
+    case (MyRound =:= OtherRound) of 
+        true -> {OldPreviousState, OldState};
+        false ->
+            % set a size_inv value of 0 (only the leader sets 1)
+            S1 = gossip_state:new_state(),
+            NewState = gossip_state:set(gossip_state:set(S1, round, OtherRound),
                                         size_inv, 0.0),
-    		request_local_info(),
-			{OldState, NewState}
-	end.
+            request_local_info(),
+            {OldState, NewState}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Requests send to other processes
@@ -617,22 +621,22 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 %%      message.
 -spec request_new_round_if_leader(state()) -> ok.
 request_new_round_if_leader(State) ->
-	Round = gossip_state:get(State, round),
-	TriggerCount = gossip_state:get(State, triggered),
-	ConvAvgCount = gossip_state:get(State, converge_avg_count),
-	ConvAvgCountNewRound = get_converge_avg_count_start_new_round(),
-	% decides when to ask whether we are the leader
-	case (Round =:= 0) orelse
+    Round = gossip_state:get(State, round),
+    TriggerCount = gossip_state:get(State, triggered),
+    ConvAvgCount = gossip_state:get(State, converge_avg_count),
+    ConvAvgCountNewRound = get_converge_avg_count_start_new_round(),
+    % decides when to ask whether we are the leader
+    case (Round =:= 0) orelse
          ((TriggerCount > get_min_tpr()) andalso (
              (TriggerCount > get_max_tpr()) orelse
              (ConvAvgCount >= ConvAvgCountNewRound))) of
-		true ->
-			DHT_Node = process_dictionary:get_group_member(dht_node),
-    		comm:send_local(DHT_Node, {get_node_details, comm:this_with_cookie(leader_start_new_round), [my_range]}),
-			ok;
-		false ->
-			ok
-	end.
+        true ->
+            DHT_Node = process_dictionary:get_group_member(dht_node),
+            comm:send_local(DHT_Node, {get_node_details, comm:this_with_cookie(leader_start_new_round), [my_range]}),
+            ok;
+        false ->
+            ok
+    end.
 
 %% @doc Sends the local node's dht_node a request to tell us some information
 %%      about itself.
@@ -640,8 +644,8 @@ request_new_round_if_leader(State) ->
 %%      {{get_node_details_response, NodeDetails}, local_info} message.
 -spec request_local_info() -> ok.
 request_local_info() ->
-	% ask for local load and key range:
-	DHT_Node = process_dictionary:get_group_member(dht_node),
+    % ask for local load and key range:
+    DHT_Node = process_dictionary:get_group_member(dht_node),
     comm:send_local(DHT_Node, {get_node_details, comm:this_with_cookie(local_info), [pred, node, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
@@ -649,7 +653,7 @@ request_local_info() ->
 -spec request_random_node() -> ok.
 request_random_node() ->
     cyclon:get_subset_rand(1),
-	ok.
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
@@ -658,7 +662,7 @@ request_random_node() ->
 %% @doc Gets the total number of keys available.
 -spec get_addr_size() -> number().
 get_addr_size() ->
-	rt_simple:n().
+    rt_simple:n().
 
 %% @doc Calculates the difference between the key of a node and its
 %%      predecessor. If the second is larger than the first it wraps around and
@@ -669,14 +673,14 @@ calc_initial_avg_kr(Pred, Me) ->
     PredKey = node:id(Pred),
     MyKey = node:id(Me),
     try
-		if
-			PredKey =:= MyKey -> get_addr_size(); % I am the only node
-			MyKey >= PredKey  -> MyKey - PredKey;
-			MyKey < PredKey   -> (get_addr_size() - PredKey - 1) + MyKey
-		end
-	catch
-		error:_ -> unknown
-	end.
+        if
+            PredKey =:= MyKey -> get_addr_size(); % I am the only node
+            MyKey >= PredKey  -> MyKey - PredKey;
+            MyKey < PredKey   -> (get_addr_size() - PredKey - 1) + MyKey
+        end
+    catch
+        error:_ -> unknown
+    end.
 
 %% @doc Checks whether config parameters of the gossip process exist and are
 %%      valid.
