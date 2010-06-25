@@ -316,19 +316,33 @@ on({dump}, State) ->
     State;
 
 on({'$gen_cast', {debug_info, Requestor}}, State) ->
+    Load = dht_node_state:get(State, load),
+    % get a list of up to 50 KV pairs to display:
+    DataListTmp = [{lists:flatten(io_lib:format("~p", [Key])),
+                    lists:flatten(io_lib:format("~p", [Value]))}
+                  || {Key, Value} <-
+                         lists:sublist(?DB:get_data(dht_node_state:get(State, db)), 50)],
+    DataList = case Load > 50 of
+                   true  -> lists:append(DataListTmp, [{"...", ""}]);
+                   false -> DataListTmp
+               end,
     KeyValueList =
         [{"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
          {"succs", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, succlist)]))},
          {"preds", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, predlist)]))},
          {"me", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, node)]))},
          {"my_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, my_range)]))},
+         {"load", lists:flatten(io_lib:format("~p", [Load]))},
 %%          {"lb", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, lb)]))},
 %%          {"deadnodes", lists:flatten(io_lib:format("~p", [dht_node_state:???(State)]))},
          {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))]))},
 %%          {"db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db)]))},
 %%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
 %%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
-         {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))}],
+         {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
+         {"data (hashed_key, {value, writelock, readlocks, version}):", ""} |
+            DataList 
+        ],
     comm:send_local(Requestor, {debug_info_response, KeyValueList}),
     State;
 
