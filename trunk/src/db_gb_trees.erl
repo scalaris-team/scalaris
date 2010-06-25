@@ -195,8 +195,8 @@ get_middle_key(DB) ->
             {ok, MiddleKey}
     end.
 
-%% @doc returns all keys (and removes them from the db) which belong
-%%      to a new node with id HisKey
+%% @doc Splits the database into a database (first element) which contains all
+%%      keys in MyNewInterval and a list of the other values (second element).
 split_data(DB, MyNewInterval) ->
     DataList = gb_trees:to_list(DB),
     {MyList, HisList} =
