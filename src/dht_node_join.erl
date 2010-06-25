@@ -45,7 +45,7 @@
         dht_node_state:state().
 join_request(State, NewPred) ->
     MyNewInterval =
-        intervals:mk_from_nodes(dht_node_state:get(State, node), NewPred),
+        intervals:mk_from_nodes(NewPred, dht_node_state:get(State, node)),
     {DB, HisData} = ?DB:split_data(dht_node_state:get(State, db), MyNewInterval),
     
     %%TODO: split data [{Key, Value, Version}], schedule transfer
@@ -53,7 +53,7 @@ join_request(State, NewPred) ->
     comm:send(node:pidX(NewPred),
               {join_response, dht_node_state:get(State, pred), HisData}),
     % TODO: better already update our range here directly than waiting for an
-    % updated state from the ring_maintenance!
+    % updated state from the ring_maintenance?
     rm_beh:notify_new_pred(comm:this(), NewPred),
     dht_node_state:set_db(State, DB).
 %% userdevguide-end dht_node_join:join_request

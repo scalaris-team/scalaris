@@ -154,17 +154,18 @@ add_data(DB, Data) ->
     ?ETS:insert(DB, Data),
     DB.
 
-%% @doc returns all keys (and removes them from the db) which belong
-%%      to a new node with id HisKey
+%% @doc Splits the database into a database (first element) which contains all
+%%      keys in MyNewInterval and a list of the other values (second element).
 split_data(DB, MyNewInterval) ->
     F = fun (KV = {Key, _}, HisList) ->
                 case intervals:in(Key, MyNewInterval) of
                     true  -> HisList;
-                    false -> [KV | HisList]
+                    false -> 
+                        ?ETS:delete(DB, Key),
+                        [KV | HisList]
                 end
         end,
     HisList = ?ETS:foldl(F, [], DB),
-    [?ETS:delete(DB, AKey) || {AKey, _} <- HisList],
     {DB, HisList}.
 
 % update only if no locks are taken and version number is higher
