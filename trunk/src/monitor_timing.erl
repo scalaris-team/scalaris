@@ -91,17 +91,3 @@ init(_) ->
 -spec(start_link/0 :: () -> {ok, pid()}).
 start_link() ->
     gen_component:start_link(?MODULE, [], [{register_native, ?MODULE}]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Helpers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-max(X, Y) when X > Y ->
-    X;
-max(_X, Y) ->
-    Y.
-
-min(X, Y) when X < Y ->
-    X;
-min(_X, Y) ->
-    Y.
