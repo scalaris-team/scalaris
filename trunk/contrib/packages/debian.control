@@ -2,12 +2,13 @@ Source: scalaris
 Section: unknown
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), erlang (>= 13.b.1), ant, java6-sdk, pkg-config
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, pkg-config
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris
 Architecture: all
-Depends: ${shlibs:Depends}, erlang (>= 13.b.1), erlang-base (>= 13.b.1)
+Depends: ${shlibs:Depends}, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
+Suggests: scalaris-client, scalaris-doc
 Description: Scalable Distributed key-value store
  Scalaris is a scalable, transactional, distributed key-value store. It
  can be used for building scalable services. Scalaris uses a structured
@@ -27,7 +28,7 @@ Description: Cli client for scalaris
 
 Package: scalaris-java
 Architecture: all
-Depends: ${shlibs:Depends}, scalaris (= ${binary:Version}), java6-runtime
+Depends: ${shlibs:Depends}, scalaris (= ${binary:Version}), java6-runtime, erlang-jinterface (>= 13.b.1)
 Description: Java API for scalaris
  Scalaris is a scalable, transactional, distributed key-value store. It
  can be used for building scalable services. Scalaris uses a structured
@@ -38,7 +39,7 @@ Description: Java API for scalaris
 Package: scalaris-doc
 Architecture: all
 Depends: ${shlibs:Depends}
-Suggests: scalaris (= ${binary:Version})
+Recommends: scalaris (= ${binary:Version})
 Description: Documentation for scalaris
  Scalaris is a scalable, transactional, distributed key-value store. It
  can be used for building scalable services. Scalaris uses a structured
