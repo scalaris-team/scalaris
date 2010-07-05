@@ -14,7 +14,7 @@ BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
 BuildRequires:  erlang >= R13B01
 Requires:       erlang >= R13B01
-BuildArch:      noarch 
+BuildArch:      noarch
 
 ##########################################################################################  
 ## Fedora, RHEL or CentOS  
@@ -31,6 +31,7 @@ BuildRequires:  pkgconfig
 %if 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
 BuildRequires:  erlang-stack >= R13B01
 Requires:       erlang-stack >= R13B01
+Suggests:       %{name}-client, %{name}-doc
 %else
 #BuildRequires:  classpathx-jaf
 %endif
@@ -41,6 +42,7 @@ Requires:       erlang-stack >= R13B01
 ###########################################################################################
 %if 0%{?suse_version}
 BuildRequires:  pkg-config
+Suggests:       %{name}-client, %{name}-doc
 %endif
 
 %description 
