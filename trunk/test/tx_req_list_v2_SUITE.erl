@@ -57,15 +57,15 @@ tx_req_list(_Config) ->
     cs_api_v2:write("A", 7),
     cs_api_v2:read("A"),
     %% write new item
-    A = cs_api_v2:process_request_list([], [{write, "B", 7}, {commit}]),
+    A = cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{write, "B", 7}, {commit}]),
     io:format("A: ~p~n", [A]),
     %% read existing item
-    B = cs_api_v2:process_request_list([], [{read, "A"}, {commit}]),
+    B = cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{read, "A"}, {commit}]),
     io:format("B: ~p~n", [B]),
     %% read non-existing item
-    C = cs_api_v2:process_request_list([], [{read, "B"}, {commit}]),
+    C = cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{read, "B"}, {commit}]),
     io:format("C: ~p~n", [C]),
-    D = cs_api_v2:process_request_list([], [{read, "B"},
+    D = cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{read, "B"},
                                           {read, "B"},
                                           {write, "A", 8},
                                         {read, "A"},

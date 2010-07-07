@@ -23,12 +23,11 @@
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
--export([process_request_list/2, read/1, write/2, delete/1,
+-export([new_tlog/0, process_request_list/2,
+         read/1, write/2, delete/1,
          test_and_set/3, range_read/2]).
 
 -include("scalaris.hrl").
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -38,6 +37,8 @@
 -type(key() :: term()).
 %% @type value() = term(). Value
 -type(value() :: term()).
+
+new_tlog() -> txlog:new().
 
 process_request_list(TLog, ReqList) ->
     ?TRACE("cs_api:process_request_list(~p, ~p)~n", [TLog, ReqList]),

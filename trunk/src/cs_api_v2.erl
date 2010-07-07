@@ -19,7 +19,7 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([process_request_list/2,
+-export([new_tlog/0, process_request_list/2,
          read/1, write/2, delete/1,
          test_and_set/3, range_read/2]).
 
@@ -31,6 +31,8 @@
 -type(key() :: term()).
 %% @type value() = term(). Value
 -type(value() :: term()).
+
+new_tlog() -> tx_tlog:empty().
 
 process_request_list([], [{commit}]) ->
     {[], {results, [commit]}};

@@ -46,14 +46,15 @@ tp_validate(State, Tid, Item)->
     StateDB = dht_node_state:get(State, db),
     {DB, LockRes} = case ?DB:read(StateDB, Item#item.rkey) of
 			 {ok, _Value, Version} ->
-			     set_lock(StateDB, check_version(Item, Version), Item);
-			 _Any ->
-			     case Item#item.operation of
-				 write ->
-				     set_lock(StateDB, success, Item);
-				 _Any2 ->
-				     {StateDB, failed}
-			     end
+			     set_lock(StateDB, check_version(Item, Version), Item)
+%% unreachable due to dialyzer
+%% 			 _Any ->
+%% 			     case Item#item.operation of
+%% 				 write ->
+%% 				     set_lock(StateDB, success, Item);
+%% 				 _Any2 ->
+%% 				     {StateDB, failed}
+%% 			     end
 		     end,
     Decision = decision(LockRes),
     NewState = update_transaction_participant_log(dht_node_state:set_db(State, DB), Tid, Item, Decision),
