@@ -37,7 +37,7 @@ make_tfun(Key) ->
 
 inc(Key) ->
     {TLog1, {results, [{read, Key, ReadResult}]}} =
-        cs_api_v2:process_request_list([], [{read, Key}]),
+        cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{read, Key}]),
     case ReadResult of
         {value, Value} ->
             {_TLog, {results, [{write, Key, {value, _Written}}, CommitResult]}} =

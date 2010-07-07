@@ -24,7 +24,8 @@
 %-define(TRACE(X,Y), ok).
 
 -export([new/1]).
--export([set_value/2]).
+-export([get_key/1]).
+-export([get_value/1, set_value/2]).
 -export([inc_readlock/1]).
 -export([dec_readlock/1]).
 -export([get_readlock/1]).

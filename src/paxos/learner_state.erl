@@ -23,6 +23,7 @@
 
 %% Operations on learner_state
 -export([new/4]).
+-export([get_paxosid/1]).
 -export([get_majority/1]).
 -export([set_majority/2]).
 -export([get_process_to_inform/1]).
