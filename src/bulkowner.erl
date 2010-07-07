@@ -46,7 +46,7 @@ bulk_owner(State, I, Msg) ->
         true  -> ok;
         false ->
             comm:send(dht_node_state:get(State, succ_pid),
-                         {bulkowner_deliver, SuccInt, Msg})
+                      {bulkowner_deliver, SuccInt, Msg})
     end,
     case intervals:is_subset(I, SuccInt) of
         true  -> ok;
@@ -62,7 +62,7 @@ bulk_owner(State, I, Msg) ->
 bulk_owner_iter([], _I, _Msg, _Limit) ->
     ok;
 bulk_owner_iter([Head | Tail], I, Msg, Limit) ->
-    Interval_Head_Limit = intervals:new(node:id(Head), Limit),
+    Interval_Head_Limit = intervals:mk_from_node_ids(node:id(Head), Limit),
     Range = intervals:intersection(I, Interval_Head_Limit),
 %%     ct:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
     NewLimit = case intervals:is_empty(Range) of
