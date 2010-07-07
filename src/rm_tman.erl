@@ -28,7 +28,7 @@
 -behavior(rm_beh).
 
 -export([start_link/1]).
--export([init/1, on/2]).
+-export([init/1, on/2, leave/0]).
 
 -export([get_base_interval/0, get_min_interval/0, get_max_interval/0,
          check_config/0]).
@@ -275,6 +275,15 @@ on({notify_new_succ, NewSucc},
 
 on(_, _State) ->
     unknown_event.
+
+%% @doc Notifies the successor and predecessor that the current dht_node is
+%%      going to leave / left.
+%%      Note: only call this method from inside the dht_node process!
+-spec leave() -> ok.
+leave() ->
+    DhtNode = comm:this(),
+    %TODO: notify successor and predecessor
+    ok.
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.

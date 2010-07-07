@@ -30,13 +30,18 @@
 -export_type([msg_queue/0]).
 -endif.
 
--export([new/0, add/2, send/1]).
+-export([new/0, is_empty/1, add/2, send/1]).
 
 -type msg_queue() :: [comm:message()].
 
 %% @doc Creates a new message queue.
 -spec new() -> msg_queue().
 new() -> [].
+
+%% @doc Checks whether the message queue is empty.
+-spec is_empty(msg_queue()) -> boolean().
+is_empty(QueuedMessages) ->
+    QueuedMessages =:= [].
 
 %% @doc Adds a message to a given queue.
 -spec add(msg_queue(), comm:message()) -> msg_queue().

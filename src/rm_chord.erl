@@ -25,9 +25,10 @@
 -behavior(rm_beh).
 -behavior(gen_component).
 
--export([init/1,on/2]).
+-export([start_link/1]).
+-export([init/1, on/2, leave/0]).
 
--export([start_link/1, check_config/0]).
+-export([check_config/0]).
 
 -type(state() :: {Id             :: ?RT:key(),
                   Neighborhood   :: nodelist:neighborhood(),
@@ -168,6 +169,15 @@ on({'$gen_cast', {debug_info, Requestor}}, {_Id, Neighborhood, _TriggerState} = 
 
 on(_, _State) ->
     unknown_event.
+
+%% @doc Notifies the successor and predecessor that the current dht_node is
+%%      going to leave / left.
+%%      Note: only call this method from inside the dht_node process!
+-spec leave() -> ok.
+leave() ->
+    DhtNode = comm:this(),
+    %TODO: notify successor and predecessor
+    ok.
 
 %% @doc Checks whether config parameters of the rm_chord process exist and are
 %%      valid.
