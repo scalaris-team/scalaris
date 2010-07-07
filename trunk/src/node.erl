@@ -36,7 +36,7 @@
 -endif.
 
 -record(node, {pid :: comm:mypid(), id :: ?RT:key(), id_version :: non_neg_integer()}).
--type(node_type() :: #node{}).
+-opaque(node_type() :: #node{}).
 
 %% @doc Creates a new node.
 -spec new(Pid::comm:mypid(), Id::?RT:key(), IdVersion::non_neg_integer()) -> node_type().

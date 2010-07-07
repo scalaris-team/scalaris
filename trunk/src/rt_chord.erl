@@ -40,11 +40,11 @@
 -endif.
 
 %% userdevguide-begin rt_chord:types
--type(key()::non_neg_integer()).
--type(rt()::gb_tree()).
--type(external_rt()::gb_tree()).
+-opaque(key()::non_neg_integer()).
+-opaque(rt()::gb_tree()).
+-type(external_rt()::gb_tree()).        %% @todo: make opaque
 -type(index() :: {pos_integer(), pos_integer()}).
--type(custom_message() ::
+-opaque(custom_message() ::
        {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}).
 %% userdevguide-end rt_chord:types
 

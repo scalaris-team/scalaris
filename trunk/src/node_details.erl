@@ -41,16 +41,16 @@
               node_type/0]).
 -endif.
 
--type(node_type() :: node:node_type()).
+-opaque(node_type() :: node:node_type()).
 -type(load() :: integer()).
 -type(hostname() :: string()).
 -type(rt_size() :: integer()).
 -type(message_log() :: any()).
 -type(memory() :: non_neg_integer()).
 
--type(node_details_name() :: predlist | pred | node | my_range | succ |
-                             succlist | load | hostname | rt_size |
-                             message_log | memory).
+-opaque(node_details_name() :: predlist | pred | node | my_range | succ |
+                               succlist | load | hostname | rt_size |
+                               message_log | memory).
 
 -record(node_details, {predlist    :: nodelist:non_empty_nodelist(),
                        node        :: node_type(),
@@ -59,7 +59,7 @@
                        hostname    :: hostname(),
                        rt_size     :: rt_size(),
                        memory      :: memory()}).
--type(node_details_record() :: #node_details{}).
+-opaque(node_details_record() :: #node_details{}).
 
 -type(node_details_list() ::
     [{predlist, nodelist:non_empty_nodelist()} |
@@ -74,7 +74,7 @@
      {message_log, message_log()} |
      {memory, memory()}]).
 
--type(node_details() :: node_details_record() | node_details_list()).
+-opaque(node_details() :: node_details_record() | node_details_list()).
 
 -spec new() -> node_details_list().
 new() -> [].
