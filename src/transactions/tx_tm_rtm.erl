@@ -316,7 +316,7 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg,
                        %%io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
                        HoldBackQ = tx_state:get_hold_back(LocalTxEntry),
                        tx_state:set_hold_back(TxState, HoldBackQ);
-                   ok -> io:format("Duplicate init_RTM~n")
+                   ok -> io:format(standard_error, "Duplicate init_RTM~n", [])
                end,
     NewEntry = tx_state:set_status(TmpEntry, ok),
     my_set_entry(NewEntry, State),
@@ -332,7 +332,7 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg,
                                 %% take over hold back from existing entry
                                 IHoldBQ = tx_item_state:get_hold_back(LocalItem),
                                 tx_item_state:set_hold_back(Entry, IHoldBQ);
-                            ok -> io:format("Duplicate init_RTM for an item~n")
+                            ok -> io:format(standard_error, "Duplicate init_RTM for an item~n", [])
                         end,
               NewItem = tx_item_state:set_status(TmpItem, ok),
               my_set_entry(NewItem, State),
@@ -417,9 +417,9 @@ on({crash, Pid},
       || {Key, RTM} <- RTMs, RTM =:= Pid ],
     State;
 
-on({crash, Pid, Cookie},
+on({crash, _Pid, _Cookie},
    {_RTMs, _TableName, _Role, _LAcceptor, _LLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [Pid, binary_to_term(Cookie)]),
+    ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
     %% @todo should we take over, if the TM failed?
     State;
 
@@ -595,9 +595,9 @@ my_inform_tps(TxState, State, Result) ->
 %%    my_trigger_delete_if_done(NewTxState),
     NewTxState.
 
-my_inform_rtms(TxId, State, Result) ->
+my_inform_rtms(_TxId, _State, _Result) ->
     ?TRACE("tx_tm_rtm:inform rtms~n", []),
-    %%{ok, TxState} = my_get_tx_entry(TxId, State),
+    %%{ok, TxState} = my_get_tx_entry(_TxId, _State),
     %% @TODO inform RTMs?
     %% msg_commit_reply(Client, ClientsId, Result)
     ok.

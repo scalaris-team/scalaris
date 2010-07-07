@@ -79,7 +79,9 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
                 andalso ProcessToInform =:= learner_state:get_process_to_inform(StateForID)
             of
                 true ->
-                    io:format("duplicate learner initialize for id ~p~n", [PaxosID]);
+                    io:format(standard_error,
+                              "duplicate learner initialize for id ~p~n",
+                              [PaxosID]);
                 false ->
                     TmpState = learner_state:set_majority(StateForID, Majority),
                     Tmp2State = learner_state:set_process_to_inform(TmpState, ProcessToInform),
