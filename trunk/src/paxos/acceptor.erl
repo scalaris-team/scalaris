@@ -94,7 +94,7 @@ on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
     ?TRACE("acceptor:initialize for paxos id: Pid ~p Learners ~p~n", [PaxosID, Learners]),
     {_, StateForID} = my_get_entry(PaxosID, ETSTableName),
     case acceptor_state:get_learners(StateForID) of
-        Learners -> io:format("dupl. acceptor init for id ~p~n", [PaxosID]);
+        Learners -> io:format(standard_error, "dupl. acceptor init for id ~p~n", [PaxosID]);
         _ ->
             NewState = acceptor_state:set_learners(StateForID, Learners),
             my_set_entry(NewState, ETSTableName),

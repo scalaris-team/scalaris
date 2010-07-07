@@ -162,7 +162,7 @@ handle_cast({send, Address, Port, Pid, Message}, State) ->
     {noreply, State};
 
 handle_cast(_Msg, State) ->
-    io:format("Not handled cast ~p~n", [_Msg]),
+    io:format(standard_error, "Not handled cast ~p~n", [_Msg]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------

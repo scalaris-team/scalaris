@@ -214,7 +214,8 @@ write_read_receive(ReplicaKeys, Operation, State)->
                 {write_read_receive_timeout, _Key} ->
                     {fail, timeout};
                 Any ->
-                    io:format("transaction:write_read_receive: Oops, unknown message ~p~n", [Any]),
+                    io:format(standard_error,
+                              "transaction:write_read_receive: Oops, unknown message ~p~n", [Any]),
                     write_read_receive(ReplicaKeys, Operation, State)
             end
     end.
@@ -342,7 +343,7 @@ write_read_receive_parallel(Results, ReplicaKeys)->
         {get_key_response, Key, {ok, Value, Versionnr}} ->
             NewResults = add_result(Results, Key, {Value, Versionnr}, Results),
             CRRes = check_results_parallel(NewResults, NewResults),
-            case CRRes of 
+            case CRRes of
                 continue ->
                     write_read_receive_parallel(NewResults, ReplicaKeys);
                 _ -> % {found, TLog}
@@ -351,7 +352,7 @@ write_read_receive_parallel(Results, ReplicaKeys)->
         {write_read_receive_timeout, _Key} ->
             {fail, timeout};
         Any ->
-            io:format("transaction:write_read_receive_parallel: Oops, unknown message ~p~n", [Any]),
+            io:format(standard_error, "transaction:write_read_receive_parallel: Oops, unknown message ~p~n", [Any]),
             write_read_receive_parallel(Results, ReplicaKeys)
     end.
 

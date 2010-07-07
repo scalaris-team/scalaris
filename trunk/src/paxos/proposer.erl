@@ -129,8 +129,10 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
                                        Majority, MaxProposers, InitialRound),
                     ETSTableName);
         _ ->
-            io:format("Duplicate proposer:initialize for paxos id ~p~n", [PaxosID]),
-            io:format("Just triggering instead~n")
+            io:format(standard_error,
+                      "Duplicate proposer:initialize for paxos id ~p~n",
+                      [PaxosID]),
+            io:format(standard_error, "Just triggering instead~n")
     end,
     on({proposer_trigger, PaxosID, InitialRound}, State);
 
