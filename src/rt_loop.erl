@@ -33,7 +33,7 @@
 -endif.
 
 % state of the routing table loop
--type(state_init() :: {Id           :: ?RT:key(),
+-opaque(state_init() :: {Id           :: ?RT:key(),
                   Pred         :: node:node_type(),
                   Succ         :: node:node_type(),
                   RTState      :: ?RT:rt(),

@@ -46,12 +46,12 @@
 -endif.
 
 % vivaldi types
--type(network_coordinate() :: [float()]).
+-opaque(network_coordinate() :: [float()]).
 -type(error() :: float()).
 -type(latency() :: number()).
 
 % state of the vivaldi loop
--type(state() :: {network_coordinate(), error(), trigger:state()}).
+-opaque(state() :: {network_coordinate(), error(), trigger:state()}).
 
 % accepted messages of vivaldi processes
 -type(message() ::

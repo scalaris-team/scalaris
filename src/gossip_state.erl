@@ -121,7 +121,7 @@
                 msg_exch           = 0 :: msg_exch(), % how often messages have been exchanged with other nodes
                 converge_avg_count = 0 :: converge_avg_count() % how often all values based on averages have changed less than epsilon percent
 }).
--type(state() :: #state{}).
+-opaque(state() :: #state{}).
 
 %%
 %% Constructors

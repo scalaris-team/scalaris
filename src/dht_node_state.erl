@@ -48,7 +48,7 @@
                 db         :: ?DB:db(),
                 tx_tp_db   :: any(),
                 proposer   :: pid()}).
--type state() :: #state{}.
+-opaque state() :: #state{}.
 
 -spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb()) -> state().
 new(RT, Neighbors, LB) ->

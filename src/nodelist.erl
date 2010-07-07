@@ -52,9 +52,9 @@
 -export_type([neighborhood/0, nodelist/0, non_empty_nodelist/0]).
 -endif.
 
--type(nodelist() :: [node:node_type()]).
--type(non_empty_nodelist() :: [node:node_type(),...]).
--type(neighborhood() :: {Preds::non_empty_nodelist(), Node::node:node_type(), Succs::non_empty_nodelist()}).
+-type(nodelist() :: [node:node_type()]). %% @todo: mark as opaque (dialyzer does not terminate?!?)
+-opaque(non_empty_nodelist() :: [node:node_type(),...]).
+-opaque(neighborhood() :: {Preds::non_empty_nodelist(), Node::node:node_type(), Succs::non_empty_nodelist()}).
 
 %% @doc Helper function that throws an exception if the given neighbor is newer
 %%      than the BaseNode (requires that both are equal!).

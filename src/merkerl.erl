@@ -75,7 +75,7 @@
 % @type treeinner() = term().
 % Not externally useful, this is one of two record types making up tree().
 
--type(tree() :: #merk{} | undefined).
+-opaque(tree() :: #merk{} | undefined).
 % @type tree() = treeleaf() | treeinner() | undefined.
 % The tree() type here is used as the internal representation of
 % a Merkle tree.  It can be used locally with insert/2 or pickled
