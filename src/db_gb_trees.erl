@@ -41,8 +41,7 @@
          get_range_only_with_version/2]).
 -export([get_load/1, get_middle_key/1, split_data/2, get_data/1,
          add_data/2]).
--export([build_merkle_tree/2,
-         update_if_newer/2]).
+-export([update_if_newer/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% public functions
@@ -230,19 +229,6 @@ get_range_only_with_version(DB, Interval) ->
     [ {Key, Value, Vers}
       || {Key, {Value, WLock, _RLock, Vers}} <- gb_trees:to_list(DB),
          WLock =:= false andalso intervals:in(Key, Interval), Value =/= empty_val ].
-
-
-build_merkle_tree(DB, Range) ->
-    MerkleTree = lists:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
-                                      case intervals:in(Key, Range) of
-                                          true ->
-                                              merkerl:insert({Key, 0}, Tree);
-                                          false ->
-                                              Tree
-                                      end
-                             end,
-                undefined, gb_trees:to_list(DB)),
-    MerkleTree.
 
 % update only if no locks are taken and version number is higher
 update_if_newer(OldDB,  KVs) ->

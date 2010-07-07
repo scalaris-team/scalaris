@@ -231,15 +231,3 @@ nth_key_iter(_DB, Key, 0) ->
     Key;
 nth_key_iter(DB, Key, N) ->
     nth_key_iter(DB, ?ETS:next(DB, Key), N - 1).
-
-build_merkle_tree(DB, Range) ->
-    MerkleTree = ?ETS:foldl(fun ({Key, {_, _, _, _Version}}, Tree) ->
-                                     case intervals:in(Key, Range) of
-                                         true ->
-                                             merkerl:insert({Key, 0}, Tree);
-                                         false ->
-                                             Tree
-                                     end
-                            end,
-                            undefined, DB),
-    MerkleTree.
