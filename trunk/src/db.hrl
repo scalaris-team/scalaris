@@ -17,9 +17,15 @@
 %%% @end
 %% @version $Id$
 
--type(key()::integer() | string()).
--type(value()::any()).
--type(version()::pos_integer()).
+-type(key() :: integer() | string()).
+-type(value() :: any()).
+-type(version() :: pos_integer()).
+-type(kv_list() :: [{Key::key(), Value::value()}]).
+-type(kv_list_version() :: [{Key::key(), Value::value(), Version::version()}]).
+-type(kv_list_locks_version() :: [{Key::key(), Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}]).
+-type(db_as_list() :: [{Key::key(),
+                        {Value::value(), WriteLock::boolean(),
+                         ReadLock::integer(), Version::version()}}]).
 
 -spec new(NodeId::?RT:key()) -> db().
 
@@ -57,22 +63,18 @@
 -spec get_middle_key(DB::db()) -> {ok, MiddleKey::key()} | failed.
 
 -spec split_data(DB::db(), MyNewInterval::intervals:interval()) ->
-         {NewDB::db(), [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()} | {empty_val, true, 0, -1}}]}.
+         {NewDB::db(), db_as_list()}.
 
--spec get_data(DB::db()) ->
-         [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()} | {empty_val, true, 0, -1}}].
+-spec get_data(DB::db()) -> db_as_list().
 
--spec add_data(DB::db(), [{Key::key(), {Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}}]) ->
-         NewDB::db().
+-spec add_data(DB::db(), db_as_list()) -> NewDB::db().
 
--spec get_range(DB::db(), Range::intervals:interval()) ->
-         [{Key::key(), Value::value()}].
+-spec get_range(DB::db(), Range::intervals:interval()) -> kv_list().
 
 -spec get_range_with_version(DB::db(), Range::intervals:interval()) ->
-         [{Key::key(), Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}].
+         kv_list_locks_version().
 
 -spec get_range_only_with_version(DB::db(), Range::intervals:interval()) ->
-         [{Key::key(), Value::value(), Version::version()}].
+         kv_list_version().
 
--spec update_if_newer(OldDB::db(), KVs::[{Key::key(), Value::value(), Version::version()}]) ->
-         NewDB::db().
+-spec update_if_newer(OldDB::db(), KVs::kv_list_version()) -> NewDB::db().

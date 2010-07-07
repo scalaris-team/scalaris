@@ -30,16 +30,15 @@
 -export([on/2, init/1]).
 
 % state of the dht_node loop
--type(state() :: any()).
+-type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
 
 % accepted messages of dht_node processes
--type(message() :: any()).
+-type(message() :: dht_node_join:join_message() | any()).
 
 %% @doc message handler
--spec(on/2 :: (message(), state()) -> state()).
+-spec on(message(), state()) -> state().
 
-
-% Join Messages
+% Join messages (see dht_node_join.erl)
 on(Msg, State) when element(1, State) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 
@@ -80,16 +79,6 @@ on({rm_update_neighbors, Neighbors}, State) ->
                                              OldRT),
     State_NewNeighbors = dht_node_state:set_neighbors(State, Neighbors),
     dht_node_state:set_rt(State_NewNeighbors, NewRT);
-
-%% @doc notification that my successor left
-on({succ_left, Succ}, State) ->
-    rm_beh:succ_left(Succ),
-    State;
-
-%% @doc notification that my predecessor left
-on({pred_left, Pred}, State) ->
-    rm_beh:pred_left(Pred),
-    State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance 

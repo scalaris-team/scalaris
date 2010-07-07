@@ -93,9 +93,7 @@ move_load(State, _, NewId) ->
     OldIdVersion = node:id_version(dht_node_state:get(State, node)),
     idholder:set_id(NewId, OldIdVersion + 1),
     comm:send_local(self() , {kill}),
-    comm:send(Succ, {pred_left, Pred}),
-    PredPid = dht_node_state:get(State, pred_pid),
-    comm:send(PredPid, {succ_left, dht_node_state:get(State, node)}),
+    ?RM:leave(),
     State.
 
 drop_data(State) ->

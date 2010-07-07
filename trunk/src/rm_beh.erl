@@ -22,13 +22,13 @@
 -vsn('$Id$').
 
 -export([behaviour_info/1,
-         succ_left/1, pred_left/1,
          update_neighbors/1,
          notify_new_pred/2, notify_new_succ/2]).
 
 behaviour_info(callbacks) ->
     [
      {start_link, 1},
+     {leave, 0}, % this function does not have to be exported -> catch RM process being killed and execute it then, instead of actively calling it
      {check_config, 0}
     ];
 
@@ -50,19 +50,6 @@ notify_new_succ(Node, NewSucc) ->
 -spec notify_new_pred(Node::comm:mypid(), NewPred::node:node_type()) -> ok.
 notify_new_pred(Node, NewPred) ->
     comm:send_to_group_member(Node, ring_maintenance, {notify_new_pred, NewPred}).
-
-
-%% @doc notification that my succ left
-%%      parameter is his current succ list
-succ_left(_SuccsSuccList) ->
-    %% @TODO implement notification
-    ok.
-
-%% @doc notification that my pred left
-%%      parameter is his current pred
-pred_left(_PredsPred) ->
-    %% @TODO implement notification
-    ok.
 
 %% @doc Notifies the dht_node that (at least one of) his neighbors changed
 %%      (to be used in the rm_*.erl modules).
