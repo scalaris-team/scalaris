@@ -28,7 +28,8 @@ all() ->
      tester_not_intersection, tester_not_intersection2,
      tester_union_well_formed, tester_union, tester_not_union, tester_union_continuous,
      tester_is_adjacent,
-     tester_is_subset, tester_is_subset2
+     tester_is_subset, tester_is_subset2,
+     tester_minus_well_formed, tester_minus, tester_not_minus, tester_not_minus2
      ].
 
 suite() ->
@@ -463,4 +464,48 @@ prop_is_subset2(_X, _Y) ->
 
 tester_is_subset2(_Config) ->
     tester:test(?MODULE, prop_is_subset2, 2, 1000).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:minus/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec(prop_minus_well_formed/2 :: (intervals:interval(), intervals:interval()) -> boolean()).
+prop_minus_well_formed(A_, B_) ->
+    A = intervals:normalize(A_),
+    B = intervals:normalize(B_),
+    intervals:is_well_formed(intervals:minus(A, B)).
+
+-spec(prop_minus/3 :: (intervals:interval(), intervals:interval(), intervals:key()) -> boolean()).
+prop_minus(A_, B_, X) ->
+    A = intervals:normalize(A_),
+    B = intervals:normalize(B_),
+    ?implies(intervals:in(X, A) andalso not intervals:in(X, B),
+             intervals:in(X, intervals:minus(A, B))).
+
+-spec(prop_not_minus/3 :: (intervals:interval(), intervals:interval(), intervals:key()) -> boolean()).
+prop_not_minus(A_, B_, X) ->
+    A = intervals:normalize(A_),
+    B = intervals:normalize(B_),
+    ?implies(intervals:in(X, B),
+             not intervals:in(X, intervals:minus(A, B))).
+
+-spec(prop_not_minus2/3 :: (intervals:interval(), intervals:interval(), intervals:key()) -> boolean()).
+prop_not_minus2(A_, B_, X) ->
+    A = intervals:normalize(A_),
+    B = intervals:normalize(B_),
+    ?implies(not intervals:in(X, A),
+             not intervals:in(X, intervals:minus(A, B))).
+
+tester_minus_well_formed(_Config) ->
+    tester:test(?MODULE, prop_minus_well_formed, 2, 1000).
+
+tester_minus(_Config) ->
+    tester:test(?MODULE, prop_minus, 3, 1000).
+
+tester_not_minus(_Config) ->
+    tester:test(?MODULE, prop_not_minus, 3, 1000).
+
+tester_not_minus2(_Config) ->
+    tester:test(?MODULE, prop_not_minus2, 3, 1000).
 
