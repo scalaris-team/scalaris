@@ -114,6 +114,9 @@ parse_chunk({attribute, _Line, type, {{record, TypeName}, ATypeSpec, _List}}, Mo
 parse_chunk({attribute, _Line, type, {TypeName, ATypeSpec, _List}}, Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
     tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec, NewParseState);
+parse_chunk({attribute, _Line, opaque, {TypeName, ATypeSpec, _List}}, Module, ParseState) ->
+    {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
+    tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec, NewParseState);
 parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, [AFunSpec]}}, Module, ParseState) ->
     {TheFunSpec, NewParseState} = parse_type(AFunSpec, Module, ParseState),
     tester_parse_state:add_type_spec({'fun', Module, FunName, FunArity}, TheFunSpec, NewParseState);
@@ -203,6 +206,8 @@ parse_type({ann_type, _Line, [{var, _Line2, _Varname}, Type]}, Module, ParseStat
     parse_type(Type, Module, ParseState);
 parse_type({atom, _Line, Atom}, _Module, ParseState) ->
     {{atom, Atom}, ParseState};
+parse_type({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
+    {{integer, -Value}, ParseState};
 parse_type({integer, _Line, Value}, _Module, ParseState) ->
     {{integer, Value}, ParseState};
 parse_type({type, _Line, dict, []}, _Module, ParseState) ->
@@ -222,6 +227,8 @@ parse_type({remote_type, _Line, [{atom, _Line2, TypeModule}, {atom, _line3, Type
         false ->
             {{typedef, TypeModule, TypeName}, tester_parse_state:add_unknown_type(TypeModule, TypeName, ParseState)}
     end;
+parse_type({type, _Line, 'function', []}, Module, ParseState) ->
+    {{'function'}, ParseState};
 parse_type({type, _Line, TypeName, []}, Module, ParseState) ->
     %ct:pal("type1 ~p:~p", [Module, TypeName]),
     case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
@@ -257,8 +264,10 @@ parse_type(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
             io:format("potentially unknown type2: ~p~n", [TypeSpecs]),
             unknown
     end;
-parse_type(TypeSpec, _Module, ParseState) ->
-    ct:pal("unknown type ~p", [TypeSpec]),
+parse_type({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
+    {{tuple, {typedef, tester, test_any}}, ParseState};
+parse_type(TypeSpec, Module, ParseState) ->
+    ct:pal("unknown type ~p in module ~p", [TypeSpec, Module]),
     {unkown, ParseState}.
 
 -spec parse_type_list/3 :: (list(type_spec()), module(), #parse_state{}) -> {list(type_spec()), #parse_state{}}.
