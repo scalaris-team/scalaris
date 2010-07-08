@@ -196,10 +196,10 @@ get_range(DB, Interval) ->
 
 %% @doc get keys and versions in a range
 get_range_with_version(DB, Interval) ->
-    F = fun ({Key, {Value, WriteLock, ReadLock, Version}}, Data) ->
+    F = fun (X = {Key, {Value, _WriteLock, _ReadLock, _Version}}, Data) ->
                 case  Value =/= empty_val
                     andalso intervals:in(Key, Interval) of
-                    true -> [{Key, Value, WriteLock, ReadLock, Version} | Data];
+                    true -> [X | Data];
                     false -> Data
                 end
         end,

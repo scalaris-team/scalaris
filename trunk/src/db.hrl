@@ -22,7 +22,6 @@
 -type(version() :: pos_integer()).
 -type(kv_list() :: [{Key::key(), Value::value()}]).
 -type(kv_list_version() :: [{Key::key(), Value::value(), Version::version()}]).
--type(kv_list_locks_version() :: [{Key::key(), Value::value(), WriteLock::boolean(), ReadLock::integer(), Version::version()}]).
 -type(db_as_list() :: [{Key::key(),
                         {Value::value(), WriteLock::boolean(),
                          ReadLock::integer(), Version::version()}}]).
@@ -72,7 +71,7 @@
 -spec get_range(DB::db(), Range::intervals:interval()) -> kv_list().
 
 -spec get_range_with_version(DB::db(), Range::intervals:interval()) ->
-         kv_list_locks_version().
+         db_as_list().
 
 -spec get_range_only_with_version(DB::db(), Range::intervals:interval()) ->
          kv_list_version().
