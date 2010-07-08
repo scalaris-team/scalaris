@@ -230,7 +230,7 @@ usplit_nodelist(NodeList, Node) ->
                         lists:usort(fun succ_ord/2, LargerOrEqual)),
     {SmallerSorted, EqualSorted, LargerSorted}.
 
-%% @doc Creates a sorted nodelist starting at the given node an going clockwise
+%% @doc Creates a sorted nodelist starting at the given node and going clockwise
 %%      along the ring (also see succ_ord/3).
 -spec mk_nodelist(NodeList::nodelist(), Node::node:node_type()) -> nodelist().
 mk_nodelist(NodeList, Node) ->

@@ -57,8 +57,18 @@ bulk_owner(State, I, Msg) ->
 
 %% @doc Iterates through the list of (unique) nodes in the routing table and
 %%      sends them the according bulkowner messages for sub-intervals of I.
--spec bulk_owner_iter(RTList::nodelist:nodelist(), I::intervals:interval(),
-                      Msg::comm:message(), Limit::?RT:key()) -> ok.
+%%      The first call should have Limit=<starting_nodeid>. The method will
+%%      then go through the ReverseRTList (starting with the longest finger,
+%%      ending with the node's successor) and send each node a bulk_owner
+%%      message for the interval it is responsible for:
+%%      I \cap (id(<node_in_reversertlist>), Limit], e.g.
+%%      node Nl from the longest finger is responsible for
+%%      I \cap (id(Nl), id(<starting_node>)].
+%%      Note that the range (id(<starting_node>), id(<succ_of_starting_node>)]
+%%      has already been covered by bulk_owner/3.
+-spec bulk_owner_iter(ReverseRTList::nodelist:nodelist(),
+                      I::intervals:interval(), Msg::comm:message(),
+                      Limit::?RT:key()) -> ok.
 bulk_owner_iter([], _I, _Msg, _Limit) ->
     ok;
 bulk_owner_iter([Head | Tail], I, Msg, Limit) ->
