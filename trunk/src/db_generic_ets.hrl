@@ -157,8 +157,9 @@ add_data(DB, Data) ->
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 split_data(DB, MyNewInterval) ->
-    F = fun (KV = {Key, _}, HisList) ->
-                case intervals:in(Key, MyNewInterval) of
+    F = fun (KV = {Key, {Value, _, _, _}}, HisList) ->
+                case Value =/= empty_val andalso
+                         intervals:in(Key, MyNewInterval) of
                     true  -> HisList;
                     false -> 
                         ?ETS:delete(DB, Key),
