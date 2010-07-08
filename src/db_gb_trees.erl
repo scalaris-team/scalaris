@@ -221,12 +221,8 @@ get_range(DB, Interval) ->
 
 %% @doc get keys and versions in a range
 get_range_with_version(DB, Interval) ->
-    [ {Key, Value, WriteLock, ReadLock, Version}
-      || {Key, {Value, WriteLock, ReadLock, Version}} <- gb_trees:to_list(DB),
+    [ X || X = {Key, {Value, _WriteLock, _ReadLock, _Version}} <- gb_trees:to_list(DB),
          intervals:in(Key, Interval), Value =/= empty_val ].
-
-% get_range_with_version
-%@private
 
 get_range_only_with_version(DB, Interval) ->
     [ {Key, Value, Vers}
