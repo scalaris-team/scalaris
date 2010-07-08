@@ -199,7 +199,10 @@ get_middle_key(DB) ->
 split_data(DB, MyNewInterval) ->
     DataList = gb_trees:to_list(DB),
     {MyList, HisList} =
-        lists:partition(fun({Key, _}) -> intervals:in(Key, MyNewInterval) end,
+        lists:partition(fun({Key, {Value, _, _, _}}) ->
+                                Value =/= empty_val andalso
+                                    intervals:in(Key, MyNewInterval)
+                        end,
                         DataList),
     {gb_trees:from_orddict(MyList), HisList}.
 
@@ -214,7 +217,7 @@ add_data(DB, Data) ->
 %% @doc get keys in a range
 get_range(DB, Interval) ->
     [ {Key, Value} ||{Key, {Value, _WLock, _RLock, _Vers}} <- gb_trees:to_list(DB),
-                      intervals:in(Key, Interval), Value =/= empty_val ].
+                      Value =/= empty_val, intervals:in(Key, Interval) ].
 
 %% @doc get keys and versions in a range
 get_range_with_version(DB, Interval) ->
