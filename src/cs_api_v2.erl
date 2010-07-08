@@ -130,13 +130,13 @@ range_read(From, To) ->
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, comm:this()}),
     TimerRef =
-        comm:send_local_after(config:read(range_read_timeout), self(), {timeout}),
+        comm:send_local_after(config:read(range_read_timeout), self(), {range_read_timeout}),
     range_read_loop(Interval, intervals:empty(), [], TimerRef).
 
 -spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[any()], TimerRef::reference()) -> {timeout | ok, Data::[any()]}.
 range_read_loop(Interval, Done, Data, TimerRef) ->
     receive
-        {timeout} ->
+        {range_read_timeout} ->
             {timeout, lists:flatten(Data)};
         {bulk_read_with_version_response, NowDone, NewData} ->
             Done2 = intervals:union(NowDone, Done),
@@ -144,7 +144,13 @@ range_read_loop(Interval, Done, Data, TimerRef) ->
                 false ->
                     range_read_loop(Interval, Done2, [NewData | Data], TimerRef);
                 true ->
+                    % cancel timeout
                     erlang:cancel_timer(TimerRef),
+                    % consume potential timeout message
+                    receive
+                        {range_read_timeout} -> ok
+                    after 0 -> ok
+                    end,
                     {ok, lists:flatten([NewData, Data])}
             end
     end.
