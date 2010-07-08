@@ -77,6 +77,10 @@ parse_expression({'try', _, Body, CaseClauses, CatchClauses, AfterBody}, ParseSt
     ParseState3 = lists:foldl(fun parse_expression/2, ParseState2, CaseClauses),
     ParseState4 = lists:foldl(fun parse_expression/2, ParseState3, CatchClauses),
     parse_expression(AfterBody, ParseState4);
+parse_expression({'catch', _, Expression}, ParseState) ->
+    parse_expression(Expression, ParseState);
+parse_expression({block, _, ExpressionList}, ParseState) ->
+    lists:foldl(fun parse_expression/2, ParseState, ExpressionList);
 parse_expression({tuple, _, Values}, ParseState) ->
     lists:foldl(fun parse_expression/2, ParseState, Values);
 parse_expression({remote, _, Module, Fun}, ParseState) ->
@@ -103,5 +107,5 @@ parse_expression({string, _, String}, ParseState) ->
     tester_parse_state:add_string(String, ParseState);
 
 parse_expression(Expression, _ParseState) ->
-    ?ct_fail("unknown expression: ~p", [Expression]).
+    ?ct_fail("unknown expression: ~w", [Expression]).
 
