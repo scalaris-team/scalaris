@@ -38,12 +38,13 @@
 -export([empty/0, new/1, new/2, new/4, all/0,
          mk_from_node_ids/2, mk_from_nodes/2,
          is_empty/1,
-         intersection/2,
          is_subset/2,
-         in/2,
-         union/2,
          is_continuous/1,
          is_adjacent/2,
+         in/2,
+         intersection/2,
+         union/2,
+         minus/2,
          % for unit testing only
          is_well_formed/1,
          normalize/1
@@ -509,6 +510,103 @@ is_continuous(_) ->
 is_adjacent(A, B) ->
     is_continuous(A) andalso is_continuous(B) andalso
         is_empty(intersection(A, B)) andalso is_continuous(union(A, B)).
+
+%% @doc Subtracts the second from the first simple interval.
+-spec minus_simple(simple_interval(), simple_interval()) -> interval().
+minus_simple(A, A) ->
+    empty();
+minus_simple(_, all) ->
+    empty();
+minus_simple(all, {element, B0}) ->
+    % hack: use [minus_infinity, plus_infinity] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
+    minus_simple2({interval, '[', minus_infinity, plus_infinity, ']'}, {interval, '[', B0, B0, ']'});
+minus_simple(all, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
+    % hack: use [minus_infinity, plus_infinity] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
+    minus_simple2({interval, '[', minus_infinity, plus_infinity, ']'}, B);
+minus_simple({element, A0}, {element, A0}) ->
+    empty();
+minus_simple(A = {element, _}, {element, _}) ->
+    A;
+minus_simple(A = {element, A0}, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
+    case in(A0, B) of
+        true -> empty();
+        _    -> A
+    end;
+minus_simple({interval, '[', A0, A1, A1Br}, {element, A0}) ->
+    new('(', A0, A1, A1Br);
+minus_simple({interval, A0Br, A0, A1, ']'}, {element, A1}) ->
+    new(A0Br, A0, A1, ')');
+minus_simple(A = {interval, A0Br, A0, A1, A1Br}, {element, B0}) ->
+    case in(B0, A) of
+        false -> A;
+        true  -> union(new(A0Br, A0, B0, ')'), new('(', B0, A1, A1Br))
+    end;
+minus_simple(A = {interval, _A0Br, _A0, _A1, _A1Br}, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
+    B_ = intersection(A, B),
+    case B_ of
+        []                     -> A;
+        A                      -> empty();
+        {interval, _, _, _, _} -> minus_simple2(A, B_);
+        X when is_list(X)      -> minus(A, B_);
+        _                      -> minus_simple(A, B_)
+    end.
+
+%% @doc Subtracts the second from the first simple interval (no elements, no
+%%      'all', no empty interval). The second interval must be a subset of the
+%%      first interval!
+-spec minus_simple2({interval, left_bracket(), key(), key(), right_bracket()}, {interval, left_bracket(), key(), key(), right_bracket()}) -> interval().
+minus_simple2({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1Br}) ->
+    First = case B0Br of
+                '(' when B0 =:= A0 andalso A0Br =:= '[' ->
+                    new(A0);
+                '(' when B0 =:= A0 ->
+                    empty();
+                '(' ->
+                    new(A0Br, A0, B0, ']');
+                '[' when B0 =:= A0 ->
+                    empty();
+                '[' ->
+                    new(A0Br, A0, B0, ')')
+               end,
+    Second = case B1Br of
+                 ')' when B1 =:= A1 andalso A1Br =:= ']' ->
+                     new(A1);
+                 ')' when B1 =:= A1 ->
+                     empty();
+                 ')' ->
+                     new('[', B1, A1, A1Br);
+                 ']' when B1 =:= A1 ->
+                     empty();
+                 ']' ->
+                     new('(', B1, A1, A1Br)
+               end,
+    union(First, Second).
+
+%% @doc Subtracts the second from the first interval.
+-spec minus(interval(), interval()) -> interval().
+minus(A, A) ->
+    empty();
+minus(_A, all) ->
+    empty();
+minus(A, []) ->
+    A;
+minus(A, B) when is_list(A) ->
+    B_ = to_list(B),
+    % from every simple interval in A, remove all simple intervals in B
+    % note: we cannot use minus_simple in foldl since the result may be a list again
+    normalize(lists:flatten([lists:foldl(fun(IB, AccIn) ->
+                                                 minus(AccIn, IB)
+                                         end,
+                                         IA, B_) || IA <- A]));
+minus(A, B) when is_list(B) ->
+    % remove all simple intervals in B
+    % note: we cannot use minus_simple in foldl since the result may be a list again
+    normalize(lists:foldl(fun(IB, AccIn) ->
+                                  minus(AccIn, IB)
+                          end,
+                          A, B));
+minus(A, B) ->
+    minus_simple(A, B).
 
 %%====================================================================
 %% private functions
