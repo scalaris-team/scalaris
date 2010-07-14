@@ -173,3 +173,22 @@ update_if_newer(OldDB, KVs) ->
                  end
         end,
     lists:foldl(F, OldDB, KVs).
+
+%% @doc Checks whether all entries in the DB are valid, i.e.
+%%      - no writelocks and readlocks at the same time
+%%      - no empty_val values (these should only be in the DB temporarily)
+%%      - version is greater than or equal to 0
+%%      Returns the result of the check and a list of invalid entries.
+check_db(DB) ->
+    Data = get_data(DB),
+    ValidFun = fun(DBEntry) ->
+                       not db_entry:is_empty(DBEntry) andalso
+                           not (db_entry:get_writelock(DBEntry) andalso
+                                    db_entry:get_readlock(DBEntry) > 0) andalso
+                           db_entry:get_version(DBEntry) >= 0
+               end,
+    {_Valid, Invalid} = lists:partition(ValidFun, Data),
+    case Invalid of
+        [] -> {true, []};
+        _  -> {false, Invalid}
+    end.

@@ -49,7 +49,9 @@ behaviour_info(callbacks) ->
      {get_range, 2}, {get_range_with_version, 2},
      {get_range_only_with_version, 2},
      % bulk op for replica repair
-     {update_if_newer, 2}
+     {update_if_newer, 2},
+     % debugging
+     {check_db, 1}
     ];
 
 behaviour_info(_Other) ->
