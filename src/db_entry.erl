@@ -20,53 +20,97 @@
 -author('schintke@onscale.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 -define(TRACE(X,Y), io:format(X,Y)).
 %-define(TRACE(X,Y), ok).
 
--export([new/1]).
--export([get_key/1]).
--export([get_value/1, set_value/2]).
--export([inc_readlock/1]).
--export([dec_readlock/1]).
--export([get_readlock/1]).
--export([get_writelock/1]).
--export([set_writelock/1]).
--export([unset_writelock/1]).
--export([get_version/1]).
--export([inc_version/1]).
--export([set_version/2]).
--export([reset_locks/1]).
+-export([new/1, new/3,
+         get_key/1,
+         get_value/1, set_value/2,
+         get_readlock/1, inc_readlock/1, dec_readlock/1,
+         get_writelock/1, set_writelock/1, unset_writelock/1,
+         get_version/1, inc_version/1, set_version/2,
+         reset_locks/1,
+         is_empty/1]).
 
-%% {key,
-%%  value,
-%%  bool writelock,
-%%  int readlock,
-%%  int version}
+-ifdef(with_export_type_support).
+-export_type([entry/0]).
+-endif.
 
+-type(entry() :: {Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
+                  ReadLock::non_neg_integer(), Version::?DB:version()} |
+                 {Key::?RT:key(), empt_val, false, 0, -1}).
+
+-spec new(Key::?RT:key()) -> {?RT:key(), empty_val, false, 0, -1}.
 new(Key) -> {Key, empty_val, false, 0, -1}.
 
+-spec new(Key::?RT:key(), Value::?DB:value(), Version::?DB:version()) ->
+    {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
+     ReadLock::0, Version::?DB:version()}.
+new(Key, Value, Version) -> {Key, Value, false, 0, Version}.
+
+-spec get_key(DBEntry::entry()) -> ?RT:key().
 get_key(DBEntry) ->            element(1, DBEntry).
+
+-spec get_value(DBEntry::entry()) -> ?DB:value().
 get_value(DBEntry) ->          element(2, DBEntry).
-set_value(DBEntry, Val) ->     setelement(2, DBEntry, Val).
+
+-spec set_value(DBEntry::entry(), Value::?DB:value()) -> entry().
+set_value(DBEntry, Value) ->     setelement(2, DBEntry, Value).
+
+-spec get_writelock(DBEntry::entry()) -> WriteLock::boolean().
 get_writelock(DBEntry) ->      element(3, DBEntry).
-set_writelock(DBEntry, Val) -> setelement(3, DBEntry, Val).
+
+-spec set_writelock(DBEntry::entry(), WriteLock::boolean()) -> entry().
+set_writelock(DBEntry, WriteLock) -> setelement(3, DBEntry, WriteLock).
+
+-spec set_writelock(DBEntry::entry()) ->
+    {Key::?RT:key(), Value::?DB:value(), WriteLock::true,
+     ReadLock::non_neg_integer(), Version::?DB:version()} |
+    {Key::?RT:key(), empt_val, true, 0, -1}.
+set_writelock(DBEntry) -> set_writelock(DBEntry, true).
+
+-spec unset_writelock(DBEntry::entry()) ->
+    {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
+     ReadLock::non_neg_integer(), Version::?DB:version()} |
+    {Key::?RT:key(), empt_val, false, 0, -1}.
+unset_writelock(DBEntry) -> set_writelock(DBEntry, false).
+
+-spec get_readlock(DBEntry::entry()) -> ReadLock::non_neg_integer().
 get_readlock(DBEntry) ->       element(4, DBEntry).
-set_readlock(DBEntry, Val) ->  setelement(4, DBEntry, Val).
+
+-spec set_readlock(DBEntry::entry(), ReadLock::non_neg_integer()) -> entry().
+set_readlock(DBEntry, ReadLock) ->  setelement(4, DBEntry, ReadLock).
+
+-spec inc_readlock(DBEntry::entry()) -> entry().
+inc_readlock(DBEntry) -> set_readlock(DBEntry, get_readlock(DBEntry) + 1).
+
+-spec dec_readlock(DBEntry::entry()) -> entry().
+dec_readlock(DBEntry) -> set_readlock(DBEntry, get_readlock(DBEntry) - 1).
+
+-spec get_version(DBEntry::entry()) -> ?DB:version().
 get_version(DBEntry) ->        element(5, DBEntry).
-inc_version(DBEntry) ->        setelement(5, DBEntry, 1 + element(5, DBEntry)).
-set_version(DBEntry, Val) ->   setelement(5, DBEntry, Val).
 
-set_writelock(DBEntry) ->
-    set_writelock(DBEntry, true).
+-spec inc_version(DBEntry::entry()) -> entry().
+inc_version(DBEntry) ->        setelement(5, DBEntry, get_version(DBEntry) + 1).
 
-unset_writelock(DBEntry) ->
-    set_writelock(DBEntry, false).
+-spec set_version(DBEntry::entry(), Version::?DB:version()) -> entry().
+set_version(DBEntry, Version) ->   setelement(5, DBEntry, Version).
 
-inc_readlock(DBEntry) ->
-    set_readlock(DBEntry, get_readlock(DBEntry) + 1).
-dec_readlock(DBEntry) ->
-    set_readlock(DBEntry, get_readlock(DBEntry) - 1).
-
+-spec reset_locks(DBEntry::entry()) ->
+    {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
+     ReadLock::0, Version::?DB:version()} |
+    {Key::?RT:key(), empt_val, false, 0, -1}.
 reset_locks(DBEntry) ->
     TmpEntry = set_readlock(DBEntry, 0),
     set_writelock(TmpEntry, false).
+
+-spec is_empty({Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
+                ReadLock::non_neg_integer(), Version::?DB:version()}) -> false;
+              ({Key::?RT:key(), empt_val, WriteLock::boolean(),
+                ReadLock::non_neg_integer(), Version::?DB:version() | -1}) -> true.
+is_empty({_Key, empty_val, _WriteLock, _ReadLock, _Version}) ->
+    true;
+is_empty(_) ->
+    false.

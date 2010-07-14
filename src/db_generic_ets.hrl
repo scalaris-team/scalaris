@@ -20,93 +20,23 @@
 % Note: this include must be included in files including this file!
 %% -include("scalaris.hrl").
 
+-include("db_common.hrl").
+
+%% @doc Gets an entry from the DB. If there is no entry with the given key,
+%%      an empty entry will be returned.
 get_entry(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-%% for new storage format
-%%        [Entry] -> Entry;
-%% for compatibility with old DB format:
-        [{Key, {A,B,C,D}}] -> {Key,A,B,C,D};
-        [] -> db_entry:new(Key)
-    end.
+    {_Exists, Result} = get_entry2(DB, Key),
+    Result.
 
-set_entry(DB, Entry) ->
-%%  for new storage format
-%%   ?ETS:insert(DB, Entry).
-%% for compatibility with old DB format:
-    {Key, A,B,C,D} = Entry,
-    ?ETS:insert(DB, {Key, {A,B,C,D}}),
-    DB.
-
-%% @doc sets a write lock on a key.
-%%      the write lock is a boolean value per key
-set_write_lock(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {Value, false, 0, Version}}] ->
-            ?ETS:insert(DB, {Key, {Value, true, 0, Version}}),
-            {DB, ok};
-        [{Key, {_Value, _WriteLock, _ReadLock, _Version}}] ->
-            {DB, failed};
-        [] ->
-            % no value stored yet
-            ?ETS:insert(DB, {Key, {empty_val, true, 0, -1}}),
-            {DB, ok}
-    end.
-
-%% @doc unsets the write lock of a key
-%%      the write lock is a boolean value per key
-unset_write_lock(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {empty_val, true, 0, -1}}] ->
-            ?ETS:delete(DB, Key),
-            {DB, ok};
-        [{Key, {Value, true, ReadLock, Version}}] ->
-            ?ETS:insert(DB, {Key, {Value, false, ReadLock, Version}}),
-            {DB, ok};
-        [{Key, {_Value, false, _ReadLock, _Version}}] ->
-            {DB, failed};
-        [] -> {DB, failed}
-    end.
-
-%% @doc sets a read lock on a key
-%%      the read lock is an integer value per key
-set_read_lock(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {Value, false, ReadLock, Version}}] ->
-            ?ETS:insert(DB, {Key, {Value, false, ReadLock + 1, Version}}),
-            {DB, ok};
-        [{Key, {_Value, _WriteLock, _ReadLock, _Version}}] ->
-            {DB, failed};
-        [] -> {DB, failed}
-    end.
-
-%% @doc unsets a read lock on a key
-%%      the read lock is an integer value per key
-unset_read_lock(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {_Value, _WriteLock, 0, _Version}}] ->
-            {DB, failed};
-        [{Key, {Value, WriteLock, ReadLock, Version}}] ->
-            ?ETS:insert(DB, {Key, {Value, WriteLock, ReadLock - 1, Version}}),
-            {DB, ok};
-        [] -> {DB, failed}
-    end.
-
-%% @doc get the locks and version of a key
-get_locks(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {_Value, WriteLock, ReadLock, Version}}] ->
-            {DB, {WriteLock, ReadLock, Version}};
-        [] -> {DB, failed}
-    end.
-
-%% @doc reads the version and value of a key
-read(DB, Key) ->
+%% @doc Gets an entry from the DB. If there is no entry with the given key,
+%%      an empty entry will be returned. The first component of the result
+%%      tuple states whether the value really exists in the DB.
+get_entry2(DB, Key) ->
 %%    Start = erlang:now(),
-    Res = case ?ETS:lookup(DB, Key) of
-              [{Key, {Value, _WriteLock, _ReadLock, Version}}] ->
-                  {ok, Value, Version};
-              [] -> {ok, empty_val, -1}
-          end,
+    Result = case ?ETS:lookup(DB, Key) of
+                 [Entry] -> {true, Entry};
+                 []      -> {false, db_entry:new(Key)}
+             end,
 %%     Stop = erlang:now(),
 %%     Span = timer:now_diff(Stop, Start),
 %%     case ?ETS:lookup(profiling, db_read_lookup) of
@@ -115,35 +45,23 @@ read(DB, Key) ->
 %%         [{_, Sum}] ->
 %%             ?ETS:insert(profiling, {db_read_lookup, Sum + Span})
 %%     end,
-    Res.
+    Result.
 
-%% @doc updates the value of key
-write(DB, Key, Value, Version) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {_Value, WriteLock, ReadLock, _Version}}] ->
-            % better use ?ETS:update_element?
-            ?ETS:insert(DB, {Key, {Value, WriteLock, ReadLock, Version}});
-        [] -> ?ETS:insert(DB, {Key, {Value, false, 0, Version}})
-    end,
+%% @doc Inserts a complete entry into the DB.
+set_entry(DB, Entry) ->
+    ?ETS:insert(DB, Entry),
     DB.
 
-%% @doc deletes the key
-delete(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {_Value, false, 0, _Version}}] ->
-            ?ETS:delete(DB, Key),
-            {DB, ok};
-        [{Key, _Value}] -> {DB, locks_set};
-        [] -> {DB, undef}
-    end.
+%% @doc Updates an existing (!) entry in the DB.
+%%      TODO: use ets:update_element here?
+update_entry(DB, Entry) ->
+    ?ETS:insert(DB, Entry),
+    DB.
 
-%% @doc reads the version of a key
-get_version(DB, Key) ->
-    case ?ETS:lookup(DB, Key) of
-        [{Key, {_Value, _WriteLock, _ReadLock, Version}}] ->
-            {ok, Version};
-        [] -> failed
-    end.
+%% @doc Removes all values with the given entry's key from the DB.
+delete_entry(DB, Entry) ->
+    ?ETS:delete(DB, db_entry:get_key(Entry)),
+    DB.
 
 %% @doc returns the number of stored keys
 get_load(DB) ->
@@ -157,71 +75,60 @@ add_data(DB, Data) ->
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 split_data(DB, MyNewInterval) ->
-    F = fun (KV = {Key, {Value, _, _, _}}, HisList) ->
-                case Value =/= empty_val andalso
-                         intervals:in(Key, MyNewInterval) of
-                    true  -> HisList;
-                    false -> 
-                        ?ETS:delete(DB, Key),
-                        [KV | HisList]
+    F = fun (DBEntry, HisList) ->
+                case not db_entry:is_empty(DBEntry) andalso
+                         intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
+                    true -> HisList;
+                    _    ->
+                        delete_entry(DB, DBEntry),
+                        [DBEntry | HisList]
                 end
         end,
     HisList = ?ETS:foldl(F, [], DB),
     {DB, HisList}.
 
-% update only if no locks are taken and version number is higher
-update_if_newer(OldDB, KVs) ->
-    F = fun ({Key, Value, Version}, DB) ->
-                 case ?ETS:lookup(DB, Key) of
-                     [] ->
-                         ?ETS:insert(DB, {Key, {Value, false, 0, Version}});
-                     [{_Value, false, 0, OldVersion}] when OldVersion < Version ->
-                         ?ETS:insert(DB, {Key, {Value, false, 0, Version}});
-                     _ -> ok
-                 end,
-                 DB
-        end,
-    lists:foldl(F, OldDB, KVs).
-
-%% @doc get keys in a range
+%% @doc Get keys and values in the given range.
 get_range(DB, Interval) ->
-    F = fun ({Key, {Value, _, _, _}}, Data) ->
-                case Value =/= empty_val
-                    andalso intervals:in(Key, Interval) of
-                    true  -> [{Key, Value} | Data];
-                    false -> Data
+    F = fun (DBEntry, Data) ->
+                case (not db_entry:is_empty(DBEntry)) andalso
+                         intervals:in(db_entry:get_key(DBEntry), Interval) of
+                    true -> [{db_entry:get_key(DBEntry),
+                              db_entry:get_value(DBEntry)} | Data];
+                    _    -> Data
                 end
         end,
     ?ETS:foldl(F, [], DB).
 
-%% @doc get keys and versions in a range
+%% @doc Get all entries in the given range.
 get_range_with_version(DB, Interval) ->
-    F = fun (X = {Key, {Value, _WriteLock, _ReadLock, _Version}}, Data) ->
-                case  Value =/= empty_val
-                    andalso intervals:in(Key, Interval) of
-                    true -> [X | Data];
-                    false -> Data
-                end
+    F = fun (DBEntry, Data) ->
+                 case (not db_entry:is_empty(DBEntry)) andalso
+                          intervals:in(db_entry:get_key(DBEntry), Interval) of
+                     true -> [DBEntry | Data];
+                     _    -> Data
+                 end
         end,
     ?ETS:foldl(F, [], DB).
 
+%% @doc Get keys, values and versions in the given range.
 get_range_only_with_version(DB, Interval) ->
-    F = fun ({Key, {Value, WLock, _, Version}}, Data) ->
-                case WLock =:= false
-                    andalso Value =/= empty_val
-                    andalso intervals:in(Key, Interval) of
-                    true -> [{Key, Value, Version} | Data];
-                    false -> Data
+    F = fun (DBEntry, Data) ->
+                case (not db_entry:is_empty(DBEntry)) andalso
+                         db_entry:get_writelock(DBEntry) =:= false andalso
+                         intervals:in(db_entry:get_key(DBEntry), Interval) of
+                    true -> [{db_entry:get_key(DBEntry),
+                              db_entry:get_value(DBEntry),
+                              db_entry:get_version(DBEntry)} | Data];
+                    _    -> Data
                 end
         end,
     ?ETS:foldl(F, [], DB).
 
-%% @doc returns the key, which splits the data into two equally
-%%      sized groups
+%% @doc Returns the key, which splits the data into two equally sized groups.
 get_middle_key(DB) ->
     case (Length = ?ETS:info(DB, size)) < 3 of
         true -> failed;
-        false -> {ok, nth_key(DB, Length div 2 - 1)}
+        _    -> {ok, nth_key(DB, Length div 2 - 1)}
     end.
 
 nth_key(DB, N) ->

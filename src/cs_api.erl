@@ -197,8 +197,7 @@ do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
     end.
 
 %@doc range a range of key-value pairs
-% TODO: evaluate use of ?DB:db_as_list() as the data type!
--spec range_read(intervals:key(), intervals:key()) -> {ok | timeout, [{Key::?DB:key(), Value::?DB:value(), WriteLock::boolean(), ReadLock::integer(), Version::?DB:version()}]}.
+-spec range_read(intervals:key(), intervals:key()) -> {ok | timeout, [db_entry:entry()]}.
 range_read(From, To) ->
     ?TRACE("cs_api:range_read(~p, ~p)~n", [From, To]),
     Interval = intervals:new(From, To),
@@ -207,11 +206,11 @@ range_read(From, To) ->
     TimerRef = comm:send_local_after(config:read(range_read_timeout), self(), {range_read_timeout}),
     range_read_loop(Interval, intervals:empty(), [], TimerRef).
 
--spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[{Key::?DB:key(), Value::?DB:value(), WriteLock::boolean(), ReadLock::integer(), Version::?DB:version()}], TimerRef::reference()) -> {ok | timeout, [{Key::?DB:key(), Value::?DB:value(), WriteLock::boolean(), ReadLock::integer(), Version::?DB:version()}]}.
+-spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
 range_read_loop(Interval, Done, Data, TimerRef) ->
     receive
         {range_read_timeout} ->
-            {timeout, convert_collected_db_as_list(lists:flatten(Data))};
+            {timeout, lists:flatten(Data)};
         {bulk_read_with_version_response, NowDone, NewData} ->
             Done2 = intervals:union(NowDone, Done),
             case intervals:is_subset(Interval, Done2) of
@@ -225,11 +224,6 @@ range_read_loop(Interval, Done, Data, TimerRef) ->
                         {range_read_timeout} -> ok
                     after 0 -> ok
                     end,
-                    {ok, convert_collected_db_as_list(lists:flatten(Data, NewData))}
+                    {ok, lists:flatten(Data, NewData)}
             end
     end.
-
--spec convert_collected_db_as_list(Data::?DB:db_as_list()) -> [{Key::?DB:key(), Value::?DB:value(), WriteLock::boolean(), ReadLock::integer(), Version::?DB:version()}].
-convert_collected_db_as_list(Data) ->
-    [{Key, Value, WriteLock, ReadLock, Version}
-        || {Key, {Value, WriteLock, ReadLock, Version}} <- Data].
