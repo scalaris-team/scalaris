@@ -87,7 +87,7 @@ split_data(DB, MyNewInterval) ->
     HisList = ?ETS:foldl(F, [], DB),
     {DB, HisList}.
 
-%% @doc Get keys and values in the given range.
+%% @doc Get key/value pairs in the given range.
 get_range(DB, Interval) ->
     F = fun (DBEntry, Data) ->
                 case (not db_entry:is_empty(DBEntry)) andalso
@@ -99,7 +99,7 @@ get_range(DB, Interval) ->
         end,
     ?ETS:foldl(F, [], DB).
 
-%% @doc Get all entries in the given range.
+%% @doc Gets db_entry objects in the given range.
 get_range_with_version(DB, Interval) ->
     F = fun (DBEntry, Data) ->
                  case (not db_entry:is_empty(DBEntry)) andalso
@@ -110,7 +110,7 @@ get_range_with_version(DB, Interval) ->
         end,
     ?ETS:foldl(F, [], DB).
 
-%% @doc Get keys, values and versions in the given range.
+%% @doc Get key/value/version triples in the given range.
 get_range_only_with_version(DB, Interval) ->
     F = fun (DBEntry, Data) ->
                 case (not db_entry:is_empty(DBEntry)) andalso

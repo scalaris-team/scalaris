@@ -23,8 +23,8 @@ AC_INIT(scalaris, 0.2, schuett@zib.de)
 PKG_PROG_PKG_CONFIG
 
 TCERLPREFIX=
-AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--disable-tcerl], [disable support for tokyo cabinet]), [TCERLPREFIX=no])
-AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--enable-tcerl@<:@=DIR@:>@], [enable support for tokyo cabinet]), [TCERLPREFIX=$enableval])
+AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--disable-tcerl], [disable support for tokyo cabinet through tcerl]), [TCERLPREFIX=no])
+AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--enable-tcerl@<:@=DIR@:>@], [enable support for tokyo cabinet through tcerl]), [TCERLPREFIX=$enableval])
 
 export PKG_CONFIG_PATH=$TCERLPREFIX/lib/pkgconfig
 AS_IF([test "x$TCERLPREFIX" != xno],
@@ -35,6 +35,10 @@ AS_IF([test "x$TCERLPREFIX" != xno],
                                [tcerldrv-1.0],
                                [[HAVETCERL=", {d, have_tcerl}"]],
                                [HAVETCERL=""])])
+
+TOKEPREFIX=
+AC_ARG_ENABLE([toke], AS_HELP_STRING([--disable-toke], [disable support for tokyo cabinet through toke]), [TOKEPREFIX=no])
+AC_ARG_ENABLE([toke], AS_HELP_STRING([--enable-toke@<:@=DIR@:>@], [enable support for tokyo cabinet through toke]), [TOKEPREFIX=$enableval])
 
 ###########################################################
 #
@@ -80,6 +84,7 @@ AC_CACHE_CHECK([for Erlang/OTP ERTS version],
     ])
 AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
+ERLANG_TCERL_FLAGS=
 AS_IF([test "x$HAVETCERL" != x],
             [
             AC_ERLANG_CHECK_LIB(tcerl,
@@ -91,14 +96,36 @@ AS_IF([test "x$HAVETCERL" != x],
                     [ERLANG_TCERLDRV_DIR="$TCERLPREFIX"],
                     [
                     HAVETCERL=""
-                    AC_MSG_NOTICE([tcerldrv libtcbdberl.so not found, disabling tcerl...])
+                    AC_MSG_NOTICE([tcerldrv libtcbdberl.so not found, disabling tcerl support...])
                     ])
                   ])
                 ])
               ],
-              [AC_MSG_FAILURE([tcerl erlang library not found])])
-            AC_SUBST(ERLANG_TCERL_FLAGS,["-pa $ERLANG_LIB_DIR_tcerl/ebin -tcerl tcerldrvprefix \\\"$ERLANG_TCERLDRV_DIR\\\""])
+              [AC_MSG_FAILURE([tcerl erlang library not found, disabling tcerl support...])])
+            ERLANG_TCERL_FLAGS="-pa $ERLANG_LIB_DIR_tcerl/ebin -tcerl tcerldrvprefix \\\"$ERLANG_TCERLDRV_DIR\\\""
             ])
+AC_SUBST([ERLANG_TCERL_FLAGS])
+
+ERLANG_TOKE_FLAGS=
+AS_IF([test "x$TOKEPREFIX" != xno],
+            [
+            AS_IF([test "x$TOKEPREFIX" != x], [export ERL_LIBS="$TOKEPREFIX"])
+            AC_ERLANG_CHECK_LIB(toke,
+              [AC_CHECK_FILE($ERLANG_LIB_DIR_toke/priv/libtoke.so,
+                [HAVETOKE=", {d, have_toke}"
+                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
+                ],
+                [
+                HAVETOKE=""
+                AC_MSG_NOTICE([toke library libtoke.so not found, disabling toke support...])
+                ])
+              ],
+              [
+              HAVETOKE=""
+              AC_MSG_FAILURE([toke erlang library not found, disabling toke support...])])
+            AS_IF([test "x$TOKEPREFIX" != x], [export ERL_LIBS=""])
+            ])
+AC_SUBST([ERLANG_TOKE_FLAGS])
 
 AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([you won't be able to run the unit tests without common_test]))
 
@@ -168,7 +195,7 @@ AC_RUN_IFELSE(
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
+EMAKEFILEDEFINES="$HAVETOKE $HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
 
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(DIALYZER_FLAGS)

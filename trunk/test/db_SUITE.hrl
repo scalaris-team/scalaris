@@ -39,6 +39,22 @@ suite() ->
      {timetrap, {seconds, 5}}
     ].
 
+-spec spawn_config_processes() -> pid().
+spawn_config_processes() ->
+    Owner = self(),
+    Pid =
+        spawn(fun () ->
+                       crypto:start(),
+                       process_dictionary:start_link(),
+                       config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                       Owner ! {continue},
+                       receive {done} -> ok
+                       end
+              end),
+    receive {continue} -> ok
+    end,
+    Pid.
+
 init_per_suite(Config) ->
     application:start(log4erl),
     crypto:start(),
@@ -49,19 +65,12 @@ init_per_suite(Config) ->
             Config;
         db_ets ->
             Config;
+        db_toke ->
+            Pid = spawn_config_processes(),
+            timer:sleep(100),
+            [{wrapper_pid, Pid} | Config];
         db_tcerl ->
-            Owner = self(),
-            Pid = 
-                spawn(fun () ->
-                               crypto:start(),
-                               process_dictionary:start_link(),
-                               config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                               Owner ! {continue},
-                               receive {done} -> ok
-                               end
-                      end),
-            receive {continue} -> ok
-            end,
+            Pid = spawn_config_processes(),
             try db_tcerl:start_per_vm()
             catch
                 error:Reason ->
@@ -224,5 +233,6 @@ get_load_and_middle(_Config) ->
     ?equals(length(HisList), 2),
     ?equals(length(?TEST_DB:get_data(DB7)), 2),
     DB8 = ?TEST_DB:add_data(DB7, HisList),
-    ?equals(OrigFullList, ?TEST_DB:get_data(DB8)),
+    % lists could be in arbitrary order -> sort them
+    ?equals(lists:sort(OrigFullList), lists:sort(?TEST_DB:get_data(DB8))),
     ?TEST_DB:close(DB8).

@@ -564,6 +564,9 @@ EMAKEFILEDEFINES
 RUN_TEST
 ERLANG_LIB_VER_common_test
 ERLANG_LIB_DIR_common_test
+ERLANG_TOKE_FLAGS
+ERLANG_LIB_VER_toke
+ERLANG_LIB_DIR_toke
 ERLANG_TCERL_FLAGS
 ERLANG_LIB_VER_tcerl
 ERLANG_LIB_DIR_tcerl
@@ -621,6 +624,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_tcerl
+enable_toke
 with_browser
 '
       ac_precious_vars='build_alias
@@ -1244,8 +1248,10 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --disable-tcerl         disable support for tokyo cabinet
-  --enable-tcerl[=DIR]    enable support for tokyo cabinet
+  --disable-tcerl         disable support for tokyo cabinet through tcerl
+  --enable-tcerl[=DIR]    enable support for tokyo cabinet through tcerl
+  --disable-toke          disable support for tokyo cabinet through toke
+  --enable-toke[=DIR]     enable support for tokyo cabinet through toke
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -2033,6 +2039,18 @@ $as_echo "yes" >&6; }
 fi
 fi
 
+TOKEPREFIX=
+# Check whether --enable-toke was given.
+if test "${enable_toke+set}" = set; then :
+  enableval=$enable_toke; TOKEPREFIX=no
+fi
+
+# Check whether --enable-toke was given.
+if test "${enable_toke+set}" = set; then :
+  enableval=$enable_toke; TOKEPREFIX=$enableval
+fi
+
+
 ###########################################################
 #
 # check browser for 'make test-vts'
@@ -2474,6 +2492,7 @@ $as_echo "$erlang_cv_erts_ver" >&6; }
 ERLANG_ERTS_VER=$erlang_cv_erts_ver
 
 
+ERLANG_TCERL_FLAGS=
 if test "x$HAVETCERL" != x; then :
 
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'tcerl' library subdirectory" >&5
@@ -2552,7 +2571,7 @@ ERLANG_LIB_VER_tcerl=$ac_cv_erlang_lib_ver_tcerl
 if test "$ac_cv_erlang_lib_dir_tcerl" = "not found"; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error "tcerl erlang library not found
+as_fn_error "tcerl erlang library not found, disabling tcerl support...
 See \`config.log' for more details." "$LINENO" 5; }
 else
   as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_tcerl/priv/lib/libtcbdberl.so" | $as_tr_sh`
@@ -2620,8 +2639,8 @@ eval as_val=\$$as_ac_File
 else
 
                     HAVETCERL=""
-                    { $as_echo "$as_me:${as_lineno-$LINENO}: tcerldrv libtcbdberl.so not found, disabling tcerl..." >&5
-$as_echo "$as_me: tcerldrv libtcbdberl.so not found, disabling tcerl..." >&6;}
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: tcerldrv libtcbdberl.so not found, disabling tcerl support..." >&5
+$as_echo "$as_me: tcerldrv libtcbdberl.so not found, disabling tcerl support..." >&6;}
 
 fi
 
@@ -2636,8 +2655,135 @@ fi
 
             ERLANG_TCERL_FLAGS="-pa $ERLANG_LIB_DIR_tcerl/ebin -tcerl tcerldrvprefix \\\"$ERLANG_TCERLDRV_DIR\\\""
 
+fi
+
+
+ERLANG_TOKE_FLAGS=
+if test "x$TOKEPREFIX" != xno; then :
+
+            if test "x$TOKEPREFIX" != x; then :
+  export ERL_LIBS="$TOKEPREFIX"
+fi
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'toke' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'toke' library subdirectory... " >&6; }
+if test "${ac_cv_erlang_lib_dir_toke+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "cannot run test program while cross compiling
+See \`config.log' for more details." "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("toke") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_toke=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "test Erlang program execution failed
+See \`config.log' for more details." "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_toke="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
 
 fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_toke" >&5
+$as_echo "$ac_cv_erlang_lib_dir_toke" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'toke' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'toke' library version... " >&6; }
+if test "${ac_cv_erlang_lib_ver_toke+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
+  ac_cv_erlang_lib_ver_toke="not found"
+else
+  ac_cv_erlang_lib_ver_toke=`$as_echo "$ac_cv_erlang_lib_dir_toke" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_toke" >&5
+$as_echo "$ac_cv_erlang_lib_ver_toke" >&6; }
+ERLANG_LIB_DIR_toke=$ac_cv_erlang_lib_dir_toke
+
+ERLANG_LIB_VER_toke=$ac_cv_erlang_lib_ver_toke
+
+if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
+
+              HAVETOKE=""
+              { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "toke erlang library not found, disabling toke support...
+See \`config.log' for more details." "$LINENO" 5; }
+else
+  as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_toke/priv/libtoke.so" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so" >&5
+$as_echo_n "checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so... " >&6; }
+if { as_var=$as_ac_File; eval "test \"\${$as_var+set}\" = set"; }; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$ERLANG_LIB_DIR_toke/priv/libtoke.so"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+eval as_val=\$$as_ac_File
+   if test "x$as_val" = x""yes; then :
+  HAVETOKE=", {d, have_toke}"
+                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
+
+else
+
+                HAVETOKE=""
+                { $as_echo "$as_me:${as_lineno-$LINENO}: toke library libtoke.so not found, disabling toke support..." >&5
+$as_echo "$as_me: toke library libtoke.so not found, disabling toke support..." >&6;}
+
+fi
+
+
+fi
+
+            if test "x$TOKEPREFIX" != x; then :
+  export ERL_LIBS=""
+fi
+
+fi
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'common_test' library subdirectory" >&5
 $as_echo_n "checking for Erlang/OTP 'common_test' library subdirectory... " >&6; }
@@ -3091,7 +3237,7 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-EMAKEFILEDEFINES="$HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
+EMAKEFILEDEFINES="$HAVETOKE $HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
 
 
 
