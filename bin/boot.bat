@@ -23,6 +23,7 @@ set NODE_NAME=boot
 set BACKGROUND=
 ::set BACKGROUND=-detached
 set TCERLFLAGS=
+set TOKEFLAGS=
 :: note: paths passed as strings to erlang applications need to be escaped!
 set LOGDIR=%SCALARISDIR:\=\\%\\log
 set DOCROOTDIR=%SCALARISDIR:\=\\%\\docroot
@@ -35,7 +36,7 @@ pushd %BEAMDIR%
 %ERLANG%\erl -setcookie "%SCALARIS_COOKIE%" ^
   -pa "%SCALARISDIR%\contrib\yaws\ebin" ^
   -pa "%SCALARISDIR%\contrib\log4erl\ebin" ^
-  -pa "%BEAMDIR%" %TCERLFLAGS% %BACKGROUND% ^
+  -pa "%BEAMDIR%" %TCERLFLAGS% %TOKEFLAGS% %BACKGROUND% ^
   -yaws embedded true ^
   -boot_cs log_path "\"%LOGDIR%\"" ^
   -boot_cs docroot "\"%DOCROOTDIR%\"" ^

@@ -47,7 +47,7 @@ new(Id) ->
     Dir = lists:flatten(io_lib:format("~s/~s", [config:read(db_directory),
                                   atom_to_list(node())])),
     file:make_dir(Dir),
-    FileName = lists:flatten(io_lib:format("~s/db_~p.tc", [Dir, Id])),
+    FileName = lists:flatten(io_lib:format("~s/db_~p.tcb", [Dir, Id])),
     case tcbdbets:open_file([{file, FileName}, truncate]) of
         {ok, Handle} ->
             Handle;

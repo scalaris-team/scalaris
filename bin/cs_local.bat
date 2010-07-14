@@ -29,6 +29,7 @@ set BEAMDIR=%SCALARISDIR%\ebin
 set BACKGROUND=
 ::set BACKGROUND=-detached
 set TCERLFLAGS=
+set TOKEFLAGS=
 :: note: paths passed as strings to erlang applications need to be escaped!
 set LOGDIR=%SCALARISDIR:\=\\%\\log
 set DOCROOTDIR=%SCALARISDIR:\=\\%\\docroot
@@ -40,7 +41,7 @@ pushd %BEAMDIR%
 %ERLANG%\erl -setcookie "%SCALARIS_COOKIE%" ^
   -pa "%SCALARISDIR%\contrib\yaws\ebin" ^
   -pa "%SCALARISDIR%\contrib\log4erl\ebin" ^
-  -pa "%BEAMDIR%" %TCERLFLAGS% %BACKGROUND% ^
+  -pa "%BEAMDIR%" %TCERLFLAGS% %TOKEFLAGS% %BACKGROUND% ^
   -yaws embedded true ^
   -scalaris log_path "\"%LOGDIR%\"" ^
   -scalaris docroot "\"%NODEDOCROOTDIR%\"" ^

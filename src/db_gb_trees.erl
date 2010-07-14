@@ -77,16 +77,16 @@ update_entry(DB, Entry) ->
 delete_entry(DB, Entry) ->
     gb_trees:delete_any(db_entry:get_key(Entry), DB).
 
-%% @doc returns the number of stored keys
+%% @doc Returns the number of stored keys.
 get_load(DB) ->
     gb_trees:size(DB).
 
-%% @doc adds keys
+%% @doc Adds all db_entry objects in the Data list.
 add_data(DB, Data) ->
     lists:foldl(fun(DBEntry, Tree) -> set_entry(Tree, DBEntry) end, DB, Data).
 
-%% @doc returns the key, which splits the data into two equally
-%%      sized groups
+%% @doc Returns the key, which splits the data into two equally
+%%      sized groups.
 get_middle_key(DB) ->
     case (Length = gb_trees:size(DB)) < 3 of
         true ->
@@ -112,19 +112,20 @@ split_data(DB, MyNewInterval) ->
     {gb_trees:from_orddict([ {db_entry:get_key(DBEntry), DBEntry} ||
                                 DBEntry <- MyList]), HisList}.
 
-%% @doc get keys in a range
+%% @doc Get key/value pairs in the given range.
 get_range(DB, Interval) ->
     [ {db_entry:get_key(DBEntry), db_entry:get_value(DBEntry)}
         || DBEntry <- gb_trees:values(DB),
            not db_entry:is_empty(DBEntry),
            intervals:in(db_entry:get_key(DBEntry), Interval) ].
 
-%% @doc get keys and versions in a range
+%% @doc Gets db_entry objects in the given range.
 get_range_with_version(DB, Interval) ->
     [ DBEntry || DBEntry <- gb_trees:values(DB),
                  not db_entry:is_empty(DBEntry),
                  intervals:in(db_entry:get_key(DBEntry), Interval) ].
 
+%% @doc Get key/value/version triples in the given range.
 get_range_only_with_version(DB, Interval) ->
     [ {db_entry:get_key(DBEntry),
        db_entry:get_value(DBEntry),
