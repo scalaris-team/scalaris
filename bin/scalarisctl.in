@@ -41,7 +41,6 @@ SCALARISCLIENT=$DESTDIR${exec_prefix}/bin/scalaris
 
 SCALARIS_COOKIE="chocolate chip cookie"
 
-TCERLFLAGS="@ERLANG_TCERL_FLAGS@"
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
 interactive=0
@@ -173,7 +172,7 @@ bootstart(){
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
         -pa $SCALARISDIR/contrib/log4erl/ebin \
-        -pa $BEAMDIR $TCERLFLAGS $TOKEFLAGS $BACKGROUND \
+        -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
         -yaws embedded true \
         -boot_cs log_path "\"$LOGDIR\"" \
         -boot_cs docroot "\"$DOCROOTDIR\"" \
@@ -216,7 +215,7 @@ nodestart(){
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
         -pa $SCALARISDIR/contrib/log4erl/ebin \
-        -pa $BEAMDIR $TCERLFLAGS $TOKEFLAGS $BACKGROUND \
+        -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
         -yaws embedded true \
         -scalaris log_path "\"$LOGDIR\"" \
         -scalaris docroot "\"$NODEDOCROOTDIR\"" \
