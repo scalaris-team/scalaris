@@ -21,9 +21,14 @@ AC_INIT(scalaris, 0.2, schuett@zib.de)
 #
 ###########################################################
 
+ENABLE_TOKE=
 TOKEPREFIX=
 AC_ARG_ENABLE([toke], AS_HELP_STRING([--disable-toke], [disable support for tokyo cabinet through toke]), [TOKEPREFIX=no])
-AC_ARG_ENABLE([toke], AS_HELP_STRING([--enable-toke@<:@=DIR@:>@], [enable support for tokyo cabinet through toke]), [TOKEPREFIX=$enableval])
+AC_ARG_ENABLE([toke],
+              AS_HELP_STRING([--enable-toke@<:@=DIR@:>@],
+              [enable support for tokyo cabinet through toke]),
+              [ENABLE_TOKE=yes
+               TOKEPREFIX=$enableval])
 
 ###########################################################
 #
@@ -72,6 +77,7 @@ AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 ERLANG_TOKE_FLAGS=
 AS_IF([test "x$TOKEPREFIX" != xno],
             [
+            ERLANG_TOKE_MESSAGE=
             AS_IF([test "x$TOKEPREFIX" != x], [export ERL_LIBS="$TOKEPREFIX"])
             AC_ERLANG_CHECK_LIB(toke,
               [AC_CHECK_FILE($ERLANG_LIB_DIR_toke/priv/libtoke.so,
@@ -80,13 +86,19 @@ AS_IF([test "x$TOKEPREFIX" != xno],
                 ],
                 [
                 HAVETOKE=""
-                AC_MSG_NOTICE([toke library libtoke.so not found, disabling toke support...])
+                ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
                 ])
               ],
               [
               HAVETOKE=""
-              AC_MSG_FAILURE([toke erlang library not found, disabling toke support...])])
+              ERLANG_TOKE_MESSAGE="toke erlang library not found"
+              ])
             AS_IF([test "x$TOKEPREFIX" != x], [export ERL_LIBS=""])
+            AS_IF([test "x$ERLANG_TOKE_MESSAGE" != x],
+              [AS_IF([test "x$ENABLE_TOKE" != xyes],
+                [ERLANG_TOKE_MESSAGE="$ERLANG_TOKE_MESSAGE, disabling toke support..."
+                 AC_MSG_NOTICE($ERLANG_TOKE_MESSAGE)],
+                AC_MSG_FAILURE($ERLANG_TOKE_MESSAGE))])
             ])
 AC_SUBST([ERLANG_TOKE_FLAGS])
 

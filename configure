@@ -1727,6 +1727,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 #
 ###########################################################
 
+ENABLE_TOKE=
 TOKEPREFIX=
 # Check whether --enable-toke was given.
 if test "${enable_toke+set}" = set; then :
@@ -1735,7 +1736,8 @@ fi
 
 # Check whether --enable-toke was given.
 if test "${enable_toke+set}" = set; then :
-  enableval=$enable_toke; TOKEPREFIX=$enableval
+  enableval=$enable_toke; ENABLE_TOKE=yes
+               TOKEPREFIX=$enableval
 fi
 
 
@@ -2183,6 +2185,7 @@ ERLANG_ERTS_VER=$erlang_cv_erts_ver
 ERLANG_TOKE_FLAGS=
 if test "x$TOKEPREFIX" != xno; then :
 
+            ERLANG_TOKE_MESSAGE=
             if test "x$TOKEPREFIX" != x; then :
   export ERL_LIBS="$TOKEPREFIX"
 fi
@@ -2262,10 +2265,8 @@ ERLANG_LIB_VER_toke=$ac_cv_erlang_lib_ver_toke
 if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
 
               HAVETOKE=""
-              { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error "toke erlang library not found, disabling toke support...
-See \`config.log' for more details." "$LINENO" 5; }
+              ERLANG_TOKE_MESSAGE="toke erlang library not found"
+
 else
   as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_toke/priv/libtoke.so" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so" >&5
@@ -2292,8 +2293,7 @@ eval as_val=\$$as_ac_File
 else
 
                 HAVETOKE=""
-                { $as_echo "$as_me:${as_lineno-$LINENO}: toke library libtoke.so not found, disabling toke support..." >&5
-$as_echo "$as_me: toke library libtoke.so not found, disabling toke support..." >&6;}
+                ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
 
 fi
 
@@ -2302,6 +2302,18 @@ fi
 
             if test "x$TOKEPREFIX" != x; then :
   export ERL_LIBS=""
+fi
+            if test "x$ERLANG_TOKE_MESSAGE" != x; then :
+  if test "x$ENABLE_TOKE" != xyes; then :
+  ERLANG_TOKE_MESSAGE="$ERLANG_TOKE_MESSAGE, disabling toke support..."
+                 { $as_echo "$as_me:${as_lineno-$LINENO}: $ERLANG_TOKE_MESSAGE" >&5
+$as_echo "$as_me: $ERLANG_TOKE_MESSAGE" >&6;}
+else
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "$ERLANG_TOKE_MESSAGE
+See \`config.log' for more details." "$LINENO" 5; }
+fi
 fi
 
 fi
