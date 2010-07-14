@@ -37,6 +37,7 @@
 -export([get_range/2, get_range_with_version/2, get_range_only_with_version/2]).
 -export([get_load/1, get_middle_key/1, split_data/2, get_data/1, add_data/2]).
 -export([update_if_newer/2]).
+-export([check_db/1]).
 
 -spec start_per_vm() -> ok | {error, Reason::term()}.
 
@@ -83,3 +84,5 @@
 -spec add_data(DB::db(), db_as_list()) -> NewDB::db().
 
 -spec update_if_newer(OldDB::db(), KVs::kv_list_version()) -> NewDB::db().
+
+-spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
