@@ -22,7 +22,8 @@ AC_INIT(scalaris, 0.2, schuett@zib.de)
 ###########################################################
 PKG_PROG_PKG_CONFIG
 
-TCERLPREFIX=no
+TCERLPREFIX=
+AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--disable-tcerl], [disable support for tokyo cabinet]), [TCERLPREFIX=no])
 AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--enable-tcerl@<:@=DIR@:>@], [enable support for tokyo cabinet]), [TCERLPREFIX=$enableval])
 
 export PKG_CONFIG_PATH=$TCERLPREFIX/lib/pkgconfig
@@ -32,7 +33,7 @@ AS_IF([test "x$TCERLPREFIX" != xno],
              AC_SUBST([TOKYOCABINET_LIBS])
              PKG_CHECK_MODULES([TCERLDRV],
                                [tcerldrv-1.0],
-                               [[HAVETCERL=", {d, HAVE_TCERL}"]],
+                               [[HAVETCERL=", {d, have_tcerl}"]],
                                [HAVETCERL=""])])
 
 ###########################################################
@@ -81,16 +82,28 @@ AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
 AS_IF([test "x$HAVETCERL" != x],
             [
-            export ERL_LIBS="$TCERLPREFIX/lib/erlang/lib"
-            AC_ERLANG_CHECK_LIB(tcerl, [ERLANG_TCERL_FLAGS="\"-pa $erlang_cv_lib_dir_tcerl/ebin -tcerl tcerldrvprefix=$TCERLPREFIX\""])
-            AC_SUBST([ERLANG_TCERL_FLAGS])
-            export ERL_LIBS=""
+            AC_ERLANG_CHECK_LIB(tcerl,
+              [AC_CHECK_FILE($ERLANG_LIB_DIR_tcerl/priv/lib/libtcbdberl.so,
+                [ERLANG_TCERLDRV_DIR="$ERLANG_LIB_DIR_tcerl/priv"],
+                [AC_CHECK_FILE($ERLANG_LIB_DIR_tcerl/lib/libtcbdberl.so,
+                  [ERLANG_TCERLDRV_DIR="$ERLANG_LIB_DIR_tcerl"],
+                  [AC_CHECK_FILE($TCERLPREFIX/lib/libtcbdberl.so,
+                    [ERLANG_TCERLDRV_DIR="$TCERLPREFIX"],
+                    [
+                    HAVETCERL=""
+                    AC_MSG_NOTICE([tcerldrv libtcbdberl.so not found, disabling tcerl...])
+                    ])
+                  ])
+                ])
+              ],
+              [AC_MSG_FAILURE([tcerl erlang library not found])])
+            AC_SUBST(ERLANG_TCERL_FLAGS,["-pa $ERLANG_LIB_DIR_tcerl/ebin -tcerl tcerldrvprefix \\\"$ERLANG_TCERLDRV_DIR\\\""])
             ])
 
 AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([you won't be able to run the unit tests without common_test]))
 
-AC_CHECK_FILE($ac_cv_erlang_lib_dir_common_test/priv/bin/run_test,
-              [AC_SUBST(RUN_TEST,[$ac_cv_erlang_lib_dir_common_test/priv/bin/run_test])],
+AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
+              [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/run_test])],
               [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/run_test,
               [AC_SUBST(RUN_TEST,[$ac_cv_erlang_root_dir/bin/run_test])],
               [AC_PATH_PROG([RUN_TEST],[run_test])
@@ -141,7 +154,7 @@ AC_RUN_IFELSE(
        [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; AC_MSG_NOTICE([type forward declarations are not supported])])
 
 AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([[-export_type([mytype/0]). -type(mytype()::ok).]], [ok])],
+       [AC_LANG_PROGRAM([-export_type([mytype/0]). -type(mytype()::ok).], [ok])],
        [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
        [EXPORTTYPESUPPORT=""; AC_MSG_NOTICE([export_type is not supported])])
 

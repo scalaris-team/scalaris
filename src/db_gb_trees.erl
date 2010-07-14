@@ -36,9 +36,9 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_link(instanceid()) -> {ok, Pid::pid()} | ignore | {error, any()}.
-start_link(_InstanceId) ->
-    ignore.
+%% @doc There is nothing to do once per VM with gb_trees.
+start_per_vm() ->
+    ok.
 
 %% @doc initializes a new database
 new(_) ->
@@ -107,7 +107,10 @@ split_data(DB, MyNewInterval) ->
                                     intervals:in(db_entry:get_key(DBEntry), MyNewInterval)
                         end,
                         gb_trees:values(DB)),
-    {gb_trees:from_orddict(MyList), HisList}.
+    % note: building [{Key, Val}] from MyList should be more memory efficient
+    % than using gb_trees:to_list(DB) and correcting HisList afterwards
+    {gb_trees:from_orddict([ {db_entry:get_key(DBEntry), DBEntry} ||
+                                DBEntry <- MyList]), HisList}.
 
 %% @doc get keys in a range
 get_range(DB, Interval) ->

@@ -41,7 +41,7 @@ SCALARISCLIENT=$DESTDIR${exec_prefix}/bin/scalaris
 
 SCALARIS_COOKIE="chocolate chip cookie"
 
-TCERLFLAGS=@ERLANG_TCERL_FLAGS@
+TCERLFLAGS="@ERLANG_TCERL_FLAGS@"
 
 interactive=0
 

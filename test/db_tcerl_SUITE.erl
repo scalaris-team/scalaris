@@ -1,4 +1,4 @@
-% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+% @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,19 +12,23 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Unit tests for src/db_gb_trees.erl.
+%%% @author Nico Kruber <kruber@zib.de>
+%%% @doc    Unit tests for src/db_tcerl.erl.
 %%% @end
 %% @version $Id$
--module(db_gb_trees_SUITE).
+-module(db_tcerl_SUITE).
 
--author('schuett@zib.de').
+-author('kruber@zib.de').
 -vsn('$Id$').
 
 -compile(export_all).
 
--define(TEST_DB, db_gb_trees).
+-define(TEST_DB, db_tcerl).
 
 -include("db_SUITE.hrl").
 
+-ifdef(have_tcerl).
 all() -> tests_avail().
+-else.
+all() -> [].
+-endif.

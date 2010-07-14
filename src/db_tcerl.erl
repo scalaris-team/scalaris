@@ -33,9 +33,14 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_link(instanceid()) -> {ok, Pid::pid()} | ignore | {error, any()}.
-start_link(_InstanceId) ->
-    ignore.
+%% @doc Starts the tcerl service (needed by tcerl).
+-ifdef(have_tcerl).
+start_per_vm() ->
+    tcerl:start().
+-else.
+start_per_vm() ->
+    erlang:error('tcerl_not_available').
+-endif.
 
 %% @doc initializes a new database; returns the DB name.
 new(Id) ->
@@ -50,8 +55,9 @@ new(Id) ->
             log:log(error, "[ TCERL ] ~p", [Reason])
     end.
 
-%% delete DB (missing function)
+%% @doc Deletes all contents of the given DB.
 close(DB) ->
+    tcbdbets:delete_all_objects(DB),
     tcbdbets:close(DB).
 
 %% @doc Returns all DB entries.

@@ -61,14 +61,6 @@ start_link(SupervisorType) ->
     scan_environment(),
     Link.
 
--ifdef(HAVE_TCERL).
-start_tcerl() ->
-    tcerl:start().
--else.
-start_tcerl() ->
-    ok.
--endif.
-
 -spec init(supervisor_type()) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
                                         PeriodInSeconds::pos_integer()},
                                        [ProcessDescr::any()]}}.
@@ -77,7 +69,7 @@ init(SupervisorType) ->
     InstanceId = string:concat("scalaris_", randoms:getRandomId()),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
-    start_tcerl(),
+    ?DB:start_per_vm(),
     {ok, {{one_for_one, 10, 1}, my_process_list(InstanceId, SupervisorType)}}.
 
 -spec my_process_list/2 :: (instanceid(), supervisor_type()) -> [any()].

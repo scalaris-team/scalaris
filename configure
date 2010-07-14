@@ -1244,6 +1244,7 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --disable-tcerl         disable support for tokyo cabinet
   --enable-tcerl[=DIR]    enable support for tokyo cabinet
 
 Optional Packages:
@@ -1861,7 +1862,12 @@ $as_echo "no" >&6; }
 
 fi
 
-TCERLPREFIX=no
+TCERLPREFIX=
+# Check whether --enable-tcerl was given.
+if test "${enable_tcerl+set}" = set; then :
+  enableval=$enable_tcerl; TCERLPREFIX=no
+fi
+
 # Check whether --enable-tcerl was given.
 if test "${enable_tcerl+set}" = set; then :
   enableval=$enable_tcerl; TCERLPREFIX=$enableval
@@ -2023,7 +2029,7 @@ else
 	TCERLDRV_LIBS=$pkg_cv_TCERLDRV_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	HAVETCERL=", {d, HAVE_TCERL}"
+	HAVETCERL=", {d, have_tcerl}"
 fi
 fi
 
@@ -2470,7 +2476,6 @@ ERLANG_ERTS_VER=$erlang_cv_erts_ver
 
 if test "x$HAVETCERL" != x; then :
 
-            export ERL_LIBS="$TCERLPREFIX/lib/erlang/lib"
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'tcerl' library subdirectory" >&5
 $as_echo_n "checking for Erlang/OTP 'tcerl' library subdirectory... " >&6; }
 if test "${ac_cv_erlang_lib_dir_tcerl+set}" = set; then :
@@ -2545,13 +2550,92 @@ ERLANG_LIB_DIR_tcerl=$ac_cv_erlang_lib_dir_tcerl
 ERLANG_LIB_VER_tcerl=$ac_cv_erlang_lib_ver_tcerl
 
 if test "$ac_cv_erlang_lib_dir_tcerl" = "not found"; then :
-
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "tcerl erlang library not found
+See \`config.log' for more details." "$LINENO" 5; }
 else
-  ERLANG_TCERL_FLAGS="\"-pa $erlang_cv_lib_dir_tcerl/ebin -tcerl tcerldrvprefix=$TCERLPREFIX\""
+  as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_tcerl/priv/lib/libtcbdberl.so" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_tcerl/priv/lib/libtcbdberl.so" >&5
+$as_echo_n "checking for $ERLANG_LIB_DIR_tcerl/priv/lib/libtcbdberl.so... " >&6; }
+if { as_var=$as_ac_File; eval "test \"\${$as_var+set}\" = set"; }; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$ERLANG_LIB_DIR_tcerl/priv/lib/libtcbdberl.so"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+eval as_val=\$$as_ac_File
+   if test "x$as_val" = x""yes; then :
+  ERLANG_TCERLDRV_DIR="$ERLANG_LIB_DIR_tcerl/priv"
+else
+  as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_tcerl/lib/libtcbdberl.so" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_tcerl/lib/libtcbdberl.so" >&5
+$as_echo_n "checking for $ERLANG_LIB_DIR_tcerl/lib/libtcbdberl.so... " >&6; }
+if { as_var=$as_ac_File; eval "test \"\${$as_var+set}\" = set"; }; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$ERLANG_LIB_DIR_tcerl/lib/libtcbdberl.so"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+eval as_val=\$$as_ac_File
+   if test "x$as_val" = x""yes; then :
+  ERLANG_TCERLDRV_DIR="$ERLANG_LIB_DIR_tcerl"
+else
+  as_ac_File=`$as_echo "ac_cv_file_$TCERLPREFIX/lib/libtcbdberl.so" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $TCERLPREFIX/lib/libtcbdberl.so" >&5
+$as_echo_n "checking for $TCERLPREFIX/lib/libtcbdberl.so... " >&6; }
+if { as_var=$as_ac_File; eval "test \"\${$as_var+set}\" = set"; }; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$TCERLPREFIX/lib/libtcbdberl.so"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+eval as_val=\$$as_ac_File
+   if test "x$as_val" = x""yes; then :
+  ERLANG_TCERLDRV_DIR="$TCERLPREFIX"
+else
+
+                    HAVETCERL=""
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: tcerldrv libtcbdberl.so not found, disabling tcerl..." >&5
+$as_echo "$as_me: tcerldrv libtcbdberl.so not found, disabling tcerl..." >&6;}
+
 fi
 
 
-            export ERL_LIBS=""
+fi
+
+
+fi
+
+
+fi
+
+            ERLANG_TCERL_FLAGS="-pa $ERLANG_LIB_DIR_tcerl/ebin -tcerl tcerldrvprefix \\\"$ERLANG_TCERLDRV_DIR\\\""
+
 
 fi
 
@@ -2634,15 +2718,15 @@ $as_echo "$as_me: you won't be able to run the unit tests without common_test" >
 fi
 
 
-as_ac_File=`$as_echo "ac_cv_file_$ac_cv_erlang_lib_dir_common_test/priv/bin/run_test" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_cv_erlang_lib_dir_common_test/priv/bin/run_test" >&5
-$as_echo_n "checking for $ac_cv_erlang_lib_dir_common_test/priv/bin/run_test... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_common_test/priv/bin/run_test" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_common_test/priv/bin/run_test" >&5
+$as_echo_n "checking for $ERLANG_LIB_DIR_common_test/priv/bin/run_test... " >&6; }
 if { as_var=$as_ac_File; eval "test \"\${$as_var+set}\" = set"; }; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$ac_cv_erlang_lib_dir_common_test/priv/bin/run_test"; then
+if test -r "$ERLANG_LIB_DIR_common_test/priv/bin/run_test"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -2653,7 +2737,7 @@ eval ac_res=\$$as_ac_File
 $as_echo "$ac_res" >&6; }
 eval as_val=\$$as_ac_File
    if test "x$as_val" = x""yes; then :
-  RUN_TEST=$ac_cv_erlang_lib_dir_common_test/priv/bin/run_test
+  RUN_TEST=$ERLANG_LIB_DIR_common_test/priv/bin/run_test
 
 else
   as_ac_File=`$as_echo "ac_cv_file_$ac_cv_erlang_root_dir/bin/run_test" | $as_tr_sh`
@@ -2945,8 +3029,6 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-CODE='-export_type([mytype/0]). -type(mytype()::ok).'
-echo $CODE
 if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
@@ -2956,7 +3038,7 @@ else
   cat > conftest.$ac_ext <<_ACEOF
 -module(conftest).
 -export([start/0]).
--export_type([mytype/0]). -type(mytype()::ok).
+-export_type(mytype/0). -type(mytype()::ok).
 start() ->
 ok
 .
