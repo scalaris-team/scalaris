@@ -27,32 +27,15 @@
 -behaviour(db_beh).
 -type(db()::atom()).
 
-% note: must include this file AFTER the type definitions for erlang < R13B04
-% to work 
--include("db.hrl").
-
--export([start_link/1]).
--export([new/1, close/1]).
--export([get_entry/2, set_entry/2]).
--export([read/2, write/4, get_version/2]).
--export([delete/2]).
--export([set_write_lock/2, unset_write_lock/2,
-         set_read_lock/2, unset_read_lock/2, get_locks/2]).
--export([get_range/2, get_range_with_version/2]).
--export([get_load/1, get_middle_key/1, split_data/2, get_data/1,
-         add_data/2]).
--export([get_range_only_with_version/2,
-         update_if_newer/2]).
-
--ifdef(with_export_type_support).
--export_type([db/0]).
--endif.
+% Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
+% to work.
+-include("db_beh.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_link(instanceid()) -> ignore.
+-spec start_link(instanceid()) -> {ok, Pid::pid()} | ignore | {error, any()}.
 start_link(_InstanceId) ->
     ignore.
 
@@ -68,7 +51,7 @@ new(_) ->
 close(DB) ->
     ets:delete(DB).
 
-%% @doc returns all keys
+%% @doc Returns all DB entries.
 get_data(DB) ->
     ets:tab2list(DB).
 

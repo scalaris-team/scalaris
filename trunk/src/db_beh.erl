@@ -37,6 +37,7 @@ behaviour_info(callbacks) ->
      {get_locks, 2},
      % standard calls
      {read, 2}, {write, 4}, {get_version, 2},
+     {get_entry, 2}, {set_entry, 2}, {update_entry, 2}, {delete_entry, 2},
      % dangerous calls
      {delete, 2},
      %load balancing
