@@ -18,7 +18,7 @@
 %%% @doc    Supervisor for each DHT node that is responsible for keeping
 %%%         processes running that are essential to the operation of the node.
 %%%
-%%%         If one of the supervised processes (dht_node, ?DB, msg_delay or
+%%%         If one of the supervised processes (dht_node, msg_delay or
 %%%         sup_dht_node_core_tx) fails, all will be re-started!
 %%%         Note that the DB is needed by the dht_node (and not vice-versa) and
 %%%         is thus started at first.
@@ -56,9 +56,6 @@ init([InstanceId, Options]) ->
     Node =
         util:sup_worker_desc(dht_node, dht_node, start_link,
                              [InstanceId, Options]),
-    DB =
-        util:sup_worker_desc(?DB, ?DB, start_link,
-                             [InstanceId]),
     Delayer =
         util:sup_worker_desc(msg_delay, msg_delay, start_link,
                              [InstanceId]),
@@ -67,7 +64,6 @@ init([InstanceId, Options]) ->
                                  [InstanceId]),
     {ok, {{one_for_all, 10, 1},
           [
-           DB,
            Proposer, Acceptor, Learner,
            Node,
            Delayer,

@@ -5,7 +5,7 @@ set ERLANG="c:\program files\erl5.7.5\bin"
 ::replace @EMAKEFILEDEFINES@ from Emakefile.in and write Emakefile
 ::(this is what autoconf on *nix would do)
 :: depending on your config, you might need to add one of the following options:
-::  {d, HAVE_TCERL},
+::  {d, have_tcerl},
 ::  {d, types_not_builtin},
 ::  {d, term_not_builtin},
 ::  {d, node_not_builtin},

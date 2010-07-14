@@ -134,7 +134,6 @@ range_read(From, To) ->
         comm:send_local_after(config:read(range_read_timeout), self(), {range_read_timeout}),
     range_read_loop(Interval, intervals:empty(), [], TimerRef).
 
-% TODO: evaluate use of ?DB:db_as_list() as the data type!
 -spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
 range_read_loop(Interval, Done, Data, TimerRef) ->
     receive

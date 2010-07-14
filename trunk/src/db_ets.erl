@@ -35,9 +35,9 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_link(instanceid()) -> {ok, Pid::pid()} | ignore | {error, any()}.
-start_link(_InstanceId) ->
-    ignore.
+%% @doc There is nothing to do once per VM with ets.
+start_per_vm() ->
+    ok.
 
 %% @doc initializes a new database; returns the DB name.
 new(_) ->

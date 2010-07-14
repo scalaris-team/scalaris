@@ -25,6 +25,8 @@
 
 behaviour_info(callbacks) ->
     [
+     % called once per erlang VM
+     {start_per_vm, 0},
      % init (node identifier)
      {new, 1},
      % close, delete?
