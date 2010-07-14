@@ -17,24 +17,9 @@ AC_INIT(scalaris, 0.2, schuett@zib.de)
 
 ###########################################################
 #
-# check tokyo cabinet and tcerl
+# check tokyo cabinet and toke
 #
 ###########################################################
-PKG_PROG_PKG_CONFIG
-
-TCERLPREFIX=
-AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--disable-tcerl], [disable support for tokyo cabinet through tcerl]), [TCERLPREFIX=no])
-AC_ARG_ENABLE([tcerl], AS_HELP_STRING([--enable-tcerl@<:@=DIR@:>@], [enable support for tokyo cabinet through tcerl]), [TCERLPREFIX=$enableval])
-
-export PKG_CONFIG_PATH=$TCERLPREFIX/lib/pkgconfig
-AS_IF([test "x$TCERLPREFIX" != xno],
-            [PKG_CHECK_MODULES([TOKYOCABINET],[tokyocabinet], [])
-             AC_SUBST([TOKYOCABINET_CFLAGS])
-             AC_SUBST([TOKYOCABINET_LIBS])
-             PKG_CHECK_MODULES([TCERLDRV],
-                               [tcerldrv-1.0],
-                               [[HAVETCERL=", {d, have_tcerl}"]],
-                               [HAVETCERL=""])])
 
 TOKEPREFIX=
 AC_ARG_ENABLE([toke], AS_HELP_STRING([--disable-toke], [disable support for tokyo cabinet through toke]), [TOKEPREFIX=no])
@@ -83,28 +68,6 @@ AC_CACHE_CHECK([for Erlang/OTP ERTS version],
      AC_LANG_POP([Erlang])[]dnl
     ])
 AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
-
-ERLANG_TCERL_FLAGS=
-AS_IF([test "x$HAVETCERL" != x],
-            [
-            AC_ERLANG_CHECK_LIB(tcerl,
-              [AC_CHECK_FILE($ERLANG_LIB_DIR_tcerl/priv/lib/libtcbdberl.so,
-                [ERLANG_TCERLDRV_DIR="$ERLANG_LIB_DIR_tcerl/priv"],
-                [AC_CHECK_FILE($ERLANG_LIB_DIR_tcerl/lib/libtcbdberl.so,
-                  [ERLANG_TCERLDRV_DIR="$ERLANG_LIB_DIR_tcerl"],
-                  [AC_CHECK_FILE($TCERLPREFIX/lib/libtcbdberl.so,
-                    [ERLANG_TCERLDRV_DIR="$TCERLPREFIX"],
-                    [
-                    HAVETCERL=""
-                    AC_MSG_NOTICE([tcerldrv libtcbdberl.so not found, disabling tcerl support...])
-                    ])
-                  ])
-                ])
-              ],
-              [AC_MSG_FAILURE([tcerl erlang library not found, disabling tcerl support...])])
-            ERLANG_TCERL_FLAGS="-pa $ERLANG_LIB_DIR_tcerl/ebin -tcerl tcerldrvprefix \\\"$ERLANG_TCERLDRV_DIR\\\""
-            ])
-AC_SUBST([ERLANG_TCERL_FLAGS])
 
 ERLANG_TOKE_FLAGS=
 AS_IF([test "x$TOKEPREFIX" != xno],
@@ -195,7 +158,7 @@ AC_RUN_IFELSE(
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-EMAKEFILEDEFINES="$HAVETOKE $HAVETCERL $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
+EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
 
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(DIALYZER_FLAGS)

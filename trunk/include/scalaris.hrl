@@ -37,7 +37,7 @@
 %% userdevguide-begin scalaris:db
 %%Standard database backend
 %-define(DB, db_gb_trees).
-%-define(DB, db_tcerl).
+%-define(DB, db_toke).
 -define(DB, db_ets).
 %% userdevguide-end scalaris:db
 
