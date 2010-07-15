@@ -81,7 +81,8 @@ test-vts: compile
 test-clean:
 	-rm -rf ct_run.ct@* ct.log index.html all_runs.html variables-ct@* \
             result_increment_10_1000.txt result_increment_1_10000.txt \
-            result_read_10_10000.txt result_read_1_100000.txt
+            result_read_10_10000.txt result_read_1_100000.txt \
+            data/ct@*
 
 java:
 	ant -buildfile java-api/build.xml jar
