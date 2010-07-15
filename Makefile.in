@@ -15,6 +15,7 @@
 ERLC = @ERLC@
 ERL = @ERL@
 DIALYZER = @ERLANG_ROOT_DIR@/bin/dialyzer
+ERL_LIB_DIR = @ERLANG_LIB_DIR@
 SVN = svn
 CD = cd
 MAKE = make
@@ -55,6 +56,10 @@ LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
 # paths of source files for make doc
 SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
 SOURCEPATHS_JAVA=java-api/src/de/zib/*/*.java java-api/src/de/zib/*/*/*.java java-api/test/de/zib/*/*.java
+
+# libraries needed to build a plt suitable for the dialyzer target
+DIALYZER_PLT_LIBS=$(ERL_LIB_DIR)/common_test-*/ebin $(ERL_LIB_DIR)/compiler-*/ebin $(ERL_LIB_DIR)/crypto-*/ebin $(ERL_LIB_DIR)/debugger-*/ebin $(ERL_LIB_DIR)/edoc-*/ebin $(ERL_LIB_DIR)/erts-*/ebin $(ERL_LIB_DIR)/et-*/ebin $(ERL_LIB_DIR)/gs-*/ebin $(ERL_LIB_DIR)/hipe-*/ebin $(ERL_LIB_DIR)/inets-*/ebin $(ERL_LIB_DIR)/kernel-*/ebin $(ERL_LIB_DIR)/mnesia-*/ebin $(ERL_LIB_DIR)/observer-*/ebin $(ERL_LIB_DIR)/public_key-*/ebin/ $(ERL_LIB_DIR)/runtime_tools-*/ebin $(ERL_LIB_DIR)/sasl-*/ebin $(ERL_LIB_DIR)/snmp-*/ebin $(ERL_LIB_DIR)/ssh-*/ebin $(ERL_LIB_DIR)/ssl-*/ebin $(ERL_LIB_DIR)/stdlib-*/ebin $(ERL_LIB_DIR)/syntax_tools-*/ebin $(ERL_LIB_DIR)/test_server-*/ebin/ $(ERL_LIB_DIR)/tools-*/ebin $(ERL_LIB_DIR)/webtool-*/ebin $(ERL_LIB_DIR)/wx-*/ebin $(ERL_LIB_DIR)/xmerl-*/ebin contrib/log4erl/ebin contrib/yaws/ebin
+#DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
 
 all: compile
 #all: compile dialyzer java test docs
@@ -132,6 +137,15 @@ svn:
 
 dialyzer: compile
 	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ --no_native
+
+plt: compile
+	dialyzer --plt_info > /dev/null ; \
+	FAILED=$$? ; \
+	if [ $$FAILED -ne 0 ]; then \
+	  $(DIALYZER) --build_plt  $(DIALYZER_PLT_LIBS) ; \
+	else \
+	  $(DIALYZER) --add_to_plt  $(DIALYZER_PLT_LIBS) ; \
+	fi
 
 rrd-init:
 	@echo This target is deprecated
