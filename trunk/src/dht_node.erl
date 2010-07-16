@@ -265,32 +265,6 @@ on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Load balancing messages (see dht_node_lb.erl) 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({get_load, Source_PID}, State) ->
-    comm:send(Source_PID, {get_load_response, comm:this(), dht_node_state:get(State, load)}),
-    State;
-
-on({get_load_response, Source_PID, Load}, State) ->
-    dht_node_lb:check_balance(State, Source_PID, Load),
-    State;
-
-on({get_middle_key, Source_PID}, State) ->
-    {MiddleKey, NewState} = dht_node_lb:get_middle_key(State),
-    comm:send(Source_PID, {get_middle_key_response, comm:this(), MiddleKey}),
-    NewState;
-
-on({get_middle_key_response, Source_PID, MiddleKey}, State) ->
-    dht_node_lb:move_load(State, Source_PID, MiddleKey);
-
-on({reset_loadbalance_flag}, State) ->
-    dht_node_lb:reset_loadbalance_flag(State);
-
-on({stabilize_loadbalance}, State) ->
-    dht_node_lb:balance_load(State),
-    State;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc. 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_node_details, Pid}, State) ->

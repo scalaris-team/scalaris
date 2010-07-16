@@ -183,7 +183,7 @@ next_hop(_Config) ->
         dht_node_state:new(RT, nodelist:new_neighborhood(node:new(pred, 1, 0),
                                                          node:new(me, 2, 0),
                                                          node:new(succ, 3, 0)),
-                           lb, db),
+                           db),
     gen_component:kill(process_dictionary),
     catch unregister(process_dictionary),
     iter(count(), fun () ->

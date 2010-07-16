@@ -35,7 +35,7 @@
 -export([set_write_lock/2, unset_write_lock/2,
          set_read_lock/2, unset_read_lock/2, get_locks/2]).
 -export([get_range/2, get_range_with_version/2, get_range_only_with_version/2]).
--export([get_load/1, get_middle_key/1, split_data/2, get_data/1, add_data/2]).
+-export([get_load/1, split_data/2, get_data/1, add_data/2]).
 -export([update_if_newer/2]).
 -export([check_db/1]).
 
@@ -77,7 +77,6 @@
          kv_list_version().
 
 -spec get_load(DB::db()) -> Load::integer().
--spec get_middle_key(DB::db()) -> {ok, MiddleKey::?RT:key()} | failed.
 -spec split_data(DB::db(), MyNewInterval::intervals:interval()) ->
          {NewDB::db(), db_as_list()}.
 -spec get_data(DB::db()) -> db_as_list().

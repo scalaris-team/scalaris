@@ -68,9 +68,10 @@ getLoad() ->
     get_load(Nodes).
     
 get_load([Head | Tail]) ->
-    comm:send(Head , {get_load, comm:this()}),
+    comm:send(Head, {get_node_details, comm:this(), [load]}),
     receive
-	{get_load_response, Node, Value} -> [{ok, Node, Value} | get_load(Tail)]
+        {get_node_details_response, NodeDetails} ->
+            [{ok, Head, node_details:get(NodeDetails, load)} | get_load(Tail)]
     after
 	2000 ->
 	    [{failed, Head} | get_load(Tail)]
