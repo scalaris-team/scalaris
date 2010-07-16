@@ -73,7 +73,7 @@ set_entry(DB, Entry) ->
 update_entry(DB, Entry) ->
     gb_trees:update(db_entry:get_key(Entry), Entry, DB).
 
-%% @doc Removes an entry from the DB. Note: the entry has to match exactly!
+%% @doc Removes all values with the given entry's key from the DB.
 delete_entry(DB, Entry) ->
     gb_trees:delete_any(db_entry:get_key(Entry), DB).
 
@@ -84,19 +84,6 @@ get_load(DB) ->
 %% @doc Adds all db_entry objects in the Data list.
 add_data(DB, Data) ->
     lists:foldl(fun(DBEntry, Tree) -> set_entry(Tree, DBEntry) end, DB, Data).
-
-%% @doc Returns the key, which splits the data into two equally
-%%      sized groups.
-get_middle_key(DB) ->
-    case (Length = gb_trees:size(DB)) < 3 of
-        true ->
-            failed;
-        false ->
-            Keys = gb_trees:keys(DB),
-            Middle = Length div 2,
-            MiddleKey = lists:nth(Middle, Keys),
-            {ok, MiddleKey}
-    end.
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).

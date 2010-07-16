@@ -90,9 +90,9 @@ update_entry(DB, Entry) ->
                          erlang:term_to_binary(Entry)),
     DB.
 
-%% @doc Removes an entry from the DB. Note: the entry has to match exactly!
+%% @doc Removes all values with the given entry's key from the DB.
 delete_entry(DB, Entry) ->
-    ok = toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(Entry))),
+    toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(Entry))),
     DB.
 
 %% @doc Returns the number of stored keys.
@@ -103,22 +103,6 @@ get_load(DB) ->
 %% @doc Adds all db_entry objects in the Data list.
 add_data(DB, Data) ->
     lists:foldl(fun(DBEntry, _) -> set_entry(DB, DBEntry) end, DB, Data).
-
-%% @doc Returns the key, which splits the data into two equally
-%%      sized groups.
-get_middle_key(DB) ->
-    KeyList = lists:reverse(
-                toke_drv:fold(fun (Key, _V, Acc) ->
-                                       [erlang:binary_to_term(Key) | Acc]
-                              end, [], DB)),
-    case (Length = length(KeyList)) < 3 of
-        true ->
-            failed;
-        false ->
-            Middle = Length div 2,
-            MiddleKey = lists:nth(Middle, KeyList),
-            {ok, MiddleKey}
-    end.
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).

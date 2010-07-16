@@ -21,13 +21,12 @@
 -include("transstore/trecords.hrl").
 -include("scalaris.hrl").
 
--export([new/3, new/4,
+-export([new/2, new/3,
          get/2,
          set_neighbors/2,
          dump/1,
          set_rt/2,
          set_db/2,
-         set_lb/2,
          details/1, details/2,
          %%transactions
          set_trans_log/2,
@@ -42,7 +41,6 @@
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
 -record(state, {rt :: ?RT:external_rt(),
                 neighbors  :: nodelist:neighborhood(),
-                lb         :: dht_node_lb:lb(),
                 join_time  :: join_time(),
                 trans_log  :: #translog{},
                 db         :: ?DB:db(),
@@ -50,17 +48,16 @@
                 proposer   :: pid()}).
 -opaque state() :: #state{}.
 
--spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(), dht_node_lb:lb()) -> state().
-new(RT, Neighbors, LB) ->
-    new(RT, Neighbors, LB, ?DB:new(nodelist:nodeid(Neighbors))).
+-spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood()) -> state().
+new(RT, Neighbors) ->
+    new(RT, Neighbors, ?DB:new(nodelist:nodeid(Neighbors))).
 
 %% userdevguide-begin dht_node_state:state
 -spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(),
-          dht_node_lb:lb(), ?DB:db()) -> state().
-new(RT, Neighbors, LB, DB) ->
+          ?DB:db()) -> state().
+new(RT, Neighbors, DB) ->
     #state{rt = RT,
            neighbors = Neighbors,
-           lb = LB,
            join_time = now(),
            trans_log = #translog{tid_tm_mapping = dict:new(),
                                  decided        = gb_trees:empty(),
@@ -89,7 +86,6 @@ new(RT, Neighbors, LB, DB) ->
 %%        <li>node_id = the ID of the own node (provided for convenience),</li>
 %%        <li>my_range = the range of the own node,</li>
 %%        <li>succ_range = the range of the successor,</li>
-%%        <li>lb = load balancing state,</li>
 %%        <li>join_time = the time the node was created, i.e. joined the system,</li>
 %%        <li>trans_log = transaction log,</li>
 %%        <li>db = DB storing the items,</li>
@@ -111,14 +107,13 @@ new(RT, Neighbors, LB, DB) ->
           (state(), node_id) -> ?RT:key();
           (state(), my_range) -> intervals:interval();
           (state(), succ_range) -> intervals:interval();
-          (state(), lb) -> dht_node_lb:lb();
           (state(), join_time) -> join_time();
           (state(), trans_log) -> #translog{};
           (state(), db) -> ?DB:db();
           (state(), tx_tp_db) -> any();
           (state(), proposer) -> pid();
           (state(), load) -> integer().
-get(#state{rt=RT, neighbors=Neighbors, lb=LB, join_time=JoinTime,
+get(#state{rt=RT, neighbors=Neighbors, join_time=JoinTime,
            trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer}, Key) ->
     case Key of
         rt         -> RT;
@@ -137,7 +132,6 @@ get(#state{rt=RT, neighbors=Neighbors, lb=LB, join_time=JoinTime,
                                               nodelist:node(Neighbors));
         succ_range -> intervals:mk_from_nodes(nodelist:node(Neighbors),
                                               nodelist:succ(Neighbors));
-        lb         -> LB;
         join_time  -> JoinTime;
         trans_log  -> TransLog;
         db         -> DB;
@@ -156,9 +150,6 @@ set_tx_tp_db(State, DB) -> State#state{tx_tp_db = DB}.
 
 -spec set_db(state(), ?DB:db()) -> state().
 set_db(State, DB) -> State#state{db=DB}.
-
--spec set_lb(state(), dht_node_lb:lb()) -> state().
-set_lb(State, LB) -> State#state{lb=LB}.
 
 -spec set_rt(state(), ?RT:external_rt()) -> state().
 set_rt(State, RT) -> State#state{rt=RT}.

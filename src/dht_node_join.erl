@@ -72,7 +72,7 @@ process_join_msg({idholder_get_id_response, Id, IdVersion},
     rt_beh:initialize(Id, Me, Me),
     NewState = dht_node_state:new(?RT:empty_ext(Me),
                                   nodelist:new_neighborhood(Me),
-                                  dht_node_lb:new(), ?DB:new(Id)),
+                                  ?DB:new(Id)),
     comm:send_local(get_local_dht_node_reregister_pid(), {go}),
     msg_queue:send(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
@@ -159,11 +159,11 @@ process_join_msg({join_response, Pred, Data},
                 rm_beh:notify_new_succ(node:pidX(Pred), Me),
                 dht_node_state:new(?RT:empty_ext(Succ),
                                    nodelist:new_neighborhood(Pred, Me, Succ),
-                                   dht_node_lb:new(), DB);
+                                   DB);
             false ->
                 dht_node_state:new(?RT:empty_ext(Succ),
                                    nodelist:new_neighborhood(Me, Succ),
-                                   dht_node_lb:new(), DB)
+                                   DB)
         end,
     cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
     comm:send_local(get_local_dht_node_reregister_pid(), {go}),

@@ -123,19 +123,3 @@ get_range_only_with_version(DB, Interval) ->
                 end
         end,
     ?ETS:foldl(F, [], DB).
-
-%% @doc Returns the key, which splits the data into two equally sized groups.
-get_middle_key(DB) ->
-    case (Length = ?ETS:info(DB, size)) < 3 of
-        true -> failed;
-        _    -> {ok, nth_key(DB, Length div 2 - 1)}
-    end.
-
-nth_key(DB, N) ->
-    First = ?ETS:first(DB),
-    nth_key_iter(DB, First, N).
-
-nth_key_iter(_DB, Key, 0) ->
-    Key;
-nth_key_iter(DB, Key, N) ->
-    nth_key_iter(DB, ?ETS:next(DB, Key), N - 1).
