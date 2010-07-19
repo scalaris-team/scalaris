@@ -69,7 +69,6 @@ init(SupervisorType) ->
     InstanceId = string:concat("scalaris_", randoms:getRandomId()),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
-    ?DB:start_per_vm(),
     {ok, {{one_for_one, 10, 1}, my_process_list(InstanceId, SupervisorType)}}.
 
 -spec my_process_list/2 :: (instanceid(), supervisor_type()) -> [any()].

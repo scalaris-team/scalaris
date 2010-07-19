@@ -70,13 +70,6 @@ init_per_suite(Config) ->
             [{wrapper_pid, Pid} | Config];
         db_tcerl ->
             Pid = spawn_config_processes(),
-            try db_tcerl:start_per_vm()
-            catch
-                error:Reason ->
-                    gen_component:kill(process_dictionary),
-                    exit(Pid, kill),
-                    erlang:error(Reason)
-            end,
             timer:sleep(100),
             [{wrapper_pid, Pid} | Config]
     end.

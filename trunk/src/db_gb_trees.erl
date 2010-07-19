@@ -36,10 +36,6 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc There is nothing to do once per VM with gb_trees.
-start_per_vm() ->
-    ok.
-
 %% @doc initializes a new database
 new(_) ->
     gb_trees:empty().
