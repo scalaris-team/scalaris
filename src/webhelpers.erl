@@ -110,27 +110,29 @@ renderLoad([]) ->
     [].
 
 %%%--------------------------Vivaldi-Map------------------------------
+-spec getVivaldiMap() -> SVG::string().
 getVivaldiMap() ->
     boot_server:node_list(),
     Nodes =
         receive
-            {get_list_response,X} ->
-            X
+            {get_list_response, X} -> X
         after 2000 ->
             log:log(error,"[ WH ] boot_server:node_list failed~n"),
             {failed}
         end,
     CC_list = lists:map(fun (Pid) -> get_vivaldi(Pid) end, Nodes),
-    renderVivaldiMap(CC_list,Nodes).
+    renderVivaldiMap(CC_list, Nodes).
 
+-spec get_vivaldi(Pid::comm:mypid()) -> vivaldi:network_coordinate().
 get_vivaldi(Pid) ->
-    comm:send_to_group_member(Pid,vivaldi, {get_coordinate,comm:this()}),
+    comm:send_to_group_member(Pid, vivaldi, {get_coordinate, comm:this()}),
     receive
-        {vivaldi_get_coordinate_response,Coordinate,_Confidence} ->
+        {vivaldi_get_coordinate_response, Coordinate, _Confidence} ->
             Coordinate
     end.
 
-renderVivaldiMap(CC_list,Nodes) ->
+-spec renderVivaldiMap(CC_list::[vivaldi:network_coordinate()], Nodes::[comm:mypid()]) -> SVG::string().
+renderVivaldiMap(CC_list, Nodes) ->
     {Min,Max} = get_min_max(CC_list),
     %io:format("Min: ~p Max: ~p~n",[Min,Max]),
     Xof=(lists:nth(1, Max)-lists:nth(1, Min))*0.1,
@@ -166,6 +168,7 @@ renderVivaldiMap(CC_list,Nodes) ->
     Foot="</svg>",
     Head++Content++Foot.
 
+-spec floor(X::number()) -> integer().
 floor(X) ->
     T = trunc(X),
     case X - T == 0 of
@@ -255,7 +258,7 @@ renderRingChart(Ring) ->
     Sizes = lists:map(
               fun ({ok,Node}) ->
                        Me_tmp = get_id(node_details:get(Node, node)),
-                       Pred_tmp = get_id(nodelist:pred(node_details:get(Node, predlist))),
+                       Pred_tmp = get_id(hd(node_details:get(Node, predlist))),
                        if
                            (null =:= Me_tmp) orelse (null =:= Pred_tmp) ->
                                io_lib:format("1.0", []); % guess the size

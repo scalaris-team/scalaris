@@ -22,6 +22,10 @@
 
 -export([join_request/2, process_join_msg/2]).
 
+-ifdef(with_export_type_support).
+-export_type([join_state/0]).
+-endif.
+
 -include("scalaris.hrl").
 
 -type(join_message() ::

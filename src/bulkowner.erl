@@ -66,7 +66,7 @@ bulk_owner(State, I, Msg) ->
 %%      I \cap (id(Nl), id(Starting_node)].
 %%      Note that the range (id(Starting_node), id(Succ_of_starting_node)]
 %%      has already been covered by bulk_owner/3.
--spec bulk_owner_iter(ReverseRTList::nodelist:nodelist(),
+-spec bulk_owner_iter(ReverseRTList::nodelist:snodelist(),
                       I::intervals:interval(), Msg::comm:message(),
                       Limit::?RT:key()) -> ok.
 bulk_owner_iter([], _I, _Msg, _Limit) ->

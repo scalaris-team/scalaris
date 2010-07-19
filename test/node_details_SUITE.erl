@@ -70,12 +70,12 @@ end_per_suite(Config) ->
     Config.
 
 -spec node_details_equals(NodeDetails::node_details:node_details(),
-                          Pred::node_details:node_type() | unknown,
-                          PredList::nodelist:non_empty_nodelist() | unknown,
-                          Node::node_details:node_type() | unknown,
+                          Pred::node:node_type() | unknown,
+                          PredList::nodelist:non_empty_snodelist() | unknown,
+                          Node::node:node_type() | unknown,
                           MyRange::intervals:interval() | unknown,
-                          Succ::node_details:node_type() | unknown,
-                          SuccList::nodelist:non_empty_nodelist() | unknown,
+                          Succ::node:node_type() | unknown,
+                          SuccList::nodelist:non_empty_snodelist() | unknown,
                           Load::node_details:load() | unknown,
                           Hostname::node_details:hostname() | unknown,
                           RTSize::node_details:rt_size() | unknown,
@@ -114,7 +114,7 @@ tester_new0(Config) ->
 % node_details:new/7
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec test_new7(nodelist:non_empty_nodelist(), node_details:node_type(), nodelist:non_empty_nodelist(), node_details:load(), node_details:hostname(), node_details:rt_size(), node_details:memory()) -> true.
+-spec test_new7(nodelist:non_empty_snodelist(), node:node_type(), nodelist:non_empty_snodelist(), node_details:load(), node_details:hostname(), node_details:rt_size(), node_details:memory()) -> true.
 test_new7(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     NodeDetails = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     node_details_equals(NodeDetails, unknown, PredList, Node, unknown, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
@@ -129,7 +129,7 @@ tester_new7(Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec test_set_get_pred(Pred::node_details:node_type()) -> true.
+-spec test_set_get_pred(Pred::node:node_type()) -> true.
 test_set_get_pred(PredTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
@@ -140,7 +140,7 @@ test_set_get_pred(PredTest) ->
     node_details_equals(NodeDetails1_new, PredTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, PredTest, PredList, Node, unknown, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_predlist(PredList::nodelist:non_empty_nodelist()) -> true.
+-spec test_set_get_predlist(PredList::nodelist:non_empty_snodelist()) -> true.
 test_set_get_predlist(PredListTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
@@ -151,7 +151,7 @@ test_set_get_predlist(PredListTest) ->
     node_details_equals(NodeDetails1_new, unknown, PredListTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, unknown, PredListTest, Node, unknown, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_node(Node::node_details:node_type()) -> true.
+-spec test_set_get_node(Node::node:node_type()) -> true.
 test_set_get_node(NodeTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
@@ -173,7 +173,7 @@ test_set_get_my_range(MyRangeTest) ->
     node_details_equals(NodeDetails1_new, unknown, unknown, unknown, MyRangeTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, unknown, PredList, Node, MyRangeTest, unknown, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_succ(Succ::node_details:node_type()) -> true.
+-spec test_set_get_succ(Succ::node:node_type()) -> true.
 test_set_get_succ(SuccTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],
@@ -184,7 +184,7 @@ test_set_get_succ(SuccTest) ->
     node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, SuccTest, unknown, unknown, unknown, unknown, unknown, unknown) andalso
     node_details_equals(NodeDetails2_new, unknown, PredList, Node, unknown, SuccTest, SuccList, Load, Hostname, RTSize, unknown, Memory).
 
--spec test_set_get_succlist(SuccList::nodelist:non_empty_nodelist()) -> true.
+-spec test_set_get_succlist(SuccList::nodelist:non_empty_snodelist()) -> true.
 test_set_get_succlist(SuccListTest) ->
     NodeDetails1 = node_details:new(),
     PredList = [], Node = node:new(comm:this(), 0, 0), SuccList = [],

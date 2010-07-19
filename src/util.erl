@@ -303,7 +303,7 @@ gb_trees_foldl_iter(F, Accu, {Key, Value, Smaller, Bigger}) ->
     Res2 = F(Key, Value, Res1),
     gb_trees_foldl_iter(F, Res2, Bigger).
 
--spec(tc/3 :: (atom(), atom(), [_]) -> {timer:time(), any()}).
+-spec(tc/3 :: (module(), atom(), [_]) -> {integer(), any()}).
 tc(M, F, A) ->
     Before = erlang:now(),
     Val = apply(M, F, A),

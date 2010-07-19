@@ -46,7 +46,7 @@
 -endif.
 
 % vivaldi types
--opaque(network_coordinate() :: [float()]).
+-type(network_coordinate() :: [float()]).
 -type(error() :: float()).
 -type(latency() :: number()).
 
@@ -56,7 +56,7 @@
 % accepted messages of vivaldi processes
 -type(message() ::
     {trigger} |
-    {cy_cache, nodelist:nodelist()} |
+    {cy_cache, [node:node_type()]} |
     {vivaldi_shuffle, comm:mypid(), network_coordinate(), error()} |
     {vivaldi_shuffle_reply, comm:mypid(), network_coordinate(), error()} |
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |

@@ -57,10 +57,10 @@
     {check_state} |
     {cy_subset, comm:mypid(), cyclon_cache:cache()} |
     {cy_subset_response, cyclon_cache:cache(), cyclon_cache:cache()} |
-    {get_node_details_response, node_details:node_details_record() |
-        [{pred, node_details:node_type()} |
-         {node, node_details:node_type()} |
-         {succ, node_details:node_type()}]} |
+    {get_node_details_response, node_details:node_details() |
+        [{pred, node:node_type()} |
+         {node, node:node_type()} |
+         {succ, node:node_type()}]} |
     {get_ages, comm:erl_local_pid()} |
     {get_subset_rand, pos_integer(), comm:erl_local_pid()} |
     {'$gen_cast', {debug_info, comm:erl_local_pid()}}).
@@ -75,7 +75,7 @@ msg_get_ages_response(Pid, Ages) ->
     comm:send_local(Pid, {cy_ages, Ages}).
 
 %% @doc Sends a response message to a request for (a subset of) the cache.
--spec msg_get_subset_response(comm:erl_local_pid(), [cyclon_cache:age()]) -> ok.
+-spec msg_get_subset_response(comm:erl_local_pid(), [node:node_type()]) -> ok.
 msg_get_subset_response(Pid, Cache) ->
     comm:send_local(Pid, {cy_cache, Cache}).
 

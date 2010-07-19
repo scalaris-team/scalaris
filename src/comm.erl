@@ -50,7 +50,7 @@
          this_with_cookie/1, self_with_cookie/1]).
 
 -ifdef(with_export_type_support).
--export_type([message/0, message_tag/0, mypid/0]).
+-export_type([message/0, message_tag/0, mypid/0, erl_local_pid/0]).
 -endif.
 
 -type cookie() :: any().
@@ -72,7 +72,7 @@
 %% -type erl_pid_with_cookie() :: {erl_pid_plain(), c, cookie()}.
 %% -type erl_pid() :: erl_pid_plain() | erl_pid_with_cookie().
 -type mypid_with_cookie() :: {mypid_plain(), c, cookie()}.
--type mypid() :: mypid_plain() | mypid_with_cookie().
+-opaque mypid() :: mypid_plain() | mypid_with_cookie().
 -type message_tag() :: atom().
 % there is no variable length-tuple definition for types -> declare messages with up to 10 parameters here:
 -type message_plain() :: {message_tag()} |
@@ -96,12 +96,6 @@
 send_to_group_member(DestNode, Processname, Mesg) ->
     send(DestNode, {send_to_group_member, Processname, Mesg}).
 
-%% @doc Encapsulates the current process' pid (as returned by this/0) and the
-%%      given cookie for seamless use of cookies with send/2.
--spec this_with_cookie(any()) -> mypid_with_cookie().
-this_with_cookie(Cookie) ->
-    {this(), c, Cookie}.
-
 %% @doc Encapsulates the current process' pid (as returned by self/0) and the
 %%      given cookie for seamless use of cookies with send_local/2 and
 %%      send_local_after/3.
@@ -121,6 +115,8 @@ get_msg_tag(Message) when is_tuple(Message) andalso is_atom(erlang:element(1, Me
 
 % specs for the functions below which differ depending on the currently defined
 % macros
+-spec this() -> mypid().
+-spec this_with_cookie(any()) -> mypid().
 -spec send(Dest::mypid(), Message::message() | group_message()) -> ok.
 -spec send_local(Dest::erl_local_pid(), Message::message()) -> ok.
 -spec send_local_after(Delay::non_neg_integer(), Dest::erl_local_pid() , Message::message()) -> reference().
@@ -131,10 +127,13 @@ get_msg_tag(Message) when is_tuple(Message) andalso is_atom(erlang:element(1, Me
 -ifdef(TCP_LAYER).
 
 %% @doc TCP_LAYER: Returns the pid of the current process.
--spec this() -> mypid_plain().
 this() ->
-    %self().
     comm_layer:this().
+
+%% @doc TCP_LAYER: Encapsulates the current process' pid (as returned by this/0)
+%%      and the given cookie for seamless use of cookies with send/2.
+this_with_cookie(Cookie) ->
+    {comm_layer:this(), c, Cookie}.
 
 %% @doc TCP_LAYER: Sends a message to a process given by its pid.
 send({Pid, c, Cookie}, Message) ->
@@ -179,9 +178,13 @@ is_valid(Pid) ->
 -ifdef(BUILTIN).
 
 %% @doc BUILTIN: Returns the pid of the current process.
--spec this() -> pid().
 this() ->
     self().
+
+%% @doc BUILTIN: Encapsulates the current process' pid (as returned by this/0)
+%%      and the given cookie for seamless use of cookies with send/2.
+this_with_cookie(Cookie) ->
+    {self(), c, Cookie}.
 
 %% @doc BUILTIN: Sends a message to a process given by its pid.
 send(Pid, Message) ->

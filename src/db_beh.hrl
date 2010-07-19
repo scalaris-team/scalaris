@@ -24,7 +24,8 @@
 -type(db_as_list() :: [db_entry:entry()]).
 
 -ifdef(with_export_type_support).
--export_type([db/0]).
+-export_type([db/0, value/0, version/0, kv_list/0, kv_list_version/0,
+              db_as_list/0]).
 -endif.
 
 -export([start_per_vm/0]).
