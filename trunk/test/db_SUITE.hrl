@@ -470,27 +470,27 @@ prop_read_lock(Key, Value, Version) ->
     
     % lock on existing entry:
     DB3 = ?TEST_DB:write(DB, Key, Value, Version),
-    check_entry(DB3, Key, create_db_entry(Key, Value, false, 0, Version), {ok, Value, Version}, {ok, Version}, {false, 0, Version}, "check_entry_write_lock_3"),
-    check_db(DB3, {true, []}, 1, [create_db_entry(Key, Value, false, 0, Version)], "check_db_write_lock_3"),
+    check_entry(DB3, Key, create_db_entry(Key, Value, false, 0, Version), {ok, Value, Version}, {ok, Version}, {false, 0, Version}, "check_entry_read_lock_3"),
+    check_db(DB3, {true, []}, 1, [create_db_entry(Key, Value, false, 0, Version)], "check_db_read_lock_3"),
     % read lock on existing key
     DB4 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB3, Key), ok),
-    check_entry(DB4, Key, create_db_entry(Key, Value, false, 1, Version), {ok, Value, Version}, {ok, Version}, {false, 1, Version}, "check_entry_write_lock_4"),
-    check_db(DB4, {true, []}, 1, [create_db_entry(Key, Value, false, 1, Version)], "check_db_write_lock_4"),
+    check_entry(DB4, Key, create_db_entry(Key, Value, false, 1, Version), {ok, Value, Version}, {ok, Version}, {false, 1, Version}, "check_entry_read_lock_4"),
+    check_db(DB4, {true, []}, 1, [create_db_entry(Key, Value, false, 1, Version)], "check_db_read_lock_4"),
     DB5 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB4, Key), ok),
-    check_entry(DB5, Key, create_db_entry(Key, Value, false, 2, Version), {ok, Value, Version}, {ok, Version}, {false, 2, Version}, "check_entry_write_lock_5"),
-    check_db(DB5, {true, []}, 1, [create_db_entry(Key, Value, false, 2, Version)], "check_db_write_lock_5"),
+    check_entry(DB5, Key, create_db_entry(Key, Value, false, 2, Version), {ok, Value, Version}, {ok, Version}, {false, 2, Version}, "check_entry_read_lock_5"),
+    check_db(DB5, {true, []}, 1, [create_db_entry(Key, Value, false, 2, Version)], "check_db_read_lock_5"),
     % read unlock on existing key
     DB6 = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB5, Key), ok),
-    check_entry(DB6, Key, create_db_entry(Key, Value, false, 1, Version), {ok, Value, Version}, {ok, Version}, {false, 1, Version}, "check_entry_write_lock_6"),
-    check_db(DB6, {true, []}, 1, [create_db_entry(Key, Value, false, 1, Version)], "check_db_write_lock_6"),
+    check_entry(DB6, Key, create_db_entry(Key, Value, false, 1, Version), {ok, Value, Version}, {ok, Version}, {false, 1, Version}, "check_entry_read_lock_6"),
+    check_db(DB6, {true, []}, 1, [create_db_entry(Key, Value, false, 1, Version)], "check_db_read_lock_6"),
     % unlockable again?
     DB7 = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB6, Key), ok),
-    check_entry(DB7, Key, create_db_entry(Key, Value, false, 0, Version), {ok, Value, Version}, {ok, Version}, {false, 0, Version}, "check_entry_write_lock_7"),
-    check_db(DB7, {true, []}, 1, [create_db_entry(Key, Value, false, 0, Version)], "check_db_write_lock_7"),
+    check_entry(DB7, Key, create_db_entry(Key, Value, false, 0, Version), {ok, Value, Version}, {ok, Version}, {false, 0, Version}, "check_entry_read_lock_7"),
+    check_db(DB7, {true, []}, 1, [create_db_entry(Key, Value, false, 0, Version)], "check_db_read_lock_7"),
     % read unlock on non-read-locked key
     DB8 = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB7, Key), failed),
-    check_entry(DB8, Key, create_db_entry(Key, Value, false, 0, Version), {ok, Value, Version}, {ok, Version}, {false, 0, Version}, "check_entry_write_lock_8"),
-    check_db(DB8, {true, []}, 1, [create_db_entry(Key, Value, false, 0, Version)], "check_db_write_lock_8"),
+    check_entry(DB8, Key, create_db_entry(Key, Value, false, 0, Version), {ok, Value, Version}, {ok, Version}, {false, 0, Version}, "check_entry_read_lock_8"),
+    check_db(DB8, {true, []}, 1, [create_db_entry(Key, Value, false, 0, Version)], "check_db_read_lock_8"),
     
     ?TEST_DB:close(DB8),
     true.
