@@ -29,7 +29,9 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([avg_kr/0, state/0, values/0, values_internal/0]).
+-export_type([state/0, values/0, values_internal/0,
+              avg/0, avg2/0, stddev/0, size_inv/0, size/0, avg_kr/0, min/0,
+              max/0, round/0, triggered/0, msg_exch/0, converge_avg_count/0]).
 -endif.
 
 %%
@@ -101,7 +103,7 @@
                  triggered = 0 :: triggered(), % how often the trigger called since the node entered/created the round
                  msg_exch  = 0 :: msg_exch() % how often messages have been exchanged with other nodes
 }).
--type(values() :: #values{}).
+-type(values() :: #values{}). %% @todo: mark as opaque (dialyzer currently crashes if set)
 
 % internal record of gossip values used for the state
 -record(values_internal, {avg       = unknown :: avg(), % average load
@@ -112,7 +114,7 @@
                           max       = unknown :: max(),
                           round     = 0 :: round()
 }).
--type(values_internal() :: #values_internal{}).
+-type(values_internal() :: #values_internal{}). %% @todo: mark as opaque (dialyzer currently crashes if set)
 
 % state of the gossip process
 -record(state, {values             = #values_internal{} :: values_internal(),  % stored (internal) values

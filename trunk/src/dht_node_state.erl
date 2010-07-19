@@ -95,11 +95,11 @@ new(RT, Neighbors, DB) ->
 %%      </ul>
 -spec get(state(), rt) -> ?RT:external_rt();
           (state(), rt_size) -> non_neg_integer();
-          (state(), succlist) -> nodelist:non_empty_nodelist();
+          (state(), succlist) -> nodelist:non_empty_snodelist();
           (state(), succ) -> node:node_type();
           (state(), succ_id) -> ?RT:key();
           (state(), succ_pid) -> comm:mypid();
-          (state(), predlist) -> nodelist:non_empty_nodelist();
+          (state(), predlist) -> nodelist:non_empty_snodelist();
           (state(), pred) -> node:node_type();
           (state(), pred_id) -> ?RT:key();
           (state(), pred_pid) -> comm:mypid();
@@ -185,7 +185,7 @@ details(State, Which) ->
 %% @doc Gets the following details about the current node:
 %%      predecessor and successor lists, the node itself, its load, hostname,
 %%      routing table size, memory usage.
--spec details(state()) -> node_details:node_details_record().
+-spec details(state()) -> node_details:node_details().
 details(State) ->
     PredList = get(State, predlist),
     SuccList = get(State, succlist),

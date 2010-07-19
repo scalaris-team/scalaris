@@ -51,7 +51,7 @@ new() ->
     [].
 
 %% @doc Creates a new node cache with the given two nodes and ages 0.
--spec new(node_details:node_type(), node_details:node_type()) -> cache().
+-spec new(node:node_type(), node:node_type()) -> cache().
 new(Node1, Node2) ->
     case node:equals(Node1, Node2) of
         true  -> [{Node1, 0}];
@@ -71,13 +71,13 @@ get_random_node(Cache) ->
 
 %% @doc Removes a random element from the (non-empty!) cache and returns the
 %%      resulting cache and the removed node.
--spec pop_random_node([Cache::element(),...]) -> {NewCache::cache(), PoppedNode::node_details:node_type()}.
+-spec pop_random_node([Cache::element(),...]) -> {NewCache::cache(), PoppedNode::node:node_type()}.
 pop_random_node(Cache) ->
     pop_random_node(Cache, cyclon_cache:size(Cache)).
 
 %% @doc Removes a random element from the (non-empty!) cache and returns the
 %%      resulting cache and the removed node.
--spec pop_random_node(Cache::[element(),...], CacheSize::non_neg_integer()) -> {NewCache::cache(), PoppedNode::node_details:node_type()}.
+-spec pop_random_node(Cache::[element(),...], CacheSize::non_neg_integer()) -> {NewCache::cache(), PoppedNode::node:node_type()}.
 pop_random_node(Cache, CacheSize) ->
     {NewCache, {Node, _Age}} = util:pop_randomelem(Cache, CacheSize),
     {NewCache, Node}.
@@ -88,7 +88,7 @@ get_random_subset(N, Cache) ->
     util:random_subset(N, Cache).
 
 %% @doc Returns a random subset of N nodes from the cache.
--spec get_random_nodes(N::non_neg_integer(), Cache::cache()) -> Nodes::[node_details:node_type()].
+-spec get_random_nodes(N::non_neg_integer(), Cache::cache()) -> Nodes::[node:node_type()].
 get_random_nodes(N, Cache) ->
     [Node || {Node, _Age} <- util:random_subset(N, Cache)].
 
@@ -140,7 +140,7 @@ get_nodes(Cache) ->
 %%      already contained in MyCache, fill up empty slots in the cache with
 %%      received entries and further replace elements in MyCache using
 %%      replace/5.
--spec merge(MyCache::cache(), MyNode::node_details:node_type(), ReceivedCache::cache(), SendCache::cache(), TargetSize::pos_integer()) -> NewCache::cache().
+-spec merge(MyCache::cache(), MyNode::node:node_type(), ReceivedCache::cache(), SendCache::cache(), TargetSize::pos_integer()) -> NewCache::cache().
 merge(MyCache, MyNode, ReceivedCache, SendCache, TargetSize) ->
     % first sort the two lists to allow transformation into 3 lists containing
     % the received entries without the already known nodes, a list of entries

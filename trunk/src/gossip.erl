@@ -81,13 +81,7 @@
 -export([get_values_best/0, get_values_best/1,
          get_values_all/0, get_values_all/1]).
 
--type(load() :: integer()).
-
 -type(state() :: gossip_state:state()).
--type(values() :: gossip_state:values()).
--type(values_internal() :: gossip_state:values_internal()).
-%% -type(values() :: gossip_state:values()).
--type(avg_kr() :: gossip_state:avg_kr()).
 
 %% Full state of the gossip process:
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
@@ -100,9 +94,9 @@
     {trigger} |
     {{get_node_details_response, node_details:node_details()}, local_info} |
     {{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
-    {get_state, comm:mypid(), values_internal()} |
-    {get_state_response, values_internal()} |
-    {cy_cache, nodelist:nodelist()} |
+    {get_state, comm:mypid(), gossip_state:values_internal()} |
+    {get_state_response, gossip_state:values_internal()} |
+    {cy_cache, [node:node_type()]} |
     {get_values_all, comm:erl_local_pid()} | 
     {get_values_best, comm:erl_local_pid()} |
     {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
@@ -112,12 +106,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends a response message to a request for the best stored values.
--spec msg_get_values_best_response(comm:erl_local_pid(), values()) -> ok.
+-spec msg_get_values_best_response(comm:erl_local_pid(), gossip_state:values()) -> ok.
 msg_get_values_best_response(Pid, BestValues) ->
     comm:send_local(Pid, {gossip_get_values_best_response, BestValues}).
 
 %% @doc Sends a response message to a request for all stored values.
--spec msg_get_values_all_response(comm:erl_local_pid(), values(), values(), values()) -> ok.
+-spec msg_get_values_all_response(comm:erl_local_pid(), gossip_state:values(), gossip_state:values(), gossip_state:values()) -> ok.
 msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
     comm:send_local(Pid, {gossip_get_values_all_response, PreviousValues, CurrentValues, BestValues}).
 
@@ -396,9 +390,9 @@ on(_Message, _State) ->
 % State update
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec integrate_state(values_internal(), state(), state(), true,
+-spec integrate_state(gossip_state:values_internal(), state(), state(), true,
                        comm:mypid()) -> {state(), state()}
-                    ; (values_internal(), state(), state(), false,
+                    ; (gossip_state:values_internal(), state(), state(), false,
                        any()) -> {state(), state()}.
 integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 %%     io:format("gossip:integrate_state: ~p~n",[{OtherValues, MyState}]),
@@ -450,7 +444,7 @@ integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
 
 %% @doc Updates MyState with the information from OtherState if both share the
 %%      same round, otherwise MyState is used as is.
--spec update(state(), values_internal()) -> state().
+-spec update(state(), gossip_state:values_internal()) -> state().
 update(MyState, OtherValues) ->
 %%     io:format("gossip:update ~p~n",[{MyState, OtherValues}]),
     MyValues = gossip_state:get(MyState, values),
@@ -484,7 +478,7 @@ update(MyState, OtherValues) ->
 
 %% @doc Calculates the change in percent from the Old value to the New value.
 -spec calc_change(Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2,
-                   OldValues::values_internal(), NewValues::values_internal()) -> Change::float().
+                   OldValues::gossip_state:values_internal(), NewValues::gossip_state:values_internal()) -> Change::float().
 calc_change(Key, OldValues, NewValues) ->
     Old = gossip_state:get(OldValues, Key),
     New = gossip_state:get(NewValues, Key),
@@ -498,7 +492,7 @@ calc_change(Key, OldValues, NewValues) ->
 %%      another node's value.
 %% @see calc_new_value/3
 -spec update_value(Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2,
-                    values_internal(), values_internal()) -> values_internal().
+                    gossip_state:values_internal(), gossip_state:values_internal()) -> gossip_state:values_internal().
 update_value(Key, MyValues, OtherValues) ->
     MyValue = gossip_state:get(MyValues, Key),
     OtherValue = gossip_state:get(OtherValues, Key),
@@ -555,7 +549,7 @@ calc_avg(MyValue, OtherValue) ->
 %%      avg_kr) in its real state. This should (only) be called when a load
 %%      and key range information message from the local node has been received
 %%      for the first time in a round.
--spec integrate_local_info(state(), load(), avg_kr()) -> state().
+-spec integrate_local_info(state(), node_details:load(), gossip_state:avg_kr()) -> state().
 integrate_local_info(MyState, Load, Avg_kr) ->
     MyValues = gossip_state:get(MyState, values),
     ValuesWithNewInfo =
@@ -594,7 +588,7 @@ new_round(OldState) ->
 %% @doc Enters the given round and thus resets the current state with
 %%      information from another node's state. Also requests the own node's
 %%      load and key range to integrate into its own state.
--spec enter_round(state(), state(), values_internal()) -> {state(), state()}.
+-spec enter_round(state(), state(), gossip_state:values_internal()) -> {state(), state()}.
 enter_round(OldPreviousState, OldState, OtherValues) ->
     MyRound = gossip_state:get(OldState, round),
     OtherRound = gossip_state:get(OtherValues, round),
@@ -668,10 +662,12 @@ get_addr_size() ->
 %%      predecessor. If the second is larger than the first it wraps around and
 %%      thus the difference is the number of keys from the predecessor to the
 %%      end (of the ring) and from the start to the current node.
--spec calc_initial_avg_kr(Pred::node:node_type(), Me::node:node_type()) -> avg_kr().
+-spec calc_initial_avg_kr(Pred::node:node_type(), Me::node:node_type()) -> gossip_state:avg_kr().
 calc_initial_avg_kr(Pred, Me) ->
     PredKey = node:id(Pred),
     MyKey = node:id(Me),
+    % we don't know whether we can subtract keys of type ?RT:key()
+    % -> try it and if it fails, return unknown
     try
         if
             PredKey =:= MyKey -> get_addr_size(); % I am the only node

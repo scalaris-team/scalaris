@@ -44,9 +44,9 @@
 
 % accepted messages
 -type(message() ::
-    {init, Id::?RT:key(), Me::node_details:node_type(), Predecessor::node_details:node_type(), Successor::node:node_type()} |
+    {init, Id::?RT:key(), Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
     {trigger} |
-    {cy_cache, Cache::nodelist:nodelist()} |
+    {cy_cache, Cache::[node:node_type()]} |
     {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()} |
     {zombie, Node::node:node_type()} |
@@ -216,7 +216,7 @@ on({crash, DeadPid},
    {Id, Neighborhood, _RandViewSize, _Interval, TriggerState, Cache, Churn}) ->
     EvalFun = fun dn_cache:add_zombie_candidate/1,
     NewNeighborhood = nodelist:remove(DeadPid, Neighborhood, EvalFun),
-    NewCache = nodelist:remove(DeadPid, Cache, EvalFun),
+    NewCache = nodelist:lremove(DeadPid, Cache, EvalFun),
     update_dht_node(Neighborhood, NewNeighborhood),
     update_failuredetector(Neighborhood, NewNeighborhood),
     NewTriggerState = trigger:next(TriggerState, now_and_min_interval),

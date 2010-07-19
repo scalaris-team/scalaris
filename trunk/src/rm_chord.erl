@@ -37,11 +37,11 @@
 
 % accepted messages
 -type(message() ::
-    {init, Id::?RT:key(), Me::node_details:node_type(), Predecessor::node_details:node_type(), Successor::node:node_type()} |
+    {init, Id::?RT:key(), Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
     {get_succlist, Source_Pid::comm:mypid()} |
     {stabilize} |
     {get_node_details_response, NodeDetails::node_details:node_details()} |
-    {get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_nodelist()} |
+    {get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()} |
     {notify_new_pred, Pred::node:node_type()} |
     {notify_new_succ, Succ::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |

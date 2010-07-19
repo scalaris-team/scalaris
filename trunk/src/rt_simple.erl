@@ -169,6 +169,6 @@ update_pred_succ_in_dht_node(_Pred, Succ, Succ) ->
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
--spec to_list(dht_node_state:state()) -> nodelist:nodelist().
+-spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) ->
     [dht_node_state:get(State, node), dht_node_state:get(State, succ)].
