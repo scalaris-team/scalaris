@@ -155,7 +155,7 @@ AC_RUN_IFELSE(
        [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; TYPEFORWARDDECLARATIONS_DIALYZER="-Dtype_forward_declarations_are_not_allowed"; AC_MSG_NOTICE([type forward declarations are not supported])])
 
 AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-export_type(@<:@mytype/0@:>@). -type(mytype()::ok).], [ok])],
+       [AC_LANG_PROGRAM([[-export_type([mytype/0]). -type(mytype()::ok).]], [ok])],
        [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_DIALYZER="-Dwith_export_type_support"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
        [EXPORTTYPESUPPORT=""; EXPORTTYPESUPPORT_DIALYZER=""; AC_MSG_NOTICE([export_type is not supported])])
 
