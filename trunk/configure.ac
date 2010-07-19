@@ -82,16 +82,17 @@ AS_IF([test "x$TOKEPREFIX" != xno],
             AC_ERLANG_CHECK_LIB(toke,
               [AC_CHECK_FILE($ERLANG_LIB_DIR_toke/priv/libtoke.so,
                 [HAVETOKE=", {d, have_toke}"
+                 HAVETOKE_DIALYZER="-Dhave_toke"
                  ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
                 ],
-                [
-                HAVETOKE=""
-                ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
+                [HAVETOKE=""
+                 HAVETOKE_DIALYZER=""
+                 ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
                 ])
               ],
-              [
-              HAVETOKE=""
-              ERLANG_TOKE_MESSAGE="toke erlang library not found"
+              [HAVETOKE=""
+               HAVETOKE_DIALYZER=""
+               ERLANG_TOKE_MESSAGE="toke erlang library not found"
               ])
             AS_IF([test "x$TOKEPREFIX" != x], [export ERL_LIBS=""])
             AS_IF([test "x$ERLANG_TOKE_MESSAGE" != x],
@@ -113,56 +114,55 @@ AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
                   AC_MSG_NOTICE([run_test not found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
                fi])])
 
-DIALYZER_FLAGS=""
-
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
-       [GBTREESISBUILTIN=""; AC_MSG_NOTICE([gb_tree() is a built-in type])],
-       [GBTREESISBUILTIN=", {d, types_not_builtin}"; AC_MSG_NOTICE([gb_tree() is not built-in])])
+       [GBTREESISBUILTIN=""; GBTREESISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([gb_tree() is a built-in type])],
+       [GBTREESISBUILTIN=", {d, types_not_builtin}"; GBTREESISBUILTIN_DIALYZER="-Dtypes_not_builtin"; AC_MSG_NOTICE([gb_tree() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::term()).], [ok])],
-       [TERMISBUILTIN=""; AC_MSG_NOTICE([term() is a built-in type])],
-       [TERMISBUILTIN=", {d, term_not_builtin}"; AC_MSG_NOTICE([term() is not built-in])])
+       [TERMISBUILTIN=""; TERMISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([term() is a built-in type])],
+       [TERMISBUILTIN=", {d, term_not_builtin}"; TERMISBUILTIN_DIALYZER="-Dterm_not_builtin"; AC_MSG_NOTICE([term() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::node()).], [ok])],
-       [NODEISBUILTIN=""; AC_MSG_NOTICE([node() is a built-in type])],
-       [NODEISBUILTIN=", {d, node_not_builtin}"; AC_MSG_NOTICE([node() is not built-in])])
+       [NODEISBUILTIN=""; NODEISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([node() is a built-in type])],
+       [NODEISBUILTIN=", {d, node_not_builtin}"; NODEISBUILTIN_DIALYZER="-Dnode_not_builtin"; AC_MSG_NOTICE([node() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::module()).], [ok])],
-       [MODULEISBUILTIN=""; AC_MSG_NOTICE([module() is a built-in type])],
-       [MODULEISBUILTIN=", {d, module_not_builtin}"; AC_MSG_NOTICE([module() is not built-in])])
+       [MODULEISBUILTIN=""; MODULEISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([module() is a built-in type])],
+       [MODULEISBUILTIN=", {d, module_not_builtin}"; MODULEISBUILTIN_DIALYZER="-Dmodule_not_builtin"; AC_MSG_NOTICE([module() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::boolean()).], [ok])],
-       [BOOLEANISBUILTIN=""; AC_MSG_NOTICE([boolean() is a built-in type])],
-       [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; AC_MSG_NOTICE([boolean() is not built-in])])
+       [BOOLEANISBUILTIN=""; BOOLEANISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([boolean() is a built-in type])],
+       [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; BOOLEANISBUILTIN_DIALYZER="-Dboolean_not_builtin"; AC_MSG_NOTICE([boolean() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::tid()).], [ok])],
-       [TIDISBUILTIN=""; AC_MSG_NOTICE([tid() is a built-in type])],
-       [TIDISBUILTIN=", {d, tid_not_builtin}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dtid_not_builtin"; AC_MSG_NOTICE([tid() is not built-in])])
+       [TIDISBUILTIN=""; TIDISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([tid() is a built-in type])],
+       [TIDISBUILTIN=", {d, tid_not_builtin}"; TIDISBUILTIN_DIALYZER="-Dtid_not_builtin"; AC_MSG_NOTICE([tid() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype()} | ok).], [ok])],
-       [RECURSIVETYPESALLOWED=""; AC_MSG_NOTICE([recursive types are supported])],
-       [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; AC_MSG_NOTICE([recursive types are not supported])])
+       [RECURSIVETYPESALLOWED=""; RECURSIVETYPESALLOWED_DIALYZER=""; AC_MSG_NOTICE([recursive types are supported])],
+       [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; RECURSIVETYPESALLOWED_DIALYZER="-Drecursive_types_are_not_allowed"; AC_MSG_NOTICE([recursive types are not supported])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype2()} | ok). -type(mytype2() :: ok).], [ok])],
-       [TYPEFORWARDDECLARATIONS=""; AC_MSG_NOTICE([type forward declarations are supported])],
-       [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; AC_MSG_NOTICE([type forward declarations are not supported])])
+       [TYPEFORWARDDECLARATIONS=""; TYPEFORWARDDECLARATIONS_DIALYZER=""; AC_MSG_NOTICE([type forward declarations are supported])],
+       [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; TYPEFORWARDDECLARATIONS_DIALYZER="-Dtype_forward_declarations_are_not_allowed"; AC_MSG_NOTICE([type forward declarations are not supported])])
 
 AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-export_type([mytype/0]). -type(mytype()::ok).], [ok])],
-       [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
-       [EXPORTTYPESUPPORT=""; AC_MSG_NOTICE([export_type is not supported])])
+       [AC_LANG_PROGRAM([-export_type(@<:@mytype/0@:>@). -type(mytype()::ok).], [ok])],
+       [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_DIALYZER="-Dwith_export_type_support"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
+       [EXPORTTYPESUPPORT=""; EXPORTTYPESUPPORT_DIALYZER=""; AC_MSG_NOTICE([export_type is not supported])])
 
 if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
    AC_MSG_NOTICE([forward declarations or recursive types are not allowed])
    FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
+   FORWARDORRECURSIVE_DIALYZER="-Dforward_or_recursive_types_are_not_allowed"
 fi
 
 AC_RUN_IFELSE(
@@ -170,7 +170,8 @@ AC_RUN_IFELSE(
        [AC_MSG_NOTICE([crypto:start() is available])],
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
+EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $TIDISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $EXPORTTYPESUPPORT"
+DIALYZER_FLAGS="$HAVETOKE_DIALYZER $GBTREESISBUILTIN_DIALYZER $TERMISBUILTIN_DIALYZER $NODEISBUILTIN_DIALYZER $MODULEISBUILTIN_DIALYZER $BOOLEANISBUILTIN_DIALYZER $TIDISBUILTIN_DIALYZER $RECURSIVETYPESALLOWED_DIALYZER $TYPEFORWARDDECLARATIONS_DIALYZER $FORWARDORRECURSIVE_DIALYZER $EXPORTTYPESUPPORT_DIALYZER"
 
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(DIALYZER_FLAGS)
