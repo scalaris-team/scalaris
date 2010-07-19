@@ -35,10 +35,6 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc There is nothing to do once per VM with ets.
-start_per_vm() ->
-    ok.
-
 %% @doc initializes a new database; returns the DB name.
 new(_) ->
     % ets prefix: DB_ + random name

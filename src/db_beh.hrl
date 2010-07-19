@@ -28,7 +28,6 @@
               db_as_list/0]).
 -endif.
 
--export([start_per_vm/0]).
 -export([new/1, close/1]).
 -export([get_entry/2, set_entry/2, update_entry/2, delete_entry/2]).
 -export([read/2, write/4, get_version/2]).
@@ -39,8 +38,6 @@
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
 -export([update_if_newer/2]).
 -export([check_db/1]).
-
--spec start_per_vm() -> ok | {error, Reason::term()}.
 
 -spec new(NodeId::?RT:key()) -> db().
 -spec close(DB::db()) -> any().

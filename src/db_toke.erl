@@ -35,10 +35,6 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc There is nothing to do once per VM with toke.
-start_per_vm() ->
-    ok.
-
 %% @doc Initializes a new database (will launch a process for it); returns the
 %%      a reference to the DB.
 new(Id) ->
