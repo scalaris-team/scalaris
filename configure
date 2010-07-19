@@ -2263,9 +2263,9 @@ ERLANG_LIB_DIR_toke=$ac_cv_erlang_lib_dir_toke
 ERLANG_LIB_VER_toke=$ac_cv_erlang_lib_ver_toke
 
 if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
-
-              HAVETOKE=""
-              ERLANG_TOKE_MESSAGE="toke erlang library not found"
+  HAVETOKE=""
+               HAVETOKE_DIALYZER=""
+               ERLANG_TOKE_MESSAGE="toke erlang library not found"
 
 else
   as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_toke/priv/libtoke.so" | $as_tr_sh`
@@ -2288,12 +2288,13 @@ $as_echo "$ac_res" >&6; }
 eval as_val=\$$as_ac_File
    if test "x$as_val" = x""yes; then :
   HAVETOKE=", {d, have_toke}"
+                 HAVETOKE_DIALYZER="-Dhave_toke"
                  ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
 
 else
-
-                HAVETOKE=""
-                ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
+  HAVETOKE=""
+                 HAVETOKE_DIALYZER=""
+                 ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
 
 fi
 
@@ -2491,8 +2492,6 @@ fi
 fi
 
 
-DIALYZER_FLAGS=""
-
 if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
@@ -2509,10 +2508,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  GBTREESISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is a built-in type" >&5
+  GBTREESISBUILTIN=""; GBTREESISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is a built-in type" >&5
 $as_echo "$as_me: gb_tree() is a built-in type" >&6;}
 else
-  GBTREESISBUILTIN=", {d, types_not_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is not built-in" >&5
+  GBTREESISBUILTIN=", {d, types_not_builtin}"; GBTREESISBUILTIN_DIALYZER="-Dtypes_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is not built-in" >&5
 $as_echo "$as_me: gb_tree() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2536,10 +2535,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  TERMISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: term() is a built-in type" >&5
+  TERMISBUILTIN=""; TERMISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: term() is a built-in type" >&5
 $as_echo "$as_me: term() is a built-in type" >&6;}
 else
-  TERMISBUILTIN=", {d, term_not_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: term() is not built-in" >&5
+  TERMISBUILTIN=", {d, term_not_builtin}"; TERMISBUILTIN_DIALYZER="-Dterm_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: term() is not built-in" >&5
 $as_echo "$as_me: term() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2563,10 +2562,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  NODEISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: node() is a built-in type" >&5
+  NODEISBUILTIN=""; NODEISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: node() is a built-in type" >&5
 $as_echo "$as_me: node() is a built-in type" >&6;}
 else
-  NODEISBUILTIN=", {d, node_not_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: node() is not built-in" >&5
+  NODEISBUILTIN=", {d, node_not_builtin}"; NODEISBUILTIN_DIALYZER="-Dnode_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: node() is not built-in" >&5
 $as_echo "$as_me: node() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2590,10 +2589,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  MODULEISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: module() is a built-in type" >&5
+  MODULEISBUILTIN=""; MODULEISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: module() is a built-in type" >&5
 $as_echo "$as_me: module() is a built-in type" >&6;}
 else
-  MODULEISBUILTIN=", {d, module_not_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: module() is not built-in" >&5
+  MODULEISBUILTIN=", {d, module_not_builtin}"; MODULEISBUILTIN_DIALYZER="-Dmodule_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: module() is not built-in" >&5
 $as_echo "$as_me: module() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2617,10 +2616,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  BOOLEANISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is a built-in type" >&5
+  BOOLEANISBUILTIN=""; BOOLEANISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is a built-in type" >&5
 $as_echo "$as_me: boolean() is a built-in type" >&6;}
 else
-  BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is not built-in" >&5
+  BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; BOOLEANISBUILTIN_DIALYZER="-Dboolean_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is not built-in" >&5
 $as_echo "$as_me: boolean() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2644,10 +2643,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  TIDISBUILTIN=""; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is a built-in type" >&5
+  TIDISBUILTIN=""; TIDISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is a built-in type" >&5
 $as_echo "$as_me: tid() is a built-in type" >&6;}
 else
-  TIDISBUILTIN=", {d, tid_not_builtin}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dtid_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is not built-in" >&5
+  TIDISBUILTIN=", {d, tid_not_builtin}"; TIDISBUILTIN_DIALYZER="-Dtid_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is not built-in" >&5
 $as_echo "$as_me: tid() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2671,10 +2670,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  RECURSIVETYPESALLOWED=""; { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are supported" >&5
+  RECURSIVETYPESALLOWED=""; RECURSIVETYPESALLOWED_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are supported" >&5
 $as_echo "$as_me: recursive types are supported" >&6;}
 else
-  RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are not supported" >&5
+  RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; RECURSIVETYPESALLOWED_DIALYZER="-Drecursive_types_are_not_allowed"; { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are not supported" >&5
 $as_echo "$as_me: recursive types are not supported" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2698,10 +2697,10 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  TYPEFORWARDDECLARATIONS=""; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are supported" >&5
+  TYPEFORWARDDECLARATIONS=""; TYPEFORWARDDECLARATIONS_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are supported" >&5
 $as_echo "$as_me: type forward declarations are supported" >&6;}
 else
-  TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are not supported" >&5
+  TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; TYPEFORWARDDECLARATIONS_DIALYZER="-Dtype_forward_declarations_are_not_allowed"; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are not supported" >&5
 $as_echo "$as_me: type forward declarations are not supported" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2718,17 +2717,17 @@ else
   cat > conftest.$ac_ext <<_ACEOF
 -module(conftest).
 -export([start/0]).
--export_type(mytype/0). -type(mytype()::ok).
+-export_type([mytype/0]). -type(mytype()::ok).
 start() ->
 ok
 .
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  EXPORTTYPESUPPORT=", {d, with_export_type_support}"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is supported" >&5
+  EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_DIALYZER="-Dwith_export_type_support"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is supported" >&5
 $as_echo "$as_me: export_type is supported" >&6;}
 else
-  EXPORTTYPESUPPORT=""; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is not supported" >&5
+  EXPORTTYPESUPPORT=""; EXPORTTYPESUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is not supported" >&5
 $as_echo "$as_me: export_type is not supported" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -2740,6 +2739,7 @@ if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
    { $as_echo "$as_me:${as_lineno-$LINENO}: forward declarations or recursive types are not allowed" >&5
 $as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
    FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
+   FORWARDORRECURSIVE_DIALYZER="-Dforward_or_recursive_types_are_not_allowed"
 fi
 
 if test "$cross_compiling" = yes; then :
@@ -2771,7 +2771,8 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $TIDISBUILTIN $EXPORTTYPESUPPORT"
+EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $TIDISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $EXPORTTYPESUPPORT"
+DIALYZER_FLAGS="$HAVETOKE_DIALYZER $GBTREESISBUILTIN_DIALYZER $TERMISBUILTIN_DIALYZER $NODEISBUILTIN_DIALYZER $MODULEISBUILTIN_DIALYZER $BOOLEANISBUILTIN_DIALYZER $TIDISBUILTIN_DIALYZER $RECURSIVETYPESALLOWED_DIALYZER $TYPEFORWARDDECLARATIONS_DIALYZER $FORWARDORRECURSIVE_DIALYZER $EXPORTTYPESUPPORT_DIALYZER"
 
 
 
