@@ -1,4 +1,4 @@
-% @copyright 2009, 2010 Konrad-Zuse-Zentrum für Informationstechnik Berlin,
+% @copyright 2009, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
 %                 onScale solutions GmbH
 % @end
 
@@ -41,6 +41,15 @@
 -export([start_link/1, start_link/2]).
 -export([on/2, init/1]).
 
+% accepted messages of the msg_delay process
+-type(message() ::
+    {msg_delay_req, Seconds::number(), Dest::comm:erl_local_pid(), Msg::comm:message()} |
+    {msg_delay_periodic}).
+
+% internal state
+-type(state()::{TableName::atom(), Round::non_neg_integer()}).
+
+-spec send_local(Seconds::number(), Dest::comm:erl_local_pid(), Msg::comm:message()) -> ok.
 send_local(Seconds, Dest, Msg) ->
     Delayer = process_dictionary:get_group_member(msg_delay),
     comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
@@ -57,7 +66,7 @@ start_link(InstanceId, Options) ->
                              [{register, InstanceId, msg_delay}]).
 
 %% initialize: return initial state.
--spec init([instanceid() | [any()]]) -> any().
+-spec init([instanceid() | [any()]]) -> state().
 init([InstanceID, _Options]) ->
     ?TRACE("msg_delay:init ~p~n", [InstanceID]),
     TableName =
@@ -69,6 +78,7 @@ init([InstanceID, _Options]) ->
     comm:send_local(self(), {msg_delay_periodic}),
     _State = {TableName, _Round = 0}.
 
+-spec on(message(), state()) -> state() | unknown_event.
 on({msg_delay_req, Seconds, Dest, Msg}, {TableName, Counter} = State) ->
     ?TRACE("msg_delay:on(msg_delay...)~n", []),
     Future = trunc(Counter + Seconds),
