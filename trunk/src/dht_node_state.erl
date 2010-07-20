@@ -13,6 +13,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
+%% @doc State of a dht_node.
 %% @version $Id$
 -module(dht_node_state).
 -author('schuett@zib.de').

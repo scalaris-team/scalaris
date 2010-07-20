@@ -57,10 +57,7 @@
     {check_state} |
     {cy_subset, comm:mypid(), cyclon_cache:cache()} |
     {cy_subset_response, cyclon_cache:cache(), cyclon_cache:cache()} |
-    {get_node_details_response, node_details:node_details() |
-        [{pred, node:node_type()} |
-         {node, node:node_type()} |
-         {succ, node:node_type()}]} |
+    {get_node_details_response, node_details:node_details()} |
     {get_ages, comm:erl_local_pid()} |
     {get_subset_rand, pos_integer(), comm:erl_local_pid()} |
     {'$gen_cast', {debug_info, comm:erl_local_pid()}}).
@@ -192,20 +189,19 @@ on({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState}) 
     {NewCache, Node, Cycles, TriggerState};
 
 on({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerState}) ->
-    Pred = node_details:get(NodeDetails, pred),
-    Succ = node_details:get(NodeDetails, succ),
-    PotentialMe = node_details:get(NodeDetails, node),
-    Me = case node:is_valid(PotentialMe) of
-             true  -> PotentialMe;
-             false -> Node
+    Me = case node_details:contains(NodeDetails, node) of
+             true -> node_details:get(NodeDetails, node);
+             _    -> Node
          end,
-    Cache = case not node:equals(Pred, Node)
-                andalso node:is_valid(Pred)
-                andalso node:is_valid(Succ)
-                andalso (cyclon_cache:size(OldCache) =< 2) of
-            true  -> cyclon_cache:new(Pred, Succ);
-            false -> OldCache
-    end,
+    Cache =
+        case node_details:contains(NodeDetails, pred) andalso
+                 node_details:contains(NodeDetails, succ) andalso
+                 not node:equals(node_details:get(NodeDetails, pred), Me) andalso
+                 (cyclon_cache:size(OldCache) =< 2) of
+            true -> cyclon_cache:new(node_details:get(NodeDetails, pred),
+                                     node_details:get(NodeDetails, succ));
+            _ -> OldCache
+        end,
     {Cache, Me, Cycles, TriggerState};
 
 on({get_ages, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->

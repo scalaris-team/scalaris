@@ -68,7 +68,7 @@ init(Trigger) ->
     {uninit, msg_queue:new(), TriggerState2}.
 
 %% @doc Sends a message to the remote node's ring_maintenance process asking for
-%%      it list of successors.
+%%      its list of successors.
 -spec get_successorlist(comm:mypid()) -> ok.
 get_successorlist(RemoteDhtNodePid) ->
     comm:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {get_succlist, comm:this()}).
@@ -107,21 +107,15 @@ on({stabilize}, {Id, Neighborhood, TriggerState}) ->
 
 on({get_node_details_response, NodeDetails}, {Id, Neighborhood, TriggerState} = State)  ->
     SuccsPred = node_details:get(NodeDetails, pred),
-    case node:is_valid(SuccsPred) of
+    % check if the predecessor of our successor is correct:
+    SuccId = node:id(nodelist:succ(Neighborhood)),
+    case intervals:in(node:id(SuccsPred), intervals:new('(', Id, SuccId, ')')) of
         true ->
-            % check if the predecessor of our successor is correct:
-            SuccId = node:id(nodelist:succ(Neighborhood)),
-            case intervals:in(node:id(SuccsPred), intervals:new('(', Id, SuccId, ')')) of
-                true ->
-                    get_successorlist(node:pidX(SuccsPred)),
-                    NewNeighborhood = nodelist:add_nodes(Neighborhood, [SuccsPred], 1, succListLength()),
-                    rm_beh:update_neighbors(NewNeighborhood),
-                    fd:subscribe(node:pidX(SuccsPred)),
-                    {Id, NewNeighborhood, TriggerState};
-                false ->
-                    get_successorlist(node:pidX(nodelist:succ(Neighborhood))),
-                    State
-            end;
+            get_successorlist(node:pidX(SuccsPred)),
+            NewNeighborhood = nodelist:add_nodes(Neighborhood, [SuccsPred], 1, succListLength()),
+            rm_beh:update_neighbors(NewNeighborhood),
+            fd:subscribe(node:pidX(SuccsPred)),
+            {Id, NewNeighborhood, TriggerState};
         false ->
             get_successorlist(node:pidX(nodelist:succ(Neighborhood))),
             State

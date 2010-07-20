@@ -25,14 +25,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
-% constructors
--export([new/0, new/7]).
-
-% getters
--export([get/2]).
-
-% setters
--export([set/3]).
+-export([new/0, new/7,
+         contains/2, get/2, set/3]).
 
 -include("scalaris.hrl").
 
@@ -62,10 +56,8 @@
 
 -type(node_details_list() ::
     [{predlist, nodelist:non_empty_snodelist()} |
-     {pred, node:node_type()} |
      {node, node:node_type()} |
      {my_range, intervals:interval()} |
-     {succ, node:node_type()} |
      {succlist, nodelist:non_empty_snodelist()} |
      {load, load()} |
      {hostname, hostname()} |
@@ -75,9 +67,11 @@
 
 -opaque(node_details() :: node_details_record() | node_details_list()).
 
+%% @doc Creates an empty node details object.
 -spec new() -> node_details().
 new() -> [].
 
+%% @doc Creates a new node details object with the given data.
 -spec new(PredList::nodelist:non_empty_snodelist(), Node::node:node_type(), SuccList::nodelist:non_empty_snodelist(), Load::load(), Hostname::hostname(), RTSize::rt_size(), Memory::memory()) -> node_details().
 new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     #node_details{
@@ -90,6 +84,7 @@ new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
      memory = Memory
     }.
 
+%% @doc Converts a node details record into a list (only for internal use!).
 -spec to_list(node_details()) -> node_details_list().
 to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load,
   hostname=HostName, rt_size=RTSize, memory=Memory} = _NodeDetails) ->
@@ -103,6 +98,9 @@ to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load,
 to_list(NodeDetails) when is_list(NodeDetails) ->
     NodeDetails.
 
+%% @doc Adds the given data to the node list object.
+%%      Beware: Setting pred/succ will overwrite predlist/succlist!
+%%      (pred and succ are only shortcuts for hd(predlist)/hd(succlist))
 -spec set(node_details(), predlist, nodelist:non_empty_snodelist()) -> node_details();
           (node_details(), pred, node:node_type()) -> node_details();
           (node_details(), node, node:node_type()) -> node_details();
@@ -124,48 +122,72 @@ set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
         hostname -> NodeDetails#node_details{hostname = Value};
         rt_size -> NodeDetails#node_details{rt_size = Value};
         memory -> NodeDetails#node_details{memory = Value};
+        succ -> NodeDetails#node_details{succlist = [Value]};
+        pred -> NodeDetails#node_details{predlist = [Value]};
         % list members:
-        pred -> [{Key, Value} | to_list(NodeDetails)];
         my_range -> [{Key, Value} | to_list(NodeDetails)];
-        succ -> [{Key, Value} | to_list(NodeDetails)];
         message_log -> [{Key, Value} | to_list(NodeDetails)]
     end;
 set(NodeDetails, Key, Value) when is_list(NodeDetails) ->
-    lists:keystore(Key, 1, NodeDetails, {Key, Value}).
+    case Key of
+        pred -> lists:keystore(predlist, 1, NodeDetails, {predlist, [Value]});
+        succ -> lists:keystore(succlist, 1, NodeDetails, {succlist, [Value]});
+        _    -> lists:keystore(Key, 1, NodeDetails, {Key, Value})
+    end.
 
--spec get(node_details_record(), predlist) -> nodelist:non_empty_snodelist();
-          (node_details_list(), predlist) -> nodelist:non_empty_snodelist() | unknown;
-          (node_details(), pred) -> node:node_type() | unknown;
-          (node_details_record(), node) -> node:node_type();
-          (node_details_list(), node) -> node:node_type() | unknown;
-          (node_details(), my_range) -> intervals:interval() | unknown;
-          (node_details(), succ) -> node:node_type() | unknown;
-          (node_details_record(), succlist) -> nodelist:non_empty_snodelist();
-          (node_details_list(), succlist) -> nodelist:non_empty_snodelist() | unknown;
-          (node_details_record(), load) -> load();
-          (node_details_list(), load) -> load() | unknown;
-          (node_details_record(), hostname) -> hostname();
-          (node_details_list(), hostname) -> hostname() | unknown;
-          (node_details_record(), rt_size) -> rt_size();
-          (node_details_list(), rt_size) -> rt_size() | unknown;
-          (node_details(), message_log) -> message_log() | unknown;
-          (node_details_record(), memory) -> memory();
-          (node_details_list(), memory) -> memory() | unknown.
+%% @doc Checks whether the given data is available in a node details object.
+-spec contains(node_details(), node_details_name()) -> boolean().
+contains(NodeDetails, Key) when is_record(NodeDetails, node_details) ->
+    lists:member(Key, [predlist, pred, node, succlist, succ, load, hostname,
+                       rt_size, memory]);
+contains(NodeDetails, Key) when is_list(NodeDetails) ->
+    case Key of
+        pred -> lists:keymember(predlist, 1, NodeDetails);
+        succ -> lists:keymember(succlist, 1, NodeDetails);
+        _    -> lists:keymember(Key, 1, NodeDetails)
+    end.
+
+%% @doc Gets the value of the given data in a node details object. Will throw
+%%      an exception if the value can not be located.
+-spec get(node_details(), predlist | succlist) -> nodelist:non_empty_snodelist();
+          (node_details(), pred | node | succ) -> node:node_type();
+          (node_details(), my_range) -> intervals:interval();
+          (node_details(), load) -> load();
+          (node_details(), hostname) -> hostname();
+          (node_details(), rt_size) -> rt_size();
+          (node_details(), message_log) -> message_log();
+          (node_details(), memory) -> memory().
 get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load,
   hostname=HostName, rt_size=RTSize, memory=Memory} = _NodeDetails, Key) ->
     case Key of
         predlist -> PredList;
+        pred -> hd(PredList);
         node -> Me;
         succlist -> SuccList;
+        succ -> hd(SuccList);
         load -> Load;
         hostname -> HostName;
         rt_size -> RTSize;
         memory -> Memory;
-        _ -> unknown
+        _ -> throw('not_available')
     end;
 get(NodeDetails, Key) when is_list(NodeDetails) ->
-    Result = lists:keysearch(Key, 1, NodeDetails),
-    case Result of
-        {value, {Key, Value}} -> Value;
-        false -> unknown
+    case Key of
+        pred -> hd(get_list(NodeDetails, predlist));
+        succ -> hd(get_list(NodeDetails, succlist));
+        _    -> get_list(NodeDetails, Key)
+    end.
+
+-spec get_list(node_details_list(), predlist | succlist) -> nodelist:non_empty_snodelist();
+              (node_details_list(), pred | node | succ) -> node:node_type();
+              (node_details_list(), my_range) -> intervals:interval();
+              (node_details_list(), load) -> load();
+              (node_details_list(), hostname) -> hostname();
+              (node_details_list(), rt_size) -> rt_size();
+              (node_details_list(), message_log) -> message_log();
+              (node_details_list(), memory) -> memory().
+get_list(NodeDetails, Key) ->
+    case lists:keyfind(Key, 1, NodeDetails) of
+        {Key, Value} -> Value;
+        false -> throw('not_available')
     end.
