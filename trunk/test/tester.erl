@@ -227,7 +227,7 @@ parse_type({remote_type, _Line, [{atom, _Line2, TypeModule}, {atom, _line3, Type
         false ->
             {{typedef, TypeModule, TypeName}, tester_parse_state:add_unknown_type(TypeModule, TypeName, ParseState)}
     end;
-parse_type({type, _Line, 'function', []}, Module, ParseState) ->
+parse_type({type, _Line, 'function', []}, _Module, ParseState) ->
     {{'function'}, ParseState};
 parse_type({type, _Line, TypeName, []}, Module, ParseState) ->
     %ct:pal("type1 ~p:~p", [Module, TypeName]),
@@ -299,7 +299,7 @@ run_helper(Module, Func, 0, Iterations, {'fun', _ArgType, _ResultType} = FunType
     catch
         throw:Term -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Term}]);
         % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, _} = Reason -> exit(Reason);
+        exit:{test_case_failed, Reason} -> ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, [], Reason]);
         exit:Reason -> ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Reason}]);
         error:Reason -> ?ct_fail("exception (error) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, {Reason, erlang:get_stacktrace()}}])
     end;
@@ -314,7 +314,7 @@ run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunT
     catch
         throw:Term -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Term}]);
         % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, _} = Reason -> exit(Reason);
+        exit:{test_case_failed, Reason} -> ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, Reason]);
         exit:Reason -> ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Reason}]);
         error:Reason -> ?ct_fail("exception (error) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, {Reason, erlang:get_stacktrace()}}])
     end.
