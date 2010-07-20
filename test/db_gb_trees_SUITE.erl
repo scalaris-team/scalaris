@@ -28,3 +28,9 @@
 -include("db_SUITE.hrl").
 
 all() -> tests_avail().
+
+%% @doc Specify how often a read/write suite can be executed in order not to
+%%      hit a timeout (depending on the speed of the DB implementation).
+-spec max_rw_tests_per_suite() -> pos_integer().
+max_rw_tests_per_suite() ->
+    10000.

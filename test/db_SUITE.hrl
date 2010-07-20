@@ -54,6 +54,12 @@ spawn_config_processes() ->
     end,
     Pid.
 
+%% @doc Returns the min of Desired and max_rw_tests_per_suite().
+%%      Should be used to limit the number of executions of r/w suites.
+-spec rw_suite_runs(Desired::pos_integer()) -> pos_integer().
+rw_suite_runs(Desired) ->
+    erlang:min(Desired, max_rw_tests_per_suite()).
+
 init_per_suite(Config) ->
     application:start(log4erl),
     crypto:start(),
@@ -244,7 +250,7 @@ prop_new(NodeId, Key) ->
     true.
 
 tester_new(_Config) ->
-    tester:test(?MODULE, prop_new, 2, 10).
+    tester:test(?MODULE, prop_new, 2, rw_suite_runs(10)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -270,7 +276,7 @@ prop_set_entry(DBEntry) ->
     true.
 
 tester_set_entry(_Config) ->
-    tester:test(?MODULE, prop_set_entry, 1, 10).
+    tester:test(?MODULE, prop_set_entry, 1, rw_suite_runs(10)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -299,7 +305,7 @@ prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     true.
 
 tester_update_entry(_Config) ->
-    tester:test(?MODULE, prop_update_entry, 5, 10).
+    tester:test(?MODULE, prop_update_entry, 5, rw_suite_runs(10)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -345,10 +351,10 @@ prop_delete_entry2(DBEntry1, DBEntry2) ->
     true.
 
 tester_delete_entry1(_Config) ->
-    tester:test(?MODULE, prop_delete_entry1, 1, 10).
+    tester:test(?MODULE, prop_delete_entry1, 1, rw_suite_runs(10)).
 
 tester_delete_entry2(_Config) ->
-    tester:test(?MODULE, prop_delete_entry2, 2, 10).
+    tester:test(?MODULE, prop_delete_entry2, 2, rw_suite_runs(10)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -370,7 +376,7 @@ prop_write(Key, Value, Version, Key2) ->
     true.
 
 tester_write(_Config) ->
-    tester:test(?MODULE, prop_write, 4, 100).
+    tester:test(?MODULE, prop_write, 4, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -449,7 +455,7 @@ prop_write_lock(Key, Value, Version, Key2) ->
     true.
 
 tester_write_lock(_Config) ->
-    tester:test(?MODULE, prop_write_lock, 4, 100).
+    tester:test(?MODULE, prop_write_lock, 4, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -496,7 +502,7 @@ prop_read_lock(Key, Value, Version) ->
     true.
 
 tester_read_lock(_Config) ->
-    tester:test(?MODULE, prop_read_lock, 3, 100).
+    tester:test(?MODULE, prop_read_lock, 3, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -526,7 +532,7 @@ prop_read_write_lock(Key, Value, Version) ->
     true.
 
 tester_read_write_lock(_Config) ->
-    tester:test(?MODULE, prop_read_write_lock, 3, 100).
+    tester:test(?MODULE, prop_read_write_lock, 3, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -556,7 +562,7 @@ prop_write_read_lock(Key, Value, Version) ->
     true.
 
 tester_write_read_lock(_Config) ->
-    tester:test(?MODULE, prop_write_read_lock, 3, 100).
+    tester:test(?MODULE, prop_write_read_lock, 3, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -609,7 +615,7 @@ prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     true.
 
 tester_delete(_Config) ->
-    tester:test(?MODULE, prop_delete, 6, 100).
+    tester:test(?MODULE, prop_delete, 6, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -634,7 +640,7 @@ prop_add_data(Data) ->
     true.
 
 tester_add_data(_Config) ->
-    tester:test(?MODULE, prop_add_data, 1, 100).
+    tester:test(?MODULE, prop_add_data, 1, rw_suite_runs(1000)).
 
 %TODO: ?TEST_DB:split_data
 %TODO: ?TEST_DB:get_range*
