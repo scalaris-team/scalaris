@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,15 +11,9 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : statistics.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Statistics Module for Bootstrap server
-%%%
-%%% Created :  7 May 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc Statistics Module for Bootstrap server
 %% @version $Id$
 -module(statistics).
 
@@ -62,21 +56,26 @@ get_memory({ok, Details}) ->
 get_memory({failed}) ->
     0.
 
+%% @doc Returns a sorted list of all known nodes.
+%%      See compare_node_details/2 for a definition of the order.
+-spec get_ring_details() -> [{ok, node_details:node_details()} | {failed}].
 get_ring_details() ->
     boot_server:node_list(),
     Nodes = receive
-        {get_list_response,N} -> 
-            
-            N
-       after 2000 ->
-            log:log(error,"ST: Timeout~n"),
-           
-            {failed}
-    end,
+                {get_list_response, N} -> N
+            after 2000 ->
+                log:log(error,"ST: Timeout~n"),
+                {failed}
+            end,
     lists:sort(fun compare_node_details/2, lists:map(fun (Pid) -> get_node_details(Pid) end, Nodes)).
     
-
-
+%% @doc Defines an order of {ok, node_details:node_details()} | {failed} terms
+%%      so that {failed} terms are considered the smallest.
+%%      Terms like {ok, node_details:node_details()} are compared using the
+%%      order of their node ids.
+-spec compare_node_details({failed}, {ok, node_details:node_details()} | {failed}) -> true;
+                          ({ok, node_details:node_details()}, {failed}) -> false;
+                          ({ok, node_details:node_details()}, {ok, node_details:node_details()}) -> boolean().
 compare_node_details({ok, X}, {ok, Y}) ->
     node:id(node_details:get(X, node)) < node:id(node_details:get(Y, node));
 compare_node_details({failed}, _) ->
@@ -84,6 +83,7 @@ compare_node_details({failed}, _) ->
 compare_node_details({ok, _}, _) ->
     false.
 
+-spec get_node_details(Pid::comm:mypid()) -> {ok, node_details:node_details()} | {failed}.
 get_node_details(Pid) ->
     comm:send(Pid, {get_node_details, comm:this_with_cookie(Pid)}),
     receive
@@ -125,6 +125,8 @@ get_rt({ok, Details}) ->
 get_rt({failed}) ->
     0.
 
+-spec is_valid({ok, Details::node_details:node_details()}) -> true;
+              ({failed}) -> false.
 is_valid({ok, _}) ->
     true;
 is_valid({failed}) ->

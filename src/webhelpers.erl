@@ -1,5 +1,6 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+%            2008 onScale solutions
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,16 +12,9 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : webhelpers.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : 
-%%%
-%%% Created : 16 Apr 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%%            2008 onScale solutions
+%% @doc web helpers module for Bootstrap server to generated the web interface
 %% @version $Id$
 -module(webhelpers).
 
@@ -235,11 +229,11 @@ getRingChart() ->
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
     RingSize = length(Ring),
     if
-	RingSize =:= 0 ->
-	    {p, [], "empty ring"};
-	RingSize =:= 1 ->
-	    {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
-	true ->
+        RingSize =:= 0 ->
+            {p, [], "empty ring"};
+        RingSize =:= 1 ->
+            {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
+        true ->
             try
               PieURL = renderRingChart(Ring),
               LPie = length(PieURL),
@@ -253,28 +247,24 @@ getRingChart() ->
             end
     end.
 
+-spec renderRingChart(Ring::[{ok, node_details:node_details()},...]) -> string().
 renderRingChart(Ring) ->
     URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
     Sizes = lists:map(
               fun ({ok,Node}) ->
-                       Me_tmp = get_id(node_details:get(Node, node)),
-                       Pred_tmp = get_id(hd(node_details:get(Node, predlist))),
-                       if
-                           (null =:= Me_tmp) orelse (null =:= Pred_tmp) ->
-                               io_lib:format("1.0", []); % guess the size
-                           true ->
-                               Tmp = (Me_tmp - Pred_tmp) * 100 /
-                                         16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
-                               Diff = if
-                                          Tmp < 0.0 ->
-                                              (Me_tmp +
-                                                   16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                                              - Pred_tmp) * 100 /
-                                                  16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-                                          true -> Tmp
-                                      end,
-                               io_lib:format("~f", [Diff])
-                       end
+                       Me_tmp = node:id(node_details:get(Node, node)),
+                       Pred_tmp = node:id(node_details:get(Node, pred)),
+                       Tmp = (Me_tmp - Pred_tmp) * 100 /
+                                 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+                       Diff = if
+                                  Tmp < 0.0 ->
+                                      (Me_tmp +
+                                           16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+                                      - Pred_tmp) * 100 /
+                                          16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+                                  true -> Tmp
+                              end,
+                       io_lib:format("~f", [Diff])
               end, Ring),
     Hostinfos = lists:map(
                   fun ({ok,Node}) ->
@@ -337,6 +327,7 @@ getRingRendered() ->
 	    }
     end.
 
+-spec renderRing(Node::{ok, Details::node_details:node_details()} | {failed}) -> {tr, [], [{td, [], [any()]}]}.
 renderRing({ok, Details}) ->
     Hostname = node_details:get(Details, hostname),
     PredList = node_details:get(Details, predlist),
@@ -347,9 +338,9 @@ renderRing({ok, Details}) ->
     {tr, [], 
       [
        {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
-       {td, [], io_lib:format('~p', [lists:map(fun get_id/1, PredList)])},
-       {td, [], io_lib:format('~p', [get_id(Node)])},
-       {td, [], io_lib:format('~p', [lists:map(fun get_id/1, SuccList)])},
+       {td, [], io_lib:format('~p', [lists:map(fun node:id/1, PredList)])},
+       {td, [], io_lib:format('~p', [node:id(Node)])},
+       {td, [], io_lib:format('~p', [lists:map(fun node:id/1, SuccList)])},
        {td, [], io_lib:format('~p', [RTSize])},
        {td, [], io_lib:format('~p', [Load])}
       ]};
@@ -411,6 +402,8 @@ getIndexedRingRendered() ->
 	    }
     end.
 
+-spec renderIndexedRing({ok, Details::node_details:node_details()} | {failed},
+                        Ring::[{ok, node_details:node_details()}]) -> {tr, [], [{td, [], [any()]}]}.
 renderIndexedRing({ok, Details}, Ring) ->
     Hostname = node_details:get(Details, hostname),
     PredList = node_details:get(Details, predlist),
@@ -432,7 +425,7 @@ renderIndexedRing({ok, Details}, Ring) ->
            false ->
                {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
        end,
-       {td, [], io_lib:format('~p: ~p', [MyIndex, get_id(Node)])},
+       {td, [], io_lib:format('~p: ~p', [MyIndex, node:id(Node)])},
        case is_list(FirstSuccIndex) orelse FirstSuccIndex =/= 1 of
            true -> {td, [], io_lib:format('<span style="color:red">~p</span>', [SuccIndices])};
            false -> {td, [], io_lib:format('~p', [SuccIndices])}
@@ -453,46 +446,53 @@ renderIndexedRing({failed}, _Ring) ->
 
 %%%-----------------------------Misc----------------------------------
 
-get_id(Node) ->
-    case node:is_valid(Node) of
-        true -> node:id(Node);
-        false -> null  
-    end.
-
+-spec get_indexed_pred_id(Node::node:node_type(),
+                          Ring::[{ok, node_details:node_details()} | {failed}],
+                          MyIndex::non_neg_integer() | string(),
+                          NIndex::non_neg_integer()) -> integer() | string().
 get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
-    case get_indexed_id(Node, Ring) of
-        "null" -> "null";
-        "none" -> "none";
-        Index -> ((Index-MyIndex+NIndex) rem NIndex)-NIndex
+    NodeIndex = get_indexed_id(Node, Ring),
+    case NodeIndex =:= "none" orelse MyIndex =:= "none" of
+        true -> "none";
+        _    -> ((NodeIndex - MyIndex + NIndex) rem NIndex) - NIndex
     end.
 
+-spec get_indexed_succ_id(Node::node:node_type(),
+                          Ring::[{ok, node_details:node_details()} | {failed}],
+                          MyIndex::non_neg_integer() | string(),
+                          NIndex::non_neg_integer()) -> integer() | string().
 get_indexed_succ_id(Node, Ring, MyIndex, NIndex) ->
-    case get_indexed_id(Node, Ring) of
-        "null" -> "null";
-        "none" -> "none";
-        Index -> (Index-MyIndex+NIndex) rem NIndex
+    NodeIndex = get_indexed_id(Node, Ring),
+    case NodeIndex =:= "none" orelse MyIndex =:= "none" of
+        true -> "none";
+        _    -> (NodeIndex - MyIndex + NIndex) rem NIndex
     end.
 
+-spec get_indexed_id(Node::node:node_type(),
+                     Ring::[{ok, node_details:node_details()} | {failed}])
+        -> non_neg_integer() | string().
 get_indexed_id(Node, Ring) ->
-    case node:is_valid(Node) of
-        true  -> get_indexed_id(Node, Ring, 0);
-        false -> "null"
-    end.
+    get_indexed_id(Node, Ring, 0).
 
-get_indexed_id(Node, [{ok, Details}|Ring], Index) ->
+-spec get_indexed_id(Node::node:node_type(),
+                     Ring::[{ok, node_details:node_details()} | {failed}],
+                     Index::non_neg_integer()) -> non_neg_integer() | string().
+get_indexed_id(Node, [{ok, Details} | Ring], Index) ->
     case node:id(Node) =:= node:id(node_details:get(Details, node)) of
         true -> Index;
-        false -> get_indexed_id(Node, Ring, Index+1)
+        _    -> get_indexed_id(Node, Ring, Index + 1)
     end;
-
 get_indexed_id(_Node, [], _Index) ->
     "none".
 
+-spec get_flag(Hostname::node_details:hostname()) -> {img, [{src, URL::string()} | {width, pos_integer()} | {height, pos_integer()}], []}.
 get_flag(Hostname) ->
     Country = string:substr(Hostname, 1 + string:rchr(Hostname, $.)),
     URL = string:concat("icons/", string:concat(Country, ".gif")),
     {img, [{src, URL}, {width, 26}, {height, 16}], []}.
 
+-spec is_valid({ok, Details::node_details:node_details()}) -> true;
+              ({failed}) -> false.
 is_valid({ok, _}) ->
     true;
 is_valid({failed}) ->
