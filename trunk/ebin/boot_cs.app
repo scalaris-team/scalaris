@@ -20,11 +20,5 @@
                {mod, {scalaris_app, boot}},
                {registered, [boot]},
                {applications, [kernel, stdlib]},
-               {env, [
-                      {config, "scalaris.cfg"},
-                      {local_config, "scalaris.local.cfg"},
-                      {log_path, "../log"},
-                      {docroot, "../docroot_node"}
-                      ]
-                     }
+               {env, []}
                ]}.
