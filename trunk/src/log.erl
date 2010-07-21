@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,26 +11,18 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : log.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : log service
-%%%
-%%% Created :  4 Apr 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc log service
 %% @version $Id$
 -module(log).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
 -include("log4erl.hrl").
 
-%-export([log/1, log2file/0]).
 -export([start_link/0]).
--export([log/2,log/3,log/4]).
+-export([log/2, log/3, log/4]).
 
 -type log_level() :: warn | info | error | fatal | debug.
 

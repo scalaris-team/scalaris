@@ -1,6 +1,5 @@
 %  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,13 +11,10 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    dht_node_reregister.erl
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Re-register with boot nodes
-%%% @end
-%%% Created : 11 Oct 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Re-register with boot nodes
+%% @end
 %% @version $Id$
 -module(dht_node_reregister).
 
@@ -32,9 +28,7 @@
 -export([start_link/1]).
 -export([init/1, on/2, get_base_interval/0]).
 
--type(message() ::
-    {go} |
-    {trigger}).
+-type(message() :: {go} | {trigger}).
 
 -type(state() :: {init | uninit, trigger:state()}).
 
@@ -81,16 +75,18 @@ on({go}, {init, TriggerState}) ->
 on(_, _State) ->
     unknown_event.
 
+-spec trigger_reregister() -> ok.
 trigger_reregister() ->
     RegisterMessage = {register, get_dht_node_this()},
     reregister(config:read(register_hosts), RegisterMessage).
 
+-spec reregister(failed | [comm:mypid()],
+                 Message::{register, ThisNode::comm:mypid()}) -> ok.
 reregister(failed, Message)->
     comm:send(bootPid(), Message);
 reregister(Hosts, Message) ->
-    lists:foreach(
-      fun(Host) -> comm:send(Host, Message) end,
-      Hosts).
+    lists:foreach(fun(Host) -> comm:send(Host, Message) end, Hosts),
+    ok.
 
 %% @doc Gets the zombie detector interval set in scalaris.cfg.
 get_base_interval() ->

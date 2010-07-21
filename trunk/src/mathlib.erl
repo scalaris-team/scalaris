@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,145 +11,140 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : mathlib.erl
-%%% Author  : Marie Hoffmann <ozymandiaz147@googlemail.com>
-%%% Description : math utility functions
-%%%
-%%% Created :  28 July 2009 by Marie Hoffmann <ozymandiaz147@googlemail.com>
-%%%-------------------------------------------------------------------
-%% @author Marie Hoffmann <ozymandiaz147@googlemail.com>
-%% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
+%% @author Marie Hoffmann <ozymandiaz147@googlemail.com>
+%% @doc Math utility functions.
+%% @version $Id$
 -module(mathlib).
 -author('ozymandiaz147@googlemail.com').
 -vsn('$Id$').
 
--export([closestPoints/1, euclideanDistance/1, euclideanDistance/2, max/2, u/1,
+-export([closestPoints/1, euclideanDistance/1, euclideanDistance/2, u/1,
          vecAdd/2, vecSub/2, vecMult/2, vecWeightedAvg/4, zeros/1, median/1,
         aggloClustering/3]).
 
--type(vector() :: [number()]).
+-type(vector() :: [number(),...]).
 -type(centroid() :: vector()).
 
-% get maximum of two values
-max(V1, V2) ->
-    T1 = V1, T2 = V2, if T1 > T2 -> T1 ; true -> T2 end.
-
-% median of an unsorted list
--spec(median/1 :: (vector()) -> number()).
+%% @doc Median of an unsorted non-empty list of numbers, i.e. a vector.
+-spec median(vector()) -> number().
 median(L) ->
-     L1 = lists:sort(L),
-     N = length(L1),
-     case N rem 2 of
- 	1 -> lists:nth(round(N/2), L1);
- 	0 -> (lists:nth(trunc(N/2), L1) + lists:nth(trunc(N/2)+1, L1))/2
-     end.
+    L1 = lists:sort(L),
+    N = length(L1),
+    case N rem 2 of
+        1 -> lists:nth(round(N / 2), L1);
+        0 -> (lists:nth(trunc(N / 2), L1) + lists:nth(trunc(N / 2) + 1, L1)) / 2
+    end.
 
+%% @doc Add two vectors X,Y, i.e. X + Y.
+-spec vecAdd(X::vector(), Y::vector()) -> vector().
+vecAdd(X, Y) ->
+    lists:zipwith(fun(Xi, Yi) -> Xi + Yi end, X, Y).
 
-% add two vectors X,Y
--spec(vecAdd/2 :: (vector(), vector()) -> vector()).
-vecAdd(L1, L2) ->
-    lists:zipwith(fun(X, Y) -> X+Y end, L1, L2).
+%% @doc Substract two vectors X,Y, i.e. X - Y.
+-spec vecSub(X::vector(), Y::vector()) -> vector().
+vecSub(X, Y) ->
+    lists:zipwith(fun(Xi, Yi) -> Xi - Yi end, X, Y).
 
-% substract two vectors X,Y
--spec(vecSub/2 :: (vector(), vector()) -> vector()).
-vecSub(L1, L2) ->
-    lists:zipwith(fun(X, Y) -> X - Y end, L1, L2).
-
-% multiply Vector V with a scalar S
--spec(vecMult/2 :: (vector(), float()) -> vector()).
+%% @doc Multiply vector V with a scalar S.
+-spec vecMult(V::vector(), S::float()) -> vector().
 vecMult(V, S) ->
     lists:map(fun(X) -> S*X end, V).
 
--spec(vecWeightedAvg/4 :: (vector(), vector(), float(), float()) -> vector()).
-vecWeightedAvg(L1, L2, W1, W2) ->
-    vecMult(vecAdd(vecMult(L1, W1), vecMult(L2, W2)), 1/(W1+W2)).
+-spec vecWeightedAvg(V1::vector(), V2::vector(), W1::float(), W2::float()) -> vector().
+vecWeightedAvg(V1, V2, W1, W2) ->
+    vecMult(vecAdd(vecMult(V1, W1), vecMult(V2, W2)), 1 / (W1 + W2)).
 
-% euclidean distance between origin and V
--spec(euclideanDistance/1 :: (vector()) -> float()).
+%% @doc Euclidean distance between origin and V.
+-spec euclideanDistance(V::vector()) -> Distance::float().
 euclideanDistance(V) ->
-    euclidDistToZero(V, 0).
+    math:sqrt(lists:foldl(fun(Vi, OldDist) -> OldDist + math:pow(Vi, 2) end,
+                          0.0, V)).
 
-euclidDistToZero([HV | V], Acc) ->
-    euclidDistToZero(V, Acc + math:pow(HV,2));
-
-euclidDistToZero([], Acc) ->
-    math:sqrt(Acc).
-
-% euclidean distance between two vectors
--spec(euclideanDistance/2 :: (vector(), vector()) -> float()).
+%% @doc Euclidean distance between two vectors.
+-spec euclideanDistance(V::vector(), W::vector()) -> Distance::float().
 euclideanDistance(V, W) ->
-    euclidDist(V, W, 0).
+    math:sqrt(util:zipfoldl(fun(Vi, Wi) -> math:pow(Vi - Wi, 2) end,
+                            fun(Dist, OldDist) -> OldDist + Dist end,
+                            V, W, 0.0)).
 
-euclidDist([HV | V], [HW | W], Acc) ->
-    euclidDist(V, W, Acc + math:pow(HV-HW, 2));
-
-euclidDist([], [], Acc) ->
-    math:sqrt(Acc).
-
-
-% unit vector u(v) = v/||v||
--spec(u/1 :: (vector()) -> vector()).
+%% @doc Unit vector u(v) = v/||v||
+-spec u(V::vector()) -> UV::vector().
 u(V) ->
-    vecMult(V, 1/euclideanDistance(V)).
+    vecMult(V, 1 / euclideanDistance(V)).
 
-% find indices of closest centroids
-closestPoints([C1, C2| Rest]) ->
-    closestPointsForI([C1, C2| Rest], 1, 2, euclideanDistance(C1, C2), 1, 2);
-
+%% @doc Find indices of closest centroids.
+-spec closestPoints(Centroids::[centroid()])
+        -> {Min::number(), I::pos_integer(), J::pos_integer()} | {-1, -1, -1}.
+closestPoints([C1, C2 | Rest]) ->
+    closestPointsForI([C1, C2 | Rest], 1, 2, euclideanDistance(C1, C2), 1, 2);
 closestPoints(_) ->
     {-1, -1, -1}.
 
+-spec closestPointsForI(Centroids::[centroid()], I::pos_integer(), J::pos_integer(),
+                        Min::number(), MinI::pos_integer(), MinJ::pos_integer())
+        -> {DistMin::number(), IMin::pos_integer(), JMin::pos_integer()}.
 closestPointsForI([First | Rest], I, J, Min, MinI, MinJ) ->
-  {Min1, MinI1, MinJ1} = closestPointsForJ(First, Rest, I, J, Min, MinI, MinJ),
+    {Min1, MinI1, MinJ1} = closestPointsForJ(First, Rest, I, J, Min, MinI, MinJ),
     I1 = I + 1,
     J1 = J + 1,
-  closestPointsForI(Rest, I1, J1, Min1, MinI1, MinJ1);
-
+    closestPointsForI(Rest, I1, J1, Min1, MinI1, MinJ1);
 closestPointsForI([], _, _, Min, I, J) ->
     {Min, I, J}.
 
+-spec closestPointsForJ(First::centroid(), Rest::[centroid()],
+                        I::pos_integer(), J::pos_integer(),
+                        Min::number(), MinI::pos_integer(), MinJ::pos_integer())
+        -> {DistMin::number(), IMin::pos_integer(), JMin::pos_integer()}.
 closestPointsForJ(First, [Centroid | Rest], I, J, Min, MinI, MinJ) ->
     Dist = euclideanDistance(First, Centroid),
     {Min1, MinI1, MinJ1} = condExchange(Min, MinI, MinJ, Dist, I, J),
     J1 = J + 1,
     closestPointsForJ(First, Rest, I, J1, Min1, MinI1, MinJ1);
-
 closestPointsForJ(_, [], _, _, Min, MinI, MinJ) ->
-  {Min, MinI, MinJ}.
+    {Min, MinI, MinJ}.
 
-% update smallest distance and its indices
+%% @doc Update smallest distance and its indices.
+-spec condExchange(Min::number(), MinI::pos_integer(), MinJ::pos_integer(),
+                   Dist::number(), DistI::pos_integer(), DistJ::pos_integer())
+        -> {DistMin::number(), IMin::integer(), JMin::integer()}.
 condExchange(Min, I, J, Dist, _, _) when Min =< Dist ->
     {Min, I, J};
 
 condExchange(_, _, _, Dist, I, J) ->
     {Dist, I, J}.
 
-% initialize list with zeros
+%% @doc Create a list with N zeros.
+-spec zeros(N::0) -> [];
+           (N::pos_integer()) -> [0,...].
+zeros(0) ->
+    [];
 zeros(N) ->
-    zerosRec(N, []).
+    [0 || _ <- lists:seq(1,N)].
 
-zerosRec(N, L) when N > 0->
-    zerosRec(N-1, [0 | L]);
-
-zerosRec(_, L) ->
-    L.
-
-% get closest centroids and melt them if their distance is within radius()
--spec(aggloClustering/3 :: ([centroid()], vector(), float()) -> {centroid(), vector()}).
+%% @doc Get closest centroids and merge them if their distance is within Radius.
+-spec aggloClustering(Centroids::[centroid()], Sizes::vector(),
+                      Radius::number()) -> {[centroid()], vector()}.
 aggloClustering(Centroids, Sizes, Radius) ->
-    {Min, I, J} = mathlib:closestPoints(Centroids),
+    {Min, I, J} = closestPoints(Centroids),
     aggloClusteringHelper(Centroids, Sizes, Radius, Min, I, J).
 
-aggloClusteringHelper(Centroids, Sizes, Radius, Min, I, J) when Min =< Radius, length(Centroids) > 1 ->
+-spec aggloClusteringHelper
+        (Centroids::[centroid(),...], Sizes::vector(), Radius::number(),
+         Min::number(), I::pos_integer(), J::pos_integer()) -> {[centroid()], vector()};
+        (Centroids::[centroid()], Sizes::vector(), Radius::number(),
+         Min::-1, I::-1, J::-1) -> {[centroid()], vector()}.
+% Note: closestPoints/1 creates Min, I, J and only returns {-1, -1, -1} if
+% Centroids contains less than two elements. This is not the case in the first
+% pattern and we can thus assume these values are pos_integer().
+aggloClusteringHelper([_,_|_] = Centroids, [_,_|_] = Sizes, Radius, Min, I, J) when Min =< Radius ->
     C1 = lists:nth(I, Centroids),
     C2 = lists:nth(J, Centroids),
     S1 = lists:nth(I, Sizes),
     S2 = lists:nth(J, Sizes),
-    Centroids1 = [mathlib:vecWeightedAvg(C1, C2, S1, S2)| tools:rmvTwo(Centroids, I, J)],
-    {Min1, I1, J1} = mathlib:closestPoints(Centroids1),
-    aggloClusteringHelper(Centroids1, [S1+S2 | tools:rmvTwo(Sizes, I, J)], Radius, Min1, I1, J1);
-
-aggloClusteringHelper(Centroids, Sizes, _, _, _, _) ->
+    Centroids1 = [vecWeightedAvg(C1, C2, S1, S2) | tools:rmvTwo(Centroids, I, J)],
+    {Min1, I1, J1} = closestPoints(Centroids1),
+    aggloClusteringHelper(Centroids1, [S1 + S2 | tools:rmvTwo(Sizes, I, J)],
+                          Radius, Min1, I1, J1);
+aggloClusteringHelper(Centroids, Sizes, _Radius, _Min, _I, _J) ->
     {Centroids, Sizes}.

@@ -223,16 +223,20 @@ on({lookup_fin, _Hops, Msg}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Database
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({get_key, Source_PID, Key}, State) ->
+on({get_key, Source_PID, HashedKey}, State) ->
     MyRange = dht_node_state:get(State, my_range),
-    case intervals:in(Key, MyRange) of
+    case intervals:in(HashedKey, MyRange) of
         true ->
-            dht_node_lookup:get_key(State, Source_PID, Key, Key),
-            State;
+%%             log:log(info, "[ ~w | I | Node   | ~w ] get_key ~s~n",
+%%                     [calendar:universal_time(), self(), HashedKey]),
+            comm:send(Source_PID,
+                      {get_key_response, HashedKey,
+                       ?DB:read(dht_node_state:get(State, db), HashedKey)});
         false ->
-            log:log(info,"[ Node ] get_Key: Got Request for Key ~p, it is not in ~p~n", [Key, MyRange]),
-            State
-    end;
+            log:log(info, "[ Node ] get_Key: Got Request for Key ~p, it is not in ~p~n",
+                    [HashedKey, MyRange])
+    end,
+    State;
 
 on({get_key, Source_PID, SourceId, HashedKey}, State) ->
 %      case 0 =:= randoms:rand_uniform(0,6) of
@@ -240,26 +244,18 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
 %              io:format("drop get_key request~n");
 %          false ->
     comm:send(Source_PID,
-                 {get_key_with_id_reply, SourceId, HashedKey,
-                  ?DB:read(dht_node_state:get(State, db), HashedKey)}),
+              {get_key_with_id_reply, SourceId, HashedKey,
+               ?DB:read(dht_node_state:get(State, db), HashedKey)}),
 %    end,
     State;
-
-on({set_key, Source_PID, Key, Value, Versionnr}, State) ->
-    MyRange = dht_node_state:get(State, my_range),
-    case intervals:in(Key, MyRange) of
-        true ->
-            dht_node_lookup:set_key(State, Source_PID, Key, Value, Versionnr);
-        false ->
-            log:log(info,"[ Node ] set_Key: Got Request for Key ~p, it is not in ~p~n", [Key, MyRange]),
-            State
-    end;
 
 on({delete_key, Source_PID, Key}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     case intervals:in(Key, MyRange) of
         true ->
-            dht_node_lookup:delete_key(State, Source_PID, Key);
+            {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), Key),
+            comm:send(Source_PID, {delete_key_response, Key, Result}),
+            dht_node_state:set_db(State, DB2);
         false ->
             log:log(info,"[ Node ] delete_Key: Got Request for Key ~p, it is not in ~p~n", [Key, MyRange]),
             State

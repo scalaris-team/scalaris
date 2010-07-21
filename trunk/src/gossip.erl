@@ -1,6 +1,5 @@
 %  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,59 +11,55 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    gossip.erl
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Framework for estimating aggregated global properties using
-%%%         gossip techniques.
-%%%  
-%%%  Gossiping is organized in rounds. At the start of each round, a node's
-%%%  gossip process has to ask its dht_node for information about its state,
-%%%  i.e. its load and the IDs of itself and its predecessor. It will not
-%%%  participate in any state exchanges until this information has been
-%%%  received and postpone such messages, i.e. 'get_state', if received. All
-%%%  other messages, e.g. requests for estimated values, are either ignored
-%%%  (only applies to "trigger") or answered with information from the previous
-%%%  round, e.g. requests for (estimated) system properties.
-%%%  
-%%%  When these values are successfully integrated into the process state,
-%%%  and the node entered some round, it will continuously ask the cyclon
-%%%  process for a random node to exchange its state with and update the local
-%%%  estimates (the interval is defined in gossip_interval given by
-%%%  scalaris.cfg).
-%%%  
-%%%  New rounds are started by the leader which is identified as the node for
-%%%  which
-%%%  intervals:in(?RT:hash_key(0), node_details:get(NodeDetails, my_range))
-%%%  is true. It will propagate its round with its state so that gossip
-%%%  processes of other nodes can join this round. Several parameters (added
-%%%  to scalaris.cfg) influence the decision about when to start a new round:
-%%%  <ul>
-%%%   <li>gossip_max_triggers_per_round: a new round is started if this many
-%%%       triggers have been received during the round</li>
-%%%   <li>gossip_min_triggers_per_round: a new round is NOT started until this
-%%%       many triggers have been received during the round</li>
-%%%   <li>gossip_converge_avg_count_start_new_round: if the estimated values
-%%%       did not change by more than gossip_converge_avg_epsilon percent this
-%%%       many times, assume the values have converged and start a new round
-%%%   </li>
-%%%   <li>gossip_converge_avg_epsilon: (see
-%%%       gossip_converge_avg_count_start_new_round)</li>
-%%%  </ul>
-%%%  
-%%%  Each process stores the estimates of the current round (which might not
-%%%  have been converged yet) and the previous estimates. If another process
-%%%  asks for gossip's best values it will favor the previous values but return
-%%%  the current ones if they have not changes by more than
-%%%  gossip_converge_avg_epsilon percent gossip_converge_avg_count times.
-%%% @end
-%%% Created : 19 Feb 2010 by Nico Kruber <kruber@zib.de>
-%%%-------------------------------------------------------------------
-%% @version $Id$
+
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Framework for estimating aggregated global properties using
+%%         gossip techniques.
+%%  
+%%  Gossiping is organized in rounds. At the start of each round, a node's
+%%  gossip process has to ask its dht_node for information about its state,
+%%  i.e. its load and the IDs of itself and its predecessor. It will not
+%%  participate in any state exchanges until this information has been
+%%  received and postpone such messages, i.e. 'get_state', if received. All
+%%  other messages, e.g. requests for estimated values, are either ignored
+%%  (only applies to "trigger") or answered with information from the previous
+%%  round, e.g. requests for (estimated) system properties.
+%%  
+%%  When these values are successfully integrated into the process state,
+%%  and the node entered some round, it will continuously ask the cyclon
+%%  process for a random node to exchange its state with and update the local
+%%  estimates (the interval is defined in gossip_interval given by
+%%  scalaris.cfg).
+%%  
+%%  New rounds are started by the leader which is identified as the node for
+%%  which
+%%  intervals:in(?RT:hash_key(0), node_details:get(NodeDetails, my_range))
+%%  is true. It will propagate its round with its state so that gossip
+%%  processes of other nodes can join this round. Several parameters (added
+%%  to scalaris.cfg) influence the decision about when to start a new round:
+%%  <ul>
+%%   <li>gossip_max_triggers_per_round: a new round is started if this many
+%%       triggers have been received during the round</li>
+%%   <li>gossip_min_triggers_per_round: a new round is NOT started until this
+%%       many triggers have been received during the round</li>
+%%   <li>gossip_converge_avg_count_start_new_round: if the estimated values
+%%       did not change by more than gossip_converge_avg_epsilon percent this
+%%       many times, assume the values have converged and start a new round
+%%   </li>
+%%   <li>gossip_converge_avg_epsilon: (see
+%%       gossip_converge_avg_count_start_new_round)</li>
+%%  </ul>
+%%  
+%%  Each process stores the estimates of the current round (which might not
+%%  have been converged yet) and the previous estimates. If another process
+%%  asks for gossip's best values it will favor the previous values but return
+%%  the current ones if they have not changes by more than
+%%  gossip_converge_avg_epsilon percent gossip_converge_avg_count times.
+%% @end
 %% @reference M. Jelasity, A. Montresor, O. Babaoglu: Gossip-based aggregation
 %% in large dynamic networks. ACM Trans. Comput. Syst. 23(3), 219-252 (2005)
+%% @version $Id$
 -module(gossip).
-
 -author('kruber@zib.de').
 -vsn('$Id$').
 

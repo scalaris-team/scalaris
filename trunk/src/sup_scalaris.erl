@@ -130,10 +130,5 @@ my_process_list(InstanceId, SupervisorType) ->
     end.
 
 scan_environment() ->
-    loadInstances(preconfig:cs_instances()),
+    admin:add_nodes(preconfig:cs_instances() - 1),
     ok.
-
-loadInstances(undefined) ->
-    ok;
-loadInstances(Instances) ->
-    admin:add_nodes(Instances - 1).

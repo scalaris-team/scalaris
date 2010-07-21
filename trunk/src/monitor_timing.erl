@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,52 +11,53 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : monitor_timing.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : monitors timing behaviour of transactions
-%%%
-%%% Created :  24 September 2009 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc Monitors timing behaviour of transactions.
 %% @version $Id$
 -module(monitor_timing).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
 -behaviour(gen_component).
 
--export([start_link/0, get_timers/0, log/2]).
+-export([start_link/0, get_timers/0, log/2,
+         on/2, init/1]).
 
--export([on/2, init/1]).
+-ifdef(with_export_type_support).
+-export_type([timer/0]).
+-endif.
 
-% state of the vivaldi loop
+-type timer() :: {Timer::atom(), Count::pos_integer(), Min::integer(),
+                  Avg::number(), Max::integer()}.
+
+% state of the module
 -type(state() :: {}).
 
-% accepted messages of vivaldi processes
--type(message() :: any()).
+% accepted messages the module
+-type(message() ::
+    {log, Timer::atom(), Time::integer()} |
+    {get_timers, From::comm:erl_local_pid()}).
 
 %% @doc log a timespan for a given timer
+-spec log(Timer::atom(), Time::integer()) -> ok.
 log(Timer, Time) ->
     comm:send_local(?MODULE, {log, Timer, Time}).
 
 %% @doc read the statistics about the known timers
+-spec get_timers() -> [timer()].
 get_timers() ->
     comm:send_local(?MODULE, {get_timers, self()}),
     receive
-        {get_timers_response, Timers} ->
-            Timers
+        {get_timers_response, Timers} -> Timers
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% start
 %% @doc message handler
--spec(on/2 :: (Message::message(), State::state()) -> state()).
+-spec on(Message::message(), State::state()) -> state() | unknown_event.
 on({log, Timer, Time}, State) ->
     case ets:lookup(?MODULE, Timer) of
         [{Timer, Sum, Count, Min, Max}] ->
@@ -83,11 +84,11 @@ on(_, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(init/1 :: (any()) -> state()).
+-spec init(any()) -> state().
 init(_) ->
     ets:new(?MODULE, [set, protected, named_table]),
     {}.
 
--spec(start_link/0 :: () -> {ok, pid()}).
+-spec start_link() -> {ok, pid()}.
 start_link() ->
     gen_component:start_link(?MODULE, [], [{register_native, ?MODULE}]).

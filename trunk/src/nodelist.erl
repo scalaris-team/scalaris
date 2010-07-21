@@ -1,6 +1,5 @@
 %  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,15 +11,11 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    nodelist.erl
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Provides lists of nodes that are sorted by the nodes' ids.
-%%% @end
-%%% Created : 17 May 2010 by Nico Kruber <kruber@zib.de>
-%%%-------------------------------------------------------------------
-%% @version $Id$
 
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Provides lists of nodes that are sorted by the nodes' ids.
+%% @end
+%% @version $Id$
 -module(nodelist).
 -author('kruber@zib.de').
 -vsn('$Id$').

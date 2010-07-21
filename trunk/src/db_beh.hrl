@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Common types and function specs for database implementations.
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Common types and function specs for database implementations.
+%% @end
 %% @version $Id$
 
 -type(value() :: any()).

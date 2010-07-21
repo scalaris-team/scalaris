@@ -1,6 +1,5 @@
 %  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,30 +11,27 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    comm.erl
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Message Sending.
-%%%  
-%%%  This module allows to configure Scalaris for using Distributed Erlang
-%%%  (if the macro BUILTIN is defined) or TCP (macro TCP_LAYER) for inter-node
-%%%  communication and wraps message sending and process identifiers.
-%%%  
-%%%  Messages consist of a tuple of which the first element is the message's
-%%%  tag, i.e. an atom. Process identifiers depend on the messaging back-end
-%%%  being used but can also wrap up an arbitrary cookie that can be used to
-%%%  tell messages with the same tag apart, e.g. when they are used for
-%%%  different purposes.
-%%%  
-%%%  Sending messages to so-tagged process identifiers works seamlessly, e.g.
-%%%  a server receiving message {tag, SourcePid} can reply with
-%%%  comm:send(SourcePid, {tag_response}). On the receiving side (a client),
-%%%  a message of the form {Message, Cookie} will then be received, e.g.
-%%%  {{tag_response}, Cookie}. Pids with cookies can be created using 
-%%%  this_with_cookie/1.
-%%% @end
-%%% Created :  15 May 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Message Sending.
+%%  
+%%  This module allows to configure Scalaris for using Distributed Erlang
+%%  (if the macro BUILTIN is defined) or TCP (macro TCP_LAYER) for inter-node
+%%  communication and wraps message sending and process identifiers.
+%%  
+%%  Messages consist of a tuple of which the first element is the message's
+%%  tag, i.e. an atom. Process identifiers depend on the messaging back-end
+%%  being used but can also wrap up an arbitrary cookie that can be used to
+%%  tell messages with the same tag apart, e.g. when they are used for
+%%  different purposes.
+%%  
+%%  Sending messages to so-tagged process identifiers works seamlessly, e.g.
+%%  a server receiving message {tag, SourcePid} can reply with
+%%  comm:send(SourcePid, {tag_response}). On the receiving side (a client),
+%%  a message of the form {Message, Cookie} will then be received, e.g.
+%%  {{tag_response}, Cookie}. Pids with cookies can be created using 
+%%  this_with_cookie/1.
+%% @end
 %% @version $Id$
 -module(comm).
 

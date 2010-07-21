@@ -26,24 +26,35 @@
 -define(TRACE(X,Y), io:format(X,Y)).
 %-define(TRACE(X,Y), ok).
 
+-type tableid() :: atom().
+
 -export([new/2, get/2, set/2, delete/2]).
 
 %% put/get variant
-new(_TableName, Params) ->
-    ok.
+-spec new(TableName::atom(), [set | ordered_set | bag | duplicate_bag |
+                              public | protected | private |
+                              named_table | {keypos, integer()} |
+                              {heir, pid(), term()} | {heir,none} |
+                              {write_concurrency, boolean()}]) -> tableid().
+new(TableName, _Params) ->
+    TableName.
 
+-spec get(Key::term(), TableName::atom()) -> tuple() | undefined.
 get(Key, _TableName) ->
     erlang:get(Key).
 
+-spec set(Value::tuple(), TableName::atom()) -> ok.
 set(NewTuple, _TableName) ->
     erlang:put(element(1,NewTuple), NewTuple),
     ok.
 
+-spec delete(Key::term(), TableName::atom()) -> ok.
 delete(Key, _TableName) ->
     erlang:erase(Key),
     ok.
 
 %% %% ets variant (only for debugging! has performance issues with msg_delay)
+%% -type tableid() :: tid() | atom().
 %% new(TableName, Params) ->
 %%     Name = ets:new(TableName, Params).
 %% 

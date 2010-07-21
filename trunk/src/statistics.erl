@@ -16,7 +16,6 @@
 %% @doc Statistics Module for Bootstrap server
 %% @version $Id$
 -module(statistics).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -39,13 +38,13 @@ get_max_memory_usage(Ring) ->
     lists:foldl(fun (X, Sum) -> util:max(X, Sum) end, 0, lists:map(fun get_memory/1, FilteredRing)).
     
 
-get_load_std_deviation(Ring) ->			
+get_load_std_deviation(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
     Average = get_average_load(FilteredRing),
-    math:sqrt(lists:foldl(fun (Load, Acc) -> 
-				  Acc + (Load - Average)*(Load - Average) 
-			  end,
-			  0, lists:map(fun get_load/1, FilteredRing)) / length(FilteredRing)).
+    math:sqrt(lists:foldl(fun (Load, Acc) ->
+                                   Acc + (Load - Average) * (Load - Average)
+                          end,
+                          0, lists:map(fun get_load/1, FilteredRing)) / length(FilteredRing)).
     
 get_load({ok, Details}) ->
     node_details:get(Details, load);
@@ -87,8 +86,7 @@ compare_node_details({ok, _}, _) ->
 get_node_details(Pid) ->
     comm:send(Pid, {get_node_details, comm:this_with_cookie(Pid)}),
     receive
-	{{get_node_details_response, Details}, Pid} -> 
-	    {ok, Details}
+        {{get_node_details_response, Details}, Pid} -> {ok, Details}
     after
         2000 ->
             log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response from ~p~n",[Pid]),
@@ -112,13 +110,13 @@ get_average_rt_size(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
     get_total_rt_size(FilteredRing) / length(FilteredRing).
 
-get_rt_size_std_deviation(Ring) ->			
+get_rt_size_std_deviation(Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
     Average = get_average_rt_size(FilteredRing),
-    math:sqrt(lists:foldl(fun (RTSize, Acc) -> 
-				  Acc + (RTSize - Average)*(RTSize - Average) 
-			  end,
-			  0, lists:map(fun get_rt/1, FilteredRing)) / length(FilteredRing)).
+    math:sqrt(lists:foldl(fun (RTSize, Acc) ->
+                                   Acc + (RTSize - Average) * (RTSize - Average)
+                          end,
+                          0, lists:map(fun get_rt/1, FilteredRing)) / length(FilteredRing)).
     
 get_rt({ok, Details}) ->
     node_details:get(Details, rt_size);

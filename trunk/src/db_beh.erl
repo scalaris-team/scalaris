@@ -15,7 +15,6 @@
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    database behaviour
 %%% @end
-
 %% @version $Id$
 -module(db_beh).
 -author('schuett@zib.de').

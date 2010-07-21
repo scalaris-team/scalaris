@@ -1,5 +1,5 @@
-%  Copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,11 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : gossip_state.erl
-%%% Author  : Nico Kruber <kruber@zib.de>
-%%% Description : Methods for working with the gossip state.
-%%%
-%%% Created : 25 Feb 2010 by Nico Kruber <kruber@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Nico Kruber <kruber@zib.de>
-%% @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc Methods for working with the gossip state.
 %% @version $Id$
 -module(gossip_state).
-
 -author('kruber@zib.de').
 -vsn('$Id$').
 
@@ -34,35 +27,16 @@
               max/0, round/0, triggered/0, msg_exch/0, converge_avg_count/0]).
 -endif.
 
-%%
-%% Exported Functions
-%%
-
-%%
-%% Externally usable exports (some also work on internal states)
-%%
-
-% constructors
--export([]).
-
-% getters
+%% Externally usable exports:
 -export([get/2]).
 
-% setters
--export([]).
-
-%%
-%% Exports only meant for use by gossip.erl
-%%
-% constructors
--export([new_state/0, new_state/1,
-         new_internal/0, new_internal/7]).
-
-% getters
--export([]).
-
-% setters
--export([set/3,
+%% Exports only meant for use by gossip.erl:
+-export([% constructors:
+         new_state/0, new_state/1,
+         new_internal/0, new_internal/7,
+         % getters:
+         % setters:
+         set/3,
          set_values/2,
          set_initialized/1,
          reset_triggered/1,
@@ -70,16 +44,14 @@
          reset_msg_exch/1,
          inc_msg_exch/1,
          reset_converge_avg_count/1,
-         inc_converge_avg_count/1]).
-
--export([conv_state_to_extval/1,
+         inc_converge_avg_count/1,
+         % misc.
+         conv_state_to_extval/1,
          calc_size_ldr/1,
          calc_size_kr/1,
          calc_stddev/1]).
 
-%%
 %% Gossip types
-%%
 -type(avg() :: number() | unknown).
 -type(avg2() :: number() | unknown).
 -type(stddev() :: float() | unknown).
@@ -150,6 +122,10 @@ new_state() -> #state{}.
 -spec new_state(values_internal()) -> state().
 new_state(Values) when is_record(Values, values_internal) ->
     #state{values=Values, initialized=false}.
+
+%%
+%% Getters
+%%
 
 %% @doc Gets information from a values, values_internal or state record.
 %%      Allowed keys include:

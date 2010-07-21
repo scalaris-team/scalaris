@@ -30,6 +30,7 @@
          get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2,
+         zipfoldl/5,
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
          smerge2/2, smerge2/3, smerge2/4,
@@ -324,6 +325,12 @@ get_global_uid() ->
     _Result = {get_pids_uid(), comm:this()}
     %% , term_to_binary(_Result)
     .
+
+-spec zipfoldl(ZipFun::fun((X, Y) -> Z), FoldFun::fun((Z, Acc) -> Acc), L1::[X], L2::[Y], Acc) -> Acc.
+zipfoldl(ZipFun, FoldFun, [L1H | L1R], [L2H | L2R], AccIn) ->
+    zipfoldl(ZipFun, FoldFun, L1R, L2R, FoldFun(ZipFun(L1H, L2H), AccIn));
+zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
+    AccIn.
 
 %% @doc Splits L1 into a list of elements that are not contained in L2, a list
 %%      of elements that both lists share and a list of elements unique to L2.
