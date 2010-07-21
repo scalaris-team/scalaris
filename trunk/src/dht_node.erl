@@ -380,6 +380,7 @@ start_link(InstanceId, Options) ->
 %% userdevguide-end dht_node:start_link
 
 % @doc find existing nodes and initialize the comm_layer
+-spec trigger_known_nodes() -> ok.
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
     % note, comm:this() may be invalid at this moment
@@ -394,6 +395,7 @@ trigger_known_nodes() ->
     end.
 
 % @doc try to check whether common-test is running
+-spec is_unittest() -> boolean().
 is_unittest() ->
     code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
     lists:member(ct_logs, registered()).
