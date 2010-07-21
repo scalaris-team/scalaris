@@ -1,5 +1,5 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,13 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : comm_acceptor.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Acceptor
-%%%           This module accepts new connections and starts corresponding 
-%%%           comm_connection processes.
-%%%
-%%% Created : 18 Apr 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% @version $Id $
+%% @doc Acceptor.
+%%
+%%      This module accepts new connections and starts corresponding 
+%%      comm_connection processes.
+%% @version $Id$
 -module(comm_acceptor).
 -author('schuett@zib.de').
 -vsn('$Id$').
@@ -45,11 +40,11 @@ init(InstanceId, Supervisor) ->
     erlang:register(comm_layer_acceptor, self()),
    log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), preconfig:cs_port()]),
     LS = case config:read(listen_ip) of
-		       undefined ->
-			   open_listen_port(preconfig:cs_port(), first_ip());
-		       _ ->
-			   open_listen_port(preconfig:cs_port(), config:read(listen_ip))
-		   end,
+             undefined ->
+                 open_listen_port(preconfig:cs_port(), first_ip());
+             _ ->
+                 open_listen_port(preconfig:cs_port(), config:read(listen_ip))
+         end,
     {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
     comm_port:set_local_address(undefined, LocalPort),
     %io:format("this() == ~w~n", [{LocalAddress, LocalPort}]),
@@ -58,39 +53,39 @@ init(InstanceId, Supervisor) ->
 
 server(LS) ->
     case gen_tcp:accept(LS) of
-	{ok, S} ->
-	    case comm_port:get_local_address_port() of
-		{undefined, LocalPort} ->
-		    {ok, {MyIP, _LocalPort}} = inet:sockname(S),
-		    comm_port:set_local_address(MyIP, LocalPort);
-		_ ->
-		    ok
-	    end,
-	    receive
-		{tcp, S, Msg} ->
-		    {endpoint, Address, Port} = binary_to_term(Msg),
-		    % auto determine remote address, when not sent correctly
- 		    NewAddress = if Address =:= {0,0,0,0} orelse Address =:= {127,0,0,1} ->  
- 			    case inet:peername(S) of
- 				{ok, {PeerAddress, _Port}} -> 
-				    % io:format("Sent Address ~p\n",[Address]),
-				    % io:format("Peername is ~p\n",[PeerAddress]),
-				    PeerAddress;
- 				{error, _Why} ->
- 				    % io:format("Peername error ~p\n",[Why]).
-				    Address
- 			    end;
-  			true ->
-  			    % io:format("Address is ~p\n",[Address]),
-			    Address
-		    end,
-		    NewPid = comm_connection:new(NewAddress, Port, S),
-		    gen_tcp:controlling_process(S, NewPid),
-		    inet:setopts(S, comm_connection:tcp_options()),
-		    comm_port:register_connection(NewAddress, Port, NewPid, S)
-	    end,
-	    server(LS);
-	Other ->
+        {ok, S} ->
+            case comm_port:get_local_address_port() of
+                {undefined, LocalPort} ->
+                    {ok, {MyIP, _LocalPort}} = inet:sockname(S),
+                    comm_port:set_local_address(MyIP, LocalPort);
+                _ ->
+                    ok
+            end,
+            receive
+                {tcp, S, Msg} ->
+                    {endpoint, Address, Port} = binary_to_term(Msg),
+                    % auto determine remote address, when not sent correctly
+                    NewAddress = if Address =:= {0,0,0,0} orelse Address =:= {127,0,0,1} ->
+                                        case inet:peername(S) of
+                                            {ok, {PeerAddress, _Port}} ->
+                                                % io:format("Sent Address ~p\n",[Address]),
+                                                % io:format("Peername is ~p\n",[PeerAddress]),
+                                                PeerAddress;
+                                            {error, _Why} ->
+                                                % io:format("Peername error ~p\n",[Why]).
+                                                Address
+                                        end;
+                                    true ->
+                                        % io:format("Address is ~p\n",[Address]),
+                                        Address
+                                 end,
+                    NewPid = comm_connection:new(NewAddress, Port, S),
+                    gen_tcp:controlling_process(S, NewPid),
+                    inet:setopts(S, comm_connection:tcp_options()),
+                    comm_port:register_connection(NewAddress, Port, NewPid, S)
+            end,
+            server(LS);
+        Other ->
             log:log(warn,"[ CC ] unknown message ~p", [Other])
     end.
 
@@ -99,11 +94,12 @@ open_listen_port({From, To}, IP) ->
 open_listen_port([Port | Rest], IP) ->
     case gen_tcp:listen(Port, [binary, {packet, 4}, {ip, IP}]
                         ++ comm_connection:tcp_options()) of
-	{ok, Socket} ->
-	    Socket;
-	{error, Reason} ->
-	   log:log(error,"[ CC ] can't listen on ~p: ~p~n", [Port, Reason]),
-	    open_listen_port(Rest, IP)
+        {ok, Socket} ->
+            log:log(info,"[ CC ] listening on ~p:~p~n", [IP, Port]),
+            Socket;
+        {error, Reason} ->
+            log:log(error,"[ CC ] can't listen on ~p: ~p~n", [Port, Reason]),
+            open_listen_port(Rest, IP)
     end;
 open_listen_port([], _) ->
     abort;

@@ -15,9 +15,9 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc Generic component framework. This component and its usage
-%% are described in more detail in the 'User and Developers Guide'
-%% which can be found in user-dev-guide/main.pdf and online at
-%% [http://code.google.com/p/scalaris/wiki/UsersDevelopersGuide].
+%%      are described in more detail in the 'User and Developers Guide'
+%%      which can be found in user-dev-guide/main.pdf and online at
+%%      [http://code.google.com/p/scalaris/wiki/UsersDevelopersGuide].
 %% @end
 %% @version $Id$
 -module(gen_component).
@@ -54,9 +54,12 @@ behaviour_info(_Other) ->
     undefined.
 
 %%% API
+-spec kill(Pid::pid()) -> ok.
 kill(Pid) ->        Pid ! {'$gen_component', kill}, ok.
+-spec sleep(Pid::pid(), TimeInMs::integer() | infinity) -> ok.
 sleep(Pid, Time) -> Pid ! {'$gen_component', sleep, Time}, ok.
 
+-spec runnable(Pid::pid()) -> boolean().
 runnable(Pid) ->
     {message_queue_len, MQLen} = erlang:process_info(Pid, message_queue_len),
     MQResult =

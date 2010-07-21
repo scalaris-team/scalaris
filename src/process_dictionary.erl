@@ -1,5 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,39 +11,32 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : process_dictionary.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : process dictionary
-%%%
-%%% Created : 17 Aug 2007 by Thorsten Schuett <schuett@csr-pc11.zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc Process dictionary.
+%%
+%%      This module provides a mechanism to implement process
+%%      groups. Within a process group, the names of processes have to
+%%      be unique, but the same name can be used in different
+%%      groups. The motivation for this module was to run several scalaris
+%%      nodes in one erlang vm. But for the processes forming a scalaris
+%%      node being able to talk to each other, they have to now their
+%%      names (dht_node, config, etc.). This module allows the processes
+%%      to keep their names.
+%% 
+%%      When a new process group is created, a unique "instance_id" is
+%%      created, which has to be shared by all nodes in this
+%%      group.
+%% 
+%%      {@link register_process/3} registers the name of a process in
+%%      his group and stores the instance_id in the calling processes'
+%%      environment using {@link erlang:put/2}.
+%% 
+%%      {@link lookup_process/2} will lookup in the process group for a
+%%      process with the given name.
+%% @end
 %% @version $Id$
-
-%@doc This module provides a mechanism to implement process
-%     groups. Within a process group, the names of processes have to
-%     be unique, but the same name can be used in different
-%     groups. The motivation for this module was to run several scalaris
-%     nodes in one erlang vm. But for the processes forming a scalaris
-%     node being able to talk to each other, they have to now their
-%     names (dht_node, config, etc.). This module allows the processes
-%     to keep their names.
-%
-%     When a new process group is created, a unique "instance_id" is
-%     created, which has to be shared by all nodes in this
-%     group.
-%
-%     {@link register_process/3} registers the name of a process in
-%     his group and stores the instance_id in the calling processes'
-%     environment using {@link erlang:put/2}.
-%
-%     {@link lookup_process/2} will lookup in the process group for a
-%     process with the given name.
-
 -module(process_dictionary).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 

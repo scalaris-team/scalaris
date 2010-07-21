@@ -1,5 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,15 +11,10 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : config.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : config file parser for scalaris
-%%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc    Config file parser for scalaris.
+%% @end
 %% @version $Id$
 -module(config).
 -author('schuett@zib.de').
@@ -107,8 +102,7 @@ loop() ->
 populate_db(File) ->
     case file:consult(File) of
         {ok, Terms} ->
-            lists:map(fun process_term/1, Terms),
-            eval_environment(os:getenv("CS_PORT"));
+            lists:map(fun process_term/1, Terms);
         {error, enoent} ->
             %% note: log4erl may not be available
             io:format("Can't load config file ~p: File does not exist. Ignoring.\n", [File]),
@@ -119,12 +113,6 @@ populate_db(File) ->
             erlang:halt(1),
             fail
     end.
-
-eval_environment(false) ->
-    ok;
-eval_environment(Port) ->
-    {PortInt, []} = string:to_integer(Port),
-    ets:insert(config_ets, {listen_port, PortInt}).
 
 process_term({Key, Value}) ->
     ets:insert(config_ets, {Key, preconfig:get_env(Key, Value)}).

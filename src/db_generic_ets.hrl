@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    generic db code for ets
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    generic db code for ets
+%% @end
 %% @version $Id$
 
 % Note: this include must be included in files including this file!

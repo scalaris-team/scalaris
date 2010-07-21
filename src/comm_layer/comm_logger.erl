@@ -1,5 +1,5 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,11 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : comm_logger.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : 
-%%%
-%%% Created : 31 Jul 2008 by Thorsten Schuett <schuett@csr-pc11.zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc Service for loggins messages.
 %% @version $Id$
 -module(comm_logger).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -35,7 +28,7 @@
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+         terminate/2, code_change/3]).
 
 -record(state, {start, map}).
 
@@ -101,10 +94,10 @@ handle_call(_Request, _From, State) ->
 %%--------------------------------------------------------------------
 handle_cast({log, Tag, Size}, State) ->
     case gb_trees:lookup(Tag, State#state.map) of
-	none ->
-	    {noreply, State#state{map=gb_trees:insert(Tag, {Size, 1}, State#state.map)}};
-	{value, {OldSize, OldCount}} ->
-	    {noreply, State#state{map=gb_trees:update(Tag, {Size + OldSize, OldCount + 1}, State#state.map)}}
+        none ->
+            {noreply, State#state{map=gb_trees:insert(Tag, {Size, 1}, State#state.map)}};
+        {value, {OldSize, OldCount}} ->
+            {noreply, State#state{map=gb_trees:update(Tag, {Size + OldSize, OldCount + 1}, State#state.map)}}
     end;
 handle_cast(_Msg, State) ->
     {noreply, State}.

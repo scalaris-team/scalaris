@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    In-process Database using toke
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc In-process Database using toke
+%% @end
 -module(db_toke).
 -author('kruber@zib.de').
 -vsn('$Id$').

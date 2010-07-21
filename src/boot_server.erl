@@ -13,10 +13,9 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc The boot server maintains a list of scalaris nodes and checks the 
-%%  availability using a failure_detector. It also exports a webpage 
-%%  on port 8000 containing some statistics. Its main purpose is to 
-%%  give new scalaris nodes a list of nodes already in the system.
+%% @doc The boot server maintains a list of scalaris nodes and checks their 
+%%      availability using a failure_detector. Its main purpose is to 
+%%      give new scalaris nodes a list of nodes already in the system.
 %% @end
 -module(boot_server).
 -author('schuett@zib.de').
@@ -25,23 +24,35 @@
 -export([start_link/0,
          number_of_nodes/0,
          node_list/0,
-         connect/0,
-         be_the_first/0]).
+         connect/0]).
 
 -behaviour(gen_component).
 -include("scalaris.hrl").
 
 -export([init/1, on/2]).
 
+% accepted messages of the boot_server process
+-type(message() ::
+    {crash, PID::comm:mypid()} |
+    {get_list, Ping_PID::comm:mypid()} |
+    {be_the_first, Ping_PID::comm:mypid()} |
+    {get_list_length, Ping_PID::comm:mypid()} |
+    {register, Ping_PID::comm:mypid()} |
+    {connect}).
+
+% internal state
+-type(state()::{Nodes::gb_set(), % known nodes
+                % nodes that asked for the boot server's list of nodes when the
+                % boot server did not know any nodes yet (they will be send the
+                % list as soon as the boot server gets knowledge of a node):
+                GetListSubscribers::[comm:mypid()]
+               }).
+
 %% @doc trigger a message with  the number of nodes known to the boot server
 -spec number_of_nodes() -> ok.
 number_of_nodes() ->
     comm:send(bootPid(), {get_list_length, comm:this()}),
     ok.
-
--spec be_the_first() -> ok.
-be_the_first() ->
-    comm:send(bootPid(), {be_the_first, comm:this()}).
 
 -spec connect() -> ok.
 connect() ->
@@ -57,51 +68,46 @@ node_list() ->
 % Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({crash, PID},{Nodes,First,Subscriber}) ->
+-spec on(message(), state()) -> state() | unknown_event.
+on({crash, PID}, {Nodes, Subscriber}) ->
     NewNodes = gb_sets:delete_any(PID, Nodes),
-    {NewNodes,First,Subscriber};
+    {NewNodes, Subscriber};
 
-on({get_list, Ping_PID},{Nodes,First,Subscriber}) ->
+on({get_list, Ping_PID}, {Nodes, Subscriber} = State) ->
     case gb_sets:is_empty(Nodes) of
-        true ->
-            {Nodes,First,[Ping_PID|Subscriber]};
+        true -> {Nodes, [Ping_PID | Subscriber]};
         _ -> comm:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
-             {Nodes,First,Subscriber}
+             State
     end;
 
-on({be_the_first,Ping_PID},{Nodes,First,Subscriber}) ->
-    comm:send(Ping_PID, {be_the_first_response,First}),
-    {Nodes,false,Subscriber};
-
-on({get_list_length,Ping_PID},{Nodes,First,Subscriber}) ->
+on({get_list_length, Ping_PID}, {Nodes, _Subscriber} = State) ->
     comm:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
-    {Nodes,First,Subscriber};
+    State;
 
-on({register, Ping_PID},{Nodes,First,Subscriber}) ->
+on({register, Ping_PID}, {Nodes, Subscriber}) ->
     fd:subscribe(Ping_PID),
     NewNodes = gb_sets:add(Ping_PID, Nodes),
     case Subscriber of
         [] -> ok;
-        _ ->
-            [comm:send(Node,{get_list_response,gb_sets:to_list(NewNodes)} )|| Node <- Subscriber]
+        _ -> [comm:send(Node,{get_list_response,gb_sets:to_list(NewNodes)})
+                || Node <- Subscriber]
     end,
-    {NewNodes,First,[]};
+    {NewNodes, []};
 
-on({connect},State) ->
+on({connect}, State) ->
     % ugly work around for finding the local ip by setting up a socket first
     State;
 
 on(_, _State) ->
     unknown_event.
 
--spec init([]) -> any().
+-spec init([]) -> state().
 init(_Arg) ->
     log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
-    {gb_sets:empty(),true,[]}.
+    {gb_sets:empty(), []}.
 
 %% @doc starts the server; called by the boot supervisor
 %% @see sup_scalaris
-
 -spec start_link() -> {ok, pid()}.
 start_link() ->
      gen_component:start_link(?MODULE, [], [{register_native, boot}]).

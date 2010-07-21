@@ -12,14 +12,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Common functions for database implementations.
-%%          Note: include from a DB implementation!
-%%          TODO: Most of them are only provided for convenience - check if
-%%          they are still needed (they all are based on the new
-%%          ?DB:get_entry/2, ?DB:get_entry2/2, ?DB:set_entry/2,
-%%          ?DB:update_entry/2 and ?DB:delete_entry/2 functions)
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc Common functions for database implementations.
+%%      Note: include from a DB implementation!
+%%      TODO: Most of them are only provided for convenience - check if
+%%      they are still needed (they all are based on the new
+%%      ?DB:get_entry/2, ?DB:get_entry2/2, ?DB:set_entry/2,
+%%      ?DB:update_entry/2 and ?DB:delete_entry/2 functions)
+%% @end
 %% @version $Id$
 
 % Beed this variant of get_entry to determine whether an entry is stored in the

@@ -37,7 +37,7 @@
 -export_type([state/0]).
 -endif.
 
--type join_time() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}. % {MegaSecs, Secs, MicroSecs}
+-type join_time() :: {MegaSecs::non_neg_integer(), Secs::non_neg_integer(), MicroSecs::non_neg_integer()}.
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
 -record(state, {rt :: ?RT:external_rt(),

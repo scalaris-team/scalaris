@@ -1,6 +1,5 @@
 %  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,13 +11,10 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    fix_queue.erl
-%%% @author Christian Hennig <hennig@zib.de>
-%%% @doc    Queue implementation with a fixed maximum length.
-%%% @end
-%%% Created : 16 Feb 2009 by Christian Hennig <hennig@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Christian Hennig <hennig@zib.de>
+%% @doc    Queue implementation with a fixed maximum length.
+%% @end
 %% @version $Id$
 -module(fix_queue).
 -author('hennig@zib.de').

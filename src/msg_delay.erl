@@ -1,4 +1,4 @@
-% @copyright 2009, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+% @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
 %                 onScale solutions GmbH
 % @end
 
@@ -24,6 +24,7 @@
 %%      Only local messages inside a VM are supported.
 %%      Internally it triggers itself periodically to schedule sending.
 %% @end
+%% @version $Id$
 -module(msg_delay).
 -author('schintke@onscale.de').
 -vsn('$Id$').

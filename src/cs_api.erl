@@ -1,5 +1,4 @@
-%% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% end
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,9 +12,8 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Scalaris API
 %% @author Thorsten Schuett <schuett@zib.de>
+%% @doc API for transactional, consistent access to the replicated DHT items
 %% @version $Id$
 -module(cs_api).
 -author('schuett@zib.de').

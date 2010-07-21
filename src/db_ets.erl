@@ -13,10 +13,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Florian Schintke <schintke@onscale.de>
-%%% @doc    In-process database using ets
-%%% @end
-
+%% @author Florian Schintke <schintke@onscale.de>
+%% @doc    In-process database using ets
+%% @end
 %% @version $Id$
 -module(db_ets).
 -author('schintke@onscale.de').

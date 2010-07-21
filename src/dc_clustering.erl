@@ -1,5 +1,5 @@
-%  Copyright 2007-2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,22 +11,16 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : dc-clustering.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : 
-%%%
-%%% Created :  26 August 2009 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Marie Hoffmann <hoffmann@zib.de>
-%% @copyright 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% @version $Id$
+%% @doc    Re-register with boot nodes
+%% @end
 %% @reference T. Schuett, A. Reinefeld,F. Schintke, M. Hoffmann.
 %% Gossip-based Topology Inference for Efficient Overlay Mapping on Data Centers.
 %% 9th Int. Conf. on Peer-to-Peer Computing Seattle, Sept. 2009.
+%% @version $Id$
 -module(dc_clustering).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -89,7 +83,7 @@ init({ResetTrigger, ClusterTrigger}) ->
 
 % start new clustering shuffle
 %% @doc message handler
--spec(on/2 :: (Message::message(), State::state()) -> state()).
+-spec on(Message::message(), State::state()) -> state().
 on({start_clustering_shuffle},
    {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
     %io:format("~p~n", [State]),
@@ -152,7 +146,7 @@ on(_, _State) ->
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec(cluster/4 :: (centroids(), sizes(), centroids(), sizes()) -> {centroids(), sizes()}).
+-spec cluster(centroids(), sizes(), centroids(), sizes()) -> {centroids(), sizes()}.
 cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes) ->
     Radius = config:read(dc_clustering_radius),
     {NewCentroids, NewSizes} = mathlib:aggloClustering(Centroids ++ RemoteCentroids,
