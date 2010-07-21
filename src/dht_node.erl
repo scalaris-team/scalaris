@@ -33,7 +33,28 @@
 -type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
 
 % accepted messages of dht_node processes
--type(message() :: dht_node_join:join_message() | any()).
+-type(message() ::
+      database_message() |
+      bulkowner_message() |
+      lookup_message() |
+      dht_node_join:join_message()).
+
+-type(lookup_message() ::
+      {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
+      {lookup_fin, Hops::pos_integer(), Msg::comm:message()}).
+
+-type(database_message() ::
+      {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
+      {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
+      {set_key, Source_PID::comm:mypid(), Key::?RT:key(), Value::?DB:value(), Versionnr::?DB:value()} |
+      {delete_key, Source_PID::comm:mypid(), Key::?RT:key()} |
+      {delete_key, Source_PID::comm:mypid(), Key::?RT:key()} |
+      {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
+
+-type(bulkowner_message() ::
+      {bulk_owner, I::intervals:interval(), Msg::comm:message()} |
+      {start_bulk_owner, I::intervals:interval(), Msg::comm:message()} |
+      {bulkowner_deliver, Range::intervals:interval(), {bulk_read_with_version, Issuer::comm:mypid()}}).
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
