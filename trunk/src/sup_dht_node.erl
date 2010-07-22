@@ -1,6 +1,5 @@
 %  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,17 +11,14 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    sup_dht_node.erl
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Supervisor for each DHT node that is responsible for keeping
-%%%         processes running that run for themselves.
-%%%
-%%%         If one of the supervised processes fails, only the failed process
-%%%         will be re-started!
-%%% @end
-%%% Created : 17 Jan 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Supervisor for each DHT node that is responsible for keeping
+%%         processes running that run for themselves.
+%%
+%%         If one of the supervised processes fails, only the failed process
+%%         will be re-started!
+%% @end
 %% @version $Id$
 -module(sup_dht_node).
 -author('schuett@zib.de').

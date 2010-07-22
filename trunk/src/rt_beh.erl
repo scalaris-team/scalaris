@@ -15,7 +15,6 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc routing table behaviour
 %% @end
-
 %% @version $Id$
 -module(rt_beh).
 -author('schuett@zib.de').
@@ -71,6 +70,8 @@ behaviour_info(_Other) ->
 
 %% see rt_simple.erl for simple standard implementation
 
+%% @doc Sends an initialization message to the node's routing table.
+-spec initialize(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
 initialize(Id, Pred, Succ) ->
     Pid = process_dictionary:get_group_member(routing_table),
-    comm:send_local(Pid , {init, Id, Pred, Succ}).
+    comm:send_local(Pid, {init, Id, Pred, Succ}).

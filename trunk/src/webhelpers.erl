@@ -17,7 +17,6 @@
 %% @doc web helpers module for Bootstrap server to generated the web interface
 %% @version $Id$
 -module(webhelpers).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -29,45 +28,56 @@
          getVivaldiMap/0]).
 
 
-%% @doc checks whether the current request is a post operation
-%% @spec isPost(A) -> boolean()
-%%   A = http_request
+%% @doc Checks whether the current request is a post operation.
+-spec isPost(A::#arg{req::#http_request{method::atom()}}) -> boolean().
 isPost(A) ->
     Method = (A#arg.req)#http_request.method,
     Method =:= 'POST'.
 
 %%%-----------------------------Lookup/Put/delete---------------------
 
+-spec lookup(Key::?RT:key())
+        -> {TimeInMs::integer(),
+            Result::{Value::?DB:value(), Version::?DB:version()} |
+                    {fail, not_found} | {fail, timeout} | {fail, fail}}.
 lookup(Key) ->
 %%    timer:tc(cs_api, read, [Key]).
     timer:tc(transaction_api, quorum_read, [Key]).
 
+-spec set_key(Key::?RT:key(), Value::?DB:value())
+        -> {TimeInMs::integer(),
+            Result::commit | userabort | {fail, not_found} | {fail, timeout} |
+                    {fail, fail} | {fail, abort}}.
 set_key(Key, Value) ->
     timer:tc(transaction_api, single_write, [Key, Value]).
 
+-spec delete_key(Key::?RT:key(), Timeout::pos_integer())
+        -> {TimeInMs::integer(),
+            Result::{ok, pos_integer(), list()} | {fail, timeout} |
+                    {fail, timeout, pos_integer(), list()} |
+                    {fail, node_not_found}}.
 delete_key(Key, Timeout) ->
     timer:tc(transaction_api, delete, [Key, Timeout]).
 
 %%%-----------------------------Load----------------------------------
 
+-spec getLoad() -> [{ok, Node::comm:mypid(), Load::node_details:load()} | {failed, Node::comm:mypid()}].
 getLoad() ->
     boot_server:node_list(),
     Nodes =
         receive
-            {get_list_response,X} ->
-                X
-        after 2000 ->
-            {failed}
+            {get_list_response, X} -> X
+        after 2000 -> []
         end,
     get_load(Nodes).
     
+-spec get_load([comm:mypid()]) -> [{ok, Node::comm:mypid(), Load::node_details:load()} | {failed, Node::comm:mypid()}].
 get_load([Head | Tail]) ->
     comm:send(Head, {get_node_details, comm:this(), [load]}),
     receive
         {get_node_details_response, NodeDetails} ->
             [{ok, Head, node_details:get(NodeDetails, load)} | get_load(Tail)]
-    after
-	2000 ->
+    after 2000 ->
 	    [{failed, Head} | get_load(Tail)]
     end;
 get_load([]) ->
@@ -104,6 +114,7 @@ renderLoad([]) ->
     [].
 
 %%%--------------------------Vivaldi-Map------------------------------
+
 -spec getVivaldiMap() -> SVG::string().
 getVivaldiMap() ->
     boot_server:node_list(),
@@ -155,10 +166,9 @@ renderVivaldiMap(CC_list, Nodes) ->
                        [lists:nth(1, Min)+(lists:nth(1, Max)-lists:nth(1, Min))/3,
                         lists:nth(2, Max)+R*4,
                          R*2,
-                        floor(lists:nth(2, Max)-lists:nth(2, Min))])                    ,
-        
+                        floor(lists:nth(2, Max)-lists:nth(2, Min))]),
 
-    Content=gen_Nodes(CC_list,Nodes,R),
+    Content=gen_Nodes(CC_list, Nodes, R),
     Foot="</svg>",
     Head++Content++Foot.
 
@@ -170,14 +180,12 @@ floor(X) ->
         false -> T - 1
     end.
 
-
-
+-spec gen_Nodes(CC_list::[vivaldi:network_coordinate()], Nodes::[comm:mypid()], R::float()) -> string().
 gen_Nodes([],_,_) ->
     "";
 gen_Nodes([H|T],[HN|TN],R) ->
     Hi=255,
     Lo=0,
-
     
     S1 =  pid(HN),
 
@@ -188,28 +196,38 @@ gen_Nodes([H|T],[HN|TN],R) ->
     io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" style=\"fill:rgb( ~p, ~p ,~p) ;\" />~n",[lists:nth(1, H),lists:nth(2, H),R,C1,C2,C3])
     ++gen_Nodes(T,TN,R).
 
+%% @doc Gets the smallest and largest coordinates in each dimension of all
+%%      vectors in the given list.
+-spec get_min_max(Vectors::[vivaldi:network_coordinate()])
+        -> {vivaldi:network_coordinate(), vivaldi:network_coordinate()}.
 get_min_max([]) ->
-    {[],[]};
-get_min_max([H|T]) ->
-    {lists:foldl(fun(A,B) -> min_list(A,B) end,H ,T),
-     lists:foldl(fun(A,B) -> max_list(A,B) end,H ,T)}.
+    {[], []};
+get_min_max([H | T]) ->
+    lists:foldl(fun(A, {Min, Max}) ->
+                        {min_list(A, Min), max_list(A, Max)}
+                end, {H, H}, T).
 
+%% @doc Gets the smallest coordinate in each dimension of the given vectors.
+-spec min_list(L1::vivaldi:network_coordinate(), L2::vivaldi:network_coordinate()) -> vivaldi:network_coordinate().
+min_list(L1, L2) ->
+    lists:zipwith(fun(X, Y) ->
+                          case X < Y of
+                              true -> X;
+                              _ -> Y
+                          end
+                  end, L1, L2).
 
-min_list(L1,L2) ->
-    lists:zipwith(fun(X,Y) ->
-                   case X < Y of
-                       true -> X;
-                       _ -> Y
-                   end
-                   end, L1, L2).
-max_list(L1,L2) ->
-    lists:zipwith(fun(X,Y) ->
-                   case X > Y of
-                       true -> X;
-                       _ -> Y
-                   end
-                   end, L1, L2).
+%% @doc Gets the largest coordinate in each dimension of the given vectors.
+-spec max_list(L1::vivaldi:network_coordinate(), L2::vivaldi:network_coordinate()) -> vivaldi:network_coordinate().
+max_list(L1, L2) ->
+    lists:zipwith(fun(X, Y) ->
+                          case X > Y of
+                              true -> X;
+                              _ -> Y
+                          end
+                  end, L1, L2).
 
+-spec pid(comm:mypid()) -> integer().
 -ifdef(TCP_LAYER).
 pid({{A,B,C,D},I,_}) ->
     A+B+C+D+I.
@@ -219,8 +237,6 @@ pid({{A,B,C,D},I,_}) ->
 pid(X) ->
     list_to_integer(lists:nth(1, string:tokens(erlang:pid_to_list(X),"<>."))).
 -endif.
-
-
 
 %%%-----------------------------Ring----------------------------------
 

@@ -39,38 +39,47 @@
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
 
+%% @doc Applies start_link in the given Module with the given Parameters.
+-spec parameterized_start_link(Module::module(), Parameters::list()) -> term() | none().
 parameterized_start_link(Module, Parameters) ->
     apply(Module, start_link, Parameters).
 
+%% @doc Creates a worker description for a supervisor.
+-spec sup_worker_desc(Name::atom() | string(), Module::module(), Function::atom())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::[]},
+            permanent, brutal_kill, worker, []}.
 sup_worker_desc(Name, Module, Function) ->
     sup_worker_desc(Name, Module, Function, []).
 
+%% @doc Creates a worker description for a supervisor.
+-spec sup_worker_desc(Name::atom() | string(), Module::module(), Function::atom(), Options::list())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::list()},
+            permanent, brutal_kill, worker, []}.
 sup_worker_desc(Name, Module, Function, Options) ->
-    {Name, {Module, Function, Options},
-      permanent,
-      brutal_kill,
-      worker,
-      []
-     }.
+    {Name, {Module, Function, Options}, permanent, brutal_kill, worker, []}.
 
+%% @doc Creates a supervisor description for a supervisor.
+-spec sup_supervisor_desc(Name::atom() | string(), Module::module(), Function::atom())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::[]},
+            permanent, brutal_kill, supervisor, []}.
 sup_supervisor_desc(Name, Module, Function) ->
     sup_supervisor_desc(Name, Module, Function, []).
 
+%% @doc Creates a supervisor description for a supervisor.
+-spec sup_supervisor_desc(Name::atom() | string(), Module::module(), Function::atom(), Options::list())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::list()},
+            permanent, brutal_kill, supervisor, []}.
 sup_supervisor_desc(Name, Module, Function, Options) ->
-    {Name, {Module, Function, Options},
-      permanent,
-      brutal_kill,
-      supervisor,
-      []
-     }.
+    {Name, {Module, Function, Options}, permanent, brutal_kill, supervisor, []}.
 
+%% @doc Escapes quotes in the given string.
 -spec escape_quotes(String::string()) -> string().
 escape_quotes(String) ->
-    lists:reverse(lists:foldl(fun escape_quotes_/2, [], String)).
+    lists:foldr(fun escape_quotes_/2, [], String).
 
 -spec escape_quotes_(String::string(), Rest::string()) -> string().
-escape_quotes_($", Rest) -> [$",$\\|Rest];
-escape_quotes_(Ch, Rest) -> [Ch|Rest].
+escape_quotes_($", Rest) -> [$\\, $" | Rest];
+escape_quotes_(Ch, Rest) -> [Ch | Rest].
 
 -spec max(plus_infinity, any()) -> plus_infinity;
          (any(), plus_infinity) -> plus_infinity;
@@ -263,48 +272,47 @@ shuffle_helper([_|_] = List, Acc, Size, ListSize) ->
     {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, ListSize), List),
     shuffle_helper(lists:append(Leading, T), [H | Acc], Size - 1, ListSize - 1).
 
--spec(gb_trees_largest_smaller_than/2 :: (any(), gb_tree()) -> {value, any(), any()} | nil).
+%% @doc Find the largest key in GBTree that is smaller than Key.
+%%      Note: gb_trees offers only linear traversal or lookup of exact keys -
+%%      we implement a more flexible binary search here despite gb_tree being
+%%      defined as opaque.
+-spec gb_trees_largest_smaller_than(Key, gb_tree()) -> {value, Key, Value::any()} | nil.
 gb_trees_largest_smaller_than(_Key, {0, _Tree}) ->
     nil;
-gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree} = Tree) ->
-    case largest_smaller_than_iter(MyKey, InnerTree) of
-        {value, _, _} = Value ->
-            Value;
-        nil ->
-            {LargestKey, LargestValue} = gb_trees:largest(Tree),
-            {value, LargestKey, LargestValue}
-    end.
+gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree}) ->
+    gb_trees_largest_smaller_than_iter(MyKey, InnerTree, true).
 
-% find largest in subtree smaller than MyKey
-largest_smaller_than_iter(_MyKey, nil) ->
+-spec gb_trees_largest_smaller_than_iter(Key, {Key, Value, Smaller::term(), Bigger::term()}, RightTree::boolean()) -> {value, Key, Value} | nil.
+gb_trees_largest_smaller_than_iter(_SearchKey, nil, _RightTree) ->
     nil;
-largest_smaller_than_iter(MyKey, {Key, Value, Smaller, Bigger}) ->
-    case Key < MyKey of
+gb_trees_largest_smaller_than_iter(SearchKey, {Key, Value, Smaller, Bigger}, RightTree) ->
+    case Key < SearchKey of
+        true when RightTree andalso Bigger =:= nil ->
+            % we reached the right end of the whole tree
+            % -> there is no larger item than the current item
+            {value, Key, Value};
         true ->
-            case largest_smaller_than_iter(MyKey, Bigger) of
-                {value, _, _} = AValue ->
-                    AValue;
-                nil ->
-                    {value, Key, Value}
+            case gb_trees_largest_smaller_than_iter(SearchKey, Bigger, RightTree) of
+                {value, _, _} = AValue -> AValue;
+                nil -> {value, Key, Value}
             end;
-        false ->
-            largest_smaller_than_iter(MyKey, Smaller)
+        _ ->
+            gb_trees_largest_smaller_than_iter(SearchKey, Smaller, false)
     end.
 
--spec(gb_trees_foldl/3 :: (any(), any(), gb_tree()) -> any()).
-gb_trees_foldl(_F, Accu, {0, _Tree}) ->
-    Accu;
-gb_trees_foldl(F, Accu, {_, Tree}) ->
-    gb_trees_foldl_iter(F, Accu, Tree).
+%% @doc Foldl over gb_trees.
+-spec gb_trees_foldl(fun((Key::any(), Value::any(), Acc) -> Acc), Acc, gb_tree()) -> Acc.
+gb_trees_foldl(F, Acc, GBTree) ->
+    gb_trees_foldl_iter(F, Acc, gb_trees:next(gb_trees:iterator(GBTree))).
 
-gb_trees_foldl_iter(_F, Accu, nil) ->
-    Accu;
-gb_trees_foldl_iter(F, Accu, {Key, Value, Smaller, Bigger}) ->
-    Res1 = gb_trees_foldl_iter(F, Accu, Smaller),
-    Res2 = F(Key, Value, Res1),
-    gb_trees_foldl_iter(F, Res2, Bigger).
+-spec gb_trees_foldl_iter(fun((Key, Value, Acc) -> Acc), Acc,
+                          {Key, Value, Iter::term()} | none) -> Acc.
+gb_trees_foldl_iter(_F, Acc, none) ->
+    Acc;
+gb_trees_foldl_iter(F, Acc, {Key, Val, Iter}) ->
+    gb_trees_foldl_iter(F, F(Key, Val, Acc), gb_trees:next(Iter)).
 
--spec(tc/3 :: (module(), atom(), [_]) -> {integer(), any()}).
+-spec tc(module(), atom(), list()) -> {integer(), any()}.
 tc(M, F, A) ->
     Before = erlang:now(),
     Val = apply(M, F, A),

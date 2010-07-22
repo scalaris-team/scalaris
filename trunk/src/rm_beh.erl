@@ -12,10 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    ring maintenance behaviour
-%%% @end
-
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc Ring maintenance behaviour
+%% @end
 %% @version $Id$
 -module(rm_beh).
 -author('schuett@zib.de').

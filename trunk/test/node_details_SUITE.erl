@@ -63,13 +63,11 @@ init_per_suite(Config) ->
                         application:start(log4erl),
                         Owner ! {continue},
                         receive
-                            {done} ->
-                                ok
+                            {done} -> ok
                         end
                 end),
     receive
-        {continue} ->
-            ok
+        {continue} -> ok
     end,
     [{wrapper_pid, Pid} | Config].
 

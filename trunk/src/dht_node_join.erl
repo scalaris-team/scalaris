@@ -157,18 +157,9 @@ process_join_msg({join_response, Pred, Data},
     log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),
     DB = ?DB:add_data(?DB:new(Id), Data),
     rt_beh:initialize(Id, Pred, Succ),
-    State = 
-        case node:is_valid(Pred) of
-            true ->
-                rm_beh:notify_new_succ(node:pidX(Pred), Me),
-                dht_node_state:new(?RT:empty_ext(Succ),
-                                   nodelist:new_neighborhood(Pred, Me, Succ),
-                                   DB);
-            false ->
-                dht_node_state:new(?RT:empty_ext(Succ),
-                                   nodelist:new_neighborhood(Me, Succ),
-                                   DB)
-        end,
+    rm_beh:notify_new_succ(node:pidX(Pred), Me),
+    State = dht_node_state:new(?RT:empty_ext(Succ),
+                               nodelist:new_neighborhood(Pred, Me, Succ), DB),
     cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
     comm:send_local(get_local_dht_node_reregister_pid(), {go}),
     msg_queue:send(QueuedMessages),

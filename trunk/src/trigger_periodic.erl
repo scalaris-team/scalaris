@@ -1,6 +1,5 @@
 %  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,25 +11,19 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    trigger_periodic.erl
-%%% @author Christian Hennig <hennig@zib.de>
-%%% @doc    Periodic trigger for (parameterized) modules.
-%%%
-%%% Can be used by a module <code>Module</code> in order to get a configurable
-%%% message (by default <code>{trigger}</code>) every
-%%% <code>BaseIntervalFun()</code> (default: <code>Module:get_base_interval()</code>)
-%%% milliseconds.
-%%% 
-%%% Use this module through the interface provided by the trigger module,
-%%% initializing it with trigger_periodic!
-%%% @end
-%%% Created :  2 Oct 2009 by Christian Hennig <hennig@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Christian Hennig <hennig@zib.de>
+%% @doc    Periodic trigger for (parameterized) modules.
+%%
+%% Can be used by a module <code>Module</code> in order to get a configurable
+%% message (by default <code>{trigger}</code>) every
+%% <code>BaseIntervalFun()</code> (default: <code>Module:get_base_interval()</code>)
+%% milliseconds.
+%% 
+%% Use this module through the interface provided by the trigger module,
+%% initializing it with trigger_periodic!
 %% @version $Id$
-
 -module(trigger_periodic).
-
 -author('hennig@zib.de').
 -vsn('$Id$').
 

@@ -19,16 +19,18 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([tracer/1, start/0, dump/0]).
+-export([tracer/1, start/0, dump/0,
+         tracer_perf/1, start_perf/0, dump_perf/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% 1. put tracer:start() into boot.erl before application:start(boot_cs)
+% 1. put tracer:start() and/or tracer:start_perf() into boot.erl before application:start(boot_cs)
 % 2. run benchmark
-% 3. call tracer:dump()
+% 3. call tracer:dump() or tracer:dump_perf()
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec start() -> ok.
 start() ->
     spawn(?MODULE, tracer, [self()]),
     receive
@@ -36,70 +38,83 @@ start() ->
     end,
     ok.
 
-tracer_perf(Pid) ->
-    erlang:trace(all, true, [running, timestamp]),
-    comm:send_local(Pid , {done}),
-    ets:new(?MODULE, [set, public, named_table]),
-    loop([]).
+-spec start_perf() -> ok.
+start_perf() ->
+    spawn(?MODULE, tracer_perf, [self()]),
+    receive
+        {done} -> ok
+    end,
+    ok.
 
+-spec tracer(Pid::comm:erl_local_pid()) -> none().
 tracer(Pid) ->
     erlang:trace(all, true, [send, procs]),
-    comm:send_local(Pid , {done}),
-    loop([]).
+    comm:send_local(Pid, {done}),
+    ets:new(tracer, [set, protected, named_table]),
+    loop().
 
-loop(Ps) ->
+-spec tracer_perf(Pid::comm:erl_local_pid()) -> none().
+tracer_perf(Pid) ->
+    erlang:trace(all, true, [running, timestamp]),
+    comm:send_local(Pid, {done}),
+    ets:new(tracer_perf, [set, protected, named_table]),
+    loop_perf().
+
+-spec loop() -> none().
+loop() ->
     receive
         {trace, Pid, send_to_non_existing_process, Msg, To} ->
-
             log:log(error,"send_to_non_existing_process: ~p -> ~p (~p)", [Pid, To, Msg]),
-
-            loop(Ps);
+            loop();
         {trace, Pid, exit, Reason} ->
             case Reason of
                 normal ->
-                    loop(Ps);
+                    loop();
                 {ok, _Stack,_Num} ->
-                    io:format(" EXIT: ~p | ~p~n", [Pid,Reason]),
-                    loop(Ps);
+                    io:format(" EXIT: ~p | ~p~n", [Pid, Reason]),
+                    loop();
                 _ ->
-                    io:format(" EXIT: ~p | ~p~n", [Pid,Reason]),
-                    %io:format("~p~n",Ps),
-                    %log:log(warn,"EXIT: ~p | ~p", [Pid,Reason]),
-                    loop(Ps)
-
+                    io:format(" EXIT: ~p | ~p~n", [Pid, Reason]),
+                    %io:format("~p~n", [dump()]),
+                    %log:log(warn,"EXIT: ~p | ~p", [Pid, Reason]),
+                    loop()
             end;
         {trace, Pid, spawn, Pid2, {M, F, Args}} ->
-            %io:format(" SPAWN: ~p -> ~p in ~p~n", [Pid,Pid2,{M, F, Args}]),
-            %log:log2file("TRACER",lists:flatten(io_lib:format(" SPAWN: ~p -> ~p in ~p~n", [Pid,Pid2,{M, F, Args}]))),
-            loop([{Pid,Pid2,{M, F, Args}}|Ps]);
+            %io:format(" SPAWN: ~p -> ~p in ~p~n", [Pid, Pid2, {M, F, Args}]),
+            %log:log2file("TRACER",lists:flatten(io_lib:format(" SPAWN: ~p -> ~p in ~p~n", [Pid, Pid2, {M, F, Args}]))),
+            ets:insert(tracer, {Pid, Pid2, {M, F, Args}}),
+            loop();
         _X ->
-            loop(Ps)
+            loop()
     end.
 
-
-
-loop_perf(Ps) ->
+-spec loop_perf() -> none().
+loop_perf() ->
     receive
         {trace_ts, Pid, in, _, TS} ->
-            case ets:lookup(?MODULE, Pid) of
+            case ets:lookup(tracer_perf, Pid) of
                 [] ->
-                    ets:insert(?MODULE, {Pid, TS, 0});
+                    ets:insert(tracer_perf, {Pid, TS, 0});
                 [{Pid, _, Sum}] ->
-                    ets:insert(?MODULE, {Pid, TS, Sum})
+                    ets:insert(tracer_perf, {Pid, TS, Sum})
             end,
-            loop_perf(Ps);
+            loop_perf();
         {trace_ts, Pid, out, _, TS} ->
-            case ets:lookup(?MODULE, Pid) of
+            case ets:lookup(tracer_perf, Pid) of
                 [] ->
-                    ets:insert(?MODULE, {Pid, ok, 0});
+                    ets:insert(tracer_perf, {Pid, ok, 0});
                 [{Pid, In, Sum}] ->
-                    ets:insert(?MODULE, {Pid, ok, timer:now_diff(TS, In) + Sum})
+                    ets:insert(tracer_perf, {Pid, ok, timer:now_diff(TS, In) + Sum})
             end,
-            loop_perf(Ps);
+            loop_perf();
         _X ->
             io:format("unknown message: ~p~n", [_X]),
-            loop_perf(Ps)
+            loop_perf()
     end.
-
+-spec dump() -> [{Pid::pid(), Pid2::pid(), {M::module(), F::atom(), Args::list()}}].
 dump() ->
-    lists:reverse(lists:keysort(3, ets:tab2list(?MODULE))).
+    ets:tab2list(tracer).
+
+-spec dump_perf() -> [{Pid::pid(), ScheduledIn::{MegaSecs::integer(), Secs::integer(), MicroSecs::integer()} | ok, Runtime::integer()}].
+dump_perf() ->
+    lists:reverse(lists:keysort(3, ets:tab2list(tracer_perf))).
