@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,11 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : scalaris_app.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : scalaris application file
-%%%
-%%% Created :  3 May 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc scalaris application file
 %% @version $Id$
 -module(scalaris_app).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -33,8 +26,7 @@
 -spec start(normal, NodeType::sup_scalaris:supervisor_type()) ->
                  {ok, Pid::pid()}
                | ignore
-               | {error, Error::{already_started,
-                                 Pid::pid()}
+               | {error, Error::{already_started, Pid::pid()}
                | term()};
            (any(), any()) -> {error, badarg}.
 start(normal, NodeType) ->

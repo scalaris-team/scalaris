@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Chord-like ring maintenance
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Chord-like ring maintenance
+%% @end
 %% @version $Id$
 -module(rm_chord).
 -author('schuett@zib.de').

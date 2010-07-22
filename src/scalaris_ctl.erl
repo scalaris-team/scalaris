@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,23 +11,17 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : scalaris_ctl.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : scalaris cli 
-%%%
-%%% Created :  12 Nov 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc scalaris cli
 %% @version $Id$
 -module(scalaris_ctl).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
 -export([start/0, process/1]).
 
+-spec start() -> none().
 start() ->
     case init:get_plain_arguments() of
 	[NodeName | Args] ->
@@ -45,9 +39,11 @@ start() ->
 	    halt(1)
     end.
 
+-spec print_usage() -> ok.
 print_usage() ->
     io:format("usage info~n", []).
 
+-spec process([string()]) -> ok.
 process(["stop"]) ->
     init:stop();
 process(Args) ->

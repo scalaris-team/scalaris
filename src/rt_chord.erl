@@ -189,16 +189,16 @@ empty_ext(_Succ) ->
 %%      it will thus have an external_rt!
 -spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
 next_hop(State, Id) ->
-    case intervals:in(Id, dht_node_state:get(State, succ_range)) of
-        %succ is responsible for the key
-        true ->
-            dht_node_state:get(State, succ_pid);
+    RT = dht_node_state:get(State, rt),
+    case get_size(RT) =:= 0 orelse
+             intervals:in(Id, dht_node_state:get(State, succ_range)) of
+        true -> dht_node_state:get(State, succ_pid); % -> succ
         % check routing table
         false ->
-            case util:gb_trees_largest_smaller_than(Id, dht_node_state:get(State, rt)) of
-                nil ->
-                    dht_node_state:get(State, succ_pid);
-                {value, _Key, Node} ->
+            case util:gb_trees_largest_smaller_than(Id, RT) of
+                {value, _Key, Node} -> node:pidX(Node);
+                nil -> % forward to largest finger
+                    {_Key, Node} = gb_trees:largest(RT),
                     node:pidX(Node)
             end
     end.

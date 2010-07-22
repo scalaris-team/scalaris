@@ -1,6 +1,5 @@
 %  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,37 +11,31 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    trigger.erl
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Generic trigger for (parameterized) modules.
-%%%
-%%% Can be used by a module <code>Module</code> in order to get a configurable
-%%% message (by default <code>{trigger}</code>) in intervals defined by a given
-%%% trigger.
-%%% The basic pattern for the use of this module is as follows:
-%%% <p><code>
-%%%  TriggerState = trigger:init(Trigger, ?MODULE),<br />
-%%%  TriggerState2 = trigger:first(TriggerState)
-%%% </code></p>
-%%% Then on each received <code>{trigger}</code> message, the trigger needs to
-%%% be told to issue another <code>{trigger}</code> message:
-%%% <p><code>
-%%%  NewTriggerState1 = trigger:next(TriggerState),
-%%%  NewTriggerState2 = trigger:next(TriggerState, base_interval),
-%%% </code></p>
-%%% Note: When parameterized modules are used, trigger:init(Trigger, THIS) does
-%%% not work. Use code like the following instead:
-%%% <p><code>
-%%%  TriggerState = trigger:init(Trigger, fun get_base_interval/0)
-%%% </code></p>
-%%% @end
-%%% Created : 26 Jan 2010 by Nico Kruber <kruber@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Generic trigger for (parameterized) modules.
+%%
+%% Can be used by a module <code>Module</code> in order to get a configurable
+%% message (by default <code>{trigger}</code>) in intervals defined by a given
+%% trigger.
+%% The basic pattern for the use of this module is as follows:
+%% <p><code>
+%%  TriggerState = trigger:init(Trigger, ?MODULE),<br />
+%%  TriggerState2 = trigger:first(TriggerState)
+%% </code></p>
+%% Then on each received <code>{trigger}</code> message, the trigger needs to
+%% be told to issue another <code>{trigger}</code> message:
+%% <p><code>
+%%  NewTriggerState1 = trigger:next(TriggerState),
+%%  NewTriggerState2 = trigger:next(TriggerState, base_interval),
+%% </code></p>
+%% Note: When parameterized modules are used, trigger:init(Trigger, THIS) does
+%% not work. Use code like the following instead:
+%% <p><code>
+%%  TriggerState = trigger:init(Trigger, fun get_base_interval/0)
+%% </code></p>
 %% @version $Id$
-
 -module(trigger).
-
 -author('kruber@zib.de').
 -vsn('$Id$').
 

@@ -130,6 +130,7 @@ on(Message, State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec get_base_interval() -> pos_integer().
 get_base_interval() ->
     config:read(pointer_base_stabilization_interval).
 

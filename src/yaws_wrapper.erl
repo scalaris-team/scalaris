@@ -25,6 +25,7 @@
 -export([start_link/3, try_link/3]).
 
 % start yaws
+-spec start_link(DocRoot::string(), SL::list(), GL::list()) -> {ok, Pid::pid()} | ignore | {error, Error::{already_started, Pid::pid()} | term()}.
 start_link(DocRoot, SL, GL) ->
     ok = application:set_env(yaws, embedded, true),
     ok = application:set_env(yaws, id, "default"),
@@ -37,6 +38,7 @@ start_link(DocRoot, SL, GL) ->
     Link.
 
 % try to open yaws
+-spec try_link(DocRoot::string(), SL::list(), GL::list()) -> {ok, Pid::pid()} | ignore | {error, Error::{already_started, Pid::pid()} | term()}.
 try_link(DocRoot, SL, GL) ->
     ok = application:set_env(yaws, embedded, true),
     ok = application:set_env(yaws, id, "default"),
@@ -54,6 +56,7 @@ try_link(DocRoot, SL, GL) ->
             ignore
     end.
 
+-spec try_port(Port::0..65535) -> boolean().
 try_port(Port) ->
     case gen_tcp:listen(Port, []) of
         {ok, Sock} ->
@@ -62,4 +65,3 @@ try_port(Port) ->
         _  ->
             false
     end.
-
