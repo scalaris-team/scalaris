@@ -140,12 +140,12 @@ get_range_with_version(DB, Interval) ->
         end,
     toke_drv:fold(F, [], DB).
 
-%% @doc Get key/value/version triples in the given range.
+%% @doc Get key/value/version triples of non-write-locked entries in the given range.
 get_range_only_with_version(DB, Interval) ->
     F = fun(_K, DBEntry_, Data) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case (not db_entry:is_empty(DBEntry)) andalso
-                         db_entry:get_writelock(DBEntry) =:= false andalso
+                         (not db_entry:get_writelock(DBEntry)) andalso
                          intervals:in(db_entry:get_key(DBEntry), Interval) of
                     true -> [{db_entry:get_key(DBEntry),
                               db_entry:get_value(DBEntry),
