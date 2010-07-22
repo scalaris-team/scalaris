@@ -30,7 +30,9 @@ tests_avail() ->
      tester_delete_entry1, tester_delete_entry2,
      tester_write, tester_write_lock, tester_read_lock,
      tester_read_write_lock, tester_write_read_lock,
-     tester_delete, tester_add_data
+     tester_delete, tester_add_data,
+     tester_get_range, tester_get_range_with_version,
+     tester_get_range_only_with_version
     ].
 
 suite() ->
@@ -240,7 +242,7 @@ get_load_and_middle(_Config) ->
 % ?TEST_DB:new/1, ?TEST_DB getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_new(NodeId::?RT:key(), Key::?RT:key()) -> true).
+-spec prop_new(NodeId::?RT:key(), Key::?RT:key()) -> true.
 prop_new(NodeId, Key) ->
     DB = ?TEST_DB:new(NodeId),
     check_db(DB, {true, []}, 0, [], "check_db_new_1"),
@@ -257,7 +259,7 @@ tester_new(_Config) ->
 % ?TEST_DB:set_entry/2, ?TEST_DB getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_set_entry(DBEntry::db_entry:entry()) -> true).
+-spec prop_set_entry(DBEntry::db_entry:entry()) -> true.
 prop_set_entry(DBEntry) ->
     DB = ?TEST_DB:new(1),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry),
@@ -283,8 +285,8 @@ tester_set_entry(_Config) ->
 % ?TEST_DB:update_entry/2, ?TEST_DB getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_update_entry(DBEntry1::db_entry:entry(), Value2::?DB:value(), WriteLock2::boolean(),
-                        ReadLock2::non_neg_integer(), Version2::?DB:version()) -> true).
+-spec prop_update_entry(DBEntry1::db_entry:entry(), Value2::?DB:value(), WriteLock2::boolean(),
+                        ReadLock2::non_neg_integer(), Version2::?DB:version()) -> true.
 prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DBEntry2 = create_db_entry(db_entry:get_key(DBEntry1), Value2, WriteLock2, ReadLock2, Version2),
     DB = ?TEST_DB:new(1),
@@ -312,7 +314,7 @@ tester_update_entry(_Config) ->
 % ?TEST_DB:delete_entry/2, ?TEST_DB getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_delete_entry1(DBEntry1::db_entry:entry()) -> true).
+-spec prop_delete_entry1(DBEntry1::db_entry:entry()) -> true.
 prop_delete_entry1(DBEntry1) ->
     DB = ?TEST_DB:new(1),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry1),
@@ -323,7 +325,7 @@ prop_delete_entry1(DBEntry1) ->
     ?TEST_DB:close(DB3),
     true.
 
--spec(prop_delete_entry2(DBEntry1::db_entry:entry(), DBEntry2::db_entry:entry()) -> true).
+-spec prop_delete_entry2(DBEntry1::db_entry:entry(), DBEntry2::db_entry:entry()) -> true.
 prop_delete_entry2(DBEntry1, DBEntry2) ->
     DB = ?TEST_DB:new(1),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry1),
@@ -361,7 +363,7 @@ tester_delete_entry2(_Config) ->
 % ?TEST_DB:write/2, ?TEST_DB getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_write(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version(), Key2::?RT:key()) -> true).
+-spec prop_write(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version(), Key2::?RT:key()) -> true.
 prop_write(Key, Value, Version, Key2) ->
     DBEntry = db_entry:new(Key, Value, Version),
     DB = ?TEST_DB:new(1),
@@ -383,7 +385,7 @@ tester_write(_Config) ->
 % ?TEST_DB:(un)set_write_lock/2 in various scenarios, also validate using different getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_write_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version(), Key2::?RT:key()) -> true).
+-spec prop_write_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version(), Key2::?RT:key()) -> true.
 prop_write_lock(Key, Value, Version, Key2) ->
     DB = ?TEST_DB:new(1),
     
@@ -462,7 +464,7 @@ tester_write_lock(_Config) ->
 % ?TEST_DB:(un)set_read_lock/2 in various scenarios, also validate using different getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_read_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true).
+-spec prop_read_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
 prop_read_lock(Key, Value, Version) ->
     DB = ?TEST_DB:new(1),
     
@@ -509,7 +511,7 @@ tester_read_lock(_Config) ->
 % ?TEST_DB:(un)set_write_lock/2 with a set read_lock, also validate using different getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_read_write_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true).
+-spec prop_read_write_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
 prop_read_write_lock(Key, Value, Version) ->
     DB = ?TEST_DB:new(1),
     DB2 = ?TEST_DB:write(DB, Key, Value, Version),
@@ -539,7 +541,7 @@ tester_read_write_lock(_Config) ->
 % ?TEST_DB:(un)set_read_lock/2 in various scenarios, also validate using different getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_write_read_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true).
+-spec prop_write_read_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
 prop_write_read_lock(Key, Value, Version) ->
     DB = ?TEST_DB:new(1),
     DB2 = ?TEST_DB:write(DB, Key, Value, Version),
@@ -569,8 +571,8 @@ tester_write_read_lock(_Config) ->
 % ?TEST_DB:delete/2, also validate using different getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_delete(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                  ReadLock::non_neg_integer(), Version::?DB:version(), Key2::?RT:key()) -> true).
+-spec prop_delete(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
+                  ReadLock::non_neg_integer(), Version::?DB:version(), Key2::?RT:key()) -> true.
 prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     DB = ?TEST_DB:new(1),
     DBEntry = create_db_entry(Key, Value, WriteLock, ReadLock, Version),
@@ -622,7 +624,7 @@ tester_delete(_Config) ->
 % ?TEST_DB:add_data/2, also validate using different getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec(prop_add_data(Data::?TEST_DB:db_as_list()) -> true).
+-spec prop_add_data(Data::?TEST_DB:db_as_list()) -> true.
 prop_add_data(Data) ->
     DB = ?TEST_DB:new(1),
     
@@ -642,8 +644,99 @@ prop_add_data(Data) ->
 tester_add_data(_Config) ->
     tester:test(?MODULE, prop_add_data, 1, rw_suite_runs(1000)).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% ?TEST_DB:get_range/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_get_range(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_range(Data, Range) ->
+    DB = ?TEST_DB:new(1),
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    DB2 = ?TEST_DB:add_data(DB, UniqueData),
+    
+    InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
+                               intervals:in(db_entry:get_key(A), Range)
+                 end,
+    
+    ?equals_w_note(lists:sort(?TEST_DB:get_range(DB2, Range)),
+                   lists:sort([{db_entry:get_key(A), db_entry:get_value(A)}
+                              || A <- lists:filter(InRangeFun, UniqueData)]),
+                   "check_get_range_1"),
+
+    ?TEST_DB:close(DB2),
+    true.
+
+tester_get_range(_Config) ->
+    tester:test(?MODULE, prop_get_range, 2, rw_suite_runs(1000)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% ?TEST_DB:get_range_with_version/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_get_range_with_version(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_range_with_version(Data, Range) ->
+    DB = ?TEST_DB:new(1),
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    DB2 = ?TEST_DB:add_data(DB, UniqueData),
+    
+    InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
+                               intervals:in(db_entry:get_key(A), Range)
+                 end,
+    
+    ?equals_w_note(lists:sort(?TEST_DB:get_range_with_version(DB2, Range)),
+                   lists:sort(lists:filter(InRangeFun, UniqueData)),
+                   "check_get_range_with_version_1"),
+
+    ?TEST_DB:close(DB2),
+    true.
+
+tester_get_range_with_version(_Config) ->
+    tester:test(?MODULE, prop_get_range_with_version, 2, rw_suite_runs(1000)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% ?TEST_DB:get_range_only_with_version/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_get_range_only_with_version(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_range_only_with_version(Data, Range) ->
+    DB = ?TEST_DB:new(1),
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    DB2 = ?TEST_DB:add_data(DB, UniqueData),
+    
+    InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
+                               (not db_entry:get_writelock(A)) andalso
+                               intervals:in(db_entry:get_key(A), Range)
+                 end,
+    
+    ?equals_w_note(lists:sort(?TEST_DB:get_range_only_with_version(DB2, Range)),
+                   lists:sort([{db_entry:get_key(A),
+                                db_entry:get_value(A),
+                                db_entry:get_version(A)}
+                              || A <- lists:filter(InRangeFun, UniqueData)]),
+                   "check_get_range_only_with_version_1"),
+
+    ?TEST_DB:close(DB2),
+    true.
+
+tester_get_range_only_with_version(_Config) ->
+    tester:test(?MODULE, prop_get_range_only_with_version, 2, rw_suite_runs(1000)).
+
 %TODO: ?TEST_DB:split_data
-%TODO: ?TEST_DB:get_range*
 %TODO: ?TEST_DB:update_if_newer
 
 % helper functions:
