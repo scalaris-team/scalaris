@@ -6,7 +6,7 @@ Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
 License:        ASL 2.0 
-Group:          Applications/Databases
+Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
@@ -54,7 +54,7 @@ implemented in Erlang.
 
 %package doc
 Summary:    Documentation for scalaris
-Group:      Documentation
+Group:      Documentation/Other
 Requires:   %{name} == %{version}-%{release}
 
 %description doc
@@ -62,7 +62,7 @@ Documentation for scalaris.
 
 %package java
 Summary:    Java API for scalaris
-Group:      Applications/Databases
+Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
 %if 0%{?suse_version} || 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
 Requires:   erlang-jinterface >= R13B01
@@ -77,7 +77,7 @@ Java Bindings
 
 %package client
 Summary:    Cli client for scalaris
-Group:      Applications/Databases
+Group:      Productivity/Databases/Clients
 Requires:   %{name}-java = %{version}-%{release}
 
 %description client
