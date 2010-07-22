@@ -133,7 +133,7 @@ docs: .make-docs
 	@touch .make-docs
 
 svn:
-	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl tests/*.erl bin/*.app bin/*.cfg
+	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl tests/*.erl ebin/*.app bin/*.cfg
 
 dialyzer: compile
 	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ --no_native
@@ -204,7 +204,7 @@ install-java: java
 install-erlang: compile
 	install -d $(BEAMDIR)
 	install -m 644 -t $(BEAMDIR) \
-	           bin/*.app \
+	           ebin/*.app \
 	           ebin/*.beam
 	install -d $(ETCDIR)
 	install -m 644 -t $(ETCDIR) \
