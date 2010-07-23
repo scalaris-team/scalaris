@@ -28,13 +28,17 @@
 
 -export([new_parse_state/0,
 
-         get_type_infos/1, get_unknown_types/1, get_atoms/1, get_integers/1,
+         get_type_infos/1, get_unknown_types/1,
+
 
          % add types
          add_type_spec/3, add_unknown_type/3,
 
          % add values
-         add_atom/2, add_integer/2, add_string/2,
+         add_atom/2, add_binary/2, add_float/2, add_integer/2, add_string/2,
+
+         % get values
+         get_atoms/1, get_binaries/1, get_floats/1, get_integers/1, get_strings/1,
 
          reset_unknown_types/1,
 
@@ -54,6 +58,8 @@ new_parse_state() ->
                  unknown_types = gb_sets:add_element({type, tester, test_any} ,
                                                      gb_sets:new()),
                 atoms = gb_sets:new(),
+                binaries = gb_sets:new(),
+                floats = gb_sets:new(),
                 integers = gb_sets:new(),
                 strings = gb_sets:new()}.
 
@@ -69,9 +75,21 @@ get_unknown_types(#parse_state{unknown_types=UnknownTypes}) ->
 get_atoms(#parse_state{atoms=Atoms}) ->
     gb_sets:to_list(Atoms).
 
+-spec get_binaries/1 :: (#parse_state{}) -> list(binary()).
+get_binaries(#parse_state{binaries=Binaries}) ->
+    gb_sets:to_list(Binaries).
+
+-spec get_floats/1 :: (#parse_state{}) -> list(float()).
+get_floats(#parse_state{floats=Floats}) ->
+    gb_sets:to_list(Floats).
+
 -spec get_integers/1 :: (#parse_state{}) -> list(integer()).
 get_integers(#parse_state{integers=Integers}) ->
     gb_sets:to_list(Integers).
+
+-spec get_strings/1 :: (#parse_state{}) -> list(string()).
+get_strings(#parse_state{strings=Strings}) ->
+    gb_sets:to_list(Strings).
 
 -spec add_type_spec/3 :: (type_name(), type_spec(), #parse_state{}) -> #parse_state{}.
 add_type_spec(TypeName, TypeSpec, #parse_state{type_infos=TypeInfos} = ParseState) ->
@@ -92,14 +110,26 @@ reset_unknown_types(ParseState) ->
 is_known_type(TypeModule, TypeName, #parse_state{type_infos=TypeInfos}) ->
     gb_trees:is_defined({type, TypeModule, TypeName}, TypeInfos).
 
+-spec add_atom/2 :: (atom(), #parse_state{}) -> #parse_state{}.
 add_atom(Atom, #parse_state{atoms=Atoms} = ParseState) ->
     ParseState#parse_state{atoms=gb_sets:add_element(Atom, Atoms)}.
 
+-spec add_binary/2 :: (binary(), #parse_state{}) -> #parse_state{}.
+add_binary(Binary, #parse_state{binaries=Binaries} = ParseState) ->
+    ParseState#parse_state{binaries=gb_sets:add_element(Binary, Binaries)}.
+
+-spec add_float/2 :: (float(), #parse_state{}) -> #parse_state{}.
+add_float(Float, #parse_state{floats=Floats} = ParseState) ->
+    ParseState#parse_state{floats=gb_sets:add_element(Float, Floats)}.
+
+-spec add_integer/2 :: (integer(), #parse_state{}) -> #parse_state{}.
 add_integer(Integer, #parse_state{integers=Integers} = ParseState) ->
     ParseState#parse_state{integers=gb_sets:add_element(Integer, Integers)}.
 
+-spec add_string/2 :: (string(), #parse_state{}) -> #parse_state{}.
 add_string(String, #parse_state{strings=Strings} = ParseState) ->
     ParseState#parse_state{strings=gb_sets:add_element(String, Strings)}.
 
+-spec lookup_type/2 :: (type_name(), #parse_state{}) -> {value, type_spec()} | none.
 lookup_type(Type, #parse_state{type_infos=TypeInfos}) ->
     gb_trees:lookup(Type, TypeInfos).

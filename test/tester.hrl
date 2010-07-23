@@ -136,6 +136,9 @@
 -record(parse_state,  {type_infos :: type_infos(),
                        unknown_types :: gb_set(),
                        atoms :: gb_set(),
+                       binaries :: gb_set(),
                        integers :: gb_set(),
-                       strings :: gb_set()}).
+                       floats :: gb_set(),
+                       strings :: gb_set()
+                       }).
 
