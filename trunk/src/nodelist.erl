@@ -113,10 +113,20 @@ new_neighborhood(Pred, Node, Succ) ->
             end
     end.
 
+%% @doc Creates a new neighborhood structure with the given elements.
+%%      Only for internal use (to make dialyzer happy with opaque types).
+%%      Note: Call this method when passing newly created neighborhood objects
+%%      to functions that expect those. Public functions, for example, work on
+%%      opaque neighborhood structures. Dialyzer will complain if you provide
+%%      the tuple yourself.
+-spec new(Preds::non_empty_snodelist(), Node::node:node_type(), Succs::non_empty_snodelist()) -> neighborhood().
+new(Preds, Node, Succs) ->
+    {Preds, Node, Succs}.
+
 %% @doc Helper function to make sure a (temporary) neighborhood object has
 %%      non-empty predecessor and successor lists (fills them with itself if
 %%      necessary).
--spec ensure_lists_not_empty(Neighborhood::{Preds::snodelist(), Node::node:node_type(), Succs::snodelist()}) -> neighborhood().
+-spec ensure_lists_not_empty(Neighborhood::neighborhood() | {Preds::snodelist(), Node::node:node_type(), Succs::snodelist()}) -> neighborhood().
 ensure_lists_not_empty({[], Node, []}) ->
     {[Node], Node, [Node]};
 ensure_lists_not_empty({Preds, Node, Succs}) ->
@@ -498,7 +508,7 @@ add_node({Preds, BaseNode, Succs}, NodeToAdd, PredsLength, SuccsLength) ->
             SuccsUpdSorted = lists:usort(SuccOrd, ViewUpd),
             PredsUpdSorted = lists:reverse(SuccsUpdSorted),
             
-            ensure_lists_not_empty(trunc({PredsUpdSorted, BaseNode, SuccsUpdSorted}, PredsLength, SuccsLength))
+            ensure_lists_not_empty(trunc(new(PredsUpdSorted, BaseNode, SuccsUpdSorted), PredsLength, SuccsLength))
     end.
 
 %% @doc Adds nodes from the given node list to the given neighborhood structure
