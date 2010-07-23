@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    dht_node main file
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    dht_node main file
+%% @end
 %% @version $Id$
 -module(dht_node).
 -author('schuett@zib.de').
@@ -360,10 +360,7 @@ on({lookup_timeout}, State) ->
 on({init_TP, Params}, State) ->
     tx_tp:on_init_TP(Params, State);
 on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
-    tx_tp:on_tx_commitreply(Id, Result, State);
-
-on(_, _State) ->
-    unknown_event.
+    tx_tp:on_tx_commitreply(Id, Result, State).
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop

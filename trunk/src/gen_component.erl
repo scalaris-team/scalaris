@@ -242,6 +242,13 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                       error:Reason -> {exception, {Reason,
                                                    erlang:get_stacktrace()}}
                   end) of
+                {exception, {function_clause, [{Module, on, [Message, State]} | _]}} ->
+                    % equivalent to unknown_event, but it resulted in an exception
+                    {NewState, NewComponentState} =
+                        handle_unknown_event(Message, State,
+                                             TmpComponentState, Module, On),
+                    NextComponentState = bp_step_done(Module, On, Message, NewComponentState),
+                    loop(Module, On, NewState, NextComponentState);
                 {exception, Exception} ->
                     log:log(error,"Error: exception ~p during handling of ~p in module ~p in (~p)~n",
                             [Exception, Message, Module, State]),
