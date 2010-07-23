@@ -72,7 +72,6 @@ create_value(nonempty_string, Size, ParseState) ->
     [create_value(Type, NewSize, ParseState) || _ <- lists:seq(1, ListLength)];
 create_value(integer, _Size, ParseState) ->
     Integers = tester_parse_state:get_integers(ParseState),
-    ct:pal("integers: ~w", [Integers]),
     crypto:rand_uniform(integer_min(), integer_max() + 1);
 create_value(pos_integer, _Size, ParseState) ->
     case crypto:rand_uniform(0, 2) of
