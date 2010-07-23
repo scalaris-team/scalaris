@@ -54,19 +54,16 @@ end_per_suite(Config) ->
     ok.
 
 getset_key(_Config) ->
-    util:dump2(),
     process_dictionary:register_process("foo", foo, self()),
     idholder:get_id(),
     _X = receive
-             {idholder_get_id_response, D, _Dversion} ->
-                 D
+             {idholder_get_id_response, D, _Dversion} -> D
          end,
     %ct:pal("X: ~p~n",[_X]),
     idholder:set_id("getset_key", 1),
     idholder:get_id(),
     Res = receive
-              {idholder_get_id_response, Id, IdVersion} ->
-                  {Id, IdVersion}
+              {idholder_get_id_response, Id, IdVersion} -> {Id, IdVersion}
     end,
     ?equals(Res, {"getset_key", 1}),
     ok.
