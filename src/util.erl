@@ -153,49 +153,58 @@ wait_for_unregister(PID) ->
 get_stacktrace() ->
     erlang:get_stacktrace().
 
+%% @doc Extracts a given ItemInfo from an ItemList that has been returned from
+%%      e.g. erlang:process_info/2 for the dump* methods.
+-spec dump_extract_from_list
+        ([{Item::atom(), Info::term()}], ItemInfo::memory | message_queue_len | stack_size | heap_size) -> non_neg_integer();
+        ([{Item::atom(), Info::term()}], ItemInfo::messages) -> [tuple()];
+        ([{Item::atom(), Info::term()}], ItemInfo::current_function) -> Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}.
+dump_extract_from_list(List, Key) ->
+    element(2, lists:keyfind(Key, 1, List)).
+
+%% @doc Returns a list of all currently executed functions and the number of
+%%      instances for each of them.
+-spec dump() -> [{Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}, FunExecCount::pos_integer()}].
 dump() ->
-    lists:reverse(
-      lists:keysort(
-        2, dict:to_list(
-             lists:foldl(
-               fun (X, Accum) ->
-                       dict:merge(fun (_K, V1, V2) ->
-                                          V1 + V2
-                                  end,
-                                  Accum,
-                                  dict:store(
-                                    lists:keysearch(current_function,
-                                                    1,
-                                                    [erlang:process_info(X, current_function)]
-                                                   ),
-                                    1,
-                                    dict:new()
-                                   )
-                                 )
-               end, dict:new(), processes())))
-     ).
+    Info = [element(2, Fun) || X <- processes(),
+                               Fun <- [process_info(X, current_function)],
+                               Fun =/= [undefined]],
+    FunCnt = dict:to_list(lists:foldl(fun(Fun, DictIn) ->
+                                              dict:update_counter(Fun, 1, DictIn)
+                                      end, dict:new(), Info)),
+    lists:reverse(lists:keysort(2, FunCnt)).
 
+%% @doc Returns information about all processes' memory usage.
+-spec dump2() -> [{PID::pid(), Mem::non_neg_integer(), Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}}].
 dump2() ->
-    lists:map(fun ({PID, {memory, Size}}) ->
-                      {_, Fun} = erlang:process_info(PID, current_function),
-                      {PID, Size, Fun}
-              end,
-              lists:reverse(lists:keysort(2, lists:map(fun (X) ->
-                                                               {X, process_info(X, memory)}
-                                                       end,
-                                                       processes())))).
+    Info = 
+        [{Pid,
+          dump_extract_from_list(Data, memory),
+          dump_extract_from_list(Data, current_function)}
+        || Pid <- processes(),
+           Data <- [process_info(Pid, [memory, current_function])],
+           Data =/= undefined],
+    lists:reverse(lists:keysort(2, Info)).
 
+%% @doc Returns various data about all processes.
+-spec dump3() -> [{PID::pid(), Mem::non_neg_integer(), MsgQLength::non_neg_integer(),
+                   StackSize::non_neg_integer(), HeapSize::non_neg_integer(),
+                   Messages::[atom()],
+                   Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}}].
 dump3() ->
-    lists:reverse(lists:keysort(2, lists:map(fun (X) ->
-     {memory, Mem} = process_info(X, memory),
-     {current_function, CurFun} = process_info(X, current_function),
-     {message_queue_len, Msgs} = process_info(X, message_queue_len),
-     %% {binary, Bin} = process_info(X, binary),
-     {stack_size, Stack} = process_info(X, stack_size),
-     {heap_size, Heap} = process_info(X, heap_size),
-     {messages, Messages} = process_info(X, messages),
-     {X, Mem, Msgs, Stack, Heap, lists:map(fun(Y) -> element(1, Y) end, Messages), CurFun}
-     end, processes()))).
+    Info = 
+        [{Pid,
+          dump_extract_from_list(Data, memory),
+          dump_extract_from_list(Data, message_queue_len),
+          dump_extract_from_list(Data, stack_size),
+          dump_extract_from_list(Data, heap_size),
+          [element(1, Y) || Y <- dump_extract_from_list(Data, messages)],
+          dump_extract_from_list(Data, current_function)}
+        || Pid <- processes(),
+           Data <- [process_info(Pid, [memory, message_queue_len, stack_size,
+                                       heap_size, messages, current_function])],
+           Data =/= undefined],
+    lists:reverse(lists:keysort(2, Info)).
 
 %% @doc minus(M,N) : { x | x in M and x notin N}
 -spec minus([T], [T]) -> [T].
