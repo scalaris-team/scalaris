@@ -26,7 +26,8 @@
 
 % for routing table implementation
 -export([start_link/1]).
--export([init/1, on/2, get_base_interval/0, check_config/0]).
+-export([init/1, on/2, get_base_interval/0, check_config/0,
+         get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2]).
 
 -ifdef(with_export_type_support).
 -export_type([state_init/0]).
@@ -83,9 +84,9 @@ on(Message, {uninit, TriggerState}) ->
     {uninit, TriggerState};
 
 % re-initialize routing table
-on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState,TriggerState}) ->
+on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState, TriggerState}) ->
     ?RT:check(RTState, ?RT:empty(NewSucc), Id2, NewPred, NewSucc),
-    {Id2, NewPred, NewSucc, ?RT:empty(NewSucc),TriggerState};
+    new_state(Id2, NewPred, NewSucc, ?RT:empty(NewSucc), TriggerState);
 
 % start new periodic stabilization
 on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
@@ -98,19 +99,19 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     ?RT:check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
     NewTriggerState = trigger:next(TriggerState),
-    {Id, Pred, Succ, NewRTState, NewTriggerState};
+    new_state(Id, Pred, Succ, NewRTState, NewTriggerState);
 
 % got new predecessor/successor
 on({{get_node_details_response, NewNodeDetails}, pred_succ}, {Id, _, _, RTState, TriggerState}) ->
     NewPred = node_details:get(NewNodeDetails, pred),
     NewSucc = node_details:get(NewNodeDetails, succ),
-    {Id, NewPred, NewSucc, RTState, TriggerState};
+    new_state(Id, NewPred, NewSucc, RTState, TriggerState);
 
 % failure detector reported dead node
-on({crash, DeadPid}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    NewRT = ?RT:filterDeadNode(RTState, DeadPid),
-    ?RT:check(RTState, NewRT, Id, Pred, Succ, false),
-    {Id, Pred, Succ, NewRT, TriggerState};
+on({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->
+    NewRT = ?RT:filterDeadNode(OldRT, DeadPid),
+    ?RT:check(OldRT, NewRT, Id, Pred, Succ, false),
+    new_state(Id, Pred, Succ, NewRT, TriggerState);
 
 % debug_info for web interface
 on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
@@ -127,6 +128,29 @@ on({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
 % unknown message
 on(Message, State) ->
     ?RT:handle_custom_message(Message, State).
+
+% handling rt_loop's (opaque) state - these handlers should at least be used
+% outside this module:
+
+-spec new_state(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type(),
+                 RTState::?RT:rt(), TriggerState::trigger:state()) -> state_init().
+new_state(Id, Pred, Succ, RTState, TriggerState) ->
+    {Id, Pred, Succ, RTState, TriggerState}.
+
+-spec get_id(State::state_init()) -> ?RT:key().
+get_id(State) -> element(1, State).
+
+-spec get_pred(State::state_init()) -> node:node_type().
+get_pred(State) -> element(2, State).
+
+-spec get_succ(State::state_init()) -> node:node_type().
+get_succ(State) -> element(3, State).
+
+-spec get_rt(State::state_init()) -> ?RT:rt().
+get_rt(State) -> element(4, State).
+
+-spec set_rt(State::state_init(), RT::?RT:rt()) -> NewState::state_init().
+set_rt(State, RT) -> setelement(4, State, RT).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

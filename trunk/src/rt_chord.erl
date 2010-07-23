@@ -166,11 +166,16 @@ check_config() ->
 
 %% @doc Chord reacts on 'rt_get_node_response' messages in response to its
 %%      'rt_get_node' messages.
--spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
-handle_custom_message({rt_get_node_response, Index, Node}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    NewRTState = stabilize(Id, Succ, RTState, Index, Node),
-    check(RTState, NewRTState, Id, Pred, Succ),
-    {Id, Pred, Succ, NewRTState, TriggerState};
+-spec handle_custom_message(custom_message(), rt_loop:state_init()) -> rt_loop:state_init();
+                           (any(), rt_loop:state_init()) -> unknown_event.
+handle_custom_message({rt_get_node_response, Index, Node}, State) ->
+    OldRT = rt_loop:get_rt(State),
+    Id = rt_loop:get_id(State),
+    Succ = rt_loop:get_succ(State),
+    Pred = rt_loop:get_pred(State),
+    NewRT = stabilize(Id, Succ, OldRT, Index, Node),
+    check(OldRT, NewRT, Id, Pred, Succ),
+    rt_loop:set_rt(State, NewRT);
 
 handle_custom_message(_Message, _State) ->
     unknown_event.

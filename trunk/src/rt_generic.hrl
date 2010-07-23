@@ -21,14 +21,16 @@
 %% @version $Id$
 
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
+%%      Provided for convenience (see check/6).
 -spec check(Old::rt(), New::rt(), key(), node:node_type(),
             node:node_type()) -> ok.
 check(Old, New, Id, Pred, Succ) ->
     check(Old, New, Id, Pred, Succ, true).
 
-%% @doc Notifies the dht_node if the routing table changed.
+%% @doc Notifies the dht_node if the routing table changed. Also updates the
+%%      failure detector if ReportToFD is set.
 -spec check(Old::rt(), New::rt(), MyId::key(), Pred::node:node_type(),
-            Succ::node:node_type(), ReportFD::boolean()) -> ok.
+            Succ::node:node_type(), ReportToFD::boolean()) -> ok.
 check(X, X, _Id, _Pred, _Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, Pred, Succ, true) ->
