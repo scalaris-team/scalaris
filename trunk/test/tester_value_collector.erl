@@ -36,8 +36,8 @@ parse_expression({call, _, Fun, Parameters}, ParseState) ->
     parse_expression(Parameters, parse_expression(Fun, ParseState));
 parse_expression({'case', _, Value, Clauses}, ParseState) ->
     parse_expression(Clauses, parse_expression(Value, ParseState));
-parse_expression({clause, _, _, _, Clause}, ParseState) ->
-    parse_expression(Clause, ParseState);
+parse_expression({clause, _Line, Pattern, _, Clause}, ParseState) ->
+    parse_expression(Clause, parse_expression(Pattern, ParseState));
 parse_expression({cons, _, Head, Tail}, ParseState) ->
     parse_expression(Tail, parse_expression(Head, ParseState));
 parse_expression({'fun', _, {clauses, Clauses}}, ParseState) ->
@@ -90,12 +90,10 @@ parse_expression({var, _, _Variable}, ParseState) ->
 
 parse_expression({atom, _, Atom}, ParseState) ->
     tester_parse_state:add_atom(Atom, ParseState);
-parse_expression({bin, _, _Binary}, ParseState) ->
-    % @todo
-    ParseState;
-parse_expression({float, _, _Float}, ParseState) ->
-    % @todo
-    ParseState;
+parse_expression({bin, _, Binary}, ParseState) ->
+    tester_parse_state:add_binary(Binary, ParseState);
+parse_expression({float, _, Float}, ParseState) ->
+    tester_parse_state:add_float(Float, ParseState);
 parse_expression({char, _, _Char}, ParseState) ->
     % @todo
     ParseState;
