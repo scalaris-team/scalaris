@@ -287,7 +287,7 @@ lremove(NodeOrPid, NodeList, EvalFun) ->
     lfilter(NodeList, fun(N) -> not node:equals(NodeOrPid, N) end, EvalFun).
 
 %% @doc Removes the given node (or node with the given Pid) from a neighborhood
-%%      executes EvalFun for any such occurrence (provided for convenience -
+%%      and executes EvalFun for any such occurrence (provided for convenience,
 %%      see filter/3).
 %%      Note: A neighborhood's base node is never removed!
 -spec remove(NodeOrPid::node:node_type() | comm:mypid() | pid(), neighborhood(), EvalFun::fun((node:node_type()) -> any())) -> neighborhood().

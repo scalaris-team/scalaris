@@ -21,8 +21,8 @@
 -vsn('$Id$').
 
 -export([behaviour_info/1,
-         update_neighbors/1,
-         notify_new_pred/2, notify_new_succ/2]).
+         notify_new_pred/2, notify_new_succ/2,
+         update_dht_node/1, update_dht_node/2, update_failuredetector/2]).
 
 behaviour_info(callbacks) ->
     [
@@ -50,9 +50,32 @@ notify_new_succ(Node, NewSucc) ->
 notify_new_pred(Node, NewPred) ->
     comm:send_to_group_member(Node, ring_maintenance, {notify_new_pred, NewPred}).
 
-%% @doc Notifies the dht_node that (at least one of) his neighbors changed
-%%      (to be used in the rm_*.erl modules).
--spec update_neighbors(Neighbors::nodelist:neighborhood()) -> ok.
-update_neighbors(Neighbors) ->
+% @doc Check if change of failuredetector is necessary.
+-spec update_failuredetector(OldNeighborhood::nodelist:neighborhood(),
+                             NewNeighborhood::nodelist:neighborhood()) -> ok.
+update_failuredetector(OldNeighborhood, NewNeighborhood) ->
+    % Note: nodelist:to_list/1 would provide similar functionality to determine
+    % the view but at a higher cost and we need neither unique nor sorted lists.
+    OldView = lists:append(nodelist:preds(OldNeighborhood),
+                           nodelist:succs(OldNeighborhood)),
+    NewView = lists:append(nodelist:preds(NewNeighborhood),
+                           nodelist:succs(NewNeighborhood)),
+    OldPids = [node:pidX(Node) || Node <- OldView],
+    NewPids = [node:pidX(Node) || Node <- NewView],
+    fd:update_subscriptions(OldPids, NewPids).
+
+%% @doc Inform the dht_node of a new neighborhood.
+-spec update_dht_node(OldNeighborhood::nodelist:neighborhood(),
+                      NewNeighborhood::nodelist:neighborhood()) -> ok.
+update_dht_node(OldNeighborhood, NewNeighborhood) ->
+    case OldNeighborhood =/= NewNeighborhood of
+        true -> update_dht_node(NewNeighborhood);
+        _    -> ok
+    end.
+
+%% @doc Notifies the dht_node that its neighbors changed
+%%      (to be used by the rm_*.erl modules).
+-spec update_dht_node(Neighbors::nodelist:neighborhood()) -> ok.
+update_dht_node(Neighbors) ->
     Pid = process_dictionary:get_group_member(dht_node),
     comm:send_local(Pid, {rm_update_neighbors, Neighbors}).
