@@ -38,17 +38,19 @@ behaviour_info(callbacks) ->
      % create a default routing table
      {empty, 1}, {empty_ext, 1},
      % mapping: key space -> identifier space
-     {hash_key, 1}, {getRandomNodeId, 0},
+     {hash_key, 1}, {get_random_node_id, 0},
      % routing
      {next_hop, 2},
      % trigger for new stabilization round
      {init_stabilize, 3},
      % dead nodes filtering
-     {filterDeadNode, 2},
+     {filter_dead_node, 2},
      % statistics
      {to_pid_list, 1}, {get_size, 1},
      % for symmetric replication
      {get_keys_for_replicas, 1},
+     % address space size (throws an exception of type 'throw' if unsupported by the RT)
+     {n, 0},
      % for debugging and web interface
      {dump, 1},
      % for bulkowner

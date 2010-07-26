@@ -648,11 +648,6 @@ request_random_node() ->
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Gets the total number of keys available.
--spec get_addr_size() -> number().
-get_addr_size() ->
-    rt_simple:n().
-
 %% @doc Calculates the difference between the key of a node and its
 %%      predecessor. If the second is larger than the first it wraps around and
 %%      thus the difference is the number of keys from the predecessor to the
@@ -665,12 +660,12 @@ calc_initial_avg_kr(Pred, Me) ->
     % -> try it and if it fails, return unknown
     try
         if
-            PredKey =:= MyKey -> get_addr_size(); % I am the only node
+            PredKey =:= MyKey -> ?RT:n(); % I am the only node
             MyKey >= PredKey  -> MyKey - PredKey;
-            MyKey < PredKey   -> (get_addr_size() - PredKey - 1) + MyKey
+            MyKey < PredKey   -> (?RT:n() - PredKey - 1) + MyKey
         end
     catch
-        error:_ -> unknown
+        throw:_ -> unknown
     end.
 
 %% @doc Checks whether config parameters of the gossip process exist and are

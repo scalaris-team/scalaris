@@ -247,7 +247,7 @@ start_link() ->
 %% helper functions
 %%==============================================================================
 get_and_init_key() ->
-    Key = ?RT:getRandomNodeId(),
+    Key = ?RT:get_random_node_id(),
     case transaction_api:single_write(Key, 0) of
       commit ->
         Key;

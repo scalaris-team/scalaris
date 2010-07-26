@@ -306,20 +306,19 @@ calc_size_ldr(State) when is_record(State, values_internal) ->
 calc_size_ldr(State) when is_record(State, state) ->
     calc_size_ldr(get(State, values)).
 
-%% @doc Gets the size of the address space.
--spec get_addr_size() -> number().
-get_addr_size() ->
-    rt_simple:n().
-
 %% @doc Extracts and calculates the size_kr field from the internal record of
 %%      values.
 -spec calc_size_kr(values_internal() | state()) -> size().
 calc_size_kr(State) when is_record(State, values_internal) ->
     AvgKR = get(State, avg_kr),
-    if
-        AvgKR =< 0        -> 1.0;
-        AvgKR =:= unknown -> unknown;
-        true              -> get_addr_size() / AvgKR
+    try
+        if
+            AvgKR =< 0        -> 1.0;
+            AvgKR =:= unknown -> unknown;
+            true              -> ?RT:n() / AvgKR
+        end
+    catch
+        throw:_ -> unknown
     end;
 calc_size_kr(State) when is_record(State, state) ->
     calc_size_kr(get(State, values)).

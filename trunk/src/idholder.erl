@@ -114,7 +114,7 @@ get_pid() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec get_initial_key(random | random_with_bit_mask) -> ?RT:key().
 get_initial_key(random) ->
-    ?RT:getRandomNodeId();
+    ?RT:get_random_node_id();
 get_initial_key(random_with_bit_mask) ->
     {Mask1, Mask2} = config:read(key_creator_bitmask),
     (get_initial_key(random) band Mask2) bor Mask1.

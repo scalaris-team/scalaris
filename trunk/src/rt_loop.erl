@@ -109,7 +109,7 @@ on({{get_node_details_response, NewNodeDetails}, pred_succ}, {Id, _, _, RTState,
 
 % failure detector reported dead node
 on({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->
-    NewRT = ?RT:filterDeadNode(OldRT, DeadPid),
+    NewRT = ?RT:filter_dead_node(OldRT, DeadPid),
     ?RT:check(OldRT, NewRT, Id, Pred, Succ, false),
     new_state(Id, Pred, Succ, NewRT, TriggerState);
 
