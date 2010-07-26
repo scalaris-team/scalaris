@@ -664,8 +664,9 @@ calc_initial_avg_kr(Pred, Me) ->
             MyKey >= PredKey  -> MyKey - PredKey;
             MyKey < PredKey   -> (?RT:n() - PredKey - 1) + MyKey
         end
-    catch
-        throw:_ -> unknown
+    catch % keys might not support subtraction or ?RT:n() might throw
+        throw:not_supported -> unknown;
+        error:{badarith, _} -> unknown
     end.
 
 %% @doc Checks whether config parameters of the gossip process exist and are

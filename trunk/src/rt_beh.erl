@@ -49,7 +49,7 @@ behaviour_info(callbacks) ->
      {to_pid_list, 1}, {get_size, 1},
      % for symmetric replication
      {get_keys_for_replicas, 1},
-     % address space size (throws an exception of type 'throw' if unsupported by the RT)
+     % address space size (throws 'throw:not_supported' if unsupported by the RT)
      {n, 0},
      % for debugging and web interface
      {dump, 1},
