@@ -1035,7 +1035,7 @@ firewalls.
 
 \section{Routing Tables}
 \label{chapter.routing}
-\svnrev{r911}
+\svnrev{r915}
 \erlmoduleindex{rt\_beh}
 
 Each node of the ring can perform searches in the overlay.
@@ -1082,73 +1082,92 @@ defined in the following file:
 \begin{description}
 \setlength{\parskip}{0pt}
 \setlength{\itemsep}{0pt}
+\erlfunindex{rt\_beh}{empty}
 \item \code{empty/1} gets a successor and generates an empty routing
   table for use inside the routing table implementation. The data structure of
   the routing table is undefined. It can be a list, a tree, a matrix \ldots
 
+\erlfunindex{rt\_beh}{empty\_ext}
 \item \code{empty_ext/1} similarly creates an empty external routing table
   for use by the \erlmodule{dht\_node}. This process might not need all the
   information a routing table implementation requires and can thus work with
   less data.
 
+\erlfunindex{rt\_beh}{hash\_key}
 \item \code{hash_key/1} gets a key and maps it into the overlay's
   identifier space.
 
+\erlfunindex{rt\_beh}{get\_random\_node\_id}
 \item \code{get_random_node_id/0} returns a random node id from the
   overlay's identifier space. This is used for example when a new node
   joins the system.
 
+\erlfunindex{rt\_beh}{next\_hop}
 \item \code{next_hop/2} gets a \erlmodule{dht\_node}'s state (including the
   external routing table representation) and a key and returns the node, that
   should be contacted next when searching for the key, i.e. the known node
   nearest to the id.
 
+\erlfunindex{rt\_beh}{init\_stabilize}
 \item \code{init_stabilize/3} is called periodically to rebuild the
   routing table. The parameters are the identifier of the node, its
   successor and the old (internal) routing table state.
 
+\erlfunindex{rt\_beh}{filter\_dead\_node}
 \item \code{filter_dead_node/2} is called by the failure detector and tells
   the routing table about dead nodes. This function gets the (internal) routing
   table and a node to remove from it. A new routing table state is returned.
 
+\erlfunindex{rt\_beh}{to\_pid\_list}
 \item \code{to_pid_list/1} get the PIDs of all (internal) routing table
   entries.
 
+\erlfunindex{rt\_beh}{get\_size}
 \item \code{get_size/1} get the (internal or external) routing table's size.
 
+\erlfunindex{rt\_beh}{get\_keys\_for\_replicas}
 \item \code{get_keys_for_replicas/1} Returns for a given (un-hashed)
   \code{Key} the (hashed) keys of its replicas. This used for implementing
   symmetric replication.
 
+\erlfunindex{rt\_beh}{n}
 \item \code{n/0} gets the number of available keys. An implementation may
-  throw an exception of type \code{throw} if the operation is unsupported by
+  throw \code{throw:not_supported} if the operation is unsupported by
   the routing table.
 
+\erlfunindex{rt\_beh}{dump}
 \item \code{dump/1} dump the (internal) routing table state for debugging,
   e.g. by using the web interface. Returns a list of
   \code{\{Index, Node_as_String\}} tuples which may just as well be empty.
 
+\erlfunindex{rt\_beh}{to\_list}
 \item \code{to_list/1} convert the (external) representation of the routing
   table inside a given \code{dht_node_state} to a sorted list of known nodes
   from the routing table, i.e. first=succ, second=next known node on the ring,
   \ldots This is used by bulk-operations to create a
   broadcast tree.
 
+\erlfunindex{rt\_beh}{export\_rt\_to\_dht\_node}
 \item \code{export_rt_to_dht_node/4} convert the internal routing table state
   to an external state. Gets the internal state, the node's ID, the predecessor
   and the successor for doing so.
 
+\erlfunindex{rt\_beh}{update\_pred\_succ\_in\_dht\_node}
 \item \code{update_pred_succ_in_dht_node/3} update predecessor and successor
   node stored in an external routing table state.
 
+\erlfunindex{rt\_beh}{handle\_custom\_message}
 \item \code{handle_custom_message/2} handle messages specific to the routing
   table implementation. \erlmodule{rt\_loop} will forward unknown messages
   to this function.
 
+\erlfunindex{rt\_beh}{check}
+\erlfunindex{rt\_beh}{check\_fd}
 \item \code{check/5}, \code{check/6}, \code{check_fd/2} are implemented in
   \code{rt_generic.hrl}, check for routing table changes and send an updated
   (external) routing table to the \erlmodule{dht\_node} process.
 
+\erlfunindex{rt\_beh}{check\_config}
 \item \code{check_config/0} check that all required configuration parameters
   exist and satisfy certain restrictions.
 
