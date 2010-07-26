@@ -317,8 +317,8 @@ calc_size_kr(State) when is_record(State, values_internal) ->
             AvgKR =:= unknown -> unknown;
             true              -> ?RT:n() / AvgKR
         end
-    catch
-        throw:_ -> unknown
+    catch % ?RT:n() might throw
+        throw:not_supported -> unknown
     end;
 calc_size_kr(State) when is_record(State, state) ->
     calc_size_kr(get(State, values)).
