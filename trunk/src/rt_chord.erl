@@ -192,8 +192,7 @@ check_config() ->
 %% userdevguide-begin rt_chord:handle_custom_message
 %% @doc Chord reacts on 'rt_get_node_response' messages in response to its
 %%      'rt_get_node' messages.
--spec handle_custom_message(custom_message(), rt_loop:state_init()) -> rt_loop:state_init();
-                           (any(), rt_loop:state_init()) -> unknown_event.
+-spec handle_custom_message(custom_message(), rt_loop:state_init()) -> rt_loop:state_init().
 handle_custom_message({rt_get_node_response, Index, Node}, State) ->
     OldRT = rt_loop:get_rt(State),
     Id = rt_loop:get_id(State),
