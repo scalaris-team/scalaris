@@ -46,11 +46,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_simple:empty
-%% @doc Creates an empty routing table.
-%%      Per default the empty routing should already include the successor.
+%% @doc Creates an "empty" routing table containing the successor.
 -spec empty(node:node_type()) -> rt().
-empty(Succ) ->
-    Succ.
+empty(Succ) -> Succ.
 %% userdevguide-end rt_simple:empty
 
 %% userdevguide-begin rt_simple:hash_key
@@ -70,49 +68,48 @@ hash_key_(Key) ->
     N.
 %% userdevguide-end rt_simple:hash_key
 
-%% @doc Generates a random node id
-%%      In this case it is a random 128-bit string.
+%% userdevguide-begin rt_simple:get_random_node_id
+%% @doc Generates a random node id, i.e. a random 128-bit string.
 -spec get_random_node_id() -> key().
-get_random_node_id() ->
-    hash_key(randoms:getRandomId()).
+get_random_node_id() -> hash_key(randoms:getRandomId()).
+%% userdevguide-end rt_simple:get_random_node_id
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% RT Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_simple:init_stabilize
-%% @doc Triggered by a new stabilization round.
+%% @doc Triggered by a new stabilization round, renews the routing table.
 -spec init_stabilize(key(), node:node_type(), rt()) -> rt().
-init_stabilize(_Id, Succ, _RT) ->
-    % renew routing table
-    empty(Succ).
+init_stabilize(_Id, Succ, _RT) -> empty(Succ).
 %% userdevguide-end rt_simple:init_stabilize
 
 %% userdevguide-begin rt_simple:filter_dead_node
-%% @doc Removes dead nodes from the routing table.
+%% @doc Removes dead nodes from the routing table (rely on periodic
+%%      stabilization here).
 -spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, _DeadPid) ->
-    RT.
+filter_dead_node(RT, _DeadPid) -> RT.
 %% userdevguide-end rt_simple:filter_dead_node
 
 %% userdevguide-begin rt_simple:to_pid_list
 %% @doc Returns the pids of the routing table entries.
 -spec to_pid_list(rt() | external_rt()) -> [comm:mypid()].
-to_pid_list(Succ) ->
-    [node:pidX(Succ)].
+to_pid_list(Succ) -> [node:pidX(Succ)].
 %% userdevguide-end rt_simple:to_pid_list
 
+%% userdevguide-begin rt_simple:get_size
 %% @doc Returns the size of the routing table.
 -spec get_size(rt() | external_rt()) -> 1.
-get_size(_RT) ->
-    1.
+get_size(_RT) -> 1.
+%% userdevguide-end rt_simple:get_size
 
-%% userdevguide-begin rt_simple:get_keys_for_replicas
+%% userdevguide-begin rt_simple:n
 %% @doc Returns the size of the address space.
 -spec n() -> non_neg_integer().
-n() ->
-    16#100000000000000000000000000000000.
+n() -> 16#100000000000000000000000000000000.
+%% userdevguide-end rt_simple:n
 
+%% userdevguide-begin rt_simple:get_keys_for_replicas
 %% @doc Returns the replicas of the given key.
 -spec get_keys_for_replicas(iodata() | integer()) -> [key()].
 get_keys_for_replicas(Key) ->
@@ -127,50 +124,56 @@ get_keys_for_replicas(Key) ->
 %% userdevguide-begin rt_simple:dump
 %% @doc Dumps the RT state for output in the web interface.
 -spec dump(RT::rt()) -> KeyValueList::[{Index::non_neg_integer(), Node::string()}].
-dump(Succ) ->
-    [{0, lists:flatten(io_lib:format("~p", [Succ]))}].
+dump(Succ) -> [{0, lists:flatten(io_lib:format("~p", [Succ]))}].
 %% userdevguide-end rt_simple:dump
 
 %% @doc Checks whether config parameters of the rt_simple process exist and are
 %%      valid (there are no config parameters).
 -spec check_config() -> true.
-check_config() ->
-    true.
+check_config() -> true.
 
 -include("rt_generic.hrl").
 
+%% userdevguide-begin rt_simple:handle_custom_message
 %% @doc There are no custom messages here.
 -spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
-handle_custom_message(_Message, _State) ->
-    unknown_event.
+handle_custom_message(_Message, _State) -> unknown_event.
+%% userdevguide-end rt_simple:handle_custom_message
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Communication with dht_node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% userdevguide-begin rt_simple:empty_ext
 -spec empty_ext(node:node_type()) -> external_rt().
-empty_ext(Succ) ->
-    empty(Succ).
+empty_ext(Succ) -> empty(Succ).
+%% userdevguide-end rt_simple:empty_ext
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
 -spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
-next_hop(State, _Key) ->
-    dht_node_state:get(State, succ_pid).
+next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, rt)).
 %% userdevguide-end rt_simple:next_hop
 
--spec export_rt_to_dht_node(rt(), key(), node:node_type(), node:node_type()) -> external_rt().
-export_rt_to_dht_node(RT, _Id, _Pred, _Succ) ->
-    RT.
+%% userdevguide-begin rt_simple:export_rt_to_dht_node
+%% @doc Converts the internal RT to the external RT used by the dht_node. Both
+%%      are the same here.
+-spec export_rt_to_dht_node(rt(), ID::key(), Pred::node:node_type(),
+                            Succ::node:node_type()) -> external_rt().
+export_rt_to_dht_node(RT, _Id, _Pred, _Succ) -> RT.
+%% userdevguide-end rt_simple:export_rt_to_dht_node
 
--spec update_pred_succ_in_dht_node(node:node_type(), node:node_type(), external_rt())
-      -> external_rt().
-update_pred_succ_in_dht_node(_Pred, Succ, Succ) ->
-    Succ.
+%% userdevguide-begin rt_simple:update_pred_succ_in_dht_node
+%% @doc Updates the successor in the (external) routing table state.
+-spec update_pred_succ_in_dht_node(Pred::node:node_type(), Succ::node:node_type(),
+                                   RT::external_rt()) -> external_rt().
+update_pred_succ_in_dht_node(_Pred, Succ, Succ) -> Succ.
+%% userdevguide-end rt_simple:update_pred_succ_in_dht_node
 
+%% userdevguide-begin rt_simple:to_list
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
 -spec to_list(dht_node_state:state()) -> nodelist:snodelist().
-to_list(State) ->
-    [dht_node_state:get(State, node), dht_node_state:get(State, succ)].
+to_list(State) -> [dht_node_state:get(State, rt)].
+%% userdevguide-end rt_simple:to_list

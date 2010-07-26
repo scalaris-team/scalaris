@@ -24,6 +24,7 @@
 
 -export([lookup_aux/4]).
 
+%% userdevguide-begin dht_node_lookup:routing
 %% @doc Find the node responsible for Key and send him the message Msg.
 -spec lookup_aux(State::dht_node_state:state(), Key::intervals:key(),
                  Hops::non_neg_integer(), Msg::comm:message()) -> ok.
@@ -36,3 +37,4 @@ lookup_aux(State, Key, Hops, Msg) ->
             P = ?RT:next_hop(State, Key),
             comm:send(P, {lookup_aux, Key, Hops + 1, Msg})
     end.
+%% userdevguide-end dht_node_lookup:routing

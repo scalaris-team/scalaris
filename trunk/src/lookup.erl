@@ -27,15 +27,20 @@
 -include("scalaris.hrl").
 
 %%%-----------------------Public API----------------------------------
+%% userdevguide-begin lookup:lookup
 -spec unreliable_lookup(Key::?RT:key(), Msg::comm:message()) -> ok.
 unreliable_lookup(Key, Msg) ->
-    comm:send_local(process_dictionary:get_group_member(dht_node), {lookup_aux, Key, 0, Msg}).
+    comm:send_local(process_dictionary:get_group_member(dht_node),
+                    {lookup_aux, Key, 0, Msg}).
 
 -spec unreliable_get_key(Key::?RT:key()) -> ok.
 unreliable_get_key(Key) ->
     unreliable_lookup(Key, {get_key, comm:this(), Key}).
 
--spec unreliable_get_key(CollectorPid::comm:mypid(), ReqId::{rdht_req_id, {pos_integer(), comm:mypid()}}, Key::?RT:key()) -> ok.
+-spec unreliable_get_key(CollectorPid::comm:mypid(),
+                         ReqId::{rdht_req_id, {pos_integer(), comm:mypid()}},
+                         Key::?RT:key()) -> ok.
 unreliable_get_key(CollectorPid, ReqId, Key) ->
     unreliable_lookup(Key, {get_key, CollectorPid, ReqId, Key}).
+%% userdevguide-end lookup:lookup
 
