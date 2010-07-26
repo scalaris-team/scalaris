@@ -55,8 +55,7 @@
 %% userdevguide-begin rt_chord:empty
 %% @doc Creates an empty routing table.
 -spec empty(node:node_type()) -> rt().
-empty(_Succ) ->
-    gb_trees:empty().
+empty(_Succ) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty
 
 %% @doc Hashes the key to the identifier space.
@@ -84,7 +83,7 @@ get_random_node_id() ->
 %% RT Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% userdevguide-begin rt_chord:init_stab
+%% userdevguide-begin rt_chord:init_stabilize
 %% @doc Starts the stabilization routine.
 -spec init_stabilize(key(), node:node_type(), rt()) -> rt().
 init_stabilize(Id, _Succ, RT) ->
@@ -93,14 +92,14 @@ init_stabilize(Id, _Succ, RT) ->
     % trigger a lookup for Key
     lookup:unreliable_lookup(Key, {rt_get_node, comm:this(), first_index()}),
     RT.
-%% userdevguide-end rt_chord:init_stab
+%% userdevguide-end rt_chord:init_stabilize
 
 %% userdevguide-begin rt_chord:filter_dead_node
 %% @doc Removes dead nodes from the routing table.
 -spec filter_dead_node(rt(), comm:mypid()) -> rt().
 filter_dead_node(RT, DeadPid) ->
-    DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
-                           node:equals(Node, DeadPid)],
+    DeadIndices = [Index || {Index, Node}  <- gb_trees:to_list(RT),
+                            node:equals(Node, DeadPid)],
     lists:foldl(fun(Index, Tree) -> gb_trees:delete(Index, Tree) end,
                 RT, DeadIndices).
 %% userdevguide-end rt_chord:filter_dead_node
@@ -140,24 +139,25 @@ get_keys_for_replicas(Key) ->
 dump(RT) ->
     [{Index, lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- gb_trees:to_list(RT)].
 
-%% userdevguide-begin rt_chord:stab
+%% userdevguide-begin rt_chord:stabilize
 %% @doc Updates one entry in the routing table and triggers the next update.
 -spec stabilize(key(), node:node_type(), rt(), pos_integer(), node:node_type())
-      -> rt().
+        -> rt().
 stabilize(Id, Succ, RT, Index, Node) ->
-    case node:is_valid(Node)                           % do not add null nodes
-        andalso (node:id(Succ) =/= node:id(Node))      % there is nothing shorter than succ
-        andalso (not intervals:in(node:id(Node), intervals:mk_from_node_ids(Id, node:id(Succ)))) of % there should not be anything shorter than succ
+    case node:is_valid(Node)                        % do not add null nodes
+        andalso (node:id(Succ) =/= node:id(Node))   % reached succ?
+        andalso (not intervals:in(                  % there should be nothing shorter
+                   node:id(Node),                   %   than succ
+                   intervals:mk_from_node_ids(Id, node:id(Succ)))) of 
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
             lookup:unreliable_lookup(Key, {rt_get_node, comm:this(),
-                                              next_index(Index)}),
+                                           next_index(Index)}),
             NewRT;
-        false ->
-            RT
+        _ -> RT
     end.
-%% userdevguide-end rt_chord:stab
+%% userdevguide-end rt_chord:stabilize
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Finger calculation
@@ -189,6 +189,7 @@ check_config() ->
 
 -include("rt_generic.hrl").
 
+%% userdevguide-begin rt_chord:handle_custom_message
 %% @doc Chord reacts on 'rt_get_node_response' messages in response to its
 %%      'rt_get_node' messages.
 -spec handle_custom_message(custom_message(), rt_loop:state_init()) -> rt_loop:state_init();
@@ -200,20 +201,19 @@ handle_custom_message({rt_get_node_response, Index, Node}, State) ->
     Pred = rt_loop:get_pred(State),
     NewRT = stabilize(Id, Succ, OldRT, Index, Node),
     check(OldRT, NewRT, Id, Pred, Succ),
-    rt_loop:set_rt(State, NewRT);
-
-handle_custom_message(_Message, _State) ->
-    unknown_event.
+    rt_loop:set_rt(State, NewRT).
+%% userdevguide-end rt_chord:handle_custom_message
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Communication with dht_node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% userdevguide-begin rt_chord:empty_ext
 -spec empty_ext(node:node_type()) -> external_rt().
-empty_ext(_Succ) ->
-    gb_trees:empty().
+empty_ext(_Succ) -> gb_trees:empty().
+%% userdevguide-end rt_chord:empty_ext
 
-%% userdevguide-begin rt_chord:next_hop1
+%% userdevguide-begin rt_chord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
@@ -223,8 +223,7 @@ next_hop(State, Id) ->
     case get_size(RT) =:= 0 orelse
              intervals:in(Id, dht_node_state:get(State, succ_range)) of
         true -> dht_node_state:get(State, succ_pid); % -> succ
-        % check routing table
-        false ->
+        _ -> % check routing table:
             case util:gb_trees_largest_smaller_than(Id, RT) of
                 {value, _Key, Node} -> node:pidX(Node);
                 nil -> % forward to largest finger
@@ -232,10 +231,11 @@ next_hop(State, Id) ->
                     node:pidX(Node)
             end
     end.
-%% userdevguide-end rt_chord:next_hop1
+%% userdevguide-end rt_chord:next_hop
 
+%% userdevguide-begin rt_chord:export_rt_to_dht_node
 -spec export_rt_to_dht_node(rt(), key(), node:node_type(), node:node_type())
-      -> external_rt().
+        -> external_rt().
 export_rt_to_dht_node(RT, Id, Pred, Succ) ->
     Tree = gb_trees:enter(node:id(Succ), Succ,
                           gb_trees:enter(node:id(Pred), Pred, gb_trees:empty())),
@@ -246,9 +246,10 @@ export_rt_to_dht_node(RT, Id, Pred, Succ) ->
                                      false -> gb_trees:enter(node:id(V), V, Acc)
                                  end
                         end, Tree, RT).
+%% userdevguide-end rt_chord:export_rt_to_dht_node
 
 -spec update_pred_succ_in_dht_node(node:node_type(), node:node_type(), external_rt())
-      -> external_rt().
+        -> external_rt().
 update_pred_succ_in_dht_node(Pred, Succ, RT) ->
     gb_trees:enter(node:id(Succ), Succ, gb_trees:enter(node:id(Pred), Pred, RT)).
 

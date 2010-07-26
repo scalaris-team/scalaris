@@ -1035,8 +1035,8 @@ firewalls.
 
 \section{Routing Tables}
 \label{chapter.routing}
-
-%\hfill\emph{2008-07-25, SVN revision 12}
+\svnrev{r911}
+\erlmoduleindex{rt\_beh}
 
 Each node of the ring can perform searches in the overlay.
 
@@ -1045,58 +1045,24 @@ other demands for communication between peers. \scalaris{} provides
 a general interface to route a message to the (other) peer, which is
 currently responsible for a given \code{key}.
 
-\begin{lstlisting}[title=\filetitle{cs_lookup.erl}]
-[...]
-unreliable_lookup(Key, Msg) ->
-    get_pid(dht_node) ! {lookup_aux, Key, Msg}.
+\codesnippet{lookup.erl}{lookup:lookup}{../src/lookup.erl}
 
-unreliable_get_key(Key) ->
-    unreliable_lookup(Key, {get_key, comm:this(), Key}).
-[...]
-\end{lstlisting}
-
-The message \code{Msg} could be a \code{get} which retrieves content from
+The message \code{Msg} could be a \code{get_key} which retrieves content from
 the responsible node or a \code{get_node} message, which returns a pointer
 to the node.
 
 All currently supported messages are listed in the file \code{dht_node.erl}.
 
-The message routing is implemented in lookup.erl
+The message routing is implemented in \code{dht_node_lookup.erl}
 
-\begin{lstlisting}[title=\filetitle{lookup.erl}]
-[...]
-lookup_fin(Msg) ->
-    self() ! Msg.
+\codesnippet{dht_node_lookup.erl}{dht_node_lookup:routing}{../src/dht_node_lookup.erl}
 
-lookup_aux(State, Key, Msg) ->
-    Terminate = util:is_between(dht_node_state:id(State), Key, dht_node_state:succ_id(State)),
-    P = ?RT:next_hop(State, Key),
-    ?LOG("[ ~w | I | Node   | ~w ] lookup_aux ~w ~w ~s~n",
-      [calendar:universal_time(), self(), Terminate, P, Key]),
-    if
-	Terminate ->
-	    comm:send(P, {lookup_fin, Msg});
-	true ->
-	    comm:send(P, {lookup_aux, Key, Msg})
-    end.
-[...]
-\end{lstlisting}
-
-Each node is responsible for a certain key interval.  The function
-\erlfun{util}{is\_between} is used to decide, whether the key is between
-the current node and its successor. If that is the case, final step is
-done using \code{lookup_fin()}, which delivers the message to the
-local node. Otherwise, the message is forwarded to the next nearest
-known peer (listed in the routing table) determined by
-\erlfun{?RT}{next\_hop}.
-
-
-% \begin{lstlisting}[language=Java]
-% interface RT {
-%   foo();
-%   lookup();
-% }
-% \end{lstlisting}
+Each node is responsible for a certain key interval. The function
+\erlfun{intervals}{in}{/2} is used to decide, whether the key is between
+the current node and its successor. If that is the case, the final step is
+delivers a \code{lookup_fin} message to the local node. Otherwise, the message
+is forwarded to the next nearest known peer (listed in the routing table)
+determined by \erlfun{?RT}{next\_hop}{/2}.
 
 \code{rt_beh.erl} is a generic interface for routing tables. It
 can be compared to interfaces in Java. In Erlang interfaces can be
@@ -1113,103 +1079,168 @@ defined in the following file:
 
 \codesnippet{rt_beh.erl}{rt_beh:behaviour}{../src/rt_beh.erl}
 
-
 \begin{description}
 \setlength{\parskip}{0pt}
 \setlength{\itemsep}{0pt}
-\item \code{empty/1} gets a successor passed and generates an empty routing
-  table.  The data structure of the routing table is undefined. It can be a
-  list, a tree, a matrix \ldots
+\item \code{empty/1} gets a successor and generates an empty routing
+  table for use inside the routing table implementation. The data structure of
+  the routing table is undefined. It can be a list, a tree, a matrix \ldots
+
+\item \code{empty_ext/1} similarly creates an empty external routing table
+  for use by the \erlmodule{dht\_node}. This process might not need all the
+  information a routing table implementation requires and can thus work with
+  less data.
 
 \item \code{hash_key/1} gets a key and maps it into the overlay's
   identifier space.
 
-\item \code{getRandomNodeId/0} returns a random node id from the
+\item \code{get_random_node_id/0} returns a random node id from the
   overlay's identifier space. This is used for example when a new node
   joins the system.
 
-\item \code{next_hop/2} gets a routing table and a key and returns the node,
-  that should be contacted next (is nearest to the id).
+\item \code{next_hop/2} gets a \erlmodule{dht\_node}'s state (including the
+  external routing table representation) and a key and returns the node, that
+  should be contacted next when searching for the key, i.e. the known node
+  nearest to the id.
 
 \item \code{init_stabilize/3} is called periodically to rebuild the
-  routing table. The parameters are the identifier of the node, the
-  successor and the old routing table state.
+  routing table. The parameters are the identifier of the node, its
+  successor and the old (internal) routing table state.
 
-\item \code{filterDeadNode/2} is called by the failuredetector and tells the
-  routing table about dead nodes to be eliminated from the routing
-  table. This function cleans the routing table.
+\item \code{filter_dead_node/2} is called by the failure detector and tells
+  the routing table about dead nodes. This function gets the (internal) routing
+  table and a node to remove from it. A new routing table state is returned.
 
-\item \code{to_pid_list/1} get all PIDs of the routing table entries.
+\item \code{to_pid_list/1} get the PIDs of all (internal) routing table
+  entries.
 
-\item \code{get_size/1} get the routing table's size.
+\item \code{get_size/1} get the (internal or external) routing table's size.
 
-\item \code{get_keys_for_replicas/1} Returns for a given \code{Key}
-  the keys of its replicas. This used for implementing symmetric
-  replication.
+\item \code{get_keys_for_replicas/1} Returns for a given (un-hashed)
+  \code{Key} the (hashed) keys of its replicas. This used for implementing
+  symmetric replication.
 
-\item \code{dump/1} dump the state. Not mandatory, may just return \code{ok}.
+\item \code{n/0} gets the number of available keys. An implementation may
+  throw an exception of type \code{throw} if the operation is unsupported by
+  the routing table.
 
-\item \code{to_dict/1} returns the routing tables entries in an
-  array-like structure. This is used by bulk-operations to create a
+\item \code{dump/1} dump the (internal) routing table state for debugging,
+  e.g. by using the web interface. Returns a list of
+  \code{\{Index, Node_as_String\}} tuples which may just as well be empty.
+
+\item \code{to_list/1} convert the (external) representation of the routing
+  table inside a given \code{dht_node_state} to a sorted list of known nodes
+  from the routing table, i.e. first=succ, second=next known node on the ring,
+  \ldots This is used by bulk-operations to create a
   broadcast tree.
+
+\item \code{export_rt_to_dht_node/4} convert the internal routing table state
+  to an external state. Gets the internal state, the node's ID, the predecessor
+  and the successor for doing so.
+
+\item \code{update_pred_succ_in_dht_node/3} update predecessor and successor
+  node stored in an external routing table state.
+
+\item \code{handle_custom_message/2} handle messages specific to the routing
+  table implementation. \erlmodule{rt\_loop} will forward unknown messages
+  to this function.
+
+\item \code{check/5}, \code{check/6}, \code{check_fd/2} are implemented in
+  \code{rt_generic.hrl}, check for routing table changes and send an updated
+  (external) routing table to the \erlmodule{dht\_node} process.
+
+\item \code{check_config/0} check that all required configuration parameters
+  exist and satisfy certain restrictions.
+
 \end{description}
 
 \subsection{Simple routing table}
+\erlmoduleindex{rt\_simple}
 
 One implementation of a routing table is the \code{rt_simple}, which routes
-via the successor, which is inefficient, as it needs a linear number of hops
-to reach its goal. A more robust implementation, would use a successor
-list. This implementation is not very efficient on churn.
+via the successor. Note that this is inefficient as it needs a linear number
+of hops to reach its goal. A more robust implementation, would use a successor
+list. This implementation is also not very efficient in the presence of churn.
 
 \subsubsection{Data types}
 First, the data structure of the routing table is defined:
 
 \codesnippet{rt_simple.erl}{rt_simple:types}{../src/rt_simple.erl}
 
-A routing table is a pair of a node (the successor) and an (unused)
-\code{gb_tree}.  Keys in the overlay are identified by integers.
+The routing table only consists of a node (the successor). Keys in the overlay
+are identified by integers $\geq 0$.
 
-\subsubsection{A simple routingtable behaviour}
+\subsubsection{A simple \texorpdfstring{\erlmodule{rm\_beh}}{rm\_beh} behaviour}
 
+\erlfunindex{rt\_simple}{empty}
 \codesnippet{rt_simple.erl}{rt_simple:empty}{../src/rt_simple.erl}
+\erlfunindex{rt\_simple}{empty\_ext}
+\codesnippet{rt_simple.erl}{rt_simple:empty_ext}{../src/rt_simple.erl}
+The empty routing table (internal or external)  consists of the successor.
 
-The empty routing table consists of the successor and an empty
-\code{gb_tree}.
-
+\erlfunindex{rt\_simple}{hash\_key}
 \codesnippet{rt_simple.erl}{rt_simple:hash_key}{../src/rt_simple.erl}
-
 Keys are hashed using MD5 and have a length of 128 bits.
 
-\codesnippet{rt_simple.erl}{rt_simple:next_hop}{../src/rt_simple.erl}
+\erlfunindex{rt\_simple}{get\_random\_node\_id}
+\codesnippet{rt_simple.erl}{rt_simple:get_random_node_id}{../src/rt_simple.erl}
+Random node id generation uses the helpers provided by the \erlmodule{randoms}
+module.
 
+\erlfunindex{rt\_simple}{next\_hop}
+\codesnippet{rt_simple.erl}{rt_simple:next_hop}{../src/rt_simple.erl}
 Next hop is always the successor.
 
+\erlfunindex{rt\_simple}{init\_stabilize}
 \codesnippet{rt_simple.erl}{rt_simple:init_stabilize}{../src/rt_simple.erl}
+\code{init_stabilize/3} resets its routing table to the current successor.
 
-\code{init_stabilize/3} resets its routing table with the current
-successor.
-
-\codesnippet{rt_simple.erl}{rt_simple:filterDeadNode}{../src/rt_simple.erl}
-
-\code{filterDeadNodes/2} does nothing, as only the successor is listed in
+\erlfunindex{rt\_simple}{filter\_dead\_node}
+\codesnippet{rt_simple.erl}{rt_simple:filter_dead_node}{../src/rt_simple.erl}
+\code{filter_dead_node/2} does nothing, as only the successor is listed in
 the routing table and that is reset periodically in \code{init_stabilize/3}.
 
+\erlfunindex{rt\_simple}{to\_pid\_list}
 \codesnippet{rt_simple.erl}{rt_simple:to_pid_list}{../src/rt_simple.erl}
+\code{to_pid_list/1} returns the pid of the successor.
 
-\code{to_pid_list/1} returns the pids of the routing tables, as defined in \code{node.erl}.
+\erlfunindex{rt\_simple}{get\_size}
+\codesnippet{rt_simple.erl}{rt_simple:get_size}{../src/rt_simple.erl}
+The size of the routing table is always \code{1}.
 
+\erlfunindex{rt\_simple}{get\_keys\_for\_replicas}
 \codesnippet{rt_simple.erl}{rt_simple:get_keys_for_replicas}{../src/rt_simple.erl}
+This \code{get_keys_for_replicas/1} implements symmetric replication.
 
-The \code{get_keys_for_replicas/1} implements symmetric replication, here.
-The call to \code{normalize} implements the modulo by throwing high bits
-away.
+\erlfunindex{rt\_simple}{n}
+\codesnippet{rt_simple.erl}{rt_simple:n}{../src/rt_simple.erl}
+There are $2^{128}$ available keys.
 
+\erlfunindex{rt\_simple}{dump}
 \codesnippet{rt_simple.erl}{rt_simple:dump}{../src/rt_simple.erl}
+\code{dump/1} lists the successor.
 
-\code{dump/1} is not implemented.
+\erlfunindex{rt\_simple}{to\_list}
+\codesnippet{rt_simple.erl}{rt_simple:to_list}{../src/rt_simple.erl}
+\code{to_list/1} lists the successor from the external routing table state.
 
+\erlfunindex{rt\_simple}{export\_rt\_to\_dht\_node}
+\codesnippet{rt_simple.erl}{rt_simple:export_rt_to_dht_node}{../src/rt_simple.erl}
+\code{export_rt_to_dht_node/1} states that the external routing table is the
+same as the internal table.
+
+\erlfunindex{rt\_simple}{update\_pred\_succ\_in\_dht\_node}
+\codesnippet{rt_simple.erl}{rt_simple:update_pred_succ_in_dht_node}{../src/rt_simple.erl}
+Updates the external routing table state with the given successor.
+
+\erlfunindex{rt\_simple}{handle\_custom\_message}
+\codesnippet{rt_simple.erl}{rt_simple:handle_custom_message}{../src/rt_simple.erl}
+Custom messages could be send from a routing table process on one node to the
+routing table process on another node and are independent from any other
+implementation.
 
 \subsection{Chord routing table}
+\erlmoduleindex{rt\_chord}
 
 The file \code{rt_chord.erl} implements Chord's routing.
 
@@ -1218,28 +1249,35 @@ The file \code{rt_chord.erl} implements Chord's routing.
 \codesnippet{rt_chord.erl}{rt_chord:types}{../src/rt_chord.erl}
 
 The routing table is a \code{gb_tree}. Identifiers in the ring are
-integers. Note, that in Erlang integer can be of arbitrary
+integers. Note that in Erlang integer can be of arbitrary
 precision. For Chord, the identifiers are in $[0, 2^{128})$,
 i.e. 128-bit strings.
 
-\subsubsection{The routingtable behaviour for Chord}
+\subsubsection{The \texorpdfstring{\erlmodule{rm\_beh}}{rm\_beh} behaviour for Chord (excerpt)}
 
+\erlfunindex{rt\_chord}{empty}
 \codesnippet{rt_chord.erl}{rt_chord:empty}{../src/rt_chord.erl}
+\erlfunindex{rt\_chord}{empty\_ext}
+\codesnippet{rt_chord.erl}{rt_chord:empty_ext}{../src/rt_chord.erl}
+\code{empty/1} returns an empty \code{gb_tree}, same for \code{empty_ext/1}.
 
-\code{empty/1} returns an empty \code{gb_tree}.
+\erlfun{rt\_chord}{hash\_key}{/1},
+\erlfun{rt\_chord}{get\_random\_node\_id}{/0},
+\erlfun{rt\_chord}{get\_keys\_for\_replicas}{/1} and
+\erlfun{rt\_chord}{n}{/0} are implemented like their counterparts in
+\code{rt_simple.erl}.
 
-\code{hash_key(Key)} and \code{getRandomNodeId} call their counterparts from
-\code{rt_simple.erl}
+\erlfunindex{rt\_chord}{next\_hop}
+\codesnippet{rt_chord.erl}{rt_chord:next_hop}{../src/rt_chord.erl}
+If the (external) routing table contains at least one item, the next hop is
+retrieved from the \code{gb_tree}. It will be the node with the largest id
+that is smaller than the id we are looking for. If the routing table is empty,
+the successor is chosen. However, if we haven't found the key in our routing
+table, the next hop will be our largest finger, i.e. entry.
 
-\codesnippet{rt_chord.erl}{rt_chord:next_hop1}{../src/rt_chord.erl}
-
-If the entry exists, it is retrieved from the \code{gb_tree}.  If the id of
-the routing table entry is between ourselves and the searched id, the finger
-is chosen. If anything fails, the successor is chosen.
-
-\codesnippet{rt_chord.erl}{rt_chord:init_stab}{../src/rt_chord.erl}
-
-The routing table stabilization is triggered with the index 127 and
+\erlfunindex{rt\_chord}{init\_stabilize}
+\codesnippet{rt_chord.erl}{rt_chord:init_stabilize}{../src/rt_chord.erl}
+The routing table stabilization is triggered for the first index and
 then runs asynchronously, as we do not want to block the
 \code{rt_loop} to perform other request while recalculating the
 routing table.
@@ -1255,25 +1293,34 @@ the responsible node is found. There, the message is delivered to the
 
 \codesnippet{dht_node.erl}{dht_node:rt_get_node}{../src/dht_node.erl}
 
-The remote node just sends the requested information back directly in
-a \code{rt_get_node_response} message including a reference to itself.
-When receiving the routing table entry, we call \code{stabilize/5}.
+The remote node sends the requested information back directly. It includes a
+reference to itself in a \code{rt_get_node_response} message which will be
+handled by \erlfun{rt\_chord}{handle\_custom\_message}{/2} that calls
+\erlfun{rt\_chord}{stabilize}{/5}:
 
-\codesnippet{rt_chord.erl}{rt_chord:stab}{../src/rt_chord.erl}
+\erlfunindex{rt\_chord}{handle\_custom\_message}
+\codesnippet{rt_chord.erl}{rt_chord:handle_custom_message}{../src/rt_chord.erl}
+\erlfunindex{rt\_chord}{stabilize}
+\codesnippet{rt_chord.erl}{rt_chord:stabilize}{../src/rt_chord.erl}
 
-%%%%%%%%%%
+\code{stabilize/5} assigns the received routing table entry and triggers the
+routing table stabilization for the the next shorter entry using the same
+mechanisms as described above.
 
-\code{stabilize/5} assigns the received routing table entry and triggers to
-fill the next shorter one using the same mechanisms as described.
-
-When the shortest finger is the successor, then filling the routing table is
+If the shortest finger is the successor, then filling the routing table is
 stopped, as no further new entries would occur. It is not necessary, that
 \code{Index} reaches 1 to make that happen. If less than $2^{128}$ nodes
 participate in the system, it may happen earlier.
 
-\code{filterDeadNode} removes dead entries from the \code{gb_tree}.
+\erlfunindex{rt\_chord}{filter\_dead\_node}
+\codesnippet{rt_chord.erl}{rt_chord:filter_dead_node}{../src/rt_chord.erl}
+\code{filter_dead_node} removes dead entries from the \code{gb_tree}.
 
-\codesnippet{rt_chord.erl}{rt_chord:filterDeadNode}{../src/rt_chord.erl}
+\erlfunindex{rt\_chord}{export\_rt\_to\_dht\_node}
+\codesnippet{rt_chord.erl}{rt_chord:export_rt_to_dht_node}{../src/rt_chord.erl}
+\code{export_rt_to_dht_node} converts the internal \code{gb_tree} structure
+based on indices into the external representation optimised for look-ups, i.e.
+a \code{gb_tree} with node ids and the nodes themselves.
 
 
 \section{Local Datastore}
