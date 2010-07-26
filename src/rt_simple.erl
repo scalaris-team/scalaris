@@ -25,22 +25,20 @@
 
 % routingtable behaviour
 -export([empty/1, empty_ext/1,
-         hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
-         filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
+         hash_key/1, get_random_node_id/0, next_hop/2, init_stabilize/3,
+         filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          dump/1, to_list/1, export_rt_to_dht_node/4, n/0,
          update_pred_succ_in_dht_node/3, handle_custom_message/2,
          check/6, check/5, check_fd/2,
          check_config/0]).
 
--export([normalize/1]).
-
 %% userdevguide-begin rt_simple:types
 % @type key(). Identifier.
--type(key()::non_neg_integer()).
+-opaque(key()::non_neg_integer()).
 % @type rt(). Routing Table.
--type(rt()::Succ::node:node_type()).
+-opaque(rt()::Succ::node:node_type()).
 -type(external_rt()::rt()).
--type(custom_message() :: any()).
+-opaque(custom_message() :: any()).
 %% userdevguide-end rt_simple:types
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -58,18 +56,24 @@ empty(Succ) ->
 %% userdevguide-begin rt_simple:hash_key
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(iodata() | integer()) -> key().
-hash_key(Key) when is_integer(Key) ->
+hash_key(Key) -> hash_key_(Key).
+
+%% @doc Hashes the key to the identifier space (internal).
+%%      Note: Needed for dialyzer to cope with the opaque key() type and the
+%%      use of key() in get_keys_for_replicas/1.
+-spec hash_key_(iodata() | integer()) -> non_neg_integer().
+hash_key_(Key) when is_integer(Key) ->
     <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
     N;
-hash_key(Key) ->
+hash_key_(Key) ->
     <<N:128>> = erlang:md5(Key),
     N.
 %% userdevguide-end rt_simple:hash_key
 
 %% @doc Generates a random node id
 %%      In this case it is a random 128-bit string.
--spec getRandomNodeId() -> key().
-getRandomNodeId() ->
+-spec get_random_node_id() -> key().
+get_random_node_id() ->
     hash_key(randoms:getRandomId()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -84,12 +88,12 @@ init_stabilize(_Id, Succ, _RT) ->
     empty(Succ).
 %% userdevguide-end rt_simple:init_stabilize
 
-%% userdevguide-begin rt_simple:filterDeadNode
+%% userdevguide-begin rt_simple:filter_dead_node
 %% @doc Removes dead nodes from the routing table.
--spec filterDeadNode(rt(), comm:mypid()) -> rt().
-filterDeadNode(RT, _DeadPid) ->
+-spec filter_dead_node(rt(), comm:mypid()) -> rt().
+filter_dead_node(RT, _DeadPid) ->
     RT.
-%% userdevguide-end rt_simple:filterDeadNode
+%% userdevguide-end rt_simple:filter_dead_node
 
 %% userdevguide-begin rt_simple:to_pid_list
 %% @doc Returns the pids of the routing table entries.
@@ -104,23 +108,21 @@ get_size(_RT) ->
     1.
 
 %% userdevguide-begin rt_simple:get_keys_for_replicas
-normalize(Key) ->
-    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
-
+%% @doc Returns the size of the address space.
+-spec n() -> non_neg_integer().
 n() ->
     16#100000000000000000000000000000000.
 
 %% @doc Returns the replicas of the given key.
--spec get_keys_for_replicas(key()) -> [key()].
+-spec get_keys_for_replicas(iodata() | integer()) -> [key()].
 get_keys_for_replicas(Key) ->
-    HashedKey = hash_key(Key),
+    HashedKey = hash_key_(Key),
     [HashedKey,
      HashedKey bxor 16#40000000000000000000000000000000,
      HashedKey bxor 16#80000000000000000000000000000000,
      HashedKey bxor 16#C0000000000000000000000000000000
     ].
 %% userdevguide-end rt_simple:get_keys_for_replicas
-
 
 %% userdevguide-begin rt_simple:dump
 %% @doc Dumps the RT state for output in the web interface.

@@ -25,9 +25,9 @@
 
 % routingtable behaviour
 -export([empty/1, empty_ext/1,
-         hash_key/1, getRandomNodeId/0, next_hop/2, init_stabilize/3,
-         filterDeadNode/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
-         dump/1, to_list/1, export_rt_to_dht_node/4,
+         hash_key/1, get_random_node_id/0, next_hop/2, init_stabilize/3,
+         filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
+         n/0, dump/1, to_list/1, export_rt_to_dht_node/4,
          update_pred_succ_in_dht_node/3, handle_custom_message/2,
          check/6, check/5, check_fd/2,
          check_config/0]).
@@ -61,14 +61,24 @@ empty(_Succ) ->
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(iodata() | integer()) -> key().
-hash_key(Key) ->
-    rt_simple:hash_key(Key).
+hash_key(Key) -> hash_key_(Key).
+
+%% @doc Hashes the key to the identifier space (internal).
+%%      Note: Needed for dialyzer to cope with the opaque key() type and the
+%%      use of key() in get_keys_for_replicas/1.
+-spec hash_key_(iodata() | integer()) -> non_neg_integer().
+hash_key_(Key) when is_integer(Key) ->
+    <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
+    N;
+hash_key_(Key) ->
+    <<N:128>> = erlang:md5(Key),
+    N.
 
 %% @doc Generates a random node id.
 %%      In this case it is a random 128-bit string.
--spec getRandomNodeId() -> key().
-getRandomNodeId() ->
-    rt_simple:getRandomNodeId().
+-spec get_random_node_id() -> key().
+get_random_node_id() ->
+    hash_key(randoms:getRandomId()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% RT Management
@@ -85,30 +95,45 @@ init_stabilize(Id, _Succ, RT) ->
     RT.
 %% userdevguide-end rt_chord:init_stab
 
-%% userdevguide-begin rt_chord:filterDeadNode
+%% userdevguide-begin rt_chord:filter_dead_node
 %% @doc Removes dead nodes from the routing table.
--spec filterDeadNode(rt(), comm:mypid()) -> rt().
-filterDeadNode(RT, DeadPid) ->
+-spec filter_dead_node(rt(), comm:mypid()) -> rt().
+filter_dead_node(RT, DeadPid) ->
     DeadIndices = [Index|| {Index, Node}  <- gb_trees:to_list(RT),
                            node:equals(Node, DeadPid)],
     lists:foldl(fun(Index, Tree) -> gb_trees:delete(Index, Tree) end,
                 RT, DeadIndices).
-%% userdevguide-end rt_chord:filterDeadNode
+%% userdevguide-end rt_chord:filter_dead_node
 
 %% @doc Returns the pids of the routing table entries.
 -spec to_pid_list(rt()) -> [comm:mypid()].
 to_pid_list(RT) ->
-    lists:map(fun({_Idx, Node}) -> node:pidX(Node) end, gb_trees:to_list(RT)).
+    [node:pidX(Node) || Node <- gb_trees:values(RT)].
 
 %% @doc Returns the size of the routing table.
 -spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(RT) ->
     gb_trees:size(RT).
 
+%% @doc Keep a key in the address space. See n/0.
+-spec normalize(Key::non_neg_integer()) -> key().
+normalize(Key) ->
+    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
+
+%% @doc Returns the size of the address space.
+-spec n() -> non_neg_integer().
+n() ->
+    16#100000000000000000000000000000000.
+
 %% @doc Returns the replicas of the given key.
--spec get_keys_for_replicas(key()) -> [key()].
+-spec get_keys_for_replicas(iodata() | integer()) -> [key()].
 get_keys_for_replicas(Key) ->
-    rt_simple:get_keys_for_replicas(Key).
+    HashedKey = hash_key_(Key),
+    [HashedKey,
+     HashedKey bxor 16#40000000000000000000000000000000,
+     HashedKey bxor 16#80000000000000000000000000000000,
+     HashedKey bxor 16#C0000000000000000000000000000000
+    ].
 
 %% @doc Dumps the RT state for output in the web interface.
 -spec dump(RT::rt()) -> KeyValueList::[{Index::non_neg_integer(), Node::string()}].
@@ -141,9 +166,9 @@ stabilize(Id, Succ, RT, Index, Node) ->
 -spec calculateKey(key(), index()) -> key().
 calculateKey(Id, {I, J}) ->
     % N / K^I * (J + 1)
-    Offset = (rt_simple:n() div util:pow(config:read(chord_base), I)) * (J + 1),
+    Offset = (n() div util:pow(config:read(chord_base), I)) * (J + 1),
     %io:format("~p: ~p + ~p~n", [{I, J}, Id, Offset]),
-    rt_simple:normalize(Id + Offset).
+    normalize(Id + Offset).
 
 -spec first_index() -> index().
 first_index() ->
