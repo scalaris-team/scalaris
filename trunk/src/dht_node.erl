@@ -87,10 +87,9 @@ on({die}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% {init_rm, pid()}
 on({init_rm, Pid}, State) ->
-    comm:send_local(Pid, {init, dht_node_state:get(State, node_id),
-                                   dht_node_state:get(State, node),
-                                   dht_node_state:get(State, pred),
-                                   dht_node_state:get(State, succ)}),
+    comm:send_local(Pid, {init, dht_node_state:get(State, node),
+                                dht_node_state:get(State, pred),
+                                dht_node_state:get(State, succ)}),
     State;
 
 %% {rm_update_neighbors, Neighbors::nodelist:neighborhood()}

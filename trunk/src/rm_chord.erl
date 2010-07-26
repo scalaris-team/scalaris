@@ -30,20 +30,22 @@
 
 -export([check_config/0]).
 
--type(state() :: {Id             :: ?RT:key(),
-                  Neighborhood   :: nodelist:neighborhood(),
+-type(state() :: {Neighborhood   :: nodelist:neighborhood(),
                   TriggerState   :: trigger:state()}
      | {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState :: trigger:state()}).
 
 % accepted messages
 -type(message() ::
-    {init, Id::?RT:key(), Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
+    {init, Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
     {get_succlist, Source_Pid::comm:mypid()} |
     {stabilize} |
     {get_node_details_response, NodeDetails::node_details:node_details()} |
     {get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()} |
     {notify_new_pred, Pred::node:node_type()} |
     {notify_new_succ, Succ::node:node_type()} |
+    {leave, SourcePid::comm:erl_local_pid()} |
+    {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
+    {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
     {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
@@ -79,99 +81,108 @@ get_successorlist(RemoteDhtNodePid) ->
 
 -spec on(message(), state()) -> state().
 %set info for dht_node
-on({init, Id, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
+on({init, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
     Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
     get_successorlist(node:pidX(Successor)),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
     msg_queue:send(QueuedMessages),
-    {Id, Neighborhood, TriggerState};
+    {Neighborhood, TriggerState};
 
 on(Msg, {uninit, QueuedMessages, TriggerState}) ->
     {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState};
 
-on({get_succlist, Source_Pid}, {_Id, Neighborhood, _TriggerState} = State) ->
+on({get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     comm:send(Source_Pid, {get_succlist_response,
-                              nodelist:node(Neighborhood),
-                              nodelist:succs(Neighborhood)}),
+                           nodelist:node(Neighborhood),
+                           nodelist:succs(Neighborhood)}),
     State;
 
-on({stabilize}, {Id, Neighborhood, TriggerState}) ->
+on({stabilize}, {Neighborhood, TriggerState}) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true ->
             comm:send(node:pidX(nodelist:succ(Neighborhood)),
-                         {get_node_details, comm:this(), [pred]});
+                      {get_node_details, comm:this(), [pred]});
         _ -> ok
     end,
-    {Id, Neighborhood, trigger:next(TriggerState)};
+    {Neighborhood, trigger:next(TriggerState)};
 
-on({get_node_details_response, NodeDetails}, {Id, Neighborhood, TriggerState} = State)  ->
+% got node_details from our successor
+on({get_node_details_response, NodeDetails}, {OldNeighborhood, TriggerState})  ->
     SuccsPred = node_details:get(NodeDetails, pred),
-    % check if the predecessor of our successor is correct:
-    SuccId = node:id(nodelist:succ(Neighborhood)),
-    case intervals:in(node:id(SuccsPred), intervals:new('(', Id, SuccId, ')')) of
-        true ->
-            get_successorlist(node:pidX(SuccsPred)),
-            NewNeighborhood = nodelist:add_nodes(Neighborhood, [SuccsPred], 1, succListLength()),
-            rm_beh:update_neighbors(NewNeighborhood),
-            fd:subscribe(node:pidX(SuccsPred)),
-            {Id, NewNeighborhood, TriggerState};
-        false ->
-            get_successorlist(node:pidX(nodelist:succ(Neighborhood))),
-            State
-    end;
+    NewNeighborhood =
+        nodelist:add_nodes(OldNeighborhood, [SuccsPred], predListLength(), succListLength()),
+    rm_beh:update_dht_node(OldNeighborhood, NewNeighborhood),
+    rm_beh:update_failuredetector(OldNeighborhood, NewNeighborhood),
+    get_successorlist(node:pidX(nodelist:succ(NewNeighborhood))),
+    {NewNeighborhood, TriggerState};
 
-on({get_succlist_response, Succ, SuccsSuccList}, {Id, Neighborhood, TriggerState}) ->
-    NewNeighborhood = nodelist:add_nodes(Neighborhood, [Succ | SuccsSuccList], 1, succListLength()),
+on({get_succlist_response, Succ, SuccsSuccList}, {Neighborhood, TriggerState}) ->
+    NewNeighborhood =
+        nodelist:add_nodes(Neighborhood, [Succ | SuccsSuccList], predListLength(), succListLength()),
     %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
     rm_beh:notify_new_pred(node:pidX(nodelist:succ(NewNeighborhood)), nodelist:node(NewNeighborhood)),
-    rm_beh:update_neighbors(NewNeighborhood),
-    % the predecessor might also have changed if the successor knew about a better predecessor
-    OldPids = [nodelist:pred(Neighborhood)] ++ [node:pidX(Node) || Node <- nodelist:succs(Neighborhood)],
-    NewPids = [nodelist:pred(NewNeighborhood)] ++ [node:pidX(Node) || Node <- nodelist:succs(NewNeighborhood)],
-    fd:update_subscriptions(OldPids, NewPids),
-    {Id, NewNeighborhood, TriggerState};
+    rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
+    rm_beh:update_failuredetector(Neighborhood, NewNeighborhood),
+    {NewNeighborhood, TriggerState};
 
-on({notify_new_pred, NewPred}, {Id, Neighborhood, TriggerState} = State) ->
-    Pred = nodelist:pred(Neighborhood),
-    % is the 'new predecessor' really our new predecessor?
-    case intervals:in(node:id(NewPred), intervals:new('(', node:id(Pred), Id, ')')) of
-        true ->
-            NewNeighborhood = nodelist:add_nodes(Neighborhood, [NewPred], 1, succListLength()),
-            rm_beh:update_neighbors(NewNeighborhood),
-            fd:update_subscriptions([node:pidX(Pred)], [node:pidX(NewPred)]),
-            {Id, NewNeighborhood, TriggerState};
-        false ->
-            State
-    end;
+on({notify_new_pred, NewPred}, {OldNeighborhood, TriggerState}) ->
+    NewNeighborhood =
+        nodelist:add_node(OldNeighborhood, NewPred, predListLength(), succListLength()),
+    rm_beh:update_dht_node(OldNeighborhood, NewNeighborhood),
+    rm_beh:update_failuredetector(OldNeighborhood, NewNeighborhood),
+    {NewNeighborhood, TriggerState};
 
-on({notify_new_succ, _NewSucc}, State) ->
-    %% @TODO use the new successor info
-    State;
+on({notify_new_succ, NewSucc}, {OldNeighborhood, TriggerState}) ->
+    NewNeighborhood =
+        nodelist:add_node(OldNeighborhood, NewSucc, predListLength(), succListLength()),
+    rm_beh:update_dht_node(OldNeighborhood, NewNeighborhood),
+    rm_beh:update_failuredetector(OldNeighborhood, NewNeighborhood),
+    {NewNeighborhood, TriggerState};
 
-on({crash, DeadPid}, {Id, Neighborhood, TriggerState})  ->
+on({crash, DeadPid}, {Neighborhood, TriggerState})  ->
     NewNeighborhood = nodelist:remove(DeadPid, Neighborhood),
-    {Id, NewNeighborhood, TriggerState};
+    {NewNeighborhood, TriggerState};
 
-on({'$gen_cast', {debug_info, Requestor}}, {_Id, Neighborhood, _TriggerState} = State)  ->
+on({leave, SourcePid}, {Neighborhood, TriggerState}) ->
+    Me = nodelist:node(Neighborhood),
+    Pred = nodelist:pred(Neighborhood),
+    Succ = nodelist:succ(Neighborhood),
+    comm:send_to_group_member(node:pidX(Succ), ring_maintenance, {pred_left, Me, Pred}),
+    comm:send_to_group_member(node:pidX(Pred), ring_maintenance, {succ_left, Me, Succ}),
+    comm:send_local(SourcePid, {leave_response}),
+    {uninit, msg_queue:new(), TriggerState};
+
+on({pred_left, OldPred, PredsPred}, {Neighborhood, TriggerState}) ->
+    NewNbh1 = nodelist:remove(OldPred, Neighborhood),
+    NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, predListLength(), succListLength()),
+    rm_beh:update_dht_node(Neighborhood, NewNbh2),
+    rm_beh:update_failuredetector(Neighborhood, NewNbh2),
+    {NewNbh2, TriggerState};
+
+on({succ_left, OldSucc, SuccsSucc}, {Neighborhood, TriggerState}) ->
+    NewNbh1 = nodelist:remove(OldSucc, Neighborhood),
+    NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
+    rm_beh:update_dht_node(Neighborhood, NewNbh2),
+    rm_beh:update_failuredetector(Neighborhood, NewNbh2),
+    {NewNbh2, TriggerState};
+
+on({'$gen_cast', {debug_info, Requestor}}, {Neighborhood, _TriggerState} = State)  ->
     comm:send_local(Requestor,
-                       {debug_info_response,
-                        [{"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
-                         {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},
-                         {"succs", lists:flatten(io_lib:format("~p", [nodelist:succs(Neighborhood)]))}]}),
-    State;
-
-on(_, _State) ->
-    unknown_event.
+                    {debug_info_response,
+                     [{"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
+                      {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},
+                      {"succs", lists:flatten(io_lib:format("~p", [nodelist:succs(Neighborhood)]))}]}),
+    State.
 
 %% @doc Notifies the successor and predecessor that the current dht_node is
-%%      going to leave / left.
+%%      going to leave / left. Will reset the ring_maintenance state to uninit
+%%      and respond with a {leave_response} message.
 %%      Note: only call this method from inside the dht_node process!
 -spec leave() -> ok.
 leave() ->
-    DhtNode = comm:this(),
-    %TODO: notify successor and predecessor
-    ok.
+    comm:send_local(process_dictionary:get_group_member(ring_maintenance),
+                    {leave, self()}).
 
 %% @doc Checks whether config parameters of the rm_chord process exist and are
 %%      valid.
@@ -193,15 +204,16 @@ check_config() ->
 
 %% @doc get Pid of assigned dht_node
 -spec get_cs_pid() -> pid().
-get_cs_pid() ->
-    process_dictionary:get_group_member(dht_node).
+get_cs_pid() -> process_dictionary:get_group_member(dht_node).
+
+%% @doc the length of the successor list
+-spec predListLength() -> pos_integer().
+predListLength() -> 1.
 
 %% @doc the length of the successor list
 -spec succListLength() -> pos_integer().
-succListLength() ->
-    config:read(succ_list_length).
+succListLength() -> config:read(succ_list_length).
 
 %% @doc the interval between two stabilization runs Max
 -spec stabilizationInterval() -> pos_integer().
-stabilizationInterval() ->
-    config:read(stabilization_interval_max).
+stabilizationInterval() -> config:read(stabilization_interval_max).
