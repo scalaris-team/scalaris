@@ -37,14 +37,20 @@ suite() ->
 
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
+    Self = self(),
     Pid = spawn(fun () ->
-			config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-			crypto:start(),
-			process_dictionary:start_link(),
-			idholder:start_link("foo"),
-			timer:sleep(5000)
-		end),
+                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                        crypto:start(),
+                        process_dictionary:start_link(),
+                        idholder:start_link("foo", []),
+                        Self ! continue,
+                        timer:sleep(5000)
+                end),
     timer:sleep(1000),
+    receive
+        continue ->
+            ok
+    end,
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
