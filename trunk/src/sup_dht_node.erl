@@ -47,7 +47,7 @@ init([Options]) ->
     boot_server:connect(),
     KeyHolder =
         util:sup_worker_desc(idholder, idholder, start_link,
-                             [InstanceId]),
+                             [InstanceId, Options]),
     Supervisor_AND =
         util:sup_supervisor_desc(cs_supervisor_and, sup_dht_node_core, start_link,
                                  [InstanceId, Options]),

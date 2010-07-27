@@ -28,7 +28,7 @@
 
 -include("scalaris.hrl").
 
--export([start_link/1, init/1, on/2, set_id/2, get_id/0, reinit/0,
+-export([start_link/2, init/1, on/2, set_id/2, get_id/0, reinit/0,
          check_config/0]).
 
 -type(message() ::
@@ -54,9 +54,10 @@ get_id() ->
 
 %% @doc Starts the idholder process, registers it with the process dictionary
 %%      and returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
-    gen_component:start_link(?MODULE, [], [{register, InstanceId, idholder}]).
+-spec start_link(instanceid(), list(tuple())) -> {ok, pid()}.
+start_link(InstanceId, Options) ->
+    io:format("~w~n", [Options]),
+    gen_component:start_link(?MODULE, Options, [{register, InstanceId, idholder}]).
 
 %% @doc Resets the key to a random key and a counter of 0.
 %%      Warning: This effectively states that a newly created DHT node is
@@ -88,8 +89,13 @@ check_config() ->
 %% userdevguide-begin gen_component:sample
 %% @doc Initialises the idholder with a random key and a counter of 0.
 -spec init([]) -> state().
-init(_Arg) ->
-    {get_initial_key(config:read(key_creator)), 0}.
+init(Options) ->
+    case lists:keyfind({idholder, id}, 1, Options) of
+        {{idholder, id}, Id} ->
+            {Id, 0};
+        false ->
+            {get_initial_key(config:read(key_creator)), 0}
+    end.
 
 -spec on(message(), state()) -> state() | unknown_event.
 on({reinit}, _State) ->
@@ -104,7 +110,7 @@ on(_, _State) ->
 %% userdevguide-end gen_component:sample
 
 %% @doc Gets the pid of the idholder process in the same group as the calling
-%%      process. 
+%%      process.
 -spec get_pid() -> pid() | failed.
 get_pid() ->
     process_dictionary:get_group_member(idholder).

@@ -29,7 +29,7 @@
 -behaviour(supervisor).
 -include("scalaris.hrl").
 
--export([start_link/1, init/1]).
+-export([start_link/1, start_link/2, init/1]).
 
 -ifdef(with_export_type_support).
 -export_type([supervisor_type/0]).
@@ -43,7 +43,11 @@
                                                        Pid::pid()}
                                      | term()}.
 start_link(SupervisorType) ->
-    Link = supervisor:start_link({local, main_sup}, ?MODULE, SupervisorType),
+    start_link(SupervisorType, []).
+
+
+start_link(SupervisorType, Options) ->
+    Link = supervisor:start_link({local, main_sup}, ?MODULE, {SupervisorType, Options}),
     case Link of
         {ok, _Pid} ->
             ok;
@@ -57,18 +61,18 @@ start_link(SupervisorType) ->
     scan_environment(),
     Link.
 
--spec init(supervisor_type()) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
-                                        PeriodInSeconds::pos_integer()},
-                                       [ProcessDescr::any()]}}.
-init(SupervisorType) ->
+-spec init({supervisor_type(), list(tuple())}) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                                                         PeriodInSeconds::pos_integer()},
+                                                        [ProcessDescr::any()]}}.
+init({SupervisorType, Options}) ->
     randoms:start(),
     InstanceId = string:concat("scalaris_", randoms:getRandomId()),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
-    {ok, {{one_for_one, 10, 1}, my_process_list(InstanceId, SupervisorType)}}.
+    {ok, {{one_for_one, 10, 1}, my_process_list(InstanceId, SupervisorType, Options)}}.
 
--spec my_process_list/2 :: (instanceid(), supervisor_type()) -> [any()].
-my_process_list(InstanceId, SupervisorType) ->
+-spec my_process_list/3 :: (instanceid(), supervisor_type(), list(tuple())) -> [any()].
+my_process_list(InstanceId, SupervisorType, Options) ->
     AdminServer =
         util:sup_worker_desc(admin_server, admin, start_link),
     BenchServer =
@@ -79,8 +83,8 @@ my_process_list(InstanceId, SupervisorType) ->
         util:sup_worker_desc(config, config, start_link,
                              [[preconfig:config(), preconfig:local_config()]]),
     DHTNodeOptions = case SupervisorType of
-                         boot -> [first];
-                         node -> []
+                         boot -> [first | Options];
+                         node -> Options
                      end,
     DHTNode =
         util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
