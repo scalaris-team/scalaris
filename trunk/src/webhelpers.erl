@@ -462,14 +462,17 @@ renderIndexedRing({failed}, _Ring) ->
 
 %%%-----------------------------Misc----------------------------------
 
+dead_node() ->
+    "dead node?".
+
 -spec get_indexed_pred_id(Node::node:node_type(),
                           Ring::[{ok, node_details:node_details()} | {failed}],
                           MyIndex::non_neg_integer() | string(),
                           NIndex::non_neg_integer()) -> integer() | string().
 get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
     NodeIndex = get_indexed_id(Node, Ring),
-    case NodeIndex =:= "none" orelse MyIndex =:= "none" of
-        true -> "none";
+    case NodeIndex =:= dead_node() orelse MyIndex =:= dead_node() of
+        true -> dead_node();
         _    -> ((NodeIndex - MyIndex + NIndex) rem NIndex) - NIndex
     end.
 
@@ -479,8 +482,8 @@ get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
                           NIndex::non_neg_integer()) -> integer() | string().
 get_indexed_succ_id(Node, Ring, MyIndex, NIndex) ->
     NodeIndex = get_indexed_id(Node, Ring),
-    case NodeIndex =:= "none" orelse MyIndex =:= "none" of
-        true -> "none";
+    case NodeIndex =:= dead_node() orelse MyIndex =:= dead_node() of
+        true -> dead_node();
         _    -> (NodeIndex - MyIndex + NIndex) rem NIndex
     end.
 
@@ -499,7 +502,7 @@ get_indexed_id(Node, [{ok, Details} | Ring], Index) ->
         _    -> get_indexed_id(Node, Ring, Index + 1)
     end;
 get_indexed_id(_Node, [], _Index) ->
-    "none".
+    dead_node().
 
 -spec get_flag(Hostname::node_details:hostname()) -> {img, [{src, URL::string()} | {width, pos_integer()} | {height, pos_integer()}], []}.
 get_flag(Hostname) ->
