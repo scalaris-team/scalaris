@@ -29,6 +29,8 @@
          set_rt/2,
          set_db/2,
          details/1, details/2,
+         add_nc_subscr/2,
+         update_node/2,
          %%transactions
          set_trans_log/2,
          set_tx_tp_db/2]).
@@ -40,13 +42,15 @@
 -type join_time() :: {MegaSecs::non_neg_integer(), Secs::non_neg_integer(), MicroSecs::non_neg_integer()}.
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {rt :: ?RT:external_rt(),
+-record(state, {rt         :: ?RT:external_rt(),
                 neighbors  :: nodelist:neighborhood(),
                 join_time  :: join_time(),
                 trans_log  :: #translog{},
                 db         :: ?DB:db(),
                 tx_tp_db   :: any(),
-                proposer   :: pid()}).
+                proposer   :: pid(),
+                nc_subscr  :: [comm:erl_local_pid()] % subscribers to node change events, i.e. node ID changes
+               }).
 -opaque state() :: #state{}.
 
 -spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood()) -> state().
@@ -93,29 +97,32 @@ new(RT, Neighbors, DB) ->
 %%        <li>tx_tp_db = transaction participant DB,</li>
 %%        <li>proposer = paxos proposer PID,</li>
 %%        <li>load = the load of the own node (provided for convenience).</li>
+%%        <li>nc_subscr = list of (local) processes that subscribed to node change events, i.e. node ID changes.</li>
 %%      </ul>
 -spec get(state(), rt) -> ?RT:external_rt();
-          (state(), rt_size) -> non_neg_integer();
-          (state(), succlist) -> nodelist:non_empty_snodelist();
-          (state(), succ) -> node:node_type();
-          (state(), succ_id) -> ?RT:key();
-          (state(), succ_pid) -> comm:mypid();
-          (state(), predlist) -> nodelist:non_empty_snodelist();
-          (state(), pred) -> node:node_type();
-          (state(), pred_id) -> ?RT:key();
-          (state(), pred_pid) -> comm:mypid();
-          (state(), node) -> node:node_type();
-          (state(), node_id) -> ?RT:key();
-          (state(), my_range) -> intervals:interval();
-          (state(), succ_range) -> intervals:interval();
-          (state(), join_time) -> join_time();
-          (state(), trans_log) -> #translog{};
-          (state(), db) -> ?DB:db();
-          (state(), tx_tp_db) -> any();
-          (state(), proposer) -> pid();
-          (state(), load) -> integer().
+         (state(), rt_size) -> non_neg_integer();
+         (state(), succlist) -> nodelist:non_empty_snodelist();
+         (state(), succ) -> node:node_type();
+         (state(), succ_id) -> ?RT:key();
+         (state(), succ_pid) -> comm:mypid();
+         (state(), predlist) -> nodelist:non_empty_snodelist();
+         (state(), pred) -> node:node_type();
+         (state(), pred_id) -> ?RT:key();
+         (state(), pred_pid) -> comm:mypid();
+         (state(), node) -> node:node_type();
+         (state(), node_id) -> ?RT:key();
+         (state(), my_range) -> intervals:interval();
+         (state(), succ_range) -> intervals:interval();
+         (state(), join_time) -> join_time();
+         (state(), trans_log) -> #translog{};
+         (state(), db) -> ?DB:db();
+         (state(), tx_tp_db) -> any();
+         (state(), proposer) -> pid();
+         (state(), load) -> integer();
+         (state(), nc_subscr) -> [comm:erl_local_pid()].
 get(#state{rt=RT, neighbors=Neighbors, join_time=JoinTime,
-           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer}, Key) ->
+           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
+           nc_subscr=NCSubscr}, Key) ->
     case Key of
         rt         -> RT;
         rt_size    -> ?RT:get_size(RT);
@@ -138,27 +145,35 @@ get(#state{rt=RT, neighbors=Neighbors, join_time=JoinTime,
         db         -> DB;
         tx_tp_db   -> TxTpDb;
         proposer   -> Proposer;
-        load       -> ?DB:get_load(DB)
+        load       -> ?DB:get_load(DB);
+        nc_subscr  -> NCSubscr
     end.
 
 %% @doc Sets the neighborhood of the current node.
--spec set_neighbors(State::state(), Neighbors::nodelist:neighborhood()) -> state().
-set_neighbors(State, Neighbors) ->
-    State#state{neighbors = Neighbors}.
+-spec set_neighbors(State::state(), NewNeighbors::nodelist:neighborhood()) -> state().
+set_neighbors(State, Neighbors) -> State#state{neighbors = Neighbors}.
 
--spec set_tx_tp_db(state(), any()) -> state().
+-spec set_tx_tp_db(State::state(), NewTxTpDb::any()) -> state().
 set_tx_tp_db(State, DB) -> State#state{tx_tp_db = DB}.
 
--spec set_db(state(), ?DB:db()) -> state().
-set_db(State, DB) -> State#state{db=DB}.
+-spec set_db(State::state(), NewDB::?DB:db()) -> state().
+set_db(State, DB) -> State#state{db = DB}.
 
--spec set_rt(state(), ?RT:external_rt()) -> state().
-set_rt(State, RT) -> State#state{rt=RT}.
+-spec set_rt(State::state(), NewRT::?RT:external_rt()) -> state().
+set_rt(State, RT) -> State#state{rt = RT}.
 
 %% @doc Sets the transaction log.
--spec set_trans_log(state(), #translog{}) -> state().
+-spec set_trans_log(State::state(), NewLog::#translog{}) -> state().
 set_trans_log(State, NewLog) ->
-    State#state{trans_log=NewLog}.
+    State#state{trans_log = NewLog}.
+
+-spec add_nc_subscr(State::state(), Pid::comm:erl_local_pid()) -> state().
+add_nc_subscr(State = #state{nc_subscr=OldNCSubscr}, Pid) ->
+    State#state{nc_subscr = [Pid | OldNCSubscr]}.
+
+-spec update_node(state(), node:node_type()) -> state().
+update_node(State = #state{neighbors=Neighbors}, Node) ->
+    State#state{neighbors = nodelist:update_node(Neighbors, Node)}.
 
 %%% util
 -spec dump(state()) -> ok.

@@ -47,6 +47,7 @@
     {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
+    {update_id, NewId::?RT:key()} |
     {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -166,6 +167,21 @@ on({succ_left, OldSucc, SuccsSucc}, {Neighborhood, TriggerState}) ->
     rm_beh:update_dht_node(Neighborhood, NewNbh2),
     rm_beh:update_failuredetector(Neighborhood, NewNbh2),
     {NewNbh2, TriggerState};
+
+on({update_id, NewId}, {Neighborhood, TriggerState} = State) ->
+    try begin
+            NewMe = node:update_id(nodelist:node(Neighborhood), NewId),
+            NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
+            rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
+            {NewNeighborhood, TriggerState}
+        end
+    catch
+        throw:_ ->
+            log:log(error, "[ RM ] can't update dht node ~w with id ~w (pred=~w, succ=~w)",
+                    [nodelist:node(Neighborhood), NewId,
+                     nodelist:pred(Neighborhood), nodelist:succ(Neighborhood)]),
+            State
+    end;
 
 on({'$gen_cast', {debug_info, Requestor}}, {Neighborhood, _TriggerState} = State)  ->
     comm:send_local(Requestor,

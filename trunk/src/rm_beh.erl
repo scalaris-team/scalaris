@@ -20,14 +20,17 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 -export([behaviour_info/1,
          notify_new_pred/2, notify_new_succ/2,
-         update_dht_node/1, update_dht_node/2, update_failuredetector/2]).
+         update_dht_node/1, update_dht_node/2, update_failuredetector/2,
+         update_id/1]).
 
 behaviour_info(callbacks) ->
     [
      {start_link, 1},
-     {leave, 0}, % this function does not have to be exported -> catch RM process being killed and execute it then, instead of actively calling it
+     {leave, 0},
      {check_config, 0}
     ];
 
@@ -42,13 +45,15 @@ behaviour_info(_Other) ->
 %%      it of a new successor.
 -spec notify_new_succ(Node::comm:mypid(), NewSucc::node:node_type()) -> ok.
 notify_new_succ(Node, NewSucc) ->
-    comm:send_to_group_member(Node, ring_maintenance, {notify_new_succ, NewSucc}).
+    comm:send_to_group_member(Node, ring_maintenance,
+                              {notify_new_succ, NewSucc}).
 
 %% @doc Sends a message to the remote node's ring_maintenance process notifying
 %%      it of a new predecessor.
 -spec notify_new_pred(Node::comm:mypid(), NewPred::node:node_type()) -> ok.
 notify_new_pred(Node, NewPred) ->
-    comm:send_to_group_member(Node, ring_maintenance, {notify_new_pred, NewPred}).
+    comm:send_to_group_member(Node, ring_maintenance,
+                              {notify_new_pred, NewPred}).
 
 % @doc Check if change of failuredetector is necessary.
 -spec update_failuredetector(OldNeighborhood::nodelist:neighborhood(),
@@ -77,5 +82,14 @@ update_dht_node(OldNeighborhood, NewNeighborhood) ->
 %%      (to be used by the rm_*.erl modules).
 -spec update_dht_node(Neighbors::nodelist:neighborhood()) -> ok.
 update_dht_node(Neighbors) ->
-    Pid = process_dictionary:get_group_member(dht_node),
-    comm:send_local(Pid, {rm_update_neighbors, Neighbors}).
+    comm:send_local(process_dictionary:get_group_member(dht_node),
+                    {rm_update_neighbors, Neighbors}).
+
+%% @doc Updates a dht node's id and sends the ring maintenance a message about
+%%      the change.
+%%      Beware: the only allowed node id changes are between the node's
+%%      predecessor and successor!
+-spec update_id(NewId::?RT:key()) -> ok.
+update_id(NewId) ->
+    comm:send_local(process_dictionary:get_group_member(ring_maintenance),
+                    {update_id, NewId}).

@@ -22,7 +22,8 @@
 
 -export([id/1, id_version/1, pidX/1,
          new/3, null/0, is_valid/1,
-         equals/2, is_newer/2, newer/2, is_me/1]).
+         equals/2, is_newer/2, newer/2, is_me/1,
+         update_id/2]).
 
 -include("scalaris.hrl").
 
@@ -35,35 +36,28 @@
 
 %% @doc Creates a new node.
 -spec new(Pid::comm:mypid(), Id::?RT:key(), IdVersion::non_neg_integer()) -> node_type().
-new(Pid, Id, IdVersion) ->
-    #node{pid = Pid, id = Id, id_version = IdVersion}.
+new(Pid, Id, IdVersion) -> #node{pid=Pid, id=Id, id_version=IdVersion}.
 
 %% @doc Creates an invalid node.
-null() ->
-    null.
+null() -> null.
 
 %% @doc Gets the pid of the node.
 -spec pidX(node_type()) -> comm:mypid().
-pidX(#node{pid=PID}) ->
-    PID.
+pidX(#node{pid=PID}) -> PID.
 
 %% @doc Gets the node's ID.
 -spec id(node_type()) -> ?RT:key().
-id(#node{id=Id}) ->
-    Id.
+id(#node{id=Id}) -> Id.
 
 %% @doc Gets the version of the node's ID.
 -spec id_version(node_type()) -> non_neg_integer().
-id_version(#node{id_version=IdVersion}) ->
-    IdVersion.
+id_version(#node{id_version=IdVersion}) -> IdVersion.
 
 %% @doc Checks whether the given parameter is a valid node.
 -spec is_valid(node_type()) -> true;
                (null | unknown) -> false.
-is_valid(X) when is_record(X, node) ->
-    true;
-is_valid(_) ->
-    false.
+is_valid(X) when is_record(X, node) -> true;
+is_valid(_) -> false.
 
 %% @doc Checks whether two nodes are the same, i.e. contain references to the.
 %%      same process.
@@ -113,3 +107,8 @@ newer(Node1, Node2) ->
         true -> Node1;
         _    -> Node2
     end.
+
+%% @doc Updates the node's id and increases the id's version accordingly. 
+-spec update_id(Node::node_type(), NewId::?RT:key()) -> node_type().
+update_id(Node = #node{id_version=IdVersion}, NewId) ->
+    Node#node{id=NewId, id_version=IdVersion + 1}.

@@ -36,6 +36,8 @@
          lfilter_min_length/3, filter_min_length/4,
          merge/4, add_node/4, add_nodes/4,
          
+         update_node/2,
+         
          % converters:
          to_list/1,
          
@@ -164,6 +166,16 @@ node({_Preds, Node, _Succs}) ->
 -spec nodeid(neighborhood()) -> ?RT:key().
 nodeid({_Preds, Node, _Succs}) ->
     node:id(Node).
+
+%% @doc Updates the base node of the neighborhood if its ID is still between
+%%      the ID of the predecessor and successor. Otherwise throws an exception.
+-spec update_node(neighborhood(), NewBaseNode::node:node_type()) -> neighborhood().
+update_node({[Pred, _] = Preds, _Node, [Succ | _] = Succs}, NewBaseNode) ->
+    case intervals:in(node:id(NewBaseNode),
+                      intervals:new('(', node:id(Pred), node:id(Succ), ')')) of
+        true -> new(Preds, NewBaseNode, Succs);
+        _ -> throw('cannot update base node - not within (id(Pred), id(Succ))')
+    end.
 
 %% @doc Returns the neighborhood's predecessor list.
 -spec preds(neighborhood()) -> non_empty_snodelist().
