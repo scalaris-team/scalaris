@@ -666,7 +666,7 @@ calc_initial_avg_kr(Pred, Me) ->
         end
     catch % keys might not support subtraction or ?RT:n() might throw
         throw:not_supported -> unknown;
-        error:{badarith, _} -> unknown
+        exit:{badarith, _} -> unknown
     end.
 
 %% @doc Checks whether config parameters of the gossip process exist and are
