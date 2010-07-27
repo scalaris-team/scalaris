@@ -25,9 +25,8 @@
 
 -behaviour(gen_component).
 
--export([start_link/1, start_link/2]).
-
--export([on/2, init/1]).
+-export([start_link/1, start_link/2, on/2, init/1,
+         register_for_node_change/1]).
 
 % state of the dht_node loop
 -type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
@@ -40,7 +39,6 @@
 -type(database_message() ::
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
-      {set_key, Source_PID::comm:mypid(), Key::?RT:key(), Value::?DB:value(), Versionnr::?DB:value()} |
       {delete_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {delete_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
@@ -49,12 +47,17 @@
       {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
       {lookup_fin, Hops::pos_integer(), Msg::comm:message()}).
 
+-type(rm_message() ::
+      {init_rm, Pid::comm:erl_local_pid()} |
+      {rm_update_neighbors, Neighbors::nodelist:neighborhood()} |
+      {reg_for_nc, Pid::comm:erl_local_pid()}).
 
 % accepted messages of dht_node processes
 -type(message() ::
       bulkowner_message() |
       database_message() |
       lookup_message() |
+      rm_message() |
       dht_node_join:join_message()).
 
 %% @doc message handler
@@ -95,12 +98,25 @@ on({init_rm, Pid}, State) ->
 %% {rm_update_neighbors, Neighbors::nodelist:neighborhood()}
 on({rm_update_neighbors, Neighbors}, State) ->
     Pred = nodelist:pred(Neighbors), Succ = nodelist:succ(Neighbors),
+    Node = nodelist:node(Neighbors),
     % for now use an "empty" external routing table state, rt_loop will change
     % the routing table and eventually send us an updated table
-    NewRT = ?RT:empty_ext(nodelist:succ(Neighbors)),
-    rt_loop:update_state(nodelist:nodeid(Neighbors), Pred, Succ),
+    NewRT = ?RT:empty_ext(Succ),
+    rt_loop:update_state(node:id(Node), Pred, Succ),
+
+    case node:is_newer(Node, dht_node_state:get(State, node)) of
+        true ->
+            [comm:send_local(Pid, {node_update, Node}) || Pid <- dht_node_state:get(State, nc_subscr)],
+            idholder:set_id(node:id(Node), node:id_version(Node));
+        _ -> ok
+    end,
+
     State_NewNeighbors = dht_node_state:set_neighbors(State, Neighbors),
     dht_node_state:set_rt(State_NewNeighbors, NewRT);
+
+%% add Pid to the node change subscriber list
+on({reg_for_nc, Pid}, State) ->
+    dht_node_state:add_nc_subscr(State, Pid);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance
@@ -394,7 +410,7 @@ start_link(InstanceId, Options) ->
                              [{register, InstanceId, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
 
-% @doc find existing nodes and initialize the comm_layer
+%% @doc Find existing nodes and initialize the comm_layer.
 -spec trigger_known_nodes() -> ok.
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
@@ -409,7 +425,14 @@ trigger_known_nodes() ->
             trigger_known_nodes()
     end.
 
-% @doc try to check whether common-test is running
+%% @doc Registers the given process to receive {node_update, Node} messages if
+%%      the dht_node changes its id.
+-spec register_for_node_change(Pid::comm:erl_local_pid()) -> ok.
+register_for_node_change(Pid) ->
+    comm:send_local(process_dictionary:get_group_member(dht_node),
+                    {reg_for_nc, Pid}).
+
+%% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
 is_unittest() ->
     code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso

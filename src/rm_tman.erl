@@ -50,14 +50,15 @@
     {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()} |
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
-    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}} |
     {check_ring, Token::non_neg_integer(), Master::node:node_type()} |
     {init_check_ring, Token::non_neg_integer()} |
     {notify_new_pred, Pred::node:node_type()} |
     {notify_new_succ, Succ::node:node_type()} |
     {leave, SourcePid::comm:erl_local_pid()} |
     {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
-    {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()}).
+    {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
+    {update_id, NewId::?RT:key()} |
+    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -294,6 +295,22 @@ on({succ_left, OldSucc, SuccsSucc},
     rm_beh:update_failuredetector(Neighborhood, NewNbh2),
     NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
     {NewNbh2, 0, stabilizationInterval_min(), NewTriggerState, NewCache, Churn};
+
+on({update_id, NewId},
+   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
+    try begin
+            NewMe = node:update_id(nodelist:node(Neighborhood), NewId),
+            NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
+            rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
+            {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}
+        end
+    catch
+        throw:_ ->
+            log:log(error, "[ RM ] can't update dht node ~w with id ~w (pred=~w, succ=~w)",
+                    [nodelist:node(Neighborhood), NewId,
+                     nodelist:pred(Neighborhood), nodelist:succ(Neighborhood)]),
+            State
+    end;
 
 on({'$gen_cast', {debug_info, Requestor}},
    {Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
