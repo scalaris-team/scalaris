@@ -83,7 +83,7 @@ on({die}, _State) ->
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Ring Maintenance (see rm_beh.erl) 
+% Ring Maintenance (see rm_beh.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% {init_rm, pid()}
 on({init_rm, Pid}, State) ->
@@ -103,7 +103,7 @@ on({rm_update_neighbors, Neighbors}, State) ->
     dht_node_state:set_rt(State_NewNeighbors, NewRT);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Finger Maintenance 
+% Finger Maintenance
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({rt_update, RoutingTable}, State) ->
     dht_node_state:set_rt(State, RoutingTable);
