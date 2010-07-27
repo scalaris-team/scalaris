@@ -33,9 +33,11 @@
 
 %% userdevguide-begin admin:add_nodes
 % @doc add new Scalaris nodes on the local node
+-spec add_node_at_id(?RT:key()) -> ok.
 add_node_at_id(Id) ->
     add_node([{{idholder, id}, Id}]).
 
+-spec add_node(list(tuple())) -> ok.
 add_node(Options) ->
     Desc = util:sup_supervisor_desc(randoms:getRandomId(),
                                     sup_dht_node, start_link, [Options]),
@@ -86,6 +88,7 @@ check_ring() ->
         _ -> ok
     end.
 
+-spec check_ring_deep() -> {error, list(), list()} | ok.
 check_ring_deep() ->
     case check_ring() of
         ok ->

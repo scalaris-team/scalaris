@@ -56,7 +56,6 @@ get_id() ->
 %%      and returns its pid for use by a supervisor.
 -spec start_link(instanceid(), list(tuple())) -> {ok, pid()}.
 start_link(InstanceId, Options) ->
-    io:format("~w~n", [Options]),
     gen_component:start_link(?MODULE, Options, [{register, InstanceId, idholder}]).
 
 %% @doc Resets the key to a random key and a counter of 0.

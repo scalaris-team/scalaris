@@ -34,6 +34,10 @@
                                              shutdown | term()}.
 start_link(Options) ->
     supervisor:start_link(?MODULE, [Options]).
+
+-spec start_link() -> {ok, Pid::pid()} | ignore |
+                          {error, Error::{already_started, Pid::pid()} |
+                           shutdown | term()}.
 start_link() ->
     supervisor:start_link(?MODULE, [[]]).
 
