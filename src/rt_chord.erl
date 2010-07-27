@@ -161,16 +161,10 @@ stabilize(Id, Succ, RT, Index, Node) ->
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
 -spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(),
              OldRT::rt(), OldId::key(), OldSucc::node:node_type())
-        -> rt().
-update(Id, _Pred, Succ, OldRT, OldId, _OldSucc) ->
-    case Id == OldId of
-        true -> % Succ or Pred changed
-            % OldRT is still valid, but it could be inefficient
-            OldRT;
-        false -> % Id changed
-            % to be on the safe side ...
-            empty(Succ)
-    end.
+        -> {trigger_rebuild, rt()}.
+update(_Id, _Pred, Succ, _OldRT, _OldId, _OldSucc) ->
+    % to be on the safe side ...
+    {trigger_rebuild, empty(Succ)}.
 %% userdevguide-end rt_chord:update
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
