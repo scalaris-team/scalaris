@@ -89,8 +89,9 @@ init_stabilize(_Id, Succ, _RT) -> empty(Succ).
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
 -spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(),
              OldRT::rt(), OldId::key(), OldSucc::node:node_type())
-        -> rt().
-update(_Id, _Pred, Succ, _OldRT, _OldId, _OldSucc) -> Succ.
+        -> {ok, rt()}.
+update(_Id, _Pred, Succ, _OldRT, _OldId, _OldSucc) ->
+    {ok, Succ}.
 %% userdevguide-end rt_simple:update
 
 %% userdevguide-begin rt_simple:filter_dead_node
