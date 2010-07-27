@@ -105,8 +105,9 @@ on({init_rt, NewId, NewPred, NewSucc}, {_, _, _, OldRT, TriggerState}) ->
     new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
 
 % update routing table with changed ID, pred and/or succ
-on({update_rt, NewId, NewPred, NewSucc}, {_, _, _, OldRT, TriggerState}) ->
-    NewRT = ?RT:update(NewId, NewPred, NewSucc, OldRT),
+on({update_rt, NewId, NewPred, NewSucc}, {OldId, _, OldSucc, OldRT, TriggerState}) ->
+    NewRT = ?RT:update(NewId, NewPred, NewSucc,
+                       OldRT, OldId, OldSucc),
     ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
     new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
 

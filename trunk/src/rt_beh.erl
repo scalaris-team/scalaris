@@ -41,7 +41,7 @@ behaviour_info(callbacks) ->
      % trigger for new stabilization round
      {init_stabilize, 3},
      % adapt RT to changed node ID, pred and/or succ
-     {update, 4},
+     {update, 6},
      % dead nodes filtering
      {filter_dead_node, 2},
      % statistics

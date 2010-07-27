@@ -26,7 +26,7 @@
 % routingtable behaviour
 -export([empty/1, empty_ext/1,
          hash_key/1, get_random_node_id/0, next_hop/2,
-         init_stabilize/3, update/4,
+         init_stabilize/3, update/6,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          n/0, dump/1, to_list/1, export_rt_to_dht_node/4,
          handle_custom_message/2,
@@ -146,7 +146,7 @@ stabilize(Id, Succ, RT, Index, Node) ->
         andalso (node:id(Succ) =/= node:id(Node))   % reached succ?
         andalso (not intervals:in(                  % there should be nothing shorter
                    node:id(Node),                   %   than succ
-                   intervals:mk_from_node_ids(Id, node:id(Succ)))) of 
+                   intervals:mk_from_node_ids(Id, node:id(Succ)))) of
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
@@ -159,13 +159,20 @@ stabilize(Id, Succ, RT, Index, Node) ->
 
 %% userdevguide-begin rt_chord:update
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
--spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(), RT::rt())
+-spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(),
+             OldRT::rt(), OldId::key(), OldSucc::node:node_type())
         -> rt().
-update(Id, Pred, Succ, RT) ->
-    %TODO: implement update
-    RT.
+update(Id, _Pred, Succ, OldRT, OldId, _OldSucc) ->
+    case Id == OldId of
+        true -> % Succ or Pred changed
+            % OldRT is still valid, but it could be inefficient
+            OldRT;
+        false -> % Id changed
+            % to be on the safe side ...
+            empty(Succ)
+    end.
 %% userdevguide-end rt_chord:update
-    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Finger calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
