@@ -41,7 +41,7 @@
 
 -include("scalaris.hrl").
 
--export([init/2, init/3, init/4, init/5, first/1, next/2, next/1]).
+-export([init/2, init/3, init/4, init/5, first/1, next/2, next/1, stop/1]).
 
 -ifdef(with_export_type_support).
 -export_type([interval/0, interval_fun/0, state/0]).
@@ -49,8 +49,7 @@
 
 -type interval() :: max_interval | base_interval | min_interval | now_and_min_interval.
 -type interval_fun() :: fun(() -> pos_integer()).
--type message_tag() :: comm:message_tag().
--type state() :: {module(), term()}.
+-opaque state() :: {TriggerModule::module(), TriggerState::term()}.
 
 %% @doc Initializes the given trigger with the given base interval function
 %%      (also used for min and max interval). If a Module is given instead,
@@ -69,7 +68,7 @@ init(Trigger, Module) ->
 %% @doc Initializes the given trigger with the given base interval function
 %%      (also used for min and max interval) and the given message tag used for
 %%      the trigger message.
--spec init(Trigger::module(), BaseIntervalFun::interval_fun(), message_tag()) -> state().
+-spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MsgTag::comm:message_tag()) -> state().
 init(Trigger, BaseIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
     {Trigger, Trigger:init(BaseIntervalFun, BaseIntervalFun, BaseIntervalFun, MsgTag)}.
 
@@ -83,7 +82,7 @@ init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun)
 
 %% @doc Initializes the trigger with the given interval functions and the given
 %%      message tag.
--spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun(), message_tag()) -> state().
+-spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun(), MsgTag::comm:message_tag()) -> state().
 init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)
   when is_function(BaseIntervalFun, 0) and
            is_function(MinIntervalFun, 0) and
@@ -107,3 +106,9 @@ next(State) ->
 -spec next(state(), IntervalTag::interval()) -> state().
 next({Trigger, TriggerState}, IntervalTag) ->
     {Trigger, Trigger:next(TriggerState, IntervalTag)}.
+
+%% @doc Stops the trigger's current timer. This will effectively stop the
+%%      trigger until next is called again.
+-spec stop(state()) -> state().
+stop({Trigger, TriggerState}) ->
+    {Trigger, Trigger:stop(TriggerState)}.
