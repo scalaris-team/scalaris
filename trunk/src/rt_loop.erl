@@ -105,13 +105,15 @@ on({init_rt, NewId, NewPred, NewSucc}, {_, _, _, OldRT, TriggerState}) ->
     new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
 
 % update routing table with changed ID, pred and/or succ
-on({update_rt, NewId, NewPred, NewSucc}, {OldId, _, OldSucc, OldRT, TriggerState}) ->
+on({update_rt, NewId, NewPred, NewSucc}, {OldId, _OldPred, OldSucc, OldRT, TriggerState}) ->
     case ?RT:update(NewId, NewPred, NewSucc,
                     OldRT, OldId, OldSucc) of
         {trigger_rebuild, NewRT} ->
-            % @todo: add trigger:abort(), trigger:next()
+            T1 = trigger:stop(TriggerState),
             % trigger immediate rebuild
-            on({trigger}, {NewId, NewPred, NewSucc, NewRT, TriggerState});
+            T2 = trigger:first(T1),
+            T3 = trigger:next(T2),
+            new_state(NewId, NewPred, NewSucc, NewRT, T3);
         {ok, NewRT} ->
             ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
             new_state(NewId, NewPred, NewSucc, NewRT, TriggerState)
