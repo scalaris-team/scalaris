@@ -37,73 +37,72 @@
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).
 
-%% tx_item_state: {TxItemId,
-%%                 tx_item_state,
-%%                 TxId,
-%%                 TLogEntry,
-%%                 Majority,
-%%                 decided?,
-%%                 numprepared,
-%%                 numabort,
-%%                 [{PaxosID, RTLogEntry, TP}]
-%%               Status (new / uninitialized / ok)
-%%               HoldBackQueue
+%% tx_item_state = {
+%%    1 TxItemId,                   % id of the item
+%%    2 tx_item_state,              % data type tag for debugging
+%%    3 TxId,                       % part of transaction with id TxId
+%%    4 TLogEntry,                  % corresponding transaction log entry
+%%    5 Majority_for_prepared,      % required prepare votes to decide prepared
+%%    6 Majority_for_abort,         % required abort votes to decide abort
+%%    7 Decided?,                   % current decision status
+%%    8 Numprepared,                % number of received prepare votes
+%%    9 Numabort,                   % number of received abort votes
+%%   10 [{PaxosID, RTLogEntry, TP}] % involved Paxos Consensus IDs
+%%   11 Status (new / uninitialized / ok) % item status
+%%   12 HoldBackQueue               % hold back queue when not initialized
+%% }
 
 %% @TODO maybe the following entries are also necessary?:
-%%               tx_tm_helper_behaviour to use? needed? for what?,
-%%               timeout before the first RTM takes over
-%%               [{TLogEntry, [{PaxosID, state}]}]
-%%               Majority of RTMs,
-%%               NumIds,
-%%               NumPrepared,
-%%               NumAbort,
-%%               }
+%%      tx_tm_helper_behaviour to use? needed? for what?,
+%%      timeout before the first RTM takes over
 
 new(ItemId) ->
+    ReplDeg = config:read(replication_factor),
     {ItemId, tx_item_state, undefined_tx_id, empty_tlog_entry,
-     config:read(quorum_factor), false, 0, 0, _no_paxIds = [],
-     uninitialized, _HoldBack = []}.
+     majority_for_prepared(ReplDeg), majority_for_abort(ReplDeg),
+     false, 0, 0, _no_paxIds = [], uninitialized, _HoldBack = []}.
 new(ItemId, TxId, TLogEntry) ->
     %% expand TransLogEntry to replicated translog entries
     RTLogEntries = apply(element(1, TLogEntry), validate_prefilter, [TLogEntry]),
     PaxosIds = [ {paxos_id, util:get_global_uid()} || _ <- RTLogEntries ],
     TPs = [ unknown || _ <- PaxosIds ],
     PaxIDsRTLogsTPs = lists:zip3(PaxosIds, RTLogEntries, TPs),
-    {ItemId, tx_item_state, TxId, TLogEntry, config:read(quorum_factor),
+    ReplDeg = config:read(replication_factor),
+    {ItemId, tx_item_state, TxId, TLogEntry,
+     majority_for_prepared(ReplDeg), majority_for_abort(ReplDeg),
      false, 0, 0, PaxIDsRTLogsTPs,
      uninitialized, _HoldBack = []}.
-
-%%    _Status = new, _HoldBackQueue = []}.
 
 get_itemid(State) ->         element(1, State).
 set_itemid(State, Val) ->    setelement(1, State, Val).
 get_txid(State) ->           element(3, State).
-get_majority(State) ->       element(5, State).
-get_decided(State) ->        element(6, State).
-set_decided(State, Val) ->   setelement(6, State, Val).
-get_numprepared(State) ->    element(7,State).
-inc_numprepared(State) ->    setelement(7, State, element(7,State) + 1).
-get_numabort(State) ->       element(8, State).
-inc_numabort(State) ->       setelement(8, State, element(8,State) + 1).
+get_maj_for_prepared(State) -> element(5, State).
+get_maj_for_abort(State) ->  element(6, State).
+get_decided(State) ->        element(7, State).
+set_decided(State, Val) ->   setelement(7, State, Val).
+get_numprepared(State) ->    element(8, State).
+inc_numprepared(State) ->    setelement(8, State, element(8,State) + 1).
+get_numabort(State) ->       element(9, State).
+inc_numabort(State) ->       setelement(9, State, element(9,State) + 1).
 
-get_paxosids_rtlogs_tps(State) -> element(9, State).
-set_paxosids_rtlogs_tps(State, NewTPList) -> setelement(9, State, NewTPList).
+get_paxosids_rtlogs_tps(State) -> element(10, State).
+set_paxosids_rtlogs_tps(State, NewTPList) -> setelement(10, State, NewTPList).
 
 %% new / uninitialized / ok.
-get_status(State) -> element(10, State).
-set_status(State, Status) -> setelement(10, State, Status).
-hold_back(Msg, State) -> setelement(11, State, [Msg | element(11, State)]).
-get_hold_back(State) -> element(11, State).
-set_hold_back(State, Queue) -> setelement(11, State, Queue).
+get_status(State) ->         element(11, State).
+set_status(State, Status) -> setelement(11, State, Status).
+hold_back(Msg, State) ->     setelement(12, State, [Msg | element(12, State)]).
+get_hold_back(State) ->      element(12, State).
+set_hold_back(State, Queue) -> setelement(12, State, Queue).
 
 newly_decided(State) ->
     case get_decided(State) of
         false ->
-            NumPrepared = get_numprepared(State),
-            NumAbort = get_numabort(State),
-            case get_majority(State) of
-                NumPrepared -> prepared;
-                NumAbort -> abort;
+            Prepared = get_numprepared(State) =:= get_maj_for_prepared(State),
+            Abort =    get_numabort(State) =:= get_maj_for_abort(State),
+            case {Prepared, Abort} of
+                {true, false} -> prepared;
+                {false, true} -> abort;
                 _ -> false
             end;
         _Any -> false
@@ -114,3 +113,6 @@ set_tp_for_paxosid(State, TP, PaxosId) ->
     Entry = lists:keyfind(PaxosId, 1, TPList),
     NewTPList = lists:keyreplace(PaxosId, 1, TPList, setelement(3, Entry, TP)),
     set_paxosids_rtlogs_tps(State, NewTPList).
+
+majority_for_prepared(ReplDeg) -> ReplDeg div 2 + 1.
+majority_for_abort(ReplDeg) -> ReplDeg div 2 + ReplDeg rem 2.
