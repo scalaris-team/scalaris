@@ -43,7 +43,7 @@
 
 % accepted messages
 -type(message() ::
-    {init, Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
+    {init_rm, Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
     {trigger} |
     {cy_cache, Cache::[node:node_type()]} |
     {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
@@ -85,7 +85,7 @@ init(Trigger) ->
 
 % @doc message handler
 -spec on(message(), state()) -> state().
-on({init, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
+on({init_rm, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
     Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
     NewTriggerState = trigger:first(TriggerState),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
