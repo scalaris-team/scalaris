@@ -22,7 +22,7 @@
 
 -export([id/1, id_version/1, pidX/1,
          new/3, null/0, is_valid/1,
-         equals/2, newer/2, is_me/1]).
+         equals/2, is_newer/2, newer/2, is_me/1]).
 
 -include("scalaris.hrl").
 
@@ -91,15 +91,25 @@ equals(Node1, Pid2) when is_record(Node1, node) ->
 is_me(Node) ->
     equals(Node, process_dictionary:get_group_member(dht_node)).
 
-%% @doc Determines the newer instance of two equal node representations.
--spec newer(node_type(), node_type()) -> node_type().
-newer(Node1 = #node{pid=PID, id=Id1, id_version=IdVersion1}, Node2 = #node{pid=PID, id=Id2, id_version=IdVersion2}) ->
+%% @doc Determines whether Node1 is a newer instance of Node2.
+%%      Note: Both nodes need to share the same PID, otherwise an exception of
+%%      type 'throw' is thrown!
+-spec is_newer(Node1::node_type(), Node2::node_type()) -> boolean().
+is_newer(#node{pid=PID, id=Id1, id_version=IdVersion1}, #node{pid=PID, id=Id2, id_version=IdVersion2}) ->
     if
-        (IdVersion1 > IdVersion2) ->
-            Node1;
-        (IdVersion1 =:= IdVersion2) andalso (Id1 =:= Id2) ->
-            Node1;
+        (IdVersion1 > IdVersion2) -> true;
+        (IdVersion1 =:= IdVersion2) andalso (Id1 =:= Id2) -> false;
         IdVersion1 =:= IdVersion2 ->
             throw('got two nodes with same IDversion but different ID');
-        true                       -> Node2
+        true -> false
+    end.
+
+%% @doc Determines the newer instance of two representations of the same node.
+%%      Note: Both nodes need to share the same PID, otherwise an exception of
+%%      type 'throw' is thrown!
+-spec newer(node_type(), node_type()) -> node_type().
+newer(Node1, Node2) ->
+    case is_newer(Node1, Node2) of
+        true -> Node1;
+        _    -> Node2
     end.

@@ -56,11 +56,10 @@
 %%      than the BaseNode (requires that both are equal!).
 -spec throw_if_newer(Neighbor::node:node_type(), BaseNode::node:node_type()) -> ok.
 throw_if_newer(Neighbor, BaseNode) ->
-    case BaseNode =/= node:newer(Neighbor, BaseNode) of
+    case node:is_newer(Neighbor, BaseNode) of
         true ->
             throw('cannot create a neighborhood() with a neighbor newer than the node itself');
-        false ->
-            ok
+        _ -> ok
     end.
 
 %% @doc Creates a new neighborhood structure for the given node.
@@ -208,20 +207,18 @@ has_real_succ({_Preds, Node, [Succ | _]}) ->
 lsplit_nodelist(NodeList, Node) ->
     lusplit_nodelist(lremove_outdated(NodeList, Node), Node).
 
-%% @doc Splits the given (unsorted) unique node list (no duplicates, i.e. nodes
-%%      with the same pid but different IDs (and IDVersions)) into sorted lists
-%%      with nodes that have smaller, equal and larger IDs than the given node.
+%% @doc Splits the given (unsorted) "unique" node list, i.e. a list containing
+%%      no two nodes with the same pid but different IDs (and IDVersions), into
+%%      three sorted lists with nodes that have smaller, equal and larger IDs
+%%      than the given node.
 -spec lusplit_nodelist(NodeList::[node:node_type()], Node::node:node_type()) -> {Smaller::snodelist(), Equal::snodelist(), Larger::snodelist()}.
 lusplit_nodelist(NodeList, Node) ->
     {Smaller, LargerOrEqual} =
         lists:partition(
           fun(N) ->
                   case node:equals(N, Node) of
-                      true ->
-                          throw_if_newer(N, Node),
-                          false;
-                      false ->
-                          node:id(N) < node:id(Node)
+                      true -> throw_if_newer(N, Node), false;
+                      _    -> node:id(N) < node:id(Node)
                   end
           end, NodeList),
 
@@ -259,7 +256,7 @@ mk_neighborhood(NodeList, Node) ->
         true ->
             Preds = lists:reverse(EqualSorted),
             Succs = EqualSorted;
-        false ->
+        _ ->
             Neighbors = lists:append([LargerSorted, SmallerSorted]),
             Preds = lists:reverse(Neighbors),
             Succs = Neighbors
@@ -598,10 +595,11 @@ lremove_outdated(NodeList, Node) ->
     % now remove all out-dated nodes:
     NodeIsUpToDate = fun(N) ->
                              NInTab = ets:lookup_element(Tab, node:pidX(N), 2),
-                             (node:newer(N, NInTab) =:= N)
+                             not node:is_newer(NInTab, N)
                      end,
     NodeListUpd = [N || N <- NodeList, node:is_valid(N),
-                        not (node:equals(N, Node) andalso (node:newer(N, Node) =:= Node)), NodeIsUpToDate(N)],
+                        not (node:equals(N, Node) andalso (node:is_newer(Node, N))),
+                        NodeIsUpToDate(N)],
     ets:delete(Tab),
     NodeListUpd.
 
