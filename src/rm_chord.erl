@@ -36,7 +36,7 @@
 
 % accepted messages
 -type(message() ::
-    {init, Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
+    {init_rm, Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
     {get_succlist, Source_Pid::comm:mypid()} |
     {stabilize} |
     {get_node_details_response, NodeDetails::node_details:node_details()} |
@@ -81,7 +81,7 @@ get_successorlist(RemoteDhtNodePid) ->
 
 -spec on(message(), state()) -> state().
 %set info for dht_node
-on({init, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
+on({init_rm, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
     Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
     get_successorlist(node:pidX(Successor)),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
