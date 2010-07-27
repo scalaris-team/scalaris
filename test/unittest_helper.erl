@@ -28,6 +28,7 @@
 
 -include("scalaris.hrl").
 
+-spec make_ring_with_ids(list(?RT:key())) -> pid().
 make_ring_with_ids(Ids) ->
     error_logger:tty(true),
     ct:pal("Starting unittest ~p", [ct:get_status()]),

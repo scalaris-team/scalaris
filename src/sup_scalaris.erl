@@ -46,6 +46,11 @@ start_link(SupervisorType) ->
     start_link(SupervisorType, []).
 
 
+-spec start_link(supervisor_type(), list(tuple())) -> {ok, Pid::pid()}
+                                                          | ignore
+                                                          | {error, Error::{already_started,
+                                                                            Pid::pid()}
+                                                             | term()}.
 start_link(SupervisorType, Options) ->
     Link = supervisor:start_link({local, main_sup}, ?MODULE, {SupervisorType, Options}),
     case Link of
