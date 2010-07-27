@@ -27,7 +27,8 @@
 % for routing table implementation
 -export([start_link/1]).
 -export([init/1, on/2, get_base_interval/0, check_config/0,
-         get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2]).
+         get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2,
+         initialize/3, update_state/3]).
 
 -ifdef(with_export_type_support).
 -export_type([state_init/0]).
@@ -44,11 +45,25 @@
 
 % accepted messages of rt_loop processes
 -type(message() ::
-      {init, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()}
-     | {stabilize}
-     | {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ}
-     | {crash, DeadPid::comm:mypid()}
-     | ?RT:custom_message()).
+    {init_rt, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
+    {update, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
+    {stabilize} |
+    {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ} |
+    {crash, DeadPid::comm:mypid()} |
+    ?RT:custom_message()).
+
+%% @doc Sends an initialization message to the node's routing table.
+-spec initialize(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
+initialize(Id, Pred, Succ) ->
+    Pid = process_dictionary:get_group_member(routing_table),
+    comm:send_local(Pid, {init_rt, Id, Pred, Succ}).
+
+%% @doc Notifies the node's routing table of a changed node ID, predecessor
+%%      and/or successor.
+-spec update_state(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
+update_state(Id, Pred, Succ) ->
+    comm:send_local(process_dictionary:get_group_member(routing_table),
+                    {update_rt, Id, Pred, Succ}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -75,7 +90,7 @@ init(Trigger) ->
 %% @doc message handler
 -spec on(message(), state()) -> state() | unknown_event.
 
-on({init, Id, Pred, Succ}, {uninit, TriggerState}) ->
+on({init_rt, Id, Pred, Succ}, {uninit, TriggerState}) ->
     TriggerState2 = trigger:next(TriggerState),
     {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
 
@@ -84,9 +99,16 @@ on(Message, {uninit, TriggerState}) ->
     {uninit, TriggerState};
 
 % re-initialize routing table
-on({init, Id2, NewPred, NewSucc}, {_, _, _, RTState, TriggerState}) ->
-    ?RT:check(RTState, ?RT:empty(NewSucc), Id2, NewPred, NewSucc),
-    new_state(Id2, NewPred, NewSucc, ?RT:empty(NewSucc), TriggerState);
+on({init_rt, NewId, NewPred, NewSucc}, {_, _, _, OldRT, TriggerState}) ->
+    NewRT = ?RT:empty(NewSucc),
+    ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
+    new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
+
+% update routing table with changed ID, pred and/or succ
+on({update_rt, NewId, NewPred, NewSucc}, {_, _, _, OldRT, TriggerState}) ->
+    NewRT = ?RT:update(NewId, NewPred, NewSucc, OldRT),
+    ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
+    new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
 
 % start new periodic stabilization
 on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->

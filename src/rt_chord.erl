@@ -25,15 +25,13 @@
 
 % routingtable behaviour
 -export([empty/1, empty_ext/1,
-         hash_key/1, get_random_node_id/0, next_hop/2, init_stabilize/3,
+         hash_key/1, get_random_node_id/0, next_hop/2,
+         init_stabilize/3, update/4,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          n/0, dump/1, to_list/1, export_rt_to_dht_node/4,
-         update_pred_succ_in_dht_node/3, handle_custom_message/2,
+         handle_custom_message/2,
          check/6, check/5, check_fd/2,
          check_config/0]).
-
-% stabilize for Chord
--export([stabilize/5]).
 
 -ifdef(with_export_type_support).
 -export_type([key/0, rt/0, custom_message/0, external_rt/0]).
@@ -159,6 +157,15 @@ stabilize(Id, Succ, RT, Index, Node) ->
     end.
 %% userdevguide-end rt_chord:stabilize
 
+%% userdevguide-begin rt_chord:update
+%% @doc Updates the routing table due to a changed node ID, pred and/or succ.
+-spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(), RT::rt())
+        -> rt().
+update(Id, Pred, Succ, RT) ->
+    %TODO: implement update
+    RT.
+%% userdevguide-end rt_chord:update
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Finger calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -246,11 +253,6 @@ export_rt_to_dht_node(RT, Id, Pred, Succ) ->
                                  end
                         end, Tree, RT).
 %% userdevguide-end rt_chord:export_rt_to_dht_node
-
--spec update_pred_succ_in_dht_node(node:node_type(), node:node_type(), external_rt())
-        -> external_rt().
-update_pred_succ_in_dht_node(Pred, Succ, RT) ->
-    gb_trees:enter(node:id(Succ), Succ, gb_trees:enter(node:id(Pred), Pred, RT)).
 
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
