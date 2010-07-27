@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc sample routing table
+%% @doc Simple implementation of a routing table with linear routing.
 %% @end
 %% @version $Id$
 -module(rt_simple).
@@ -25,10 +25,11 @@
 
 % routingtable behaviour
 -export([empty/1, empty_ext/1,
-         hash_key/1, get_random_node_id/0, next_hop/2, init_stabilize/3,
+         hash_key/1, get_random_node_id/0, next_hop/2,
+         init_stabilize/3, update/4,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          dump/1, to_list/1, export_rt_to_dht_node/4, n/0,
-         update_pred_succ_in_dht_node/3, handle_custom_message/2,
+         handle_custom_message/2,
          check/6, check/5, check_fd/2,
          check_config/0]).
 
@@ -83,6 +84,13 @@ get_random_node_id() -> hash_key(randoms:getRandomId()).
 -spec init_stabilize(key(), node:node_type(), rt()) -> rt().
 init_stabilize(_Id, Succ, _RT) -> empty(Succ).
 %% userdevguide-end rt_simple:init_stabilize
+
+%% userdevguide-begin rt_simple:update
+%% @doc Updates the routing table due to a changed node ID, pred and/or succ.
+-spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(), RT::rt())
+        -> rt().
+update(_Id, _Pred, Succ, _RT) -> Succ.
+%% userdevguide-end rt_simple:update
 
 %% userdevguide-begin rt_simple:filter_dead_node
 %% @doc Removes dead nodes from the routing table (rely on periodic
@@ -162,13 +170,6 @@ next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, rt)).
                             Succ::node:node_type()) -> external_rt().
 export_rt_to_dht_node(RT, _Id, _Pred, _Succ) -> RT.
 %% userdevguide-end rt_simple:export_rt_to_dht_node
-
-%% userdevguide-begin rt_simple:update_pred_succ_in_dht_node
-%% @doc Updates the successor in the (external) routing table state.
--spec update_pred_succ_in_dht_node(Pred::node:node_type(), Succ::node:node_type(),
-                                   RT::external_rt()) -> external_rt().
-update_pred_succ_in_dht_node(_Pred, Succ, Succ) -> Succ.
-%% userdevguide-end rt_simple:update_pred_succ_in_dht_node
 
 %% userdevguide-begin rt_simple:to_list
 %% @doc Converts the (external) representation of the routing table to a list

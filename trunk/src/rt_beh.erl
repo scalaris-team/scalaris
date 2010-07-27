@@ -23,9 +23,6 @@
 % for behaviour
 -export([behaviour_info/1]).
 
-% for routing table implementation
--export([initialize/3]).
-
 -include("scalaris.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -43,6 +40,8 @@ behaviour_info(callbacks) ->
      {next_hop, 2},
      % trigger for new stabilization round
      {init_stabilize, 3},
+     % adapt RT to changed node ID, pred and/or succ
+     {update, 4},
      % dead nodes filtering
      {filter_dead_node, 2},
      % statistics
@@ -57,8 +56,6 @@ behaviour_info(callbacks) ->
      {to_list, 1},
      % convert from internal representation to version for dht_node
      {export_rt_to_dht_node, 4},
-     % update pred/succ in routing stored in dht_node
-     {update_pred_succ_in_dht_node, 3},
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
      % common methods, e.g. from rt_generic.hrl
@@ -69,11 +66,3 @@ behaviour_info(callbacks) ->
 
 behaviour_info(_Other) ->
     undefined.
-
-%% see rt_simple.erl for simple standard implementation
-
-%% @doc Sends an initialization message to the node's routing table.
--spec initialize(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
-initialize(Id, Pred, Succ) ->
-    Pid = process_dictionary:get_group_member(routing_table),
-    comm:send_local(Pid, {init, Id, Pred, Succ}).
