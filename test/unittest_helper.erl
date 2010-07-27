@@ -22,9 +22,48 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([make_ring/1, stop_ring/1]).
+-export([make_ring_with_ids/1, make_ring/1, stop_ring/1,
+
+        check_ring_size/1, wait_for_stable_ring/0, wait_for_stable_ring_deep/0]).
 
 -include("scalaris.hrl").
+
+make_ring_with_ids(Ids) ->
+    error_logger:tty(true),
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
+    Owner = self(),
+    undefined = ets:info(config_ets),
+    Pid = spawn(fun () ->
+                        %timer:sleep(1000),
+                        ct:pal("Trying to build Scalaris~n"),
+                        randoms:start(),
+                        process_dictionary:start_link(),
+                        %timer:sleep(1000),
+                        sup_scalaris:start_link(boot,
+                                                [{{idholder, id}, hd(Ids)}]),
+                        %timer:sleep(1000),
+                        boot_server:connect(),
+                        [admin:add_node_at_id(Id) || Id <- tl(Ids)],
+                        Owner ! {continue},
+                        receive
+                            {done} ->
+                                ok
+                        end
+                end),
+    %erlang:monitor(process, Pid),
+    receive
+        {'DOWN', _Ref, process, _Pid2, Reason} ->
+            ct:pal("process died: ~p ~n", [Reason]);
+        {continue} ->
+            ok
+    end,
+    timer:sleep(1000),
+    check_ring_size(length(Ids)),
+    wait_for_stable_ring(),
+    check_ring_size(length(Ids)),
+    ct:pal("Scalaris has booted~n"),
+%    timer:sleep(30000),
+    Pid.
 
 -spec make_ring(pos_integer()) -> pid().
 make_ring(Size) ->
@@ -118,6 +157,18 @@ wait_for_stable_ring() ->
         _ ->
             timer:sleep(1000),
             wait_for_stable_ring()
+    end.
+
+-spec wait_for_stable_ring_deep() -> ok.
+wait_for_stable_ring_deep() ->
+    R = admin:check_ring_deep(),
+    ct:pal("CheckRingDeep: ~p~n",[R]),
+    case R of
+        ok ->
+            ok;
+        _ ->
+            timer:sleep(1000),
+            wait_for_stable_ring_deep()
     end.
 
 -spec check_ring_size(non_neg_integer()) -> ok.

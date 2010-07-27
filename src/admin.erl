@@ -19,10 +19,11 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([add_nodes/1, del_nodes/1, check_ring/0, nodes/0,
-         start_link/0, start/0, get_dump/0, get_dump_bw/0,
-         diff_dump/3, print_ages/0, check_routing_tables/1,
-         dd_check_ring/1,dd_check_ring/0, number_of_nodes/0]).
+-export([add_node/1, add_node_at_id/1, add_nodes/1, del_nodes/1,
+         check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
+         get_dump_bw/0, diff_dump/3, print_ages/0,
+         check_routing_tables/1, dd_check_ring/1,dd_check_ring/0,
+         number_of_nodes/0]).
 
 -include("scalaris.hrl").
 
@@ -32,6 +33,14 @@
 
 %% userdevguide-begin admin:add_nodes
 % @doc add new Scalaris nodes on the local node
+add_node_at_id(Id) ->
+    add_node([{{idholder, id}, Id}]).
+
+add_node(Options) ->
+    Desc = util:sup_supervisor_desc(randoms:getRandomId(),
+                                    sup_dht_node, start_link, [Options]),
+    supervisor:start_child(main_sup, Desc).
+
 -spec add_nodes(non_neg_integer()) -> ok.
 add_nodes(0) ->
     ok;
@@ -76,6 +85,30 @@ check_ring() ->
         {error, Reason} -> {error, Reason};
         _ -> ok
     end.
+
+check_ring_deep() ->
+    case check_ring() of
+        ok ->
+            Nodes = statistics:get_ring_details(),
+            lists:foldl(fun check_ring_deep_foldl/2, ok, Nodes);
+        X ->
+            X
+    end.
+
+check_ring_deep_foldl({ok, NodeDetails}, ok) ->
+    PredList = node_details:get(NodeDetails, predlist),
+    SuccList = node_details:get(NodeDetails, succlist),
+    case lists:all(fun node:is_valid/1, PredList) andalso
+          lists:all(fun node:is_valid/1, SuccList) of
+        true ->
+            ok;
+        _ ->
+            {error, PredList, SuccList}
+    end;
+check_ring_deep_foldl(X, ok) ->
+    X;
+check_ring_deep_foldl(_, X) ->
+    X.
 
 -spec check_ring_foldl(NodeState::{ok, node_details:node_details()} | {failed},
                        Acc::first | ?RT:key())

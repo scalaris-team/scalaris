@@ -69,8 +69,8 @@ sup_supervisor_desc(Name, Module, Function) ->
 -spec sup_supervisor_desc(Name::atom() | string(), Module::module(), Function::atom(), Options::list())
         -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::list()},
             permanent, brutal_kill, supervisor, []}.
-sup_supervisor_desc(Name, Module, Function, Options) ->
-    {Name, {Module, Function, Options}, permanent, brutal_kill, supervisor, []}.
+sup_supervisor_desc(Name, Module, Function, Args) ->
+    {Name, {Module, Function, Args}, permanent, brutal_kill, supervisor, []}.
 
 %% @doc Escapes quotes in the given string.
 -spec escape_quotes(String::string()) -> string().
