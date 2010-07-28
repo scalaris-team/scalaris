@@ -58,10 +58,10 @@
 %% @end
 %% @reference M. Jelasity, A. Montresor, O. Babaoglu: Gossip-based aggregation
 %% in large dynamic networks. ACM Trans. Comput. Syst. 23(3), 219-252 (2005)
-%% @version $Id: gossip.erl 932 2010-07-28 09:34:51Z kruber@zib.de $
+%% @version $Id$
 -module(gossip).
 -author('kruber@zib.de').
--vsn('$Id: gossip.erl 932 2010-07-28 09:34:51Z kruber@zib.de $').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 
