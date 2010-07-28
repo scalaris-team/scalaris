@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+# Copyright 2007-2010 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 # 
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -19,9 +19,18 @@ LOCAL_CFG="$DIRNAME/scalaris.local.cfg.sh"
 if [ -f "$GLOBAL_CFG" ] ; then source "$GLOBAL_CFG" ; fi
 if [ -f "$LOCAL_CFG" ] ; then source "$LOCAL_CFG" ; fi
 
+ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+DIRNAME=`dirname $ABSPATH`
+
+if [ 4 != $# ] ; then
+    echo Usage: $DIRNAME/bench_master nodes_per_vm workers iterations ring_size
+    exit 1 ;
+fi
+
 export ERL_MAX_PORTS=16384
 export NODES_VM=$1
-export WORKER=$2 
+export WORKER=$2
 export ITERATIONS=$3
 export RING_SIZE=$4
-erl $ERL_OPTS -noinput -setcookie "chocolate chip cookie" -pa ../contrib/log4erl/ebin -pa ../contrib/yaws/ebin -pa ../ebin -yaws embedded true -connect_all false -name boot -s bench_master 
+
+$DIRNAME/scalarisctl bench_master

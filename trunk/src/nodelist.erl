@@ -447,8 +447,8 @@ lrebase_list([First | T], NewFirstNode) ->
     {LastNode, TFilt} = lget_last_and_remove(T, NewFirstNode, []),
     case LastNode =/= null of
         true ->
-            NodeListInterval = intervals:mk_from_nodes(First, LastNode),
-            NewPredsInterval = intervals:mk_from_nodes(First, NewFirstNode),
+            NodeListInterval = node:mk_interval_between_nodes(First, LastNode),
+            NewPredsInterval = node:mk_interval_between_nodes(First, NewFirstNode),
             case intervals:in(node:id(NewFirstNode), NodeListInterval) of
                 false ->
                     ladd_head_if_noteq(First, TFilt, NewFirstNode);

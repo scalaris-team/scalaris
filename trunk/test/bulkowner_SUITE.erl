@@ -52,7 +52,7 @@ count(_Config) ->
     ?equals(transaction_api:single_write("j", 3), commit),
     ?equals(transaction_api:single_write("k", 5), commit),
     ?equals(transaction_api:single_write("l", 7), commit),
-    bulkowner:issue_bulk_owner(intervals:new(0, 0), {unit_test_bulkowner, self()}),
+    bulkowner:issue_bulk_owner(intervals:new('[', 0, 0, ']'), {unit_test_bulkowner, self()}),
     ?equals(collect(0), 68),
     ok.
 
@@ -80,4 +80,3 @@ reduce([]) ->
     0;
 reduce([{_, Value}| Rest]) ->
     Value + reduce(Rest).
-    

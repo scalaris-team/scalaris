@@ -136,10 +136,12 @@ get(#state{rt=RT, neighbors=Neighbors, join_time=JoinTime,
         pred_pid   -> node:pidX(nodelist:pred(Neighbors));
         node       -> nodelist:node(Neighbors);
         node_id    -> nodelist:nodeid(Neighbors);
-        my_range   -> intervals:mk_from_nodes(nodelist:pred(Neighbors),
-                                              nodelist:node(Neighbors));
-        succ_range -> intervals:mk_from_nodes(nodelist:node(Neighbors),
-                                              nodelist:succ(Neighbors));
+        my_range   -> node:mk_interval_between_nodes(
+                        nodelist:pred(Neighbors),
+                        nodelist:node(Neighbors));
+        succ_range -> node:mk_interval_between_nodes(
+                        nodelist:node(Neighbors),
+                        nodelist:succ(Neighbors));
         join_time  -> JoinTime;
         trans_log  -> TransLog;
         db         -> DB;

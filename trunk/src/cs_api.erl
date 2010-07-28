@@ -198,7 +198,7 @@ do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
 -spec range_read(intervals:key(), intervals:key()) -> {ok | timeout, [db_entry:entry()]}.
 range_read(From, To) ->
     ?TRACE("cs_api:range_read(~p, ~p)~n", [From, To]),
-    Interval = intervals:new(From, To),
+    Interval = intervals:new('[', From, To, ']'),
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, comm:this()}),
     TimerRef = comm:send_local_after(config:read(range_read_timeout), self(), {range_read_timeout}),

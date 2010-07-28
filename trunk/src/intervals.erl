@@ -13,9 +13,10 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Thorsten Schuett, Florian Schintke <schuett@zib.de, schintke@onscale.de>
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc Interval data structure and handling functions.
-%% 
+%%
 %% All intervals created by methods of this module are normalized, i.e. simple
 %% intervals having unambiguous representations and complex intervals being
 %% lists of simple intervals sorted by the order given by interval_sort/2.
@@ -30,19 +31,14 @@
 
 -include("scalaris.hrl").
 
--export([empty/0, new/1, new/2, new/4, all/0,
-         mk_from_node_ids/2, mk_from_nodes/2,
-         is_empty/1,
-         is_subset/2,
-         is_continuous/1,
-         is_adjacent/2,
-         in/2,
-         intersection/2,
-         union/2,
-         minus/2,
+-export([empty/0, new/1, new/4, all/0,
+         % testing / comparing intervals
+         is_empty/1, is_subset/2, is_continuous/1,
+         is_adjacent/2, in/2,
+         % operations for intervals
+         intersection/2, union/2, minus/2,
          % for unit testing only
-         is_well_formed/1,
-         normalize/1
+         is_well_formed/1, normalize/1
         ]).
 
 -ifdef(with_export_type_support).
@@ -67,25 +63,15 @@
 
 %% @doc Creates an empty interval.
 -spec empty() -> [].
-empty() ->
-    [].
+empty() -> [].
 
 %% @doc Creates an interval covering the whole key space.
 -spec all() -> all.
-all() ->
-    all.
+all() -> all.
 
 %% @doc Creates an interval covering a single element.
 -spec new(key()) -> {element, key()}.
-new(X) ->
-    {element, X}.
-
-%% @doc Creates a new closed interval, i.e. "[A, B]". The new interval may wrap
-%%      around, i.e. A > B. If A=:=B, an interval covering the whole space is
-%%      created.
--spec new(A::key(), B::key()) -> interval().
-new(A, B) ->
-    new('[', A, B, ']').
+new(X) -> {element, X}.
 
 %% @doc Creates a new interval depending on the given brackets, i.e.:
 %%      - closed interval [A, B],
@@ -99,66 +85,40 @@ new(A, B) ->
 new(LeftBr, Begin, End, RightBr) ->
     normalize_simple({interval, LeftBr, Begin, End, RightBr}).
 
-%% @doc Creates an interval that covers all keys a node with MyKey is
-%%      responsible for if his predecessor has PredKey, i.e. (PredKey, MyKey]
-%%      (provided for convenience).
--spec mk_from_node_ids(PredKey::?RT:key(), MyKey::?RT:key()) -> interval().
-mk_from_node_ids(PredKey, MyKey) ->
-    new('(', PredKey, MyKey, ']').
-
-%% @doc Creates an interval that covers all keys a node is responsible for given
-%%      his predecessor, i.e. (node:id(PredKey), node:id(MyKey)]
-%%      (provided for convenience).
--spec mk_from_nodes(Pred::node:node_type(), Node::node:node_type()) -> interval().
-mk_from_nodes(Pred, Node) ->
-    mk_from_node_ids(node:id(Pred), node:id(Node)).
-
 %% @doc Checks whether the given interval is empty.
 -spec is_empty(interval()) -> boolean().
-is_empty([]) ->
-    true;
-is_empty(_) ->
-    false.
+is_empty([]) -> true;
+is_empty(_) ->  false.
 
 %% @doc Creates the intersection of two intervals.
 %%      Precondition: is_well_formed(A) andalso is_well_formed(B).
 -spec intersection(A::interval(), B::interval()) -> interval().
-intersection(A, A) ->
-    A;
-intersection(all, B) ->
-    B;
-intersection([], _) ->
-    empty();
-intersection(_, []) ->
-    empty();
-intersection(A, all) ->
-    A;
+intersection(A, A)   -> A;
+intersection(all, B) -> B;
+intersection([], _)  -> empty();
+intersection(_, [])  -> empty();
+intersection(A, all) -> A;
 intersection({element, X} = A, B) ->
     case in(X, B) of
         true  -> A;
         false -> empty()
     end;
-intersection(A, {element, _} = B) ->
-    intersection(B, A);
+intersection(A, {element, _} = B) -> intersection(B, A);
 intersection(A, B) when is_list(A) orelse is_list(B) ->
     A_ = to_list(A),
     B_ = to_list(B),
-    normalize([intersection_simple(IA, IB) || IA <- A_, IB <- B_, intersection_simple(IA, IB) =/= []]);
-intersection(A, B) ->
-    normalize(intersection_simple(A, B)).
+    normalize([intersection_simple(IA, IB)
+               || IA <- A_, IB <- B_,
+                  intersection_simple(IA, IB) =/= []]);
+intersection(A, B) -> normalize(intersection_simple(A, B)).
 
 %% @doc Creates the intersection of two simple intervals or empty lists.
 -spec intersection_simple(A::simple_interval() | [], B::simple_interval() | []) -> simple_interval() | [].
-intersection_simple(A, A) ->
-    A;
-intersection_simple(all, B) ->
-    B;
-intersection_simple([], _) ->
-    empty();
-intersection_simple(_, []) ->
-    empty();
-intersection_simple(A, all) ->
-    A;
+intersection_simple(A, A)   -> A;
+intersection_simple(all, B) -> B;
+intersection_simple([], _)  -> empty();
+intersection_simple(_, [])  -> empty();
+intersection_simple(A, all) -> A;
 intersection_simple({element, A_Value} = A, B) ->
     case in(A_Value, B) of
         true  -> A;
@@ -166,7 +126,8 @@ intersection_simple({element, A_Value} = A, B) ->
     end;
 intersection_simple(A, {element, _} = B) ->
     intersection_simple(B, A);
-intersection_simple({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1Br}) ->
+intersection_simple({interval, A0Br, A0, A1, A1Br},
+                    {interval, B0Br, B0, B1, B1Br}) ->
     B0_in_A = is_between(A0Br, A0, B0, A1, A1Br),
     B1_in_A = is_between(A0Br, A0, B1, A1, A1Br),
     A0_in_B = is_between(B0Br, B0, A0, B1, B1Br),
@@ -175,10 +136,8 @@ intersection_simple({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1B
         B0_in_A orelse B1_in_A orelse A0_in_B orelse A1_in_B ->
             {NewLeft, NewLeftBr} =
                 case A0 =:= B0 of
-                    true when A0Br =:= '(' ->
-                        {A0, '('};
-                    true ->
-                        {A0, B0Br};
+                    true when A0Br =:= '(' -> {A0, '('};
+                    true -> {A0, B0Br};
                     false ->
                         case util:max(A0, B0) =:= A0 of
                             true  -> {A0, A0Br};
@@ -187,10 +146,8 @@ intersection_simple({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1B
                 end,
             {NewRight, NewRightBr} =
                 case A1 =:= B1 of
-                    true when A1Br =:= ')' ->
-                        {A1, ')'};
-                    true ->
-                        {A1, B1Br};
+                    true when A1Br =:= ')' -> {A1, ')'};
+                    true -> {A1, B1Br};
                     false ->
                         case util:min(A1, B1) =:= A1 of
                             true  -> {A1, A1Br};
@@ -202,23 +159,20 @@ intersection_simple({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1B
             % is en empty interval
             % (using new/4 would create 'all' instead)
             case NewLeft =:= NewRight of
-                true when (NewLeftBr =:= '[') andalso (NewRightBr =:= ']') ->
+                true when (NewLeftBr =:= '[')
+                          andalso (NewRightBr =:= ']') ->
                     new(NewLeft);
-                true ->
-                    empty();
-                false ->
-                    new(NewLeftBr, NewLeft, NewRight, NewRightBr)
+                true -> empty();
+                false -> new(NewLeftBr, NewLeft, NewRight, NewRightBr)
             end;
-        true ->
-            empty()
+        true -> empty()
     end.
 
 %% @doc Returns true if A is a subset of B, i.e. the intersection of both
 %%      equals A.
 %%      Precondition: is_well_formed(A) andalso is_well_formed(B).
 -spec(is_subset(A::interval(), B::interval()) -> boolean()).
-is_subset(A, B) ->
-    A =:= intersection(A, B).
+is_subset(A, B) -> A =:= intersection(A, B).
 
 %% @doc X \in I. Precondition: is_well_formed(I).
 -spec in/2 :: (X::key(), I::interval()) -> boolean().
@@ -226,14 +180,10 @@ in(X, {interval, FirstBr, First, Last, LastBr}) ->
     is_between(FirstBr, First, X, Last, LastBr);
 in(X, [I | Rest]) ->
     in(X, I) orelse in(X, Rest);
-in(_, []) ->
-    false;
-in(_, all) ->
-    true;
-in(X, {element, X}) ->
-    true;
-in(_, {element, _}) ->
-    false.
+in(_, [])           -> false;
+in(_, all)          -> true;
+in(X, {element, X}) -> true;
+in(_, {element, _}) -> false.
 
 %% @doc Bring list of intervals to normal form, i.e. sort, eliminate empty
 %%      intervals, convert intervals with a single element to elements, convert
@@ -246,27 +196,20 @@ normalize(List) when is_list(List) ->
     NormalizedList1 =
         lists:flatmap(fun(I) -> to_list(normalize_simple(I)) end, List),
     case merge_adjacent(lists:usort(fun interval_sort/2, NormalizedList1), []) of
-        [Element] ->
-            Element;
-        X ->
-            X
+        [Element] -> Element;
+        X         -> X
     end;
 normalize(Element) ->
     case normalize_simple(Element) of
-        [Element2] ->
-            Element2;
-        X ->
-            X
+        [Element2] -> Element2;
+        X          -> X
     end.
 
 %% @doc Normalizes simple intervals (see normalize/1).
 -spec normalize_simple(simple_interval() | []) -> interval().
-normalize_simple(all) ->
-    all;
-normalize_simple({element, _A} = I) ->
-    I;
-normalize_simple({interval, '(', X, X, ')'}) ->
-    empty();
+normalize_simple(all) -> all;
+normalize_simple({element, _A} = I) -> I;
+normalize_simple({interval, '(', X, X, ')'}) -> empty();
 normalize_simple({interval, '[', minus_infinity, plus_infinity, ']'}) ->
     all;
 normalize_simple({interval, LeftBr, minus_infinity, plus_infinity, RightBr}) ->
@@ -301,21 +244,17 @@ normalize_simple({interval, LeftBr, Begin, End, RightBr}) ->
 %%      Use only for testing - all intervals generated by this module are
 %%      well-formed, i.e. normalized!
 -spec is_well_formed(interval()) ->  boolean().
-is_well_formed([_Interval]) ->
-    false;
+is_well_formed([_Interval]) -> false;
 is_well_formed([_|_] = List) ->
     lists:all(fun is_well_formed_simple/1, List) andalso
         List =:= lists:usort(fun interval_sort/2, List);
-is_well_formed([]) ->
-    true;
-is_well_formed(X) ->
-    is_well_formed_simple(X).
+is_well_formed([]) -> true;
+is_well_formed(X) -> is_well_formed_simple(X).
 
 %% @doc Checks whether a given simple interval is normalized. Complex intervals
 %%      or any other value are considered 'not normalized'.
 -spec is_well_formed_simple(interval()) ->  boolean().
-is_well_formed_simple({element, _X}) ->
-    true;
+is_well_formed_simple({element, _X}) -> true;
 is_well_formed_simple({interval, '(', plus_infinity, _Y, _RightBr}) ->
     false;
 is_well_formed_simple({interval, _LeftBr, _X, minus_infinity, ')'}) ->
@@ -323,10 +262,8 @@ is_well_formed_simple({interval, _LeftBr, _X, minus_infinity, ')'}) ->
 is_well_formed_simple({interval, _LeftBr, X, Y, _RightBr}) ->
     % same as: X=/=Y andalso not wraps_around(Interval)
     not greater_equals_than(X, Y);
-is_well_formed_simple(all) ->
-    true;
-is_well_formed_simple(_) ->
-    false.
+is_well_formed_simple(all) -> true;
+is_well_formed_simple(_) -> false.
 
 %% @doc Converts the given interval to a list of simple intervals. If it already
 %%      is a list, this list is returned.
@@ -334,7 +271,7 @@ is_well_formed_simple(_) ->
 to_list(Interval) ->
     case Interval of
         X when is_list(X) -> X;
-        X -> [X]
+        X                 -> [X]
     end.
 
 %% @doc Specifies an order over simple intervals based on their first component
@@ -371,31 +308,21 @@ merge_adjacent([HI | TI], [HR | TR]) ->
 
 %% @doc Creates the union of two intervals.
 -spec union(A::interval(), B::interval()) -> interval().
-union(A, A) ->
-    A;
-union(all, _B) ->
-    all;
-union([], B) ->
-    B;
-union(A, []) ->
-    A;
-union(_A, all) ->
-    all;
+union(A, A)    -> A;
+union(all, _B) -> all;
+union([], B)   -> B;
+union(A, [])   -> A;
+union(_A, all) -> all;
 union(A, B) when is_list(A) orelse is_list(B) ->
     normalize(lists:append(to_list(A), to_list(B)));
-union(A, B) ->
-    normalize(union_simple(A, B)).
+union(A, B) -> normalize(union_simple(A, B)).
 
 %% @doc Creates the union of two simple intervals or empty lists.
 -spec union_simple(A::simple_interval() | [], B::simple_interval() | []) -> interval().
-union_simple(all, _B) ->
-    all;
-union_simple([], B) ->
-    B;
-union_simple(A, []) ->
-    A;
-union_simple(_A, all) ->
-    all;
+union_simple(all, _B) -> all;
+union_simple([], B)   -> B;
+union_simple(A, [])   -> A;
+union_simple(_A, all) -> all;
 union_simple({element, B0}, {interval, _B0Br, B0, B1, B1Br}) ->
     new('[', B0, B1, B1Br);
 union_simple({element, B1}, {interval, B0Br, B0, B1, _B1Br}) ->
@@ -410,7 +337,8 @@ union_simple({element, A_Value} = A, B) ->
         false -> [A, B]
     end;
 union_simple(A, {element, B_Value} = B) ->
-    % note: always place the first element (A) before the second element (B) in a union 
+    % note: always place the first element (A) before the second
+    % element (B) in a union
     case in(B_Value, A) of
         true  -> A;
         false -> [A, B]
@@ -432,10 +360,8 @@ union_simple({interval, A0Br, A0, A1, A1Br} = A, {interval, B0Br, B0, B1, B1Br} 
         B0_in_A orelse B1_in_A orelse A0_in_B orelse A1_in_B ->
             {NewLeft, NewLeftBr} =
                 case A0 =:= B0 of
-                    true when A0Br =:= '[' ->
-                        {A0, '['};
-                    true ->
-                        {A0, B0Br};
+                    true when A0Br =:= '[' -> {A0, '['};
+                    true -> {A0, B0Br};
                     false ->
                         case util:min(A0, B0) =:= A0 of
                             true  -> {A0, A0Br};
@@ -444,10 +370,8 @@ union_simple({interval, A0Br, A0, A1, A1Br} = A, {interval, B0Br, B0, B1, B1Br} 
                 end,
             {NewRight, NewRightBr} =
                 case A1 =:= B1 of
-                    true when A1Br =:= ']' ->
-                        {A1, ']'};
-                    true ->
-                        {A1, B1Br};
+                    true when A1Br =:= ']' -> {A1, ']'};
+                    true -> {A1, B1Br};
                     false ->
                         case util:max(A1, B1) =:= A1 of
                             true  -> {A1, A1Br};
@@ -463,13 +387,10 @@ union_simple({interval, A0Br, A0, A1, A1Br} = A, {interval, B0Br, B0, B1, B1Br} 
             case NewLeft =:= NewRight of
                 true when (NewLeftBr =:= '[') andalso (NewRightBr =:= ']') ->
                     new(NewLeft);
-                true ->
-                    empty();
-                false ->
-                    new(NewLeftBr, NewLeft, NewRight, NewRightBr)
+                true -> empty();
+                false -> new(NewLeftBr, NewLeft, NewRight, NewRightBr)
             end;
-        true ->
-            [A, B]
+        true -> [A, B]
     end.
 
 %% @doc Checks whether the given interval is a continuous interval, i.e. simple
@@ -477,24 +398,20 @@ union_simple({interval, A0Br, A0, A1, A1Br} = A, {interval, B0Br, B0, B1, B1Br} 
 %%      they contain 2 simple intervals which are adjacent and wrap around.
 %%      Note: empty intervals are not continuous!
 -spec is_continuous(interval()) -> boolean().
-is_continuous(all) ->
-    true;
-is_continuous({element, _Key}) ->
-    true;
-is_continuous({interval, _LBr, _L, _R, _RBr}) ->
-    true;
+is_continuous(all) -> true;
+is_continuous({element, _Key}) -> true;
+is_continuous({interval, _LBr, _L, _R, _RBr}) -> true;
 % complex intervals have adjacent intervals merged except for those wrapping around
 % -> if it contains only two simple intervals which are adjacent, then it is continuous!
-is_continuous([{interval, '[', minus_infinity, _B1, _B1Br}, {interval, _A0Br, _A0, plus_infinity, ']'}]) ->
-    true;
-is_continuous([{element, minus_infinity}, {interval, _A0Br, _A0, plus_infinity, ']'}]) ->
-    true;
-is_continuous([{interval, '[', minus_infinity, _B1, _B1Br}, {element, plus_infinity}]) ->
-    true;
-is_continuous([{element, minus_infinity}, {element, plus_infinity}]) ->
-    true;
-is_continuous(_) ->
-    false.
+is_continuous([{interval, '[', minus_infinity, _B1, _B1Br},
+               {interval, _A0Br, _A0, plus_infinity, ']'}]) -> true;
+is_continuous([{element, minus_infinity},
+               {interval, _A0Br, _A0, plus_infinity, ']'}]) -> true;
+is_continuous([{interval, '[', minus_infinity, _B1, _B1Br},
+               {element, plus_infinity}]) -> true;
+is_continuous([{element, minus_infinity},
+               {element, plus_infinity}]) -> true;
+is_continuous(_) -> false.
 
 %% @doc Checks whether two intervals are adjacent, i.e. the intervals are both
 %%      continuous, their union is continuous and their intersection is empty,
@@ -508,20 +425,17 @@ is_adjacent(A, B) ->
 
 %% @doc Subtracts the second from the first simple interval.
 -spec minus_simple(simple_interval(), simple_interval()) -> interval().
-minus_simple(A, A) ->
-    empty();
-minus_simple(_, all) ->
-    empty();
+minus_simple(A, A)   -> empty();
+minus_simple(_, all) -> empty();
 minus_simple(all, {element, B0}) ->
     % hack: use [minus_infinity, plus_infinity] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
-    minus_simple2({interval, '[', minus_infinity, plus_infinity, ']'}, {interval, '[', B0, B0, ']'});
+    minus_simple2({interval, '[', minus_infinity, plus_infinity, ']'},
+                  {interval, '[', B0, B0, ']'});
 minus_simple(all, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
     % hack: use [minus_infinity, plus_infinity] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
     minus_simple2({interval, '[', minus_infinity, plus_infinity, ']'}, B);
-minus_simple({element, A0}, {element, A0}) ->
-    empty();
-minus_simple(A = {element, _}, {element, _}) ->
-    A;
+minus_simple({element, A0}, {element, A0}) -> empty();
+minus_simple(A = {element, _}, {element, _}) -> A;
 minus_simple(A = {element, A0}, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
     case in(A0, B) of
         true -> empty();
@@ -554,37 +468,26 @@ minus_simple2({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1Br}) ->
     First = case B0Br of
                 '(' when B0 =:= A0 andalso A0Br =:= '[' ->
                     new(A0);
-                '(' when B0 =:= A0 ->
-                    empty();
-                '(' ->
-                    new(A0Br, A0, B0, ']');
-                '[' when B0 =:= A0 ->
-                    empty();
-                '[' ->
-                    new(A0Br, A0, B0, ')')
+                '(' when B0 =:= A0 -> empty();
+                '('                -> new(A0Br, A0, B0, ']');
+                '[' when B0 =:= A0 -> empty();
+                '['                -> new(A0Br, A0, B0, ')')
                end,
     Second = case B1Br of
                  ')' when B1 =:= A1 andalso A1Br =:= ']' ->
                      new(A1);
-                 ')' when B1 =:= A1 ->
-                     empty();
-                 ')' ->
-                     new('[', B1, A1, A1Br);
-                 ']' when B1 =:= A1 ->
-                     empty();
-                 ']' ->
-                     new('(', B1, A1, A1Br)
+                 ')' when B1 =:= A1 -> empty();
+                 ')'                -> new('[', B1, A1, A1Br);
+                 ']' when B1 =:= A1 -> empty();
+                 ']'                -> new('(', B1, A1, A1Br)
                end,
     union(First, Second).
 
 %% @doc Subtracts the second from the first interval.
 -spec minus(interval(), interval()) -> interval().
-minus(A, A) ->
-    empty();
-minus(_A, all) ->
-    empty();
-minus(A, []) ->
-    A;
+minus(A, A)    -> empty();
+minus(_A, all) -> empty();
+minus(A, [])   -> A;
 minus(A, B) when is_list(A) ->
     B_ = to_list(B),
     % from every simple interval in A, remove all simple intervals in B
@@ -600,12 +503,7 @@ minus(A, B) when is_list(B) ->
                                   minus(AccIn, IB)
                           end,
                           A, B));
-minus(A, B) ->
-    minus_simple(A, B).
-
-%%====================================================================
-%% private functions
-%%====================================================================
+minus(A, B) -> minus_simple(A, B).
 
 %% @private
 %% @doc Determines whether the given interval wraps around, i.e. the interval
@@ -647,20 +545,13 @@ is_between('(', Begin, X, End, ')') ->
 
 %% @doc A &gt; B
 -spec greater_than/2 :: (A::key(), B::key()) -> boolean().
-greater_than(X, X) ->
-    false;
-greater_than(minus_infinity, _) ->
-    false;
-greater_than(plus_infinity, _) ->
-    true;
-greater_than(_, plus_infinity) ->
-    false;
-greater_than(_, minus_infinity) ->
-    true;
-greater_than(X, Y) ->
-    X > Y.
+greater_than(X, X)              -> false;
+greater_than(minus_infinity, _) -> false;
+greater_than(plus_infinity, _)  -> true;
+greater_than(_, plus_infinity)  -> false;
+greater_than(_, minus_infinity) -> true;
+greater_than(X, Y)              -> X > Y.
 
 %% @doc A &gt;= B
 -spec greater_equals_than/2 :: (A::key(), B::key()) -> boolean().
-greater_equals_than(A, B) ->
-    (A =:= B) orelse greater_than(A, B).
+greater_equals_than(A, B) -> (A =:= B) orelse greater_than(A, B).

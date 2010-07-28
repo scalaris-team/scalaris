@@ -49,7 +49,8 @@
         dht_node_state:state().
 join_request(State, NewPred) ->
     MyNewInterval =
-        intervals:mk_from_nodes(NewPred, dht_node_state:get(State, node)),
+        node:mk_interval_between_nodes(NewPred,
+                                       dht_node_state:get(State, node)),
     {DB, HisData} = ?DB:split_data(dht_node_state:get(State, db), MyNewInterval),
     
     %%TODO: split data [{Key, Value, Version}], schedule transfer
