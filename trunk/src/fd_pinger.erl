@@ -52,7 +52,7 @@ init([Module, Pid]) ->
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec on(message(), state()) -> state() | unknown_event.
+-spec on(message(), state()) -> state().
 on({stop}, {_Module, _Pid, _Count}) ->
     kill;
 on({pong}, {Module, Pid, Count}) ->
@@ -66,9 +66,7 @@ on({timeout, OldCount}, {Module, Pid, Count}) ->
         false ->    
            report_crash(Pid, Module),
            kill
-    end;
- on(_, _State) ->
-    unknown_event.
+    end.
 
 %% @doc Checks whether config parameters of the gossip process exist and are
 %%      valid.

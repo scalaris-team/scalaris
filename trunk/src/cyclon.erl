@@ -45,18 +45,21 @@
 %% {Cache, Node, Cycles, TriggerState}
 %% Node: the scalaris node of this cyclon-task
 %% Cycles: the amount of shuffle-cycles
--type(state() :: {cyclon_cache:cache(), node:node_type() | null, integer(), trigger:state()}).
+-type(state() :: {RandomNodes::cyclon_cache:cache(),
+                  MyNode::node:node_type() | null,
+                  Cycles::integer(), TriggerState::trigger:state()}).
 
 % accepted messages of cyclon process
 -type(message() ::
     {trigger} |
+    {node_update, Node::node:node_type()} |
     {check_state} |
-    {cy_subset, comm:mypid(), cyclon_cache:cache()} |
-    {cy_subset_response, cyclon_cache:cache(), cyclon_cache:cache()} |
+    {cy_subset, SourcePid::comm:mypid(), PSubset::cyclon_cache:cache()} |
+    {cy_subset_response, QSubset::cyclon_cache:cache(), PSubset::cyclon_cache:cache()} |
     {get_node_details_response, node_details:node_details()} |
-    {get_ages, comm:erl_local_pid()} |
-    {get_subset_rand, pos_integer(), comm:erl_local_pid()} |
-    {'$gen_cast', {debug_info, comm:erl_local_pid()}}).
+    {get_ages, SourcePid::comm:erl_local_pid()} |
+    {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
+    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -149,6 +152,7 @@ start_link(InstanceId) ->
 -spec init(module()) -> state().
 init(Trigger) ->
     request_node_details([node, pred, succ]),
+    dht_node:register_for_node_change(self()),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:now(TriggerState),
@@ -165,6 +169,9 @@ on({trigger}, {Cache, Node, Cycles, TriggerState} = State)  ->
         end,
     TriggerState2 = trigger:next(TriggerState),
     {NewCache, Node, Cycles + 1, TriggerState2};
+
+on({node_update, Node}, {Cache, _OldNode, Cycles, TriggerState}) ->
+    {Cache, Node, Cycles, TriggerState};
 
 on({check_state}, State) ->
     check_state(State),
@@ -220,10 +227,7 @@ on({'$gen_cast', {debug_info, Requestor}}, {Cache, _Node, _Cycles, _TriggerState
         [{"cache_size", cyclon_cache:size(Cache)},
          {"cache (age, node):", ""} | cyclon_cache:debug_format_by_age(Cache)],
     comm:send_local(Requestor, {debug_info_response, KeyValueList}),
-    State;
-
-on(_, _State) ->
-    unknown_event.
+    State.
 
 %% @doc enhanced shuffle with age
 enhanced_shuffle(Cache, Node) ->

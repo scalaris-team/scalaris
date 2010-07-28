@@ -78,7 +78,7 @@ init(Trigger) ->
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 
 
--spec on(message(), state()) -> state() | unknown_event.
+-spec on(message(), state()) -> state().
 on({trigger}, {Queue, Subscriber, TriggerState}) ->
         fix_queue:map(fun(X) -> comm:send(node:pidX(X), {ping, comm:this_with_cookie(X)}) end, Queue), 
         NewTriggerState = trigger:next(TriggerState),
@@ -95,10 +95,7 @@ on({subscribe, Node}, {Queue, Subscriber, TriggerState}) ->
     {Queue, gb_sets:insert(Node, Subscriber), TriggerState};
 
 on({unsubscribe, Node}, {Queue, Subscriber, TriggerState}) ->
-    {Queue, gb_sets:del_element(Node, Subscriber), TriggerState};
-
-on(_, _State) ->
-    unknown_event.
+    {Queue, gb_sets:del_element(Node, Subscriber), TriggerState}.
 
 %% @doc Gets the pid of the dn_cache process in the same group as the calling
 %%      process. 

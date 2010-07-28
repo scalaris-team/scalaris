@@ -58,7 +58,7 @@ start_link() ->
 init(_Arg) ->
     ok.
 
--spec on(Message::message(), State::state()) -> state() | unknown_event.
+-spec on(Message::message(), State::state()) -> state().
 on({get_dht_nodes, Pid}, ok) ->
     case comm:is_valid(Pid) of
         true ->
@@ -67,10 +67,7 @@ on({get_dht_nodes, Pid}, ok) ->
         false ->
             ok
     end,
-    ok;
-
-on(_, _State) ->
-    unknown_event.
+    ok.
 
 -spec get_live_dht_nodes() -> [comm:mypid()].
 get_live_dht_nodes() ->

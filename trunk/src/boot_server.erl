@@ -68,7 +68,7 @@ node_list() ->
 % Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec on(message(), state()) -> state() | unknown_event.
+-spec on(message(), state()) -> state().
 on({crash, PID}, {Nodes, Subscriber}) ->
     NewNodes = gb_sets:delete_any(PID, Nodes),
     {NewNodes, Subscriber};
@@ -96,10 +96,7 @@ on({register, Ping_PID}, {Nodes, Subscriber}) ->
 
 on({connect}, State) ->
     % ugly work around for finding the local ip by setting up a socket first
-    State;
-
-on(_, _State) ->
-    unknown_event.
+    State.
 
 -spec init([]) -> state().
 init(_Arg) ->

@@ -80,6 +80,9 @@ start_link(InstanceId) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> {uninit, trigger:state()}.
 init(Trigger) ->
+    % Note: no need to call dht_node:register_for_node_change(self()) since we
+    % get notified of a new node ID via the update_state/3 method that is
+    % called in dht_node's rm_update_neighbors handler
     log:log(info,"[ RT ~p ] starting routingtable", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     {uninit, TriggerState}.

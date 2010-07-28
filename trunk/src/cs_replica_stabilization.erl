@@ -80,23 +80,20 @@ init({Owner, Index, Interval}) ->
     {Owner, Index, Interval, [], []}.
 
 
+on({timeout}, {Owner, Index, Interval, Done, FetchedData}) ->
+    comm:send_local_after(5000, self(), {timeout}),
+    {Owner, Index, Interval, Done, FetchedData};
 
-on({timeout},{Owner, Index, Interval, Done, FetchedData}) ->
-	    comm:send_local_after(5000, self(), {timeout}),
-	    {Owner, Index, Interval, Done, FetchedData};
-on({bulk_read_with_version_response, Interval, NewData},{Owner, Index, Interval, Done, FetchedData}) ->
-	    Done2 = intervals:union(Interval, Done),
-        %TODO: this test is always be true!
-	    case intervals:is_subset(Interval, Done2) of
-            false ->
-                {Owner, Index, Interval, Done2,[FetchedData| NewData]};
-            true ->
-                comm:send_local(Owner , {fetched_data, Index, FetchedData}),
-                kill
-        end;
-on(_, _State) ->
-    unknown_event.
-
+on({bulk_read_with_version_response, Interval, NewData}, {Owner, Index, Interval, Done, FetchedData}) ->
+    Done2 = intervals:union(Interval, Done),
+    %TODO: this test is always be true!
+    case intervals:is_subset(Interval, Done2) of
+        false ->
+            {Owner, Index, Interval, Done2,[FetchedData| NewData]};
+        true ->
+            comm:send_local(Owner, {fetched_data, Index, FetchedData}),
+            kill
+    end.
 
 %%====================================================================
 %% update database functions (TODO)

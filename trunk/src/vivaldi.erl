@@ -51,9 +51,8 @@
 % accepted messages of vivaldi processes
 -type(message() ::
     {trigger} |
-    {cy_cache, [node:node_type()]} |
-    {vivaldi_shuffle, comm:mypid(), network_coordinate(), error()} |
-    {vivaldi_shuffle_reply, comm:mypid(), network_coordinate(), error()} |
+    {cy_cache, RandomNodes::[node:node_type()]} |
+    {vivaldi_shuffle, SourcePid::comm:mypid(), network_coordinate(), error()} |
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |
     {get_coordinate, comm:mypid()} |
     {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
@@ -114,7 +113,7 @@ init(Trigger) ->
 
 % start new vivaldi shuffle
 %% @doc message handler
--spec on(Message::message(), State::state()) -> state() | unknown_event.
+-spec on(Message::message(), State::state()) -> state().
 on({trigger}, {Coordinate, Confidence, TriggerState} ) ->
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
     NewTriggerState = trigger:next(TriggerState),
@@ -171,10 +170,7 @@ on({'$gen_cast', {debug_info, Requestor}},
         [{"coordinate", lists:flatten(io_lib:format("~p", [Coordinate]))},
          {"confidence", Confidence}],
     comm:send_local(Requestor, {debug_info_response, KeyValueList}),
-    State;
-
-on(_, _State) ->
-    unknown_event.
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers

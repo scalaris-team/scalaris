@@ -79,7 +79,7 @@ init([InstanceID, _Options]) ->
     comm:send_local(self(), {msg_delay_periodic}),
     _State = {TableName, _Round = 0}.
 
--spec on(message(), state()) -> state() | unknown_event.
+-spec on(message(), state()) -> state().
 on({msg_delay_req, Seconds, Dest, Msg}, {TableName, Counter} = State) ->
     ?TRACE("msg_delay:on(msg_delay...)~n", []),
     Future = trunc(Counter + Seconds),
@@ -101,7 +101,4 @@ on({msg_delay_periodic} = Trigger, {TableName, Counter} = _State) ->
             pdb:delete(Counter, TableName)
     end,
     comm:send_local_after(1000, self(), Trigger),
-    {TableName, Counter + 1};
-
-on(_, _State) ->
-    unknown_event.
+    {TableName, Counter + 1}.

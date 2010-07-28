@@ -248,7 +248,7 @@ init(_Args) ->
 
 %% @doc Handling call messages
 %% @private
--spec on(message(), null) -> null | unknown_event.
+-spec on(message(), null) -> null.
 on({register_process, InstanceId, Name, Pid}, State) ->
     case ets:insert_new(?MODULE, {{InstanceId, Name}, Pid}) of
         true ->
@@ -272,10 +272,7 @@ on({drop_state}, State) ->
 on({'EXIT', FromPid, _Reason}, State) ->
     Processes = ets:match(?MODULE, {'$1', FromPid}),
     [ets:delete(?MODULE, {InstanceId, Name}) || [{InstanceId, Name}] <- Processes],
-    State;
-
-on(_, _State) ->
-    unknown_event.
+    State.
 
 -spec find_all_groups([{{instanceid(), name()}, pid()}], gb_set()) -> gb_set().
 find_all_groups([], Set) ->
