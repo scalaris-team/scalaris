@@ -69,7 +69,7 @@ start_link(InstanceId) ->
 init(Trigger) ->
     log:log(info,"[ DNC ~p ] starting Dead Node Cache", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:first(TriggerState),
+    TriggerState2 = trigger:now(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new(), TriggerState2}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -31,7 +31,7 @@
 
 -include("scalaris.hrl").
 
--export([init/4, first/1, next/2, stop/1]).
+-export([init/4, now/1, next/2, stop/1]).
 
 -opaque state() :: {trigger:interval_fun(), comm:message_tag(), reference() | ok}.
 
@@ -43,8 +43,8 @@ init(BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, MsgTag) when is_function
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization.
--spec first(state()) -> state().
-first({BaseIntervalFun, MsgTag, TimerRef}) ->
+-spec now(state()) -> state().
+now({BaseIntervalFun, MsgTag, TimerRef}) ->
     comm:send_local(self(), {MsgTag}),
     {BaseIntervalFun, MsgTag, TimerRef}.
 

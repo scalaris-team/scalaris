@@ -88,7 +88,7 @@ init(Trigger) ->
 -spec on(message(), state()) -> state().
 on({init_rm, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
     Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
-    NewTriggerState = trigger:first(TriggerState),
+    NewTriggerState = trigger:now(TriggerState),
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
     cyclon:get_subset_rand_next_interval(1),
     msg_queue:send(QueuedMessages),
