@@ -35,20 +35,21 @@
 -endif.
 
 % state of the routing table loop
+%% userdevguide-begin rt_loop:state
 -opaque(state_init() :: {Id           :: ?RT:key(),
-                  Pred         :: node:node_type(),
-                  Succ         :: node:node_type(),
-                  RTState      :: ?RT:rt(),
-                  TriggerState :: trigger:state()}).
+                         Pred         :: node:node_type(),
+                         Succ         :: node:node_type(),
+                         RTState      :: ?RT:rt(),
+                         TriggerState :: trigger:state()}).
 -type(state_uninit() :: {uninit, TriggerState :: trigger:state()}).
 -type(state() :: state_init() | state_uninit()).
+%% userdevguide-end rt_loop:state
 
 % accepted messages of rt_loop processes
 -type(message() ::
     {init_rt, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
     {update, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
     {stabilize} |
-    {{get_node_details, NewNodeDetails::node_details:node_details()}, pred_succ} |
     {crash, DeadPid::comm:mypid()} |
     ?RT:custom_message()).
 
@@ -104,39 +105,32 @@ on({init_rt, NewId, NewPred, NewSucc}, {_, _, _, OldRT, TriggerState}) ->
     ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
     new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
 
+%% userdevguide-begin rt_loop:update_rt
 % update routing table with changed ID, pred and/or succ
-on({update_rt, NewId, NewPred, NewSucc}, {OldId, _OldPred, OldSucc, OldRT, TriggerState}) ->
-    case ?RT:update(NewId, NewPred, NewSucc,
-                    OldRT, OldId, OldSucc) of
+on({update_rt, NewId, NewPred, NewSucc}, {OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
+    case ?RT:update(NewId, NewPred, NewSucc, OldRT, OldId, OldPred, OldSucc) of
         {trigger_rebuild, NewRT} ->
             T1 = trigger:stop(TriggerState),
             % trigger immediate rebuild
             T2 = trigger:now(T1),
-            T3 = trigger:next(T2),
-            new_state(NewId, NewPred, NewSucc, NewRT, T3);
+            ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
+            new_state(NewId, NewPred, NewSucc, NewRT, T2);
         {ok, NewRT} ->
             ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
             new_state(NewId, NewPred, NewSucc, NewRT, TriggerState)
     end;
+%% userdevguide-end rt_loop:update_rt
 
-% start new periodic stabilization
+%% userdevguide-begin rt_loop:trigger
 on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
-    %io:format("[ RT ] stabilize~n"),
-    Pid = process_dictionary:get_group_member(dht_node),
-    % get new pred and succ from dht_node
-    comm:send_local(Pid , {get_node_details, comm:this_with_cookie(pred_succ), [pred, succ]}),
     % start periodic stabilization
+    % log:log(info, "[ RT ] stabilize~n"),
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     ?RT:check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization
     NewTriggerState = trigger:next(TriggerState),
     new_state(Id, Pred, Succ, NewRTState, NewTriggerState);
-
-% got new predecessor/successor
-on({{get_node_details_response, NewNodeDetails}, pred_succ}, {Id, _, _, RTState, TriggerState}) ->
-    NewPred = node_details:get(NewNodeDetails, pred),
-    NewSucc = node_details:get(NewNodeDetails, succ),
-    new_state(Id, NewPred, NewSucc, RTState, TriggerState);
+%% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
 on({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->

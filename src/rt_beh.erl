@@ -41,7 +41,7 @@ behaviour_info(callbacks) ->
      % trigger for new stabilization round
      {init_stabilize, 3},
      % adapt RT to changed node ID, pred and/or succ
-     {update, 6},
+     {update, 7},
      % dead nodes filtering
      {filter_dead_node, 2},
      % statistics
@@ -59,7 +59,7 @@ behaviour_info(callbacks) ->
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
      % common methods, e.g. from rt_generic.hrl
-     {check, 5}, {check, 6}, {check_fd, 2},
+     {check, 5}, {check, 6},
      {check_config, 0}
     ];
 %% userdevguide-end rt_beh:behaviour

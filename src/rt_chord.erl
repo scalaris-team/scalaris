@@ -26,11 +26,11 @@
 % routingtable behaviour
 -export([empty/1, empty_ext/1,
          hash_key/1, get_random_node_id/0, next_hop/2,
-         init_stabilize/3, update/6,
+         init_stabilize/3, update/7,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          n/0, dump/1, to_list/1, export_rt_to_dht_node/4,
          handle_custom_message/2,
-         check/6, check/5, check_fd/2,
+         check/6, check/5,
          check_config/0]).
 
 -ifdef(with_export_type_support).
@@ -160,9 +160,9 @@ stabilize(Id, Succ, RT, Index, Node) ->
 %% userdevguide-begin rt_chord:update
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
 -spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(),
-             OldRT::rt(), OldId::key(), OldSucc::node:node_type())
-        -> {trigger_rebuild, rt()}.
-update(_Id, _Pred, Succ, _OldRT, _OldId, _OldSucc) ->
+             OldRT::rt(), OldId::key(), OldPred::node:node_type(),
+             OldSucc::node:node_type()) -> {trigger_rebuild, rt()}.
+update(_Id, _Pred, Succ, _OldRT, _OldId, _OldPred, _OldSucc) ->
     % to be on the safe side ...
     {trigger_rebuild, empty(Succ)}.
 %% userdevguide-end rt_chord:update
