@@ -34,17 +34,17 @@
 -type(message() ::
     {reinit} |
     {get_id, PID::pid()} |
-    {set_id, NewKey::?RT:key(), Count::non_neg_integer()}).
--type(state() :: {Key::?RT:key(), Count::non_neg_integer()}).
+    {set_id, NewId::?RT:key(), NewIdVersion::non_neg_integer()}).
+-type(state() :: {Id::?RT:key(), IdVersion::non_neg_integer()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Sets the key of the dht_node including the counter that states how often
 %%      a DHT node's ID changed (the version of the ID).
--spec set_id(NewKey::?RT:key(), Count::non_neg_integer()) -> ok.
-set_id(Key, Count) ->
-    comm:send_local(get_pid(), {set_id, Key, Count}).
+-spec set_id(NewId::?RT:key(), NewIdVersion::non_neg_integer()) -> ok.
+set_id(NewId, NewIdVersion) ->
+    comm:send_local(get_pid(), {set_id, NewId, NewIdVersion}).
 
 %% @doc Reads the key of the dht_node; sends a 'idholder_get_id_response'
 %%      message in response.
@@ -90,22 +90,18 @@ check_config() ->
 -spec init([]) -> state().
 init(Options) ->
     case lists:keyfind({idholder, id}, 1, Options) of
-        {{idholder, id}, Id} ->
-            {Id, 0};
-        false ->
-            {get_initial_key(config:read(key_creator)), 0}
+        {{idholder, id}, Id} -> {Id, 0};
+        _ -> {get_initial_key(config:read(key_creator)), 0}
     end.
 
--spec on(message(), state()) -> state() | unknown_event.
+-spec on(message(), state()) -> state().
 on({reinit}, _State) ->
     {get_initial_key(config:read(key_creator)), 0};
-on({get_id, PID}, {Key, Count} = State) ->
-    comm:send_local(PID, {idholder_get_id_response, Key, Count}),
+on({get_id, PID}, {Id, IdVersion} = State) ->
+    comm:send_local(PID, {idholder_get_id_response, Id, IdVersion}),
     State;
-on({set_id, NewKey, Count}, _State) ->
-    {NewKey, Count};
-on(_, _State) ->
-    unknown_event.
+on({set_id, NewId, NewIdVersion}, _State) ->
+    {NewId, NewIdVersion}.
 %% userdevguide-end gen_component:sample
 
 %% @doc Gets the pid of the idholder process in the same group as the calling

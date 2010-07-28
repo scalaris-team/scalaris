@@ -29,11 +29,12 @@
 -export([measure_latency/3, check_config/0]).
 
 % state of the vivaldi loop
--type(state() :: {comm:erl_local_pid(),
-                  comm:mypid(),
-                  {vivaldi:network_coordinate(), vivaldi:error()},
-                  {integer(), integer(), integer()} | unknown,
-                  [vivaldi:latency()]}).
+-type(state() ::
+    {Owner::comm:erl_local_pid(),
+     RemotePid::comm:mypid(),
+     Token::{vivaldi:network_coordinate(), vivaldi:error()},
+     Start::{MegaSecs::non_neg_integer(), Secs::non_neg_integer(), MicroSecs::non_neg_integer()} | unknown,
+     Latencies::[vivaldi:latency()]}).
 
 % accepted messages of vivaldi_latency processes
 -type(message() :: {pong} | {start_ping} | {shutdown}).
@@ -63,10 +64,7 @@ on({start_ping}, {Owner, RemotePid, Token, _, Latencies}) ->
 
 on({shutdown}, _State) ->
     log:log(info, "shutdown vivaldi_latency due to timeout", []),
-    kill;
-
-on(_, _State) ->
-    unknown_event.
+    kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init

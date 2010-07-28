@@ -38,7 +38,9 @@
 -type(sizes() :: [relative_size()]).
 
 % state of the clustering loop
--type(state() :: {centroids(), sizes(), trigger:state(), trigger:state()}).
+-type(state() :: {Centroids::centroids(), Sizes::sizes(),
+                  ResetTriggerState::trigger:state(),
+                  ClusterTriggerState::trigger:state()}).
 
 % accepted messages of cluistering process
 -type(message() :: 
@@ -137,10 +139,7 @@ on({clustering_shuffle_reply, _RemoteNode, RemoteCentroids, RemoteSizes},
 % return my clusters
 on({query_clustering, Pid}, {Centroids, Sizes, _ResetTriggerState, _ClusterTriggerState} = State) ->
     comm:send(Pid, {query_clustering_response, {Centroids, Sizes}}),
-    State;
-
-on(_, _State) ->
-    unknown_event.
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers

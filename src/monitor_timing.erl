@@ -57,7 +57,7 @@ get_timers() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc message handler
--spec on(Message::message(), State::state()) -> state() | unknown_event.
+-spec on(Message::message(), State::state()) -> state().
 on({log, Timer, Time}, State) ->
     case ets:lookup(?MODULE, Timer) of
         [{Timer, Sum, Count, Min, Max}] ->
@@ -76,10 +76,7 @@ on({get_timers, From}, State) ->
                  {Timer, Sum, Count, Min, Max} <- ets:tab2list(?MODULE)],
     comm:send_local(From, {get_timers_response, Result}),
     ets:delete_all_objects(?MODULE),
-    State;
-
-on(_, _State) ->
-    unknown_event.
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init

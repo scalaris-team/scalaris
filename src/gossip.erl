@@ -82,7 +82,9 @@
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
 %% -> previous and current state, queued messages (get_state messages received
 %% before local values are known) and the state of the trigger.
--type(full_state() :: {state(), state(), msg_queue:msg_queue(), trigger:state()}).
+-type(full_state() :: {PreviousState::state(), CurrentState::state(),
+                       MessageQueue::msg_queue:msg_queue(),
+                       TriggerState::trigger:state()}).
 
 % accepted messages of gossip processes
 -type(message() ::
@@ -91,9 +93,9 @@
     {{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
     {get_state, comm:mypid(), gossip_state:values_internal()} |
     {get_state_response, gossip_state:values_internal()} |
-    {cy_cache, [node:node_type()]} |
-    {get_values_all, comm:erl_local_pid()} | 
-    {get_values_best, comm:erl_local_pid()} |
+    {cy_cache, RandomNodes::[node:node_type()]} |
+    {get_values_all, SourcePid::comm:erl_local_pid()} | 
+    {get_values_best, SourcePid::comm:erl_local_pid()} |
     {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -191,7 +193,7 @@ init(Trigger) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc message handler
--spec on(message(), full_state()) -> full_state() | unknown_event.
+-spec on(message(), full_state()) -> full_state().
 on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
     % this message is received continuously when the Trigger calls
     % see gossip_trigger and gossip_interval in the scalaris.cfg file
@@ -368,14 +370,7 @@ on({'$gen_cast', {debug_info, Requestor}},
          {"best_size_ldr",        gossip_state:get(BestValues, size_ldr)},
          {"best_size_kr",         gossip_state:get(BestValues, size_kr)}],
     comm:send_local(Requestor, {debug_info_response, KeyValueList}),
-    FullState;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Unknown events
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-on(_Message, _State) ->
-    unknown_event.
+    FullState.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
@@ -635,7 +630,9 @@ request_new_round_if_leader(State) ->
 request_local_info() ->
     % ask for local load and key range:
     DHT_Node = process_dictionary:get_group_member(dht_node),
-    comm:send_local(DHT_Node, {get_node_details, comm:this_with_cookie(local_info), [pred, node, load]}).
+    comm:send_local(DHT_Node, {get_node_details,
+                               comm:this_with_cookie(local_info),
+                               [pred, node, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
 %%      on({cy_cache, Cache},State) will handle the response

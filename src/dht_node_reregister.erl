@@ -54,7 +54,7 @@ init(Trigger) ->
 % Internal Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec on(message(), state()) -> state() | unknown_event.
+-spec on(message(), state()) -> state().
 on({go}, {uninit, TriggerState}) ->
     NewTriggerState = trigger:now(TriggerState),
     {init, NewTriggerState};
@@ -70,10 +70,7 @@ on({trigger}, {init, TriggerState}) ->
 on({go}, {init, TriggerState}) ->
     trigger_reregister(),
     NewTriggerState = trigger:next(TriggerState),
-    {init, NewTriggerState};
-
-on(_, _State) ->
-    unknown_event.
+    {init, NewTriggerState}.
 
 -spec trigger_reregister() -> ok.
 trigger_reregister() ->

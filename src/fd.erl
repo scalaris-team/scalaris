@@ -152,7 +152,7 @@ init(_Args) ->
     {null}.
 
 %% @private
--spec on(message(), state()) -> state() | unknown_event.
+-spec on(message(), state()) -> state().
 on({subscribe_list, Subscriber, PidList, Cookie}, State) ->
     [make_pinger(Pid) || Pid <- PidList],
     [fd_db:add_subscription(Subscriber, Pid, Cookie) || Pid <- PidList],
@@ -205,10 +205,7 @@ on({crash, Target}, State) ->
               end
               || {Subscriber, Cookie} <- Subscribers]
     end,
-    State;
-
- on(_, _State) ->
-    unknown_event.
+    State.
 
 %%% Internal functions
 -spec make_pinger(Target::comm:mypid()) -> ok.
