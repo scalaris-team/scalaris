@@ -100,9 +100,9 @@ on(Message, {uninit, TriggerState}) ->
     {uninit, TriggerState};
 
 % re-initialize routing table
-on({init_rt, NewId, NewPred, NewSucc}, {_, _, _, OldRT, TriggerState}) ->
+on({init_rt, NewId, NewPred, NewSucc}, {_, OldPred, OldSucc, OldRT, TriggerState}) ->
     NewRT = ?RT:empty(NewSucc),
-    ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
+    ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
     new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
 
 %% userdevguide-begin rt_loop:update_rt
@@ -113,10 +113,10 @@ on({update_rt, NewId, NewPred, NewSucc}, {OldId, OldPred, OldSucc, OldRT, Trigge
             T1 = trigger:stop(TriggerState),
             % trigger immediate rebuild
             T2 = trigger:now(T1),
-            ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
+            ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
             new_state(NewId, NewPred, NewSucc, NewRT, T2);
         {ok, NewRT} ->
-            ?RT:check(OldRT, NewRT, NewId, NewPred, NewSucc),
+            ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
             new_state(NewId, NewPred, NewSucc, NewRT, TriggerState)
     end;
 %% userdevguide-end rt_loop:update_rt

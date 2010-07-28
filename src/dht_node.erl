@@ -290,7 +290,7 @@ on({drop_data, Data, Sender}, State) ->
     dht_node_state:set_db(State, DB);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Bulk owner messages (see bulkowner.erl) 
+% Bulk owner messages (see bulkowner.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({bulk_owner, I, Msg}, State) ->
     bulkowner:bulk_owner(State, I, Msg),
@@ -306,7 +306,7 @@ on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Misc. 
+% Misc.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_node_details, Pid}, State) ->
     comm:send(Pid, {get_node_details_response, dht_node_state:details(State)}),

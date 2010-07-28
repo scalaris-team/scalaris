@@ -59,7 +59,7 @@ behaviour_info(callbacks) ->
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
      % common methods, e.g. from rt_generic.hrl
-     {check, 5}, {check, 6},
+     {check, 5}, {check, 6}, {check, 7},
      {check_config, 0}
     ];
 %% userdevguide-end rt_beh:behaviour

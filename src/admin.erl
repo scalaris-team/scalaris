@@ -93,22 +93,38 @@ check_ring_deep() ->
     case check_ring() of
         ok ->
             Nodes = statistics:get_ring_details(),
-            lists:foldl(fun check_ring_deep_foldl/2, ok, Nodes);
+            NodePids = strip_node_details(Nodes),
+            case lists:foldl(fun check_ring_deep_foldl/2,
+                             {ok, NodePids}, Nodes) of
+                {ok, NodePids} ->
+                    ok;
+                X ->
+                    X
+            end;
         X ->
             X
     end.
 
-check_ring_deep_foldl({ok, NodeDetails}, ok) ->
+strip_node_details([]) -> [];
+strip_node_details([{ok, NodeDetails} | Rest]) ->
+    [node_details:get(NodeDetails, node) | strip_node_details(Rest)];
+strip_node_details([_ | Rest]) ->
+    strip_node_details(Rest).
+
+check_ring_deep_foldl({ok, NodeDetails}, {ok, NodePids}) ->
     PredList = node_details:get(NodeDetails, predlist),
     SuccList = node_details:get(NodeDetails, succlist),
-    case lists:all(fun node:is_valid/1, PredList) andalso
-          lists:all(fun node:is_valid/1, SuccList) of
+    CheckIsKnownNode = fun (Node) ->
+                               lists:member(Node, NodePids)
+                       end,
+    case lists:all(CheckIsKnownNode, PredList) andalso
+          lists:all(CheckIsKnownNode, SuccList) of
         true ->
-            ok;
+            {ok, NodePids};
         _ ->
             {error, PredList, SuccList}
     end;
-check_ring_deep_foldl(X, ok) ->
+check_ring_deep_foldl(X, {ok, _}) ->
     X;
 check_ring_deep_foldl(_, X) ->
     X.
