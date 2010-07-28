@@ -45,17 +45,17 @@ end_per_suite(_Config) ->
     ok.
 
 new(_Config) ->
-    ?assert(intervals:is_well_formed(intervals:new("a", "b"))),
+    ?assert(intervals:is_well_formed(intervals:new('[', "a", "b", ']'))),
     ?equals(intervals:new(minus_infinity), intervals:new('(',plus_infinity,minus_infinity,']')).
 
 is_empty(_Config) ->
-    NotEmpty = intervals:new("a", "b"),
+    NotEmpty = intervals:new('[', "a", "b", ']'),
     Empty = intervals:empty(),
     ?assert(not intervals:is_empty(NotEmpty)),
     ?assert(intervals:is_empty(Empty)).
 
 intersection(_Config) ->
-    NotEmpty = intervals:new("a", "b"),
+    NotEmpty = intervals:new('[', "a", "b", ']'),
     Empty = intervals:empty(),
     ?assert(intervals:is_empty(intervals:intersection(NotEmpty, Empty))),
     ?assert(intervals:is_empty(intervals:intersection(Empty, NotEmpty))),
@@ -67,17 +67,27 @@ intersection(_Config) ->
 
 tc1(_Config) ->
     % some tests that have once failed:
-    ?assert(intervals:is_subset(intervals:union(intervals:new(minus_infinity, 42312921949186639748260586507533448975),
-                                                intervals:new(316058952221211684850834434588481137334, plus_infinity)),
-                                intervals:new(316058952221211684850834434588481137334, 127383513679421255614104238365475501839))),
+    ?assert(intervals:is_subset(
+              intervals:union(
+                intervals:new('[', minus_infinity,
+                              42312921949186639748260586507533448975, ']'),
+                intervals:new('[', 316058952221211684850834434588481137334,
+                              plus_infinity, ']')),
+              intervals:new('[', 316058952221211684850834434588481137334,
+                            127383513679421255614104238365475501839, ']'))),
 
-    ?assert(intervals:is_subset(intervals:union(intervals:new(187356034246551717222654062087646951235),
-                                                intervals:new(36721483204272088954146455621100499974)),
-                                intervals:new(36721483204272088954146455621100499974, 187356034246551717222654062087646951235))),
-    
-    ?equals(intervals:union({interval,'[', minus_infinity, plus_infinity,')'}, [{interval,'[',minus_infinity,4,']'}, {element,plus_infinity}]),
+    ?assert(intervals:is_subset(
+              intervals:union(
+                intervals:new(187356034246551717222654062087646951235),
+                intervals:new(36721483204272088954146455621100499974)),
+              intervals:new('[', 36721483204272088954146455621100499974,
+                            187356034246551717222654062087646951235, ']'))),
+
+    ?equals(intervals:union({interval,'[', minus_infinity, plus_infinity,')'},
+                            [{interval,'[',minus_infinity,4,']'},
+                             {element,plus_infinity}]),
             intervals:all()),
-    
+
     ok.
 
 normalize(_Config) ->
@@ -149,23 +159,23 @@ tester_new1(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% intervals:new/2, intervals:in/2 and intervals:is_continuous/1
+% intervals:new/4, intervals:in/2 and intervals:is_continuous/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec(prop_new2_well_formed/2 :: (intervals:key(), intervals:key()) -> boolean()).
 prop_new2_well_formed(X, Y) ->
-    intervals:is_well_formed(intervals:new(X, Y)).
+    intervals:is_well_formed(intervals:new('[', X, Y, ']')).
 
 -spec(prop_new2_continuous/2 :: (intervals:key(), intervals:key()) -> boolean()).
 prop_new2_continuous(X, Y) ->
-    intervals:is_continuous(intervals:new(X, Y)).
+    intervals:is_continuous(intervals:new('[', X, Y, ']')).
 
 -spec(prop_new2/2 :: (intervals:key(), intervals:key()) -> boolean()).
 prop_new2(X, Y) ->
-    intervals:new(X, Y) =:= intervals:new('[', X, Y, ']') andalso
-        intervals:in(X, intervals:new(X, Y)) andalso
-        intervals:in(Y, intervals:new(X, Y)) andalso
-        not intervals:is_empty(intervals:new(X, Y)).
+    intervals:new('[', X, Y, ']') =:= intervals:new('[', X, Y, ']') andalso
+        intervals:in(X, intervals:new('[', X, Y, ']')) andalso
+        intervals:in(Y, intervals:new('[', X, Y, ']')) andalso
+        not intervals:is_empty(intervals:new('[', X, Y, ']')).
 
 tester_new2_well_formed(_Config) ->
     tester:test(intervals_SUITE, prop_new2_well_formed, 2, 1000).
@@ -216,24 +226,24 @@ tester_new4(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% intervals:mk_from_node_ids/2, intervals:in/2 and intervals:is_continuous/1
+% node:mk_interval_between_ids/2, intervals:in/2 and intervals:is_continuous/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec(prop_mk_from_node_ids_well_formed/2 :: (?RT:key(), ?RT:key()) -> boolean()).
 prop_mk_from_node_ids_well_formed(X, Y) ->
-    intervals:is_well_formed(intervals:mk_from_node_ids(X, Y)).
+    intervals:is_well_formed(node:mk_interval_between_ids(X, Y)).
 
 -spec(prop_mk_from_node_ids_continuous/2 :: (?RT:key(), ?RT:key()) -> boolean()).
 prop_mk_from_node_ids_continuous(X, Y) ->
-    Interval = intervals:mk_from_node_ids(X, Y),
+    Interval = node:mk_interval_between_ids(X, Y),
     ?implies(not intervals:is_empty(Interval), intervals:is_continuous(Interval)).
 
 -spec(prop_mk_from_node_ids/2 :: (?RT:key(), ?RT:key()) -> boolean()).
 prop_mk_from_node_ids(X, Y) ->
-    intervals:new('(', X, Y, ']') =:= intervals:mk_from_node_ids(X, Y) andalso
-        ?implies(X =/= Y, not intervals:in(X, intervals:mk_from_node_ids(X, Y))) andalso
-        intervals:in(Y, intervals:mk_from_node_ids(X, Y)) andalso
-        not intervals:is_empty(intervals:mk_from_node_ids(X, Y)).
+    intervals:new('(', X, Y, ']') =:= node:mk_interval_between_ids(X, Y) andalso
+        ?implies(X =/= Y, not intervals:in(X, node:mk_interval_between_ids(X, Y))) andalso
+        intervals:in(Y, node:mk_interval_between_ids(X, Y)) andalso
+        not intervals:is_empty(node:mk_interval_between_ids(X, Y)).
 
 tester_mk_from_node_ids_well_formed(_Config) ->
     tester:test(intervals_SUITE, prop_mk_from_node_ids_well_formed, 2, 1000).
@@ -246,18 +256,18 @@ tester_mk_from_node_ids(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% intervals:mk_from_nodes/2, intervals:in/2 and intervals:is_continuous/1
+% node:mk_interval_between_nodes/2, intervals:in/2 and intervals:is_continuous/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec(prop_mk_from_nodes_well_formed/2 :: (node:node_type(), node:node_type()) -> boolean()).
 prop_mk_from_nodes_well_formed(X, Y) ->
     %TODO: why does the tester create 'undefined' entries for node ids?
     ?implies(node:id(X) =/= undefined andalso node:id(Y) =/= undefined,
-             intervals:is_well_formed(intervals:mk_from_nodes(X, Y))).
+             intervals:is_well_formed(node:mk_interval_between_nodes(X, Y))).
 
 -spec(prop_mk_from_nodes_continuous/2 :: (node:node_type(), node:node_type()) -> boolean()).
 prop_mk_from_nodes_continuous(X, Y) ->
-    Interval = intervals:mk_from_nodes(X, Y),
+    Interval = node:mk_interval_between_nodes(X, Y),
     %TODO: why does the tester create 'undefined' entries for node ids?
     ?implies(node:id(X) =/= undefined andalso node:id(Y) =/= undefined andalso
                  not intervals:is_empty(Interval),
@@ -267,10 +277,10 @@ prop_mk_from_nodes_continuous(X, Y) ->
 prop_mk_from_nodes(X, Y) ->
     %TODO: why does the tester create 'undefined' entries for node ids?
     ?implies(node:id(X) =/= undefined andalso node:id(Y) =/= undefined,
-             intervals:new('(', node:id(X), node:id(Y), ']') =:= intervals:mk_from_nodes(X, Y) andalso
-                 ?implies(node:id(X) =/= node:id(Y), not intervals:in(node:id(X), intervals:mk_from_nodes(X, Y))) andalso
-                 intervals:in(node:id(Y), intervals:mk_from_nodes(X, Y)) andalso
-                 not intervals:is_empty(intervals:mk_from_nodes(X, Y))).
+             intervals:new('(', node:id(X), node:id(Y), ']') =:= node:mk_interval_between_nodes(X, Y) andalso
+                 ?implies(node:id(X) =/= node:id(Y), not intervals:in(node:id(X), node:mk_interval_between_nodes(X, Y))) andalso
+                 intervals:in(node:id(Y), node:mk_interval_between_nodes(X, Y)) andalso
+                 not intervals:is_empty(node:mk_interval_between_nodes(X, Y))).
 
 tester_mk_from_nodes_well_formed(_Config) ->
     tester:test(intervals_SUITE, prop_mk_from_nodes_well_formed, 2, 1000).

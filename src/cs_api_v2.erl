@@ -127,7 +127,7 @@ test_and_set(Key, OldValue, NewValue) ->
 %@doc read a range of key-value pairs
 -spec range_read(intervals:key(), intervals:key()) -> {ok | timeout, [db_entry:entry()]}.
 range_read(From, To) ->
-    Interval = intervals:new(From, To),
+    Interval = intervals:new('[', From, To, ']'),
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_with_version, comm:this()}),
     TimerRef =

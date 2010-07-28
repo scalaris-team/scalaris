@@ -14,11 +14,10 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc    Bulk owner operations (for now only broadcasting).
-%% @end
+
 %% @version $Id$
 %% @reference Ali Ghodsi, <em>Distributed k-ary System: Algorithms for Distributed Hash Tables</em>, PhD Thesis, page 129.
 -module(bulkowner).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -68,7 +67,7 @@ bulk_owner(State, I, Msg) ->
 bulk_owner_iter([], _I, _Msg, _Limit) ->
     ok;
 bulk_owner_iter([Head | Tail], I, Msg, Limit) ->
-    Interval_Head_Limit = intervals:mk_from_node_ids(node:id(Head), Limit),
+    Interval_Head_Limit = node:mk_interval_between_ids(node:id(Head), Limit),
     Range = intervals:intersection(I, Interval_Head_Limit),
 %%     ct:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
     NewLimit = case intervals:is_empty(Range) of

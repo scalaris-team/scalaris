@@ -224,7 +224,7 @@ get_load_and_middle(_Config) ->
     DB5 = ?TEST_DB:write(DB4, "Key3", "Value3", 1),
     DB6 = ?TEST_DB:write(DB5, "Key4", "Value4", 1),
     OrigFullList = ?TEST_DB:get_data(DB6),
-    {DB7, HisList} = ?TEST_DB:split_data(DB6, intervals:mk_from_node_ids("Key2", "Key4")),
+    {DB7, HisList} = ?TEST_DB:split_data(DB6, node:mk_interval_between_ids("Key2", "Key4")),
     ?equals(?TEST_DB:read(DB7, "Key3"), {ok, "Value3", 1}),
     ?equals(?TEST_DB:read(DB7, "Key4"), {ok, "Value4", 1}),
     ?equals(?TEST_DB:get_load(DB7), 2),

@@ -14,7 +14,7 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc    node data structure + functions
-%% @end
+
 %% @version $Id$
 -module(node).
 -author('schuett@zib.de').
@@ -24,6 +24,8 @@
          new/3, null/0, is_valid/1,
          equals/2, is_newer/2, newer/2, is_me/1,
          update_id/2]).
+%% intervals between nodes
+-export([mk_interval_between_ids/2, mk_interval_between_nodes/2]).
 
 -include("scalaris.hrl").
 
@@ -97,6 +99,21 @@ is_newer(#node{pid=PID, id=Id1, id_version=IdVersion1}, #node{pid=PID, id=Id2, i
             throw('got two nodes with same IDversion but different ID');
         true -> false
     end.
+
+%% @doc Creates an interval that covers all keys a node with MyKey is
+%%      responsible for if his predecessor has PredKey, i.e. (PredKey, MyKey]
+-spec mk_interval_between_ids(PredKey::?RT:key(), MyKey::?RT:key())
+                             -> intervals:interval().
+mk_interval_between_ids(PredKey, MyKey) ->
+    intervals:new('(', PredKey, MyKey, ']').
+
+%% @doc Creates an interval that covers all keys a node is responsible for given
+%%      his predecessor, i.e. (node:id(PredKey), node:id(MyKey)]
+-spec mk_interval_between_nodes(Pred::node:node_type(),
+                                Node::node:node_type())
+                               -> intervals:interval().
+mk_interval_between_nodes(Pred, Node) ->
+    mk_interval_between_ids(node:id(Pred), node:id(Node)).
 
 %% @doc Determines the newer instance of two representations of the same node.
 %%      Note: Both nodes need to share the same PID, otherwise an exception of

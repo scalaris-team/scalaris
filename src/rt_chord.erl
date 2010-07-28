@@ -146,7 +146,7 @@ stabilize(Id, Succ, RT, Index, Node) ->
         andalso (node:id(Succ) =/= node:id(Node))   % reached succ?
         andalso (not intervals:in(                  % there should be nothing shorter
                    node:id(Node),                   %   than succ
-                   intervals:mk_from_node_ids(Id, node:id(Succ)))) of
+                   node:mk_interval_between_ids(Id, node:id(Succ)))) of
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
