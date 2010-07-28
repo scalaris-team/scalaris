@@ -30,7 +30,7 @@
          filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
          dump/1, to_list/1, export_rt_to_dht_node/4, n/0,
          handle_custom_message/2,
-         check/6, check/5,
+         check/5, check/6, check/7,
          check_config/0]).
 
 %% userdevguide-begin rt_simple:types
