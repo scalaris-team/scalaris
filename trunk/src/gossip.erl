@@ -58,10 +58,10 @@
 %% @end
 %% @reference M. Jelasity, A. Montresor, O. Babaoglu: Gossip-based aggregation
 %% in large dynamic networks. ACM Trans. Comput. Syst. 23(3), 219-252 (2005)
-%% @version $Id$
+%% @version $Id: gossip.erl 932 2010-07-28 09:34:51Z kruber@zib.de $
 -module(gossip).
 -author('kruber@zib.de').
--vsn('$Id$').
+-vsn('$Id: gossip.erl 932 2010-07-28 09:34:51Z kruber@zib.de $').
 
 -behaviour(gen_component).
 
@@ -666,7 +666,7 @@ calc_initial_avg_kr(Pred, Me) ->
         end
     catch % keys might not support subtraction or ?RT:n() might throw
         throw:not_supported -> unknown;
-        exit:{badarith, _} -> unknown
+        error:badarith -> unknown
     end.
 
 %% @doc Checks whether config parameters of the gossip process exist and are
