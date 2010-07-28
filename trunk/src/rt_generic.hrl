@@ -13,13 +13,14 @@
 %   limitations under the License.
 
 %%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Generic code for routing table implementations.
+%%% @doc Generic code for routing table implementations.
 %%%         
-%%%         Note: Including modules need to provide some types and functions,
-%%%         i.e. rt(), key(), export_rt_to_dht_node/4, to_pid_list/1
+%%% Note: Including modules need to provide some types and functions, i.e.
+%%% rt(), key(), export_rt_to_dht_node/4, to_pid_list/1
 %%% @end
 %% @version $Id$
 
+%% userdevguide-begin rt_generic:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/6).
 -spec check(Old::rt(), New::rt(), key(), node:node_type(),
@@ -36,16 +37,10 @@ check(X, X, _Id, _Pred, _Succ, _) ->
 check(OldRT, NewRT, Id, Pred, Succ, true) ->
     Pid = process_dictionary:get_group_member(dht_node),
     comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}),
-    check_fd(NewRT, OldRT);
+    % update failure detector:
+    NewPids = to_pid_list(NewRT), OldPids = to_pid_list(OldRT),
+    fd:update_subscriptions(OldPids, NewPids);
 check(_OldRT, NewRT, Id, Pred, Succ, false) ->
     Pid = process_dictionary:get_group_member(dht_node),
     comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, Pred, Succ)}).
-
-%% @doc Updates the failure detector in case the routing table changed.
--spec check_fd(Old::rt(), New::rt()) -> ok.
-check_fd(X, X) ->
-    ok;
-check_fd(NewRT, OldRT) ->
-    NewPids = to_pid_list(NewRT),
-    OldPids = to_pid_list(OldRT),
-    fd:update_subscriptions(OldPids, NewPids).
+%% userdevguide-end rt_generic:check
