@@ -111,7 +111,7 @@ on({update_rt, NewId, NewPred, NewSucc}, {OldId, _OldPred, OldSucc, OldRT, Trigg
         {trigger_rebuild, NewRT} ->
             T1 = trigger:stop(TriggerState),
             % trigger immediate rebuild
-            T2 = trigger:first(T1),
+            T2 = trigger:now(T1),
             T3 = trigger:next(T2),
             new_state(NewId, NewPred, NewSucc, NewRT, T3);
         {ok, NewRT} ->

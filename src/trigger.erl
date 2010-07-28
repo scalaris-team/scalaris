@@ -21,7 +21,7 @@
 %% The basic pattern for the use of this module is as follows:
 %% <p><code>
 %%  TriggerState = trigger:init(Trigger, ?MODULE),<br />
-%%  TriggerState2 = trigger:first(TriggerState)
+%%  TriggerState2 = trigger:now(TriggerState)
 %% </code></p>
 %% Then on each received <code>{trigger}</code> message, the trigger needs to
 %% be told to issue another <code>{trigger}</code> message:
@@ -41,7 +41,7 @@
 
 -include("scalaris.hrl").
 
--export([init/2, init/3, init/4, init/5, first/1, next/2, next/1, stop/1]).
+-export([init/2, init/3, init/4, init/5, now/1, next/2, next/1, stop/1]).
 
 -ifdef(with_export_type_support).
 -export_type([interval/0, interval_fun/0, state/0]).
@@ -91,9 +91,9 @@ init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization.
--spec first(state()) -> state().
-first({Trigger, TriggerState}) ->
-    {Trigger, Trigger:first(TriggerState)}.
+-spec now(state()) -> state().
+now({Trigger, TriggerState}) ->
+    {Trigger, Trigger:now(TriggerState)}.
 
 %% @doc Sets the trigger to send its message after BaseIntervalFun()
 %%      milliseconds.

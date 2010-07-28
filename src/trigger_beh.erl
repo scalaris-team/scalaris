@@ -29,7 +29,7 @@
 behaviour_info(callbacks) ->
     [
      {init, 4},
-     {first, 1},
+     {now, 1},
      {next, 2},
      {stop, 1}
     ];

@@ -56,7 +56,7 @@ init(Trigger) ->
 
 -spec on(message(), state()) -> state() | unknown_event.
 on({go}, {uninit, TriggerState}) ->
-    NewTriggerState = trigger:first(TriggerState),
+    NewTriggerState = trigger:now(TriggerState),
     {init, NewTriggerState};
 
 on(_, {uninit, _TriggerState} = State) ->

@@ -105,7 +105,7 @@ start_link(InstanceId) ->
 init(Trigger) ->
     log:log(info,"[ Vivaldi ~p ] starting~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:first(TriggerState),
+    TriggerState2 = trigger:now(TriggerState),
     {random_coordinate(), 1.0, TriggerState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

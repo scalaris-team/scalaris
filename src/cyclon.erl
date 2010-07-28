@@ -151,7 +151,7 @@ init(Trigger) ->
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:first(TriggerState),
+    TriggerState2 = trigger:now(TriggerState),
     log:log(info,"[ CY ] Cyclon spawn: ~p~n", [comm:this()]),
     {cyclon_cache:new(), null, 0, TriggerState2}.
 

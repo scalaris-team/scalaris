@@ -71,9 +71,9 @@ start_link(InstanceId) ->
 -spec init({module(), module()}) -> state().
 init({ResetTrigger, ClusterTrigger}) ->
     ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
-    ResetTriggerState2 = trigger:first(ResetTriggerState),
+    ResetTriggerState2 = trigger:now(ResetTriggerState),
     ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
-    ClusterTriggerState2 = trigger:first(ClusterTriggerState),
+    ClusterTriggerState2 = trigger:now(ClusterTriggerState),
     log:log(info,"dc_clustering spawn: ~p~n", [comm:this()]),
     {[], [], ResetTriggerState2, ClusterTriggerState2}.
 

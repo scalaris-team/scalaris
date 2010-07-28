@@ -181,7 +181,7 @@ start_link(InstanceId) ->
 init(Trigger) ->
     log:log(info,"[ Gossip ~p ] starting~n", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:first(TriggerState),
+    TriggerState2 = trigger:now(TriggerState),
     PreviousState = gossip_state:new_state(),
     State = gossip_state:new_state(),
     {PreviousState, State, [], TriggerState2}.
