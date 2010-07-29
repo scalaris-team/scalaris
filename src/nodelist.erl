@@ -42,6 +42,7 @@
          to_list/1,
          
          % miscellaneous:
+         succ_ord/3,
          lupdate_ids/2, lremove_outdated/1, lremove_outdated/2]).
 
 -include("scalaris.hrl").
