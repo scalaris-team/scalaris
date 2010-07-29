@@ -33,13 +33,15 @@
 -export([get_base_interval/0, get_min_interval/0, get_max_interval/0,
          check_config/0]).
 
--type(state() :: {Neighborhood   :: nodelist:neighborhood(),
-                  RandomViewSize :: pos_integer(),
-                  Interval       :: pos_integer(),
-                  TriggerState   :: trigger:state(),
-                  Cache          :: [node:node_type()], % random cyclon nodes
-                  Churn          :: boolean()}
-     | {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState :: trigger:state()}).
+-type(state_init() :: {Neighborhood   :: nodelist:neighborhood(),
+                       RandomViewSize :: pos_integer(),
+                       Interval       :: base_interval | min_interval | max_interval,
+                       TriggerState   :: trigger:state(),
+                       Cache          :: [node:node_type()], % random cyclon nodes
+                       Churn          :: boolean()}).
+-type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
+                         TriggerState :: trigger:state()}).
+-type(state() :: state_init() | state_uninit()).
 
 % accepted messages
 -type(message() ::
@@ -48,12 +50,13 @@
     {cy_cache, Cache::[node:node_type()]} |
     {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()} |
+    {get_node_details_response, NodeDetails::node_details:node_details()} |
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
     {check_ring, Token::non_neg_integer(), Master::node:node_type()} |
     {init_check_ring, Token::non_neg_integer()} |
-    {notify_new_pred, Pred::node:node_type()} |
-    {notify_new_succ, Succ::node:node_type()} |
+    {notify_new_pred, NewPred::node:node_type()} |
+    {notify_new_succ, NewSucc::node:node_type()} |
     {leave, SourcePid::comm:erl_local_pid()} |
     {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
@@ -89,17 +92,18 @@ init(Trigger) ->
 on({init_rm, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
     Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
     NewTriggerState = trigger:now(TriggerState),
+    % make Pred++Succ unique and subscribe to fd:
     fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
     cyclon:get_subset_rand_next_interval(1),
     msg_queue:send(QueuedMessages),
-    {Neighborhood, config:read(cyclon_cache_size),
-     stabilizationInterval_min(), NewTriggerState, [], true};
+    {Neighborhood, config:read(cyclon_cache_size), min_interval,
+     NewTriggerState, [], true};
 
 on(Msg, {uninit, QueuedMessages, TriggerState}) ->
     {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState};
 
 on({trigger},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
+   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
     % Trigger an update of the Random view
     %
     RndView = get_RndView(RandViewSize, Cache),
@@ -107,37 +111,37 @@ on({trigger},
     {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
     %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
     % Test for being alone:
-    NewTriggerState =
-        case nodelist:has_real_pred(Neighborhood) andalso
-                      nodelist:has_real_succ(Neighborhood) of
-            false -> % our node is the only node in the system
-                %TODO: do we need to tell the DHT node here? doesn't it already know?
-                rm_beh:update_dht_node(Neighborhood),
-                TriggerState;
-            _ -> % there is another node in the system
-                RequestPredsMinCount =
-                    case nodelist:has_real_pred(Neighborhood) of
-                        true  -> get_pred_list_length() - length(nodelist:preds(Neighborhood));
-                        false -> get_pred_list_length()
-                    end,
-                RequestSuccsMinCount =
-                    case nodelist:has_real_succ(Neighborhood) of
-                        true  -> get_succ_list_length() - length(nodelist:succs(Neighborhood));
-                        false -> get_succ_list_length()
-                    end,
-                Message = {rm_buffer, Neighborhood, RequestPredsMinCount, RequestSuccsMinCount},
-                comm:send_to_group_member(node:pidX(Succ), ring_maintenance,
-                                          Message),
-                case Pred =/= Succ of
-                    true ->
-                        comm:send_to_group_member(node:pidX(Pred),
-                                                  ring_maintenance, Message);
-                    false ->
-                        ok
+    case nodelist:has_real_pred(Neighborhood) andalso
+             nodelist:has_real_succ(Neighborhood) of
+        false -> % our node is the only node in the system
+            %TODO: do we need to tell the DHT node here? doesn't it already know?
+            rm_beh:update_dht_node(Neighborhood),
+            % no need to set a new trigger - we will be actively called by
+            % any new node and set the trigger then (see handling of
+            % notify_new_succ and notify_new_pred)
+            State;
+        _ -> % there is another node in the system
+            RequestPredsMinCount =
+                case nodelist:has_real_pred(Neighborhood) of
+                    true -> get_pred_list_length() - length(nodelist:preds(Neighborhood));
+                    _    -> get_pred_list_length()
                 end,
-                trigger:next(TriggerState, base_interval)
-        end,
-   {Neighborhood, RandViewSize, Interval, NewTriggerState, Cache, Churn};
+            RequestSuccsMinCount =
+                case nodelist:has_real_succ(Neighborhood) of
+                    true -> get_succ_list_length() - length(nodelist:succs(Neighborhood));
+                    _    -> get_succ_list_length()
+                end,
+            % send succ and pred our known nodes and request their nodes
+            Message = {rm_buffer, Neighborhood, RequestPredsMinCount, RequestSuccsMinCount},
+            comm:send_to_group_member(node:pidX(Succ), ring_maintenance, Message),
+            case Pred =/= Succ of
+                true ->
+                    comm:send_to_group_member(node:pidX(Pred), ring_maintenance, Message);
+                _ -> ok
+            end,
+            NewTriggerState = trigger:next(TriggerState, Interval),
+            {Neighborhood, RandViewSize, base_interval, NewTriggerState, Cache, Churn}
+    end;
 
 % got empty cyclon cache
 on({cy_cache, []},
@@ -158,71 +162,62 @@ on({cy_cache, NewCache},
     % trigger new cyclon cache request
     cyclon:get_subset_rand_next_interval(RandViewSizeNew),
     MyRndView = get_RndView(RandViewSizeNew, NewCache),
-    {NewNeighborhood, NewInterval, NewChurn} =
-        update_view(Neighborhood, MyRndView,
-                    nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood), get_pred_list_length(), get_succ_list_length()),
-                    Interval, Churn),
-    {NewNeighborhood, RandViewSizeNew, NewInterval, TriggerState, NewCache, NewChurn};
+    trigger_update(Neighborhood, MyRndView,
+                   nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
+                                            get_pred_list_length(),
+                                            get_succ_list_length())),
+    {Neighborhood, RandViewSizeNew, Interval, TriggerState, NewCache, Churn};
 
 % got shuffle request
 on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
+   {Neighborhood, RandViewSize, _Interval, _TriggerState, Cache, _Churn} = State) ->
     MyRndView = get_RndView(RandViewSize, Cache),
-    MyView = lists:append(nodelist:to_list(Neighborhood), MyRndView),
+    MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
     OtherNode = nodelist:node(OtherNeighbors),
     OtherNodeId = node:id(OtherNode),
     OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
     OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
-    NeighborsToSendTmp = nodelist:mk_neighborhood(MyView, OtherNode, get_pred_list_length(), get_succ_list_length()),
-    NeighborsToSend = 
-        case (OtherNodeId =:= OtherLastPredId) orelse (OtherNodeId =:= OtherLastSuccId) of
-            true  -> NeighborsToSendTmp;
-            false ->
-                nodelist:filter_min_length(NeighborsToSendTmp,
-                                           fun(N) ->
-                                                   intervals:in(node:id(N), intervals:new('(', OtherNodeId, OtherLastSuccId, ')')) orelse
-                                                   intervals:in(node:id(N), intervals:new('(', OtherLastPredId, OtherNodeId, ')'))
-                                           end,
-                                           RequestPredsMinCount,
-                                           RequestSuccsMinCount)
-        end,
+    NeighborsToSendTmp = nodelist:mk_neighborhood(MyView, OtherNode,
+                                                  get_pred_list_length(),
+                                                  get_succ_list_length()),
+    NeighborsToSend =
+        nodelist:filter_min_length(
+          NeighborsToSendTmp,
+          fun(N) ->
+                  intervals:in(node:id(N), intervals:new('(', OtherNodeId, OtherLastSuccId, ')')) orelse
+                      intervals:in(node:id(N), intervals:new('(', OtherLastPredId, OtherNodeId, ')'))
+          end,
+          RequestPredsMinCount, RequestSuccsMinCount),
     comm:send_to_group_member(node:pidX(nodelist:node(OtherNeighbors)),
                               ring_maintenance,
                               {rm_buffer_response, NeighborsToSend}),
-    {NewNeighborhood, NewInterval, NewChurn} =
-        update_view(Neighborhood, MyRndView, OtherNeighbors, Interval, Churn),
-    NewTriggerState = trigger:next(TriggerState, NewInterval),
-    {NewNeighborhood, RandViewSize, NewInterval, NewTriggerState, Cache, NewChurn};
+    trigger_update(Neighborhood, MyRndView, OtherNeighbors),
+    State;
 
 on({rm_buffer_response, OtherNeighbors},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
     MyRndView = get_RndView(RandViewSize, Cache),
-    {NewNeighborhood, NewInterval, NewChurn} =
-        update_view(Neighborhood, MyRndView, OtherNeighbors, Interval, Churn),
+    trigger_update(Neighborhood, MyRndView, OtherNeighbors),
     % increase RandViewSize (no error detected):
     NewRandViewSize =
         case RandViewSize < config:read(cyclon_cache_size) of
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    NewTriggerState = trigger:next(TriggerState, NewInterval),
-    {NewNeighborhood, NewRandViewSize, NewInterval, NewTriggerState, Cache, NewChurn};
+    {Neighborhood, NewRandViewSize, Interval, TriggerState, Cache, Churn};
+
+% we asked another node we wanted to add for its node object -> now add it
+on({get_node_details_response, NodeDetails}, State) ->
+    update_nodes(State, [node_details:get(NodeDetails, node)], [], null);
 
 % dead-node-cache reported dead node to be alive again
-on({zombie, Node}, {Neighborhood, RandViewSize, _Interval, TriggerState, Cache, Churn})  ->
-    NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
-    {Neighborhood, RandViewSize, stabilizationInterval_min(), NewTriggerState, [Node | Cache], Churn};
+on({zombie, Node}, State) ->
+    % this node could potentially be useful as it has been in our state before
+    update_nodes(State, [Node], [], null);
 
 % failure detector reported dead node
-on({crash, DeadPid},
-   {Neighborhood, _RandViewSize, _Interval, TriggerState, Cache, Churn}) ->
-    EvalFun = fun dn_cache:add_zombie_candidate/1,
-    NewNeighborhood = nodelist:remove(DeadPid, Neighborhood, EvalFun),
-    NewCache = nodelist:lremove(DeadPid, Cache, EvalFun),
-    rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
-    rm_beh:update_failuredetector(Neighborhood, NewNeighborhood),
-    NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
-    {NewNeighborhood, 0, stabilizationInterval_min(), NewTriggerState, NewCache, Churn};
+on({crash, DeadPid}, State) ->
+    update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1);
 
 % trigger by admin:dd_check_ring
 on({check_ring, Token, Master},
@@ -251,20 +246,15 @@ on({init_check_ring, Token},
                               {check_ring, Token - 1, Me}),
     State;
 
-on({notify_new_pred, NewPred},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
-    NewNeighborhood = nodelist:add_node(Neighborhood, NewPred, get_pred_list_length(), get_succ_list_length()),
-    rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
-    rm_beh:update_failuredetector(Neighborhood, NewNeighborhood),
-    {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
+on({notify_new_pred, NewPred}, State) ->
+    % if we do not want to trust notify_new_pred messages to provide an alive node, use this instead:
+%%     trigger_update(OldNeighborhood, [], nodelist:new_neighborhood(nodelist:node(OldNeighborhood), NewPred)),
+    % we trust NewPred to be alive -> integrate node:
+    update_nodes(State, [NewPred], [], null);
 
-on({notify_new_succ, NewSucc},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
-    NewNeighborhood = nodelist:add_node(Neighborhood, NewSucc, get_pred_list_length(), get_succ_list_length()),
-    rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
-    rm_beh:update_failuredetector(Neighborhood, NewNeighborhood),
-    NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
-    {NewNeighborhood, RandViewSize, Interval, NewTriggerState, Cache, Churn};
+on({notify_new_succ, NewSucc}, State) ->
+    % same as notify_new_pred
+    update_nodes(State, [NewSucc], [], null);
 
 on({leave, SourcePid},
    {Neighborhood, _RandViewSize, _Interval, TriggerState, _Cache, _Churn}) ->
@@ -276,41 +266,18 @@ on({leave, SourcePid},
     comm:send_local(SourcePid, {leave_response}),
     {uninit, msg_queue:new(), TriggerState};
 
-on({pred_left, OldPred, PredsPred},
-   {Neighborhood, _RandViewSize, _Interval, TriggerState, Cache, Churn}) ->
-    NewNbh1 = nodelist:remove(OldPred, Neighborhood),
-    NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, get_pred_list_length(), get_succ_list_length()),
-    NewCache = nodelist:lremove(OldPred, Cache),
-    rm_beh:update_dht_node(Neighborhood, NewNbh2),
-    rm_beh:update_failuredetector(Neighborhood, NewNbh2),
-    NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
-    {NewNbh2, 0, stabilizationInterval_min(), NewTriggerState, NewCache, Churn};
+on({pred_left, OldPred, PredsPred}, State) ->
+    update_nodes(State, [PredsPred], [OldPred], null);
 
-on({succ_left, OldSucc, SuccsSucc},
-   {Neighborhood, _RandViewSize, _Interval, TriggerState, Cache, Churn}) ->
-    NewNbh1 = nodelist:remove(OldSucc, Neighborhood),
-    NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, get_pred_list_length(), get_succ_list_length()),
-    NewCache = nodelist:lremove(OldSucc, Cache),
-    rm_beh:update_dht_node(Neighborhood, NewNbh2),
-    rm_beh:update_failuredetector(Neighborhood, NewNbh2),
-    NewTriggerState = trigger:next(TriggerState, now_and_min_interval),
-    {NewNbh2, 0, stabilizationInterval_min(), NewTriggerState, NewCache, Churn};
+on({succ_left, OldSucc, SuccsSucc}, State) ->
+    update_nodes(State, [SuccsSucc], [OldSucc], null);
 
 on({update_id, NewId},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
-    try begin
-            NewMe = node:update_id(nodelist:node(Neighborhood), NewId),
-            NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
-            rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
-            {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}
-        end
-    catch
-        throw:_ ->
-            log:log(error, "[ RM ] can't update dht node ~w with id ~w (pred=~w, succ=~w)",
-                    [nodelist:node(Neighborhood), NewId,
-                     nodelist:pred(Neighborhood), nodelist:succ(Neighborhood)]),
-            State
-    end;
+   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
+    NewMe = node:update_id(nodelist:node(Neighborhood), NewId),
+    NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
+    rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
+    {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
 
 on({'$gen_cast', {debug_info, Requestor}},
    {Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
@@ -361,7 +328,7 @@ check_config() ->
 % Internal Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc get a peer form the cycloncache which is alive
+%% @doc Get N peers from the cyclon cache.
 -spec get_RndView(integer(), [node:node_type()]) -> [node:node_type()].
 get_RndView(N, Cache) ->
     lists:sublist(Cache, N).
@@ -374,51 +341,88 @@ get_RndView(N, Cache) ->
         Neighborhood::nodelist:neighborhood(), RndView::[node:node_type()]) ->
               {Pred::node:node_type(), Succ::node:node_type()}.
 get_safe_pred_succ(Neighborhood, RndView) ->
-    case (not nodelist:has_real_pred(Neighborhood)) orelse
-             (not nodelist:has_real_succ(Neighborhood)) of
-        true ->
-            NewNeighbors = nodelist:add_nodes(Neighborhood, RndView, 1, 1),
-            {nodelist:pred(NewNeighbors), nodelist:succ(NewNeighbors)};
-        false ->
-            {nodelist:pred(Neighborhood), nodelist:succ(Neighborhood)}
-    end.
-
-% @doc adapt the Tman-interval
--spec new_interval(
-        OldNeighborhood::nodelist:neighborhood(),
-        NewNeighborhood::nodelist:neighborhood(),
-        Interval::trigger:interval(), Churn::boolean()) ->
-              min_interval | max_interval.
-new_interval(OldNeighborhood, NewNeighborhood, _Interval, Churn) ->
-    case Churn orelse has_churn(OldNeighborhood, NewNeighborhood) of
-        true ->
-            % increasing the ring maintenance frequency
-            min_interval;
-        false ->
-            max_interval
+    case nodelist:has_real_pred(Neighborhood) andalso
+             nodelist:has_real_succ(Neighborhood) of
+        true -> {nodelist:pred(Neighborhood), nodelist:succ(Neighborhood)};
+        _    -> NewNeighbors = nodelist:add_nodes(Neighborhood, RndView, 1, 1),
+                {nodelist:pred(NewNeighbors), nodelist:succ(NewNeighbors)}
     end.
 
 % @doc is there churn in the system
--spec has_churn(
-        OldNeighborhood::nodelist:neighborhood(),
-        NewNeighborhood::nodelist:neighborhood()) -> boolean().
+-spec has_churn(OldNeighborhood::nodelist:neighborhood(),
+                NewNeighborhood::nodelist:neighborhood()) -> boolean().
 has_churn(OldNeighborhood, NewNeighborhood) ->
     OldNeighborhood =/= NewNeighborhood.
 
--spec update_view(
-        Neighborhood::nodelist:neighborhood(), RndView::[node:node_type()],
-        OtherNeighborhood::nodelist:neighborhood(),
-        Interval::trigger:interval(), Churn::boolean()) ->
-              {NewNeighborhood::nodelist:neighborhood(),
-               NewInterval::min_interval | max_interval, NewChurn::boolean()}.
-update_view(OldNeighborhood, MyRndView, OtherNeighborhood, Interval, Churn) ->
+%% @doc Triggers the integration of new nodes from OtherNeighborhood and
+%%      RndView into out Neighborhood by contacting every useful node.
+-spec trigger_update(Neighborhood::nodelist:neighborhood(),
+                     RndView::[node:node_type()],
+                     OtherNeighborhood::nodelist:neighborhood()) -> ok.
+trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     NewNeighborhood1 = nodelist:add_nodes(OldNeighborhood, MyRndView, get_pred_list_length(), get_succ_list_length()),
     NewNeighborhood2 = nodelist:merge(NewNeighborhood1, OtherNeighborhood, get_pred_list_length(), get_succ_list_length()),
-    rm_beh:update_dht_node(OldNeighborhood, NewNeighborhood2),
-    rm_beh:update_failuredetector(OldNeighborhood, NewNeighborhood2),
-    NewInterval = new_interval(OldNeighborhood, NewNeighborhood2, Interval, Churn),
-    NewChurn = has_churn(OldNeighborhood, NewNeighborhood2),
-    {NewNeighborhood2, NewInterval, NewChurn}.
+    
+    OldView = nodelist:to_list(OldNeighborhood),
+    NewView = nodelist:to_list(NewNeighborhood2),
+    ViewOrd = fun(A, B) ->
+                      nodelist:succ_ord(A, B, nodelist:node(OldNeighborhood))
+              end,
+    {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
+    
+    % TODO: add a local cache of contacted nodes in order not to contact them again
+    [comm:send(node:pidX(Node), {get_node_details, comm:this(), [node]})
+        || Node <- NewNodes],
+    ok.
+
+%% @doc Adds and removes the given nodes from the rm_tman state.
+%%      Note: Sets the new RandViewSize to 0 if NodesToRemove is not empty and
+%%      the new neighborhood is different to the old one. If either churn
+%%      occurred or was already determined, min_interval if chosen for the next
+%%      interval, otherwise max_interval. If the successor or predecessor
+%%      changes, the trigger will be called immediately.
+-spec update_nodes(State::state(), NodesToAdd::[node:node_type()],
+                   NodesToRemove::[node:node_type() | comm:mypid() | pid()],
+                   RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
+        -> NewState::state_init().
+update_nodes(State, [], [], _RemoveNodeEvalFun) ->
+    State;
+update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, Churn},
+             NodesToAdd, NodesToRemove, RemoveNodeEvalFun) ->
+    % keep all nodes that are not in NodesToRemove - note: NodesToRemove should
+    % have 0 or 1 element - so lists:member/2 is not expensive
+    FilterFun = fun(N) -> not lists:any(fun(B) -> node:equals(N, B) end, NodesToRemove) end,
+    case is_function(RemoveNodeEvalFun) of
+        true ->
+            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun),
+            NewCache = nodelist:lfilter(OldCache, FilterFun, RemoveNodeEvalFun);
+        _ ->
+            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun),
+            NewCache = nodelist:lfilter(OldCache, FilterFun)
+    end,
+    
+    NewNeighborhood = nodelist:add_nodes(Nbh1, NodesToAdd,
+                                         get_pred_list_length(),
+                                         get_succ_list_length()),
+    
+    rm_beh:update_dht_node(OldNeighborhood, NewNeighborhood),
+    rm_beh:update_failuredetector(OldNeighborhood, NewNeighborhood),
+    NewChurn = has_churn(OldNeighborhood, NewNeighborhood),
+    NewInterval = case Churn orelse NewChurn of
+                      true -> min_interval; % increase ring maintenance frequency
+                      _    -> max_interval
+                  end,
+    NewTriggerState =
+        case nodelist:pred(OldNeighborhood) =/= nodelist:pred(NewNeighborhood) orelse
+                 nodelist:succ(OldNeighborhood) =/= nodelist:succ(NewNeighborhood) of
+            true -> trigger:now(TriggerState);
+            _    -> TriggerState
+        end,
+    NewRandViewSize = case NewChurn andalso NodesToRemove =/= [] of
+                          true -> 0;
+                          _    -> RandViewSize
+                      end,
+    {NewNeighborhood, NewRandViewSize, NewInterval, NewTriggerState, NewCache, NewChurn}.
 
 -spec get_pid_dnc() -> pid() | failed.
 get_pid_dnc() -> process_dictionary:get_group_member(dn_cache).
@@ -441,7 +445,3 @@ get_pred_list_length() -> config:read(pred_list_length).
 
 -spec get_succ_list_length() -> pos_integer().
 get_succ_list_length() -> config:read(succ_list_length).
-
-%% @doc the interval between two stabilization runs Min
--spec stabilizationInterval_min() -> pos_integer().
-stabilizationInterval_min() -> config:read(stabilization_interval_min).
