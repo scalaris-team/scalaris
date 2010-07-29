@@ -42,29 +42,30 @@ init(BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, MsgTag) when is_function
     {BaseIntervalFun, MsgTag, ok}.
 
 %% @doc Sets the trigger to send its message immediately, for example after
-%%      its initialization.
+%%      its initialization. Any previous trigger will be canceled!
 -spec now(state()) -> state().
+now({BaseIntervalFun, MsgTag, ok}) ->
+    TimerRef = comm:send_local(self(), {MsgTag}),
+    {BaseIntervalFun, MsgTag, TimerRef};
 now({BaseIntervalFun, MsgTag, TimerRef}) ->
-    comm:send_local(self(), {MsgTag}),
-    {BaseIntervalFun, MsgTag, TimerRef}.
+    % timer still running
+    erlang:cancel_timer(TimerRef),
+    NewTimerRef = comm:send_local(self(), {MsgTag}),
+    {BaseIntervalFun, MsgTag, NewTimerRef}.
 
 %% @doc Sets the trigger to send its message after BaseIntervalFun()
-%%      milliseconds.
+%%      milliseconds. Any previous trigger will be canceled!
 -spec next(state(), IntervalTag::trigger:interval()) -> state().
 next({BaseIntervalFun, MsgTag, ok}, _IntervalTag) ->
     NewTimerRef = comm:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
     {BaseIntervalFun, MsgTag, NewTimerRef};
+next({BaseIntervalFun, MsgTag, TimerRef}, _IntervalTag) ->
+    % timer still running
+    erlang:cancel_timer(TimerRef),
+    NewTimerRef = comm:send_local_after(BaseIntervalFun(), self(), {MsgTag}),
+    {BaseIntervalFun, MsgTag, NewTimerRef}.
 
-next({BaseIntervalFun, MsgTag, TimerRef} = State, _U) ->
-    % timer still running?
-    case erlang:read_timer(TimerRef) of
-        false ->
-            {BaseIntervalFun, MsgTag,
-             comm:send_local_after(BaseIntervalFun(), self(), {MsgTag})};
-        _T ->
-            State
-    end.
-
+%% @doc Stops the trigger until next or now are called again.
 -spec stop(state()) -> state().
 stop({_BaseIntervalFun, _MsgTag, ok} = State) ->
     State;
