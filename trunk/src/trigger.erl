@@ -47,7 +47,7 @@
 -export_type([interval/0, interval_fun/0, state/0]).
 -endif.
 
--type interval() :: max_interval | base_interval | min_interval | now_and_min_interval.
+-type interval() :: max_interval | base_interval | min_interval.
 -type interval_fun() :: fun(() -> pos_integer()).
 -opaque state() :: {TriggerModule::module(), TriggerState::term()}.
 
@@ -90,25 +90,24 @@ init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)
     {Trigger, Trigger:init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)}.
 
 %% @doc Sets the trigger to send its message immediately, for example after
-%%      its initialization.
+%%      its initialization. Any previous trigger will be canceled!
 -spec now(state()) -> state().
 now({Trigger, TriggerState}) ->
     {Trigger, Trigger:now(TriggerState)}.
 
 %% @doc Sets the trigger to send its message after BaseIntervalFun()
-%%      milliseconds.
+%%      milliseconds. Any previous trigger will be canceled!
 -spec next(state()) -> state().
 next(State) ->
     next(State, base_interval).
 
 %% @doc Sets the trigger to send its message after the given interval's number
-%%      of milliseconds.
+%%      of milliseconds. Any previous trigger will be canceled!
 -spec next(state(), IntervalTag::interval()) -> state().
 next({Trigger, TriggerState}, IntervalTag) ->
     {Trigger, Trigger:next(TriggerState, IntervalTag)}.
 
-%% @doc Stops the trigger's current timer. This will effectively stop the
-%%      trigger until next is called again.
+%% @doc Stops the trigger until next or now are called again.
 -spec stop(state()) -> state().
 stop({Trigger, TriggerState}) ->
     {Trigger, Trigger:stop(TriggerState)}.

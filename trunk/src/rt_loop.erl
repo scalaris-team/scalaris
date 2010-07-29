@@ -113,11 +113,10 @@ on({init_rt, NewId, NewPred, NewSucc}, {_, OldPred, OldSucc, OldRT, TriggerState
 on({update_rt, NewId, NewPred, NewSucc}, {OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
     case ?RT:update(NewId, NewPred, NewSucc, OldRT, OldId, OldPred, OldSucc) of
         {trigger_rebuild, NewRT} ->
-            T1 = trigger:stop(TriggerState),
             % trigger immediate rebuild
-            T2 = trigger:now(T1),
+            NewTriggerState = trigger:now(TriggerState),
             ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
-            new_state(NewId, NewPred, NewSucc, NewRT, T2);
+            new_state(NewId, NewPred, NewSucc, NewRT, NewTriggerState);
         {ok, NewRT} ->
             ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
             new_state(NewId, NewPred, NewSucc, NewRT, TriggerState)

@@ -18,14 +18,12 @@
 %% Can be used by a module <code>Module</code> in order to get a configurable
 %% message (by default <code>{trigger}</code>) every
 %% <code>BaseIntervalFun()</code> (default: <code>Module:get_base_interval()</code>),
-%% <code>MinIntervalFun()</code> (default: <code>Module:get_min_interval()</code>),
-%% <code>0</code> and <code>MinIntervalFun()</code> or
-%% <code>MaxIntervalFun()</code> (default: <code>Module:get_max_interval()</code>),
-%% milliseconds depending on a user-provided function (note: this is not fully
-%% implemented yet).
+%% <code>MinIntervalFun()</code> (default: <code>Module:get_min_interval()</code>) or
+%% <code>MaxIntervalFun()</code> (default: <code>Module:get_max_interval()</code>)
+%% milliseconds depending on a user-provided interval tag specified with next/2.
 %% 
 %% Use this module through the interface provided by the trigger module,
-%% initializing it with trigger_periodic!
+%% initializing it with trigger_dynamic!
 %% @version $Id$
 -module(trigger_dynamic).
 -author('hennig@zib.de').
@@ -49,24 +47,25 @@ init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) when is_function(B
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}.
 
 %% @doc Sets the trigger to send its message immediately, for example after
-%%      its initialization.
+%%      its initialization. Any previous trigger will be canceled!
 -spec now(state()) -> state().
+now({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}) ->
+    TimerRef = comm:send_local(self(), {MsgTag}),
+    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef};
 now({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}) ->
-    comm:send_local(self(), {MsgTag}),
-    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}.
+    % timer still running
+    erlang:cancel_timer(TimerRef),
+    NewTimerRef = comm:send_local(self(), {MsgTag}),
+    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef}.
 
-%% @doc Sets the trigger to send its message after some delay (in milliseconds).
-%%      If the trigger has not been called before, BaseIntervalFun()
-%%      will be used, otherwise function U will be evaluated in order to decide
-%%      whether to use MaxIntervalFun() (return value 0),
-%%      MinIntervalFun() (return value 2),
-%%      0 (now) and MinIntervalFun() (return value 3) or
-%%      BaseIntervalFun() (any other return value) for the delay.
+%% @doc Sets the trigger to send its message after some delay. The given
+%%      IntervalTag will determine which of the three interval functions will
+%%      be evaluated in order to get the number of milliseconds of this delay.
+%%      Any previous trigger will be canceled!
 -spec next(state(), IntervalTag::trigger:interval()) -> state().
 next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, IntervalTag) ->
     NewTimerRef = send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef};
-
 next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, IntervalTag) ->
     % timer still running?
     erlang:cancel_timer(TimerRef),
@@ -86,13 +85,11 @@ send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTa
             comm:send_local_after(BaseIntervalFun(), self(), {MsgTag});
         min_interval ->
             comm:send_local_after(MinIntervalFun(), self(), {MsgTag});
-        now_and_min_interval ->
-            comm:send_local(self(), {MsgTag}),
-            comm:send_local_after(MinIntervalFun(), self(), {MsgTag});
         _ ->
             comm:send_local_after(BaseIntervalFun(), self(), {MsgTag})
      end.
 
+%% @doc Stops the trigger until next or now are called again.
 -spec stop(state()) -> state().
 stop({_BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, _MsgTag, ok} = State) ->
     State;
