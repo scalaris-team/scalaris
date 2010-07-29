@@ -354,7 +354,7 @@ zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
 %%      Returned lists are sorted and contain no duplicates.
 -spec split_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
 split_unique(L1, L2) ->
-    split_unique(L1, L2, fun(A, B) -> A =< B end).
+    split_unique(L1, L2, fun erlang:'=<'/2).
 
 %% @doc Splits L1 into a list of elements that are not contained in L2, a list
 %%      of elements that are equal in both lists (according to the ordering
@@ -386,7 +386,7 @@ split_unique(L1, L2, Lte, EqSelect) ->
 %%      Both lists must be sorted. Returned lists are sorted as well.
 -spec ssplit_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
 ssplit_unique(L1, L2) ->
-    ssplit_unique(L1, L2, fun(A, B) -> A =< B end).
+    ssplit_unique(L1, L2, fun erlang:'=<'/2).
 
 %% @doc Splits L1 into a list of elements that are not contained in L2, a list
 %%      of elements that are equal in both lists (according to the ordering
@@ -443,7 +443,7 @@ ssplit_unique_helper([], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, Uniqu
 
 -spec smerge2(L1::[X], L2::[X]) -> MergedList::[X].
 smerge2(L1, L2) ->
-    smerge2(L1, L2, fun(A, B) -> A =< B end).
+    smerge2(L1, L2, fun erlang:'=<'/2).
 
 -spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> MergedList::[X].
 smerge2(L1, L2, Lte) ->
