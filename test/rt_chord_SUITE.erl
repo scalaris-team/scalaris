@@ -62,6 +62,7 @@ end_per_suite(Config) ->
     Config.
 
 next_hop(_Config) ->
+    erlang:put(instance_id, "rt_chord_SUITE_group"),
     MyNode = node:new(fake_dht_node(), 0, 0),
     Succ = node:new(fake_dht_node(), 1, 0),
     Pred = node:new(fake_dht_node(), 1000000, 0),
@@ -73,6 +74,8 @@ next_hop(_Config) ->
                                 {16, node:new(lists:nth(4, DHTNodes), 16, 0)},
                                 {32, node:new(lists:nth(5, DHTNodes), 32, 0)},
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
+    % note: dht_node_state:new/3 will call process_dictionary:get_group_member(paxos_proposer)
+    % which will fail here -> however, we don't need this process
     State = dht_node_state:new(RT, nodelist:new_neighborhood(Pred, MyNode, Succ)),
     ?equals(rt_chord:next_hop(State, 0), lists:nth(6, DHTNodes)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
