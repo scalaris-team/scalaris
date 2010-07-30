@@ -74,7 +74,7 @@ new_neighborhood(Node) ->
 %%      (this will be its predecessor and successor).
 -spec new_neighborhood(Node::node:node_type(), Neighbor::node:node_type()) -> neighborhood().
 new_neighborhood(Node, Neighbor) ->
-    case node:equals(Node, Neighbor) of
+    case node:same_process(Node, Neighbor) of
         true ->
             % the node should always be the first to get a new ID!
             % if not, something went wrong
@@ -89,19 +89,19 @@ new_neighborhood(Node, Neighbor) ->
 %%      (provided for convenience - special case of mk_neighborhood)
 -spec new_neighborhood(Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()) -> neighborhood().
 new_neighborhood(Pred, Node, Succ) ->
-    case node:equals(Pred, Node) of
+    case node:same_process(Pred, Node) of
         true ->
             % the node should always be the first to get a new ID!
             % if not, something went wrong
             throw_if_newer(Pred, Node),
             new_neighborhood(Node, Succ);
         false ->
-            case node:equals(Succ, Node) of
+            case node:same_process(Succ, Node) of
                 true ->
                     throw_if_newer(Succ, Node),
                     {[Pred], Node, [Pred]};
                 false ->
-                    case node:equals(Pred, Succ) of
+                    case node:same_process(Pred, Succ) of
                         true ->
                             NewerNode = node:newer(Pred, Succ),
                             {[NewerNode], Node, [NewerNode]};
@@ -229,7 +229,7 @@ lusplit_nodelist(NodeList, Node) ->
     {Smaller, LargerOrEqual} =
         lists:partition(
           fun(N) ->
-                  case node:equals(N, Node) of
+                  case node:same_process(N, Node) of
                       true -> throw_if_newer(N, Node), false;
                       _    -> node:id(N) < node:id(Node)
                   end
@@ -280,21 +280,21 @@ mk_neighborhood(NodeList, Node) ->
 %%      (provided for convenience - see lfilter/2).
 -spec lremove(NodeOrPid::node:node_type() | comm:mypid() | pid(), snodelist()) -> snodelist().
 lremove(NodeOrPid, NodeList) ->
-    lfilter(NodeList, fun(N) -> not node:equals(NodeOrPid, N) end).
+    lfilter(NodeList, fun(N) -> not node:same_process(NodeOrPid, N) end).
 
 %% @doc Removes the given node (or node with the given Pid) from a neighborhood
 %%      (provided for convenience - see filter/2).
 %%      Note: A neighborhood's base node is never removed!
 -spec remove(NodeOrPid::node:node_type() | comm:mypid() | pid(), neighborhood()) -> neighborhood().
 remove(NodeOrPid, Neighborhood) ->
-    filter(Neighborhood, fun(N) -> not node:equals(NodeOrPid, N) end).
+    filter(Neighborhood, fun(N) -> not node:same_process(NodeOrPid, N) end).
 
 %% @doc Removes the given node (or node with the given Pid) from a node list
 %%      and executes EvalFun for any such occurrence (provided for convenience
 %%      - see filter/3).
 -spec lremove(NodeOrPid::node:node_type() | comm:mypid() | pid(), snodelist(), EvalFun::fun((node:node_type()) -> any())) -> snodelist().
 lremove(NodeOrPid, NodeList, EvalFun) ->
-    lfilter(NodeList, fun(N) -> not node:equals(NodeOrPid, N) end, EvalFun).
+    lfilter(NodeList, fun(N) -> not node:same_process(NodeOrPid, N) end, EvalFun).
 
 %% @doc Removes the given node (or node with the given Pid) from a neighborhood
 %%      and executes EvalFun for any such occurrence (provided for convenience,
@@ -302,7 +302,7 @@ lremove(NodeOrPid, NodeList, EvalFun) ->
 %%      Note: A neighborhood's base node is never removed!
 -spec remove(NodeOrPid::node:node_type() | comm:mypid() | pid(), neighborhood(), EvalFun::fun((node:node_type()) -> any())) -> neighborhood().
 remove(NodeOrPid, Neighborhood, EvalFun) ->
-    filter(Neighborhood, fun(N) -> not node:equals(NodeOrPid, N) end, EvalFun).
+    filter(Neighborhood, fun(N) -> not node:same_process(NodeOrPid, N) end, EvalFun).
 
 %% @doc Keeps any node for which FilterFun returns true in a node list.
 -spec lfilter(snodelist(), FilterFun::fun((node:node_type()) -> boolean())) -> snodelist().
@@ -385,12 +385,12 @@ filter_min_length({Preds, Node, Succs}, FilterFun, MinPredsLength, MinSuccsLengt
     ensure_lists_not_empty(NewNeighbors).
 
 %% @doc Helper function that removes the head of NodeList if is is equal to
-%%      Node (using node:equals/2).
+%%      Node (using node:same_process/2).
 -spec lremove_head_if_eq(NodeList::snodelist(), Node::node:node_type()) -> snodelist().
 lremove_head_if_eq([] = NodeList, _Node) ->
     NodeList;
 lremove_head_if_eq([H | T] = NodeList, Node) ->
-    case node:equals(H, Node) of
+    case node:same_process(H, Node) of
         true  -> T;
         false -> NodeList
     end.
@@ -417,7 +417,7 @@ lget_last_and_remove([], _NodeToRemove, []) ->
 lget_last_and_remove([], _NodeToRemove, [Last | _] = ResultList) ->
     {Last, lists:reverse(ResultList)};
 lget_last_and_remove([H | T], NodeToRemove, ResultList) ->
-    case node:equals(H, NodeToRemove) of
+    case node:same_process(H, NodeToRemove) of
         true ->
             lget_last_and_remove(T, NodeToRemove, ResultList);
         false ->
@@ -425,10 +425,10 @@ lget_last_and_remove([H | T], NodeToRemove, ResultList) ->
     end.
 
 %% @doc Helper function that adds NewHead to the head of NodeList if is is not
-%%      equal to Node (using node:equals/2).
+%%      equal to Node (using node:same_process/2).
 -spec ladd_head_if_noteq(NewHead::node:node_type(), NodeList::snodelist(), Node::node:node_type()) -> snodelist().
 ladd_head_if_noteq(NewHead, NodeList, Node) ->
-    case node:equals(NewHead, Node) of
+    case node:same_process(NewHead, Node) of
         true  -> NodeList;
         false -> [NewHead | NodeList]
     end.
@@ -438,7 +438,7 @@ ladd_head_if_noteq(NewHead, NodeList, Node) ->
 %%      Removes the NewFirstNode from this list on the fly.
 -spec lrebase_list(non_empty_snodelist(), NewFirstNode::node:node_type()) -> snodelist().
 lrebase_list([First] = NodeList, NewFirstNode) ->
-    case node:equals(First, NewFirstNode) of
+    case node:same_process(First, NewFirstNode) of
         true  -> [];
         false -> NodeList
     end;
@@ -497,7 +497,7 @@ merge(Neighbors1, Neighbors2, PredsLength, SuccsLength) ->
 %%      has been too small.
 -spec add_node(Neighbors::neighborhood(), NodeToAdd::node:node_type(), PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
 add_node({Preds, BaseNode, Succs}, NodeToAdd, PredsLength, SuccsLength) ->
-    case node:equals(BaseNode, NodeToAdd) of
+    case node:same_process(BaseNode, NodeToAdd) of
         true ->
             throw_if_newer(NodeToAdd, BaseNode),
             % eventually
@@ -506,7 +506,7 @@ add_node({Preds, BaseNode, Succs}, NodeToAdd, PredsLength, SuccsLength) ->
             CleanPreds = lremove_head_if_eq(Preds, BaseNode),
             CleanSuccs = lremove_head_if_eq(Succs, BaseNode),
             UpdateFun = fun(N) ->
-                                case node:equals(N, NodeToAdd) of
+                                case node:same_process(N, NodeToAdd) of
                                     true -> node:newer(N, NodeToAdd);
                                     _    -> N
                                 end
@@ -540,7 +540,7 @@ add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
 
     OtherView = case (LargerSorted =:= []) andalso (SmallerSorted =:= []) of
                     true ->
-                        [N || N <- EqualSorted, not node:equals(N, Node)];
+                        [N || N <- EqualSorted, not node:same_process(N, Node)];
                     false ->
                         lists:append([LargerSorted, SmallerSorted])
                 end,
@@ -598,7 +598,8 @@ ets_insert_newer_node(Table, Node) ->
     end.
 
 %% @doc Removes any node with outdated ID information from the list as well as
-%%      any outdated node that equals Node and any invalid node.
+%%      any outdated node that shares the same process as Node and any invalid
+%%      node.
 -spec lremove_outdated(NodeList::[node:node_type()], Node::node:node_type() | null) -> [node:node_type()].
 lremove_outdated(NodeList, Node) ->
     Tab = ets:new(nodelist_helper_lremove_outdated, [set, private]),
@@ -611,7 +612,7 @@ lremove_outdated(NodeList, Node) ->
                              not node:is_newer(NInTab, N)
                      end,
     NodeListUpd = [N || N <- NodeList, node:is_valid(N),
-                        not (node:equals(N, Node) andalso (node:is_newer(Node, N))),
+                        not (node:same_process(N, Node) andalso (node:is_newer(Node, N))),
                         NodeIsUpToDate(N)],
     ets:delete(Tab),
     NodeListUpd.

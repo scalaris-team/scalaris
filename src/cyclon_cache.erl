@@ -48,7 +48,7 @@ new() ->
 %% @doc Creates a new node cache with the given two nodes and ages 0.
 -spec new(node:node_type(), node:node_type()) -> cache().
 new(Node1, Node2) ->
-    case node:equals(Node1, Node2) of
+    case node:same_process(Node1, Node2) of
         true  -> [{node:newer(Node1, Node2), 0}];
         false -> [{Node2, 0}, {Node1, 0}]
     end.
@@ -116,7 +116,7 @@ inc_age(Cache) ->
 %% @doc Checks whether the cache contains an element with the given Node.
 -spec contains_node(Node::node:node_type(), Cache::cache()) -> Result::boolean().
 contains_node(Node, Cache) ->
-    lists:any(fun({SomeNode, _Age}) -> node:equals(SomeNode, Node) end, Cache).
+    lists:any(fun({SomeNode, _Age}) -> node:same_process(SomeNode, Node) end, Cache).
 
 %% @doc Returns the ages of all nodes in the cache.
 -spec get_ages(Cache::cache()) -> Ages::[age()].
@@ -151,10 +151,10 @@ merge(MyCache, MyNode, ReceivedCache, SendCache, TargetSize) ->
     % remove eventually existing references to the node itself
     ReceivedCache_Filtered =
         [Elem || {Node, _Age} = Elem <- EntriesInReceivedCacheOnly,
-                 not node:equals(Node, MyNode)],
+                 not node:same_process(Node, MyNode)],
     SendCache_Filtered =
         [Elem || {Node, _Age} = Elem <- SendCache,
-                 not node:equals(Node, MyNode)],
+                 not node:same_process(Node, MyNode)],
     % finally fill up my cache to the full size (if necessary) and start
     % replacing entries
     {MyC2, ReceivedCacheRest, AddedElements} =
@@ -256,7 +256,7 @@ add_node(Node, Age, Cache) ->
 %% @doc Removes any element with the given Node from the Cache.
 -spec remove_node(Node::node:node_type(), Cache::cache()) -> NewCache::cache().
 remove_node(Node, Cache) ->
-    [Element || {SomeNode, _Age} = Element <- Cache, not node:equals(SomeNode, Node)].
+    [Element || {SomeNode, _Age} = Element <- Cache, not node:same_process(SomeNode, Node)].
 
 %% @doc Trims the cache to size TargetSize (if necessary) by deleting random
 %%      entries as long as the cache is larger than the given TargetSize.

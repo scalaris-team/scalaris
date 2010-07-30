@@ -199,7 +199,7 @@ on({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerSta
     Cache =
         case node_details:contains(NodeDetails, pred) andalso
                  node_details:contains(NodeDetails, succ) andalso
-                 not node:equals(node_details:get(NodeDetails, pred), Me) andalso
+                 not node:same_process(node_details:get(NodeDetails, pred), Me) andalso
                  (cyclon_cache:size(OldCache) =< 2) of
             true -> cyclon_cache:new(node_details:get(NodeDetails, pred),
                                      node_details:get(NodeDetails, succ));
