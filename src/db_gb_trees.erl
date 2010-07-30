@@ -97,7 +97,7 @@ split_data(DB, MyNewInterval) ->
                                 DBEntry <- MyList]), HisList}.
 
 %% @doc Get key/value pairs in the given range.
-get_range(DB, Interval) ->
+get_range_kv(DB, Interval) ->
     F = fun (_Key, DBEntry, Data) ->
                 case (not db_entry:is_empty(DBEntry)) andalso
                          intervals:in(db_entry:get_key(DBEntry), Interval) of
@@ -108,19 +108,8 @@ get_range(DB, Interval) ->
         end,
     util:gb_trees_foldl(F, [], DB).
 
-%% @doc Gets db_entry objects in the given range.
-get_range_with_version(DB, Interval) ->
-    F = fun (_Key, DBEntry, Data) ->
-                 case (not db_entry:is_empty(DBEntry)) andalso
-                          intervals:in(db_entry:get_key(DBEntry), Interval) of
-                     true -> [DBEntry | Data];
-                     _    -> Data
-                 end
-        end,
-    util:gb_trees_foldl(F, [], DB).
-
 %% @doc Get key/value/version triples of non-write-locked entries in the given range.
-get_range_only_with_version(DB, Interval) ->
+get_range_kvv(DB, Interval) ->
     F = fun (_Key, DBEntry, Data) ->
                 case (not db_entry:is_empty(DBEntry)) andalso
                          (not db_entry:get_writelock(DBEntry)) andalso
@@ -130,6 +119,17 @@ get_range_only_with_version(DB, Interval) ->
                               db_entry:get_version(DBEntry)} | Data];
                     _    -> Data
                 end
+        end,
+    util:gb_trees_foldl(F, [], DB).
+
+%% @doc Gets db_entry objects in the given range.
+get_range_entry(DB, Interval) ->
+    F = fun (_Key, DBEntry, Data) ->
+                 case (not db_entry:is_empty(DBEntry)) andalso
+                          intervals:in(db_entry:get_key(DBEntry), Interval) of
+                     true -> [DBEntry | Data];
+                     _    -> Data
+                 end
         end,
     util:gb_trees_foldl(F, [], DB).
 
