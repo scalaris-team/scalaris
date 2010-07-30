@@ -49,7 +49,7 @@ new() ->
 -spec new(node:node_type(), node:node_type()) -> cache().
 new(Node1, Node2) ->
     case node:equals(Node1, Node2) of
-        true  -> [{Node1, 0}];
+        true  -> [{node:newer(Node1, Node2), 0}];
         false -> [{Node2, 0}, {Node1, 0}]
     end.
 
