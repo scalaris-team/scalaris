@@ -103,14 +103,17 @@ on({rm_update_neighbors, Neighbors}, State) ->
     OldNode = dht_node_state:get(State, node),
     Pred = nodelist:pred(Neighbors), Succ = nodelist:succ(Neighbors),
     Node = nodelist:node(Neighbors),
-    % for now use an "empty" external routing table state, rt_loop will change
-    % the routing table and eventually send us an updated table
-    NewRT = ?RT:empty_ext(Succ),
-    case node:id(Node) =/= node:id(OldNode) orelse
-             Pred =/= OldPred orelse Succ =/= OldSucc of
-        true -> rt_loop:update_state(node:id(Node), Pred, Succ);
-        _    -> ok
-    end,
+    NewRT = case node:id(Node) =/= node:id(OldNode) orelse
+                     Pred =/= OldPred orelse Succ =/= OldSucc of
+                true ->
+                    % for now use an "empty" external routing table state,
+                    % rt_loop will change the routing table and eventually send
+                    % us an updated table
+                    rt_loop:update_state(node:id(Node), Pred, Succ),
+                    ?RT:empty_ext(Succ);
+                _ ->
+                    dht_node_state:get(State, rt)
+            end,
 
     case node:is_newer(Node, OldNode) of
         true ->
