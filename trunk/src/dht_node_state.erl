@@ -29,7 +29,7 @@
          set_rt/2,
          set_db/2,
          details/1, details/2,
-         add_nc_subscr/3,
+         add_nc_subscr/3, rm_nc_subscr/3, rm_nc_subscr/2,
          update_node/2,
          %%transactions
          set_trans_log/2,
@@ -175,6 +175,19 @@ set_trans_log(State, NewLog) ->
         -> state().
 add_nc_subscr(State = #state{nc_subscr=OldNCSubscr}, Pid, FunToExecute) ->
     State#state{nc_subscr = [{Pid, FunToExecute} | OldNCSubscr]}.
+
+-spec rm_nc_subscr(State::state(), Subscriber::comm:erl_local_pid(),
+                   fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type())
+                       -> any()))
+        -> state().
+rm_nc_subscr(State = #state{nc_subscr=OldNCSubscr}, Pid, FunToExecute) ->
+    SubscrTuple = {Pid, FunToExecute},
+    State#state{nc_subscr = [X || X <- OldNCSubscr, X =/= SubscrTuple]}.
+
+-spec rm_nc_subscr(State::state(), Subscriber::comm:erl_local_pid())
+        -> state().
+rm_nc_subscr(State = #state{nc_subscr=OldNCSubscr}, Pid) ->
+    State#state{nc_subscr = [E || E = {Subscr, _Fun} <- OldNCSubscr, Subscr =/= Pid]}.
 
 -spec update_node(state(), node:node_type()) -> state().
 update_node(State = #state{neighbors=Neighbors}, Node) ->

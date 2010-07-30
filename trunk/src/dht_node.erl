@@ -26,7 +26,9 @@
 -behaviour(gen_component).
 
 -export([start_link/1, start_link/2, on/2, init/1,
-         register_for_node_change/1, register_for_node_change/2]).
+         register_for_node_change/1, register_for_node_change/2,
+         unregister_from_node_change/1, unregister_from_node_change/2,
+         unregister_all_from_node_change/1]).
 
 % state of the dht_node loop
 -type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
@@ -51,7 +53,10 @@
       {init_rm, Pid::comm:erl_local_pid()} |
       {rm_update_neighbors, Neighbors::nodelist:neighborhood()} |
       {reg_for_nc, Pid::comm:erl_local_pid(),
-       fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}).
+       fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())} |
+      {unreg_from_nc, Pid::comm:erl_local_pid(),
+       fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())} |
+      {unreg_from_nc, Pid::comm:erl_local_pid()}).
 
 % accepted messages of dht_node processes
 -type(message() ::
@@ -128,6 +133,12 @@ on({rm_update_neighbors, Neighbors}, State) ->
 %% add Pid to the node change subscriber list
 on({reg_for_nc, Pid, Fun}, State) ->
     dht_node_state:add_nc_subscr(State, Pid, Fun);
+
+on({unreg_from_nc, Pid, Fun}, State) ->
+    dht_node_state:rm_nc_subscr(State, Pid, Fun);
+
+on({unreg_from_nc, Pid}, State) ->
+    dht_node_state:rm_nc_subscr(State, Pid);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance
@@ -456,6 +467,31 @@ register_for_node_change(Pid) ->
 register_for_node_change(Pid, FunToExecute) ->
     comm:send_local(process_dictionary:get_group_member(dht_node),
                     {reg_for_nc, Pid, FunToExecute}).
+
+%% @doc Un-registers the given process from node change updates using the
+%%      default send_node_change/2 handler sending {node_update, Node} messages.
+-spec unregister_from_node_change(Pid::comm:erl_local_pid()) -> ok.
+unregister_from_node_change(Pid) ->
+    comm:send_local(process_dictionary:get_group_member(dht_node),
+                    {unreg_from_nc, Pid, fun send_node_change/2}).
+
+%% @doc Un-registers the given process from all node change updates using
+%%      any(!) message handler.
+-spec unregister_all_from_node_change(Pid::comm:erl_local_pid()) -> ok.
+unregister_all_from_node_change(Pid) ->
+    comm:send_local(process_dictionary:get_group_member(dht_node),
+                    {unreg_from_nc, Pid}).
+
+%% @doc Un-registers the given process from node change updates using
+%%      the given message handler.
+%%      Note that locally created funs may not be eligible for this as a newly
+%%      created fun may not compare equal to the previously created one.
+-spec unregister_from_node_change(Pid::comm:erl_local_pid(),
+                                  fun((Subscriber::comm:erl_local_pid(),
+                                       NewNode::node:node_type()) -> any())) -> ok.
+unregister_from_node_change(Pid, FunToExecute) ->
+    comm:send_local(process_dictionary:get_group_member(dht_node),
+                    {unreg_from_nc, Pid, FunToExecute}).
 
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
