@@ -303,7 +303,7 @@ on({start_bulk_owner, I, Msg}, State) ->
 
 on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
     comm:send(Issuer, {bulk_read_with_version_response, dht_node_state:get(State, my_range),
-                       ?DB:get_range_with_version(dht_node_state:get(State, db), Range)}),
+                       ?DB:get_range_entry(dht_node_state:get(State, db), Range)}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -354,7 +354,7 @@ on({'$gen_cast', {debug_info, Requestor}}, State) ->
 
 %% unit_tests
 on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
-    Res = ?DB:get_range(dht_node_state:get(State, db), Range),
+    Res = ?DB:get_range_kv(dht_node_state:get(State, db), Range),
     comm:send_local(Owner , {unit_test_bulkowner_response, Res, dht_node_state:get(State, node_id)}),
     State;
 

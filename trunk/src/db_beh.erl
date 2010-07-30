@@ -43,8 +43,7 @@ behaviour_info(callbacks) ->
      {get_load, 1}, {split_data, 2},
      %
      {get_data, 1}, {add_data, 2},
-     {get_range, 2}, {get_range_with_version, 2},
-     {get_range_only_with_version, 2},
+     {get_range_kv, 2}, {get_range_kvv, 2}, {get_range_entry, 2},
      % bulk op for replica repair
      {update_if_newer, 2},
      % debugging

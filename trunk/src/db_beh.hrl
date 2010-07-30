@@ -20,11 +20,11 @@
 -type(value() :: any()).
 -type(version() :: non_neg_integer()).
 -type(kv_list() :: [{Key::?RT:key(), Value::value()}]).
--type(kv_list_version() :: [{Key::?RT:key(), Value::value(), Version::version()}]).
+-type(kvv_list() :: [{Key::?RT:key(), Value::value(), Version::version()}]).
 -type(db_as_list() :: [db_entry:entry()]).
 
 -ifdef(with_export_type_support).
--export_type([db/0, value/0, version/0, kv_list/0, kv_list_version/0,
+-export_type([db/0, value/0, version/0, kv_list/0, kvv_list/0,
               db_as_list/0]).
 -endif.
 
@@ -34,7 +34,7 @@
 -export([delete/2]).
 -export([set_write_lock/2, unset_write_lock/2,
          set_read_lock/2, unset_read_lock/2, get_locks/2]).
--export([get_range/2, get_range_with_version/2, get_range_only_with_version/2]).
+-export([get_range_kv/2, get_range_kvv/2, get_range_entry/2]).
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
 -export([update_if_newer/2]).
 -export([check_db/1]).
@@ -68,11 +68,9 @@
 -spec get_locks(DB::db(), Key::?RT:key()) ->
          {DB::db(), {WriteLock::boolean(), ReadLock::non_neg_integer(), Version::version()} | {true, 0, -1} | failed}.
 
--spec get_range(DB::db(), Range::intervals:interval()) -> kv_list().
--spec get_range_with_version(DB::db(), Range::intervals:interval()) ->
-         db_as_list().
--spec get_range_only_with_version(DB::db(), Range::intervals:interval()) ->
-         kv_list_version().
+-spec get_range_kv(DB::db(), Range::intervals:interval()) -> kv_list().
+-spec get_range_kvv(DB::db(), Range::intervals:interval()) -> kvv_list().
+-spec get_range_entry(DB::db(), Range::intervals:interval()) -> db_as_list().
 
 -spec get_load(DB::db()) -> Load::integer().
 -spec split_data(DB::db(), MyNewInterval::intervals:interval()) ->
@@ -80,6 +78,6 @@
 -spec get_data(DB::db()) -> db_as_list().
 -spec add_data(DB::db(), db_as_list()) -> NewDB::db().
 
--spec update_if_newer(OldDB::db(), KVs::kv_list_version()) -> NewDB::db().
+-spec update_if_newer(OldDB::db(), KVs::kvv_list()) -> NewDB::db().
 
 -spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.

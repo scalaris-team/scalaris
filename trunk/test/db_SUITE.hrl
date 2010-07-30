@@ -31,8 +31,7 @@ tests_avail() ->
      tester_write, tester_write_lock, tester_read_lock,
      tester_read_write_lock, tester_write_read_lock,
      tester_delete, tester_add_data,
-     tester_get_range, tester_get_range_with_version,
-     tester_get_range_only_with_version
+     tester_get_range_kv, tester_get_range_kvv, tester_get_range_entry
     ].
 
 suite() ->
@@ -646,11 +645,11 @@ tester_add_data(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% ?TEST_DB:get_range/2
+% ?TEST_DB:get_range_kv/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get_range(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_range(Data, Range) ->
+-spec prop_get_range_kv(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_range_kv(Data, Range) ->
     DB = ?TEST_DB:new(1),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -663,53 +662,24 @@ prop_get_range(Data, Range) ->
                                intervals:in(db_entry:get_key(A), Range)
                  end,
     
-    ?equals_w_note(lists:sort(?TEST_DB:get_range(DB2, Range)),
+    ?equals_w_note(lists:sort(?TEST_DB:get_range_kv(DB2, Range)),
                    lists:sort([{db_entry:get_key(A), db_entry:get_value(A)}
                               || A <- lists:filter(InRangeFun, UniqueData)]),
-                   "check_get_range_1"),
+                   "check_get_range_kv_1"),
 
     ?TEST_DB:close(DB2),
     true.
 
-tester_get_range(_Config) ->
-    tester:test(?MODULE, prop_get_range, 2, rw_suite_runs(1000)).
+tester_get_range_kv(_Config) ->
+    tester:test(?MODULE, prop_get_range_kv, 2, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% ?TEST_DB:get_range_with_version/2
+% ?TEST_DB:get_range_kvv/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get_range_with_version(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_range_with_version(Data, Range) ->
-    DB = ?TEST_DB:new(1),
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    DB2 = ?TEST_DB:add_data(DB, UniqueData),
-    
-    InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
-                               intervals:in(db_entry:get_key(A), Range)
-                 end,
-    
-    ?equals_w_note(lists:sort(?TEST_DB:get_range_with_version(DB2, Range)),
-                   lists:sort(lists:filter(InRangeFun, UniqueData)),
-                   "check_get_range_with_version_1"),
-
-    ?TEST_DB:close(DB2),
-    true.
-
-tester_get_range_with_version(_Config) ->
-    tester:test(?MODULE, prop_get_range_with_version, 2, rw_suite_runs(1000)).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% ?TEST_DB:get_range_only_with_version/2
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get_range_only_with_version(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_range_only_with_version(Data, Range) ->
+-spec prop_get_range_kvv(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_range_kvv(Data, Range) ->
     DB = ?TEST_DB:new(1),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -723,18 +693,47 @@ prop_get_range_only_with_version(Data, Range) ->
                                intervals:in(db_entry:get_key(A), Range)
                  end,
     
-    ?equals_w_note(lists:sort(?TEST_DB:get_range_only_with_version(DB2, Range)),
+    ?equals_w_note(lists:sort(?TEST_DB:get_range_kvv(DB2, Range)),
                    lists:sort([{db_entry:get_key(A),
                                 db_entry:get_value(A),
                                 db_entry:get_version(A)}
                               || A <- lists:filter(InRangeFun, UniqueData)]),
-                   "check_get_range_only_with_version_1"),
+                   "check_get_range_kvv_1"),
 
     ?TEST_DB:close(DB2),
     true.
 
-tester_get_range_only_with_version(_Config) ->
-    tester:test(?MODULE, prop_get_range_only_with_version, 2, rw_suite_runs(1000)).
+tester_get_range_kvv(_Config) ->
+    tester:test(?MODULE, prop_get_range_kvv, 2, rw_suite_runs(1000)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% ?TEST_DB:get_range_entry/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_get_range_entry(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_range_entry(Data, Range) ->
+    DB = ?TEST_DB:new(1),
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    DB2 = ?TEST_DB:add_data(DB, UniqueData),
+    
+    InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
+                               intervals:in(db_entry:get_key(A), Range)
+                 end,
+    
+    ?equals_w_note(lists:sort(?TEST_DB:get_range_entry(DB2, Range)),
+                   lists:sort(lists:filter(InRangeFun, UniqueData)),
+                   "check_get_range_entry_1"),
+
+    ?TEST_DB:close(DB2),
+    true.
+
+tester_get_range_entry(_Config) ->
+    tester:test(?MODULE, prop_get_range_entry, 2, rw_suite_runs(1000)).
 
 %TODO: ?TEST_DB:split_data
 %TODO: ?TEST_DB:update_if_newer
