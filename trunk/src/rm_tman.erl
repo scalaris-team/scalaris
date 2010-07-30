@@ -391,7 +391,7 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
              NodesToAdd, NodesToRemove, RemoveNodeEvalFun) ->
     % keep all nodes that are not in NodesToRemove - note: NodesToRemove should
     % have 0 or 1 element - so lists:member/2 is not expensive
-    FilterFun = fun(N) -> not lists:any(fun(B) -> node:equals(N, B) end, NodesToRemove) end,
+    FilterFun = fun(N) -> not lists:any(fun(B) -> node:same_process(N, B) end, NodesToRemove) end,
     case is_function(RemoveNodeEvalFun) of
         true ->
             Nbh1 = nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun),

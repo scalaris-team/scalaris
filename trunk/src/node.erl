@@ -22,7 +22,7 @@
 
 -export([id/1, id_version/1, pidX/1,
          new/3, null/0, is_valid/1,
-         equals/2, is_newer/2, newer/2, is_me/1,
+         same_process/2, is_newer/2, newer/2, is_me/1,
          update_id/2]).
 %% intervals between nodes
 -export([mk_interval_between_ids/2, mk_interval_between_nodes/2]).
@@ -63,29 +63,29 @@ is_valid(_) -> false.
 
 %% @doc Checks whether two nodes are the same, i.e. contain references to the.
 %%      same process.
--spec equals(node_type() | comm:mypid() | pid(), node_type()) -> boolean();
-            (node_type(), comm:mypid() | pid()) -> boolean();
-            (null | unknown, node_type() | comm:mypid() | pid()) -> false;
-            (node_type() | comm:mypid() | pid(), null | unknown) -> false.
-equals(Node1, Node2) when ((Node1 =:= null) orelse (Node1 =:= unknown) orelse
+-spec same_process(node_type() | comm:mypid() | pid(), node_type()) -> boolean();
+                  (node_type(), comm:mypid() | pid()) -> boolean();
+                  (null | unknown, node_type() | comm:mypid() | pid()) -> false;
+                  (node_type() | comm:mypid() | pid(), null | unknown) -> false.
+same_process(Node1, Node2) when ((Node1 =:= null) orelse (Node1 =:= unknown) orelse
                            (Node2 =:= null) orelse (Node2 =:= unknown)) ->
     false;
-equals(Node1, Node2) when is_record(Node1, node) andalso is_record(Node2, node) ->
+same_process(Node1, Node2) when is_record(Node1, node) andalso is_record(Node2, node) ->
     pidX(Node1) =:= pidX(Node2);
-equals(Pid1, Node2) when is_record(Node2, node) andalso is_pid(Pid1) ->
+same_process(Pid1, Node2) when is_record(Node2, node) andalso is_pid(Pid1) ->
     comm:make_global(Pid1) =:= pidX(Node2);
-equals(Pid1, Node2) when is_record(Node2, node) ->
+same_process(Pid1, Node2) when is_record(Node2, node) ->
     Pid1 =:= pidX(Node2);
-equals(Node1, Pid2) when is_record(Node1, node) andalso is_pid(Pid2)->
+same_process(Node1, Pid2) when is_record(Node1, node) andalso is_pid(Pid2)->
     pidX(Node1) =:= comm:make_global(Pid2);
-equals(Node1, Pid2) when is_record(Node1, node) ->
+same_process(Node1, Pid2) when is_record(Node1, node) ->
     pidX(Node1) =:= Pid2.
 
 %% @doc Checks whether the given node is the same as the node associated with
 %%      the requesting process.
 -spec is_me(node_type() | null | unknown) -> boolean().
 is_me(Node) ->
-    equals(Node, process_dictionary:get_group_member(dht_node)).
+    same_process(Node, process_dictionary:get_group_member(dht_node)).
 
 %% @doc Determines whether Node1 is a newer instance of Node2.
 %%      Note: Both nodes need to share the same PID, otherwise an exception of

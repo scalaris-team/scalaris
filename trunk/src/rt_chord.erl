@@ -97,7 +97,7 @@ init_stabilize(Id, _Succ, RT) ->
 -spec filter_dead_node(rt(), comm:mypid()) -> rt().
 filter_dead_node(RT, DeadPid) ->
     DeadIndices = [Index || {Index, Node}  <- gb_trees:to_list(RT),
-                            node:equals(Node, DeadPid)],
+                            node:same_process(Node, DeadPid)],
     lists:foldl(fun(Index, Tree) -> gb_trees:delete(Index, Tree) end,
                 RT, DeadIndices).
 %% userdevguide-end rt_chord:filter_dead_node
