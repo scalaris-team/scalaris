@@ -1,6 +1,6 @@
 % behaviors first - otherwise there are compile warnings
 {["src/gen_component.erl", "src/trigger_beh.erl", "src/db_beh.erl", "src/rm_beh.erl", "src/rt_beh.erl", "src/transactions/rdht_op_beh.erl", "src/transactions/tx_op_beh.erl"],
- [debug_info,
+ [debug_info, warn_unused_import, warn_missing_spec,
   {outdir, "ebin"},
   {i, "include"},
   {i, "contrib/yaws/include"},
@@ -9,7 +9,7 @@
  ]}.
 % now the source and all of its sub-directories:
 {["src/*", "src/comm_layer/*", "src/paxos/*", "src/pubsub/*", "src/simulation/*", "src/transactions/*", "src/transstore/*"],
- [debug_info,
+ [debug_info, warn_unused_import, warn_missing_spec,
   {outdir, "ebin"},
   {i, "ebin"},
   {i, "include"},
@@ -26,12 +26,12 @@
  ]}.
 % contributing libraries:
 {"contrib/log4erl/src/*",
- [debug_info,
+ [debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,
   {outdir, "contrib/log4erl/ebin/"},
   {i, "contrib/log4erl/include"}
  ]}.
 {"contrib/yaws/src/*",
- [debug_info,
+ [debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,
   {outdir, "contrib/yaws/ebin/"},
   {i, "contrib/yaws/include"}
  ]}.
