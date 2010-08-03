@@ -220,21 +220,19 @@ write_read_receive(ReplicaKeys, Operation, State)->
             end
     end.
 
+%% @doc Executes parallel reads and sends the result to SourcePid, i.e. a
+%%      {parallel_reads_return, fail} message in case of failures, otherwise
+%%      {parallel_reads_return, NewTransLog} with the new translog.
+%%      Needs a TransLog to collect all operations that are part of the
+%%      transaction. Use this function if you want to do parallel reads
+%%      without a transaction.
 %%--------------------------------------------------------------------
-%% Function: parallel_quorum_reads(Keys, TransLog, SourcePID) -> {fail, TransLog},
-%%                                   {success, NewTransLog}
-%% Args: [Keys] - List with keys
-%%       TransLog
-%% Description: Needs a TransLog to collect all operations
-%%                  that are part of the transaction
-%%              Use this function if you want to do parallel reads
-%%                  without a transaction
-%%                  e.g. in the read phase of wikipedia operations
-%%--------------------------------------------------------------------
-parallel_quorum_reads(Keys, TransLog, SourcePID)->
+-spec parallel_quorum_reads(Keys::[iodata() | integer()], TransLog::any(), SourcePID::comm:mypid()) -> pid().
+parallel_quorum_reads(Keys, TransLog, SourcePID) ->
     InstanceId = erlang:get(instance_id),
     spawn(transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
 
+-spec do_parallel_reads(Keys::[iodata() | integer()], SourcePID::comm:mypid(), TransLog::any(), InstanceId::instanceid()) -> ok.
 do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
     erlang:put(instance_id, InstanceId),
     {Flag, NewTransLog} = parallel_reads(Keys, TransLog),
@@ -245,16 +243,12 @@ do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
             comm:send(SourcePID, {parallel_reads_return, NewTransLog})
     end.
 
-
 %%--------------------------------------------------------------------
-%% Function: parallel_reads(Keys, TransLog) -> {fail, TransLog} |
-%%                                  {success, NewTransLog}
-%% Description: Executes a read operation
-%%              - retrieves value and version number remotely
-%%              - adds the operation to TransLog
-%%--------------------------------------------------------------------
-
-parallel_reads(Keys, TransLog)->
+%% @doc Executes a parallel read operation
+%%       - retrieves value and version number remotely
+%%       - adds the operation to TransLog
+-spec parallel_reads(Keys::[iodata() | integer()], TransLog) -> {success | fail, TransLog}.
+parallel_reads(Keys, TransLog) ->
     TLogCheck = check_trans_log(Keys, TransLog, [], []),
 
     if TLogCheck =:= fail->
@@ -474,44 +468,39 @@ initRTM(State, Message)->
 %% @doc deletes all replicas of an item, but respects locks
 %%      the return value is the number of successfully deleted items
 %%      WARNING: this function can lead to inconsistencies
--spec(delete/2 :: (comm:mypid(), any()) -> ok).
+-spec delete(SourcePid::comm:mypid(), Key::iodata() | integer()) -> ok.
 delete(SourcePID, Key) ->
     InstanceId = erlang:get(instance_id),
     spawn(transaction, do_delete, [Key, SourcePID, InstanceId]), 
     ok.
 
+-spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::instanceid()) -> ok.
 do_delete(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_keys_for_replicas(Key),
     [ lookup:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
-	Replica <- ReplicaKeys],
+        Replica <- ReplicaKeys],
     erlang:send_after(config:read(transaction_lookup_timeout), self(), {timeout}),
     delete_collect_results(ReplicaKeys, SourcePID, []).
 
 %% @doc collect the response for the delete requests
--spec(delete_collect_results/3 :: (list(?RT:key()), comm:mypid(),
-				   list()) -> any()).
+-spec delete_collect_results(ReplicaKeys::[?RT:key()], SourcePid::comm:mypid(),
+				             Results::[ok | locks_set | undef]) -> ok.
 delete_collect_results([], SourcePID, Results) ->
-    comm:send(SourcePID, {delete_result, {ok,
-					     length([ok || R <- Results, R =:= ok]),
-					     Results}});
+    OKs = length([ok || R <- Results, R =:= ok]),
+    comm:send(SourcePID, {delete_result, {ok, OKs, Results}});
 delete_collect_results(ReplicaKeys, Source_PID, Results) ->
     receive
-	{delete_key_response, Key, Result} ->
-	    case lists:member(Key, ReplicaKeys) of
-		true ->
-		    delete_collect_results(lists:delete(Key, ReplicaKeys),
-					   Source_PID,
-					   [Result | Results]);
-		false ->
-		    delete_collect_results(ReplicaKeys,
-					   Source_PID,
-					   Results)
-	    end;
-	{timeout} ->
-	    comm:send(Source_PID, {delete_result,
-				      {fail, timeout,
-				       length([ok || R <- Results, R =:= ok]),
-				       Results}})
+        {delete_key_response, Key, Result} ->
+            case lists:member(Key, ReplicaKeys) of
+                true ->
+                    delete_collect_results(lists:delete(Key, ReplicaKeys),
+                                           Source_PID, [Result | Results]);
+                false ->
+                    delete_collect_results(ReplicaKeys, Source_PID, Results)
+            end;
+        {timeout} ->
+            OKs = length([ok || R <- Results, R =:= ok]),
+            comm:send(Source_PID,
+                      {delete_result, {fail, timeout, OKs, Results}})
     end.
-

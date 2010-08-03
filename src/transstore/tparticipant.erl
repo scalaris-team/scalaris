@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,22 +11,14 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : tparticipant.erl
-%%% Author  : Monika Moser <moser@zib.de>
-%%% Description : transaction algorithm related to a participant
-%%%               unlike for the transaction manager there won't be 
-%%%                   a separate thread for each participant
-%%%                   
-%%%
-%%% Created :  11 Feb 2008 by Monika Moser <moser@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Monika Moser <moser@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @doc transaction algorithm related to a participant
+%%      unlike for the transaction manager there won't be 
+%%      a separate thread for each participant
+%% @end
 %% @version $Id$
-
 -module(tparticipant).
-
 -author('moser@zib.de').
 -vsn('$Id$').
 
@@ -35,11 +27,10 @@
 
 -export([tp_validate/3, tp_commit/2, tp_abort/2]).
 
-
 %% TP method:
 %%     validate operation on a certain item
 %%     only committed items can be read
--spec(tp_validate/3 :: (any(), any(), any()) -> any()).
+-spec tp_validate(dht_node_state:state(), Tid::any(), #item{}) -> dht_node_state:state().
 tp_validate(State, Tid, Item)->
     %?TLOGN("validating item ~p", [Item]),
     %% Check whether the version is still valid
@@ -61,9 +52,8 @@ tp_validate(State, Tid, Item)->
     NewVote = trecords:new_vote(Tid, Item#item.key, Item#item.rkey, Decision, 1),   
     tsend:send_vote_to_rtms(Item#item.tms, NewVote),
     NewState.
-    
 
--spec(set_lock/3 :: (any(), success | fail, any()) -> {any(), ok | failed}).
+-spec set_lock(?DB:db(), success | fail, #item{}) -> {?DB:db(), ok | failed}.
 set_lock(DB, success, #item{operation=read} = Item) ->
     ?DB:set_read_lock(DB, Item#item.rkey);
 set_lock(DB, success, #item{operation=write} = Item) ->
@@ -71,34 +61,34 @@ set_lock(DB, success, #item{operation=write} = Item) ->
 set_lock(DB, _LockFailed, _Item)->
     {DB, failed}.
 
-decision(ok)->
-    prepared;
-decision(_)->
-    abort.
+-spec decision(ok) -> prepared;
+              (failed) -> abort.
+decision(ok) -> prepared;
+decision(_) -> abort.
 
+-spec update_transaction_participant_log(State::dht_node_state:state(), Tid::any(), Item::#item{}, prepared | abort) -> dht_node_state:state().
 update_transaction_participant_log(State, Tid, Item, prepared) ->
     update_state(State, Tid, tp_log:new_logentry(prepared, Tid, Item));
 update_transaction_participant_log(State, Tid, Item, abort) ->
     update_state(State, Tid, tp_log:new_logentry(local_abort, Tid, Item)).
 
+-spec update_state(OldState::dht_node_state:state(), Tid::any(), LogEntry::#logentry{}) -> dht_node_state:state().
 update_state(OldState, Tid, LogEntry)->
     tp_log:add_to_undecided(OldState, Tid, LogEntry).
-    
-check_version(#item{operation=read} = TransactionItem, Version)-> 
-     if
-	 TransactionItem#item.version >= Version ->   
-	     success;
-	 true ->
-	     fail
-     end;
-check_version(#item{operation=write} = TransactionItem, Version)-> 
+
+-spec check_version(#item{}, Version::?DB:version()) -> success | fail.
+check_version(#item{operation=read} = TransactionItem, Version) ->
     if
-	TransactionItem#item.version =:= (Version + 1) ->
-	    success;
-	true ->
-	    fail
+        TransactionItem#item.version >= Version -> success;
+        true -> fail
+    end;
+check_version(#item{operation=write} = TransactionItem, Version) ->
+    if
+        TransactionItem#item.version =:= (Version + 1) -> success;
+        true -> fail
     end.
 
+-spec tp_commit(State::dht_node_state:state(), TransactionID::any()) -> dht_node_state:state().
 tp_commit(State, TransactionID)->
     %?TLOGN("committing transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
@@ -115,6 +105,7 @@ tp_commit(State, TransactionID)->
 	    State
     end.
 
+-spec tp_commit_store_unlock(DB::?DB:db(), [#logentry{}]) -> ?DB:db().
 tp_commit_store_unlock(DB, []) ->
     DB;
 tp_commit_store_unlock(DB, [Entry | LogRest])->
@@ -126,9 +117,9 @@ tp_commit_store_unlock(DB, [Entry | LogRest])->
 	_Any ->
 	    ?DB:unset_read_lock(DB, Entry#logentry.rkey)
     end,
-    
     tp_commit_store_unlock(DB3, LogRest).
 
+-spec tp_abort(State::dht_node_state:state(), TransactionID::any()) -> dht_node_state:state().
 tp_abort(State, TransactionID)->
     ?TLOGN("aborting transaction ~p", [TransactionID]),
     TransLog = tp_log:get_log(State),
@@ -145,6 +136,7 @@ tp_abort(State, TransactionID)->
 	    State
     end.
 
+-spec tp_abort_unlock(DB::?DB:db(), [#logentry{}]) -> ?DB:db().
 tp_abort_unlock(DB, []) ->
     DB;	    
 tp_abort_unlock(DB, [Entry | LogRest])->
@@ -160,4 +152,3 @@ tp_abort_unlock(DB, [Entry | LogRest])->
 	    {DB, ok}
     end,
     tp_abort_unlock(DB2, LogRest).    
-    
