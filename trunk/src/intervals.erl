@@ -49,7 +49,7 @@
 -type(right_bracket() :: ')' | ']').
 -type(key() :: ?RT:key() | minus_infinity | plus_infinity).
 -type(simple_interval() :: {element, key()} | {interval, left_bracket(), key(), key(), right_bracket()} | all).
--type(interval() :: simple_interval() | [simple_interval()]).
+-type(interval() :: simple_interval() | [simple_interval()]). %todo: make opaque (gives wrong dialyzer warnings with erlang < R14B)
 
 % @type interval() = [] | term() | {interval,term(),term()} | all | list(interval()).
 % [] -> empty interval
@@ -206,7 +206,7 @@ normalize(Element) ->
     end.
 
 %% @doc Normalizes simple intervals (see normalize/1).
--spec normalize_simple(simple_interval() | []) -> interval().
+-spec normalize_simple(simple_interval()) -> interval().
 normalize_simple(all) -> all;
 normalize_simple({element, _A} = I) -> I;
 normalize_simple({interval, '(', X, X, ')'}) -> empty();
@@ -232,11 +232,11 @@ normalize_simple({interval, LeftBr, X, minus_infinity, ')'}) ->
     {interval, LeftBr, X, plus_infinity, ']'};
 normalize_simple({interval, LeftBr, X, minus_infinity, ']'}) ->
     [{element, minus_infinity}, {interval, LeftBr, X, plus_infinity, ']'}];
-normalize_simple({interval, LeftBr, Begin, End, RightBr}) ->
-    case wraps_around({interval, LeftBr, Begin, End, RightBr}) of
+normalize_simple({interval, LeftBr, Begin, End, RightBr} = I) ->
+    case wraps_around(I) of
         true ->  [{interval, '[', minus_infinity, End, RightBr},
                   {interval, LeftBr, Begin, plus_infinity, ']'}];
-        false -> {interval, LeftBr, Begin, End, RightBr}
+        false -> I
     end.
 
 %% @doc Checks whether the given interval is normalized, i.e. not wrapping
@@ -253,7 +253,7 @@ is_well_formed(X) -> is_well_formed_simple(X).
 
 %% @doc Checks whether a given simple interval is normalized. Complex intervals
 %%      or any other value are considered 'not normalized'.
--spec is_well_formed_simple(interval()) ->  boolean().
+-spec is_well_formed_simple(simple_interval()) ->  boolean().
 is_well_formed_simple({element, _X}) -> true;
 is_well_formed_simple({interval, '(', plus_infinity, _Y, _RightBr}) ->
     false;
@@ -296,7 +296,7 @@ interval_sort(_Interval1, _Interval2) ->
 
 %% @doc Merges adjacent intervals in a sorted list of simple intervals using
 %%      union_simple/2.
--spec merge_adjacent(interval(), [simple_interval()]) -> [simple_interval()].
+-spec merge_adjacent([simple_interval()], [simple_interval()]) -> [simple_interval()].
 merge_adjacent([], Results) ->
     lists:reverse(Results);
 merge_adjacent([all | _T], _Results) ->
@@ -509,7 +509,7 @@ minus(A, B) -> minus_simple(A, B).
 %% @doc Determines whether the given interval wraps around, i.e. the interval
 %%      would cover the (non-existing) gap between plus_infinity and
 %%      minus_infinity.
--spec wraps_around({interval, left_bracket(), key(), key(), right_bracket()}) -> boolean().
+-spec wraps_around(simple_interval()) -> boolean().
 wraps_around({interval, _LeftBr, X, X, _RightBr}) ->
     false;
 wraps_around({interval, _LeftBr, minus_infinity, _, _RightBr}) ->
