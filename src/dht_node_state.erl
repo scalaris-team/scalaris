@@ -22,7 +22,7 @@
 -include("transstore/trecords.hrl").
 -include("scalaris.hrl").
 
--export([new/2, new/3,
+-export([new/3,
          get/2,
          set_neighbors/2,
          dump/1,
@@ -52,10 +52,6 @@
                 nc_subscr  :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}] % subscribers to node change events, i.e. node ID changes
                }).
 -opaque state() :: #state{}.
-
--spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood()) -> state().
-new(RT, Neighbors) ->
-    new(RT, Neighbors, ?DB:new(nodelist:nodeid(Neighbors))).
 
 %% userdevguide-begin dht_node_state:state
 -spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(),

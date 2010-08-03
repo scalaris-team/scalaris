@@ -23,6 +23,7 @@
 -compile(export_all).
 
 -include("unittest.hrl").
+-include("scalaris.hrl").
 
 all() ->
     [next_hop].
@@ -76,7 +77,7 @@ next_hop(_Config) ->
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
     % note: dht_node_state:new/3 will call process_dictionary:get_group_member(paxos_proposer)
     % which will fail here -> however, we don't need this process
-    State = dht_node_state:new(RT, nodelist:new_neighborhood(Pred, MyNode, Succ)),
+    State = dht_node_state:new(RT, nodelist:new_neighborhood(Pred, MyNode, Succ), ?DB:new(node:id(MyNode))),
     ?equals(rt_chord:next_hop(State, 0), lists:nth(6, DHTNodes)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
     ?equals(rt_chord:next_hop(State, 2), node:pidX(Succ)),
