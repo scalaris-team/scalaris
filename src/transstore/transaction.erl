@@ -115,7 +115,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
         [] ->
             %% we do not have any information for the key in the log read the
             %% information from remote
-            ReplicaKeys = ?RT:get_keys_for_replicas(Key),
+            ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
             [ lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
             erlang:send_after(config:read(transaction_lookup_timeout), self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
@@ -157,7 +157,7 @@ quorum_read(Key, SourcePID)->
 
 do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
-    ReplicaKeys = ?RT:get_keys_for_replicas(Key),
+    ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
     erlang:send_after(config:read(transaction_lookup_timeout), self(),
                       {write_read_receive_timeout, hd(ReplicaKeys)}),
@@ -260,7 +260,7 @@ parallel_reads(Keys, TransLog) ->
             %% get a list with all replica keys
             %% [[Key, RKey1, RKey2, ..., RKey3], [Key2, ....], ...]
             ReplicaKeysAll =
-                [ ?RT:get_keys_for_replicas(Elem) ||
+                [ ?RT:get_replica_keys(?RT:hash_key(Elem)) ||
                     Elem <- ToLookup ],
 
             lists:map(fun(ReplicaKeys)->
@@ -447,7 +447,7 @@ generateTID(State)->
 
 getRTMKeys(TID)->
     {Key, _} = TID,
-    RKeys = ?RT:get_keys_for_replicas(Key),
+    RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     lists:delete(Key, RKeys).
 
 %%--------------------------------------------------------------------
@@ -477,7 +477,7 @@ delete(SourcePID, Key) ->
 -spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::instanceid()) -> ok.
 do_delete(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
-    ReplicaKeys = ?RT:get_keys_for_replicas(Key),
+    ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ lookup:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
         Replica <- ReplicaKeys],
     erlang:send_after(config:read(transaction_lookup_timeout), self(), {timeout}),
