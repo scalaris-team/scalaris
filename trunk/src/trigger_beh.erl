@@ -26,6 +26,7 @@
 % Behaviour definition
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
      {init, 4},

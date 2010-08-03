@@ -22,6 +22,7 @@
 
 -export([behaviour_info/1]).
 
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
      % init (node identifier)

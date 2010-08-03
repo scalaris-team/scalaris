@@ -1,5 +1,5 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,12 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : pubsub_publish.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Publish function
-%%%
-%%% Created : 26 Mar 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% @version $Id $
--module(pubsub_publish).
 
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc Publish function
+%% @end
+%% @version $Id$
+-module(pubsub_publish).
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -33,12 +27,12 @@
 %%====================================================================
 
 %% @doc publishs an event to a given url.
-%% @spec publish(string(), string(), string()) -> ok
 %% @todo use pool:pspawn
+-spec publish(URL::string(), Topic::string(), Content::string()) -> ok.
 publish(URL, Topic, Content) ->
-    spawn(fun () -> pubsub_publish:publish_internal(URL, Topic, Content) end),
+    spawn(pubsub_publish, publish_internal, [URL, Topic, Content]),
     ok.
 
+-spec publish_internal(URL::string(), Topic::string(), Content::string()) -> {ok, {response, Result::[term()]}} | {error, Reason::term()}.
 publish_internal(URL, Topic, Content) ->
     jsonrpc:call(URL, [], {call, notify, [Topic, Content]}).
-

@@ -30,9 +30,14 @@
 
 -export([start_link/0, init/1]).
 
+-spec start_link() -> {ok, Pid::pid()} | ignore |
+                      {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link() ->
     supervisor:start_link(?MODULE, []).
 
+-spec init([]) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
+                                      PeriodInSeconds::pos_integer()},
+                         [ProcessDescr::any()]}}.
 init([]) ->
     InstanceId = string:concat("comm_port_", randoms:getRandomId()),
     CommPort =

@@ -43,6 +43,7 @@
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
 %% userdevguide-begin gen_component:behaviour
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
      {init, 1},     % initialize component

@@ -42,7 +42,8 @@
 %%====================================================================
 
 %% @doc starts the communication port (for supervisor)
-%% @spec start_link() -> {ok,Pid} | ignore | {error,Error}
+-spec start_link() -> {ok, Pid::pid()} | ignore |
+                      {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link() ->
     comm_port_sup:start_link().
 

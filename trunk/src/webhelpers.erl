@@ -27,6 +27,12 @@
          getIndexedRingRendered/0, lookup/1, set_key/2, delete_key/2, isPost/1,
          getVivaldiMap/0]).
 
+-opaque attribute_type() :: {atom(), string()}.
+-ifdef(forward_or_recursive_types_are_not_allowed).
+-type html_type() :: {atom(), [attribute_type()], term()}.
+-else.
+-type html_type() :: {atom(), [attribute_type()], html_type() | string()}.
+-endif.
 
 %% @doc Checks whether the current request is a post operation.
 -spec isPost(A::#arg{req::#http_request{method::atom()}}) -> boolean().
@@ -86,6 +92,7 @@ get_load([]) ->
 
 %%%-----------------------------Load----------------------------------
 
+-spec getLoadRendered() -> html_type().
 getLoadRendered() ->
     Load = getLoad(),
     {table, [{bgcolor, "#cccccc"}, {border, "0"}, {cellpadding, "2"}, {cellspacing, "2"}, {width, "90%"}],
@@ -98,6 +105,7 @@ getLoadRendered() ->
      ]
     }.
 
+-spec renderLoad([{failed, Node::node:node_type()} | {ok, Node::node:node_type(), non_neg_integer()}]) -> [html_type()].
 renderLoad([{ok, Node, Value} | Tail]) ->
     [{tr, [], 
       [
@@ -240,6 +248,7 @@ pid(X) ->
 
 %%%-----------------------------Ring----------------------------------
 
+-spec getRingChart() -> html_type().
 getRingChart() ->
     RealRing = statistics:get_ring_details(),
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
@@ -253,10 +262,10 @@ getRingChart() ->
             try
               PieURL = renderRingChart(Ring),
               LPie = length(PieURL),
-              if LPie < 1023 ->
-                      {p, [], [{img, [{src, PieURL}], ""}]};
-                 true ->
-                      throw({urlTooLong, PieURL})
+              if
+                  LPie =:= 0  -> throw({urlTooShort, PieURL});
+                  LPie < 1023 -> {p, [], [{img, [{src, PieURL}], ""}]};
+                  true        -> throw({urlTooLong, PieURL})
               end
             catch
                 _:_ -> {p, [], "Sorry, pie chart not available (too many nodes or other error)."}
@@ -265,36 +274,31 @@ getRingChart() ->
 
 -spec renderRingChart(Ring::[{ok, node_details:node_details()},...]) -> string().
 renderRingChart(Ring) ->
-    URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
-    Sizes = lists:map(
-              fun ({ok,Node}) ->
-                       Me_tmp = node:id(node_details:get(Node, node)),
-                       Pred_tmp = node:id(node_details:get(Node, pred)),
-                       Tmp = (Me_tmp - Pred_tmp) * 100 /
-                                 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
-                       Diff = if
-                                  Tmp < 0.0 ->
-                                      (Me_tmp +
-                                           16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                                      - Pred_tmp) * 100 /
-                                          16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-                                  true -> Tmp
-                              end,
-                       io_lib:format("~f", [Diff])
-              end, Ring),
-    Hostinfos = lists:map(
-                  fun ({ok,Node}) ->
-                           node_details:get(Node, hostname) ++ " (" ++
-                               integer_to_list(node_details:get(Node, load)) ++
-                               ")"
-                  end, Ring),
-    CHD = "chd=t:" ++ tl(
-            lists:foldl(fun(X,S) -> S ++ "," ++ X end, "", Sizes)),
-    CHS = "chs=600x350",
-    CHL = "chl=" ++ tl(
-            lists:foldl(fun(X,S) -> S ++ "|" ++ X end, "", Hostinfos)),
-    URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL.
+    try
+        URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
+        Sizes = [ begin
+                      Me_tmp = node:id(node_details:get(Node, node)),
+                      Pred_tmp = node:id(node_details:get(Node, pred)),
+                      MaxKey = ?RT:n() - 1,
+                      Diff = case (Me_tmp - Pred_tmp) of
+                                 X when X < 0 -> X + MaxKey;
+                                 Y            -> Y
+                             end * 100 / MaxKey,
+                      io_lib:format("~f", [Diff])
+                  end || {ok,Node} <- Ring ],
+        Hostinfos = [ node_details:get(Node, hostname) ++ " (" ++
+                          integer_to_list(node_details:get(Node, load)) ++ ")"
+                    || {ok,Node} <- Ring ],
+        CHD = "chd=t:" ++ string:join(Sizes, ","),
+        CHS = "chs=600x350",
+        CHL = "chl=" ++ string:join(Hostinfos, "|"),
+        URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL
+    catch % keys might not support subtraction or ?RT:n() might throw
+        throw:not_supported -> "";
+        error:badarith -> ""
+    end.
 
+-spec getRingRendered() -> html_type().
 getRingRendered() ->
     RealRing = statistics:get_ring_details(),
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
@@ -343,7 +347,7 @@ getRingRendered() ->
 	    }
     end.
 
--spec renderRing(Node::{ok, Details::node_details:node_details()} | {failed}) -> {tr, [], [{td, [], [any()]}]}.
+-spec renderRing(Node::{ok, Details::node_details:node_details()} | {failed}) -> html_type().
 renderRing({ok, Details}) ->
     Hostname = node_details:get(Details, hostname),
     PredList = node_details:get(Details, predlist),
@@ -370,6 +374,7 @@ renderRing({failed}) ->
        {td, [], "-"}
       ]}.
 
+-spec getIndexedRingRendered() -> html_type().
 getIndexedRingRendered() ->
     RealRing = statistics:get_ring_details(),
     Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
@@ -419,7 +424,7 @@ getIndexedRingRendered() ->
     end.
 
 -spec renderIndexedRing({ok, Details::node_details:node_details()} | {failed},
-                        Ring::[{ok, node_details:node_details()}]) -> {tr, [], [{td, [], [any()]}]}.
+                        Ring::[{ok, node_details:node_details()}]) -> html_type().
 renderIndexedRing({ok, Details}, Ring) ->
     Hostname = node_details:get(Details, hostname),
     PredList = node_details:get(Details, predlist),
@@ -504,7 +509,7 @@ get_indexed_id(Node, [{ok, Details} | Ring], Index) ->
 get_indexed_id(_Node, [], _Index) ->
     dead_node().
 
--spec get_flag(Hostname::node_details:hostname()) -> {img, [{src, URL::string()} | {width, pos_integer()} | {height, pos_integer()}], []}.
+-spec get_flag(Hostname::node_details:hostname()) -> html_type().
 get_flag(Hostname) ->
     Country = string:substr(Hostname, 1 + string:rchr(Hostname, $.)),
     URL = string:concat("icons/", string:concat(Country, ".gif")),

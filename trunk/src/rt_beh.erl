@@ -30,6 +30,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_beh:behaviour
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
      % create a default routing table

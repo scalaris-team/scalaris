@@ -208,9 +208,11 @@ diff([Tag | Rest], Before, After) ->
 %%=============================================================================
 %% admin server functions
 %%=============================================================================
+-spec start_link() -> {ok, pid()}.
 start_link() ->
     {ok, spawn_link(?MODULE, start, [])}.
 
+-spec start() -> none().
 start() ->
     register(admin_server, self()),
     loop().
@@ -267,10 +269,12 @@ check_routing_tables(Port) ->
     end,
     ok.
 
+-spec dd_check_ring() -> {token_on_the_way}.
 dd_check_ring() ->
     dd_check_ring(0).
 
+-spec dd_check_ring(non_neg_integer()) -> {token_on_the_way}.
 dd_check_ring(Token) ->
-    {ok,One} = process_dictionary:find_dht_node(),
-    comm:send_local(One , {send_to_group_member,ring_maintenance,{init_check_ring,Token}}),
+    {ok, One} = process_dictionary:find_dht_node(),
+    comm:send_local(One, {send_to_group_member, ring_maintenance, {init_check_ring, Token}}),
     {token_on_the_way}.
