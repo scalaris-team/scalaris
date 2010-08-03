@@ -88,24 +88,21 @@ quorum_read(Key)->
     end.
 
 %% Use this function to do parallel quorum reads on a list of keys with a commit phase
+-spec parallel_quorum_reads(Keys::[iodata() | integer()], Par::any()) -> {fail} | {fail, timeout} | any().
 parallel_quorum_reads(Keys, _Par)->
 %    ?TLOGN("starting quorum reads on ~p", [Keys]),
     {Flag, LocalDHTNode} = process_dictionary:find_dht_node(),
     RTO = config:read(parallel_quorum_read_timeout),
-    if 
-	Flag =/= ok->
-	    fail;
-	true ->
-	    LocalDHTNode ! {parallel_reads, comm:this(), Keys, []},
-	    receive
-		{parallel_reads_return, fail}->
-		    {fail};
-		{parallel_reads_return, NewTransLog}->
-		    NewTransLog
-	    after
-		RTO ->
-		    {fail, timeout}
-	    end
+    if
+        Flag =/= ok->
+            fail;
+        true ->
+            LocalDHTNode ! {parallel_reads, comm:this(), Keys, []},
+            receive
+                {parallel_reads_return, fail}        -> {fail};
+                {parallel_reads_return, NewTransLog} -> NewTransLog
+            after RTO -> {fail, timeout}
+            end
     end.
 
 %% returns:
