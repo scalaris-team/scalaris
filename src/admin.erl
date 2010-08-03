@@ -41,7 +41,8 @@ add_node_at_id(Id) ->
 add_node(Options) ->
     Desc = util:sup_supervisor_desc(randoms:getRandomId(),
                                     sup_dht_node, start_link, [Options]),
-    supervisor:start_child(main_sup, Desc).
+    supervisor:start_child(main_sup, Desc),
+    ok.
 
 -spec add_nodes(non_neg_integer()) -> ok.
 add_nodes(0) ->
