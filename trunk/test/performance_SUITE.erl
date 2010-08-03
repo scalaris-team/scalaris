@@ -35,12 +35,21 @@ all() ->
      next_hop,
      process_dictionary_lookup,
      process_dictionary_lookup_by_pid,
-     ets_insert,
-     ets_lookup,
+     ets_ordset_insert1,
+     ets_ordset_insert2,
+     ets_ordset_lookup1,
+     ets_ordset_lookup2,
      erlang_put,
      erlang_get,
      pdb_set,
      pdb_get,
+%%      ordsets_add_element,
+%%      sets_add_element,
+     gb_sets_add_element,
+     ets_set_insert1N,
+     ets_set_insert2N,
+     ets_ordset_insert1N,
+     ets_ordset_insert2N,
      erlang_send,
      comm_local,
     erlang_send_after,
@@ -67,35 +76,54 @@ count() ->
 empty(_Config) ->
     iter(count(), fun () ->
                        ok
-               end, "empty"),
+                  end, "empty"),
     ok.
 
-ets_lookup(_Config) ->
-    ets:new(performance, [ordered_set, private, named_table]),
-    ets:insert(performance, {123456, "foo"}),
+ets_ordset_lookup1(_Config) ->
+    ets:new(ets_ordset_lookup1, [ordered_set, private, named_table]),
+    ets:insert(ets_ordset_lookup1, {123456, "foo"}),
     iter(count(), fun() ->
-                          ets:lookup(performance, 123456)
-                              end, "ets:lookup"),
+                          ets:lookup(ets_ordset_lookup1, 123456)
+                  end, "ets(ordered_set):lookup"),
+    ets:delete(ets_ordset_lookup1),
     ok.
 
-ets_insert(_Config) ->
-    ets:new(ets_insert, [ordered_set, private, named_table]),
+ets_ordset_lookup2(_Config) ->
+    Table = ets:new(ets_ordset_lookup2, [ordered_set, private]),
+    ets:insert(Table, {123456, "foo"}),
     iter(count(), fun() ->
-                          ets:insert(ets_insert, {performance, "abc"})
-                              end, "ets:insert"),
+                          ets:lookup(Table, 123456)
+                  end, "ets(ordered_set_unnamed):lookup"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_insert1(_Config) ->
+    ets:new(ets_ordset_insert1, [ordered_set, private, named_table]),
+    iter(count(), fun() ->
+                          ets:insert(ets_ordset_insert1, {performance, "abc"})
+                  end, "ets(ordered_set):insert"),
+    ets:delete(ets_ordset_insert1),
+    ok.
+
+ets_ordset_insert2(_Config) ->
+    Table = ets:new(ets_ordset_insert2, [ordered_set, private, named_table]),
+    iter(count(), fun() ->
+                          ets:insert(Table, {performance, "abc"})
+                  end, "ets(ordered_set_unnamed):insert"),
+    ets:delete(Table),
     ok.
 
 erlang_get(_Config) ->
     erlang:put(performance, "foo"),
     iter(count(), fun() ->
                           erlang:get(performance)
-                              end, "erlang:get"),
+                  end, "erlang:get"),
     ok.
 
 erlang_put(_Config) ->
     iter(count(), fun() ->
                           erlang:put(performance, "abc")
-                              end, "erlang:put"),
+                  end, "erlang:put"),
     ok.
 
 pdb_get(_Config) ->
@@ -111,6 +139,69 @@ pdb_set(_Config) ->
     iter(count(), fun() ->
                           pdb:set({performance, "abc"}, pdb_set)
                   end, "pdb:set"),
+    ok.
+
+% weigh too slow - can not execute the default number of test runs, i.e. 1.000.000
+%% ordsets_add_element(_Config) ->
+%%     Set = ordsets:new(),
+%%     Set2 = iter2_foldl(10000, fun ordsets:add_element/2, Set, "ordsets:add_element (1)"),
+%%     _Set3 = iter2_foldl(10000, fun ordsets:add_element/2, Set2, "ordsets:add_element (2)"),
+%%     ok.
+%% 
+%% sets_add_element(_Config) ->
+%%     Set = sets:new(),
+%%     Set2 = iter2_foldl(100000, fun sets:add_element/2, Set, "sets:add_element (1)"),
+%%     _Set3 = iter2_foldl(100000, fun sets:add_element/2, Set2, "sets:add_element (2)"),
+%%     ok.
+
+gb_sets_add_element(_Config) ->
+    Set = gb_sets:new(),
+    Set2 = iter2_foldl(count(), fun gb_sets:add_element/2, Set, "gb_sets:add_element (1)"),
+    _Set3 = iter2_foldl(count(), fun gb_sets:add_element/2, Set2, "gb_sets:add_element (2)"),
+    ok.
+
+ets_set_insert1N(_Config) ->
+    ets:new(ets_set_insert1N, [set, private, named_table]),
+    iter2(count(), fun(N) ->
+                           ets:insert(ets_set_insert1N, {N})
+                   end, "ets(set):insert (1N)"),
+    iter2(count(), fun(N) ->
+                           ets:insert(ets_set_insert1N, {N})
+                   end, "ets(set):insert (2N)"),
+    ets:delete(ets_set_insert1N),
+    ok.
+
+ets_set_insert2N(_Config) ->
+    Table = ets:new(ets_set_insert2N, [set, private]),
+    iter2(count(), fun(N) ->
+                           ets:insert(Table, {N})
+                   end, "ets(set_unnamed):insert (1N)"),
+    iter2(count(), fun(N) ->
+                           ets:insert(Table, {N})
+                   end, "ets(set_unnamed):insert (2N)"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_insert1N(_Config) ->
+    ets:new(ets_ordset_insert1N, [ordered_set, private, named_table]),
+    iter2(count(), fun(N) ->
+                           ets:insert(ets_ordset_insert1N, {N})
+                   end, "ets(ordered_set):insert (1N)"),
+    iter2(count(), fun(N) ->
+                           ets:insert(ets_ordset_insert1N, {N})
+                   end, "ets(ordered_set):insert (2N)"),
+    ets:delete(ets_ordset_insert1N),
+    ok.
+
+ets_ordset_insert2N(_Config) ->
+    Table = ets:new(ets_set_insert2N, [ordered_set, private]),
+    iter2(count(), fun(N) ->
+                           ets:insert(Table, {N})
+                   end, "ets(ordered_set_unnamed):insert (1N)"),
+    iter2(count(), fun(N) ->
+                           ets:insert(Table, {N})
+                   end, "ets(ordered_set_unnamed):insert (2N)"),
+    ets:delete(Table),
     ok.
 
 erlang_send(_Config) ->
@@ -213,20 +304,52 @@ process_dictionary_lookup_by_pid(_Config) ->
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec iter(Count::pos_integer(), F::fun(() -> any()), Tag::string()) -> ok.
 iter(Count, F, Tag) ->
     F(),
     Start = erlang:now(),
     iter_inner(Count, F),
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
-    Frequency = 1000000.0 / (timer:now_diff(Stop, Start) / Count),
-    ct:pal("~p iterations of ~p took ~ps: ~p1/s", [Count, Tag,
-                                                   ElapsedTime,
-                                                   Frequency]),
+    Frequency = Count / ElapsedTime,
+    ct:pal("~p iterations of ~p took ~ps: ~p1/s",
+           [Count, Tag, ElapsedTime, Frequency]),
     ok.
 
+-spec iter_inner(Count::pos_integer(), F::fun(() -> any())) -> ok.
 iter_inner(0, _) ->
     ok;
 iter_inner(N, F) ->
     F(),
     iter_inner(N - 1, F).
+
+-spec iter2(Count::pos_integer(), F::fun((Count::pos_integer()) -> any()), Tag::string()) -> ok.
+iter2(Count, F, Tag) ->
+    F(0),
+    Start = erlang:now(),
+    iter2_inner(Count, F),
+    Stop = erlang:now(),
+    ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
+    Frequency = Count / ElapsedTime,
+    ct:pal("~p iterations of ~p took ~ps: ~p1/s",
+           [Count, Tag, ElapsedTime, Frequency]),
+    ok.
+
+-spec iter2_inner(Count::pos_integer(), F::fun((Count::pos_integer()) -> any())) -> ok.
+iter2_inner(0, _) ->
+    ok;
+iter2_inner(N, F) ->
+    F(N),
+    iter2_inner(N - 1, F).
+
+-spec iter2_foldl(Count::pos_integer(), F::fun((Count::pos_integer(), Acc) -> Acc), Acc, Tag::string()) -> Acc.
+iter2_foldl(Count, F, Acc0, Tag) ->
+    F(0, Acc0),
+    Start = erlang:now(),
+    FinalAcc = lists:foldl(F, Acc0, lists:seq(1, Count)),
+    Stop = erlang:now(),
+    ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
+    Frequency = Count / ElapsedTime,
+    ct:pal("~p foldl iterations of ~p took ~ps: ~p1/s",
+           [Count, Tag, ElapsedTime, Frequency]),
+    FinalAcc.
