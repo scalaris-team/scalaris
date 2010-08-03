@@ -1,5 +1,5 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,12 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : pubsub_api.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Publish API function
-%%%
-%%% Created : 17 Sep 2007 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% @version $Id $
--module(pubsub_api).
 
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc Publish/Subscribe API functions
+%% @end
+%% @version $Id$
+-module(pubsub_api).
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -34,7 +28,7 @@
 
 %% @doc publishs an event under a given topic.
 %%      called e.g. from the java-interface
-%% @spec publish(string(), string()) -> ok
+-spec publish(string(), string()) -> ok.
 publish(Topic, Content) ->
     Subscribers = get_subscribers(Topic),
     lists:foreach(fun (Subscriber) -> 
@@ -45,7 +39,7 @@ publish(Topic, Content) ->
 
 %% @doc subscribes a url for a topic.
 %%      called e.g. from the java-interface
-%% @spec subscribe(string(), string()) -> ok | {fail, term()}
+-spec subscribe(string(), string()) -> ok | {fail, Reason::term()}.
 subscribe(Topic, URL) ->
     TFun = fun(TransLog) ->
 		   {{Success, _ValueOrReason} = Result, TransLog1} = transaction_api:read(Topic, TransLog),
@@ -75,7 +69,7 @@ subscribe(Topic, URL) ->
     transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).
 
 %% @doc unsubscribes a url for a topic.
--spec(unsubscribe/2 :: (string(), string()) -> ok | {fail, any()}).
+-spec unsubscribe(string(), string()) -> ok | {fail, any()}.
 unsubscribe(Topic, URL) ->
     TFun = fun(TransLog) ->
 		   {Subscribers, TransLog1} = transaction_api:read2(TransLog, Topic),
@@ -93,6 +87,7 @@ unsubscribe(Topic, URL) ->
 
 %% @doc queries the subscribers of a query
 %% @spec get_subscribers(string()) -> [string()]
+-spec get_subscribers(Topic::string()) -> [string()].
 get_subscribers(Topic) ->
     {Res, _Value} = transaction_api:quorum_read(Topic),
     if

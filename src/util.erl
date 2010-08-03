@@ -485,10 +485,17 @@ smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
         false -> smerge2_helper([], T2, Lte, EqSelect, ML)
     end.
 
+-spec for_each_line_in_file(Name::file:name(), Proc::fun((string(), AccT) -> AccT),
+                            Mode::[read | write | append | raw | binary |
+                                   {delayed_write, Size::integer(), Delay::integer()} |
+                                   delayed_write | {read_ahead, Size::integer()} |
+                                   read_ahead | compressed],
+                            AccT) -> AccT.
 for_each_line_in_file(Name, Proc, Mode, Accum0) ->
     {ok, Device} = file:open(Name, Mode),
     for_each_line(Device, Proc, Accum0).
 
+-spec for_each_line(Device::file:io_device(), Proc::fun((string(), AccT) -> AccT), AccT) -> AccT.
 for_each_line(Device, Proc, Accum) ->
     case io:get_line(Device, "") of
         eof  -> file:close(Device), Accum;

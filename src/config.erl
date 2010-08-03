@@ -61,6 +61,7 @@ write(Key, Value) ->
 
 %% gen_server setup
 
+-spec start_link(Files::[file:name()]) -> {ok, pid()}.
 start_link(Files) ->
     TheFiles = case application:get_env(add_config) of
                    {ok, ConfigFile} ->
@@ -80,6 +81,7 @@ start_link(Files) ->
     {ok, Link}.
 
 %@private
+-spec start(Files::[file:name()], Owner::pid()) -> none().
 start(Files, Owner) ->
     register(?MODULE, self()),
     ets:new(config_ets, [set, protected, named_table]),
@@ -99,6 +101,7 @@ loop() ->
     end.
 
 %@private
+-spec populate_db(File::file:name()) -> any().
 populate_db(File) ->
     case file:consult(File) of
         {ok, Terms} ->
@@ -114,6 +117,7 @@ populate_db(File) ->
             fail
     end.
 
+-spec process_term({Key::atom(), Value::term()}) -> any().
 process_term({Key, Value}) ->
     ets:insert(config_ets, {Key, preconfig:get_env(Key, Value)}).
 

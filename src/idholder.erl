@@ -62,6 +62,7 @@ start_link(InstanceId, Options) ->
 %%      Warning: This effectively states that a newly created DHT node is
 %%      unrelated to the old one and should only be used if the old DHT node is
 %%      stopped.
+-spec reinit() -> ok.
 reinit() ->
     comm:send_local(get_pid(), {reinit}).
 

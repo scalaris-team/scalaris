@@ -25,6 +25,7 @@
 % for behaviour
 -export([behaviour_info/1]).
 
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
      {tlogentry_get_status, 1},

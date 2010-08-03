@@ -35,6 +35,7 @@
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @doc ask all local nodes for their state
+-spec dump_node_states() -> [term()].
 dump_node_states() ->
     [gen_component:get_state(Pid)
      || Pid <- process_dictionary:find_all_dht_nodes()].

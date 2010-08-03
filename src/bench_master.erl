@@ -1,5 +1,5 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,32 +11,27 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%% Author: Christian Hennig
-%% Created: Feb 12, 2009
-%% Description: TODO: Add description to experiments
+
+%% @author Christian Hennig <hennig@zib.de>
+%% @doc Master for local benchmark.
+%% @end
+%% @version $Id$
 -module(bench_master).
 -author('hennig@zib.de').
 -vsn('$Id$').
-
-%%
-%% Include files
-%%
-
-%%
-%% Exported Functions
-%%
 
 -export([run_1/0, start/0]).
  
 %%
 %% API Functions
 %%
+-spec start() -> pid().
 start() ->
     application:start(boot_cs),
     timer:sleep(1000),
     erlang:spawn(?MODULE,run_1,[]).
 
-
+-spec run_1() -> none().
 run_1() ->
     Size = list_to_integer(os:getenv("NODES_VM")),
     Worker = list_to_integer(os:getenv("WORKER")),
@@ -54,13 +49,10 @@ run_1() ->
     io:format("~p~n",[util:get_proc_in_vms(admin_server)]),
     [comm:send(Pid,{halt,1}) || Pid <- util:get_proc_in_vms(admin_server)],
     halt(1).
-    
-
 
 %%
 %% Local Functions
 %%
-
 
 wait_for_stable_ring() ->
     R = admin:check_ring(),
@@ -90,6 +82,6 @@ check_ring_size(Size) ->
     end.
 
 %% @doc the interval between two finger/pointer stabilization runs
-%% @spec pointerBaseStabilizationInterval() -> integer() | failed
+-spec pointerBaseStabilizationInterval() -> pos_integer().
 pointerBaseStabilizationInterval() ->
     config:read(pointer_base_stabilization_interval).

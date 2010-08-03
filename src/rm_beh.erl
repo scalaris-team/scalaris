@@ -27,6 +27,7 @@
          update_dht_node/1, update_dht_node/2, update_failuredetector/2,
          update_id/1]).
 
+-spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
      {start_link, 1},

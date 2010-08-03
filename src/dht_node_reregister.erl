@@ -86,6 +86,7 @@ reregister(Hosts, Message) ->
     ok.
 
 %% @doc Gets the zombie detector interval set in scalaris.cfg.
+-spec get_base_interval() -> pos_integer().
 get_base_interval() ->
     config:read(reregister_interval).
 

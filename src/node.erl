@@ -41,6 +41,7 @@
 new(Pid, Id, IdVersion) -> #node{pid=Pid, id=Id, id_version=IdVersion}.
 
 %% @doc Creates an invalid node.
+-spec null() -> null.
 null() -> null.
 
 %% @doc Gets the pid of the node.
