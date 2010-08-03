@@ -89,7 +89,7 @@ new_tm_state(TransID, Items, Leader, Self)->
      NewRVAcks,
      _NewDecisions} = lists:foldl(fun(Entry, {MyVotes, MyAcks, MyRVAcks, MyDec}) ->
                                          Key = Entry#tm_item.key,
-                                         RKeys = ?RT:get_keys_for_replicas(Key),
+                                         RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
                                          {VotesReplica, AcksReplica, _RVAcksReplica} =
                                              lists:foldl(fun(Elem, {Acc1,Acc2,Acc3})->
                                                                  {dict:store(Elem, {bottom, 0, 0}, Acc1),

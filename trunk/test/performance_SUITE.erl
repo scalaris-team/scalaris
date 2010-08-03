@@ -147,13 +147,13 @@ erlang_now(_Config) ->
 
 get_keys_for_replica_string(_Config) ->
     iter(count(), fun () ->
-                          rt_chord:get_keys_for_replicas("42")
+                          rt_chord:get_replica_keys(rt_chord:hash_key("42"))
                end, "get_keys_for_replica_string"),
     ok.
 
 get_keys_for_replica_int(_Config) ->
       iter(count(), fun () ->
-                            rt_chord:get_keys_for_replicas(42)
+                            rt_chord:get_replica_keys(rt_chord:hash_key(42))
                  end, "get_keys_for_replica_int"),
       ok.
 

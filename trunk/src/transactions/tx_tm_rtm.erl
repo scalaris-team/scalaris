@@ -480,7 +480,7 @@ on_init(_, _State) ->
 %% first entry is the locally hosted replica of IdSelf
 my_get_RTM_ids(IdSelf) ->
     %% @todo sort Ids by latency or do the sorting after RTMs are determined
-    ?RT:get_keys_for_replicas(IdSelf).
+    ?RT:get_replica_keys(?RT:hash_key(IdSelf)).
 
 my_RTM_update(RTMs) ->
     [ begin

@@ -1133,8 +1133,8 @@ defined in the following file:
 \erlfunindex{rt\_beh}{get\_size}
 \item \code{get_size/1} get the (internal or external) routing table's size.
 
-\erlfunindex{rt\_beh}{get\_keys\_for\_replicas}
-\item \code{get_keys_for_replicas/1} Returns for a given (un-hashed)
+\erlfunindex{rt\_beh}{get\_replica\_keys}
+\item \code{get_replica_keys/1} Returns for a given (hashed)
   \code{Key} the (hashed) keys of its replicas. This used for implementing
   symmetric replication.
 
@@ -1271,9 +1271,9 @@ the routing table and that is reset periodically in \code{init_stabilize/3}.
 \codesnippet{rt_simple.erl}{rt_simple:get_size}{../src/rt_simple.erl}
 The size of the routing table is always \code{1}.
 
-\erlfunindex{rt\_simple}{get\_keys\_for\_replicas}
-\codesnippet{rt_simple.erl}{rt_simple:get_keys_for_replicas}{../src/rt_simple.erl}
-This \code{get_keys_for_replicas/1} implements symmetric replication.
+\erlfunindex{rt\_simple}{get\_replica\_keys}
+\codesnippet{rt_simple.erl}{rt_simple:get_replica_keys}{../src/rt_simple.erl}
+This \code{get_replica_keys/1} implements symmetric replication.
 
 \erlfunindex{rt\_simple}{n}
 \codesnippet{rt_simple.erl}{rt_simple:n}{../src/rt_simple.erl}
@@ -1322,7 +1322,7 @@ i.e. 128-bit strings.
 
 \erlfun{rt\_chord}{hash\_key}{/1},
 \erlfun{rt\_chord}{get\_random\_node\_id}{/0},
-\erlfun{rt\_chord}{get\_keys\_for\_replicas}{/1} and
+\erlfun{rt\_chord}{get\_replica\_keys}{/1} and
 \erlfun{rt\_chord}{n}{/0} are implemented like their counterparts in
 \code{rt_simple.erl}.
 

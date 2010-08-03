@@ -294,7 +294,7 @@ vote_for_suspected(TMState)->
     %%Filter all items that have no decision yet
     Undecided = filter_undecided_items(TMState),
     lists:foreach(fun({Key, _Val})->
-			  RKeys = ?RT:get_keys_for_replicas(Key),
+			  RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
 			  lists:foreach(fun(RKey)->
 						Vote = trecords:new_vote(TMState#tm_state.transID, Key, RKey, abort, TMState#tm_state.myBallot),
 						Message = {read_vote, Vote},

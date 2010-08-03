@@ -110,7 +110,7 @@ update_db(Data) ->
 
 % @spec createReplicatedIntervals(term(), term()) -> [intervals:interval()]
 createReplicatedIntervals(From, To) ->
-    FromReplicas = ?RT:get_keys_for_replicas(From),
-    ToReplicas   = ?RT:get_keys_for_replicas(To),
+    FromReplicas = ?RT:get_replica_keys(?RT:hash_key(From)),
+    ToReplicas   = ?RT:get_replica_keys(?RT:hash_key(To)),
     lists:zipwith(fun intervals:new/2, FromReplicas, ToReplicas).
 

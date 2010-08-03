@@ -82,7 +82,7 @@ work_phase(ClientPid, ReqId, Request) ->
 quorum_read(CollectorPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:quorum_read~n", []),
     Key = element(2, Request),
-    RKeys = ?RT:get_keys_for_replicas(Key),
+    RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ lookup:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
     ok.
 
@@ -92,7 +92,7 @@ quorum_read(CollectorPid, ReqId, Request) ->
 validate_prefilter(TLogEntry) ->
     ?TRACE("rdht_tx_read:validate_prefilter(~p)~n", [TLog]),
     Key = erlang:element(2, TLogEntry),
-    RKeys = ?RT:get_keys_for_replicas(Key),
+    RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ setelement(2, TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal

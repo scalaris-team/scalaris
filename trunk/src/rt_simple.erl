@@ -27,7 +27,7 @@
 -export([empty/1, empty_ext/1,
          hash_key/1, get_random_node_id/0, next_hop/2,
          init_stabilize/3, update/7,
-         filter_dead_node/2, to_pid_list/1, get_size/1, get_keys_for_replicas/1,
+         filter_dead_node/2, to_pid_list/1, get_size/1, get_replica_keys/1,
          dump/1, to_list/1, export_rt_to_dht_node/4, n/0,
          handle_custom_message/2,
          check/5, check/6, check/7,
@@ -55,16 +55,10 @@ empty(Succ) -> Succ.
 %% userdevguide-begin rt_simple:hash_key
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(iodata() | integer()) -> key().
-hash_key(Key) -> hash_key_(Key).
-
-%% @doc Hashes the key to the identifier space (internal).
-%%      Note: Needed for dialyzer to cope with the opaque key() type and the
-%%      use of key() in get_keys_for_replicas/1.
--spec hash_key_(iodata() | integer()) -> non_neg_integer().
-hash_key_(Key) when is_integer(Key) ->
+hash_key(Key) when is_integer(Key) ->
     <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
     N;
-hash_key_(Key) ->
+hash_key(Key) ->
     <<N:128>> = erlang:md5(Key),
     N.
 %% userdevguide-end rt_simple:hash_key
@@ -119,17 +113,16 @@ get_size(_RT) -> 1.
 n() -> 16#100000000000000000000000000000000.
 %% userdevguide-end rt_simple:n
 
-%% userdevguide-begin rt_simple:get_keys_for_replicas
+%% userdevguide-begin rt_simple:get_replica_keys
 %% @doc Returns the replicas of the given key.
--spec get_keys_for_replicas(iodata() | integer()) -> [key()].
-get_keys_for_replicas(Key) ->
-    HashedKey = hash_key_(Key),
-    [HashedKey,
-     HashedKey bxor 16#40000000000000000000000000000000,
-     HashedKey bxor 16#80000000000000000000000000000000,
-     HashedKey bxor 16#C0000000000000000000000000000000
+-spec get_replica_keys(key()) -> [key()].
+get_replica_keys(Key) ->
+    [Key,
+     Key bxor 16#40000000000000000000000000000000,
+     Key bxor 16#80000000000000000000000000000000,
+     Key bxor 16#C0000000000000000000000000000000
     ].
-%% userdevguide-end rt_simple:get_keys_for_replicas
+%% userdevguide-end rt_simple:get_replica_keys
 
 %% userdevguide-begin rt_simple:dump
 %% @doc Dumps the RT state for output in the web interface.

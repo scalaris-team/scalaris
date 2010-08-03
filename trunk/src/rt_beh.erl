@@ -47,8 +47,9 @@ behaviour_info(callbacks) ->
      {filter_dead_node, 2},
      % statistics
      {to_pid_list, 1}, {get_size, 1},
-     % for symmetric replication
-     {get_keys_for_replicas, 1},
+     % gets all (replicated) keys for a given (hashed) key
+     % (for symmetric replication)
+     {get_replica_keys, 1},
      % address space size (throws 'throw:not_supported' if unsupported by the RT)
      {n, 0},
      % for debugging and web interface

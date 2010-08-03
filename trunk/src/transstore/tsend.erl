@@ -58,7 +58,7 @@ send_to_participants_with_lookup(TMState, Message)->
 
 send_to_replica_with_lookup(Key, Message)->
     ?TLOG("send_to_replica_with_lookup"),
-    ReplKeys = ?RT:get_keys_for_replicas(Key),
+    ReplKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     {MessName, MessText} = Message,
     F = fun(XKey) -> NewMessText =
                       MessText#tp_message{item_key = XKey, orig_key = Key},
