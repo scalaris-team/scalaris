@@ -108,6 +108,19 @@ java-test: compile java
 	  true ; \
 	fi
 
+java-bench: compile java
+	./bin/scalarisctl boot start ; \
+	SCALARIS_NODE_NAME="node1" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14196 -scalaris yaws_port 8001" ./bin/scalarisctl node start ; \
+	SCALARIS_NODE_NAME="node2" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14197 -scalaris yaws_port 8002" ./bin/scalarisctl node start ; \
+	SCALARIS_NODE_NAME="node3" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14198 -scalaris yaws_port 8003" ./bin/scalarisctl node start ; \
+	sleep 5s ; \
+	./java-api/scalaris --noconfig -b ; \
+	./bin/scalarisctl boot stop ; \
+	SCALARIS_NODE_NAME="node1" ./bin/scalarisctl node stop ; \
+	SCALARIS_NODE_NAME="node2" ./bin/scalarisctl node stop ; \
+	SCALARIS_NODE_NAME="node3" ./bin/scalarisctl node stop ; \
+	true
+
 clean:
 	-rm -f .make-docs
 	-rm -rf bin/*.beam
