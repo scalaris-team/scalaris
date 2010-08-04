@@ -197,12 +197,13 @@ debug(){
 }
 
 bootstop(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -name ctl \
         -pa $BEAMDIR \
         -noinput \
-        -s scalaris_ctl -extra boot@`hostname -f` stop
+        -s scalaris_ctl -extra $NODE_NAME@`hostname -f` stop
     popd > /dev/null
 }
 
@@ -235,12 +236,13 @@ nodestart(){
 
 
 nodestop(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -name ctl \
         -pa $BEAMDIR \
         -noinput \
-        -s scalaris_ctl -extra node@`hostname -f` stop
+        -s scalaris_ctl -extra $NODE_NAME@`hostname -f` stop
     popd > /dev/null
 }
 
