@@ -93,6 +93,7 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Debian_5.0/] ||
 || Ubuntu || 9.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.04/] ||
 || Ubuntu || 9.10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.10/] ||
+|| Ubuntu || 10.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_10.04/] ||
 
 Inside those repositories you will also find erlang packages - you don't need this if you already have a recent enough erlang version.
 
