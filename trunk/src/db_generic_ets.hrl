@@ -76,12 +76,13 @@ add_data(DB, Data) ->
 %%      keys in MyNewInterval and a list of the other values (second element).
 split_data(DB, MyNewInterval) ->
     F = fun (DBEntry, HisList) ->
-                case not db_entry:is_empty(DBEntry) andalso
-                         intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
+                case intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
                     true -> HisList;
-                    _    ->
-                        delete_entry(DB, DBEntry),
-                        [DBEntry | HisList]
+                    _    -> delete_entry(DB, DBEntry),
+                            case db_entry:is_empty(DBEntry) of
+                                false -> [DBEntry | HisList];
+                                _     -> HisList
+                            end
                 end
         end,
     HisList = ?ETS:foldl(F, [], DB),

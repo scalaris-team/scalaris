@@ -84,17 +84,18 @@ add_data(DB, Data) ->
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 split_data(DB, MyNewInterval) ->
-    {MyList, HisList} =
+    {MyListTmp, HisListTmp} =
         lists:partition(fun(DBEntry) ->
-                                (not db_entry:is_empty(DBEntry)) andalso
-                                    intervals:in(db_entry:get_key(DBEntry), MyNewInterval)
-                        end,
-                        gb_trees:values(DB)),
-    % note: building [{Key, Val}] from MyList should be more memory efficient
+                                intervals:in(db_entry:get_key(DBEntry),
+                                             MyNewInterval)
+                        end, gb_trees:values(DB)),
+    % note: building [{Key, DBEntry}] from MyList should be more memory efficient
     % than using gb_trees:to_list(DB) above and removing Key from the tuples in
     % HisList
-    {gb_trees:from_orddict([ {db_entry:get_key(DBEntry), DBEntry} ||
-                                DBEntry <- MyList]), HisList}.
+    MyNewList = [{db_entry:get_key(DBEntry), DBEntry} || DBEntry <- MyListTmp],
+    HisList = [DBEntry || DBEntry <- HisListTmp,
+                          not db_entry:is_empty(DBEntry)],
+    {gb_trees:from_orddict(MyNewList), HisList}.
 
 %% @doc Get key/value pairs in the given range.
 get_range_kv(DB, Interval) ->
