@@ -105,15 +105,21 @@ add_data(DB, Data) ->
 split_data(DB, MyNewInterval) ->
     F = fun(_K, DBEntry_, HisList) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
-                case not db_entry:is_empty(DBEntry) andalso
-                         intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
+                case intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
                     true -> HisList;
                     _    -> [DBEntry | HisList]
                 end
         end,
     HisList = toke_drv:fold(F, [], DB),
-    lists:foldl(fun(DBEntry, _) -> delete_entry(DB, DBEntry) end, DB, HisList),
-    {DB, HisList}.
+    % delete empty entries from HisList and remove all entries in HisList from the DB
+    HisListFilt = lists:foldl(fun(DBEntry, L) ->
+                                      delete_entry(DB, DBEntry),
+                                      case db_entry:is_empty(DBEntry) of
+                                          false -> [DBEntry | L];
+                                          _     -> L
+                                      end
+                              end, [], HisList),
+    {DB, HisListFilt}.
 
 %% @doc Get key/value pairs in the given range.
 get_range_kv(DB, Interval) ->
