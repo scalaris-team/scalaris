@@ -37,6 +37,8 @@
          is_adjacent/2, in/2,
          % operations for intervals
          intersection/2, union/2, minus/2,
+         % getters for certain intervals
+         get_bounds/1, get_elements/1,
          % for unit testing only
          is_well_formed/1, normalize/1
         ]).
@@ -195,15 +197,9 @@ in(_, {element, _}) -> false.
 normalize(List) when is_list(List) ->
     NormalizedList1 =
         lists:flatmap(fun(I) -> to_list(normalize_simple(I)) end, List),
-    case merge_adjacent(lists:usort(fun interval_sort/2, NormalizedList1), []) of
-        [Element] -> Element;
-        X         -> X
-    end;
+    from_list(merge_adjacent(lists:usort(fun interval_sort/2, NormalizedList1), []));
 normalize(Element) ->
-    case normalize_simple(Element) of
-        [Element2] -> Element2;
-        X          -> X
-    end.
+    from_list(normalize_simple(Element)).
 
 %% @doc Normalizes simple intervals (see normalize/1).
 -spec normalize_simple(simple_interval()) -> interval().
@@ -272,6 +268,15 @@ to_list(Interval) ->
     case Interval of
         X when is_list(X) -> X;
         X                 -> [X]
+    end.
+
+%% @doc Converts the given interval list to a simple interval if it only
+%%      contains a single (simple) interval.
+-spec from_list(Interval::interval()) -> interval().
+from_list(Interval) ->
+    case Interval of
+        [X] -> X;
+        _   -> Interval
     end.
 
 %% @doc Specifies an order over simple intervals based on their first component
@@ -402,7 +407,7 @@ is_continuous(all) -> true;
 is_continuous({element, _Key}) -> true;
 is_continuous({interval, _LBr, _L, _R, _RBr}) -> true;
 % complex intervals have adjacent intervals merged except for those wrapping around
-% -> if it contains only two simple intervals which are adjacent, then it is continuous!
+% -> if it contains only two simple intervals which are adjacent, it is continuous!
 is_continuous([{interval, '[', minus_infinity, _B1, _B1Br},
                {interval, _A0Br, _A0, plus_infinity, ']'}]) -> true;
 is_continuous([{element, minus_infinity},
@@ -412,6 +417,41 @@ is_continuous([{interval, '[', minus_infinity, _B1, _B1Br},
 is_continuous([{element, minus_infinity},
                {element, plus_infinity}]) -> true;
 is_continuous(_) -> false.
+
+%% @doc Gets the bounds of a given continuous (!) interval including their
+%%      brackets. Note that here
+%%      'all' transfers to {'[', minus_infinity, plus_infinity, ']'},
+%%      {element, Key} to {'[', Key, Key, ']'} and
+%%      [{interval,'[',minus_infinity,1,')'},{interval,'(',1,plus_infinity,']'}] to {'(', Key, Key, ')'}.
+%%      Other normalized intervals that wrap around will be returned the same
+%%      way they can be constructed with new/4.
+%%      Note: this method will only works on continuous non-empty intervals
+%%      and will throw an exception otherwise!
+-spec get_bounds(interval()) -> {left_bracket(), key(), key(), right_bracket()}.
+get_bounds(all) -> {'[', minus_infinity, plus_infinity, ']'};
+get_bounds({element, Key}) -> {'[', Key, Key, ']'};
+get_bounds({interval, LBr, L, R, RBr}) -> {LBr, L, R, RBr};
+get_bounds([{interval, '[', minus_infinity, B1, B1Br},
+            {interval, A0Br, A0, plus_infinity, ']'}]) -> {A0Br, A0, B1, B1Br};
+get_bounds([{element, minus_infinity},
+            {interval, A0Br, A0, plus_infinity, ']'}]) -> {A0Br, A0, minus_infinity, ']'};
+get_bounds([{interval, '[', minus_infinity, B1, B1Br},
+            {element, plus_infinity}]) -> {'[', plus_infinity, B1, B1Br};
+get_bounds([{element, minus_infinity}, {element, plus_infinity}]) -> {'[', plus_infinity, minus_infinity, ']'}.
+
+%% @doc Gets all elements inside the interval and returnes a "rest"-interval,
+%%      i.e. the interval without the elements.
+-spec get_elements(interval()) -> {Elements::[key()], RestInt::interval()}.
+get_elements(I) -> get_elements_list(to_list(I), [], []).
+
+%% @doc Helper for get_elements/1.
+-spec get_elements_list(Interval::interval(), Elements::[key()], RestInt::interval()) -> {Elements::[key()], RestInt::interval()}.
+get_elements_list([], Elements, RestInt) ->
+    {lists:reverse(Elements), from_list(lists:reverse(RestInt))};
+get_elements_list([{element, Key} | T], Elements, RestInt) ->
+    get_elements_list(T, [Key | Elements], RestInt);
+get_elements_list([I | T], Elements, RestInt) ->
+    get_elements_list(T, Elements, [I | RestInt]).
 
 %% @doc Checks whether two intervals are adjacent, i.e. the intervals are both
 %%      continuous, their union is continuous and their intersection is empty,
