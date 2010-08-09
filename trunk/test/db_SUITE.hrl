@@ -24,15 +24,15 @@
 
 tests_avail() ->
     [read, write, write_lock, read_lock, read_write_lock, write_read_lock,
-     delete, get_version, get_load_and_middle, split_data,
+     delete, get_version, get_load_and_middle, split_data, update_entries,
      % random tester functions:
      tester_new, tester_set_entry, tester_update_entry,
      tester_delete_entry1, tester_delete_entry2,
      tester_write, tester_write_lock, tester_read_lock,
      tester_read_write_lock, tester_write_read_lock,
      tester_delete, tester_add_data,
-     tester_get_range_kv, tester_get_range_kvv, tester_get_range_entry,
-     tester_split_data
+     tester_get_entries2, tester_get_entries3_1, tester_get_entries3_2,
+     tester_split_data, tester_update_entries
     ].
 
 suite() ->
@@ -258,7 +258,74 @@ split_data(_Config) ->
                      db_entry:new(4, "Value4", 4),
                      db_entry:new(5, "Value5", 5)],
                     intervals:union(intervals:new('[', 1, 3, ')'),
+                                    intervals:new(4))),
+    prop_split_data([db_entry:set_writelock(db_entry:new(1, "Value1", 1)),
+                     db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
+                     db_entry:new(3, "Value3", 3),
+                     db_entry:new(4, "Value4", 4),
+                     db_entry:new(5, "Value5", 5)],
+                    intervals:union(intervals:new('[', 1, 3, ')'),
                                     intervals:new(4))).
+
+%% @doc Some update_entries tests using fixed values.
+%% @see prop_update_entries_helper/3
+update_entries(_Config) ->
+    prop_update_entries_helper([db_entry:new(1, "Value1", 1),
+                                db_entry:new(2, "Value2", 1),
+                                db_entry:new(3, "Value3", 1),
+                                db_entry:new(4, "Value4", 1),
+                                db_entry:new(5, "Value5", 1)],
+                               [db_entry:new(1, "Value1", 2),
+                                db_entry:new(2, "Value2", 2),
+                                db_entry:new(3, "Value3", 2),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 2)],
+                               [db_entry:new(1, "Value1", 2),
+                                db_entry:new(2, "Value2", 2),
+                                db_entry:new(3, "Value3", 2),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 2)]),
+    prop_update_entries_helper([db_entry:new(1, "Value1", 1),
+                                db_entry:new(2, "Value2", 1),
+                                db_entry:new(3, "Value3", 1),
+                                db_entry:new(4, "Value4", 1),
+                                db_entry:new(5, "Value5", 1)],
+                               [db_entry:new(1, "Value1", 2),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 3)],
+                               [db_entry:new(1, "Value1", 2),
+                                db_entry:new(2, "Value2", 1),
+                                db_entry:new(3, "Value3", 1),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 3)]),
+    prop_update_entries_helper([db_entry:new(1, "Value1", 2),
+                                db_entry:new(2, "Value2", 2),
+                                db_entry:new(3, "Value3", 2),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 2)],
+                               [db_entry:new(1, "Value1", 1),
+                                db_entry:new(4, "Value4", 1),
+                                db_entry:new(5, "Value5", 1)],
+                               [db_entry:new(1, "Value1", 2),
+                                db_entry:new(2, "Value2", 2),
+                                db_entry:new(3, "Value3", 2),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 2)]),
+    prop_update_entries_helper([db_entry:set_writelock(db_entry:new(1, "Value1", 1)),
+                                db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
+                                db_entry:new(3, "Value3", 1),
+                                db_entry:new(4, "Value4", 1),
+                                db_entry:new(5, "Value5", 1)],
+                               [db_entry:new(1, "Value1", 2),
+                                db_entry:new(2, "Value2", 2),
+                                db_entry:new(3, "Value3", 2),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 2)],
+                               [db_entry:set_writelock(db_entry:new(1, "Value1", 1)),
+                                db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
+                                db_entry:new(3, "Value3", 2),
+                                db_entry:new(4, "Value4", 2),
+                                db_entry:new(5, "Value5", 2)]).
 
 % tester-based functions below:
 
@@ -671,11 +738,11 @@ tester_add_data(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% ?TEST_DB:get_range_kv/2
+% ?TEST_DB:get_entries/3 emulating the former get_range_kv/2 method
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get_range_kv(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_range_kv(Data, Range) ->
+-spec prop_get_entries3_1(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_entries3_1(Data, Range) ->
     DB = ?TEST_DB:new(1),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -684,28 +751,30 @@ prop_get_range_kv(Data, Range) ->
                              end, lists:reverse(Data)),
     DB2 = ?TEST_DB:add_data(DB, UniqueData),
     
-    InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
-                               intervals:in(db_entry:get_key(A), Range)
-                 end,
+    FilterFun = fun(A) -> (not db_entry:is_empty(A)) andalso
+                              intervals:in(db_entry:get_key(A), Range)
+                end,
+    ValueFun = fun(DBEntry) -> {db_entry:get_key(DBEntry),
+                                db_entry:get_value(DBEntry)}
+               end,
     
-    ?equals_w_note(lists:sort(?TEST_DB:get_range_kv(DB2, Range)),
-                   lists:sort([{db_entry:get_key(A), db_entry:get_value(A)}
-                              || A <- lists:filter(InRangeFun, UniqueData)]),
-                   "check_get_range_kv_1"),
+    ?equals_w_note(lists:sort(?TEST_DB:get_entries(DB2, FilterFun, ValueFun)),
+                   lists:sort([ValueFun(A) || A <- lists:filter(FilterFun, UniqueData)]),
+                   "check_get_entries3_1_1"),
 
     ?TEST_DB:close(DB2),
     true.
 
-tester_get_range_kv(_Config) ->
-    tester:test(?MODULE, prop_get_range_kv, 2, rw_suite_runs(1000)).
+tester_get_entries3_1(_Config) ->
+    tester:test(?MODULE, prop_get_entries3_1, 2, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% ?TEST_DB:get_range_kvv/2
+% ?TEST_DB:get_entries/3 emulating the former get_range_kvv/2 method
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get_range_kvv(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_range_kvv(Data, Range) ->
+-spec prop_get_entries3_2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_entries3_2(Data, Range) ->
     DB = ?TEST_DB:new(1),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -714,31 +783,32 @@ prop_get_range_kvv(Data, Range) ->
                              end, lists:reverse(Data)),
     DB2 = ?TEST_DB:add_data(DB, UniqueData),
     
-    InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
-                               (not db_entry:get_writelock(A)) andalso
-                               intervals:in(db_entry:get_key(A), Range)
-                 end,
+    FilterFun = fun(A) -> (not db_entry:is_empty(A)) andalso
+                              (not db_entry:get_writelock(A)) andalso
+                              intervals:in(db_entry:get_key(A), Range)
+                end,
+    ValueFun = fun(DBEntry) -> {db_entry:get_key(DBEntry),
+                                db_entry:get_value(DBEntry),
+                                db_entry:get_version(DBEntry)}
+               end,
     
-    ?equals_w_note(lists:sort(?TEST_DB:get_range_kvv(DB2, Range)),
-                   lists:sort([{db_entry:get_key(A),
-                                db_entry:get_value(A),
-                                db_entry:get_version(A)}
-                              || A <- lists:filter(InRangeFun, UniqueData)]),
-                   "check_get_range_kvv_1"),
+    ?equals_w_note(lists:sort(?TEST_DB:get_entries(DB2, FilterFun, ValueFun)),
+                   lists:sort([ValueFun(A) || A <- lists:filter(FilterFun, UniqueData)]),
+                   "check_get_entries3_2_1"),
 
     ?TEST_DB:close(DB2),
     true.
 
-tester_get_range_kvv(_Config) ->
-    tester:test(?MODULE, prop_get_range_kvv, 2, rw_suite_runs(1000)).
+tester_get_entries3_2(_Config) ->
+    tester:test(?MODULE, prop_get_entries3_2, 2, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% ?TEST_DB:get_range_entry/2
+% ?TEST_DB:get_entries/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get_range_entry(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_range_entry(Data, Range) ->
+-spec prop_get_entries2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_get_entries2(Data, Range) ->
     DB = ?TEST_DB:new(1),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -751,15 +821,15 @@ prop_get_range_entry(Data, Range) ->
                                intervals:in(db_entry:get_key(A), Range)
                  end,
     
-    ?equals_w_note(lists:sort(?TEST_DB:get_range_entry(DB2, Range)),
+    ?equals_w_note(lists:sort(?TEST_DB:get_entries(DB2, Range)),
                    lists:sort(lists:filter(InRangeFun, UniqueData)),
-                   "check_get_range_entry_1"),
+                   "check_get_entries2_1"),
 
     ?TEST_DB:close(DB2),
     true.
 
-tester_get_range_entry(_Config) ->
-    tester:test(?MODULE, prop_get_range_entry, 2, rw_suite_runs(1000)).
+tester_get_entries2(_Config) ->
+    tester:test(?MODULE, prop_get_entries2, 2, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -795,7 +865,63 @@ prop_split_data(Data, Range) ->
 tester_split_data(_Config) ->
     tester:test(?MODULE, prop_split_data, 2, rw_suite_runs(1000)).
 
-%TODO: ?TEST_DB:update_if_newer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% ?TEST_DB:update_entries/4
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_update_entries(Data::?TEST_DB:db_as_list(), ItemsToUpdate::pos_integer()) -> true.
+prop_update_entries(Data, ItemsToUpdate) ->
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    UniqueUpdateData =
+        [db_entry:inc_version(E) || E <- lists:sublist(UniqueData, ItemsToUpdate)],
+    ExpUpdatedData =
+        [begin
+             case db_entry:get_writelock(E) orelse db_entry:get_readlock(E) =/= 0 of
+                 true -> E;
+                 _    ->
+                     EUpd = [X || X <- UniqueUpdateData,
+                                  db_entry:get_key(X) =:= db_entry:get_key(E),
+                                  db_entry:get_version(X) > db_entry:get_version(E)],
+                     case EUpd of
+                         []  -> E;
+                         [X] -> X
+                     end
+             end
+         end || E <- UniqueData] ++
+        [E || E <- UniqueUpdateData,
+              not lists:any(fun(X) ->
+                                    db_entry:get_key(X) =:= db_entry:get_key(E)
+                            end, UniqueData)],
+    
+    prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData).
+
+-spec prop_update_entries_helper(UniqueData::?TEST_DB:db_as_list(), UniqueUpdateData::?TEST_DB:db_as_list(), ExpUpdatedData::?TEST_DB:db_as_list()) -> true.
+prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData) ->
+    DB = ?TEST_DB:new(1),
+    DB2 = ?TEST_DB:add_data(DB, UniqueData),
+    
+    UpdatePred = fun(OldEntry, NewEntry) ->
+                         db_entry:get_version(OldEntry) < db_entry:get_version(NewEntry)
+                 end,
+    UpdateVal = fun(_OldEntry, NewEntry) -> NewEntry end,
+    
+    DB3 = ?TEST_DB:update_entries(DB2, UniqueUpdateData, UpdatePred, UpdateVal),
+    
+    ?equals_w_note(lists:sort(?TEST_DB:get_data(DB3)),
+                   lists:sort(ExpUpdatedData),
+                   "check_update_entries_1"),
+
+    ?TEST_DB:close(DB3),
+    true.
+
+tester_update_entries(_Config) ->
+    tester:test(?MODULE, prop_update_entries, 2, rw_suite_runs(1000)).
+
 
 % helper functions:
 

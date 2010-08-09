@@ -26,6 +26,7 @@
 -compile(export_all).
 
 -include("unittest.hrl").
+-include("scalaris.hrl").
 
 all() ->
     [count].
@@ -76,7 +77,6 @@ collect(Sum) ->
 	    Sum
     end.
 
-reduce([]) ->
-    0;
-reduce([{_, Value}| Rest]) ->
-    Value + reduce(Rest).
+-spec reduce(?DB:db_as_list()) -> integer().
+reduce(Entries) ->
+    lists:foldl(fun(E, Acc) -> db_entry:get_value(E) + Acc end, 0, Entries).

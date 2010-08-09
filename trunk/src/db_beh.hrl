@@ -19,12 +19,11 @@
 
 -type(value() :: any()).
 -type(version() :: non_neg_integer()).
--type(kv_list() :: [{Key::?RT:key(), Value::value()}]).
 -type(kvv_list() :: [{Key::?RT:key(), Value::value(), Version::version()}]).
 -type(db_as_list() :: [db_entry:entry()]).
 
 -ifdef(with_export_type_support).
--export_type([db/0, value/0, version/0, kv_list/0, kvv_list/0,
+-export_type([db/0, value/0, version/0, kvv_list/0,
               db_as_list/0]).
 -endif.
 
@@ -34,9 +33,9 @@
 -export([delete/2]).
 -export([set_write_lock/2, unset_write_lock/2,
          set_read_lock/2, unset_read_lock/2, get_locks/2]).
--export([get_range_kv/2, get_range_kvv/2, get_range_entry/2]).
+-export([get_entries/2, get_entries/3]).
+-export([update_entries/4]).
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
--export([update_if_newer/2]).
 -export([check_db/1]).
 -export([record_changes/2, stop_record_changes/1, get_changes/1]).
 
@@ -69,17 +68,21 @@
 -spec get_locks(DB::db(), Key::?RT:key()) ->
          {DB::db(), {WriteLock::boolean(), ReadLock::non_neg_integer(), Version::version()} | {true, 0, -1} | failed}.
 
--spec get_range_kv(DB::db(), Range::intervals:interval()) -> kv_list().
--spec get_range_kvv(DB::db(), Range::intervals:interval()) -> kvv_list().
--spec get_range_entry(DB::db(), Range::intervals:interval()) -> db_as_list().
+-spec get_entries(DB::db(), Range::intervals:interval()) -> db_as_list().
+-spec get_entries(DB::db(),
+                  FilterFun::fun((DBEntry::db_entry:entry()) -> boolean()),
+                  ValueFun::fun((DBEntry::db_entry:entry()) -> Value))
+        -> [Value].
+-spec update_entries(DB::db(), Values::[db_entry:entry()],
+                     Pred::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> boolean()),
+                     UpdateFun::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> UpdatedEntry::db_entry:entry()))
+        -> NewDB::db().
 
 -spec get_load(DB::db()) -> Load::integer().
 -spec split_data(DB::db(), MyNewInterval::intervals:interval()) ->
          {NewDB::db(), db_as_list()}.
 -spec get_data(DB::db()) -> db_as_list().
 -spec add_data(DB::db(), db_as_list()) -> NewDB::db().
-
--spec update_if_newer(OldDB::db(), KVs::kvv_list()) -> NewDB::db().
 
 -spec record_changes(OldDB::db(), intervals:interval()) -> NewDB::db().
 -spec stop_record_changes(OldDB::db()) -> NewDB::db().
