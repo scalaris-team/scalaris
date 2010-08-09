@@ -45,7 +45,7 @@ all() ->
      pdb_get,
 %%      ordsets_add_element,
 %%      sets_add_element,
-     gb_sets_add_element,
+%%      gb_sets_add_element,
      ets_set_insert1N,
      ets_set_insert2N,
      ets_ordset_insert1N,
@@ -142,18 +142,20 @@ pdb_set(_Config) ->
     ok.
 
 % weigh too slow - can not execute the default number of test runs, i.e. 1.000.000
-%% ordsets_add_element(_Config) ->
-%%     Set = ordsets:new(),
-%%     Set2 = iter2_foldl(10000, fun ordsets:add_element/2, Set, "ordsets:add_element (1)"),
-%%     _Set3 = iter2_foldl(10000, fun ordsets:add_element/2, Set2, "ordsets:add_element (2)"),
-%%     ok.
-%% 
-%% sets_add_element(_Config) ->
-%%     Set = sets:new(),
-%%     Set2 = iter2_foldl(100000, fun sets:add_element/2, Set, "sets:add_element (1)"),
-%%     _Set3 = iter2_foldl(100000, fun sets:add_element/2, Set2, "sets:add_element (2)"),
-%%     ok.
+ordsets_add_element(_Config) ->
+    Set = ordsets:new(),
+    Set2 = iter2_foldl(10000, fun ordsets:add_element/2, Set, "ordsets:add_element (1)"),
+    _Set3 = iter2_foldl(10000, fun ordsets:add_element/2, Set2, "ordsets:add_element (2)"),
+    ok.
 
+% slow, too - do not call by default
+sets_add_element(_Config) ->
+    Set = sets:new(),
+    Set2 = iter2_foldl(100000, fun sets:add_element/2, Set, "sets:add_element (1)"),
+    _Set3 = iter2_foldl(100000, fun sets:add_element/2, Set2, "sets:add_element (2)"),
+    ok.
+
+% slow, too - do not call by default
 gb_sets_add_element(_Config) ->
     Set = gb_sets:new(),
     Set2 = iter2_foldl(count(), fun gb_sets:add_element/2, Set, "gb_sets:add_element (1)"),
