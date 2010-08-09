@@ -69,11 +69,11 @@ compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
 test: compile
-	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skip_benchmark.cfg | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skip_benchmark.cfg -cover test/scalaris.coverspec | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 %_SUITE: compile

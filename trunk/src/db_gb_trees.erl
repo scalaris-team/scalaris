@@ -49,12 +49,6 @@ close({_DB, _CKInt, CKDB}) ->
     ?CKETS:delete(CKDB).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
-%%      an empty entry will be returned.
-get_entry(State, Key) ->
-    {_Exists, Result} = get_entry2(State, Key),
-    Result.
-
-%% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
 get_entry2({DB, _CKInt, _CKDB}, Key) ->
@@ -65,27 +59,30 @@ get_entry2({DB, _CKInt, _CKDB}, Key) ->
 
 %% @doc Inserts a complete entry into the DB.
 set_entry({DB, CKInt, CKDB}, Entry) ->
-    case intervals:in(db_entry:get_key(Entry), CKInt) of
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
         false -> ok;
-        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+        _     -> ?CKETS:insert(CKDB, {Key})
     end,
-    {gb_trees:enter(db_entry:get_key(Entry), Entry, DB), CKInt, CKDB}.
+    {gb_trees:enter(Key, Entry, DB), CKInt, CKDB}.
 
 %% @doc Updates an existing (!) entry in the DB.
 update_entry({DB, CKInt, CKDB}, Entry) ->
-    case intervals:in(db_entry:get_key(Entry), CKInt) of
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
         false -> ok;
-        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+        _     -> ?CKETS:insert(CKDB, {Key})
     end,
-    {gb_trees:update(db_entry:get_key(Entry), Entry, DB), CKInt, CKDB}.
+    {gb_trees:update(Key, Entry, DB), CKInt, CKDB}.
 
 %% @doc Removes all values with the given entry's key from the DB.
 delete_entry({DB, CKInt, CKDB}, Entry) ->
-    case intervals:in(db_entry:get_key(Entry), CKInt) of
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
         false -> ok;
-        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+        _     -> ?CKETS:insert(CKDB, {Key})
     end,
-    {gb_trees:delete_any(db_entry:get_key(Entry), DB), CKInt, CKDB}.
+    {gb_trees:delete_any(Key, DB), CKInt, CKDB}.
 
 %% @doc Returns the number of stored keys.
 get_load({DB, _CKInt, _CKDB}) ->
