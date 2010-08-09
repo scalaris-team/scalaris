@@ -108,97 +108,26 @@ end_per_suite(Config) ->
         end()).
 
 read(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?TEST_DB:new(1),
-    ?equals(?TEST_DB:read(DB, ?RT:hash_key("Unknown")), {ok, empty_val, -1}),
-    ?TEST_DB:close(DB),
-    ok.
+    prop_new(1, ?RT:hash_key("Unknown")).
 
 write(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?TEST_DB:new(1),
-    DB2 = ?TEST_DB:write(DB, ?RT:hash_key("Key1"), "Value1", 1),
-    ?equals(?TEST_DB:read(DB2, ?RT:hash_key("Key1")), {ok, "Value1", 1}),
-    ?TEST_DB:close(DB2),
-    ok.
+    prop_write(?RT:hash_key("Key1"), "Value1", 1, ?RT:hash_key("Key2")).
 
 write_lock(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?TEST_DB:new(1),
-    % lock on a key
-    DB2 = ?db_equals_pattern(?TEST_DB:set_write_lock(DB, ?RT:hash_key("WriteLockKey1")), ok),
-    DB3 = ?db_equals_pattern(?TEST_DB:set_write_lock(DB2, ?RT:hash_key("WriteLockKey2")), ok),
-    % lock on locked key should fail
-    DB4 = ?db_equals_pattern(?TEST_DB:set_write_lock(DB3, ?RT:hash_key("WriteLockKey2")), failed),
-    % unlock key
-    DB5 = ?db_equals_pattern(?TEST_DB:unset_write_lock(DB4, ?RT:hash_key("WriteLockKey2")), ok),
-    % lockable again?
-    DB6 = ?db_equals_pattern(?TEST_DB:set_write_lock(DB5, ?RT:hash_key("WriteLockKey2")), ok),
-    DB7 = ?db_equals_pattern(?TEST_DB:get_locks(DB6, ?RT:hash_key("WriteLockKey2")), {true, 0, _Version}),
-    % unlock to finish
-    DB8 = ?db_equals_pattern(?TEST_DB:unset_write_lock(DB7, ?RT:hash_key("WriteLockKey2")), ok),
-    % unlock non existing key
-    DB9 = ?db_equals_pattern(?TEST_DB:unset_write_lock(DB8, ?RT:hash_key("WriteLockKey2")), failed),
-    ?TEST_DB:close(DB9),
-    ok.
+    prop_write_lock(?RT:hash_key("WriteLockKey1"), "Value1", 1, ?RT:hash_key("WriteLockKey2")).
 
 read_lock(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?TEST_DB:new(1),
-    % read lock on new key should fail
-    DB2 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB, ?RT:hash_key("ReadLockKey1")), failed),
-    DB2b = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB2, ?RT:hash_key("ReadLockKey1")), failed),
-    DB3           = ?TEST_DB:write(DB2b, ?RT:hash_key("ReadLockKey2"), "Value1", 1),
-    % read lock on existing key
-    DB4 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB3, ?RT:hash_key("ReadLockKey2")), ok),
-    DB5 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB4, ?RT:hash_key("ReadLockKey2")), ok),
-    % read unlock on existing key
-    DB6 = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB5, ?RT:hash_key("ReadLockKey2")), ok),
-    DB7 = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB6, ?RT:hash_key("ReadLockKey2")), ok),
-    % read unlock on non read locked key
-    DB8 = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB7, ?RT:hash_key("ReadLockKey2")), failed),
-    DB9 = ?db_equals_pattern(?TEST_DB:get_locks(DB8, ?RT:hash_key("ReadLockKey2")), {false,0,1}),
-    DB10 = ?db_equals_pattern(?TEST_DB:get_locks(DB9, ?RT:hash_key("Unknown")), failed),
-    % read on write locked new key should fail
-    DB11 = ?db_equals_pattern(?TEST_DB:set_write_lock(DB10, ?RT:hash_key("ReadLockKey1")), ok),
-    %% never set a value, but DB Entry was created
-    ?equals(?TEST_DB:read(DB11, ?RT:hash_key("ReadLockKey1")), {ok, empty_val, -1}),
-    ?TEST_DB:close(DB11),
-    ok.
+    prop_read_lock(?RT:hash_key("ReadLockKey1"), "Value1", 1).
 
 read_write_lock(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?TEST_DB:new(2),
-    DB2 = ?TEST_DB:write(DB, ?RT:hash_key("ReadWriteLockKey1"), "Value1", 1),
-    ?equals(?TEST_DB:get_load(DB2), 1),
-    DB3 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB2, ?RT:hash_key("ReadWriteLockKey1")), ok),
-    % no write lock, when read locks exist
-    DB4 = ?db_equals_pattern(?TEST_DB:set_write_lock(DB3, ?RT:hash_key("ReadWriteLockKey1")), failed),
-    ?TEST_DB:close(DB4),
-    ok.
+    prop_read_write_lock(?RT:hash_key("ReadWriteLockKey1"), "Value1", 1).
 
 write_read_lock(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?TEST_DB:new(1),
-    DB2 = ?TEST_DB:write(DB, ?RT:hash_key("WriteReadLockKey1"), "Value1", 1),
-    DB3 = ?db_equals_pattern(?TEST_DB:set_write_lock(DB2, ?RT:hash_key("WriteReadLockKey1")), ok),
-    % no read lock, when a write lock exists
-    DB4 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB3, ?RT:hash_key("WriteReadLockKey1")), failed),
-    ?TEST_DB:close(DB4),
-    ok.
+    prop_write_read_lock(?RT:hash_key("WriteReadLockKey1"), "Value1", 1).
 
 delete(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
-    DB = ?TEST_DB:new(1),
-    DB2 = ?TEST_DB:write(DB, ?RT:hash_key("Key1"), "Value1", 1),
-    DB3 = ?db_equals_pattern(?TEST_DB:delete(DB2, ?RT:hash_key("Key1")), ok),
-    ?equals(?TEST_DB:read(DB3, ?RT:hash_key("Key1")), {ok, empty_val, -1}),
-    DB5 = ?db_equals_pattern(?TEST_DB:delete(DB3, ?RT:hash_key("Key1")), undef),
-    DB6 = ?TEST_DB:write(DB5, ?RT:hash_key("Key1"), "Value1", 1),
-    DB7 = ?db_equals_pattern(?TEST_DB:set_read_lock(DB6, ?RT:hash_key("Key1")), ok),
-    DB8 = ?db_equals_pattern(?TEST_DB:delete(DB7, ?RT:hash_key("Key1")), locks_set),
-    ?TEST_DB:close(DB8),
-    ok.
+    prop_delete(?RT:hash_key("DeleteKey1"), "Value1", false, 0, 1, ?RT:hash_key("DeleteKey2")),
+    prop_delete(?RT:hash_key("DeleteKey1"), "Value1", false, 1, 1, ?RT:hash_key("DeleteKey2")).
 
 get_version(_Config) ->
     erlang:put(instance_id, "db_SUITE.erl"),
