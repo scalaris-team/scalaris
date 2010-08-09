@@ -40,6 +40,9 @@
 %-define(DB, db_toke).
 %-define(DB, db_verify_use). % for testing only!
 -define(DB, db_ets).
+% special parameters to be passed to ets:new/2 (not only used on db_ets!)
+%-define(DB_ETS_ADDITIONAL_OPS, [private]). % better, faster for production use
+-define(DB_ETS_ADDITIONAL_OPS, [protected, named_table]). % better for debugging
 %% userdevguide-end scalaris:db
 
 

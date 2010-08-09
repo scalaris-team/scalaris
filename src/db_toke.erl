@@ -23,11 +23,13 @@
 
 -behaviour(db_beh).
 
--type(db()::atom()).
+-opaque(db() :: {Table::atom(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}).
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
 -include("db_beh.hrl").
+
+-define(CKETS, ets).
 
 -include("db_common.hrl").
 
@@ -45,64 +47,91 @@ new(Id) ->
     {ok, DB} = toke_drv:start_link(),
     case toke_drv:new(DB) of
         ok ->
+            RandomName = randoms:getRandomId(),
+            CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
             case toke_drv:open(DB, FileName, [read,write,create,truncate]) of
-                ok     -> DB;
-                Error2 -> log:log(error, "[ TOKE ] ~p", [Error2])
+                ok     -> {DB, intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])};
+                Error2 -> log:log(error, "[ TOKE ] ~p", [Error2]),
+                          erlang:error({toke_failed, Error2})
             end;
         Error1 ->
-            log:log(error, "[ TOKE ] ~p", [Error1])
+            log:log(error, "[ TOKE ] ~p", [Error1]),
+            erlang:error({toke_failed, Error1})
     end.
 
 %% @doc Deletes all contents of the given DB.
-close(DB) ->
+close({DB, _CKInt, CKDB}) ->
     toke_drv:close(DB),
     toke_drv:delete(DB),
-    toke_drv:stop(DB).
+    toke_drv:stop(DB),
+    ?CKETS:delete(CKDB).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned.
-get_entry(DB, Key) ->
-    {_Exists, Result} = get_entry2(DB, Key),
+get_entry(State, Key) ->
+    {_Exists, Result} = get_entry2(State, Key),
     Result.
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
-get_entry2(DB, Key) ->
+get_entry2({DB, _CKInt, _CKDB}, Key) ->
     case toke_drv:get(DB, erlang:term_to_binary(Key)) of
         not_found -> {false, db_entry:new(Key)};
         Entry     -> {true, erlang:binary_to_term(Entry)}
     end.
 
 %% @doc Inserts a complete entry into the DB.
-set_entry(DB, Entry) ->
+set_entry(State = {DB, CKInt, CKDB}, Entry) ->
+    case intervals:in(db_entry:get_key(Entry), CKInt) of
+        false -> ok;
+        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+    end,
     ok = toke_drv:insert(DB, erlang:term_to_binary(db_entry:get_key(Entry)),
                          erlang:term_to_binary(Entry)),
-    DB.
+    State.
 
 %% @doc Updates an existing (!) entry in the DB.
-update_entry(DB, Entry) ->
-    ok = toke_drv:insert(DB, erlang:term_to_binary(db_entry:get_key(Entry)),
-                         erlang:term_to_binary(Entry)),
-    DB.
+update_entry(State, Entry) ->
+    set_entry(State, Entry).
 
 %% @doc Removes all values with the given entry's key from the DB.
-delete_entry(DB, Entry) ->
+delete_entry(State = {DB, CKInt, CKDB}, Entry) ->
+    case intervals:in(db_entry:get_key(Entry), CKInt) of
+        false -> ok;
+        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+    end,
     toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(Entry))),
-    DB.
+    State.
 
 %% @doc Returns the number of stored keys.
-get_load(DB) ->
+get_load({DB, _CKInt, _CKDB}) ->
     % TODO: not really efficient (maybe store the load in the DB?)
     toke_drv:fold(fun (_K, _V, Acc) -> Acc + 1 end, 0, DB).
 
 %% @doc Adds all db_entry objects in the Data list.
-add_data(DB, Data) ->
-    lists:foldl(fun(DBEntry, _) -> set_entry(DB, DBEntry) end, DB, Data).
+add_data(State = {DB, CKInt, CKDB}, Data) ->
+    % check once for the 'common case'
+    case intervals:is_empty(CKInt) of
+        true -> ok;
+        _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
+                   Entry <- Data,
+                   intervals:in(db_entry:get_key(Entry), CKInt)]
+    end,
+    % -> do not use set_entry (no further checks for changed keys necessary)
+    lists:foldl(
+      fun(DBEntry, _) ->
+              ok = toke_drv:insert(DB,
+                                   erlang:term_to_binary(db_entry:get_key(DBEntry)),
+                                   erlang:term_to_binary(DBEntry))
+      end, null, Data),
+    State.
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
-split_data(DB, MyNewInterval) ->
+%%      Note: removes all keys not in MyNewInterval from the list of changed
+%%      keys!
+split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
     F = fun(_K, DBEntry_, HisList) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
@@ -112,17 +141,20 @@ split_data(DB, MyNewInterval) ->
         end,
     HisList = toke_drv:fold(F, [], DB),
     % delete empty entries from HisList and remove all entries in HisList from the DB
-    HisListFilt = lists:foldl(fun(DBEntry, L) ->
-                                      delete_entry(DB, DBEntry),
-                                      case db_entry:is_empty(DBEntry) of
-                                          false -> [DBEntry | L];
-                                          _     -> L
-                                      end
-                              end, [], HisList),
-    {DB, HisListFilt}.
+    HisListFilt =
+        lists:foldl(
+          fun(DBEntry, L) ->
+                  toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(DBEntry))),
+                  ?CKETS:delete(CKDB, db_entry:get_key(DBEntry)),
+                  case db_entry:is_empty(DBEntry) of
+                      false -> [DBEntry | L];
+                      _     -> L
+                  end
+          end, [], HisList),
+    {State, HisListFilt}.
 
 %% @doc Get key/value pairs in the given range.
-get_range_kv(DB, Interval) ->
+get_range_kv({DB, _CKInt, _CKDB}, Interval) ->
     F = fun(_K, DBEntry_, Data) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case (not db_entry:is_empty(DBEntry)) andalso
@@ -135,7 +167,7 @@ get_range_kv(DB, Interval) ->
     toke_drv:fold(F, [], DB).
 
 %% @doc Get key/value/version triples of non-write-locked entries in the given range.
-get_range_kvv(DB, Interval) ->
+get_range_kvv({DB, _CKInt, _CKDB}, Interval) ->
     F = fun(_K, DBEntry_, Data) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case (not db_entry:is_empty(DBEntry)) andalso
@@ -150,7 +182,7 @@ get_range_kvv(DB, Interval) ->
     toke_drv:fold(F, [], DB).
 
 %% @doc Gets db_entry objects in the given range.
-get_range_entry(DB, Interval) ->
+get_range_entry({DB, _CKInt, _CKDB}, Interval) ->
     F = fun(_K, DBEntry_, Data) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case (not db_entry:is_empty(DBEntry)) andalso
@@ -162,7 +194,7 @@ get_range_entry(DB, Interval) ->
     toke_drv:fold(F, [], DB).
 
 %% @doc Returns all DB entries.
-get_data(DB) ->
+get_data({DB, _CKInt, _CKDB}) ->
     toke_drv:fold(fun (_K, DBEntry, Acc) ->
                            [erlang:binary_to_term(DBEntry) | Acc]
                   end, [], DB).
