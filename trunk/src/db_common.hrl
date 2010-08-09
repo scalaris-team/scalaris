@@ -139,12 +139,18 @@ delete(DB, Key) ->
 
 %% @doc Gets (non-empty) db_entry objects in the given range.
 get_entries(State, Interval) ->
-    get_entries(State,
-                fun(DBEntry) ->
-                        (not db_entry:is_empty(DBEntry)) andalso
-                          intervals:in(db_entry:get_key(DBEntry), Interval)
-                end,
-                fun(DBEntry) -> DBEntry end).
+    {Elements, RestInterval} = intervals:get_elements(Interval),
+    case intervals:is_empty(RestInterval) of
+        true -> [E || Key <- Elements,
+                      E <- [get_entry(State, Key)],
+                      not db_entry:is_empty(E)];
+        _ -> get_entries(State,
+                         fun(DBEntry) ->
+                                 (not db_entry:is_empty(DBEntry)) andalso
+                                     intervals:in(db_entry:get_key(DBEntry), Interval)
+                         end,
+                         fun(DBEntry) -> DBEntry end)
+    end.
 
 %% @doc Updates all (existing or non-existing) non-locked entries from
 %%      NewEntries for which Pred(OldEntry, NewEntry) returns true with
