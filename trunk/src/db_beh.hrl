@@ -38,6 +38,7 @@
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
 -export([update_if_newer/2]).
 -export([check_db/1]).
+-export([record_changes/2, stop_record_changes/1, get_changes/1]).
 
 -spec new(NodeId::?RT:key()) -> db().
 -spec close(DB::db()) -> any().
@@ -79,5 +80,9 @@
 -spec add_data(DB::db(), db_as_list()) -> NewDB::db().
 
 -spec update_if_newer(OldDB::db(), KVs::kvv_list()) -> NewDB::db().
+
+-spec record_changes(OldDB::db(), intervals:interval()) -> NewDB::db().
+-spec stop_record_changes(OldDB::db()) -> NewDB::db().
+-spec get_changes(DB::db()) -> {db_as_list(), [?RT:key()]}.
 
 -spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.

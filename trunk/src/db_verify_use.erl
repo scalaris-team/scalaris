@@ -25,22 +25,24 @@
 
 -behaviour(db_beh).
 
--type(db()::{gb_tree(), Counter::non_neg_integer()}).
+-define(BASE_DB, db_gb_trees).
+
+-opaque(db()::{?BASE_DB:db(), Counter::non_neg_integer()}).
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
 -include("db_beh.hrl").
 
--include("db_common.hrl").
-
 %% -define(TRACE0(Fun), io:format("~w: ~w()~n", [self(), Fun])).
 %% -define(TRACE1(Fun, Par1), io:format("~w: ~w(~w)~n", [self(), Fun, Par1])).
 %% -define(TRACE2(Fun, Par1, Par2), io:format("~w: ~w(~w, ~w)~n", [self(), Fun, Par1, Par2])).
 %% -define(TRACE3(Fun, Par1, Par2, Par3), io:format("~w: ~w(~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3])).
+%% -define(TRACE4(Fun, Par1, Par2, Par3, Par4), io:format("~w: ~w(~w, ~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3, Par4])).
 -define(TRACE0(Fun), Fun, ok).
 -define(TRACE1(Fun, Par1), Fun, Par1, ok).
 -define(TRACE2(Fun, Par1, Par2), Fun, Par1, Par2, ok).
 -define(TRACE3(Fun, Par1, Par2, Par3), Fun, Par1, Par2, Par3, ok).
+-define(TRACE4(Fun, Par1, Par2, Par3, Par4), Fun, Par1, Par2, Par3, Par4, ok).
 -spec verify_counter(Counter::non_neg_integer()) -> ok.
 verify_counter(Counter) ->
     case erlang:get(?MODULE) of
@@ -67,127 +69,160 @@ new(NodeId) ->
         _         -> erlang:error({counter_defined, erlang:get(?MODULE)})
     end,
     erlang:put(?MODULE, 0),
-    {gb_trees:empty(), 0}.
+    {?BASE_DB:new(NodeId), 0}.
 
 %% delete DB (missing function)
-close(DB) ->
-    ?TRACE1(close, DB),
+close({DB, _Counter} = DB_) ->
+    ?TRACE1(close, DB_),
     erlang:erase(?MODULE),
-    ok.
+    ?BASE_DB:close(DB).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned.
 get_entry({DB, Counter} = DB_, Key) ->
     ?TRACE2(get_entry, DB_, Key),
     verify_counter(Counter),
-    case gb_trees:lookup(Key, DB) of
-        {value, Entry} -> Entry;
-        none           -> db_entry:new(Key)
-    end.
-
-%% @doc Gets an entry from the DB. If there is no entry with the given key,
-%%      an empty entry will be returned. The first component of the result
-%%      tuple states whether the value really exists in the DB.
-get_entry2({DB, Counter} = DB_, Key) ->
-    ?TRACE2(get_entry2, DB_, Key),
-    verify_counter(Counter),
-    case gb_trees:lookup(Key, DB) of
-        {value, Entry} -> {true, Entry};
-        none           -> {false, db_entry:new(Key)}
-    end.
+    ?BASE_DB:get_entry(DB, Key).
 
 %% @doc Inserts a complete entry into the DB.
 set_entry({DB, Counter} = DB_, Entry) ->
     ?TRACE2(set_entry, DB_, Entry),
     verify_counter(Counter),
-    {gb_trees:enter(db_entry:get_key(Entry), Entry, DB), update_counter(Counter)}.
+    {?BASE_DB:set_entry(DB, Entry), update_counter(Counter)}.
 
 %% @doc Updates an existing (!) entry in the DB.
 update_entry({DB, Counter} = DB_, Entry) ->
     ?TRACE2(update_entry, DB_, Entry),
     verify_counter(Counter),
-    {gb_trees:update(db_entry:get_key(Entry), Entry, DB), update_counter(Counter)}.
+    {?BASE_DB:update_entry(DB, Entry), update_counter(Counter)}.
 
 %% @doc Removes all values with the given entry's key from the DB.
 delete_entry({DB, Counter} = DB_, Entry) ->
     ?TRACE2(delete_entry, DB_, Entry),
     verify_counter(Counter),
-    {gb_trees:delete_any(db_entry:get_key(Entry), DB), update_counter(Counter)}.
+    {?BASE_DB:delete_entry(DB, Entry), update_counter(Counter)}.
 
 %% @doc Returns the number of stored keys.
 get_load({DB, Counter} = DB_) ->
     ?TRACE1(get_load, DB_),
     verify_counter(Counter),
-    gb_trees:size(DB).
+    ?BASE_DB:get_load(DB).
 
 %% @doc Adds all db_entry objects in the Data list.
 add_data({DB, Counter} = DB_, Data) ->
     ?TRACE2(add_data, DB_, Data),
     verify_counter(Counter),
-    {lists:foldl(fun(DBEntry, Tree) -> set_entry(Tree, DBEntry) end, DB, Data), update_counter(Counter)}.
+    {?BASE_DB:add_data(DB, Data), update_counter(Counter)}.
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 split_data({DB, Counter} = DB_, MyNewInterval) ->
     ?TRACE2(split_data, DB_, MyNewInterval),
     verify_counter(Counter),
-    {MyList, HisList} =
-        lists:partition(fun(DBEntry) ->
-                                (not db_entry:is_empty(DBEntry)) andalso
-                                    intervals:in(db_entry:get_key(DBEntry), MyNewInterval)
-                        end,
-                        gb_trees:values(DB)),
-    % note: building [{Key, Val}] from MyList should be more memory efficient
-    % than using gb_trees:to_list(DB) above and removing Key from the tuples in
-    % HisList
-    {{gb_trees:from_orddict([ {db_entry:get_key(DBEntry), DBEntry} ||
-                                DBEntry <- MyList]), update_counter(Counter)}, HisList}.
+    {MyNewDB, HisList} = ?BASE_DB:split_data(DB, MyNewInterval),
+    {{MyNewDB, update_counter(Counter)}, HisList}.
 
 %% @doc Get key/value pairs in the given range.
 get_range_kv({DB, Counter} = DB_, Interval) ->
     ?TRACE2(get_range_kv, DB_, Interval),
     verify_counter(Counter),
-    F = fun (_Key, DBEntry, Data) ->
-                case (not db_entry:is_empty(DBEntry)) andalso
-                         intervals:in(db_entry:get_key(DBEntry), Interval) of
-                    true -> [{db_entry:get_key(DBEntry),
-                              db_entry:get_value(DBEntry)} | Data];
-                    _    -> Data
-                end
-        end,
-    util:gb_trees_foldl(F, [], DB).
+    ?BASE_DB:get_range_kv(DB, Interval).
 
 %% @doc Get key/value/version triples of non-write-locked entries in the given range.
 get_range_kvv({DB, Counter} = DB_, Interval) ->
     ?TRACE2(get_range_kvv, DB_, Interval),
     verify_counter(Counter),
-    F = fun (_Key, DBEntry, Data) ->
-                case (not db_entry:is_empty(DBEntry)) andalso
-                         (not db_entry:get_writelock(DBEntry)) andalso
-                         intervals:in(db_entry:get_key(DBEntry), Interval) of
-                    true -> [{db_entry:get_key(DBEntry),
-                              db_entry:get_value(DBEntry),
-                              db_entry:get_version(DBEntry)} | Data];
-                    _    -> Data
-                end
-        end,
-    util:gb_trees_foldl(F, [], DB).
+    ?BASE_DB:get_range_kvv(DB, Interval).
 
 %% @doc Gets db_entry objects in the given range.
 get_range_entry({DB, Counter} = DB_, Interval) ->
     ?TRACE2(get_range_entry, DB_, Interval),
     verify_counter(Counter),
-    F = fun (_Key, DBEntry, Data) ->
-                 case (not db_entry:is_empty(DBEntry)) andalso
-                          intervals:in(db_entry:get_key(DBEntry), Interval) of
-                     true -> [DBEntry | Data];
-                     _    -> Data
-                 end
-        end,
-    util:gb_trees_foldl(F, [], DB).
+    ?BASE_DB:get_range_entry(DB, Interval).
 
 %% @doc Returns all DB entries.
 get_data({DB, Counter} = DB_) ->
     ?TRACE1(get_data, DB_),
     verify_counter(Counter),
-    gb_trees:values(DB).
+    ?BASE_DB:get_data(DB).
+
+%% @doc Adds the new interval to the interval to record changes for.
+%%      Changed entries can then be gathered by get_changes/1.
+record_changes({DB, Counter} = DB_, NewInterval) ->
+    ?TRACE2(record_changes, DB_, NewInterval),
+    verify_counter(Counter),
+    {?BASE_DB:record_changes(DB, NewInterval), update_counter(Counter)}.
+
+%% @doc Stops recording changes and deletes all entries of the table of changed
+%%      keys. 
+stop_record_changes({DB, Counter} = DB_) ->
+    ?TRACE1(stop_record_changes, DB_),
+    verify_counter(Counter),
+    {?BASE_DB:stop_record_changes(DB), update_counter(Counter)}.
+
+%% @doc Gets all db_entry objects which have been changed or deleted.
+get_changes({DB, Counter} = DB_) ->
+    ?TRACE1(get_changes, DB_),
+    verify_counter(Counter),
+    ?BASE_DB:get_changes(DB).
+
+set_write_lock({DB, Counter} = DB_, Key) ->
+    ?TRACE2(set_write_lock, DB_, Key),
+    verify_counter(Counter),
+    {NewDB, Status} = ?BASE_DB:set_write_lock(DB, Key),
+    {{NewDB, update_counter(Counter)}, Status}.
+
+unset_write_lock({DB, Counter} = DB_, Key) ->
+    ?TRACE2(unset_write_lock, DB_, Key),
+    verify_counter(Counter),
+    {NewDB, Status} = ?BASE_DB:unset_write_lock(DB, Key),
+    {{NewDB, update_counter(Counter)}, Status}.
+
+set_read_lock({DB, Counter} = DB_, Key) ->
+    ?TRACE2(set_read_lock, DB_, Key),
+    verify_counter(Counter),
+    {NewDB, Status} = ?BASE_DB:set_read_lock(DB, Key),
+    {{NewDB, update_counter(Counter)}, Status}.
+
+unset_read_lock({DB, Counter} = DB_, Key) ->
+    ?TRACE2(unset_read_lock, DB_, Key),
+    verify_counter(Counter),
+    {NewDB, Status} = ?BASE_DB:unset_read_lock(DB, Key),
+    {{NewDB, update_counter(Counter)}, Status}.
+
+get_locks({DB, Counter} = DB_, Key) ->
+    ?TRACE2(get_locks, DB_, Key),
+    verify_counter(Counter),
+    {NewDB, Locks} = ?BASE_DB:get_locks(DB, Key),
+    {{NewDB, update_counter(Counter)}, Locks}.
+
+read({DB, Counter} = DB_, Key) ->
+    ?TRACE2(read, DB_, Key),
+    verify_counter(Counter),
+    ?BASE_DB:read(DB, Key).
+
+write({DB, Counter} = DB_, Key, Value, Version) ->
+    ?TRACE4(write, DB_, Key, Value, Version),
+    verify_counter(Counter),
+    {?BASE_DB:write(DB, Key, Value, Version), update_counter(Counter)}.
+
+delete({DB, Counter} = DB_, Key) ->
+    ?TRACE2(delete, DB_, Key),
+    verify_counter(Counter),
+    {NewDB, Status} = ?BASE_DB:delete(DB, Key),
+    {{NewDB, update_counter(Counter)}, Status}.
+
+get_version({DB, Counter} = DB_, Key) ->
+    ?TRACE2(get_version, DB_, Key),
+    verify_counter(Counter),
+    ?BASE_DB:get_version(DB, Key).
+
+update_if_newer({DB, Counter} = DB_, KVs) ->
+    ?TRACE2(update_if_newer, DB_, KVs),
+    verify_counter(Counter),
+    {?BASE_DB:update_if_newer(DB, KVs), update_counter(Counter)}.
+
+check_db({DB, Counter} = DB_) ->
+    ?TRACE1(check_db, DB_),
+    verify_counter(Counter),
+    ?BASE_DB:check_db(DB).
