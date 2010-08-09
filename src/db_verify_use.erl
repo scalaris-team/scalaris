@@ -122,23 +122,18 @@ split_data({DB, Counter} = DB_, MyNewInterval) ->
     {MyNewDB, HisList} = ?BASE_DB:split_data(DB, MyNewInterval),
     {{MyNewDB, update_counter(Counter)}, HisList}.
 
-%% @doc Get key/value pairs in the given range.
-get_range_kv({DB, Counter} = DB_, Interval) ->
-    ?TRACE2(get_range_kv, DB_, Interval),
+%% @doc Gets (non-empty) db_entry objects in the given range.
+get_entries({DB, Counter} = DB_, Interval) ->
+    ?TRACE2(get_entries, DB_, Interval),
     verify_counter(Counter),
-    ?BASE_DB:get_range_kv(DB, Interval).
+    ?BASE_DB:get_entries(DB, Interval).
 
-%% @doc Get key/value/version triples of non-write-locked entries in the given range.
-get_range_kvv({DB, Counter} = DB_, Interval) ->
-    ?TRACE2(get_range_kvv, DB_, Interval),
+%% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
+%%      which FilterFun returns true.
+get_entries({DB, Counter} = DB_, FilterFun, ValueFun) ->
+    ?TRACE3(get_entries, DB_, FilterFun, ValueFun),
     verify_counter(Counter),
-    ?BASE_DB:get_range_kvv(DB, Interval).
-
-%% @doc Gets db_entry objects in the given range.
-get_range_entry({DB, Counter} = DB_, Interval) ->
-    ?TRACE2(get_range_entry, DB_, Interval),
-    verify_counter(Counter),
-    ?BASE_DB:get_range_entry(DB, Interval).
+    ?BASE_DB:get_entries(DB, FilterFun, ValueFun).
 
 %% @doc Returns all DB entries.
 get_data({DB, Counter} = DB_) ->
@@ -217,10 +212,10 @@ get_version({DB, Counter} = DB_, Key) ->
     verify_counter(Counter),
     ?BASE_DB:get_version(DB, Key).
 
-update_if_newer({DB, Counter} = DB_, KVs) ->
-    ?TRACE2(update_if_newer, DB_, KVs),
+update_entries({DB, Counter} = DB_, NewEntries, Pred, UpdateFun) ->
+    ?TRACE4(update_entries, DB_, NewEntries, Pred, UpdateFun),
     verify_counter(Counter),
-    {?BASE_DB:update_if_newer(DB, KVs), update_counter(Counter)}.
+    {?BASE_DB:update_entries(DB, NewEntries, Pred, UpdateFun), update_counter(Counter)}.
 
 check_db({DB, Counter} = DB_) ->
     ?TRACE1(check_db, DB_),

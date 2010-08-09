@@ -155,24 +155,34 @@ get_version(DB, Key) ->
         _     -> {ok, db_entry:get_version(DBEntry)}
     end.
 
-%% @doc Updates all entries in the DB that are listed in KVs with versions
-%%      higher than existing entries and with no locks set on existing entries.
-update_if_newer(OldDB, KVs) ->
-    F = fun ({Key, Value, Version}, DB) ->
-                 {Exists, DBEntry} = get_entry2(DB, Key),
-                 IsUpdatable = db_entry:get_writelock(DBEntry) =:= false andalso
-                                   db_entry:get_readlock(DBEntry) =:= 0 andalso
-                                   db_entry:get_version(DBEntry) < Version,
-                 case Exists of
-                     false ->
-                         set_entry(DB, db_entry:new(Key, Value, Version));
-                     _ when IsUpdatable ->
-                         update_entry(DB, db_entry:new(Key, Value, Version));
-                     _ ->
-                         DB
-                 end
+%% @doc Gets (non-empty) db_entry objects in the given range.
+get_entries(State, Interval) ->
+    get_entries(State,
+                fun(DBEntry) ->
+                        (not db_entry:is_empty(DBEntry)) andalso
+                          intervals:in(db_entry:get_key(DBEntry), Interval)
+                end,
+                fun(DBEntry) -> DBEntry end).
+
+%% @doc Updates all (existing or non-existing) non-locked entries from
+%%      NewEntries for which Pred(OldEntry, NewEntry) returns true with
+%%      UpdateFun(OldEntry, NewEntry).
+update_entries(OldDB, NewEntries, Pred, UpdateFun) ->
+    F = fun(NewEntry, DB) ->
+                {Exists, OldEntry} = get_entry2(DB, db_entry:get_key(NewEntry)),
+                IsNotLocked = (not db_entry:get_writelock(OldEntry)) andalso
+                                  db_entry:get_readlock(OldEntry) =:= 0,
+                IsUpdatable = IsNotLocked andalso Pred(OldEntry, NewEntry),
+                case Exists of
+                    false when IsUpdatable ->
+                        set_entry(DB, UpdateFun(OldEntry, NewEntry));
+                    _ when IsUpdatable ->
+                        update_entry(DB, UpdateFun(OldEntry, NewEntry));
+                    _ ->
+                        DB
+                end
         end,
-    lists:foldl(F, OldDB, KVs).
+    lists:foldl(F, OldDB, NewEntries).
 
 %% @doc Checks whether all entries in the DB are valid, i.e.
 %%      - no writelocks and readlocks at the same time

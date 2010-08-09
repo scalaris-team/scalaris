@@ -153,43 +153,15 @@ split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
           end, [], HisList),
     {State, HisListFilt}.
 
-%% @doc Get key/value pairs in the given range.
-get_range_kv({DB, _CKInt, _CKDB}, Interval) ->
-    F = fun(_K, DBEntry_, Data) ->
-                DBEntry = erlang:binary_to_term(DBEntry_),
-                case (not db_entry:is_empty(DBEntry)) andalso
-                         intervals:in(db_entry:get_key(DBEntry), Interval) of
-                    true -> [{db_entry:get_key(DBEntry),
-                              db_entry:get_value(DBEntry)} | Data];
-                    _    -> Data
-                end
-        end,
-    toke_drv:fold(F, [], DB).
-
-%% @doc Get key/value/version triples of non-write-locked entries in the given range.
-get_range_kvv({DB, _CKInt, _CKDB}, Interval) ->
-    F = fun(_K, DBEntry_, Data) ->
-                DBEntry = erlang:binary_to_term(DBEntry_),
-                case (not db_entry:is_empty(DBEntry)) andalso
-                         (not db_entry:get_writelock(DBEntry)) andalso
-                         intervals:in(db_entry:get_key(DBEntry), Interval) of
-                    true -> [{db_entry:get_key(DBEntry),
-                              db_entry:get_value(DBEntry),
-                              db_entry:get_version(DBEntry)} | Data];
-                    _    -> Data
-                end
-        end,
-    toke_drv:fold(F, [], DB).
-
-%% @doc Gets db_entry objects in the given range.
-get_range_entry({DB, _CKInt, _CKDB}, Interval) ->
-    F = fun(_K, DBEntry_, Data) ->
-                DBEntry = erlang:binary_to_term(DBEntry_),
-                case (not db_entry:is_empty(DBEntry)) andalso
-                         intervals:in(db_entry:get_key(DBEntry), Interval) of
-                    true -> [DBEntry | Data];
-                    _    -> Data
-                end
+%% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
+%%      which FilterFun returns true.
+get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
+    F = fun (_Key, DBEntry_, Data) ->
+                 DBEntry = erlang:binary_to_term(DBEntry_),
+                 case FilterFun(DBEntry) of
+                     true -> [ValueFun(DBEntry) | Data];
+                     _    -> Data
+                 end
         end,
     toke_drv:fold(F, [], DB).
 

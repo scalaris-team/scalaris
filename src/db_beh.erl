@@ -44,9 +44,9 @@ behaviour_info(callbacks) ->
      {get_load, 1}, {split_data, 2},
      %
      {get_data, 1}, {add_data, 2},
-     {get_range_kv, 2}, {get_range_kvv, 2}, {get_range_entry, 2},
+     {get_entries, 2}, {get_entries, 3},
      % bulk op for replica repair
-     {update_if_newer, 2},
+     {update_entries, 4},
      % debugging
      {check_db, 1}
     ];
