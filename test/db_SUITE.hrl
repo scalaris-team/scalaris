@@ -266,54 +266,8 @@ changed_keys(_Config) ->
     
     DB3 = ?TEST_DB:record_changes(DB2, intervals:empty()),
     ?equals(?TEST_DB:get_changes(DB3), {[], []}),
-%%     
-%%     
-%%     ?equals(?TEST_DB:get_load(DB), 0),
-%%     DB2 = ?TEST_DB:write(DB, "Key1", "Value1", 1),
-%%     ?equals(?TEST_DB:get_load(DB2), 1),
-%%     DB3 = ?TEST_DB:write(DB2, "Key1", "Value1", 2),
-%%     ?equals(?TEST_DB:get_load(DB3), 1),
-%%     DB4 = ?TEST_DB:write(DB3, "Key2", "Value2", 1),
-%%     ?equals(?TEST_DB:get_load(DB4), 2),
-%%     DB5 = ?TEST_DB:write(DB4, "Key3", "Value3", 1),
-%%     DB6 = ?TEST_DB:write(DB5, "Key4", "Value4", 1),
-%%     OrigFullList = ?TEST_DB:get_data(DB6),
-%%     {DB7, HisList} = ?TEST_DB:split_data(DB6, node:mk_interval_between_ids("Key2", "Key4")),
-%%     ?equals(?TEST_DB:read(DB7, "Key3"), {ok, "Value3", 1}),
-%%     ?equals(?TEST_DB:read(DB7, "Key4"), {ok, "Value4", 1}),
-%%     ?equals(?TEST_DB:get_load(DB7), 2),
-%%     ?equals(length(HisList), 2),
-%%     ?equals(length(?TEST_DB:get_data(DB7)), 2),
-%%     DB8 = ?TEST_DB:add_data(DB7, HisList),
-%%     % lists could be in arbitrary order -> sort them
-%%     ?equals(lists:sort(OrigFullList), lists:sort(?TEST_DB:get_data(DB8))),
     
     ?TEST_DB:close(DB3).
-
-%% changed_keys_helper(DB, ExpChanges, Note) ->
-%%     ?TEST_DB:get_entry(DB, Key),
-%%     ?TEST_DB:set_entry(DB, Entry),
-%%     ?TEST_DB:update_entry(DB, Entry),
-%%     ?TEST_DB:delete_entry(DB, Entry),
-%%     ?TEST_DB:read(DB, Key),
-%%     ?TEST_DB:write(DB, Key, Value, Version),
-%%     ?TEST_DB:delete(DB, Key),
-%%     ?TEST_DB:set_write_lock(DB, Key),
-%%     ?TEST_DB:unset_write_lock(DB, Key),
-%%     ?TEST_DB:set_read_lock(DB, Key),
-%%     ?TEST_DB:unset_read_lock(DB, Key),
-%%     ?TEST_DB:get_entries(DB, Range),
-%%     ?TEST_DB:get_entries(DB, FilterFun, ValueFun),
-%%     ?TEST_DB:changed_keys(DB, Values, Pred, UpdateFun),
-%%     ?TEST_DB:get_load(DB),
-%%     ?TEST_DB:split_data(DB, MyNewInterval),
-%%     ?TEST_DB:get_data(DB),
-%%     ?TEST_DB:add_data(DB, Data),
-%%     ?TEST_DB:check_db(DB)
-%%     
-%%     
-%%     ?equals_w_note(?TEST_DB:get_changes(DB), ExpChanges, Note),
-%%     true.
 
 % tester-based functions below:
 
@@ -1388,26 +1342,6 @@ check_changes(DB, ChangesInterval, Note) ->
          ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
                   ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys,
                    ChangesInterval, lists:flatten(Note)])).
-
-%% @doc Checks that a key is not present in either of the the lists returned by
-%%      ?TEST_DB:get_changes/1.
--spec check_key_not_in_changes(
-        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(),
-        Key::?RT:key(), Note::string()) -> true.
-check_key_not_in_changes(DB, ChangesInterval, Key, Note) ->
-    case intervals:in(Key, ChangesInterval) of
-        true ->
-            {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
-            (not lists:any(fun(E) -> db_entry:get_key(E) =:= Key end, ChangedEntries)) orelse
-                ?ct_fail("~s evaluated to \"~w\" and did contain key ~w~n(~s)~n",
-                  ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries,
-                   Key, lists:flatten(Note)]),
-            (not lists:any(fun(K) -> K =:= Key end, DeletedKeys)) orelse
-                ?ct_fail("~s evaluated to \"~w\" and did contain key ~w~n(~s)~n",
-                  ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys,
-                   Key, lists:flatten(Note)]);
-        _    -> true
-    end.
 
 %% @doc Checks that a key is present exactly once in the list of deleted
 %%      keys returned by ?TEST_DB:get_changes/1.
