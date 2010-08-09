@@ -1,7 +1,7 @@
 \section{\texorpdfstring{The \erlmodule{gen\_component}}
          {The gen\_component}}
 \erlmoduleindex{gen\_component}
-\svnrev{r832}
+\svnrev{r969}
 
 The generic component model implemented by
 \erlmodule[noindex]{gen\_component} allows to add some common functionality
@@ -52,8 +52,9 @@ This is illustrated by the following example:
 \codesnippet{idholder.erl}{gen_component:sample}{../src/idholder.erl}
 
 \erlfun{your\_gen\_component}{init}{/1} is called during start-up of a
-\erlmodule{gen\_component} and should return the initial state to be used for
-this \erlmodule{gen\_component}.
+\erlmodule{gen\_component} and should return the initial state to be used
+for this \erlmodule{gen\_component}. Later, the current state of the
+component can be retrieved using \erlfun{gen\_component}{get\_state}{/1}.
 
 To react on messages / events, a message handler is used. The default
 message handler is called \erlfun{your\_gen\_component}{on}{/2}. This can be
@@ -281,7 +282,7 @@ Breakpoints are managed by the following functions:
 \item[\erlfun{gen\_component}{bp\_del}{Pid, BPName}:] The breakpoint
   \code{BPName} is deleted. If the component is in this breakpoint, it will
   not be released by this call. This has to be done separately by
-  \erlfun{gen\_component}{cont}{/1}. But the deleted breakpoint will no
+  \erlfun{gen\_component}{bp\_cont}{/1}. But the deleted breakpoint will no
   longer be considered for newly entering a breakpoint.
 \item[\erlfun{gen\_component}{bp\_barrier}{Pid}:]
   Delay all further handling of breakpoint requests until a breakpoint is
@@ -296,7 +297,7 @@ Breakpoints are managed by the following functions:
   gen_component:bp_set(Pid, ping, bp_ping),
   timer:sleep(10),
   gen_component:bp_del(Pid, bp_ping),
-  gen_component:cont(Pid).
+  gen_component:bp_cont(Pid).
   \end{lstlisting}
 
   This is where \erlfun{gen\_component}{bp\_barrier}{/1} can be used:
@@ -311,7 +312,7 @@ Breakpoints are managed by the following functions:
   gen_component:bp_del(Pid, bp_ping),
   % the breakpoint was entered once, so we delete.
   % next we leave the breakpoint and continue the gen_component
-  gen_component:cont(Pid).
+  gen_component:bp_cont(Pid).
   \end{lstlisting}
 \end{description}
 
@@ -376,7 +377,7 @@ To get a message interleaving protocol, we either can output the results
 of each \erlfun{gen\_component}{bp\_step}{/1} call together with the
 Pid we selected for stepping, or alter the definition of the macro
 \code{TRACE_BP_STEPS} in \erlmodule{gen\_component}, when we execute all
-\erlmodule{gen\_components} locally in the same Erlang virtual machine.
+\erlmodule{gen\_component}s locally in the same Erlang virtual machine.
 
 \codesnippet{gen_component.erl}{gen_component:trace_bp_steps}{../src/gen_component.erl}
 
