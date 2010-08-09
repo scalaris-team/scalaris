@@ -28,11 +28,11 @@
 -endif.
 
 -export([new/1, close/1]).
--export([get_entry/2, set_entry/2, update_entry/2, delete_entry/2]).
--export([read/2, write/4, get_version/2]).
+-export([get_entry/2, get_entry2/2, set_entry/2, update_entry/2, delete_entry/2]).
+-export([read/2, write/4]).
 -export([delete/2]).
 -export([set_write_lock/2, unset_write_lock/2,
-         set_read_lock/2, unset_read_lock/2, get_locks/2]).
+         set_read_lock/2, unset_read_lock/2]).
 -export([get_entries/2, get_entries/3]).
 -export([update_entries/4]).
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
@@ -43,6 +43,7 @@
 -spec close(DB::db()) -> any().
 
 -spec get_entry(DB::db(), Key::?RT:key()) -> db_entry:entry().
+-spec get_entry2(DB::db(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
 -spec set_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 -spec update_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 -spec delete_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
@@ -51,8 +52,6 @@
          {ok, Value::value(), Version::version()} | {ok, empty_val, -1}.
 -spec write(DB::db(), Key::?RT:key(), Value::value(), Version::version()) ->
          NewDB::db().
--spec get_version(DB::db(), Key::?RT:key()) ->
-         {ok, Version::version() | -1} | failed.
 
 -spec delete(DB::db(), Key::?RT:key()) ->
          {NewDB::db(), Status::ok | locks_set | undef}.
@@ -65,8 +64,6 @@
          {NewDB::db(), Status::ok | failed}.
 -spec unset_read_lock(DB::db(), Key::?RT:key()) ->
          {NewDB::db(), Status::ok | failed}.
--spec get_locks(DB::db(), Key::?RT:key()) ->
-         {DB::db(), {WriteLock::boolean(), ReadLock::non_neg_integer(), Version::version()} | {true, 0, -1} | failed}.
 
 -spec get_entries(DB::db(), Range::intervals:interval()) -> db_as_list().
 -spec get_entries(DB::db(),

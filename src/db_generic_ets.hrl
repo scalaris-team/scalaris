@@ -23,12 +23,6 @@
 -include("db_common.hrl").
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
-%%      an empty entry will be returned.
-get_entry(State, Key) ->
-    {_Exists, Result} = get_entry2(State, Key),
-    Result.
-
-%% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
 get_entry2({DB, _CKInt, _CKDB}, Key) ->
@@ -49,11 +43,12 @@ get_entry2({DB, _CKInt, _CKDB}, Key) ->
 
 %% @doc Inserts a complete entry into the DB.
 set_entry(State = {DB, CKInt, CKDB}, Entry) ->
-    ?ETS:insert(DB, Entry),
-    case intervals:in(db_entry:get_key(Entry), CKInt) of
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
         false -> ok;
-        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+        _     -> ?CKETS:insert(CKDB, {Key})
     end,
+    ?ETS:insert(DB, Entry),
     State.
 
 %% @doc Updates an existing (!) entry in the DB.
@@ -63,11 +58,12 @@ update_entry(State, Entry) ->
 
 %% @doc Removes all values with the given entry's key from the DB.
 delete_entry(State = {DB, CKInt, CKDB}, Entry) ->
-    ?ETS:delete(DB, db_entry:get_key(Entry)),
-    case intervals:in(db_entry:get_key(Entry), CKInt) of
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
         false -> ok;
-        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+        _     -> ?CKETS:insert(CKDB, {Key})
     end,
+    ?ETS:delete(DB, Key),
     State.
 
 %% @doc returns the number of stored keys

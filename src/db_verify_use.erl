@@ -84,6 +84,14 @@ get_entry({DB, Counter} = DB_, Key) ->
     verify_counter(Counter),
     ?BASE_DB:get_entry(DB, Key).
 
+%% @doc Gets an entry from the DB. If there is no entry with the given key,
+%%      an empty entry will be returned. The first component of the result
+%%      tuple states whether the value really exists in the DB.
+get_entry2({DB, Counter} = DB_, Key) ->
+    ?TRACE2(get_entry2, DB_, Key),
+    verify_counter(Counter),
+    ?BASE_DB:get_entry2(DB, Key).
+
 %% @doc Inserts a complete entry into the DB.
 set_entry({DB, Counter} = DB_, Entry) ->
     ?TRACE2(set_entry, DB_, Entry),
@@ -94,6 +102,7 @@ set_entry({DB, Counter} = DB_, Entry) ->
 update_entry({DB, Counter} = DB_, Entry) ->
     ?TRACE2(update_entry, DB_, Entry),
     verify_counter(Counter),
+    {true, _} = ?BASE_DB:get_entry2(DB, db_entry:get_key(Entry)),
     {?BASE_DB:update_entry(DB, Entry), update_counter(Counter)}.
 
 %% @doc Removes all values with the given entry's key from the DB.
@@ -185,12 +194,6 @@ unset_read_lock({DB, Counter} = DB_, Key) ->
     {NewDB, Status} = ?BASE_DB:unset_read_lock(DB, Key),
     {{NewDB, update_counter(Counter)}, Status}.
 
-get_locks({DB, Counter} = DB_, Key) ->
-    ?TRACE2(get_locks, DB_, Key),
-    verify_counter(Counter),
-    {NewDB, Locks} = ?BASE_DB:get_locks(DB, Key),
-    {{NewDB, update_counter(Counter)}, Locks}.
-
 read({DB, Counter} = DB_, Key) ->
     ?TRACE2(read, DB_, Key),
     verify_counter(Counter),
@@ -206,11 +209,6 @@ delete({DB, Counter} = DB_, Key) ->
     verify_counter(Counter),
     {NewDB, Status} = ?BASE_DB:delete(DB, Key),
     {{NewDB, update_counter(Counter)}, Status}.
-
-get_version({DB, Counter} = DB_, Key) ->
-    ?TRACE2(get_version, DB_, Key),
-    verify_counter(Counter),
-    ?BASE_DB:get_version(DB, Key).
 
 update_entries({DB, Counter} = DB_, NewEntries, Pred, UpdateFun) ->
     ?TRACE4(update_entries, DB_, NewEntries, Pred, UpdateFun),

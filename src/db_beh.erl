@@ -33,10 +33,8 @@ behaviour_info(callbacks) ->
      {set_write_lock, 2}, {unset_write_lock, 2},
      % read locks
      {set_read_lock, 2}, {unset_read_lock, 2},
-     % locks helper
-     {get_locks, 2},
      % standard calls
-     {read, 2}, {write, 4}, {get_version, 2},
+     {read, 2}, {write, 4},
      {get_entry, 2}, {set_entry, 2}, {update_entry, 2}, {delete_entry, 2},
      % dangerous calls
      {delete, 2},

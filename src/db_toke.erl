@@ -67,12 +67,6 @@ close({DB, _CKInt, CKDB}) ->
     ?CKETS:delete(CKDB).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
-%%      an empty entry will be returned.
-get_entry(State, Key) ->
-    {_Exists, Result} = get_entry2(State, Key),
-    Result.
-
-%% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
 get_entry2({DB, _CKInt, _CKDB}, Key) ->
@@ -83,11 +77,12 @@ get_entry2({DB, _CKInt, _CKDB}, Key) ->
 
 %% @doc Inserts a complete entry into the DB.
 set_entry(State = {DB, CKInt, CKDB}, Entry) ->
-    case intervals:in(db_entry:get_key(Entry), CKInt) of
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
         false -> ok;
-        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+        _     -> ?CKETS:insert(CKDB, {Key})
     end,
-    ok = toke_drv:insert(DB, erlang:term_to_binary(db_entry:get_key(Entry)),
+    ok = toke_drv:insert(DB, erlang:term_to_binary(Key),
                          erlang:term_to_binary(Entry)),
     State.
 
@@ -97,11 +92,12 @@ update_entry(State, Entry) ->
 
 %% @doc Removes all values with the given entry's key from the DB.
 delete_entry(State = {DB, CKInt, CKDB}, Entry) ->
-    case intervals:in(db_entry:get_key(Entry), CKInt) of
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
         false -> ok;
-        _     -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)})
+        _     -> ?CKETS:insert(CKDB, {Key})
     end,
-    toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(Entry))),
+    toke_drv:delete(DB, erlang:term_to_binary(Key)),
     State.
 
 %% @doc Returns the number of stored keys.
