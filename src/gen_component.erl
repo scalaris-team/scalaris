@@ -55,9 +55,9 @@ behaviour_info(_Other) ->
     undefined.
 
 %%% API
--spec kill(Pid::pid()) -> ok.
+-spec kill(Pid::pid() | port() | atom()) -> ok.
 kill(Pid) ->        Pid ! {'$gen_component', kill}, ok.
--spec sleep(Pid::pid(), TimeInMs::integer() | infinity) -> ok.
+-spec sleep(Pid::pid() | port() | atom(), TimeInMs::integer() | infinity) -> ok.
 sleep(Pid, Time) -> Pid ! {'$gen_component', sleep, Time}, ok.
 
 -spec runnable(Pid::pid()) -> boolean().
