@@ -14,7 +14,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc Public Lookup API; Reliable Lookup.
+%% @doc Public DHT Lookup API; Unreliable Lookup.
 %% @end
 %% @version $Id$
 -module(lookup).

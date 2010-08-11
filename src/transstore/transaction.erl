@@ -1,4 +1,4 @@
-%  Copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2008, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -116,10 +116,15 @@ read_or_write(Key, Value, TransLog, Operation) ->
             %% we do not have any information for the key in the log read the
             %% information from remote
             ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-            [ lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
-            erlang:send_after(config:read(transaction_lookup_timeout), self(),
+            Cookie = util:get_global_uid(),
+            [ lookup:unreliable_lookup(
+                X, {get_key, comm:this_with_cookie(Cookie), X})
+              || X <- ReplicaKeys ],
+            TRef = erlang:send_after(config:read(transaction_lookup_timeout),
+                                     self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
-            {Flag, Result} = write_read_receive(ReplicaKeys, Operation),
+            {Flag, Result} = write_read_receive(ReplicaKeys, Operation, Cookie),
+            erlang:cancel_timer(TRef),
             if Flag =:= fail ->
                     NewTransLog =
                         txlog:add_entry(TransLog,
@@ -158,10 +163,14 @@ quorum_read(Key, SourcePID)->
 do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    [ lookup:unreliable_get_key(X) || X <- ReplicaKeys ],
-    erlang:send_after(config:read(transaction_lookup_timeout), self(),
+    Cookie = util:get_global_uid(),
+            [ lookup:unreliable_lookup(
+                X, {get_key, comm:this_with_cookie(Cookie), X})
+              || X <- ReplicaKeys ],
+    TRef = erlang:send_after(config:read(transaction_lookup_timeout), self(),
                       {write_read_receive_timeout, hd(ReplicaKeys)}),
-    {Flag, Result} = write_read_receive(ReplicaKeys, read),
+    {Flag, Result} = write_read_receive(ReplicaKeys, read, Cookie),
+    erlang:cancel_timer(TRef),
     if
         Flag =:= fail ->
             comm:send(SourcePID, {single_read_return, {fail, Result}});
@@ -170,13 +179,13 @@ do_quorum_read(Key, SourcePID, InstanceId)->
             comm:send(SourcePID, {single_read_return,{value, Value, Version}})
     end.
 
-write_read_receive(ReplicaKeys, Operation)->
-    write_read_receive(ReplicaKeys, Operation,
+write_read_receive(ReplicaKeys, Operation, Cookie)->
+    write_read_receive(ReplicaKeys, Operation, Cookie,
                        {config:read(replication_factor),
                         config:read(quorum_factor),
                         0, 0, {0,-1}}).
 
-write_read_receive(ReplicaKeys, Operation, State)->
+write_read_receive(ReplicaKeys, Operation, Cookie, State)->
     {ReplFactor, Quorum, NumOk, NumFailed, Result} = State,
     if (NumOk >= Quorum) ->
             {value, Result};
@@ -188,16 +197,16 @@ write_read_receive(ReplicaKeys, Operation, State)->
             {fail, not_found};
        true ->
             receive
-                {get_key_response, Key, failed} ->
+                {{get_key_response, Key, failed}, Cookie} ->
                     case lists:member(Key, ReplicaKeys) of
                         true ->
-                            write_read_receive(ReplicaKeys, Operation,
+                            write_read_receive(ReplicaKeys, Operation, Cookie,
                                                {ReplFactor, Quorum,
                                                 NumOk, 1 + NumFailed, Result});
                         false ->
-                            write_read_receive(ReplicaKeys, Operation, State)
+                            write_read_receive(ReplicaKeys, Operation, Cookie, State)
                     end;
-                {get_key_response, Key, {ok, Value, Versionnr}} ->
+                {{get_key_response, Key, {ok, Value, Versionnr}}, Cookie} ->
                     case lists:member(Key, ReplicaKeys) of
                         true ->
                             {_OldVal, OldVersnr} = Result,
@@ -205,18 +214,21 @@ write_read_receive(ReplicaKeys, Operation, State)->
                                             true -> {Value, Versionnr};
                                             false -> Result
                                         end,
-                            write_read_receive(ReplicaKeys, Operation,
+                            write_read_receive(ReplicaKeys, Operation, Cookie,
                                                {ReplFactor, Quorum,
                                                 NumOk + 1, NumFailed, NewResult});
                        false ->
-                            write_read_receive(ReplicaKeys, Operation, State)
+                            write_read_receive(ReplicaKeys, Operation, Cookie, State)
                     end;
                 {write_read_receive_timeout, _Key} ->
                     {fail, timeout};
+                {{get_key_response, _,_}, _} ->
+                    % Outdated reply. Drop it.
+                    write_read_receive(ReplicaKeys, Operation, Cookie, State);
                 Any ->
                     io:format(standard_error,
                               "transaction:write_read_receive: Oops, unknown message ~p~n", [Any]),
-                    write_read_receive(ReplicaKeys, Operation, State)
+                    write_read_receive(ReplicaKeys, Operation, Cookie, State)
             end
     end.
 
