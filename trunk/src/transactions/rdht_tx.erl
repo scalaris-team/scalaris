@@ -107,7 +107,7 @@ my_key_in_numbered_reqlist(Key, [{_Num, Entry} | Tail]) ->
 initiate_rdht_ops(ReqList) ->
     ?TRACE("rdht_tx:initiate_rdht_ops(~p)~n", [ReqList]),
     [ begin
-          NewReqId = {rdht_req_id, util:get_global_uid()},
+          NewReqId = {rdht_req_id, util:get_pids_uid()}, % local id sufficient
           apply(element(1, Entry), work_phase, [self(), NewReqId, Entry]),
           {NewReqId, {Num, Entry}}
       end || {Num, Entry} <- ReqList ].
