@@ -116,7 +116,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
             %% we do not have any information for the key in the log read the
             %% information from remote
             ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-            Cookie = util:get_global_uid(),
+            Cookie = util:get_pids_uid(),
             [ lookup:unreliable_lookup(
                 X, {get_key, comm:this_with_cookie(Cookie), X})
               || X <- ReplicaKeys ],
@@ -163,7 +163,7 @@ quorum_read(Key, SourcePID)->
 do_quorum_read(Key, SourcePID, InstanceId)->
     erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    Cookie = util:get_global_uid(),
+    Cookie = util:get_pids_uid(),
             [ lookup:unreliable_lookup(
                 X, {get_key, comm:this_with_cookie(Cookie), X})
               || X <- ReplicaKeys ],
@@ -483,7 +483,7 @@ initRTM(State, Message)->
 -spec delete(SourcePid::comm:mypid(), Key::iodata() | integer()) -> ok.
 delete(SourcePID, Key) ->
     InstanceId = erlang:get(instance_id),
-    spawn(transaction, do_delete, [Key, SourcePID, InstanceId]), 
+    spawn(transaction, do_delete, [Key, SourcePID, InstanceId]),
     ok.
 
 -spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::instanceid()) -> ok.
@@ -497,7 +497,7 @@ do_delete(Key, SourcePID, InstanceId)->
 
 %% @doc collect the response for the delete requests
 -spec delete_collect_results(ReplicaKeys::[?RT:key()], SourcePid::comm:mypid(),
-				             Results::[ok | locks_set | undef]) -> ok.
+                             Results::[ok | locks_set | undef]) -> ok.
 delete_collect_results([], SourcePID, Results) ->
     OKs = length([ok || R <- Results, R =:= ok]),
     comm:send(SourcePID, {delete_result, {ok, OKs, Results}});

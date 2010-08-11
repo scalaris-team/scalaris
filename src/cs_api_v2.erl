@@ -82,6 +82,8 @@ write(Key, Value) ->
     ReqList = [{write, Key, Value}, {commit}],
     case process_request_list(tx_tlog:empty(), ReqList) of
         {_TLog, {results, [{write, Key, {value, Value}}, commit]}} -> ok;
+%        {_TLog, {results, [{write, Key, {fail, timeout}}, Reason]}} ->
+%            {fail, Reason};
         {_TLog, {results, [{write, Key, {value, Value}}, Reason]}} ->
             {fail, Reason}
     end.
