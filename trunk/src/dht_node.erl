@@ -404,12 +404,13 @@ on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
 %% @doc joins this node in the ring and calls the main loop
 -spec init([instanceid() | [any()]]) -> {join, {as_first}, msg_queue:msg_queue()} | {join, {phase1}, msg_queue:msg_queue()}.
 init([_InstanceId, Options]) ->
-    %io:format("~p~n", [Options]),
+    % io:format("~p~n", [application:get_env(scalaris, first)]),
     % first node in this vm and also vm is marked as first
     % or unit-test
     case lists:member(first, Options) andalso
           (is_unittest() orelse
-          application:get_env(boot_cs, first) =:= {ok, true}) of
+          application:get_env(boot_cs, first) =:= {ok, true} orelse
+          application:get_env(scalaris, first) =:= {ok, true}) of
         true ->
             trigger_known_nodes(),
             idholder:get_id(),
