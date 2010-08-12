@@ -41,7 +41,7 @@
                          Succ         :: node:node_type(),
                          RTState      :: ?RT:rt(),
                          TriggerState :: trigger:state()}).
--type(state_uninit() :: {uninit, TriggerState :: trigger:state()}).
+-type(state_uninit() :: {uninit, MessageQueue::msg_queue:msg_queue(), TriggerState::trigger:state()}).
 -type(state() :: state_init() | state_uninit()).
 %% userdevguide-end rt_loop:state
 
@@ -78,14 +78,14 @@ start_link(InstanceId) ->
     gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, routing_table}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {uninit, trigger:state()}.
+-spec init(module()) -> state_uninit().
 init(Trigger) ->
     % Note: no need to call dht_node:register_for_node_change(self()) since we
     % get notified of a new node ID via the update_state/3 method that is
     % called in dht_node's rm_update_neighbors handler
     log:log(info,"[ RT ~p ] starting routingtable", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    {uninit, TriggerState}.
+    {uninit, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Private Code
@@ -94,23 +94,25 @@ init(Trigger) ->
 %% @doc message handler
 -spec on(message(), state()) -> state() | unknown_event.
 
-on({init_rt, Id, Pred, Succ}, {uninit, TriggerState}) ->
+on({init_rt, Id, Pred, Succ}, {uninit, QueuedMessages, TriggerState}) ->
     TriggerState2 = trigger:next(TriggerState),
+    msg_queue:send(QueuedMessages),
     {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
 
-on(Message, {uninit, TriggerState}) ->
-    comm:send_local(self() , Message),
-    {uninit, TriggerState};
+on(Message, {uninit, QueuedMessages, TriggerState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Message), TriggerState};
 
 % re-initialize routing table
-on({init_rt, NewId, NewPred, NewSucc}, {_, OldPred, OldSucc, OldRT, TriggerState}) ->
+on({init_rt, NewId, NewPred, NewSucc},
+   {_OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
     NewRT = ?RT:empty(NewSucc),
     ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
     new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
 
 %% userdevguide-begin rt_loop:update_rt
 % update routing table with changed ID, pred and/or succ
-on({update_rt, NewId, NewPred, NewSucc}, {OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
+on({update_rt, NewId, NewPred, NewSucc},
+   {OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
     case ?RT:update(NewId, NewPred, NewSucc, OldRT, OldId, OldPred, OldSucc) of
         {trigger_rebuild, NewRT} ->
             % trigger immediate rebuild
@@ -141,7 +143,8 @@ on({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->
     new_state(Id, Pred, Succ, NewRT, TriggerState);
 
 % debug_info for web interface
-on({'$gen_cast', {debug_info, Requestor}}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
+on({'$gen_cast', {debug_info, Requestor}},
+   {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
     KeyValueList =
         [{"rt_size", ?RT:get_size(RTState)},
          {"rt (index, node):", ""} | ?RT:dump(RTState)],
