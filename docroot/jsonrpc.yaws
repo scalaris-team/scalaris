@@ -120,7 +120,7 @@ handler(AnyOp, AnyParams) ->
 
 make_result_json_conforming(ErlResult) ->
     case ErlResult of
-        {{translog, TLog}, {results, Results}} ->
+        {TLog, {results, Results}} ->
             {struct, [{translog, translog_to_json(TLog)}, {results, results_to_json(Results)}]};
         Any ->
             ok
