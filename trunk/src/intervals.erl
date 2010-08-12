@@ -279,11 +279,13 @@ from_list(Interval) ->
         _   -> Interval
     end.
 
-%% @doc Specifies an order over simple intervals based on their first component
+%% @doc Specifies an order over simple intervals (returns true if I1 &lt;= I2).
+%%      The order is based on the intervals' first components
 %%      and in case of elements based on their value. 'all' is the first and
 %%      elements are sorted before intervals with the same values, if two
-%%      intervals' values compare equal, normal &lt;= from erlang is used.
--spec interval_sort(Interval1::simple_interval(), Interval2::simple_interval()) -> boolean().
+%%      intervals' first components compare equal the one with '[' is smaller
+%%      (to ease merge_adjacent/2), otherwise normal &lt;= from erlang is used.
+-spec interval_sort(I1::simple_interval(), I2::simple_interval()) -> boolean().
 interval_sort(all, _Interval2) ->
     true;
 interval_sort({element, A}, {element, B}) ->
@@ -292,10 +294,12 @@ interval_sort({element, A}, {interval, _B0Br, B0, _B1, _B1Br}) ->
     greater_equals_than(B0, A);
 interval_sort({interval, _A0Br, A0, _A1, _A1Br}, {element, B}) ->
     greater_than(B, A0);
-interval_sort({interval, _A0Br, A0, _A1, _A1Br} = A, {interval, _B0Br, B0, _B1, _B1Br} = B) ->
-    % beware of not accidentally makeing two intervals equal, which is defined
+interval_sort({interval, A0Br, A0, _A1, _A1Br} = A, {interval, B0Br, B0, _B1, _B1Br} = B) ->
+    % beware of not accidentally making two intervals equal, which is defined
     % as A==B <=> interval_sort(A, B) andalso interval_sort(B, A)
-    greater_than(B0, A0) orelse (A0 =:= B0 andalso A =< B);
+    greater_than(B0, A0) orelse
+        (A0 =:= B0 andalso A0Br =:= '[' andalso B0Br =:= '(') orelse
+        (A0 =:= B0 andalso (not (A0Br =:= '(' andalso B0Br =:= '[')) andalso A =< B);
 interval_sort(_Interval1, _Interval2) ->
     false.
 

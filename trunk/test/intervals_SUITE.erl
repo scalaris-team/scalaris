@@ -104,6 +104,9 @@ normalize(_Config) ->
             intervals:all()),
     
     ?equals(intervals:normalize([{interval,'[', minus_infinity, plus_infinity,')'}, {interval,'[', plus_infinity, 4, ']'}]),
+            intervals:all()),
+
+    ?equals(intervals:normalize([{interval,'[',3,2,']'}, {interval,'[',plus_infinity,3,')'}, {interval,'(',3,plus_infinity,')'}]),
             intervals:all()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
