@@ -21,7 +21,7 @@
 
 -export([start/0, process/1]).
 
--spec start() -> none().
+-spec start() -> no_return().
 start() ->
     case init:get_plain_arguments() of
 	[NodeName | Args] ->

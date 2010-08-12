@@ -39,7 +39,7 @@
 % @type rt(). Routing Table.
 -opaque(rt()::Succ::node:node_type()).
 -type(external_rt()::rt()).
--opaque(custom_message() :: any()).
+-opaque(custom_message() :: none()).
 %% userdevguide-end rt_simple:types
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -55,18 +55,30 @@ empty(Succ) -> Succ.
 %% userdevguide-begin rt_simple:hash_key
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(iodata() | integer()) -> key().
-hash_key(Key) when is_integer(Key) ->
+hash_key(Key) -> hash_key_(Key).
+
+%% @doc Hashes the key to the identifier space (internal function to allow
+%%      use in e.g. get_random_node_id without dialyzer complaining about the
+%%      opaque key type).
+-spec hash_key_(iodata() | integer()) -> integer().
+hash_key_(Key) when is_integer(Key) ->
     <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
     N;
-hash_key(Key) ->
+hash_key_(Key) ->
     <<N:128>> = erlang:md5(Key),
     N.
 %% userdevguide-end rt_simple:hash_key
 
 %% userdevguide-begin rt_simple:get_random_node_id
-%% @doc Generates a random node id, i.e. a random 128-bit string.
+%% @doc Generates a random node id, i.e. a random 128-bit number.
 -spec get_random_node_id() -> key().
-get_random_node_id() -> hash_key(randoms:getRandomId()).
+get_random_node_id() ->
+    case config:read(key_creator) of
+        random -> hash_key_(randoms:getRandomId());
+        random_with_bit_mask ->
+            {Mask1, Mask2} = config:read(key_creator_bitmask),
+            (hash_key_(randoms:getRandomId()) band Mask2) bor Mask1
+    end.
 %% userdevguide-end rt_simple:get_random_node_id
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -131,15 +143,25 @@ dump(Succ) -> [{0, lists:flatten(io_lib:format("~p", [Succ]))}].
 %% userdevguide-end rt_simple:dump
 
 %% @doc Checks whether config parameters of the rt_simple process exist and are
-%%      valid (there are no config parameters).
+%%      valid.
 -spec check_config() -> true.
-check_config() -> true.
+check_config() ->
+    config:is_in(key_creator, [random, random_with_bit_mask]) and
+        case config:read(key_creator) of
+            random -> true;
+            random_with_bit_mask ->
+                config:is_tuple(key_creator_bitmask, 2,
+                                fun({Mask1, Mask2}) ->
+                                        erlang:is_integer(Mask1) andalso
+                                            erlang:is_integer(Mask2) end,
+                                "{int(), int()}")
+        end.
 
 -include("rt_generic.hrl").
 
 %% userdevguide-begin rt_simple:handle_custom_message
 %% @doc There are no custom messages here.
--spec handle_custom_message(custom_message(), rt_loop:state_init()) -> unknown_event.
+-spec handle_custom_message(custom_message() | any(), rt_loop:state_init()) -> unknown_event.
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_simple:handle_custom_message
 

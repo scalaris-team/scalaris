@@ -140,8 +140,7 @@ check_config() ->
         vivaldi:check_config() and
         vivaldi_latency:check_config() and
         ?RM:check_config() and
-        fd_pinger:check_config() and
-        idholder:check_config().
+        fd_pinger:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->

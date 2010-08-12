@@ -31,7 +31,7 @@ start() ->
     timer:sleep(1000),
     erlang:spawn(?MODULE,run_1,[]).
 
--spec run_1() -> none().
+-spec run_1() -> no_return().
 run_1() ->
     Size = list_to_integer(os:getenv("NODES_VM")),
     Worker = list_to_integer(os:getenv("WORKER")),

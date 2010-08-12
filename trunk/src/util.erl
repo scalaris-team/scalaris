@@ -83,7 +83,7 @@ escape_quotes_(Ch, Rest) -> [Ch | Rest].
 
 -spec max(plus_infinity, any()) -> plus_infinity;
          (any(), plus_infinity) -> plus_infinity;
-         (T, T) -> T.
+         (T | minus_infinity, T | minus_infinity) -> T.
 max(plus_infinity, _) -> plus_infinity;
 max(_, plus_infinity) -> plus_infinity;
 max(minus_infinity, X) -> X;
@@ -96,7 +96,7 @@ max(A, B) ->
 
 -spec min(minus_infinity, any()) -> minus_infinity;
          (any(), minus_infinity) -> minus_infinity;
-         (T, T) -> T.
+         (T | plus_infinity, T | plus_infinity) -> T.
 min(minus_infinity, _) -> minus_infinity;
 min(_, minus_infinity) -> minus_infinity;
 min(plus_infinity, X) -> X;
@@ -149,7 +149,7 @@ wait_for_unregister(PID) ->
             wait_for_unregister(PID)
     end.
 
--spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::integer() | [term()]}].
+-spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()]}].
 get_stacktrace() ->
     erlang:get_stacktrace().
 
@@ -158,13 +158,13 @@ get_stacktrace() ->
 -spec dump_extract_from_list
         ([{Item::atom(), Info::term()}], ItemInfo::memory | message_queue_len | stack_size | heap_size) -> non_neg_integer();
         ([{Item::atom(), Info::term()}], ItemInfo::messages) -> [tuple()];
-        ([{Item::atom(), Info::term()}], ItemInfo::current_function) -> Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}.
+        ([{Item::atom(), Info::term()}], ItemInfo::current_function) -> Fun::mfa().
 dump_extract_from_list(List, Key) ->
     element(2, lists:keyfind(Key, 1, List)).
 
 %% @doc Returns a list of all currently executed functions and the number of
 %%      instances for each of them.
--spec dump() -> [{Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}, FunExecCount::pos_integer()}].
+-spec dump() -> [{Fun::mfa(), FunExecCount::pos_integer()}].
 dump() ->
     Info = [element(2, Fun) || X <- processes(),
                                Fun <- [process_info(X, current_function)],
@@ -175,7 +175,7 @@ dump() ->
     lists:reverse(lists:keysort(2, FunCnt)).
 
 %% @doc Returns information about all processes' memory usage.
--spec dump2() -> [{PID::pid(), Mem::non_neg_integer(), Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}}].
+-spec dump2() -> [{PID::pid(), Mem::non_neg_integer(), Fun::mfa()}].
 dump2() ->
     Info = 
         [{Pid,
@@ -189,8 +189,7 @@ dump2() ->
 %% @doc Returns various data about all processes.
 -spec dump3() -> [{PID::pid(), Mem::non_neg_integer(), MsgQLength::non_neg_integer(),
                    StackSize::non_neg_integer(), HeapSize::non_neg_integer(),
-                   Messages::[atom()],
-                   Fun::{Module::atom(), FunName::atom(), Arity::non_neg_integer()}}].
+                   Messages::[atom()], Fun::mfa()}].
 dump3() ->
     Info = 
         [{Pid,
