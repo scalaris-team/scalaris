@@ -87,7 +87,11 @@ set_readlock(DBEntry, ReadLock) ->  setelement(4, DBEntry, ReadLock).
 inc_readlock(DBEntry) -> set_readlock(DBEntry, get_readlock(DBEntry) + 1).
 
 -spec dec_readlock(DBEntry::entry()) -> entry().
-dec_readlock(DBEntry) -> set_readlock(DBEntry, get_readlock(DBEntry) - 1).
+dec_readlock(DBEntry) ->
+    case get_readlock(DBEntry) of
+        0 -> log:log(warn, "Decreasing empty readlock~n"), DBEntry;
+        N -> set_readlock(DBEntry, N - 1)
+    end.
 
 -spec get_version(DBEntry::entry()) -> ?DB:version().
 get_version(DBEntry) ->        element(5, DBEntry).

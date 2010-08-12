@@ -53,7 +53,7 @@ process_request_list(TLog, ReqList) ->
                   {NewAccTLog, [SingleResult | AccRes]}
           end,
           {TLog, []}, ReqList),
-    {{translog, TransLogResult}, {results, lists:reverse(ReverseResultList)}}.
+    {TransLogResult, {results, lists:reverse(ReverseResultList)}}.
 
 process_request(TLog, Request) ->
     ?TRACE("cs_api:process_request(~p, ~p)~n", [TLog, Request]),

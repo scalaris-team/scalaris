@@ -111,7 +111,7 @@ validate(DB, RTLogEntry) ->
             NewDB = ?DB:set_entry(DB, NewEntry),
             {NewDB, prepared};
         false ->
-          {DB, abort}
+            {DB, abort}
     end.
 
 commit(DB, RTLogEntry, OwnProposalWas) ->
