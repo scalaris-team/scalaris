@@ -28,8 +28,7 @@
 
 -include("scalaris.hrl").
 
--export([start_link/2, init/1, on/2, set_id/2, get_id/0, reinit/0,
-         check_config/0]).
+-export([start_link/2, init/1, on/2, set_id/2, get_id/0, reinit/0]).
 
 -type(message() ::
     {reinit} |
@@ -66,22 +65,6 @@ start_link(InstanceId, Options) ->
 reinit() ->
     comm:send_local(get_pid(), {reinit}).
 
-%% @doc Checks whether config parameters of the idholder process exist and are
-%%      valid.
--spec check_config() -> boolean().
-check_config() ->
-    config:is_in(key_creator, [random, random_with_bit_mask]) and
-        case config:read(key_creator) of
-            random -> true;
-            random_with_bit_mask ->
-                config:is_tuple(key_creator_bitmask, 2,
-                                fun({Mask1, Mask2}) ->
-                                        erlang:is_integer(Mask1) andalso
-                                            erlang:is_integer(Mask2) end,
-                                "{int(), int()}")
-        end.
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Server process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -92,12 +75,12 @@ check_config() ->
 init(Options) ->
     case lists:keyfind({idholder, id}, 1, Options) of
         {{idholder, id}, Id} -> {Id, 0};
-        _ -> {get_initial_key(config:read(key_creator)), 0}
+        _ -> {?RT:get_random_node_id(), 0}
     end.
 
 -spec on(message(), state()) -> state().
 on({reinit}, _State) ->
-    {get_initial_key(config:read(key_creator)), 0};
+    {?RT:get_random_node_id(), 0};
 on({get_id, PID}, {Id, IdVersion} = State) ->
     comm:send_local(PID, {idholder_get_id_response, Id, IdVersion}),
     State;
@@ -110,13 +93,3 @@ on({set_id, NewId, NewIdVersion}, _State) ->
 -spec get_pid() -> pid() | failed.
 get_pid() ->
     process_dictionary:get_group_member(idholder).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Key creation algorithms
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec get_initial_key(random | random_with_bit_mask) -> ?RT:key().
-get_initial_key(random) ->
-    ?RT:get_random_node_id();
-get_initial_key(random_with_bit_mask) ->
-    {Mask1, Mask2} = config:read(key_creator_bitmask),
-    (get_initial_key(random) band Mask2) bor Mask1.

@@ -58,13 +58,18 @@
        fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())} |
       {unreg_from_nc, Pid::comm:erl_local_pid()}).
 
+-type(rt_message() ::
+      {rt_update, RoutingTable::?RT:external_rt()} |
+      {rt_get_node, Source_PID::comm:mypid(), Index::rt_chord:index()}).
+
 % accepted messages of dht_node processes
 -type(message() ::
       bulkowner_message() |
       database_message() |
       lookup_message() |
       rm_message() |
-      dht_node_join:join_message()).
+      dht_node_join:join_message() |
+      rt_message()).
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
@@ -146,6 +151,7 @@ on({unreg_from_nc, Pid}, State) ->
 on({rt_update, RoutingTable}, State) ->
     dht_node_state:set_rt(State, RoutingTable);
 
+%% TODO: rt_chord-specific message -> move to rt_chord
 %% userdevguide-begin dht_node:rt_get_node
 on({rt_get_node, Source_PID, Index}, State) ->
     comm:send(Source_PID, {rt_get_node_response, Index, dht_node_state:get(State, node)}),

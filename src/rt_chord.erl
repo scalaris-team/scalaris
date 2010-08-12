@@ -34,16 +34,16 @@
          check_config/0]).
 
 -ifdef(with_export_type_support).
--export_type([key/0, rt/0, custom_message/0, external_rt/0]).
+-export_type([key/0, rt/0, custom_message/0, external_rt/0, index/0]).
 -endif.
 
 %% userdevguide-begin rt_chord:types
 -opaque(key()::non_neg_integer()).
 -opaque(rt()::gb_tree()).
 -type(external_rt()::gb_tree()).        %% @todo: make opaque
--type(index() :: {pos_integer(), pos_integer()}).
+-type(index() :: {pos_integer(), non_neg_integer()}).
 -opaque(custom_message() ::
-       {rt_get_node_response, Index::pos_integer(), Node::node:node_type()}).
+       {rt_get_node_response, Index::index(), Node::node:node_type()}).
 %% userdevguide-end rt_chord:types
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -58,18 +58,29 @@ empty(_Succ) -> gb_trees:empty().
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(iodata() | integer()) -> key().
-hash_key(Key) when is_integer(Key) ->
+hash_key(Key) -> hash_key_(Key).
+
+%% @doc Hashes the key to the identifier space (internal function to allow
+%%      use in e.g. get_random_node_id without dialyzer complaining about the
+%%      opaque key type).
+-spec hash_key_(iodata() | integer()) -> integer().
+hash_key_(Key) when is_integer(Key) ->
     <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
     N;
-hash_key(Key) ->
+hash_key_(Key) ->
     <<N:128>> = erlang:md5(Key),
     N.
 
-%% @doc Generates a random node id.
-%%      In this case it is a random 128-bit string.
+%% @doc Generates a random node id, i.e. a random 128-bit number, based on the
+%%      parameters set in the config file (key_creator and key_creator_bitmask).
 -spec get_random_node_id() -> key().
 get_random_node_id() ->
-    hash_key(randoms:getRandomId()).
+    case config:read(key_creator) of
+        random -> hash_key_(randoms:getRandomId());
+        random_with_bit_mask ->
+            {Mask1, Mask2} = config:read(key_creator_bitmask),
+            (hash_key_(randoms:getRandomId()) band Mask2) bor Mask1
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% RT Management
@@ -132,13 +143,12 @@ dump(RT) ->
 
 %% userdevguide-begin rt_chord:stabilize
 %% @doc Updates one entry in the routing table and triggers the next update.
--spec stabilize(key(), node:node_type(), rt(), pos_integer(), node:node_type())
-        -> rt().
+-spec stabilize(MyId::key(), Succ::node:node_type(), OldRT::rt(),
+                Index::index(), Node::node:node_type()) -> NewRT::rt().
 stabilize(Id, Succ, RT, Index, Node) ->
-    case node:is_valid(Node)                        % do not add null nodes
-        andalso (node:id(Succ) =/= node:id(Node))   % reached succ?
-        andalso (not intervals:in(                  % there should be nothing shorter
-                   node:id(Node),                   %   than succ
+    case (node:id(Succ) =/= node:id(Node))   % reached succ?
+        andalso (not intervals:in(           % there should be nothing shorter
+                   node:id(Node),            %   than succ
                    node:mk_interval_between_ids(Id, node:id(Succ)))) of
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
@@ -186,14 +196,26 @@ next_index({I, J}) ->
 -spec check_config() -> boolean().
 check_config() ->
     config:is_integer(chord_base) and
-        config:is_greater_than_equal(chord_base, 2).
+        config:is_greater_than_equal(chord_base, 2) and
+        config:is_in(key_creator, [random, random_with_bit_mask]) and
+        case config:read(key_creator) of
+            random -> true;
+            random_with_bit_mask ->
+                config:is_tuple(key_creator_bitmask, 2,
+                                fun({Mask1, Mask2}) ->
+                                        erlang:is_integer(Mask1) andalso
+                                            erlang:is_integer(Mask2) end,
+                                "{int(), int()}")
+        end.
 
 -include("rt_generic.hrl").
 
 %% userdevguide-begin rt_chord:handle_custom_message
 %% @doc Chord reacts on 'rt_get_node_response' messages in response to its
 %%      'rt_get_node' messages.
--spec handle_custom_message(custom_message(), rt_loop:state_init()) -> rt_loop:state_init().
+-spec handle_custom_message
+        (custom_message(), rt_loop:state_init()) -> rt_loop:state_init();
+        (any(), rt_loop:state_init()) -> unknown_event.
 handle_custom_message({rt_get_node_response, Index, Node}, State) ->
     OldRT = rt_loop:get_rt(State),
     Id = rt_loop:get_id(State),
@@ -201,7 +223,9 @@ handle_custom_message({rt_get_node_response, Index, Node}, State) ->
     Pred = rt_loop:get_pred(State),
     NewRT = stabilize(Id, Succ, OldRT, Index, Node),
     check(OldRT, NewRT, Id, Pred, Succ),
-    rt_loop:set_rt(State, NewRT).
+    rt_loop:set_rt(State, NewRT);
+handle_custom_message(_Message, _State) ->
+    unknown_event.
 %% userdevguide-end rt_chord:handle_custom_message
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
