@@ -56,7 +56,7 @@
     | iodata).
 
 -type(type_name() ::
-      {'fun', Module :: module(), FunName :: atom(), FunArity :: non_neg_integer()}
+      {'fun', Module :: module(), FunName :: atom(), FunArity :: byte()}
       | {type, Module :: module(), TypeName :: atom()}).
 
 -ifdef(forward_or_recursive_types_are_not_allowed).
