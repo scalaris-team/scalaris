@@ -87,10 +87,7 @@ my_process_list(InstanceId, SupervisorType, Options) ->
     Config =
         util:sup_worker_desc(config, config, start_link,
                              [[preconfig:config(), preconfig:local_config()]]),
-    DHTNodeOptions = case SupervisorType of
-                         boot -> [first | Options];
-                         node -> Options
-                     end,
+    DHTNodeOptions = [first | Options],
     DHTNode =
         util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
     FailureDetector =
@@ -122,10 +119,18 @@ my_process_list(InstanceId, SupervisorType, Options) ->
                      CommPort,
                      FailureDetector,
                      AdminServer],
-    PostBootServer = [YAWS,
-                      BenchServer,
-                      Ganglia,
-                      DHTNode],
+    %% do we want to run an empty boot-server?
+    PostBootServer = case application:get_env(boot_cs, empty) of
+                         {ok, true} ->
+                             [YAWS,
+                              BenchServer,
+                              Ganglia];
+                         _ ->
+                             [YAWS,
+                              BenchServer,
+                              Ganglia,
+                              DHTNode]
+                     end,
     % check whether to start the boot server
     case SupervisorType of
         boot ->

@@ -44,11 +44,15 @@ SCALARIS_COOKIE="chocolate chip cookie"
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
 interactive=0
+first=0
+empty=0
 
 usage(){
     echo "usage: scalarisctl [options] <cmd>"
     echo "    -h                   help"
     echo "    -i                   interactive"
+    echo "    -f                   marks this node as the first"
+    echo "    -e                   start boot server with no scalaris nodes (empty)"
     echo "    boot start           start boot server"
     echo "    boot stop            stop boot server"
     echo "    boot restart         restart boot server"
@@ -168,6 +172,9 @@ bootstart(){
     if [ $interactive -eq 0 ]; then
         BACKGROUND="-detached"
     fi
+    if [ $empty -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs empty true"
+    fi
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
@@ -213,6 +220,9 @@ nodestart(){
         BACKGROUND="-detached"
     fi
     pushd $BEAMDIR > /dev/null
+    if [ $first -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris first true"
+    fi
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
         -pa $SCALARISDIR/contrib/log4erl/ebin \
@@ -248,8 +258,10 @@ nodestop(){
 
 fix_paths
 
-while getopts "hi" optionName; do
+while getopts "hife" optionName; do
     case "$optionName" in
+        e) empty=1;;
+        f) first=1;;
         h) usage 0;;
         i) interactive=1;;
         [?]) usage "$badOptionHelp";;
