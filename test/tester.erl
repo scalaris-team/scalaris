@@ -155,6 +155,8 @@ parse_type({type, _Line, pos_integer, []}, _Module, ParseState) ->
     {pos_integer, ParseState};
 parse_type({type, _Line, non_neg_integer, []}, _Module, ParseState) ->
     {non_neg_integer, ParseState};
+parse_type({type, _Line, byte, []}, _Module, ParseState) ->
+    {{range, {integer, 0}, {integer, 255}}, ParseState};
 parse_type({type, _Line, bool, []}, _Module, ParseState) ->
     {bool, ParseState};
 parse_type({type, _Line, char, []}, _Module, ParseState) ->
