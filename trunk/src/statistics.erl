@@ -78,7 +78,7 @@ get_ring_details() ->
             end,
     lists:sort(fun compare_node_details/2,
                lists:map(fun (Pid) -> get_node_details(Pid) end, Nodes)).
-    
+
 %% @doc Defines an order of {ok, node_details:node_details()} | {failed} terms
 %%      so that {failed} terms are considered the smallest.
 %%      Terms like {ok, node_details:node_details()} are compared using the
