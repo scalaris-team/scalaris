@@ -42,7 +42,8 @@
          to_list/1,
          
          % miscellaneous:
-         succ_ord/3,
+         succ_ord_node/2, succ_ord_id/2,
+         succ_ord_node/3, succ_ord_id/3,
          lupdate_ids/2, lremove_outdated/1, lremove_outdated/2]).
 
 -include("scalaris.hrl").
@@ -107,7 +108,7 @@ new_neighborhood(Pred, Node, Succ) ->
                             {[NewerNode], Node, [NewerNode]};
                         false ->
                             % distinct nodes -> determine order:
-                            case succ_ord(Pred, Succ, Node) of
+                            case succ_ord_node(Pred, Succ, Node) of
                                 true  -> {[Succ], Node, [Pred]};
                                 false -> {[Pred], Node, [Succ]}
                             end
@@ -235,14 +236,14 @@ lusplit_nodelist(NodeList, Node) ->
                   end
           end, NodeList),
 
-    SmallerSorted = lists:usort(fun succ_ord/2, Smaller),
+    SmallerSorted = lists:usort(fun succ_ord_node/2, Smaller),
     {EqualSorted, LargerSorted} =
         lists:splitwith(fun(N) -> node:id(N) =:= node:id(Node) end,
-                        lists:usort(fun succ_ord/2, LargerOrEqual)),
+                        lists:usort(fun succ_ord_node/2, LargerOrEqual)),
     {SmallerSorted, EqualSorted, LargerSorted}.
 
 %% @doc Creates a sorted nodelist starting at the given node and going clockwise
-%%      along the ring (also see succ_ord/3).
+%%      along the ring (also see succ_ord_node/3).
 -spec mk_nodelist(UnorderedNodeList::[node:node_type()], Node::node:node_type()) -> OrderedNodeList::snodelist().
 mk_nodelist(NodeList, Node) ->
     {SmallerSorted, EqualSorted, LargerSorted} =
@@ -401,7 +402,7 @@ lremove_head_if_eq([H | T] = NodeList, Node) ->
 %%      along the ring towards the first node.
 -spec to_list(neighborhood()) -> non_empty_snodelist().
 to_list({Preds, Node, Succs}) ->
-    Ord = fun(N1, N2) -> succ_ord(N1, N2, Node) end,
+    Ord = fun(N1, N2) -> succ_ord_node(N1, N2, Node) end,
     CleanPreds = lremove_head_if_eq(Preds, Node),
     CleanSuccs = lremove_head_if_eq(Succs, Node),
     CleanPredsReversed = lists:reverse(CleanPreds),
@@ -470,7 +471,7 @@ lrebase_list([First | T], NewFirstNode) ->
 lmerge_helper(Node1View, Node2View, BaseNode, PredsLength, SuccsLength) ->
     {Node1ViewUpd, Node2ViewUpd} = lupdate_ids(Node1View, Node2View),
     % due to updated IDs, the lists might not be sorted anymore...
-    Ord = fun(N1, N2) -> succ_ord(N1, N2, BaseNode) end,
+    Ord = fun(N1, N2) -> succ_ord_node(N1, N2, BaseNode) end,
     Node1ViewUpdSorted = lists:usort(Ord, Node1ViewUpd),
     Node2ViewUpdSorted = lists:usort(Ord, Node2ViewUpd),
 
@@ -514,7 +515,7 @@ add_node({Preds, BaseNode, Succs}, NodeToAdd, PredsLength, SuccsLength) ->
             % create a view of all know (and updated) nodes:
             ViewUpd = lists:append([NodeToAdd | lists:map(UpdateFun, CleanPreds)], lists:map(UpdateFun, CleanSuccs)),
             % sort the list again
-            SuccOrd = fun(N1, N2) -> succ_ord(N1, N2, BaseNode) end,
+            SuccOrd = fun(N1, N2) -> succ_ord_node(N1, N2, BaseNode) end,
             SuccsUpdSorted = lists:usort(SuccOrd, ViewUpd),
             PredsUpdSorted = lists:reverse(SuccsUpdSorted),
             
@@ -546,21 +547,36 @@ add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
                 end,
     lmerge_helper(NeighborsView, OtherView, Node, PredsLength, SuccsLength).
 
-%% @doc Defines that N1 is less than or equal to N2 if their IDs are.
--spec succ_ord(N1::node:node_type(), N2::node:node_type()) -> boolean().
-succ_ord(N1, N2) ->
-    node:id(N1) =< node:id(N2).
+%% @doc Defines that N1 is less than or equal to N2 if their IDs are (provided
+%%      for convenience).
+-spec succ_ord_node(N1::node:node_type(), N2::node:node_type()) -> boolean().
+succ_ord_node(N1, N2) -> succ_ord_id(node:id(N1), node:id(N2)).
+
+%% @doc Defines that K1 is less than or equal to K2 if their IDs are.
+-spec succ_ord_id(K1::?RT:key(), K2::?RT:key()) -> boolean().
+succ_ord_id(K1, K2) -> K1 =< K2.
 
 %% @doc Defines a 'less than or equal' order starting from a base node going
 %%      along the ring towards the successor where nodes that are further away
 %%      are said to be larger than nodes with smaller distances.
--spec succ_ord(node:node_type(), node:node_type(), BaseNode::node:node_type()) -> boolean().
-succ_ord(N1, N2, BaseNode) ->
-    BaseNodeId = node:id(BaseNode),
-    (node:id(N1) > BaseNodeId andalso node:id(N2) > BaseNodeId andalso node:id(N1) =< node:id(N2)) orelse
-    (node:id(N1) < BaseNodeId andalso node:id(N2) < BaseNodeId andalso node:id(N1) =< node:id(N2)) orelse
-    (node:id(N1) > BaseNodeId andalso node:id(N2) < BaseNodeId) orelse
-    (node:id(N1) =:= BaseNodeId).
+-spec succ_ord_node(node:node_type(), node:node_type(), BaseNode::node:node_type()) -> boolean().
+succ_ord_node(N1, N2, BaseNode) ->
+    succ_ord_id(node:id(N1), node:id(N2), node:id(BaseNode)).
+
+%% @doc Defines a 'less than or equal' order starting from a base node going
+%%      along the ring towards the successor where nodes that are further away
+%%      are said to be larger than nodes with smaller distances.
+-spec succ_ord_id(K1::?RT:key(), K2::?RT:key(), BaseKey::?RT:key()) -> boolean().
+succ_ord_id(K1, K2, BaseKey) ->
+    % more understandable version:
+%%     (K1 > BaseKey andalso K2 > BaseKey andalso K1 =< K2) orelse
+%%     (K1 < BaseKey andalso K2 < BaseKey andalso K1 =< K2) orelse
+%%     (K1 > BaseKey andalso K2 < BaseKey) orelse
+%%     (K1 =:= BaseKey).
+    % (slightly) faster version: 
+    (K1 =:= BaseKey) orelse
+    (K1 > BaseKey andalso K2 < BaseKey) orelse
+    (K1 =< K2 andalso (not (K1 < BaseKey andalso K2 > BaseKey))).
 
 %% %%  doc Defines a 'less than or equal' order starting from a base node going
 %% %%      along the ring towards the predecessor where nodes that are further away

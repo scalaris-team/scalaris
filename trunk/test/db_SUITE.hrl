@@ -65,15 +65,14 @@ suite() ->
 -spec spawn_config_processes() -> pid().
 spawn_config_processes() ->
     Owner = self(),
-    Pid =
-        spawn(fun () ->
-                       crypto:start(),
-                       process_dictionary:start_link(),
-                       config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                       Owner ! {continue},
-                       receive {done} -> ok
-                       end
-              end),
+    Pid = spawn(fun() ->
+                        crypto:start(),
+                        process_dictionary:start_link(),
+                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                        Owner ! {continue},
+                        receive {done} -> ok
+                        end
+                end),
     receive {continue} -> ok
     end,
     Pid.

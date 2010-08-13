@@ -366,7 +366,7 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     OldView = nodelist:to_list(OldNeighborhood),
     NewView = nodelist:to_list(NewNeighborhood2),
     ViewOrd = fun(A, B) ->
-                      nodelist:succ_ord(A, B, nodelist:node(OldNeighborhood))
+                      nodelist:succ_ord_node(A, B, nodelist:node(OldNeighborhood))
               end,
     {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
     

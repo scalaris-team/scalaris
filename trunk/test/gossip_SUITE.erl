@@ -84,7 +84,7 @@ init_per_suite(Config) ->
     file:set_cwd("../bin"),
     error_logger:tty(true),
     Owner = self(),
-    Pid = spawn(fun () ->
+    Pid = spawn(fun() ->
                         crypto:start(),
                         process_dictionary:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
@@ -93,14 +93,10 @@ init_per_suite(Config) ->
                         comm_port:set_local_address({127,0,0,1},14195),
                         application:start(log4erl),
                         Owner ! {continue},
-                        receive
-                            {done} ->
-                                ok
+                        receive {done} -> ok
                         end
                 end),
-    receive
-        {continue} ->
-            ok
+    receive {continue} -> ok
     end,
     [{wrapper_pid, Pid} | Config].
 
