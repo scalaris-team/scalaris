@@ -24,6 +24,7 @@
 
 -type(test_any() ::
    % | none()
+   % | no_return()
    % | pid()
    % | port()
    % | ref()
@@ -86,6 +87,7 @@
     | port
     | reference
     | none
+    | no_return
     | {typedef, module(), atom()}
     | atom
     | float
@@ -122,6 +124,7 @@
     | port
     | reference
     | none
+    | no_return
     | {typedef, module(), atom()}
     | atom
     | float

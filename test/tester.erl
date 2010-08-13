@@ -191,6 +191,8 @@ parse_type({type, _Line, node, []}, _Module, ParseState) ->
     {node, ParseState};
 parse_type({type, _Line, none, []}, _Module, ParseState) ->
     {none, ParseState};
+parse_type({type, _Line, no_return, []}, _Module, ParseState) ->
+    {none, ParseState};
 parse_type({type, _Line, reference, []}, _Module, ParseState) ->
     {reference, ParseState};
 parse_type({type, _Line, term, []}, _Module, ParseState) ->
