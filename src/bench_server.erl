@@ -13,7 +13,6 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %% @doc This is a small server for running benchmarks
 %% @end
 -module(bench_server).
