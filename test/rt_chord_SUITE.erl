@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 
 all() ->
-    [next_hop].
+    [next_hop, next_hop2].
 
 suite() ->
     [
@@ -78,6 +78,7 @@ next_hop(_Config) ->
     % note: dht_node_state:new/3 will call process_dictionary:get_group_member(paxos_proposer)
     % which will fail here -> however, we don't need this process
     State = dht_node_state:new(RT, nodelist:new_neighborhood(Pred, MyNode, Succ), ?DB:new(node:id(MyNode))),
+    config:write(rt_size_use_neighbors, 0),
     ?equals(rt_chord:next_hop(State, 0), lists:nth(6, DHTNodes)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
     ?equals(rt_chord:next_hop(State, 2), node:pidX(Succ)),
@@ -92,6 +93,43 @@ next_hop(_Config) ->
     [exit(Node, kill) || Node <- DHTNodes],
     exit(node:pidX(MyNode), kill),
     exit(node:pidX(Succ), kill),
+    exit(node:pidX(Pred), kill),
+    ok.
+
+next_hop2(_Config) ->
+    erlang:put(instance_id, "rt_chord_SUITE_group"),
+    MyNode = node:new(fake_dht_node(), 0, 0),
+    Succ = node:new(fake_dht_node(), 1, 0),
+    SuccSucc = node:new(fake_dht_node(), 2, 0),
+    Pred = node:new(fake_dht_node(), 1000000, 0),
+    DHTNodes = [fake_dht_node() || _ <- lists:seq(1, 6)],
+    RT = gb_trees:from_orddict([{1, Succ},
+                                {4, node:new(lists:nth(2, DHTNodes), 4, 0)},
+                                {8, node:new(lists:nth(3, DHTNodes), 8, 0)},
+                                {16, node:new(lists:nth(4, DHTNodes), 16, 0)},
+                                {32, node:new(lists:nth(5, DHTNodes), 32, 0)},
+                                {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
+    % note: dht_node_state:new/3 will call process_dictionary:get_group_member(paxos_proposer)
+    % which will fail here -> however, we don't need this process
+    Neighbors = nodelist:add_node(nodelist:new_neighborhood(Pred, MyNode, Succ),
+                                  SuccSucc, 2, 2),
+    State = dht_node_state:new(RT, Neighbors, ?DB:new(node:id(MyNode))),
+    config:write(rt_size_use_neighbors, 10),
+    ?equals(rt_chord:next_hop(State, 0), lists:nth(6, DHTNodes)),
+    ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
+    ?equals(rt_chord:next_hop(State, 2), node:pidX(Succ)),
+    ?equals(rt_chord:next_hop(State, 3), node:pidX(SuccSucc)),
+    ?equals(rt_chord:next_hop(State, 7), lists:nth(2, DHTNodes)),
+    ?equals(rt_chord:next_hop(State, 9), lists:nth(3, DHTNodes)),
+    ?equals(rt_chord:next_hop(State, 31), lists:nth(4, DHTNodes)),
+    ?equals(rt_chord:next_hop(State, 64), lists:nth(5, DHTNodes)),
+    ?equals(rt_chord:next_hop(State, 65), lists:nth(6, DHTNodes)),
+    ?equals(rt_chord:next_hop(State, 1000), lists:nth(6, DHTNodes)),
+    
+    [exit(Node, kill) || Node <- DHTNodes],
+    exit(node:pidX(MyNode), kill),
+    exit(node:pidX(Succ), kill),
+    exit(node:pidX(SuccSucc), kill),
     exit(node:pidX(Pred), kill),
     ok.
 

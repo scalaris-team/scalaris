@@ -32,7 +32,8 @@ all() ->
      get_keys_for_replica_int,
      get_keys_for_replica_string,
      md5,
-     next_hop,
+     next_hop_no_neighbors,
+     next_hop_with_neighbors,
      process_dictionary_lookup,
      process_dictionary_lookup_by_pid,
      ets_ordset_insert1,
@@ -52,14 +53,31 @@ all() ->
      ets_ordset_insert2N,
      erlang_send,
      comm_local,
-    erlang_send_after,
-    erlang_spawn,
-    erlang_now].
+     erlang_send_after,
+     erlang_spawn,
+     erlang_now].
 
 suite() ->
     [
      {timetrap, {seconds, 20}}
     ].
+
+-spec spawn_config_processes() -> pid().
+spawn_config_processes() ->
+    Owner = self(),
+    Pid =
+        spawn(fun () ->
+                       file:set_cwd("../bin"),
+%%                        crypto:start(),
+                       process_dictionary:start_link(),
+                       config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                       Owner ! {continue},
+                       receive {done} -> ok
+                       end
+              end),
+    receive {continue} -> ok
+    end,
+    Pid.
 
 init_per_suite(Config) ->
     crypto:start(),
@@ -259,29 +277,49 @@ md5(_Config) ->
                end, "erlang:md5"),
     ok.
 
-next_hop(_Config) ->
-    {ok, _Pid} = process_dictionary:start_link(),
-    process_dictionary:register_process(atom_to_list(?MODULE), process_dictionary, self()),
-    proposer:start_link(atom_to_list(?MODULE)),
-    RT = gb_trees:enter(1, node:new(succ, 3, 0),
-          gb_trees:enter(2, node:new(pred, 1, 0),
-           gb_trees:enter(3, node:new(succ, 3, 0),
-            gb_trees:enter(4, node:new(pred, 1, 0),
-             gb_trees:enter(100, node:new(succ, 3, 0),
-              gb_trees:enter(101, node:new(pred, 1, 0),
-               gb_trees:enter(102, node:new(succ, 3, 0),
-                gb_trees:enter(103, node:new(pred, 1, 0),
-                 rt_chord:empty(node:new(succ, 3, 0)))))))))),
-    State =
-        dht_node_state:new(RT, nodelist:new_neighborhood(node:new(pred, 1, 0),
-                                                         node:new(me, 2, 0),
-                                                         node:new(succ, 3, 0)),
-                           db),
+next_hop_setup() ->
+    Pred = node:new(pred, 1, 0),
+    Me = node:new(me, 2, 0),
+    Succ = node:new(succ, 3, 0),
+    RT = gb_trees:enter(1, Pred,
+          gb_trees:enter(4, node:new(succ2, 4, 0),
+           gb_trees:enter(5, node:new(succ3, 5, 0),
+            gb_trees:enter(6, node:new(succ4, 6, 0),
+             gb_trees:enter(100, node:new(rt5, 100, 0),
+              gb_trees:enter(101, node:new(rt6, 101, 0),
+               gb_trees:enter(102, node:new(rt7, 102, 0),
+                gb_trees:enter(103, node:new(rt8, 103, 0),
+                 rt_chord:empty_ext(Succ))))))))),
+    Neighbors =
+        nodelist:add_nodes(
+          nodelist:new_neighborhood(Pred, Me, Succ),
+          [node:new(list_to_atom(lists:flatten(io_lib:format("succ~w", [Id]))), Id + 2, 0) || Id <- lists:seq(2, config:read(succ_list_length))] ++
+              [node:new(list_to_atom(lists:flatten(io_lib:format("pred~w", [Id]))), 1022 - Id, 0) || Id <- lists:seq(2, config:read(pred_list_length))],
+          config:read(succ_list_length), config:read(pred_list_length)),
+    _State = dht_node_state:new(RT, Neighbors, db).
+
+next_hop_no_neighbors(_Config) ->
+    Pid = spawn_config_processes(),
+    erlang:put(instance_id, "performance_SUITE_group"),
+    State = next_hop_setup(),
+    config:write(rt_size_use_neighbors, 0),
+    iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) no neighbors"),
+    iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) no neighbors"),
     gen_component:kill(process_dictionary),
     catch unregister(process_dictionary),
-    iter(count(), fun () ->
-                           rt_chord:next_hop(State, 42)
-         end, "next_hop"),
+    exit(Pid, kill),
+    ok.
+
+next_hop_with_neighbors(_Config) ->
+    Pid = spawn_config_processes(),
+    erlang:put(instance_id, "performance_SUITE_group"),
+    State = next_hop_setup(),
+    config:write(rt_size_use_neighbors, 10),
+    iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) with neighbors"),
+    iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) with neighbors"),
+    gen_component:kill(process_dictionary),
+    catch unregister(process_dictionary),
+    exit(Pid, kill),
     ok.
 
 process_dictionary_lookup(_Config) ->
