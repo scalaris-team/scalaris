@@ -41,11 +41,7 @@
     {connect}).
 
 % internal state
--type(state()::{Nodes::gb_set(), % known nodes
-                % nodes that asked for the boot server's list of nodes when the
-                % boot server did not know any nodes yet (they will be send the
-                % list as soon as the boot server gets knowledge of a node):
-                GetListSubscribers::[comm:mypid()]
+-type(state()::{Nodes::gb_set() % known nodes
                }).
 
 %% @doc trigger a message with  the number of nodes known to the boot server
@@ -69,30 +65,22 @@ node_list() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on(message(), state()) -> state().
-on({crash, PID}, {Nodes, Subscriber}) ->
+on({crash, PID}, {Nodes}) ->
     NewNodes = gb_sets:delete_any(PID, Nodes),
-    {NewNodes, Subscriber};
+    {NewNodes};
 
-on({get_list, Ping_PID}, {Nodes, Subscriber} = State) ->
-    case gb_sets:is_empty(Nodes) of
-        true -> {Nodes, [Ping_PID | Subscriber]};
-        _ -> comm:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
-             State
-    end;
+on({get_list, Ping_PID}, {Nodes} = State) ->
+    comm:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
+    State;
 
-on({get_list_length, Ping_PID}, {Nodes, _Subscriber} = State) ->
+on({get_list_length, Ping_PID}, {Nodes} = State) ->
     comm:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
     State;
 
-on({register, Ping_PID}, {Nodes, Subscriber}) ->
+on({register, Ping_PID}, {Nodes}) ->
     fd:subscribe(Ping_PID),
     NewNodes = gb_sets:add(Ping_PID, Nodes),
-    case Subscriber of
-        [] -> ok;
-        _ -> [comm:send(Node,{get_list_response,gb_sets:to_list(NewNodes)})
-                || Node <- Subscriber]
-    end,
-    {NewNodes, []};
+    {NewNodes};
 
 on({connect}, State) ->
     % ugly work around for finding the local ip by setting up a socket first
@@ -101,7 +89,14 @@ on({connect}, State) ->
 -spec init([]) -> state().
 init(_Arg) ->
     log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
-    {gb_sets:empty(), []}.
+    case application:get_env(boot_cs, empty) of
+        {ok, true} ->
+            % ugly hack to get a valid ip-address into the comm-layer
+            dht_node:trigger_known_nodes();
+        _ ->
+            ok
+    end,
+    {gb_sets:empty()}.
 
 %% @doc starts the server; called by the boot supervisor
 %% @see sup_scalaris

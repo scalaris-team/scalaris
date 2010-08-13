@@ -145,6 +145,8 @@ get_vivaldi(Pid) ->
     end.
 
 -spec renderVivaldiMap(CC_list::[vivaldi:network_coordinate()], Nodes::[comm:mypid()]) -> SVG::string().
+renderVivaldiMap(_CC_list, []) ->
+    "<svg xmlns=\"http://www.w3.org/2000/svg\"/>";
 renderVivaldiMap(CC_list, Nodes) ->
     {Min,Max} = get_min_max(CC_list),
     %io:format("Min: ~p Max: ~p~n",[Min,Max]),

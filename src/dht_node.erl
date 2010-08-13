@@ -28,7 +28,7 @@
 -export([start_link/1, start_link/2, on/2, init/1,
          register_for_node_change/1, register_for_node_change/2,
          unregister_from_node_change/1, unregister_from_node_change/2,
-         unregister_all_from_node_change/1]).
+         unregister_all_from_node_change/1, trigger_known_nodes/0]).
 
 % state of the dht_node loop
 -type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
@@ -439,7 +439,7 @@ start_link(InstanceId, Options) ->
                              [{register, InstanceId, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
 
-%% @doc Find existing nodes and initialize the comm_layer.
+%% @doc Find existing nodes and as a side-effect initialize the comm_layer.
 -spec trigger_known_nodes() -> ok.
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
