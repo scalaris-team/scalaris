@@ -89,7 +89,9 @@ process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
 	{failure, timeout} ->
 	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
 	{failure, failed} ->
-	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1)
+	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+	X ->
+	    io:format("~p~n", [X])
     end.
 
 bench() ->
@@ -133,7 +135,7 @@ increment_test() ->
     Key = "i",
     commit = transaction_api:single_write(Key, 0),
 
-    {Time, Value} = timer:tc(bench_increment, bench, []),
+    {Time, Value} = util:tc(bench_increment, bench, []),
     io:format("executed ~p transactions in ~p us: ~p~n", [Value, Time, Value / Time * 1000000]),
     %error_logger:tty(false),
     ok.
