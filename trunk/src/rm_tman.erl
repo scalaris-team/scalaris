@@ -162,15 +162,16 @@ on({cy_cache, NewCache},
     % trigger new cyclon cache request
     cyclon:get_subset_rand_next_interval(RandViewSizeNew),
     MyRndView = get_RndView(RandViewSizeNew, NewCache),
-    trigger_update(Neighborhood, MyRndView,
-                   nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
-                                            get_pred_list_length(),
-                                            get_succ_list_length())),
-    {Neighborhood, RandViewSizeNew, Interval, TriggerState, NewCache, Churn};
+    NewNeighborhood =
+        trigger_update(Neighborhood, MyRndView,
+                       nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
+                                                get_pred_list_length(),
+                                                get_succ_list_length())),
+    {NewNeighborhood, RandViewSizeNew, Interval, TriggerState, NewCache, Churn};
 
 % got shuffle request
 on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
-   {Neighborhood, RandViewSize, _Interval, _TriggerState, Cache, _Churn} = State) ->
+   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
     MyRndView = get_RndView(RandViewSize, Cache),
     MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
     OtherNode = nodelist:node(OtherNeighbors),
@@ -191,20 +192,20 @@ on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
     comm:send_to_group_member(node:pidX(nodelist:node(OtherNeighbors)),
                               ring_maintenance,
                               {rm_buffer_response, NeighborsToSend}),
-    trigger_update(Neighborhood, MyRndView, OtherNeighbors),
-    State;
+    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
+    {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
 
 on({rm_buffer_response, OtherNeighbors},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
     MyRndView = get_RndView(RandViewSize, Cache),
-    trigger_update(Neighborhood, MyRndView, OtherNeighbors),
+    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
     % increase RandViewSize (no error detected):
     NewRandViewSize =
         case RandViewSize < config:read(cyclon_cache_size) of
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    {Neighborhood, NewRandViewSize, Interval, TriggerState, Cache, Churn};
+    {NewNeighborhood, NewRandViewSize, Interval, TriggerState, Cache, Churn};
 
 % we asked another node we wanted to add for its node object -> now add it
 on({get_node_details_response, NodeDetails}, State) ->
@@ -356,10 +357,11 @@ has_churn(OldNeighborhood, NewNeighborhood) ->
     OldNeighborhood =/= NewNeighborhood.
 
 %% @doc Triggers the integration of new nodes from OtherNeighborhood and
-%%      RndView into out Neighborhood by contacting every useful node.
--spec trigger_update(Neighborhood::nodelist:neighborhood(),
+%%      RndView into our Neighborhood by contacting every useful node.
+-spec trigger_update(OldNeighborhood::nodelist:neighborhood(),
                      RndView::[node:node_type()],
-                     OtherNeighborhood::nodelist:neighborhood()) -> ok.
+                     OtherNeighborhood::nodelist:neighborhood())
+        -> NewNeighborhood::nodelist:neighborhood().
 trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     NewNeighborhood1 = nodelist:add_nodes(OldNeighborhood, MyRndView, get_pred_list_length(), get_succ_list_length()),
     NewNeighborhood2 = nodelist:merge(NewNeighborhood1, OtherNeighborhood, get_pred_list_length(), get_succ_list_length()),
@@ -374,7 +376,8 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     % TODO: add a local cache of contacted nodes in order not to contact them again
     [comm:send(node:pidX(Node), {get_node_details, comm:this(), [node]})
         || Node <- NewNodes],
-    ok.
+    % update node ids with information from the other node's neighborhood
+    nodelist:update_ids(OldNeighborhood, nodelist:to_list(OtherNeighborhood)).
 
 %% @doc Adds and removes the given nodes from the rm_tman state.
 %%      Note: Sets the new RandViewSize to 0 if NodesToRemove is not empty and
@@ -382,7 +385,7 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
 %%      occurred or was already determined, min_interval if chosen for the next
 %%      interval, otherwise max_interval. If the successor or predecessor
 %%      changes, the trigger will be called immediately.
--spec update_nodes(State::state(), NodesToAdd::[node:node_type()],
+-spec update_nodes(State::state_init(), NodesToAdd::[node:node_type()],
                    NodesToRemove::[node:node_type() | comm:mypid() | pid()],
                    RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
         -> NewState::state_init().
