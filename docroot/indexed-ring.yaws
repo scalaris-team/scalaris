@@ -37,7 +37,6 @@
 Number of nodes: 
 <erl> 
  out(Arg) ->
-    erlang:put(instance_id, Arg#arg.opaque),
     boot_server:number_of_nodes(),
     receive
         {get_list_length_response,Res} ->
@@ -48,7 +47,6 @@ Number of nodes:
 <p>
 <erl>
 out(A) ->
-    erlang:put(instance_id, A#arg.opaque),
     {ehtml, webhelpers:getRingChart()}.
 </erl>
 </p>
@@ -56,7 +54,6 @@ out(A) ->
 <p>
 <erl>
 out(A) ->
-    erlang:put(instance_id, A#arg.opaque),
     {ehtml, webhelpers:getIndexedRingRendered()}.
 </erl>
 </p>
@@ -66,7 +63,6 @@ Last update:
 <erl>
  
  out(Arg) ->
-        erlang:put(instance_id, Arg#arg.opaque),
 	{Date, {Hour, Minute, Second}} = calendar:local_time(),
     {html, io_lib:format("~w:~w:~w", [Hour, Minute, Second])}.
 </erl>

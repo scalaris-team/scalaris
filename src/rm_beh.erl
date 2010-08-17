@@ -83,7 +83,7 @@ update_dht_node(OldNeighborhood, NewNeighborhood) ->
 %%      (to be used by the rm_*.erl modules).
 -spec update_dht_node(Neighbors::nodelist:neighborhood()) -> ok.
 update_dht_node(Neighbors) ->
-    comm:send_local(process_dictionary:get_group_member(dht_node),
+    comm:send_local(pid_groups:get_my(dht_node),
                     {rm_update_neighbors, Neighbors}).
 
 %% @doc Updates a dht node's id and sends the ring maintenance a message about
@@ -92,5 +92,5 @@ update_dht_node(Neighbors) ->
 %%      predecessor and successor!
 -spec update_id(NewId::?RT:key()) -> ok.
 update_id(NewId) ->
-    comm:send_local(process_dictionary:get_group_member(ring_maintenance),
+    comm:send_local(pid_groups:get_my(ring_maintenance),
                     {update_id, NewId}).

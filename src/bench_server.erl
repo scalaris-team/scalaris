@@ -86,7 +86,7 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
                                                  [comm:send(Server, Message) || Server <- ServerList],
                                                  [receive {done, Time} -> Time end || _Server <- ServerList]
                                          end,
-                                         [], [{procs, process_dictionary:get_all_pids()}]),
+                                         [], [{procs, pid_groups:processes()}]),
                     fprof:profile(),
                     %fprof:analyse(),
                     fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]),

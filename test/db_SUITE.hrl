@@ -67,7 +67,7 @@ spawn_config_processes() ->
     Owner = self(),
     Pid = spawn(fun() ->
                         crypto:start(),
-                        process_dictionary:start_link(),
+                        pid_groups:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                         Owner ! {continue},
                         receive {done} -> ok
@@ -97,7 +97,7 @@ end_per_suite(Config) ->
         false ->
             ok;
         {wrapper_pid, Pid} ->
-            gen_component:kill(process_dictionary),
+            gen_component:kill(pid_groups),
             exit(Pid, kill)
     end,
     ok.
@@ -140,7 +140,6 @@ delete(_Config) ->
     prop_delete(?RT:hash_key("DeleteKey1"), "Value1", false, 1, 1, ?RT:hash_key("DeleteKey2")).
 
 get_load_and_middle(_Config) ->
-    erlang:put(instance_id, "db_SUITE.erl"),
     DB = ?TEST_DB:new(?RT:hash_key(1)),
     ?equals(?TEST_DB:get_load(DB), 0),
     DB2 = ?TEST_DB:write(DB, "Key1", "Value1", 1),

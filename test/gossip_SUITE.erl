@@ -86,7 +86,7 @@ init_per_suite(Config) ->
     Owner = self(),
     Pid = spawn(fun() ->
                         crypto:start(),
-                        process_dictionary:start_link(),
+                        pid_groups:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                         comm_port:start_link(),
                         timer:sleep(1000),
@@ -103,7 +103,7 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     reset_config(),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    gen_component:kill(process_dictionary),
+    gen_component:kill(pid_groups),
     error_logger:tty(false),
     exit(Pid, kill),
     Config.
@@ -126,7 +126,7 @@ test_init(Config) ->
     Config.
 
 test_get_values_best0(Config) ->
-    process_dictionary:register_process("gossip_group", gossip, self()),
+    pid_groups:join_as("gossip_group", gossip),
 
     gossip:get_values_best(),
     ?expect_message({get_values_best, _Pid}),
@@ -134,7 +134,7 @@ test_get_values_best0(Config) ->
     Config.
 
 test_get_values_best1(Config) ->
-    process_dictionary:register_process("gossip_group", gossip, self()),
+    pid_groups:join_as("gossip_group", gossip),
 
     SelfPid = self(),
     gossip:get_values_best(self()),
@@ -143,7 +143,7 @@ test_get_values_best1(Config) ->
     Config.
 
 test_get_values_all0(Config) ->
-    process_dictionary:register_process("gossip_group", gossip, self()),
+    pid_groups:join_as("gossip_group", gossip),
 
     gossip:get_values_all(),
     ?expect_message({get_values_all, _Pid}),
@@ -151,7 +151,7 @@ test_get_values_all0(Config) ->
     Config.
 
 test_get_values_all1(Config) ->
-    process_dictionary:register_process("gossip_group", gossip, self()),
+    pid_groups:join_as("gossip_group", gossip),
 
     SelfPid = self(),
     gossip:get_values_all(self()),
@@ -160,8 +160,8 @@ test_get_values_all1(Config) ->
     Config.
 
 test_on_trigger1(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
-    process_dictionary:register_process("gossip_group", cyclon, self()),
+    pid_groups:join_as("gossip_group", dht_node),
+    pid_groups:join_as("gossip_group", cyclon),
     
     GossipNewValues = gossip_state:new_internal(),
 %%     Self = self(),
@@ -195,8 +195,8 @@ test_on_trigger1(Config) ->
     Config.
 
 test_on_trigger2(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
-    process_dictionary:register_process("gossip_group", cyclon, self()),
+    pid_groups:join_as("gossip_group", dht_node),
+    pid_groups:join_as("gossip_group", cyclon),
     
     GossipNewValues = gossip_state:new_internal(),
 %%     Self = self(),
@@ -230,8 +230,8 @@ test_on_trigger2(Config) ->
     Config.
 
 test_on_trigger3(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
-    process_dictionary:register_process("gossip_group", cyclon, self()),
+    pid_groups:join_as("gossip_group", dht_node),
+    pid_groups:join_as("gossip_group", cyclon),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -266,8 +266,8 @@ test_on_trigger3(Config) ->
     Config.
 
 test_on_trigger4(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
-    process_dictionary:register_process("gossip_group", cyclon, self()),
+    pid_groups:join_as("gossip_group", dht_node),
+    pid_groups:join_as("gossip_group", cyclon),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -302,8 +302,8 @@ test_on_trigger4(Config) ->
     Config.
 
 test_on_trigger5(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
-    process_dictionary:register_process("gossip_group", cyclon, self()),
+    pid_groups:join_as("gossip_group", dht_node),
+    pid_groups:join_as("gossip_group", cyclon),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -338,8 +338,8 @@ test_on_trigger5(Config) ->
     Config.
 
 test_on_trigger6(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
-    process_dictionary:register_process("gossip_group", cyclon, self()),
+    pid_groups:join_as("gossip_group", dht_node),
+    pid_groups:join_as("gossip_group", cyclon),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -374,8 +374,8 @@ test_on_trigger6(Config) ->
     Config.
 
 test_on_trigger7(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
-    process_dictionary:register_process("gossip_group", cyclon, self()),
+    pid_groups:join_as("gossip_group", dht_node),
+    pid_groups:join_as("gossip_group", cyclon),
     
     GossipNewValues = gossip_state:new_internal(),
     Self = self(),
@@ -627,7 +627,7 @@ test_on_get_node_details_response_local_info7(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round1(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -650,7 +650,7 @@ test_on_get_node_details_response_leader_start_new_round1(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round2(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -674,7 +674,7 @@ test_on_get_node_details_response_leader_start_new_round2(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round3(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -698,7 +698,7 @@ test_on_get_node_details_response_leader_start_new_round3(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round4(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -730,7 +730,7 @@ test_on_get_node_details_response_leader_start_new_round4(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round5(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -762,7 +762,7 @@ test_on_get_node_details_response_leader_start_new_round5(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round6(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -794,7 +794,7 @@ test_on_get_node_details_response_leader_start_new_round6(Config) ->
     Config.
 
 test_on_get_node_details_response_leader_start_new_round7(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     
     GossipNewValues = gossip_state:new_internal(),
     
@@ -855,7 +855,7 @@ test_on_cy_cache1(Config) ->
     Config.
 
 test_on_cy_cache2(Config) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
 
     GossipNewValues = gossip_state:new_internal(),
     
@@ -878,10 +878,9 @@ test_on_cy_cache2(Config) ->
     Config.
 
 test_on_cy_cache3(Config) ->
-    erlang:put(instance_id, "gossip_group"),
     % register some other process as the dht_node
     DHT_Node = fake_dht_node(),
-%%     ?equals(process_dictionary:get_group_member(dht_node), DHT_Node),
+%%     ?equals(pid_groups:get_my(dht_node), DHT_Node),
 
     GossipNewValues = gossip_state:new_internal(),
     
@@ -1238,7 +1237,7 @@ fake_dht_node() ->
     end.
 
 fake_dht_node_start(Supervisor) ->
-    process_dictionary:register_process("gossip_group", dht_node, self()),
+    pid_groups:join_as("gossip_group", dht_node),
     Supervisor ! {started, self()},
     fake_process().
 

@@ -53,9 +53,9 @@ get_id() ->
 
 %% @doc Starts the idholder process, registers it with the process dictionary
 %%      and returns its pid for use by a supervisor.
--spec start_link(instanceid(), list(tuple())) -> {ok, pid()}.
-start_link(InstanceId, Options) ->
-    gen_component:start_link(?MODULE, Options, [{register, InstanceId, idholder}]).
+-spec start_link(pid_groups:groupname(), list(tuple())) -> {ok, pid()}.
+start_link(DHTNodeGroup, Options) ->
+    gen_component:start_link(?MODULE, Options, [{pid_groups_join_as, DHTNodeGroup, idholder}]).
 
 %% @doc Resets the key to a random key and a counter of 0.
 %%      Warning: This effectively states that a newly created DHT node is
@@ -92,4 +92,4 @@ on({set_id, NewId, NewIdVersion}, _State) ->
 %%      process.
 -spec get_pid() -> pid() | failed.
 get_pid() ->
-    process_dictionary:get_group_member(idholder).
+    pid_groups:get_my(idholder).

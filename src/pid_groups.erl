@@ -1,0 +1,344 @@
+% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @author Florian Schintke <schintke@zib.de>
+%% @doc Process groups.
+%%
+%%      This module provides a mechanism to implement process
+%%      groups. Within a process group, the names of processes have to
+%%      be unique, but the same name can be used in different
+%%      groups. The motivation for this module was to run several
+%%      scalaris nodes in one erlang vm for debugging. But for the
+%%      processes forming a scalaris node being able to talk to each
+%%      other, they have to now their names (dht_node, config,
+%%      etc.). This module allows the processes to keep their names.
+%%
+%%      When a new process group is created, a unique "groupname" is
+%%      created, which has to be shared by all nodes in this group.
+%% @end
+%% @version $Id$
+-module(pid_groups).
+-author('schuett@zib.de').
+-author('schintke@zib.de').
+-vsn('$Id$').
+
+-behaviour(gen_component).
+
+-include("scalaris.hrl").
+
+-export([start_link/0]).
+
+%% gen_server callbacks
+-export([init/1,on/2]).
+
+%% group creation
+-export([new/0,     %% () -> GrpName
+         new/1]).   %% (PrefixAtom) -> GrpName
+
+%% group membership management
+-export([join/1,          %% (GrpName) -> ok               deprecated
+         join_as/2,       %% (GrpName, PidName) -> ok
+         add/3]).         %% (GrpName, PidName, Pid) -> ok
+
+%% operations inside a group (PRE: caller is group member):
+-export([my_groupname/0,  %% () -> GrpName
+         my_pidname/0,    %% () -> PidName
+         get_my/1,        %% (PidName) -> Pid
+         my_members/0,    %% () -> [Pids]
+         my_tab2list/0]). %% () -> [{GrpName, PidName, Pid}]
+
+%% get information on groups for non-members
+-export([pid_of/2,            %% (GrpName, PidName) -> Pid
+         group_and_name_of/1, %% (Pid) -> {GrpName, PidName}
+         group_of/1,          %% (Pid) -> GrpName
+         group_with/1,        %% (PidName) -> GrpName
+         groups_with/1,       %% (PidName) -> [GrpName]
+
+         find_a/1,            %% (PidName) -> Pid
+         find_all/1,          %% (PidName) -> [Pid]
+
+         members/1,           %% (GrpName) -> [Pids]
+         members_by_name/1]). %% (GrpName) -> [pidname()]
+
+%% global information
+-export([processes/0,     %% () -> [Pid]    %% for fprof
+         groups/0,        %% () -> [GrpName]
+         tab2list/0]).    %% () -> [{GrpName, PidName, Pid}]
+
+%% for the monitoring in the web interface
+-export([get_web_debug_info/2,    %% (Group, PidName) -> any()
+        groups_as_json/0,
+        members_by_name_as_json/1]).
+
+-ifdef(with_export_type_support).
+-export_type([pidname/0]).
+-export_type([groupname/0]).
+-endif.
+
+-type(pidname() :: atom()).
+-type(groupname() :: nonempty_string()).
+
+-type(message() ::
+    {pid_groups_add, groupname(), pidname(), pid()} |
+    {drop_state} |
+    {'EXIT', pid(), Reason::any()}).
+
+%%% group creation
+%% @doc create a new group with a random name.
+-spec new() -> groupname().
+new() ->
+    randoms:getRandomId().
+
+%% @doc create a new group with a given prefix.
+-spec new(string()) -> groupname().
+new(Prefix) ->
+    Prefix ++ new().
+
+%%% group membership management
+%% @doc Current process joins the group GrpName, but has no process name.
+%%
+%% DEPRECATED! client processes should not join groups.  Other
+%% processes should have a unique role name and join via join_as or
+%% add.
+-spec join(groupname()) -> ok.
+join(GrpName) ->
+    %% @todo eliminate this function
+    erlang:put('$@groupname', GrpName), ok.
+
+%% @doc Current process joins the group GrpName with process name Pidname.
+-spec join_as(groupname(), pidname()) -> ok.
+join_as(GrpName, PidName) ->
+    erlang:put('$@groupname', GrpName), %% for my_groupname()
+    erlang:put('$@pidname', PidName),   %% for my_pidname()
+    add(GrpName, PidName, self()).
+
+%% @doc Third party register: add a pid with a given pidname (role) to a group.
+-spec add(groupname(), pidname(), pid()) -> ok.
+add(GrpName, PidName, Pid) ->
+    comm:send_local(pid_groups_manager(),
+                    {pid_groups_add, GrpName, PidName, Pid, self()}),
+    receive {pid_groups_add_done} -> ok end.
+
+
+%%% operations inside a group (PRE_COND: caller is group member):
+-spec my_groupname() -> groupname() | undefined.
+my_groupname() -> erlang:get('$@groupname').
+
+-spec my_pidname() -> pidname().
+my_pidname() -> erlang:get('$@pidname').
+
+%% @doc Gets the Pid of the current process' group member with the given name.
+-spec get_my(pidname()) -> pid() | failed.
+get_my(PidName) ->
+    case my_groupname() of
+        undefined -> failed;
+        GrpName   -> pid_of(GrpName, PidName)
+    end.
+
+-spec my_members() -> [pid()].
+my_members() -> members(my_groupname()).
+
+-spec my_tab2list() -> [{{groupname(), pidname()}, pid()}].
+my_tab2list() ->
+    GrpName = my_groupname(),
+    [ X || X <- tab2list(), GrpName =:= element(1, element(1, X)) ].
+
+%% get information on groups for non-members
+
+%% @doc lookup a pid via its group name and pid name.
+-spec pid_of(groupname(), pidname()) -> pid() | failed.
+pid_of(GrpName, PidName) ->
+    case ets:lookup(?MODULE, {GrpName, PidName}) of
+        [{{GrpName, PidName}, Pid}] -> Pid;
+        []                          -> failed
+    end.
+
+%% @doc lookup group and pid name of a process via its pid.
+-spec group_and_name_of(pid()) -> {groupname(), pidname()} | failed.
+group_and_name_of(Pid) ->
+    case ets:match(?MODULE, {'$1',Pid}) of
+        [[{GrpName, PidName}]] -> {GrpName, PidName};
+        []                -> failed
+    end.
+
+-spec group_of(pid()) -> groupname().
+group_of(Pid) -> element(1, group_and_name_of(Pid)).
+
+%% @doc find a process group with a given process name inside
+-spec group_with(pidname()) -> groupname() | failed.
+group_with(PidName) ->
+    case ets:match(?MODULE, {{'$1', PidName}, '_'}) of
+        [[GrpName] | _] -> GrpName;
+        []            -> failed
+    end.
+
+%% @doc find all process groups with a given process name inside
+-spec groups_with(pidname()) -> [groupname()].
+groups_with(PidName) ->
+    case ets:match(?MODULE, {{'$1', PidName}, '_'}) of
+        []   -> failed;
+        Groups -> lists:append(Groups)
+    end.
+
+-spec find_a(pidname()) -> pid() | failed.
+find_a(PidName) ->
+    case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
+        [[Pid] | _] -> Pid;
+        []          -> failed
+    end.
+
+-spec find_all(pidname()) -> [pid()].
+find_all(PidName) ->
+    PidList = ets:match(?MODULE, {{'_', PidName}, '$1'}),
+    lists:flatten(PidList).
+
+-spec members(groupname()) -> [pid()].
+members(GrpName) ->
+    PidList = ets:match(?MODULE, {{GrpName, '_'}, '$1'}),
+    lists:flatten(PidList).
+
+-spec members_by_name(groupname()) -> [pidname()].
+members_by_name(GrpName) ->
+    PidNameList = ets:match(?MODULE, {{GrpName, '$1'}, '_'}),
+    lists:sort(lists:flatten(PidNameList)).
+
+%% global information
+-spec processes() -> [pid()]. %% for fprof for example
+processes() ->
+    %% alternative implementation, when each pid is only in one group:
+    %% [X || [X]<- ets:match(?MODULE, {'_','$1'})].
+    lists:usort([element(2, X) || X <- tab2list()]).
+
+-spec groups() -> [groupname()].
+groups() ->
+    lists:usort([element(1, element(1,X)) || X <- tab2list()]).
+
+-spec tab2list() -> [{{groupname(), pidname()}, pid()}].
+tab2list() -> ets:tab2list(?MODULE).
+
+
+%% for the monitoring in the web interface
+%% @doc get info about a process
+-spec get_web_debug_info(groupname(), nonempty_string()) ->
+   {struct, [{pairs, {array, {struct, [{key | value, nonempty_string()}]}}}]}.
+get_web_debug_info(GrpName, PidNameString) ->
+    KVs =
+        case pid_of(GrpName, list_to_atom(PidNameString)) of
+            failed -> [{"process", "unknown"}];
+            Pid ->
+                comm:send_local(Pid , {web_debug_info, self()}),
+                GenCompInfo =
+                    receive
+                        {web_debug_info_reply, LocalKVs} -> LocalKVs
+                    after 1000 -> []
+                    end,
+
+                [{_, Memory}, {_, Reductions}, {_, QueueLen}] =
+                    process_info(Pid, [memory, reductions, message_queue_len]),
+
+                [{"memory", Memory},
+                 {"reductions", Reductions},
+                 {"message_queue_len", QueueLen}
+                 | GenCompInfo]
+        end,
+    JsonKVs = [ {struct, [{key, K}, {value, toString(V)}]} || {K, V} <- KVs],
+    {struct, [{pairs, {array, JsonKVs}}]}.
+
+%% for web interface
+-spec groups_as_json() ->
+   {array, [{struct, [{id | text, nonempty_string()} | {leaf, false}]}]}.
+groups_as_json() ->
+    GroupList = groups(),
+    GroupListAsStructs =
+        [ {struct, [{id, El}, {text, El}, {leaf, false}]} || El <- GroupList ],
+    {array, GroupListAsStructs}.
+
+%% @doc find processes in a group (for web interface)
+-spec members_by_name_as_json(groupname()) ->
+   {array, [{struct, [{id | text, nonempty_string()} | {leaf, true}]}]}.
+members_by_name_as_json(GrpName) ->
+    PidList = members_by_name(GrpName),
+    PidListAsJson =
+        [ {struct, [{id, toString(GrpName) ++ "." ++ toString(El)},
+                    {text, toString(El)}, {leaf, true}]}
+          || El <- PidList ],
+    {array, PidListAsJson}.
+
+
+%%
+%% pid_groups manager process (gen_component)
+%%
+
+%% @doc Starts the server
+-spec start_link() -> {ok, pid()}.
+start_link() ->
+    gen_component:start_link(?MODULE, [], [{erlang_register, ?MODULE}]).
+
+%% @doc Initiates the server
+%% @private
+-spec init([]) -> null.
+init(_Args) ->
+%%  ets:new(call_counter, [set, public, named_table]),
+%%  ets:insert(call_counter, {lookup_pointer, 0}),
+    ets:new(?MODULE, [set, protected, named_table]),
+    %% required to gracefully eliminate dead, but registered processes
+    %% from the ets-table
+    process_flag(trap_exit, true),
+    _State = null.
+
+%% @doc Handling call messages
+%% @private
+-spec on(message(), null) -> null.
+on({pid_groups_add, GrpName, PidName, Pid, ReplyTo}, State) ->
+    case ets:insert_new(?MODULE, {{GrpName, PidName}, Pid}) of
+        true -> ok;
+        false ->
+            OldPid = ets:lookup_element(?MODULE, {GrpName, PidName}, 2),
+            unlink(OldPid),
+            ets:insert(?MODULE, {{GrpName, PidName}, Pid})
+    end,
+    link(Pid),
+    comm:send_local(ReplyTo, {pid_groups_add_done}),
+    State;
+
+on({drop_state}, State) ->
+    % only for unit tests
+    Links = ets:match(?MODULE, {'_', '$1'}),
+    [unlink(Pid) || [Pid] <- Links],
+    ets:delete_all_objects(?MODULE),
+    State;
+
+on({'EXIT', FromPid, _Reason}, State) ->
+    Processes = ets:match(?MODULE, {'$1', FromPid}),
+    [ets:delete(?MODULE, {InstanceId, Name}) || [{InstanceId, Name}] <- Processes],
+    State.
+
+
+%% Internal functions
+-spec toString(atom() | nonempty_string()) -> nonempty_string().
+toString(X) when is_atom(X) -> atom_to_list(X);
+toString(X)                 -> X.
+
+%% @doc Returns the pid of the pid_groups manager process (a gen_component).
+-spec pid_groups_manager() -> pid() | failed.
+pid_groups_manager() ->
+    case whereis(?MODULE) of
+        undefined ->
+            log:log(error, "[ PG ] no pid_groups gen_component process found"),
+            failed;
+        PID ->
+            %log:log(info, "[ PG ] pid_groups gen_component process found"),
+            PID
+    end.

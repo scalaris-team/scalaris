@@ -33,13 +33,11 @@
 -define(TRACE(_X,_Y), ok).
 -behaviour(gen_component).
 
--include("scalaris.hrl").
-
 %% public interface for transaction validation using Paxos-Commit.
 -export([send_local/3]).
 
 %% functions for gen_component module and supervisor callbacks
--export([start_link/1, start_link/2]).
+-export([start_link/1]).
 -export([on/2, init/1]).
 
 % accepted messages of the msg_delay process
@@ -52,27 +50,24 @@
 
 -spec send_local(Seconds::number(), Dest::comm:erl_local_pid(), Msg::comm:message()) -> ok.
 send_local(Seconds, Dest, Msg) ->
-    Delayer = process_dictionary:get_group_member(msg_delay),
+    Delayer = pid_groups:find_a(msg_delay),
     comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
 
 %% be startable via supervisor, use gen_component
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
-    start_link(InstanceId, []).
-
--spec start_link(instanceid(), [any()]) -> {ok, pid()}.
-start_link(InstanceId, Options) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE,
-                             [InstanceId, Options],
-                             [{register, InstanceId, msg_delay}]).
+                             [], % parameters passed to init
+                             [{pid_groups_join_as, DHTNodeGroup, msg_delay}]).
 
 %% initialize: return initial state.
--spec init([instanceid() | [any()]]) -> state().
-init([InstanceID, _Options]) ->
-    ?TRACE("msg_delay:init ~p~n", [InstanceID]),
+-spec init([]) -> state().
+init([]) ->
+    MyGroup = pid_groups:my_groupname(),
+    ?TRACE("msg_delay:init for pid group ~p~n", [MyGroup]),
     TableName =
         list_to_atom(lists:flatten(
-                       io_lib:format("~p_msg_delay", [InstanceID]))),
+                       io_lib:format("~p_msg_delay", [MyGroup]))),
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
     pdb:new(TableName, [set, protected, named_table]),

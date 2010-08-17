@@ -66,7 +66,7 @@ new(RT, Neighbors, DB) ->
                                 },
            db = DB,
            tx_tp_db = tx_tp:init(),
-           proposer = process_dictionary:get_group_member(paxos_proposer)
+           proposer = pid_groups:get_my(paxos_proposer)
           }.
 %% userdevguide-end dht_node_state:state
 

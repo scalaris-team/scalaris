@@ -22,6 +22,8 @@
 -export([tracer/1, start/0, dump/0,
          tracer_perf/1, start_perf/0, dump_perf/0]).
 
+-include("scalaris.hrl").
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % 1. put tracer:start() and/or tracer:start_perf() into boot.erl before application:start(boot_cs)

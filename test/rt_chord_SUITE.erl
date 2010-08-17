@@ -39,7 +39,7 @@ init_per_suite(Config) ->
     Owner = self(),
     Pid = spawn(fun () ->
                         crypto:start(),
-                        process_dictionary:start_link(),
+                        pid_groups:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                         comm_port:start_link(),
                         timer:sleep(1000),
@@ -57,13 +57,12 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    gen_component:kill(process_dictionary),
+    gen_component:kill(pid_groups),
     error_logger:tty(false),
     exit(Pid, kill),
     Config.
 
 next_hop(_Config) ->
-    erlang:put(instance_id, "rt_chord_SUITE_group"),
     MyNode = node:new(fake_dht_node(), 0, 0),
     Succ = node:new(fake_dht_node(), 1, 0),
     Pred = node:new(fake_dht_node(), 1000000, 0),
@@ -75,7 +74,7 @@ next_hop(_Config) ->
                                 {16, node:new(lists:nth(4, DHTNodes), 16, 0)},
                                 {32, node:new(lists:nth(5, DHTNodes), 32, 0)},
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
-    % note: dht_node_state:new/3 will call process_dictionary:get_group_member(paxos_proposer)
+    % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
     State = dht_node_state:new(RT, nodelist:new_neighborhood(Pred, MyNode, Succ), ?DB:new(node:id(MyNode))),
     config:write(rt_size_use_neighbors, 0),
@@ -97,7 +96,6 @@ next_hop(_Config) ->
     ok.
 
 next_hop2(_Config) ->
-    erlang:put(instance_id, "rt_chord_SUITE_group"),
     MyNode = node:new(fake_dht_node(), 0, 0),
     Succ = node:new(fake_dht_node(), 1, 0),
     SuccSucc = node:new(fake_dht_node(), 2, 0),
@@ -109,7 +107,7 @@ next_hop2(_Config) ->
                                 {16, node:new(lists:nth(4, DHTNodes), 16, 0)},
                                 {32, node:new(lists:nth(5, DHTNodes), 32, 0)},
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
-    % note: dht_node_state:new/3 will call process_dictionary:get_group_member(paxos_proposer)
+    % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
     Neighbors = nodelist:add_node(nodelist:new_neighborhood(Pred, MyNode, Succ),
                                   SuccSucc, 2, 2),
@@ -125,7 +123,7 @@ next_hop2(_Config) ->
     ?equals(rt_chord:next_hop(State, 64), lists:nth(5, DHTNodes)),
     ?equals(rt_chord:next_hop(State, 65), lists:nth(6, DHTNodes)),
     ?equals(rt_chord:next_hop(State, 1000), lists:nth(6, DHTNodes)),
-    
+
     [exit(Node, kill) || Node <- DHTNodes],
     exit(node:pidX(MyNode), kill),
     exit(node:pidX(Succ), kill),
@@ -142,7 +140,7 @@ fake_dht_node() ->
     end.
 
 fake_dht_node_start(Supervisor) ->
-%%     process_dictionary:register_process("rt_chord_SUITE_group", dht_node, self()),
+    %% pid_groups:join_as("rt_chord_SUITE_group", dht_node),
     Supervisor ! {started, self()},
     fake_process().
 

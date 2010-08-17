@@ -56,10 +56,10 @@
 
 %% @doc Starts a chord-like ring maintenance process, registers it with the
 %%      process dictionary and returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     Trigger = config:read(ringmaintenance_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, ring_maintenance}]).
+    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, ring_maintenance}]).
 
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState::trigger:state()}.
@@ -183,10 +183,11 @@ on({update_id, NewId}, {Neighborhood, TriggerState} = State) ->
             State
     end;
 
-on({'$gen_cast', {debug_info, Requestor}}, {Neighborhood, _TriggerState} = State)  ->
+on({web_debug_info, Requestor}, {Neighborhood, _TriggerState} = State)  ->
     comm:send_local(Requestor,
-                    {debug_info_response,
-                     [{"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
+                    {web_debug_info_reply,
+                     [{"algorithm", lists:flatten(io_lib:format("~p", [?MODULE]))},
+                      {"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
                       {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},
                       {"succs", lists:flatten(io_lib:format("~p", [nodelist:succs(Neighborhood)]))}]}),
     State.
@@ -197,7 +198,7 @@ on({'$gen_cast', {debug_info, Requestor}}, {Neighborhood, _TriggerState} = State
 %%      Note: only call this method from inside the dht_node process!
 -spec leave() -> ok.
 leave() ->
-    comm:send_local(process_dictionary:get_group_member(ring_maintenance),
+    comm:send_local(pid_groups:get_my(ring_maintenance),
                     {leave, self()}).
 
 %% @doc Checks whether config parameters of the rm_chord process exist and are
@@ -220,7 +221,7 @@ check_config() ->
 
 %% @doc get Pid of assigned dht_node
 -spec get_cs_pid() -> pid().
-get_cs_pid() -> process_dictionary:get_group_member(dht_node).
+get_cs_pid() -> pid_groups:get_my(dht_node).
 
 %% @doc the length of the successor list
 -spec predListLength() -> pos_integer().

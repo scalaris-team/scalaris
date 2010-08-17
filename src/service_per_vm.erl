@@ -23,7 +23,7 @@
 
 -export([dump_node_states/0, kill_nodes/1, get_round_trip/2]).
 
--export([start_link/0, init/1, on/2]).
+-export([start_link/1, init/1, on/2]).
 
 % state of the module
 -type(state() :: ok).
@@ -38,7 +38,7 @@
 -spec dump_node_states() -> [term()].
 dump_node_states() ->
     [gen_component:get_state(Pid)
-     || Pid <- process_dictionary:find_all_dht_nodes()].
+     || Pid <- pid_groups:find_all(dht_node)].
 
 -spec kill_nodes(No::non_neg_integer()) -> ok.
 kill_nodes(No) ->
@@ -51,9 +51,11 @@ kill_nodes(No) ->
 % Server process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_link() -> {ok, pid()}.
-start_link() ->
-    gen_component:start_link(?MODULE, [], [{register_native, service_per_vm}]).
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(ServiceGroup) ->
+    gen_component:start_link(?MODULE, [],
+                             [{erlang_register, service_per_vm},
+                              {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
 -spec init(any()) -> state().
 init(_Arg) ->
@@ -72,7 +74,7 @@ on({get_dht_nodes, Pid}, ok) ->
 
 -spec get_live_dht_nodes() -> [comm:mypid()].
 get_live_dht_nodes() ->
-    [comm:make_global(Pid) || Pid <- process_dictionary:find_all_dht_nodes(), element(1, gen_component:get_state(Pid)) =:= state].
+    [comm:make_global(Pid) || Pid <- pid_groups:find_all(dht_node), element(1, gen_component:get_state(Pid)) =:= state].
 
 -spec get_round_trip(GPid::comm:mypid(), Iterations::pos_integer()) -> float().
 get_round_trip(GPid, Iterations) ->

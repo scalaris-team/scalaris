@@ -52,7 +52,3 @@
 -type gb_tree() :: gb_trees:gb_tree().
 -type dict() :: dict:dictionary().
 -endif.
-
-%% some custom types:
-
--type instanceid() :: nonempty_string().

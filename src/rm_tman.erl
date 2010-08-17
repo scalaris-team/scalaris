@@ -69,10 +69,10 @@
 
 %% @doc Starts a chord-like ring maintenance process, registers it with the
 %%      process dictionary and returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     Trigger = config:read(ringmaintenance_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, ring_maintenance}]).
+    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, ring_maintenance}]).
 
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState::trigger:state()}.
@@ -279,11 +279,12 @@ on({update_id, NewId},
     rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
     {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
 
-on({'$gen_cast', {debug_info, Requestor}},
+on({web_debug_info, Requestor},
    {Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
     comm:send_local(Requestor,
-                    {debug_info_response,
-                     [{"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
+                    {web_debug_info_reply,
+                     [{"algorithm", lists:flatten(io_lib:format("~p", [?MODULE]))},
+                      {"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
                       {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},
                       {"succs", lists:flatten(io_lib:format("~p", [nodelist:succs(Neighborhood)]))}]}),
     State.
@@ -294,7 +295,7 @@ on({'$gen_cast', {debug_info, Requestor}},
 %%      Note: only call this method from inside the dht_node process!
 -spec leave() -> ok.
 leave() ->
-    comm:send_local(process_dictionary:get_group_member(ring_maintenance),
+    comm:send_local(pid_groups:get_my(ring_maintenance),
                     {leave, self()}).
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
@@ -425,11 +426,11 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
     {NewNeighborhood, NewRandViewSize, NewInterval, NewTriggerState, NewCache, NewChurn}.
 
 -spec get_pid_dnc() -> pid() | failed.
-get_pid_dnc() -> process_dictionary:get_group_member(dn_cache).
+get_pid_dnc() -> pid_groups:get_my(dn_cache).
 
 % get Pid of assigned dht_node
 -spec get_cs_pid() -> pid() | failed.
-get_cs_pid() -> process_dictionary:get_group_member(dht_node).
+get_cs_pid() -> pid_groups:get_my(dht_node).
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() -> config:read(stabilization_interval_base).

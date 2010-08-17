@@ -71,7 +71,7 @@ work_phase(ClientPid, ReqId, Request) ->
     %% PRE: No entry for key in TLog
     %% find rdht_tx_read process as collector
 
-    CollectorPid = process_dictionary:get_group_member(?MODULE),
+    CollectorPid = pid_groups:find_a(?MODULE),
     Key = element(2, Request),
     %% inform CollectorPid on whom to inform after quorum reached
     comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
@@ -143,20 +143,21 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
 
 
 %% be startable via supervisor, use gen_component
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE,
-                             [InstanceId],
-                             [{register, InstanceId, ?MODULE}]).
+                             [],
+                             [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
 %% initialize: return initial state.
--spec init([instanceid()]) -> any().
-init([InstanceID]) ->
-    ?TRACE("rdht_tx_read: Starting rdht_tx_read for instance: ~p~n", [InstanceID]),
+-spec init([]) -> any().
+init([]) ->
+    DHTNodeGroup = pid_groups:my_groupname(),
+    ?TRACE("rdht_tx_read: Starting rdht_tx_read for DHT node: ~p~n", [DHTNodeGroup]),
     %% For easier debugging, use a named table (generates an atom)
     Table =
         list_to_atom(lists:flatten(
-                       io_lib:format("~p_rdht_tx_read", [InstanceID]))),
+                       io_lib:format("~p_rdht_tx_read", [DHTNodeGroup]))),
     pdb:new(Table, [set, private, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     %% Table = ets:new(?MODULE, [set, private]),

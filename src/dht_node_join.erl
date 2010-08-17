@@ -186,4 +186,4 @@ process_join_msg(Msg, {join, Details, QueuedMessages}) ->
 
 -spec get_local_dht_node_reregister_pid() -> pid().
 get_local_dht_node_reregister_pid() ->
-    process_dictionary:get_group_member(dht_node_reregister).
+    pid_groups:get_my(dht_node_reregister).

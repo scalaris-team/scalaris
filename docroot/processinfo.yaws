@@ -13,6 +13,6 @@ out(A) ->
        		{pre, [], 
         	""}};
 	true ->
-	      {html, json:encode(process_dictionary:get_info(Group, Id))}
+	      {html, json:encode(pid_groups:get_web_debug_info(Group, Id))}
      end.
 </erl>

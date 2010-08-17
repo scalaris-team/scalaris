@@ -40,7 +40,7 @@
 
 -type(entry() :: {Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
                   ReadLock::non_neg_integer(), Version::?DB:version()} |
-                 {Key::?RT:key(), empt_val, false, 0, -1}).
+                 {Key::?RT:key(), empty_val, false, 0, -1}).
 
 -spec new(Key::?RT:key()) -> {?RT:key(), empty_val, false, 0, -1}.
 new(Key) -> {Key, empty_val, false, 0, -1}.
@@ -68,13 +68,13 @@ set_writelock(DBEntry, WriteLock) -> setelement(3, DBEntry, WriteLock).
 -spec set_writelock(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::true,
      ReadLock::non_neg_integer(), Version::?DB:version()} |
-    {Key::?RT:key(), empt_val, true, 0, -1}.
+    {Key::?RT:key(), empty_val, true, 0, -1}.
 set_writelock(DBEntry) -> set_writelock(DBEntry, true).
 
 -spec unset_writelock(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
      ReadLock::non_neg_integer(), Version::?DB:version()} |
-    {Key::?RT:key(), empt_val, false, 0, -1}.
+    {Key::?RT:key(), empty_val, false, 0, -1}.
 unset_writelock(DBEntry) -> set_writelock(DBEntry, false).
 
 -spec get_readlock(DBEntry::entry()) -> ReadLock::non_neg_integer().
@@ -105,14 +105,14 @@ set_version(DBEntry, Version) ->   setelement(5, DBEntry, Version).
 -spec reset_locks(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
      ReadLock::0, Version::?DB:version()} |
-    {Key::?RT:key(), empt_val, false, 0, -1}.
+    {Key::?RT:key(), empty_val, false, 0, -1}.
 reset_locks(DBEntry) ->
     TmpEntry = set_readlock(DBEntry, 0),
     set_writelock(TmpEntry, false).
 
 -spec is_empty({Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
                 ReadLock::non_neg_integer(), Version::?DB:version()}) -> false;
-              ({Key::?RT:key(), empt_val, WriteLock::boolean(),
+              ({Key::?RT:key(), empty_val, WriteLock::boolean(),
                 ReadLock::non_neg_integer(), Version::?DB:version() | -1}) -> true.
 is_empty({_Key, empty_val, _WriteLock, _ReadLock, _Version}) ->
     true;

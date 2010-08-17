@@ -134,7 +134,7 @@ get_values_best() ->
 %%      msg_get_values_best_response/2
 -spec get_values_best(comm:erl_local_pid()) -> ok.
 get_values_best(Pid) ->
-    GossipPid = process_dictionary:get_group_member(gossip),
+    GossipPid = pid_groups:get_my(gossip),
     comm:send_local(GossipPid, {get_values_best, Pid}).
 
 %% @doc Sends a (local) message to the gossip process of the requesting
@@ -151,7 +151,7 @@ get_values_all() ->
 %%      msg_get_values_all_response/4
 -spec get_values_all(comm:erl_local_pid()) -> ok.
 get_values_all(Pid) ->
-    GossipPid = process_dictionary:get_group_member(gossip),
+    GossipPid = pid_groups:get_my(gossip),
     comm:send_local(GossipPid, {get_values_all, Pid}).
 
 %% @doc Returns the previous state if the current state has not sufficiently
@@ -173,10 +173,10 @@ previous_or_current(PreviousState, CurrentState) ->
 
 %% @doc Starts the gossip process, registers it with the process dictionary and
 %%      returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     Trigger = config:read(gossip_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, gossip}]).
+    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> full_state().
@@ -336,7 +336,7 @@ on({get_values_all, SourcePid},
 % Web interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({'$gen_cast', {debug_info, Requestor}},
+on({web_debug_info, Requestor},
    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
     BestValues = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
     KeyValueList =
@@ -369,7 +369,7 @@ on({'$gen_cast', {debug_info, Requestor}},
          {"best_size",            gossip_state:get(BestValues, size)},
          {"best_size_ldr",        gossip_state:get(BestValues, size_ldr)},
          {"best_size_kr",         gossip_state:get(BestValues, size_kr)}],
-    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     FullState.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -615,7 +615,7 @@ request_new_round_if_leader(State) ->
              (TriggerCount > get_max_tpr()) orelse
              (ConvAvgCount >= ConvAvgCountNewRound))) of
         true ->
-            DHT_Node = process_dictionary:get_group_member(dht_node),
+            DHT_Node = pid_groups:get_my(dht_node),
             comm:send_local(DHT_Node, {get_node_details, comm:this_with_cookie(leader_start_new_round), [my_range]}),
             ok;
         false ->
@@ -629,7 +629,7 @@ request_new_round_if_leader(State) ->
 -spec request_local_info() -> ok.
 request_local_info() ->
     % ask for local load and key range:
-    DHT_Node = process_dictionary:get_group_member(dht_node),
+    DHT_Node = pid_groups:get_my(dht_node),
     comm:send_local(DHT_Node, {get_node_details,
                                comm:this_with_cookie(local_info),
                                [pred, node, load]}).

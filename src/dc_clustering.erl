@@ -25,7 +25,6 @@
 -vsn('$Id$').
 
 -behaviour(gen_component).
-
 -include("scalaris.hrl").
 
 -export([start_link/1]).
@@ -58,13 +57,13 @@
 
 %% @doc Starts the dc_clustering process, registers it with the process
 %%      dictionary and returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()} | ignore.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()} | ignore.
+start_link(DHTNodeGroup) ->
     case config:read(dc_clustering_enable) of
         true ->
             ResetTrigger = config:read(dc_clustering_reset_trigger),
             ClusterTrigger = config:read(dc_clustering_cluster_trigger),
-            gen_component:start_link(?MODULE, {ResetTrigger, ClusterTrigger}, [{register, InstanceId, dc_clustering}]);
+            gen_component:start_link(?MODULE, {ResetTrigger, ClusterTrigger}, [{pid_groups_join_as, DHTNodeGroup, dc_clustering}]);
         false ->
             ignore
     end.

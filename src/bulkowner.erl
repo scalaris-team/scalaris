@@ -29,7 +29,7 @@
 %%      given interval.
 -spec issue_bulk_owner(I::intervals:interval(), Msg::comm:message()) -> ok.
 issue_bulk_owner(I, Msg) ->
-    {ok, DHTNode} = process_dictionary:find_dht_node(),
+    DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode , {start_bulk_owner, I, Msg}).
 
 %% @doc main routine. It spans a broadcast tree over the nodes in I

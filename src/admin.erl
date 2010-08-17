@@ -82,7 +82,6 @@ del_single_node([{Key, _, _, _} | T]) ->
 %% @doc Contact boot server and check ring.
 -spec check_ring() -> {error, string()} | ok.
 check_ring() ->
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     Nodes = statistics:get_ring_details(),
     case lists:foldl(fun check_ring_foldl/2, first, Nodes) of
         {error, Reason} -> {error, Reason};
@@ -276,6 +275,6 @@ dd_check_ring() ->
 
 -spec dd_check_ring(non_neg_integer()) -> {token_on_the_way}.
 dd_check_ring(Token) ->
-    {ok, One} = process_dictionary:find_dht_node(),
+    One = pid_groups:find_a(dht_node),
     comm:send_local(One, {send_to_group_member, ring_maintenance, {init_check_ring, Token}}),
     {token_on_the_way}.

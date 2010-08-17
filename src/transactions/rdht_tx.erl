@@ -194,12 +194,11 @@ commit(TLog) ->
     %% number of retries, etc?
     %% some parameters are checked via the individual operations
     %% rdht_tx_read, rdht_tx_write which implement the behaviour tx_op_beh.
-    InstanceID = erlang:get(instance_id),
     Client = comm:this(),
     ClientsId = {commit_client_id, util:get_global_uid()},
-    case process_dictionary:get_group_member(tx_tm) of
+    case pid_groups:find_a(tx_tm) of
         failed ->
-            Msg = io_lib:format("No tx_tm in process group ~p.", [InstanceID]),
+            Msg = io_lib:format("No tx_tm found.~n", []),
             tx_tm_rtm:msg_commit_reply(Client, ClientsId, {fail, Msg});
         TM ->
             tx_tm_rtm:commit(TM, Client, ClientsId, TLog)

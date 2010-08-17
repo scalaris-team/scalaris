@@ -66,7 +66,7 @@
 %% * for {fail, fail} the reason is currently unknown, should 
 %%   not occur 
 quorum_read(Key)->
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
+%%    pid_groups:join(pid_groups:group_with(dht_node)),
     RTO = config:read(quorum_read_timeout),
     transaction:quorum_read(Key, comm:this()),
     receive
@@ -91,12 +91,10 @@ quorum_read(Key)->
 -spec parallel_quorum_reads(Keys::[iodata() | integer()], Par::any()) -> {fail} | {fail, timeout} | any().
 parallel_quorum_reads(Keys, _Par)->
 %    ?TLOGN("starting quorum reads on ~p", [Keys]),
-    {Flag, LocalDHTNode} = process_dictionary:find_dht_node(),
     RTO = config:read(parallel_quorum_read_timeout),
-    if
-        Flag =/= ok->
-            fail;
-        true ->
+    case pid_groups:find_a(dht_node) of
+        failed -> fail;
+        LocalDHTNode ->
             LocalDHTNode ! {parallel_reads, comm:this(), Keys, []},
             receive
                 {parallel_reads_return, fail}        -> {fail};
@@ -124,9 +122,8 @@ single_write(Key, Value)->
 
 %% use this function to do a full transaction including a readphase
 do_transaction(TFun, SuccessFun, FailureFun)->
-    LocalDHTNodes = process_dictionary:find_all_dht_nodes(),
+    LocalDHTNodes = pid_groups:find_all(dht_node),
     LocalDHTNode = lists:nth(random:uniform(length(LocalDHTNodes)), LocalDHTNodes),
-    %{_, LocalDHTNode} = process_dictionary:find_dht_node(),
     LocalDHTNode ! {do_transaction, TFun, SuccessFun, FailureFun, comm:this()},
     receive
         {trans, Message}->
@@ -138,17 +135,12 @@ do_transaction(TFun, SuccessFun, FailureFun)->
 do_transaction_wo_rp([], _SuccessFun, _FailureFun)->
     {ok};
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
-    {Flag, LocalDHTNode} = process_dictionary:find_dht_node(),
-    if
-	Flag =/= ok->
-	    fail;
-	true ->
-	    LocalDHTNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, comm:this()},
-	    receive
-		{trans, Message}->
-		    %?TLOGN(" received ~p~n", [Message]),
-		    Message
-	    end
+    LocalDHTNode = pid_groups:find_a(dht_node),
+    LocalDHTNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, comm:this()},
+    receive
+        {trans, Message}->
+            %% ?TLOGN(" received ~p~n", [Message]),
+            Message
     end.
 
 %%--------------------------------------------------------------------
@@ -241,8 +233,10 @@ abort()->
 						{fail, timeout, pos_integer(), list()} | 
 						{fail, node_not_found}).
 delete(Key, Timeout) ->
-    case process_dictionary:find_dht_node() of
-	{ok, LocalDHTNode} ->
+    case pid_groups:find_a(dht_node) of
+        failed ->
+	    {fail, node_not_found};
+	LocalDHTNode ->
 	    LocalDHTNode ! {delete, comm:this(), Key},
 	    receive
 		{delete_result, Result} ->
@@ -250,9 +244,7 @@ delete(Key, Timeout) ->
 	    after
 		Timeout ->
 		    {fail, timeout}
-	    end;
-	_ ->
-	    {fail, node_not_found}
+	    end
     end.
 
 %%====================================================================
@@ -268,7 +260,6 @@ delete(Key, Timeout) ->
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
 jWrite(Key, Value, TransLog)->
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     write(Key, Value, TransLog).
 
 %%--------------------------------------------------------------------
@@ -280,7 +271,6 @@ jWrite(Key, Value, TransLog)->
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
 jRead(Key, TransLog)->
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     read(Key, TransLog).
 
 %%--------------------------------------------------------------------
@@ -293,7 +283,6 @@ jRead(Key, TransLog)->
 %%--------------------------------------------------------------------
 jParallel_reads(Keys, TransLog)->
     io:format("~p~n", [TransLog]),
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     A = parallel_reads(Keys, TransLog),
     io:format("~p~n", [A]),
     A.

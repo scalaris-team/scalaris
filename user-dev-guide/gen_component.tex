@@ -1,7 +1,7 @@
 \section{\texorpdfstring{The \erlmodule{gen\_component}}
          {The gen\_component}}
 \erlmoduleindex{gen\_component}
-\svnrev{r969}
+\svnrev{r993}
 
 The generic component model implemented by
 \erlmodule[noindex]{gen\_component} allows to add some common functionality
@@ -22,7 +22,7 @@ to all the components that build up the \scalaris{} system. It supports:
 \item[state dependent message handlers:] depending on its state, different
   message handlers can be used and switched during runtime. Thereby a kind
   of state-machine based message handling is supported.
-\item[prepared for \erlmodule{process\_dictionary}:] allows to send events to
+\item[prepared for \erlmodule{pid\_groups}:] allows to send events to
   named processes inside the same group as the actual component itself
   (\code{send_to_group_member}) when just holding a reference to any group
   member, and
@@ -85,10 +85,10 @@ A \erlmodule{gen\_component} can be started using one of:
 \begin{description}
 \setlength{\parskip}{0pt}
 \setlength{\itemsep}{0pt}
-\item[\texttt{\{register, ProcessGroup, ProcessName\}}:] registers the new
-  process with the given process group (also called instanceid) and name in
-  the \erlmodule{process\_dictionary}.
-\item[\texttt{\{register\_native, ProcessName\}}:] registers the process as
+\item[\texttt{\{pid\_groups\_join\_as, ProcessGroup, ProcessName\}}:] registers the new
+  process with the given process group (also called instanceid) and name
+  using \erlmodule{pid\_groups}.
+\item[\texttt{\{erlang\_register, ProcessName\}}:] registers the process as
   a named Erlang process.
 \item[\texttt{wait\_for\_init}:] wait for \code{Module:init/1} to return
   before returning to the caller.
@@ -127,20 +127,20 @@ and currently active message handler, as shown in the following example:
 \begin{lstlisting}[language=bash]
 # bin/boot.sh
 [...]
-(boot@localhost)10> process_dictionary ! {no_message}.
+(boot@localhost)10> pid_groups ! {no_message}.
 {no_message}
-[error] unknown message: {no_message} in Module: process_dictionary and
+[error] unknown message: {no_message} in Module: pid_groups and
 handler on in State null
 (boot@localhost)11>
 \end{lstlisting}
 
-The \erlmodule{process\_dictionary} (see
-Section~\ref{sec:process_dictionary}) is a \erlmodule{gen\_component} which
+The \erlmodule{pid\_groups} (see
+Section~\ref{sec:pid_groups}) is a \erlmodule{gen\_component} which
 registers itself as named Erlang process with the \erlmodule{gen\_component}
-option \code{register_native} and therefore can be addressed by its name in
+option \code{erlang_register} and therefore can be addressed by its name in
 the Erlang shell. We send it a \code{\{no_message\}} and
 \erlmodule{gen\_component} reports on the unhandled message. The
-\erlmodule{process\_dictionary} itself continues to run and waits for
+\erlmodule{pid\_groups} module itself continues to run and waits for
 further messages.
 
 \subsection{What if my message handler generates an exception or
@@ -212,15 +212,15 @@ Using \erlfun{gen\_component}{kill}{Pid} and
 \erlfun{gen\_component}{sleep}{Pid, Time} components can be terminated or
 paused.
 
-\subsection{\texorpdfstring{Integration with \erlmodule{process\_dictionary}:
+\subsection{\texorpdfstring{Integration with \erlmodule{pid\_groups}:
   Redirecting events / messages  to other \erlmodule{gen\_component}s}
-  {Integration with process\_dictionary:
+  {Integration with pid\_groups:
   Redirecting events / messages  to other gen\_components}}
 
 Each \erlmodule{gen\_component} by itself is prepared to support
 \erlfun{comm}{send\_to\_group\_member}{/3} which forwards messages inside a
-group of processes registered via the \erlmodule{process\_dictionary} (see
-Section~\ref{sec:process_dictionary}) by their name. So, if you hold a Pid
+group of processes registered via \erlmodule{pid\_groups} (see
+Section~\ref{sec:pid_groups}) by their name. So, if you hold a Pid
 of one member of a process group, you can send messages to other members of
 this group, if you know their registered Erlang name. You do not necessarily
 have to know their individual Pid.

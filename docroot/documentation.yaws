@@ -43,7 +43,6 @@ Last update:
 <erl>
  
  out(Arg) ->
-        erlang:put(instance_id, Arg#arg.opaque),
 	{Date, {Hour, Minute, Second}} = calendar:local_time(),
     {html, io_lib:format("~w:~w:~w", [Hour, Minute, Second])}.
 </erl>

@@ -31,7 +31,7 @@
 -export([start_paxosid/2, start_paxosid_local/3, start_paxosid/3]).
 -export([msg_accepted/4]).
 %%% functions for gen_component module and supervisor callbacks
--export([start_link/1, start_link/2]).
+-export([start_link/1]).
 -export([on/2, init/1]).
 -export([check_config/0]).
 
@@ -57,7 +57,7 @@ msg_accepted(Learner, PaxosID, Raccepted, Val) ->
 %%%   InitialRound (optional): start with paxos round number (default 1)
 %%%     if InitialRound is 0, a Fast-Paxos is executed
 start_paxosid(PaxosID, Learners) ->
-    Acceptor = process_dictionary:get_group_member(paxos_acceptor),
+    Acceptor = pid_groups:get_my(paxos_acceptor),
     start_paxosid_local(Acceptor, PaxosID, Learners).
 
 start_paxosid_local(LAcceptor, PaxosID, Learners) ->
@@ -69,22 +69,18 @@ start_paxosid(Acceptor, PaxosID, Learners) ->
     comm:send(Acceptor, {acceptor_initialize, PaxosID, Learners}).
 
 %% be startable via supervisor, use gen_component
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
-    start_link(InstanceId, []).
-
--spec start_link(instanceid(), [any()]) -> {ok, pid()}.
-start_link(InstanceId, Options) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE,
-                             [InstanceId, Options],
-                             [{register, InstanceId, paxos_acceptor}]).
+                             [],
+                             [{pid_groups_join_as, DHTNodeGroup, paxos_acceptor}]).
 
 %% initialize: return initial state.
--spec init([instanceid() | [any()]]) -> any().
-init([_InstanceID, _Options]) ->
-    ?TRACE("Starting acceptor for instance: ~p~n", [_InstanceID]),
+-spec init([pid_groups:groupname() | [any()]]) -> any().
+init([]) ->
+    ?TRACE("Starting acceptor for DHT node: ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
-    %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_acceptor", [InstanceID]))),
+    %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_acceptor", [pid_groups:my_groupname()]))),
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     TableName = pdb:new(?MODULE, [set, protected]),

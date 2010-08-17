@@ -41,7 +41,7 @@ init_per_suite(Config) ->
     Pid = spawn(fun () ->
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                         crypto:start(),
-                        process_dictionary:start_link(),
+                        pid_groups:start_link(),
                         idholder:start_link("foo", []),
                         Self ! continue,
                         timer:sleep(5000)
@@ -55,12 +55,12 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    gen_component:kill(process_dictionary),
+    gen_component:kill(pid_groups),
     exit(Pid, kill),
     ok.
 
 getset_key(_Config) ->
-    process_dictionary:register_process("foo", foo, self()),
+    pid_groups:join_as("foo", foo),
     idholder:get_id(),
     _X = receive
              {idholder_get_id_response, D, _Dversion} -> D

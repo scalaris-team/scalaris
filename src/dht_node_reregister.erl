@@ -38,10 +38,11 @@
 
 %% @doc Starts a Dead Node Cache process, registers it with the process
 %%      dictionary and returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     Trigger = config:read(dht_node_reregister_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, dht_node_reregister}]).
+    gen_component:start_link(?MODULE, Trigger,
+                             [{pid_groups_join_as, DHTNodeGroup, dht_node_reregister}]).
 
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, trigger:state()}.
@@ -74,11 +75,11 @@ on({go}, {init, TriggerState}) ->
 
 -spec trigger_reregister() -> ok.
 trigger_reregister() ->
-    RegisterMessage = {register, get_dht_node_this()},
+    RegisterMessage = {pid_groups_join_as, get_dht_node_this()},
     reregister(config:read(register_hosts), RegisterMessage).
 
 -spec reregister(failed | [comm:mypid()],
-                 Message::{register, ThisNode::comm:mypid()}) -> ok.
+                 Message::{pid_groups_join_as, ThisNode::comm:mypid()}) -> ok.
 reregister(failed, Message)->
     comm:send(bootPid(), Message);
 reregister(Hosts, Message) ->
@@ -94,7 +95,7 @@ get_base_interval() ->
 %%      process.
 -spec get_dht_node_this() -> comm:mypid().
 get_dht_node_this() ->
-    comm:make_global(process_dictionary:get_group_member(dht_node)).
+    comm:make_global(pid_groups:get_my(dht_node)).
 
 %% @doc pid of the boot daemon
 -spec bootPid() -> comm:mypid().

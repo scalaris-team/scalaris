@@ -30,7 +30,7 @@
 -export([init/0, on_init_TP/2, on_tx_commitreply/3]).
 
 init() ->
-    InstanceID = get(instance_id),
+    InstanceID = pid_groups:my_groupname(),
     Table = list_to_atom(lists:flatten(
                            io_lib:format("~p_tx_tp", [InstanceID]))),
     pdb:new(Table, [set, private, named_table]).

@@ -27,41 +27,42 @@
 -vsn('$Id$').
 
 -behaviour(supervisor).
--include("scalaris.hrl").
 
 -export([start_link/2, init/1]).
 
--spec start_link(instanceid(), [any()]) -> {ok, Pid::pid()} | ignore |
-                                           {error, Error::{already_started, Pid::pid()} |
-                                                           shutdown | term()}.
-start_link(InstanceId, Options) ->
-    supervisor:start_link(?MODULE, [InstanceId, Options]).
+-spec start_link(pid_groups:groupname(), [any()]) ->
+                        {ok, Pid::pid()} | ignore |
+                        {error, Error::{already_started, Pid::pid()} |
+                                       shutdown | term()}.
+start_link(DHTNodeGroup, Options) ->
+    supervisor:start_link(?MODULE, [DHTNodeGroup, Options]).
 
 %% userdevguide-begin sup_dht_node_core:init
--spec init([instanceid() | [any()]]) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
-                                               PeriodInSeconds::pos_integer()},
-                                              [ProcessDescr::any()]}}.
-init([InstanceId, Options]) ->
-    process_dictionary:register_process(InstanceId, sup_dht_node_core, self()),
+-spec init([pid_groups:groupname() | [any()]]) ->
+                  {ok, {{one_for_all, MaxRetries::pos_integer(),
+                         PeriodInSeconds::pos_integer()},
+                        [ProcessDescr::any()]}}.
+init([DHTNodeGroup, Options]) ->
+    pid_groups:join_as(DHTNodeGroup, ?MODULE),
     Proposer =
-        util:sup_worker_desc(proposer, proposer, start_link, [InstanceId]),
+        util:sup_worker_desc(proposer, proposer, start_link, [DHTNodeGroup]),
     Acceptor =
-        util:sup_worker_desc(acceptor, acceptor, start_link, [InstanceId]),
+        util:sup_worker_desc(acceptor, acceptor, start_link, [DHTNodeGroup]),
     Learner =
-        util:sup_worker_desc(learner, learner, start_link, [InstanceId]),
-    Node =
+        util:sup_worker_desc(learner, learner, start_link, [DHTNodeGroup]),
+    DHTNode =
         util:sup_worker_desc(dht_node, dht_node, start_link,
-                             [InstanceId, Options]),
+                             [DHTNodeGroup, Options]),
     Delayer =
         util:sup_worker_desc(msg_delay, msg_delay, start_link,
-                             [InstanceId]),
+                             [DHTNodeGroup]),
     TX =
         util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
-                                 [InstanceId]),
+                                 [DHTNodeGroup]),
     {ok, {{one_for_all, 10, 1},
           [
            Proposer, Acceptor, Learner,
-           Node,
+           DHTNode,
            Delayer,
            TX
           ]}}.

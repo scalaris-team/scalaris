@@ -23,6 +23,8 @@
 %% userdevguide-begin rt_generic:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/6).
+-include("types.hrl").
+
 -spec check(Old::rt(), New::rt(), key(), node:node_type(),
             node:node_type()) -> ok.
 check(Old, New, Id, Pred, Succ) ->
@@ -48,12 +50,12 @@ check(Old, New, Id, OldPred, NewPred, OldSucc, NewSucc) ->
 check(X, X, _Id, Pred, Pred, Succ, Succ, _) ->
     ok;
 check(OldRT, NewRT, Id, _, NewPred, _, NewSucc, true) ->
-    Pid = process_dictionary:get_group_member(dht_node),
+    Pid = pid_groups:get_my(dht_node),
     comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, NewPred, NewSucc)}),
     % update failure detector:
     NewPids = to_pid_list(NewRT), OldPids = to_pid_list(OldRT),
     fd:update_subscriptions(OldPids, NewPids);
 check(_OldRT, NewRT, Id, _, NewPred, _, NewSucc, false) ->
-    Pid = process_dictionary:get_group_member(dht_node),
+    Pid = pid_groups:get_my(dht_node),
     comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, Id, NewPred, NewSucc)}).
 %% userdevguide-end rt_generic:check

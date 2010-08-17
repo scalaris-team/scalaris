@@ -38,7 +38,7 @@
 -export([remove_subscriber/1]).
 
 %% gen_server & gen_component callbacks
--export([start_link/0, init/1, on/2]).
+-export([start_link/1, init/1, on/2]).
 
 -type(cookie() :: '$fd_nil' | any()).
 -type(state() :: {null}).
@@ -139,9 +139,12 @@ start_pinger(Pid) ->
 
 %% gen_component functions
 %% @doc Starts the failure detector server
--spec start_link() -> {ok, pid()}.
-start_link() ->
-    gen_component:start_link(?MODULE, [], [wait_for_init, {register_native, ?MODULE}]).
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(ServiceGroup) ->
+    gen_component:start_link(?MODULE, [],
+                             [wait_for_init,
+                              {erlang_register, ?MODULE},
+                              {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init(any()) -> state().
