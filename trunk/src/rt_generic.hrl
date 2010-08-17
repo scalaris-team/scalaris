@@ -20,11 +20,12 @@
 %%% @end
 %% @version $Id$
 
+% include needed in modules including this file!
+%% -include("types.hrl").
+
 %% userdevguide-begin rt_generic:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/6).
--include("types.hrl").
-
 -spec check(Old::rt(), New::rt(), key(), node:node_type(),
             node:node_type()) -> ok.
 check(Old, New, Id, Pred, Succ) ->
