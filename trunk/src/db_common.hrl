@@ -212,16 +212,27 @@ get_ckdb({_DB, _CKInt, CKDB}) -> CKDB.
 %%      touched by one of the DB setters).
 get_changes(State) ->
     CKDB = get_ckdb(State),
-    get_changes_helper(State, ?CKETS:tab2list(CKDB), [], []).
+    get_changes_helper(State, ?CKETS:tab2list(CKDB), intervals:all(), [], []).
+
+%% @doc Gets all db_entry objects in the given interval which have
+%%      (potentially) been changed or deleted (might return objects that have
+%%      not changed but have been touched by one of the DB setters).
+get_changes(State, Interval) ->
+    CKDB = get_ckdb(State),
+    get_changes_helper(State, ?CKETS:tab2list(CKDB), Interval, [], []).
 
 %% @doc Helper for get_changes/2 that adds the entry of a changed key either to
 %%      the list of changed entries or to the list of deleted entries.
--spec get_changes_helper(State::db(), ChangedKeys::[{?RT:key()}], ChangedEntries::[db_entry:entry()], DeletedKeys::[?RT:key()]) -> {ChangedEntries::[db_entry:entry()], DeletedKeys::[?RT:key()]}.
-get_changes_helper(_State, [], ChangedEntries, DeletedKeys) ->
+-spec get_changes_helper(State::db(), ChangedKeys::[{?RT:key()}], Interval::intervals:interval(), ChangedEntries::[db_entry:entry()], DeletedKeys::[?RT:key()]) -> {ChangedEntries::[db_entry:entry()], DeletedKeys::[?RT:key()]}.
+get_changes_helper(_State, [], _Interval, ChangedEntries, DeletedKeys) ->
     {ChangedEntries, DeletedKeys};
-get_changes_helper(State, [{CurKey} | RestKeys], ChangedEntries, DeletedKeys) ->
-    {Existing, Entry} = get_entry2(State, CurKey),
-    case Existing of
-        true -> get_changes_helper(State, RestKeys, [Entry | ChangedEntries], DeletedKeys);
-        _    -> get_changes_helper(State, RestKeys, ChangedEntries, [CurKey | DeletedKeys])
+get_changes_helper(State, [{CurKey} | RestKeys], Interval, ChangedEntries, DeletedKeys) ->
+    case intervals:in(CurKey, Interval) of
+        true ->
+            {Existing, Entry} = get_entry2(State, CurKey),
+            case Existing of
+                true -> get_changes_helper(State, RestKeys, Interval, [Entry | ChangedEntries], DeletedKeys);
+                _    -> get_changes_helper(State, RestKeys, Interval, ChangedEntries, [CurKey | DeletedKeys])
+            end;
+        _ -> get_changes_helper(State, RestKeys, Interval, ChangedEntries, DeletedKeys)
     end.

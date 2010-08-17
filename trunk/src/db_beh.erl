@@ -35,16 +35,18 @@ behaviour_info(callbacks) ->
      {set_read_lock, 2}, {unset_read_lock, 2},
      % standard calls
      {read, 2}, {write, 4},
-     {get_entry, 2}, {set_entry, 2}, {update_entry, 2}, {delete_entry, 2},
+     {get_entry, 2}, {get_entry2, 2}, {set_entry, 2}, {update_entry, 2},
      % dangerous calls
-     {delete, 2},
-     %load balancing
+     {delete, 2}, {delete_entry, 2},
+     % load balancing
      {get_load, 1}, {split_data, 2},
-     %
+     % operations on multiple entries
      {get_data, 1}, {add_data, 2},
      {get_entries, 2}, {get_entries, 3},
-     % bulk op for replica repair
      {update_entries, 4},
+     % record changes
+     {record_changes, 2}, {stop_record_changes, 1},
+     {get_changes, 1}, {get_changes, 2},
      % debugging
      {check_db, 1}
     ];

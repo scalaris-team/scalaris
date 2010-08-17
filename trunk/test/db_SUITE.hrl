@@ -1330,16 +1330,44 @@ prop_changed_keys_mult_interval(Data, Entry1, Entry2, Entry3, Entry4) ->
 %%      given interval.
 -spec check_changes(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Note::string()) -> true.
 check_changes(DB, ChangesInterval, Note) ->
-    {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
+    {ChangedEntries1, DeletedKeys1} = ?TEST_DB:get_changes(DB),
     (lists:all(fun(E) -> intervals:in(db_entry:get_key(E), ChangesInterval) end,
-               ChangedEntries) orelse
+               ChangedEntries1) orelse
          ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                  ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries,
+                  ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries1,
                    ChangesInterval, lists:flatten(Note)])) andalso
-    (lists:all(fun(E) -> intervals:in(E, ChangesInterval) end, DeletedKeys) orelse
+    (lists:all(fun(E) -> intervals:in(E, ChangesInterval) end, DeletedKeys1) orelse
          ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                  ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys,
-                   ChangesInterval, lists:flatten(Note)])).
+                  ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys1,
+                   ChangesInterval, lists:flatten(Note)])) andalso
+    check_changes2(DB, ChangesInterval, ChangesInterval, Note) andalso
+    % select some random key from the changed entries and try get_changes/2
+    % with an interval that does not contain this key
+    case ChangedEntries1 =/= [] orelse DeletedKeys1 =/= [] of
+        true ->
+            SomeKey = util:randomelem(
+                        lists:append(
+                          [db_entry:get_key(E) || E <- ChangedEntries1],
+                          DeletedKeys1)),
+            check_changes2(DB, ChangesInterval, intervals:minus(ChangesInterval, intervals:new(SomeKey)), Note);
+        _    -> true
+    end.
+
+%% @doc Checks that all entries returned by ?TEST_DB:get_changes/2 are in the
+%%      given interval GetChangesInterval and also ChangesInterval.
+-spec check_changes2(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), GetChangesInterval::intervals:interval(), Note::string()) -> true.
+check_changes2(DB, ChangesInterval, GetChangesInterval, Note) ->
+    {ChangedEntries2, DeletedKeys2} = ?TEST_DB:get_changes(DB, GetChangesInterval),
+    FinalInterval = intervals:intersection(ChangesInterval, GetChangesInterval),
+    (lists:all(fun(E) -> intervals:in(db_entry:get_key(E), FinalInterval) end,
+               ChangedEntries2) orelse
+         ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                  ["element(1, ?TEST_DB:get_changes(DB, FinalInterval))",
+                   ChangedEntries2, FinalInterval, lists:flatten(Note)])) andalso
+    (lists:all(fun(E) -> intervals:in(E, FinalInterval) end, DeletedKeys2) orelse
+         ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                  ["element(2, ?TEST_DB:get_changes(DB, FinalInterval))",
+                   DeletedKeys2, FinalInterval, lists:flatten(Note)])).
 
 %% @doc Checks that a key is present exactly once in the list of deleted
 %%      keys returned by ?TEST_DB:get_changes/1.

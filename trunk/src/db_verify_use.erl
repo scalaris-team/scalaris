@@ -170,6 +170,13 @@ get_changes({DB, Counter} = DB_) ->
     verify_counter(Counter),
     ?BASE_DB:get_changes(DB).
 
+%% @doc Gets all db_entry objects in the given interval which have been
+%%      changed or deleted.
+get_changes({DB, Counter} = DB_, Interval) ->
+    ?TRACE2(get_changes, DB_, Interval),
+    verify_counter(Counter),
+    ?BASE_DB:get_changes(DB, Interval).
+
 set_write_lock({DB, Counter} = DB_, Key) ->
     ?TRACE2(set_write_lock, DB_, Key),
     verify_counter(Counter),

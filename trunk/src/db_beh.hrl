@@ -29,15 +29,14 @@
 
 -export([new/1, close/1]).
 -export([get_entry/2, get_entry2/2, set_entry/2, update_entry/2, delete_entry/2]).
--export([read/2, write/4]).
--export([delete/2]).
+-export([read/2, write/4, delete/2]).
 -export([set_write_lock/2, unset_write_lock/2,
          set_read_lock/2, unset_read_lock/2]).
 -export([get_entries/2, get_entries/3]).
 -export([update_entries/4]).
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
 -export([check_db/1]).
--export([record_changes/2, stop_record_changes/1, get_changes/1]).
+-export([record_changes/2, stop_record_changes/1, get_changes/1, get_changes/2]).
 
 -spec new(NodeId::?RT:key()) -> db().
 -spec close(DB::db()) -> any().
@@ -83,6 +82,7 @@
 
 -spec record_changes(OldDB::db(), intervals:interval()) -> NewDB::db().
 -spec stop_record_changes(OldDB::db()) -> NewDB::db().
--spec get_changes(DB::db()) -> {db_as_list(), [?RT:key()]}.
+-spec get_changes(DB::db()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
+-spec get_changes(DB::db(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 
 -spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
