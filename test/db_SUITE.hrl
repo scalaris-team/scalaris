@@ -25,7 +25,7 @@
 tests_avail() ->
     [read, write, write_lock, read_lock, read_write_lock, write_read_lock,
      delete, get_load_and_middle, split_data, update_entries,
-     changed_keys,
+     changed_keys, various_tests,
      % random tester functions:
      tester_new, tester_set_entry, tester_update_entry,
      tester_delete_entry1, tester_delete_entry2,
@@ -266,6 +266,14 @@ changed_keys(_Config) ->
     ?equals(?TEST_DB:get_changes(DB3), {[], []}),
     
     ?TEST_DB:close(DB3).
+
+%% @doc Tests that previously failed with tester-generated values or otherwise
+%%      manually generated test cases.
+various_tests(_Config) ->
+    prop_changed_keys_split_data2([create_db_entry(3, empty_val, false, 0, -1),
+                                   create_db_entry(0, empty_val, false, 0, -1)],
+                                 intervals:new('[', 3, minus_infinity,']'),
+                                 intervals:new(plus_infinity)).
 
 % tester-based functions below:
 

@@ -87,10 +87,11 @@ add_data(State = {DB, CKInt, CKDB}, Data) ->
 %%      keys!
 split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
     F = fun (DBEntry, HisList) ->
-                case intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
+                Key = db_entry:get_key(DBEntry),
+                case intervals:in(Key, MyNewInterval) of
                     true -> HisList;
-                    _    -> ?ETS:delete(DB, db_entry:get_key(DBEntry)),
-                            ?CKETS:delete(CKDB, db_entry:get_key(DBEntry)),
+                    _    -> ?ETS:delete(DB, Key),
+                            ?CKETS:delete(CKDB, Key),
                             case db_entry:is_empty(DBEntry) of
                                 false -> [DBEntry | HisList];
                                 _     -> HisList
