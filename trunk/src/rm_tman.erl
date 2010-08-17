@@ -278,7 +278,8 @@ on({update_id, NewId},
     NewMe = node:update_id(nodelist:node(Neighborhood), NewId),
     NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
     rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
-    {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
+    NewTriggerState = trigger:now(TriggerState), % inform neighbors
+    {NewNeighborhood, RandViewSize, Interval, NewTriggerState, Cache, Churn};
 
 on({web_debug_info, Requestor},
    {Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
