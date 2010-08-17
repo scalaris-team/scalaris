@@ -109,20 +109,24 @@ add_data({DB, CKInt, CKDB}, Data) ->
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
 split_data({DB, CKInt, CKDB}, MyNewInterval) ->
-    {MyListTmp, HisListTmp} =
-        lists:partition(fun(DBEntry) ->
-                                intervals:in(db_entry:get_key(DBEntry),
-                                             MyNewInterval)
-                        end, gb_trees:values(DB)),
-    % note: building [{Key, DBEntry}] from MyList should be more memory efficient
-    % than using gb_trees:to_list(DB) above and removing Key from the tuples in
-    % HisList
-    MyNewList = [{db_entry:get_key(DBEntry), DBEntry} || DBEntry <- MyListTmp],
-    HisList = [begin
-                   ?CKETS:delete(CKDB, db_entry:get_key(DBEntry)),
-                   DBEntry
-               end || DBEntry <- HisListTmp, not db_entry:is_empty(DBEntry)],
-    {{gb_trees:from_orddict(MyNewList), CKInt, CKDB}, HisList}.
+    % depending on the number of removed entries, a complete re-construction of
+    % the tree using gb_trees:from_orddict could be faster than continuously
+    % deleting entries - we do not know this beforehand though
+    % -> do single deletes here
+    F = fun (DBEntry, {HisList, MyTree}) ->
+                 Key = db_entry:get_key(DBEntry),
+                 case intervals:in(Key, MyNewInterval) of
+                     true -> {HisList, MyTree};
+                     _    -> NewTree = gb_trees:delete(Key, MyTree),
+                             ?CKETS:delete(CKDB, Key),
+                             case db_entry:is_empty(DBEntry) of
+                                 false -> {[DBEntry | HisList], NewTree};
+                                 _     -> {HisList, NewTree}
+                             end
+                end
+        end,
+    {HisList, MyNewTree} = lists:foldr(F, {[], DB}, gb_trees:values(DB)),
+    {{MyNewTree, CKInt, CKDB}, HisList}.
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
