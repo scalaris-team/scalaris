@@ -34,7 +34,7 @@ all() ->
     [test_new, test_mk2, test_mk4, test_trunc,
      test_remove2, test_remove3, test_filter2, test_filter3,
      test_filter_min_length4, test_merge, test_add_node, test_add_nodes,
-     test_to_list, test_lupdate_ids, test_lremove_outdated].
+     test_update_ids, test_to_list, test_lupdate_ids, test_lremove_outdated].
 
 suite() ->
     [
@@ -2352,6 +2352,101 @@ test_add_nodes(_Config) ->
     ?expect_exception(nodelist:add_nodes(nodelist:new_neighborhood(N14), [N8, N15], 1, 1),
                       throw, 'cannot create a neighborhood() with a neighbor newer than the node itself'),
     ?expect_exception(nodelist:add_nodes(nodelist:new_neighborhood(N14), [N15, N8], 1, 1),
+                      throw, 'cannot create a neighborhood() with a neighbor newer than the node itself'),
+
+    ok.
+
+%% @doc Tests adding nodes to a neighborhood structure.
+-spec test_update_ids(any()) -> ok.
+test_update_ids(_Config) ->
+    N8 = node:new(pid1,   8, 0),
+    N9 = node:new(pid1,   9, 1), % N8 updated
+    N14 = node:new(pid2, 14, 0),
+    N15 = node:new(pid2, 15, 1), % N14 updated
+    N20 = node:new(pid3, 20, 0),
+    N33 = node:new(pid4, 33, 0),
+    N42 = node:new(pid5, 42, 0),
+    N50 = node:new(pid6, 50, 0),
+    N66 = node:new(pid7, 66, 0),
+    
+    Neighb1 = nodelist:mk_neighborhood([N8, N14, N50], N33),
+    Neighb5 = nodelist:mk_neighborhood([N14], N33, 1, 1),
+    Neighb6 = nodelist:mk_neighborhood([], N33, 1, 1),
+    
+    % Neighb1 = nodelist:mk_neighborhood([N8, N14, N50], N33),
+    ?equals(nodelist:add_nodes(Neighb1, [], 3, 3), Neighb1),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N20, N42, N66]),
+                          N33, 33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N20, N42, N66, N42]),
+                          N33, 33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N20, N42, N66, N9]),
+                          N33, 33, N14, [N14, N9, N50], N50, [N50, N9, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N20, N9, N66, N42]),
+                          N33, 33, N14, [N14, N9, N50], N50, [N50, N9, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N14]),
+                          N33, 33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N20]),
+                          N33, 33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N9]),
+                          N33, 33, N14, [N14, N9, N50], N50, [N50, N9, N14], true, true),
+    
+    % tests with (almost) empty successor/predecessor lists:
+    % Neighb5 = nodelist:mk_neighborhood([N14], N33, 1, 1),
+    ?equals(nodelist:update_ids(Neighb5, []), Neighb5),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N20, N42, N66]),
+                          N33, 33, N14, [N14], N14, [N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N20, N42, N66, N42]),
+                          N33, 33, N14, [N14], N14, [N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N20, N42, N66, N15]),
+                          N33, 33, N15, [N15], N15, [N15], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N20, N15, N66, N42]),
+                          N33, 33, N15, [N15], N15, [N15], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N20]),
+                          N33, 33, N14, [N14], N14, [N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N14]),
+                          N33, 33, N14, [N14], N14, [N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N15]),
+                          N33, 33, N15, [N15], N15, [N15], true, true),
+    
+%%     Neighb6 = nodelist:mk_neighborhood([], N33, 1, 1),
+    ?equals(nodelist:update_ids(Neighb6, []), Neighb6),
+    ?compare_neighborhood(nodelist:update_ids(Neighb6, [N20, N42, N66]),
+                          N33, 33, N33, [N33], N33, [N33], false, false),
+    ?compare_neighborhood(nodelist:update_ids(Neighb6, [N20, N42, N66, N42]),
+                          N33, 33, N33, [N33], N33, [N33], false, false),
+    ?compare_neighborhood(nodelist:update_ids(Neighb6, [N20, N42, N66, N33]),
+                          N33, 33, N33, [N33], N33, [N33], false, false),
+    ?compare_neighborhood(nodelist:update_ids(Neighb6, [N20]),
+                          N33, 33, N33, [N33], N33, [N33], false, false),
+    
+    % some tests with the base node in the to-be-updated nodes:
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N20, N42, N33, N66]),
+                          N33, 33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N20, N42, N66, N33]),
+                          N33, 33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb1, [N33, N20, N42, N66]),
+                          N33, 33, N14, [N14, N8, N50], N50, [N50, N8, N14], true, true),
+
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N20, N42, N33, N66]),
+                          N33, 33, N14, [N14], N14, [N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N20, N42, N66, N33]),
+                          N33, 33, N14, [N14], N14, [N14], true, true),
+    ?compare_neighborhood(nodelist:update_ids(Neighb5, [N33, N20, N42, N66]),
+                          N33, 33, N14, [N14], N14, [N14], true, true),
+
+    ?compare_neighborhood(nodelist:update_ids(Neighb6, [N20, N42, N33, N66]),
+                          N33, 33, N33, [N33], N33, [N33], false, false),
+    ?compare_neighborhood(nodelist:update_ids(Neighb6, [N20, N42, N66, N33]),
+                          N33, 33, N33, [N33], N33, [N33], false, false),
+    ?compare_neighborhood(nodelist:update_ids(Neighb6, [N33, N20, N42, N66]),
+                          N33, 33, N33, [N33], N33, [N33], false, false),
+    
+    % some tests with an updated base node in the to-be-added nodes:
+    ?expect_exception(nodelist:update_ids(nodelist:new_neighborhood(N14), [N15]),
+                      throw, 'cannot create a neighborhood() with a neighbor newer than the node itself'),
+    ?expect_exception(nodelist:update_ids(nodelist:new_neighborhood(N14), [N8, N15]),
+                      throw, 'cannot create a neighborhood() with a neighbor newer than the node itself'),
+    ?expect_exception(nodelist:update_ids(nodelist:new_neighborhood(N14), [N15, N8]),
                       throw, 'cannot create a neighborhood() with a neighbor newer than the node itself'),
 
     ok.

@@ -36,7 +36,8 @@
          lfilter_min_length/3, filter_min_length/4,
          merge/4, add_node/4, add_nodes/4,
          
-         update_node/2,
+         update_node/2, % update base node
+         update_ids/2, % update node ids
          
          % converters:
          to_list/1,
@@ -546,6 +547,24 @@ add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
                         lists:append([LargerSorted, SmallerSorted])
                 end,
     lmerge_helper(NeighborsView, OtherView, Node, PredsLength, SuccsLength).
+
+%% @doc Updates the node IDs of the nodes in the neighborhood with the most
+%%      up-to-date ID in either its own lists or the given node list.
+%%      Note: throws if any node in the NodeList is the same as the base node
+%%      but with an updated ID!
+-spec update_ids(Neighbors::neighborhood(), NodeList::[node:node_type()]) -> neighborhood().
+update_ids(Neighbors, []) ->
+    Neighbors;
+update_ids({Preds, BaseNode, Succs}, NodeList) ->
+    {PredsUpd, _} = lupdate_ids(Preds, NodeList),
+    {SuccsUpd, _} = lupdate_ids(Succs, NodeList),
+    [throw_if_newer(N, BaseNode) || N <- NodeList, node:same_process(BaseNode, N)],
+    % due to updated IDs, the lists might not be sorted anymore...
+    SuccOrd = fun(N1, N2) -> succ_ord_node(N1, N2, BaseNode) end,
+    PredOrd = fun(N1, N2) -> succ_ord_node(N2, N1, BaseNode) end,
+    SuccsUpdSorted = lists:usort(SuccOrd, SuccsUpd),
+    PredsUpdSorted = lists:usort(PredOrd, PredsUpd),
+    ensure_lists_not_empty({PredsUpdSorted, BaseNode, SuccsUpdSorted}).
 
 %% @doc Defines that N1 is less than or equal to N2 if their IDs are (provided
 %%      for convenience).
