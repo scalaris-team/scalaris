@@ -56,14 +56,14 @@
 %% @doc Sends an initialization message to the node's routing table.
 -spec initialize(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
 initialize(Id, Pred, Succ) ->
-    Pid = process_dictionary:get_group_member(routing_table),
+    Pid = pid_groups:get_my(routing_table),
     comm:send_local(Pid, {init_rt, Id, Pred, Succ}).
 
 %% @doc Notifies the node's routing table of a changed node ID, predecessor
 %%      and/or successor.
 -spec update_state(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
 update_state(Id, Pred, Succ) ->
-    comm:send_local(process_dictionary:get_group_member(routing_table),
+    comm:send_local(pid_groups:get_my(routing_table),
                     {update_rt, Id, Pred, Succ}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,10 +72,10 @@ update_state(Id, Pred, Succ) ->
 
 %% @doc Starts the routing tabe maintenance process, registers it with the
 %%      process dictionary and returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     Trigger = config:read(routingtable_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, routing_table}]).
+    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, routing_table}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> state_uninit().
@@ -143,12 +143,12 @@ on({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->
     new_state(Id, Pred, Succ, NewRT, TriggerState);
 
 % debug_info for web interface
-on({'$gen_cast', {debug_info, Requestor}},
+on({web_debug_info, Requestor},
    {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
     KeyValueList =
         [{"rt_size", ?RT:get_size(RTState)},
          {"rt (index, node):", ""} | ?RT:dump(RTState)],
-    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
 on({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->

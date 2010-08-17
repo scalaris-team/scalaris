@@ -53,7 +53,7 @@ ganglia_loop(Last) ->
     Timers = monitor_timing:get_timers(),
     [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
     % vivaldi statistics
-    monitor_per_dht_node(fun monitor_vivaldi_errors/2, process_dictionary:find_all_groups(dht_node)),
+    monitor_per_dht_node(fun monitor_vivaldi_errors/2, pid_groups:groups_with(dht_node)),
     timer:sleep(config:read(ganglia_interval)),
     ganglia_loop(Now).
 
@@ -66,7 +66,7 @@ update(Tree) ->
     gmetric(both, "Memory used by binaries", "int32", erlang:memory(binary), "Bytes"),
     gmetric(both, "Memory used by system", "int32", erlang:memory(system), "Bytes"),
     DHTNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
-                                    || P <- process_dictionary:find_all_dht_nodes()]),
+                                    || P <- pid_groups:find_all(dht_node)]),
     gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
     traverse(gb_trees:iterator(Tree)).
 
@@ -92,9 +92,9 @@ gmetric(Slope, Metric, Type, Value, Unit) ->
     os:cmd(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
                          [Slope, Metric, Type, Value, Unit])).
 
--spec monitor_vivaldi_errors(Group::instanceid(), Idx::non_neg_integer()) -> ok | string().
+-spec monitor_vivaldi_errors(pid_groups:groupname(), non_neg_integer()) -> ok | string().
 monitor_vivaldi_errors(Group, Idx) ->
-    case process_dictionary:lookup_process(Group, vivaldi) of
+    case pid_groups:pid_of(Group, vivaldi) of
         failed ->
             ok;
         Vivaldi ->
@@ -105,7 +105,7 @@ monitor_vivaldi_errors(Group, Idx) ->
             end
     end.
 
--spec monitor_per_dht_node(fun((Group::instanceid(), Idx::non_neg_integer()) -> any()), [instanceid(),...] | failed) -> ok | non_neg_integer().
+-spec monitor_per_dht_node(fun((pid_groups:groupname(), Idx::non_neg_integer()) -> any()), [pid_groups:groupname(),...] | failed) -> ok | non_neg_integer().
 monitor_per_dht_node(_, failed) ->
     ok;
 monitor_per_dht_node(F, Nodes) ->

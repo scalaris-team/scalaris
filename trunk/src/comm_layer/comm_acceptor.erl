@@ -22,23 +22,20 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--include("scalaris.hrl").
+-export([start_link/1, init/1]).
 
--export([start_link/1, init/2]).
-
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
-    Pid = spawn_link(comm_acceptor, init, [InstanceId, self()]),
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(_GroupName) ->
+    Pid = spawn_link(comm_acceptor, init, [self()]),
     receive
         {started} ->
             {ok, Pid}
     end.
 
--spec init(instanceid(), pid()) -> any().
-init(InstanceId, Supervisor) ->
-    process_dictionary:register_process(InstanceId, acceptor, self()),
+-spec init(pid()) -> any().
+init(Supervisor) ->
     erlang:register(comm_layer_acceptor, self()),
-   log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), preconfig:cs_port()]),
+    log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), preconfig:cs_port()]),
     LS = case config:read(listen_ip) of
              undefined ->
                  open_listen_port(preconfig:cs_port(), first_ip());

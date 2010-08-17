@@ -34,9 +34,8 @@
 %% @spec recreate_replicas({string(), string()}) -> pid()
 -spec recreate_replicas(Interval::intervals:interval()) -> ok.
 recreate_replicas(_Interval) ->
-%    InstanceId = erlang:get(instance_id),
+%    InstanceId = pid_groups:my_groupname(),
 %    spawn(fun () -> 
-%		  erlang:put(instance_id, InstanceId),
 % 		  Intervals = createReplicatedIntervals(From, To),
 % 		  io:format("{~p, ~p}: ~p~n", [From, To, Intervals]),
 % 		  start_fetchers(1, Intervals),

@@ -27,6 +27,8 @@
 
 -export([new/0, is_empty/1, add/2, send/1]).
 
+-include("scalaris.hrl").
+
 -type msg_queue() :: [comm:message()].
 
 %% @doc Creates a new message queue.

@@ -25,31 +25,30 @@
 -vsn('$Id$').
 
 -behaviour(supervisor).
--include("scalaris.hrl").
 
 -export([start_link/1, init/1]).
 
--spec start_link(instanceid()) -> {ok, Pid::pid()} | ignore | {error, Error::{already_started, Pid::pid()} | term()}.
-start_link(InstanceId) ->
-    supervisor:start_link(?MODULE, [InstanceId]).
+-spec start_link(pid_groups:groupname()) -> {ok, Pid::pid()} | ignore | {error, Error::{already_started, Pid::pid()} | term()}.
+start_link(DHTNodeGroup) ->
+    supervisor:start_link(?MODULE, [DHTNodeGroup]).
 
--spec init([instanceid()]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
-init([InstanceId]) ->
-    process_dictionary:register_process(InstanceId, sup_dht_node_core_tx, self()),
-    RDHT_tx_read =
-        util:sup_worker_desc(rdht_tx_read, rdht_tx_read, start_link, [InstanceId]),
-    RDHT_tx_write =
-        util:sup_worker_desc(rdht_tx_write, rdht_tx_write, start_link, [InstanceId]),
-    TX_TM =
-        util:sup_worker_desc(tx_tm, tx_tm_rtm, start_link, [InstanceId, tx_tm]),
-    TX_RTM0 =
-        util:sup_worker_desc(tx_rtm0, tx_tm_rtm, start_link, [InstanceId, tx_rtm0]),
-    TX_RTM1 =
-        util:sup_worker_desc(tx_rtm1, tx_tm_rtm, start_link, [InstanceId, tx_rtm1]),
-    TX_RTM2 =
-        util:sup_worker_desc(tx_rtm2, tx_tm_rtm, start_link, [InstanceId, tx_rtm2]),
-    TX_RTM3 =
-        util:sup_worker_desc(tx_rtm3, tx_tm_rtm, start_link, [InstanceId, tx_rtm3]),
+-spec init([pid_groups:groupname()]) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
+init([DHTNodeGroup]) ->
+    pid_groups:join_as(DHTNodeGroup, ?MODULE),
+    RDHT_tx_read = util:sup_worker_desc(rdht_tx_read, rdht_tx_read, start_link,
+                                        [DHTNodeGroup]),
+    RDHT_tx_write = util:sup_worker_desc(rdht_tx_write, rdht_tx_write,
+                                         start_link, [DHTNodeGroup]),
+    TX_TM = util:sup_worker_desc(tx_tm, tx_tm_rtm, start_link,
+                                 [DHTNodeGroup, tx_tm]),
+    TX_RTM0 = util:sup_worker_desc(tx_rtm0, tx_tm_rtm, start_link,
+                                   [DHTNodeGroup, tx_rtm0]),
+    TX_RTM1 = util:sup_worker_desc(tx_rtm1, tx_tm_rtm, start_link,
+                                   [DHTNodeGroup, tx_rtm1]),
+    TX_RTM2 = util:sup_worker_desc(tx_rtm2, tx_tm_rtm, start_link,
+                                   [DHTNodeGroup, tx_rtm2]),
+    TX_RTM3 = util:sup_worker_desc(tx_rtm3, tx_tm_rtm, start_link,
+                                   [DHTNodeGroup, tx_rtm3]),
     {ok, {{one_for_all, 10, 1},
           [
            RDHT_tx_read, RDHT_tx_write,

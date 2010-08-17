@@ -27,7 +27,6 @@
 -vsn('$Id$').
 
 -behaviour(supervisor).
--include("scalaris.hrl").
 
 -export([start_link/1, start_link/2, init/1]).
 
@@ -71,13 +70,13 @@ start_link(SupervisorType, Options) ->
                                                         [ProcessDescr::any()]}}.
 init({SupervisorType, Options}) ->
     randoms:start(),
-    InstanceId = string:concat("scalaris_", randoms:getRandomId()),
+    ServiceGroup = pid_groups:new("common_services_"),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
-    {ok, {{one_for_one, 10, 1}, my_process_list(InstanceId, SupervisorType, Options)}}.
+    {ok, {{one_for_one, 10, 1}, my_process_list(SupervisorType, ServiceGroup, Options)}}.
 
--spec my_process_list/3 :: (instanceid(), supervisor_type(), list(tuple())) -> [any()].
-my_process_list(InstanceId, SupervisorType, Options) ->
+-spec my_process_list/3 :: (supervisor_type(), pid_groups:groupname(), list(tuple())) -> [any()].
+my_process_list(SupervisorType, ServiceGroup, Options) ->
     AdminServer =
         util:sup_worker_desc(admin_server, admin, start_link),
     BenchServer =
@@ -91,22 +90,22 @@ my_process_list(InstanceId, SupervisorType, Options) ->
     DHTNode =
         util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
     FailureDetector =
-        util:sup_worker_desc(fd, fd, start_link),
+        util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia =
         util:sup_worker_desc(ganglia_server, ganglia, start_link),
     Logger =
         util:sup_worker_desc(logger, log, start_link),
     MonitorTiming =
-        util:sup_worker_desc(monitor_timing, monitor_timing, start_link),
+        util:sup_worker_desc(monitor_timing, monitor_timing, start_link, [ServiceGroup]),
     BootServer =
-        util:sup_worker_desc(boot_server, boot_server, start_link),
+        util:sup_worker_desc(boot_server, boot_server, start_link, [ServiceGroup]),
     Service =
-        util:sup_worker_desc(service_per_vm, service_per_vm, start_link),
+        util:sup_worker_desc(service_per_vm, service_per_vm, start_link, [ServiceGroup]),
     YAWS =
         util:sup_worker_desc(yaws, yaws_wrapper, start_link,
                              [ preconfig:docroot(),
                                [{port, preconfig:yaws_port()},
-                                {listen, {0,0,0,0}}, {opaque, InstanceId}],
+                                {listen, {0,0,0,0}}],
                                [{max_open_conns, 800},
                                 {access_log, false},
                                 {logdir, preconfig:log_path()}]

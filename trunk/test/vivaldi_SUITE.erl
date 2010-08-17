@@ -33,7 +33,7 @@ init_per_suite(Config) ->
     Owner = self(),
     Pid = spawn(fun () ->
                         crypto:start(),
-                        process_dictionary:start_link(),
+                        pid_groups:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                         comm_port:start_link(),
                         timer:sleep(1000),
@@ -55,7 +55,7 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     reset_config(),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    gen_component:kill(process_dictionary),
+    gen_component:kill(pid_groups),
     error_logger:tty(false),
     exit(Pid, kill),
     Config.
@@ -77,7 +77,7 @@ test_init(Config) ->
     Config.
 
 test_on_trigger(Config) ->
-    process_dictionary:register_process(atom_to_list(?MODULE), cyclon, self()),
+    pid_groups:join_as(atom_to_list(?MODULE), cyclon),
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
@@ -125,7 +125,7 @@ test_on_cy_cache1(Config) ->
     Config.
 
 test_on_cy_cache2(Config) ->
-    process_dictionary:register_process(atom_to_list(?MODULE), dht_node, self()),
+    pid_groups:join_as(atom_to_list(?MODULE), dht_node),
 
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
@@ -141,10 +141,9 @@ test_on_cy_cache2(Config) ->
     Config.
 
 test_on_cy_cache3(Config) ->
-    erlang:put(instance_id, atom_to_list(?MODULE)),
     % register some other process as the dht_node
     DHT_Node = fake_dht_node(),
-%%     ?equals(process_dictionary:get_group_member(dht_node), DHT_Node),
+%%     ?equals(pid_groups:get_my(dht_node), DHT_Node),
 
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
@@ -186,7 +185,7 @@ fake_dht_node() ->
     end.
 
 fake_dht_node_start(Supervisor) ->
-    process_dictionary:register_process(atom_to_list(?MODULE), dht_node, self()),
+    pid_groups:join_as(atom_to_list(?MODULE), dht_node),
     Supervisor ! {started, self()},
     fake_process().
 

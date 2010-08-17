@@ -66,7 +66,6 @@ wait_for_stable_ring() ->
     end.
 
 check_ring_size(Size) ->
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     boot_server:number_of_nodes(),
     RSize = receive
         {get_list_length_response,L} ->

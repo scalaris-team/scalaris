@@ -30,7 +30,7 @@
                | term()};
            (any(), any()) -> {error, badarg}.
 start(normal, NodeType) ->
-    process_dictionary:start_link(),
+    pid_groups:start_link(),
     Sup = sup_scalaris:start_link(NodeType),
     Size = config:read(nodes_per_vm),
     log:log(info,"Do ~p~n",[Size]),

@@ -122,7 +122,7 @@ bench_cprof() ->
     Count.
 
 bench_fprof() ->
-    Count = fprof:apply(bench_increment, bench_raw, [], [{procs, process_dictionary:get_all_pids()}]),
+    Count = fprof:apply(bench_increment, bench_raw, [], [{procs, pid_groups:processes()}]),
     fprof:profile(),
     %fprof:analyse(),
     fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), % , totals, no_details, no_callers, {sort, acc}, 

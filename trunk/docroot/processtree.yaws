@@ -6,9 +6,9 @@ out(A) ->
 		{ok, Node} = postvar(A,"node"),
 		case Node of
 		  "processTreeRoot" ->
-		    {html, json:encode(process_dictionary:get_groups())};
+		    {html, json:encode(pid_groups:groups_as_json())};
 		  _ ->
-		    {html, json:encode(process_dictionary:get_processes_in_group(Node))}
+		    {html, json:encode(pid_groups:members_by_name_as_json(Node))}
 		end;
 	true ->
       		{ehtml, 

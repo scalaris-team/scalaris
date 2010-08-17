@@ -51,29 +51,33 @@ commit(TM, Client, ClientsID, TLog) ->
     comm:send_local(TM, Msg).
 
 %% be startable via supervisor, use gen_component
--spec start_link(instanceid(), any()) -> {ok, pid()}.
-start_link(InstanceId, Name) ->
+-spec start_link(pid_groups:groupname(), any()) -> {ok, pid()}.
+start_link(DHTNodeGroup, Role) ->
     gen_component:start_link(?MODULE,
-                             [InstanceId, Name],
-                             [{register, InstanceId, Name}]).
+                             [],
+                             [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
 %% initialize: return initial state.
--spec init([instanceid() | any()]) -> any().
-init([InstanceID, Name]) ->
-    ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n", [InstanceID, Name]),
+-spec init([]) -> any().
+init([]) ->
+    Role = pid_groups:my_pidname(),
+    ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n",
+           [pid_groups:my_groupname(), Role]),
     %% For easier debugging, use a named table (generates an atom)
     TableName =
         list_to_atom(lists:flatten(
-                       io_lib:format("~p_tx_tm_rtm_~p", [InstanceID, Name]))),
+                       io_lib:format("~p_tx_tm_rtm_~p",
+                                     [pid_groups:my_groupname(),
+                                      Role]))),
     pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
-    LAcceptor = process_dictionary:get_group_member(paxos_acceptor),
-    LLearner = process_dictionary:get_group_member(paxos_learner),
-    State = {_RTMs = [], TableName, _Role = Name, LAcceptor, LLearner},
+    LAcceptor = pid_groups:get_my(paxos_acceptor),
+    LLearner = pid_groups:get_my(paxos_learner),
+    State = {_RTMs = [], TableName, Role, LAcceptor, LLearner},
 
     %% start getting rtms and maintain them.
-    case Name of
+    case Role of
         tx_tm ->
             idholder:get_id(),
             gen_component:change_handler(State, on_init);
@@ -486,8 +490,7 @@ my_get_RTM_ids(IdSelf) ->
 my_RTM_update(RTMs) ->
     [ begin
           Name = list_to_atom(lists:flatten(io_lib:format("tx_rtm~p", [Nth]))),
-          lookup:unreliable_lookup(
-            Key, {get_rtm, comm:this(), Key, Name})
+          lookup:unreliable_lookup(Key, {get_rtm, comm:this(), Key, Name})
       end
       || {Key, _Pid, Nth} <- RTMs],
     comm:send_local_after(config:read(tx_rtm_update_interval),

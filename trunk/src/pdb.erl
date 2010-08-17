@@ -30,6 +30,8 @@
 
 -export([new/2, get/2, set/2, delete/2]).
 
+-include("scalaris.hrl").
+
 %% put/get variant
 -spec new(TableName::atom(), [set | ordered_set | bag | duplicate_bag |
                               public | protected | private |

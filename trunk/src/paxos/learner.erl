@@ -30,7 +30,7 @@
 -export([start_paxosid/5]).
 -export([stop_paxosids/2]).
 
--export([start_link/1, start_link/2]).
+-export([start_link/1]).
 -export([on/2, init/1]).
 -export([check_config/0]).
 
@@ -45,22 +45,18 @@ stop_paxosids(Learner, ListOfPaxosIDs) ->
     comm:send(Learner, {learner_deleteids, ListOfPaxosIDs}).
 
 %% startable via supervisor, use gen_component
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
-    start_link(InstanceId, []).
-
--spec start_link(instanceid(), [any()]) -> {ok, pid()}.
-start_link(InstanceId, Options) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE,
-                             [InstanceId, Options],
-                             [{register, InstanceId, paxos_learner}]).
+                             [],
+                             [{pid_groups_join_as, DHTNodeGroup, paxos_learner}]).
 
 %% initialize: return initial state.
--spec init([instanceid() | [any()]]) -> any().
-init([_InstanceID, _Options]) ->
-    ?TRACE("Starting learner for instance: ~p~n", [_InstanceID]),
+-spec init([pid_groups:groupname() | [any()]]) -> any().
+init([]) ->
+    ?TRACE("Starting learner for DHT node: ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
-    %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_learner", [InstanceID]))),
+    %%TableName = list_to_atom(lists:flatten(io_lib:format("~p_learner", [pid_groups:my_groupname()]))),
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     TableName = pdb:new(?MODULE, [set, protected]),

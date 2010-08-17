@@ -21,7 +21,7 @@
 
 -behaviour(gen_component).
 
--export([start_link/0, get_timers/0, log/2,
+-export([start_link/1, get_timers/0, log/2,
          on/2, init/1]).
 
 -ifdef(with_export_type_support).
@@ -86,6 +86,8 @@ init(_) ->
     ets:new(?MODULE, [set, protected, named_table]),
     {}.
 
--spec start_link() -> {ok, pid()}.
-start_link() ->
-    gen_component:start_link(?MODULE, [], [{register_native, ?MODULE}]).
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(ServiceGroup) ->
+    gen_component:start_link(?MODULE, [],
+                             [{erlang_register, ?MODULE},
+                              {pid_groups_join_as, ServiceGroup, ?MODULE}]).

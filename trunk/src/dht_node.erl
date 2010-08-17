@@ -25,7 +25,7 @@
 
 -behaviour(gen_component).
 
--export([start_link/1, start_link/2, on/2, init/1,
+-export([start_link/2, on/2, init/1,
          register_for_node_change/1, register_for_node_change/2,
          unregister_from_node_change/1, unregister_from_node_change/2,
          unregister_all_from_node_change/1, trigger_known_nodes/0]).
@@ -221,21 +221,21 @@ on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
     dht_node_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
 
 on({get_process_in_group, Source_PID, Key, Process}, State) ->
-    Pid = process_dictionary:get_group_member(Process),
+    Pid = pid_groups:get_my(Process),
     GPid = comm:make_global(Pid),
     comm:send(Source_PID, {get_process_in_group_reply, Key, GPid}),
     State;
 
 on({get_rtm, Source_PID, Key, Process}, State) ->
-    InstanceId = erlang:get(instance_id),
-    Pid = process_dictionary:get_group_member(Process),
-    SupTx = process_dictionary:get_group_member(sup_dht_node_core_tx),
+    MyGroup = pid_groups:my_groupname(),
+    Pid = pid_groups:get_my(Process),
+    SupTx = pid_groups:get_my(sup_dht_node_core_tx),
     NewPid = case Pid of
                  failed ->
                      %% start, if necessary
                      RTM_desc = util:sup_worker_desc(
                                   Process, tx_tm_rtm, start_link,
-                                  [InstanceId, Process]),
+                                  [MyGroup, Process]),
                      case supervisor:start_child(SupTx, RTM_desc) of
                          {ok, TmpPid} -> TmpPid;
                          {ok, TmpPid, _} -> TmpPid;
@@ -340,7 +340,7 @@ on({dump}, State) ->
     dht_node_state:dump(State),
     State;
 
-on({'$gen_cast', {debug_info, Requestor}}, State) ->
+on({web_debug_info, Requestor}, State) ->
     Load = dht_node_state:get(State, load),
     % get a list of up to 50 KV pairs to display:
     DataListTmp = [{lists:flatten(io_lib:format("~p", [Key])),
@@ -352,7 +352,8 @@ on({'$gen_cast', {debug_info, Requestor}}, State) ->
                    false -> DataListTmp
                end,
     KeyValueList =
-        [{"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
+        [{"rt_algorithm", lists:flatten(io_lib:format("~p", [?RT]))},
+         {"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
          {"succs", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, succlist)]))},
          {"preds", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, predlist)]))},
          {"me", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, node)]))},
@@ -368,7 +369,7 @@ on({'$gen_cast', {debug_info, Requestor}}, State) ->
          {"data (hashed_key, {value, writelock, readlocks, version}):", ""} |
             DataList 
         ],
-    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
 
@@ -408,8 +409,8 @@ on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec init([instanceid() | [any()]]) -> {join, {as_first}, msg_queue:msg_queue()} | {join, {phase1}, msg_queue:msg_queue()}.
-init([_InstanceId, Options]) ->
+-spec init([[any()]]) -> {join, {as_first}, msg_queue:msg_queue()} | {join, {phase1}, msg_queue:msg_queue()}.
+init([Options]) ->
     % io:format("~p~n", [application:get_env(scalaris, first)]),
     % first node in this vm and also vm is marked as first
     % or unit-test
@@ -429,14 +430,10 @@ init([_InstanceId, Options]) ->
 
 %% userdevguide-begin dht_node:start_link
 %% @doc spawns a scalaris node, called by the scalaris supervisor process
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
-    start_link(InstanceId, []).
-
--spec start_link(instanceid(), [any()]) -> {ok, pid()}.
-start_link(InstanceId, Options) ->
-    gen_component:start_link(?MODULE, [InstanceId, Options],
-                             [{register, InstanceId, dht_node}, wait_for_init]).
+-spec start_link(pid_groups:groupname(), [any()]) -> {ok, pid()}.
+start_link(DHTNodeGroup, Options) ->
+    gen_component:start_link(?MODULE, [Options],
+                             [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
 
 %% @doc Find existing nodes and as a side-effect initialize the comm_layer.
@@ -463,7 +460,7 @@ send_node_change(Pid, NewNode) ->
 %%      the dht_node changes its id.
 -spec register_for_node_change(Pid::comm:erl_local_pid()) -> ok.
 register_for_node_change(Pid) ->
-    comm:send_local(process_dictionary:get_group_member(dht_node),
+    comm:send_local(pid_groups:get_my(dht_node),
                     {reg_for_nc, Pid, fun send_node_change/2}).
 
 %% @doc Registers the given function to be called when the dht_node changes its
@@ -472,21 +469,21 @@ register_for_node_change(Pid) ->
                                fun((Subscriber::comm:erl_local_pid(),
                                     NewNode::node:node_type()) -> any())) -> ok.
 register_for_node_change(Pid, FunToExecute) ->
-    comm:send_local(process_dictionary:get_group_member(dht_node),
+    comm:send_local(pid_groups:get_my(dht_node),
                     {reg_for_nc, Pid, FunToExecute}).
 
 %% @doc Un-registers the given process from node change updates using the
 %%      default send_node_change/2 handler sending {node_update, Node} messages.
 -spec unregister_from_node_change(Pid::comm:erl_local_pid()) -> ok.
 unregister_from_node_change(Pid) ->
-    comm:send_local(process_dictionary:get_group_member(dht_node),
+    comm:send_local(pid_groups:get_my(dht_node),
                     {unreg_from_nc, Pid, fun send_node_change/2}).
 
 %% @doc Un-registers the given process from all node change updates using
 %%      any(!) message handler.
 -spec unregister_all_from_node_change(Pid::comm:erl_local_pid()) -> ok.
 unregister_all_from_node_change(Pid) ->
-    comm:send_local(process_dictionary:get_group_member(dht_node),
+    comm:send_local(pid_groups:get_my(dht_node),
                     {unreg_from_nc, Pid}).
 
 %% @doc Un-registers the given process from node change updates using
@@ -497,7 +494,7 @@ unregister_all_from_node_change(Pid) ->
                                   fun((Subscriber::comm:erl_local_pid(),
                                        NewNode::node:node_type()) -> any())) -> ok.
 unregister_from_node_change(Pid, FunToExecute) ->
-    comm:send_local(process_dictionary:get_group_member(dht_node),
+    comm:send_local(pid_groups:get_my(dht_node),
                     {unreg_from_nc, Pid, FunToExecute}).
 
 %% @doc Try to check whether common-test is running.

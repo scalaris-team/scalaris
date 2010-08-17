@@ -124,7 +124,6 @@ bp_barrier(Pid) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% generic framework
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% register, InstanceId, Name
 % profile
 -spec(start_link/2 :: (module(), term()) -> {ok, pid()}).
 start_link(Module, Args) ->
@@ -153,18 +152,22 @@ start(Module, Args, Options) ->
 -spec(start/4 :: (module(), any(), list(), comm:erl_local_pid()) -> ok).
 start(Module, Args, Options, Supervisor) ->
     %% io:format("Starting ~p~n",[Module]),
-    case lists:keysearch(register, 1, Options) of
-        {value, {register, InstanceId, Name}} ->
-            process_dictionary:register_process(InstanceId, Name, self()),
+    case lists:keysearch(pid_groups_join_as, 1, Options) of
+        {value, {pid_groups_join_as, GroupId, PidName}} ->
+            pid_groups:join_as(GroupId, PidName),
             ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self());
+        false -> ok
+    end,
+    case lists:keysearch(erlang_register, 1, Options) of
+        {value, {erlang_register, Name}} ->
+            case whereis(Name) of
+                undefined -> ok;
+                _ -> unregister(Name) %% unittests may leave garbage
+            end,
+            register(Name, self());
         false ->
-            case lists:keysearch(register_native, 1, Options) of
-                {value, {register_native,Name}} ->
-                    register(Name, self());
-                false ->
-                    ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
-                    ok
-            end
+            ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+            ok
     end,
     case lists:member(wait_for_init, Options) of
         true -> ok;
@@ -226,7 +229,7 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
         %% forward a message to group member by its process name
         %% initiated via comm:send_to_group_member()
         {send_to_group_member, Processname, Msg} ->
-            Pid = process_dictionary:get_group_member(Processname),
+            Pid = pid_groups:get_my(Processname),
             case Pid of
                 failed -> ok;
                 _ -> comm:send_local(Pid , Msg)

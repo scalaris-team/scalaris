@@ -948,7 +948,8 @@ firewalls.
 \item Don't use \erlfun{erlang}{now}{}, \erlfun{erlang}{send\_after}{},
   \erlmodule{receive after} etc. in performance critical code, consider
   using \erlmodule{msg\_delay} instead.
-\item Don't use \erlfun{tc}{timer}{} as it catches exceptions
+\item Don't use \erlfun{timer}{tc}{} as it catches exceptions. Use
+  \erlfun{util}{tc}{} instead.
 \end{itemize}
 
 \section{Testing Your Modifications and Extensions}
@@ -987,15 +988,15 @@ firewalls.
 
 \chapter{System Infrastructure}
 
-\section{The Process Dictionary}
-\label{sec:process_dictionary}
-\erlmoduleindex{process\_dictionary}
+\section{Groups of Processes}
+\label{sec:pid_groups}
+\erlmoduleindex{pid\_groups}
 
 \begin{itemize}
-\item What is it? How to distinguish from Erlangs internal process dictionary?
-\item Joining a process group (InstanceId is a group name)
+\item What is it? How to distinguish from Erlangs internal named processes?
+\item Joining a process group
 \item Why do we do this... (managing several independent nodes inside a single
-  Erlang VM)
+  Erlang VM for testing)
 \end{itemize}
 
 \section{\texorpdfstring{The Communication Layer \erlmodule{comm}}

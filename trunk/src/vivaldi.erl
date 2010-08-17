@@ -88,17 +88,17 @@ get_coordinate() ->
 %%      msg_get_coordinate_response/3
 -spec get_coordinate(comm:mypid()) -> ok.
 get_coordinate(Pid) ->
-    VivaldiPid = process_dictionary:get_group_member(vivaldi),
+    VivaldiPid = pid_groups:get_my(vivaldi),
     comm:send_local(VivaldiPid, {get_coordinate, Pid}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     Trigger = config:read(vivaldi_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, vivaldi}]).
+    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, vivaldi}]).
 
 -spec init(module()) -> vivaldi:state().
 init(Trigger) ->
@@ -164,12 +164,12 @@ on({get_coordinate, Pid}, {Coordinate, Confidence, _TriggerState} = State) ->
 % Web interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({'$gen_cast', {debug_info, Requestor}},
+on({web_debug_info, Requestor},
    {Coordinate, Confidence, _TriggerState} = State) ->
     KeyValueList =
         [{"coordinate", lists:flatten(io_lib:format("~p", [Coordinate]))},
          {"confidence", Confidence}],
-    comm:send_local(Requestor, {debug_info_response, KeyValueList}),
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

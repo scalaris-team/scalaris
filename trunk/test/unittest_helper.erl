@@ -38,7 +38,7 @@ make_ring_with_ids(Ids) ->
                         %timer:sleep(1000),
                         ct:pal("Trying to build Scalaris~n"),
                         randoms:start(),
-                        process_dictionary:start_link(),
+                        pid_groups:start_link(),
                         %timer:sleep(1000),
                         sup_scalaris:start_link(boot,
                                                 [{{idholder, id}, hd(Ids)}]),
@@ -76,7 +76,7 @@ make_ring(Size) ->
                         %timer:sleep(1000),
                         ct:pal("Trying to build Scalaris~n"),
                         randoms:start(),
-                        process_dictionary:start_link(),
+                        pid_groups:start_link(),
                         %timer:sleep(1000),
                         sup_scalaris:start_link(boot),
                         %timer:sleep(1000),
@@ -111,8 +111,8 @@ stop_ring(Pid) ->
             exit(Pid, kill),
             timer:sleep(1000),
             wait_for_process_to_die(Pid),
-            gen_component:kill(process_dictionary),
-            wait_for_table_to_disappear(process_dictionary),
+            gen_component:kill(pid_groups),
+            wait_for_table_to_disappear(pid_groups),
             timer:sleep(2000),
             ok
         end
@@ -174,7 +174,6 @@ wait_for_stable_ring_deep() ->
 
 -spec check_ring_size(non_neg_integer()) -> ok.
 check_ring_size(Size) ->
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     boot_server:number_of_nodes(),
     RSize = receive
         {get_list_length_response,L} ->

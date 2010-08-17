@@ -59,10 +59,10 @@ unsubscribe() ->
 
 %% @doc Starts a Dead Node Cache process, registers it with the process
 %%      dictionary and returns its pid for use by a supervisor.
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     Trigger = config:read(dn_cache_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{register, InstanceId, dn_cache}]).
+    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, dn_cache}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> state().
@@ -101,7 +101,7 @@ on({unsubscribe, Node}, {Queue, Subscriber, TriggerState}) ->
 %%      process. 
 -spec get_pid() -> pid() | failed.
 get_pid() ->
-    process_dictionary:get_group_member(dn_cache).
+    pid_groups:get_my(dn_cache).
 
 %% @doc Gets the zombie detector interval set in scalaris.cfg.
 -spec get_base_interval() -> pos_integer().

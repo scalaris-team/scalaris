@@ -58,7 +58,7 @@
 %%--------------------------------------------------------------------
 do_transaction(State, TransFun, SuccessMessage, FailureFun, Owner)->
     TID = transaction:generateTID(State),
-    InstanceId = erlang:get(instance_id),
+    InstanceId = pid_groups:my_groupname(),
     TM = spawn(tmanager, start_manager, [TransFun, SuccessMessage, FailureFun, Owner,  TID, InstanceId]),
     {{tid, TID},{tm, TM}}.
 
@@ -74,7 +74,7 @@ do_transaction(State, TransFun, SuccessMessage, FailureFun, Owner)->
 %%--------------------------------------------------------------------
 do_transaction_wo_readphase(State, Items, _SuccessFunArgument, SuccessFun, FailureFun, Owner)->
     TID = transaction:generateTID(State),
-    InstanceId = erlang:get(instance_id),
+    InstanceId = pid_groups:my_groupname(),
     TM = spawn(tmanager, start_manager_commit, [Items, SuccessFun, FailureFun, Owner, TID, InstanceId]),
     {{tid, TID},{tm, TM}}.
 
@@ -157,11 +157,10 @@ read_or_write(Key, Value, TransLog, Operation) ->
 %%              - retrieves value and version number remotely
 %%--------------------------------------------------------------------
 quorum_read(Key, SourcePID)->
-    InstanceId = erlang:get(instance_id),
+    InstanceId = pid_groups:my_groupname(),
     spawn(transaction, do_quorum_read, [Key, SourcePID, InstanceId]).
 
 do_quorum_read(Key, SourcePID, InstanceId)->
-    erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     Cookie = util:get_pids_uid(),
             [ lookup:unreliable_lookup(
@@ -241,12 +240,11 @@ write_read_receive(ReplicaKeys, Operation, Cookie, State)->
 %%--------------------------------------------------------------------
 -spec parallel_quorum_reads(Keys::[iodata() | integer()], TransLog::any(), SourcePID::comm:mypid()) -> pid().
 parallel_quorum_reads(Keys, TransLog, SourcePID) ->
-    InstanceId = erlang:get(instance_id),
+    InstanceId = pid_groups:my_groupname(),
     spawn(transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
 
--spec do_parallel_reads(Keys::[iodata() | integer()], SourcePID::comm:mypid(), TransLog::any(), InstanceId::instanceid()) -> ok.
+-spec do_parallel_reads(Keys::[iodata() | integer()], SourcePID::comm:mypid(), TransLog::any(), InstanceId::pid_groups:groupname()) -> ok.
 do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
-    erlang:put(instance_id, InstanceId),
     {Flag, NewTransLog} = parallel_reads(Keys, TransLog),
     if
         Flag =:= fail->
@@ -469,7 +467,9 @@ getRTMKeys(TID)->
 
 initRTM(State, Message)->
     TransID = Message#tm_message.transaction_id,
-    ERTMPID = spawn(tmanager, start_replicated_manager, [Message, erlang:get(instance_id)]),
+    ERTMPID = spawn(tmanager,
+                    start_replicated_manager,
+                    [Message, pid_groups:my_groupname()]),
     RTMPID = comm:make_global(ERTMPID),
     %% update transaction log: store mapping between transaction ID and local TM
     TransLog = dht_node_state:get(State, trans_log),
@@ -482,13 +482,12 @@ initRTM(State, Message)->
 %%      WARNING: this function can lead to inconsistencies
 -spec delete(SourcePid::comm:mypid(), Key::iodata() | integer()) -> ok.
 delete(SourcePID, Key) ->
-    InstanceId = erlang:get(instance_id),
+    InstanceId = pid_groups:my_groupname(),
     spawn(transaction, do_delete, [Key, SourcePID, InstanceId]),
     ok.
 
--spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::instanceid()) -> ok.
+-spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::pid_groups:groupname()) -> ok.
 do_delete(Key, SourcePID, InstanceId)->
-    erlang:put(instance_id, InstanceId),
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ lookup:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
         Replica <- ReplicaKeys],

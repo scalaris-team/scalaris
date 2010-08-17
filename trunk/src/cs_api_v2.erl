@@ -39,7 +39,6 @@ process_request_list([], [{commit}]) ->
 process_request_list(TLog, ReqList) ->
     %% @todo should choose a dht_node in the local VM at random or even
     %% better round robin.
-    erlang:put(instance_id, process_dictionary:find_group(dht_node)),
     %% replace operations by corresponding module names in ReqList
     %% number requests in ReqList to keep ordering more easily
     RDHT_ReqList = [ case element(1, Entry) of

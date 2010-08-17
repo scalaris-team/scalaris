@@ -58,7 +58,6 @@
 
 %% start a manager: it will execute the readphase and commit phase
 start_manager(TransFun, SuccessFun, FailureFun, Owner, TID, InstanceId)->
-    erlang:put(instance_id, InstanceId),
     {Res, ResVal} = tmanager:read_phase(TransFun),
     case Res of
         ok ->
@@ -75,7 +74,6 @@ start_manager(TransFun, SuccessFun, FailureFun, Owner, TID, InstanceId)->
 
 %% start a manager without a read phase
 start_manager_commit(Items, SuccessFun, FailureFun, Owner, TID, InstanceId)->
-    erlang:put(instance_id, InstanceId),
     commit_phase(Items, SuccessFun, empty ,FailureFun, Owner, TID).
 
 %% readphase: execute the transaction function
@@ -223,13 +221,13 @@ start_replicated_manager(Message, InstanceId)->
     {Leader, Items} = Message#tm_message.message,
     RKey = Message#tm_message.tm_key,
     TransID = Message#tm_message.transaction_id,
-    erlang:put(instance_id, InstanceId),
+%%    pid_groups:join(InstanceId),
     comm:send(Leader, {rtm, comm:this(), RKey}),
     TMState = trecords:new_tm_state(TransID, Items, Leader,
                                     {RKey, comm:this(), unknownballot}),
     loop(TMState),
     % done: remove tid_tm_mapping.
-    DHTNodePid = process_dictionary:get_group_member(dht_node),
+    DHTNodePid = pid_groups:find_a(dht_node),
     DHTNodePid ! {remove_tm_tid_mapping, TransID, comm:this()}.
 
 loop(TMState)->

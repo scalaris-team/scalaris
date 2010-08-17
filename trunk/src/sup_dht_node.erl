@@ -46,39 +46,41 @@ start_link() ->
                                 PeriodInSeconds::pos_integer()},
                                [ProcessDescr::any()]}}.
 init([Options]) ->
-    InstanceId = string:concat("dht_node_", randoms:getRandomId()),
-    process_dictionary:register_process(InstanceId, sup_dht_node, self()),
+    DHTNodeGroup = pid_groups:new("dht_node_"),
+    pid_groups:join_as(DHTNodeGroup, sup_dht_node),
     boot_server:connect(),
     KeyHolder =
         util:sup_worker_desc(idholder, idholder, start_link,
-                             [InstanceId, Options]),
-    Supervisor_AND =
-        util:sup_supervisor_desc(cs_supervisor_and, sup_dht_node_core, start_link,
-                                 [InstanceId, Options]),
+                             [DHTNodeGroup, Options]),
+    SupDHTNodeCore_AND =
+        util:sup_supervisor_desc(sup_dht_node_core, sup_dht_node_core,
+                                 start_link, [DHTNodeGroup, Options]),
     RingMaintenance =
-        util:sup_worker_desc(?RM, ?RM, start_link, [InstanceId]),
+        util:sup_worker_desc(?RM, ?RM, start_link, [DHTNodeGroup]),
     RoutingTable =
-        util:sup_worker_desc(routingtable, rt_loop, start_link, [InstanceId]),
+        util:sup_worker_desc(routingtable, rt_loop, start_link,
+                             [DHTNodeGroup]),
     DeadNodeCache =
-        util:sup_worker_desc(deadnodecache, dn_cache, start_link, [InstanceId]),
+        util:sup_worker_desc(deadnodecache, dn_cache, start_link,
+                             [DHTNodeGroup]),
     Vivaldi =
-        util:sup_worker_desc(vivaldi, vivaldi, start_link, [InstanceId]),
+        util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Reregister =
-        util:sup_worker_desc(dht_node_reregister, dht_node_reregister, start_link,
-                             [InstanceId]),
+        util:sup_worker_desc(dht_node_reregister, dht_node_reregister,
+                             start_link, [DHTNodeGroup]),
     DC_Clustering =
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
-                             [InstanceId]),
+                             [DHTNodeGroup]),
     Cyclon =
-        util:sup_worker_desc(cyclon, cyclon, start_link, [InstanceId]),
+        util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     Gossip =
-        util:sup_worker_desc(gossip, gossip, start_link, [InstanceId]),
+        util:sup_worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
     {ok, {{one_for_one, 10, 1},
           [
            Reregister,
            KeyHolder,
            RoutingTable,
-           Supervisor_AND,
+           SupDHTNodeCore_AND,
            Cyclon,
            DeadNodeCache,
            RingMaintenance,

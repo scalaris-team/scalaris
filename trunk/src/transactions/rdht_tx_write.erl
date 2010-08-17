@@ -27,9 +27,9 @@
 -include("scalaris.hrl").
 
 -behaviour(tx_op_beh).
--export([work_phase/2,work_phase/3,
-         validate_prefilter/1,validate/2,
-         commit/3,abort/3]).
+-export([work_phase/2, work_phase/3,
+         validate_prefilter/1, validate/2,
+         commit/3, abort/3]).
 
 -behaviour(rdht_op_beh).
 -export([tlogentry_get_status/1, tlogentry_get_value/1,
@@ -62,7 +62,7 @@ work_phase(ClientPid, ReqId, Request) ->
     %% Find rdht_tx_write process
     WriteValue = erlang:element(3, Request),
 
-    RdhtTxWritePid = process_dictionary:get_group_member(?MODULE),
+    RdhtTxWritePid = pid_groups:find_a(?MODULE),
     rdht_tx_read:work_phase(RdhtTxWritePid, {ReqId, ClientPid, WriteValue},
                             Request),
     ok.
@@ -148,26 +148,18 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
     end.
 
 %% be startable via supervisor, use gen_component
--spec start_link(instanceid()) -> {ok, pid()}.
-start_link(InstanceId) ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE,
-                             [InstanceId],
-                             [{register, InstanceId, ?MODULE}]).
+                             [],
+                             [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
 %% initialize: return initial state.
--spec init([instanceid()]) -> any().
-init([_InstanceID]) ->
-    ?TRACE("rdht_tx_write: Starting rdht_tx_write for instance: ~p~n", [_InstanceID]),
-    %% For easier debugging, use a named table (generates an atom)
-    %%TableName =
-    %%    list_to_atom(lists:flatten(
-    %%                   io_lib:format("~p_rdht_tx_write", [InstanceID]))),
-    %%ets:new(TableName, [set, private, named_table]),
-    %% use random table name provided by ets to *not* generate an atom
-    %%TableName = ets:new(?MODULE, [set, private]),
-    Reps = config:read(replication_factor),
-    Maj = config:read(quorum_factor),
-    _State = {Reps, Maj}.
+-spec init([]) -> any().
+init([]) ->
+    ?TRACE("rdht_tx_write: Starting rdht_tx_write for DHT node: ~p~n",
+           [pid_groups:my_groupname()]),
+    _State = null.
 
 %% reply triggered by rdht_tx_write:work_phase/3
 %% ClientPid and WriteValue could also be stored in local process state via ets
@@ -204,9 +196,5 @@ my_make_tlog_result_entry(TLogEntry, Request) ->
     end.
 
 %% @doc Checks whether used config parameters exist and are valid.
--spec check_config() -> boolean().
-check_config() ->
-    config:is_integer(quorum_factor) and
-    config:is_greater_than(quorum_factor, 0) and
-    config:is_integer(replication_factor) and
-    config:is_greater_than(replication_factor, 0).
+-spec check_config() -> true.
+check_config() -> true.

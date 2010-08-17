@@ -34,8 +34,8 @@ all() ->
      md5,
      next_hop_no_neighbors,
      next_hop_with_neighbors,
-     process_dictionary_lookup,
-     process_dictionary_lookup_by_pid,
+     pid_groups_lookup,
+     pid_groups_lookup_by_pid,
      ets_ordset_insert1,
      ets_ordset_insert2,
      ets_ordset_lookup1,
@@ -69,7 +69,7 @@ spawn_config_processes() ->
         spawn(fun () ->
                        file:set_cwd("../bin"),
 %%                        crypto:start(),
-                       process_dictionary:start_link(),
+                       pid_groups:start_link(),
                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                        Owner ! {continue},
                        receive {done} -> ok
@@ -300,47 +300,43 @@ next_hop_setup() ->
 
 next_hop_no_neighbors(_Config) ->
     Pid = spawn_config_processes(),
-    erlang:put(instance_id, "performance_SUITE_group"),
     State = next_hop_setup(),
     config:write(rt_size_use_neighbors, 0),
     iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) no neighbors"),
     iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) no neighbors"),
-    gen_component:kill(process_dictionary),
-    catch unregister(process_dictionary),
+    gen_component:kill(pid_groups),
+    catch unregister(pid_groups),
     exit(Pid, kill),
     ok.
 
 next_hop_with_neighbors(_Config) ->
     Pid = spawn_config_processes(),
-    erlang:put(instance_id, "performance_SUITE_group"),
     State = next_hop_setup(),
     config:write(rt_size_use_neighbors, 10),
     iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) with neighbors"),
     iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) with neighbors"),
-    gen_component:kill(process_dictionary),
-    catch unregister(process_dictionary),
+    gen_component:kill(pid_groups),
+    catch unregister(pid_groups),
     exit(Pid, kill),
     ok.
 
-process_dictionary_lookup(_Config) ->
-    {ok, _Pid} = process_dictionary:start_link(),
-    process_dictionary:register_process(atom_to_list(?MODULE), process_dictionary, self()),
+pid_groups_lookup(_Config) ->
+    {ok, _Pid} = pid_groups:start_link(),
+    pid_groups:join_as(atom_to_list(?MODULE), pid_groups),
     iter(count(), fun () ->
-                          process_dictionary:lookup_process(atom_to_list(?MODULE),
-                                                            process_dictionary)
-                  end, "lookup_process by instance_id"),
-    gen_component:kill(process_dictionary),
-    catch unregister(process_dictionary),
+                          pid_groups:pid_of(atom_to_list(?MODULE),
+                                            pid_groups)
+                  end, "pid_of by group and process name"),
+    gen_component:kill(pid_groups),
     ok.
 
-process_dictionary_lookup_by_pid(_Config) ->
-    {ok, _Pid} = process_dictionary:start_link(),
-    process_dictionary:register_process(atom_to_list(?MODULE), process_dictionary, self()),
+pid_groups_lookup_by_pid(_Config) ->
+    {ok, _Pid} = pid_groups:start_link(),
+    pid_groups:join_as(atom_to_list(?MODULE), pid_groups),
     iter(count(), fun () ->
-                          process_dictionary:lookup_process(self())
-                  end, "lookup_process by pid"),
-    gen_component:kill(process_dictionary),
-    catch unregister(process_dictionary),
+                          pid_groups:group_and_name_of(self())
+                  end, "group_and_name_of pid"),
+    gen_component:kill(pid_groups),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

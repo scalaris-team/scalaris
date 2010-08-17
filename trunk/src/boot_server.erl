@@ -21,7 +21,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([start_link/0,
+-export([start_link/1,
          number_of_nodes/0,
          node_list/0,
          connect/0]).
@@ -37,7 +37,7 @@
     {get_list, Ping_PID::comm:mypid()} |
     {be_the_first, Ping_PID::comm:mypid()} |
     {get_list_length, Ping_PID::comm:mypid()} |
-    {register, Ping_PID::comm:mypid()} |
+    {pid_groups_join_as, Ping_PID::comm:mypid()} |
     {connect}).
 
 % internal state
@@ -77,7 +77,7 @@ on({get_list_length, Ping_PID}, {Nodes} = State) ->
     comm:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
     State;
 
-on({register, Ping_PID}, {Nodes}) ->
+on({pid_groups_join_as, Ping_PID}, {Nodes}) ->
     fd:subscribe(Ping_PID),
     NewNodes = gb_sets:add(Ping_PID, Nodes),
     {NewNodes};
@@ -100,9 +100,11 @@ init(_Arg) ->
 
 %% @doc starts the server; called by the boot supervisor
 %% @see sup_scalaris
--spec start_link() -> {ok, pid()}.
-start_link() ->
-     gen_component:start_link(?MODULE, [], [{register_native, boot}]).
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(ServiceGroup) ->
+     gen_component:start_link(?MODULE, [],
+                              [{erlang_register, boot},
+                               {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
 %% @doc pid of the boot daemon
 -spec bootPid() -> comm:mypid().

@@ -86,7 +86,7 @@ same_process(Node1, Pid2) when is_record(Node1, node) ->
 %%      the requesting process.
 -spec is_me(node_type() | null | unknown) -> boolean().
 is_me(Node) ->
-    same_process(Node, process_dictionary:get_group_member(dht_node)).
+    same_process(Node, pid_groups:get_my(dht_node)).
 
 %% @doc Determines whether Node1 is a newer instance of Node2.
 %%      Note: Both nodes need to share the same PID, otherwise an exception of
