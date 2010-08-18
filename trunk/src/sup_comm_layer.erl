@@ -38,7 +38,7 @@ init([]) ->
         util:sup_worker_desc(comm_port, comm_port, start_link),
     CommAcceptor =
         util:sup_worker_desc(comm_acceptor, comm_acceptor, start_link,
-                             [InstanceId]),
+                             [Group]),
     CommLogger =
         util:sup_worker_desc(comm_logger, comm_logger, start_link),
     {ok, {{one_for_all, 10, 1},
