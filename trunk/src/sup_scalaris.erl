@@ -70,7 +70,7 @@ start_link(SupervisorType, Options) ->
                                                         [ProcessDescr::any()]}}.
 init({SupervisorType, Options}) ->
     randoms:start(),
-    ServiceGroup = pid_groups:new("common_services_"),
+    ServiceGroup = pid_groups:new("basic_services_"),
     error_logger:logfile({open, preconfig:cs_log_file()}),
     inets:start(),
     {ok, {{one_for_one, 10, 1}, my_process_list(SupervisorType, ServiceGroup, Options)}}.
@@ -81,8 +81,8 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
         util:sup_worker_desc(admin_server, admin, start_link),
     BenchServer =
         util:sup_worker_desc(bench_server, bench_server, start_link),
-    CommPort =
-        util:sup_supervisor_desc(comm_port_sup, comm_port_sup, start_link),
+    CommLayer =
+        util:sup_supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
     Config =
         util:sup_worker_desc(config, config, start_link,
                              [[preconfig:config(), preconfig:local_config()]]),
@@ -115,7 +115,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                      Service,
                      Logger,
                      MonitorTiming,
-                     CommPort,
+                     CommLayer,
                      FailureDetector,
                      AdminServer],
     %% do we want to run an empty boot-server?

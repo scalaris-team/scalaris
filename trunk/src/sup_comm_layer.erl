@@ -1,5 +1,5 @@
-%  Copyright 2008, 2009 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%
+%% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,11 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : comm_port_sup.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : 
-%%%
-%%% Created : 04 Feb 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
-%% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%% @version $Id$
--module(comm_port_sup).
 
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @author Florian Schintke <schintke@zib.de>
+%% @version $Id$
+-module(sup_comm_layer).
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -39,7 +32,8 @@ start_link() ->
                                       PeriodInSeconds::pos_integer()},
                          [ProcessDescr::any()]}}.
 init([]) ->
-    InstanceId = string:concat("comm_port_", randoms:getRandomId()),
+    Group = pid_groups:new("comm_layer_"),
+    pid_groups:join_as(Group, ?MODULE),
     CommPort =
         util:sup_worker_desc(comm_port, comm_port, start_link),
     CommAcceptor =
