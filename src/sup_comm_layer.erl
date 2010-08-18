@@ -32,18 +32,19 @@ start_link() ->
                                       PeriodInSeconds::pos_integer()},
                          [ProcessDescr::any()]}}.
 init([]) ->
-    Group = pid_groups:new("comm_layer_"),
-    pid_groups:join_as(Group, ?MODULE),
-    CommPort =
-        util:sup_worker_desc(comm_port, comm_port, start_link),
+    CommLayerGroup = pid_groups:new("comm_layer_"),
+    pid_groups:join_as(CommLayerGroup, ?MODULE),
+    CommServer =
+        util:sup_worker_desc(comm_server, comm_server, start_link,
+                             [CommLayerGroup]),
     CommAcceptor =
         util:sup_worker_desc(comm_acceptor, comm_acceptor, start_link,
-                             [Group]),
+                             [CommLayerGroup]),
     CommLogger =
         util:sup_worker_desc(comm_logger, comm_logger, start_link),
     {ok, {{one_for_all, 10, 1},
           [
-           CommPort,
+           CommServer,
            CommLogger,
            CommAcceptor
           ]}}.

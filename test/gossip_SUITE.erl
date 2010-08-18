@@ -88,9 +88,9 @@ init_per_suite(Config) ->
                         crypto:start(),
                         pid_groups:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                        comm_port:start_link(),
+                        comm_server:start_link(pid_groups:new("comm_layer_")),
                         timer:sleep(1000),
-                        comm_port:set_local_address({127,0,0,1},14195),
+                        comm_server:set_local_address({127,0,0,1},14195),
                         application:start(log4erl),
                         Owner ! {continue},
                         receive {done} -> ok

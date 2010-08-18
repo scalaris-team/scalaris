@@ -95,7 +95,7 @@ open_new_async(Address, Port, _MyAddr, MyPort) ->
     Pid = spawn(fun () ->
                         case new_connection(Address, Port, MyPort) of
                             fail ->
-                                comm_port:unregister_connection(Address, Port),
+                                comm_server:unregister_connection(Address, Port),
                                 ok;
                             Socket ->
                                 loop(Socket, Address, Port)
@@ -110,7 +110,7 @@ send({_Address, _Port, Socket}, Pid, Message) ->
     ok.
 
 loop(fail, Address, Port) ->
-    comm_port:unregister_connection(Address, Port),
+    comm_server:unregister_connection(Address, Port),
     ok;
 loop(Socket, Address, Port) ->
     receive
@@ -118,7 +118,7 @@ loop(Socket, Address, Port) ->
             send({Address, Port, Socket}, Pid, Message),
             loop(Socket, Address, Port);
         {tcp_closed, Socket} ->
-                comm_port:unregister_connection(Address, Port),
+                comm_server:unregister_connection(Address, Port),
                 gen_tcp:close(Socket);
         {tcp, Socket, Data} ->
             case binary_to_term(Data) of
@@ -127,7 +127,7 @@ loop(Socket, Address, Port) ->
                     inet:setopts(Socket, [{active, once}]),
                     loop(Socket, Address, Port);
                 {user_close} ->
-                    comm_port:unregister_connection(Address, Port),
+                    comm_server:unregister_connection(Address, Port),
                     gen_tcp:close(Socket);
                 {youare, _Address, _Port} ->
                     %% @TODO what do we get from this information?
@@ -148,12 +148,12 @@ loop(Socket, Address, Port) ->
                     %% ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
                     ok;
                 {error, closed} ->
-                    comm_port:unregister_connection(Address, Port),
+                    comm_server:unregister_connection(Address, Port),
                     close_connection(Socket);
                 {error, _Reason} ->
                     %% log:log(error,"[ CC ] couldn't send to ~p:~p (~p)",
                     %% [Address, Port, Reason]),
-                    comm_port:unregister_connection(Address, Port),
+                    comm_server:unregister_connection(Address, Port),
                     close_connection(Socket)
             end,
             loop(Socket, Address, Port);
