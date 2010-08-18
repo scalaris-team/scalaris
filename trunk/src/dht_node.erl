@@ -293,6 +293,18 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
 %    end,
     State;
 
+%% for unit testing only: allow direct DB manipulation
+on({get_key_entry, Source_PID, Key}, State) ->
+    Entry = ?DB:get_entry(dht_node_state:get(State, db), Key),
+    comm:send(Source_PID, {get_key_entry_reply, Entry}),
+    State;
+
+on({set_key_entry, Source_PID, Entry}, State) ->
+    Key = db_entry:get_key(Entry),
+    NewDB = ?DB:set_entry(dht_node_state:get(State, db), Entry),
+    comm:send(Source_PID, {set_key_entry_reply, Entry}),
+    dht_node_state:set_db(State, NewDB);
+
 on({delete_key, Source_PID, Key}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     case intervals:in(Key, MyRange) of
