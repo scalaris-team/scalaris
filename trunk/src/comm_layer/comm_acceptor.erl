@@ -43,7 +43,7 @@ init(Supervisor) ->
                  open_listen_port(preconfig:cs_port(), config:read(listen_ip))
          end,
     {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
-    comm_port:set_local_address(undefined, LocalPort),
+    comm_server:set_local_address(undefined, LocalPort),
     %io:format("this() == ~w~n", [{LocalAddress, LocalPort}]),
     Supervisor ! {started},
     server(LS).
@@ -51,10 +51,10 @@ init(Supervisor) ->
 server(LS) ->
     case gen_tcp:accept(LS) of
         {ok, S} ->
-            case comm_port:get_local_address_port() of
+            case comm_server:get_local_address_port() of
                 {undefined, LocalPort} ->
                     {ok, {MyIP, _LocalPort}} = inet:sockname(S),
-                    comm_port:set_local_address(MyIP, LocalPort);
+                    comm_server:set_local_address(MyIP, LocalPort);
                 _ ->
                     ok
             end,
@@ -79,7 +79,7 @@ server(LS) ->
                     NewPid = comm_connection:new(NewAddress, Port, S),
                     gen_tcp:controlling_process(S, NewPid),
                     inet:setopts(S, comm_connection:tcp_options()),
-                    comm_port:register_connection(NewAddress, Port, NewPid, S)
+                    comm_server:register_connection(NewAddress, Port, NewPid, S)
             end,
             server(LS);
         Other ->

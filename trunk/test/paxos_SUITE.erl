@@ -38,7 +38,7 @@ suite() ->
 init_per_suite(Config) ->
     file:set_cwd("../bin"),
     Pid = unittest_helper:make_ring(2),
-    comm_port:set_local_address({127,0,0,1},14195),
+    comm_server:set_local_address({127,0,0,1},14195),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
