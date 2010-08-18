@@ -162,9 +162,9 @@ start(Module, Args, Options, Supervisor) ->
         {value, {erlang_register, Name}} ->
             case whereis(Name) of
                 undefined -> ok;
-                _ -> unregister(Name) %% unittests may leave garbage
+                _ -> catch(unregister(Name)) %% unittests may leave garbage
             end,
-            register(Name, self());
+            catch(register(Name, self()));
         false ->
             ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
             ok
