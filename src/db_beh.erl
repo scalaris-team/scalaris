@@ -45,7 +45,7 @@ behaviour_info(callbacks) ->
      {get_entries, 2}, {get_entries, 3},
      {update_entries, 4},
      % record changes
-     {record_changes, 2}, {stop_record_changes, 1},
+     {record_changes, 2}, {stop_record_changes, 1}, {stop_record_changes, 2},
      {get_changes, 1}, {get_changes, 2},
      % debugging
      {check_db, 1}

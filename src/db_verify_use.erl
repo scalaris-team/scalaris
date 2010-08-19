@@ -157,12 +157,19 @@ record_changes({DB, Counter} = DB_, NewInterval) ->
     verify_counter(Counter),
     {?BASE_DB:record_changes(DB, NewInterval), update_counter(Counter)}.
 
-%% @doc Stops recording changes and deletes all entries of the table of changed
-%%      keys. 
+%% @doc Stops recording changes and removes all entries from the table of
+%%      changed keys.
 stop_record_changes({DB, Counter} = DB_) ->
     ?TRACE1(stop_record_changes, DB_),
     verify_counter(Counter),
     {?BASE_DB:stop_record_changes(DB), update_counter(Counter)}.
+
+%% @doc Stops recording changes in the given interval and removes all such
+%%      entries from the table of changed keys.
+stop_record_changes({DB, Counter} = DB_, Interval) ->
+    ?TRACE2(stop_record_changes, DB_, Interval),
+    verify_counter(Counter),
+    {?BASE_DB:stop_record_changes(DB, Interval), update_counter(Counter)}.
 
 %% @doc Gets all db_entry objects which have been changed or deleted.
 get_changes({DB, Counter} = DB_) ->

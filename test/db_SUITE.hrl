@@ -54,7 +54,8 @@ tests_avail() ->
      tester_changed_keys_get_data,
      tester_changed_keys_add_data,
      tester_changed_keys_check_db,
-     tester_changed_keys_mult_interval
+     tester_changed_keys_mult_interval,
+     tester_stop_record_changes
     ].
 
 suite() ->
@@ -885,8 +886,7 @@ prop_changed_keys_get_entry(Data, ChangesInterval_, Key) ->
     ?TEST_DB:get_entry(DB3, Key),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_entry_1"),
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "changed_keys_get_entry_2"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entry_2"),
     
     ?TEST_DB:close(DB4),
     true.
@@ -905,8 +905,7 @@ prop_changed_keys_set_entry(Data, ChangesInterval_, Entry) ->
     check_changes(DB4, ChangesInterval, "changed_keys_set_entry_1"),
     check_entry_in_changes(DB4, ChangesInterval, Entry, Old, "changed_keys_set_entry_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "changed_keys_set_entry_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_keys_set_entry_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -933,8 +932,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval_, UpdateVal) ->
     check_changes(DB4, ChangesInterval, "changed_update_entry_1"),
     check_entry_in_changes(DB4, ChangesInterval, UpdatedElement, Old, "changed_update_entry_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "changed_update_entry_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_update_entry_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -953,8 +951,7 @@ prop_changed_keys_delete_entry(Data, ChangesInterval_, Entry) ->
     check_changes(DB4, ChangesInterval, "delete_entry_1"),
     check_key_in_deleted(DB4, ChangesInterval, db_entry:get_key(Entry), Old, "delete_entry_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "delete_entry_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "delete_entry_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -971,8 +968,7 @@ prop_changed_keys_read(Data, ChangesInterval_, Key) ->
     ?TEST_DB:read(DB3, Key),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_read_1"),
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "changed_keys_read_2"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_read_2"),
 
     ?TEST_DB:close(DB4),
     true.
@@ -992,8 +988,7 @@ prop_changed_keys_write(Data, ChangesInterval_, Key, Value, Version) ->
     ChangedEntry = ?TEST_DB:get_entry(DB4, Key),
     check_entry_in_changes(DB4, ChangesInterval, ChangedEntry, Old, "changed_keys_write_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "changed_keys_write_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_keys_write_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1012,8 +1007,7 @@ prop_changed_keys_delete(Data, ChangesInterval_, Key) ->
     check_changes(DB4, ChangesInterval, "delete_1"),
     check_key_in_deleted(DB4, ChangesInterval, Key, Old, "delete_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "delete_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "delete_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1033,8 +1027,7 @@ prop_changed_keys_set_write_lock(Data, ChangesInterval_, Key) ->
     check_changes(DB4, ChangesInterval, "set_write_lock_1"),
     check_entry_in_changes(DB4, ChangesInterval, NewEntry, Old, "set_write_lock_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "set_write_lock_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "set_write_lock_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1054,8 +1047,7 @@ prop_changed_keys_unset_write_lock(Data, ChangesInterval_, Key) ->
     check_changes(DB4, ChangesInterval, "unset_write_lock_1"),
     check_entry_in_changes(DB4, ChangesInterval, NewEntry, Old, "unset_write_lock_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "unset_write_lock_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "unset_write_lock_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1075,8 +1067,7 @@ prop_changed_keys_set_read_lock(Data, ChangesInterval_, Key) ->
     check_changes(DB4, ChangesInterval, "set_read_lock_1"),
     check_entry_in_changes(DB4, ChangesInterval, NewEntry, Old, "set_read_lock_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "set_read_lock_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "set_read_lock_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1096,8 +1087,7 @@ prop_changed_keys_unset_read_lock(Data, ChangesInterval_, Key) ->
     check_changes(DB4, ChangesInterval, "unset_read_lock_1"),
     check_entry_in_changes(DB4, ChangesInterval, NewEntry, Old, "unset_read_lock_2"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "unset_read_lock_3"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "unset_read_lock_3"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1115,8 +1105,7 @@ prop_changed_keys_get_entries2(Data, ChangesInterval_, Interval_) ->
     ?TEST_DB:get_entries(DB3, Interval),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_entries2_1"),
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "changed_keys_get_entries2_2"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entries2_2"),
 
     ?TEST_DB:close(DB4),
     true.
@@ -1139,8 +1128,7 @@ prop_changed_keys_get_entries4(Data, ChangesInterval_, Interval_) ->
     ?TEST_DB:get_entries(DB3, FilterFun, ValueFun),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_entries4_1"),
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "changed_keys_get_entries4_2"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entries4_2"),
 
     ?TEST_DB:close(DB4),
     true.
@@ -1168,8 +1156,7 @@ prop_changed_keys_update_entries(Data, ChangesInterval_, Entry1, Entry2) ->
     check_entry_in_changes(DB4, ChangesInterval, NewEntry1, Old1, "update_entries_2"),
     check_entry_in_changes(DB4, ChangesInterval, NewEntry2, Old2, "update_entries_3"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "changed_keys_get_load_2"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "update_entries_4"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1185,8 +1172,7 @@ prop_changed_keys_get_load(Data, ChangesInterval_) ->
     ?TEST_DB:get_load(DB3),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_load_1"),
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "changed_keys_get_load_2"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_load_2"),
 
     ?TEST_DB:close(DB4),
     true.
@@ -1205,8 +1191,7 @@ prop_changed_keys_split_data1(Data, ChangesInterval_, MyNewInterval_) ->
     {DB4, _HisList} = ?TEST_DB:split_data(DB3, MyNewInterval),
     ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "split_data1_1"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "split_data1_2"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "split_data1_2"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1226,8 +1211,7 @@ prop_changed_keys_split_data2(Data, ChangesInterval_, MyNewInterval_) ->
     
     check_changes(DB4, intervals:intersection(ChangesInterval, MyNewInterval), "split_data2_1"),
     
-    DB5 = ?TEST_DB:stop_record_changes(DB4),
-    ?equals_w_note(?TEST_DB:get_changes(DB5), {[], []}, "split_data2_2"),
+    DB5 = check_stop_record_changes(DB4, ChangesInterval, "split_data2_2"),
 
     ?TEST_DB:close(DB5),
     true.
@@ -1243,8 +1227,7 @@ prop_changed_keys_get_data(Data, ChangesInterval_) ->
     ?TEST_DB:get_data(DB3),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_data_1"),
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "changed_keys_get_data_2"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_data_2"),
 
     ?TEST_DB:close(DB4),
     true.
@@ -1268,8 +1251,7 @@ prop_changed_keys_add_data(Data, ChangesInterval_) ->
     [check_entry_in_changes(DB3, ChangesInterval, E, {false, db_entry:new(db_entry:get_key(E))}, "add_data_2")
         || E <- UniqueData],
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "add_data_3"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "add_data_3"),
 
     ?TEST_DB:close(DB4),
     true.
@@ -1285,8 +1267,7 @@ prop_changed_keys_check_db(Data, ChangesInterval_) ->
     ?TEST_DB:check_db(DB3),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_check_db_1"),
     
-    DB4 = ?TEST_DB:stop_record_changes(DB3),
-    ?equals_w_note(?TEST_DB:get_changes(DB4), {[], []}, "changed_keys_check_db_2"),
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_check_db_2"),
 
     ?TEST_DB:close(DB4),
     true.
@@ -1328,11 +1309,78 @@ prop_changed_keys_mult_interval(Data, Entry1, Entry2, Entry3, Entry4) ->
     check_changes(DB10, CI1_2, "changed_keys_mult_interval_7"),
     check_entry_in_changes(DB10, CI1_2, Entry4, Old4, "changed_keys_mult_interval_8"),
     
-    DB11 = ?TEST_DB:stop_record_changes(DB10),
-    ?equals_w_note(?TEST_DB:get_changes(DB11), {[], []}, "changed_keys_mult_interval_9"),
+    DB11 = check_stop_record_changes(DB10, CI1_2, "changed_keys_mult_interval_9"),
 
     ?TEST_DB:close(DB11),
     true.
+
+-spec prop_stop_record_changes(
+        Data::?TEST_DB:db_as_list(), Entry1::db_entry:entry(),
+        Entry2::db_entry:entry(), Entry3::db_entry:entry(),
+        Entry4::db_entry:entry()) -> true.
+prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
+    CI1 = intervals:union(intervals:new(db_entry:get_key(Entry1)),
+                          intervals:new(db_entry:get_key(Entry2))),
+    CI2 = intervals:union(intervals:new(db_entry:get_key(Entry3)),
+                          intervals:new(db_entry:get_key(Entry4))),
+    CI1_2 = intervals:union(CI1, CI2),
+    CI1_wo2 = intervals:minus(CI1, CI2),
+    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB2 = ?TEST_DB:add_data(DB, Data),
+    
+    DB3 = ?TEST_DB:record_changes(DB2, CI1_2),
+    Old1 = ?TEST_DB:get_entry2(DB3, db_entry:get_key(Entry1)),
+    DB4 = ?TEST_DB:set_entry(DB3, Entry1),
+    check_changes(DB4, CI1_2, "stop_record_changes_1"),
+    check_entry_in_changes(DB4, CI1_2, Entry1, Old1, "stop_record_changes_2"),
+    
+    Old3 = ?TEST_DB:get_entry2(DB4, db_entry:get_key(Entry3)),
+    DB5 = ?TEST_DB:set_entry(DB4, Entry3),
+    check_changes(DB5, CI1_2, "stop_record_changes_3"),
+    check_entry_in_changes(DB5, CI1_2, Entry3, Old3, "stop_record_changes_4"),
+    
+    DB6 = ?TEST_DB:stop_record_changes(DB5, CI2),
+    check_changes(DB6, CI1_wo2, "stop_record_changes_5"),
+    check_entry_in_changes(DB6, CI1_wo2, Entry1, Old1, "stop_record_changes_6"),
+    
+    Old2 = ?TEST_DB:get_entry2(DB6, db_entry:get_key(Entry2)),
+    DB7 = ?TEST_DB:set_entry(DB6, Entry2),
+    check_changes(DB7, CI1_wo2, "stop_record_changes_7"),
+    check_entry_in_changes(DB7, CI1_wo2, Entry2, Old2, "stop_record_changes_8"),
+    
+    Old4 = ?TEST_DB:get_entry2(DB7, db_entry:get_key(Entry4)),
+    DB8 = ?TEST_DB:set_entry(DB7, Entry4),
+    check_changes(DB8, CI1_wo2, "stop_record_changes_9"),
+    check_entry_in_changes(DB8, CI1_wo2, Entry4, Old4, "stop_record_changes_10"),
+    
+    DB9 = ?TEST_DB:stop_record_changes(DB8),
+    ?equals_w_note(?TEST_DB:get_changes(DB9), {[], []}, "stop_record_changes_11"),
+
+    ?TEST_DB:close(DB9),
+    true.
+
+get_random_interval_from_changes(DB) ->
+    {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
+    case ChangedEntries =/= [] orelse DeletedKeys =/= [] of
+        true ->
+            intervals:new(util:randomelem(
+                            lists:append(
+                              [db_entry:get_key(E) || E <- ChangedEntries],
+                              DeletedKeys)));
+        _    -> intervals:empty()
+    end.
+
+-spec check_stop_record_changes(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Note::string()) -> ?TEST_DB:db().
+check_stop_record_changes(DB, ChangesInterval, Note) ->
+    I1 = get_random_interval_from_changes(DB),
+    DB2 = ?TEST_DB:stop_record_changes(DB, I1),
+    check_changes(DB2, intervals:minus(ChangesInterval, I1), string:concat(Note, "a")),
+
+    DB3 = ?TEST_DB:stop_record_changes(DB2),
+    ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, string:concat(Note, "b")),
+
+    DB3.
+    
 
 %% @doc Checks that all entries returned by ?TEST_DB:get_changes/1 are in the
 %%      given interval.
@@ -1474,6 +1522,9 @@ tester_changed_keys_check_db(_Config) ->
 
 tester_changed_keys_mult_interval(_Config) ->
     tester:test(?MODULE, prop_changed_keys_mult_interval, 5, rw_suite_runs(1000)).
+
+tester_stop_record_changes(_Config) ->
+    tester:test(?MODULE, prop_stop_record_changes, 5, rw_suite_runs(1000)).
 
 
 % helper functions:
