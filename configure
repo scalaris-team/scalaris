@@ -567,6 +567,7 @@ ERLANG_LIB_DIR_common_test
 ERLANG_TOKE_FLAGS
 ERLANG_LIB_VER_toke
 ERLANG_LIB_DIR_toke
+EPMD
 ERLANG_ERTS_VER
 ERLANG_LIB_DIR
 ERLANG_ROOT_DIR
@@ -2180,6 +2181,49 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $erlang_cv_erts_ver" >&5
 $as_echo "$erlang_cv_erts_ver" >&6; }
 ERLANG_ERTS_VER=$erlang_cv_erts_ver
+
+
+# Extract the first word of "epmd", so it can be a program name with args.
+set dummy epmd; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_EPMD+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $EPMD in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_EPMD="$EPMD" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy=""$PATH:$ERLANG_ROOT_DIR/bin:$ERLANG_ROOT_DIR/erts-$ERLANG_ERTS_VER/bin""
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_EPMD="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_EPMD" && ac_cv_path_EPMD=""/bin/false""
+  ;;
+esac
+fi
+EPMD=$ac_cv_path_EPMD
+if test -n "$EPMD"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $EPMD" >&5
+$as_echo "$EPMD" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
 
 
 ERLANG_TOKE_FLAGS=

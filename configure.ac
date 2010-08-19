@@ -74,6 +74,8 @@ AC_CACHE_CHECK([for Erlang/OTP ERTS version],
     ])
 AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
+AC_PATH_PROG(EPMD, epmd, "/bin/false", "$PATH:$ERLANG_ROOT_DIR/bin:$ERLANG_ROOT_DIR/erts-$ERLANG_ERTS_VER/bin")
+
 ERLANG_TOKE_FLAGS=
 AS_IF([test "x$TOKEPREFIX" != xno],
             [
