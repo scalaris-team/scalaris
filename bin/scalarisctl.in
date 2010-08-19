@@ -147,16 +147,24 @@ checkinstallation() {
         exit 1
     fi
 
-    ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
-    JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
-    if [ $ERLANGHOST != $JAVAHOST ]; then
-        echo -n "ERROR: the hostnames reported by Erlang and Java do not match"
-        echo " please check that /etc/hosts and DNS are consistent"
-        echo "erlang: $ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
-        echo "     -> $ERLANGHOST"
-        echo "java:   $SCALARISCLIENT -lh"
-        echo "     -> $JAVAHOST"
-        exit 1
+    $SCALARISCLIENT > /dev/null 2>/dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -n "INFO: could not find Scalaris' Java-API files. "
+        echo "You won't be able to use the 'scalaris' command line script to access Scalaris."
+        echo "$SCALARISCLIENT"
+    else
+        ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
+        JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
+        if [ $ERLANGHOST != $JAVAHOST ]; then
+            echo -n "ERROR: the hostnames reported by Erlang and Java do not match"
+            echo " please check that /etc/hosts and DNS are consistent"
+            echo "erlang: $ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
+            echo "     -> $ERLANGHOST"
+            echo "java:   $SCALARISCLIENT -lh"
+            echo "     -> $JAVAHOST"
+            exit 1
+        fi
     fi
 
     CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
