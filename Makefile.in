@@ -22,7 +22,7 @@ MAKE = make
 VERSION=0.0.1
 OTP_ERLANG_VERSION=1.5.3
 
-.PHONY: all compile test test-vts java clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test test-clean
+.PHONY: all compile test test-vts java java-clean clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test test-clean
 
 YAWS_PATH= /usr/local/lib/yaws
 
@@ -91,6 +91,9 @@ test-clean:
 
 java:
 	ant -buildfile java-api/build.xml jar
+
+java-clean:
+	ant -buildfile java-api/build.xml clean
 
 java-test: compile java
 	SCALARIS_ADDITIONAL_PARAMETERS="-noinput" ./bin/scalarisctl -i boot start > log/java-test.log & \
