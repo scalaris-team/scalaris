@@ -49,13 +49,12 @@ Requirements
 ============
 
 You will need:
-- Erlang R12
+- Erlang R13
 - GNU Make
 
 Optional:
 - java
 - ant
-- libxslt
 
 Building
 ========
@@ -65,9 +64,8 @@ Execute:
 make
 make docs
 
-Note: There is no make install at the moment!
-
-Afterwards the system is built. 
+Afterwards the system is built. You can either use it from the source directory
+or install it using 'make install'.
 
 Configuration
 =============
@@ -84,35 +82,33 @@ Distributed Setup
  
 For distributed setups, i.e. multiple servers forming one database,
 change the ip-address in the tuple {boot_host ...} to the one of the
-indiviudal server (the boot-server).
+individual server (the boot-server).
 
 Production Setup
 
 To start scalaris into the background for production, use
-bin/scalarisctl. For a self-compiled Scalaris you have to edit the
-pathes in the file to match your setup. The rpms come with a
-scalarisctl with correct paths.
+./bin/scalarisctl.
 
-change the ip-address in the tuple to your own. (boot_host)
-log_path: the path to the log directory.
+Change the ip-address in the tuple {boot_host ...} to your own and adapt
+log_path (the path to the log directory).
 
 Running
 =======
 
-Open at least two shells. In the first go into the bin directory:
-./boot.sh
+Open at least two shells. In the first:
+./bin/boot.sh
 
 This will start the boot server. On success http://localhost:8000
 should point to the statistics page of the boot server.
 
 In a second shell:
-./cs_local.sh
+./bin/cs_local.sh
 
 In a third shell:
-./cs_local2.sh
+./bin/cs_local2.sh
 
 In a fourth shell:
-./cs_local3.sh
+./bin/cs_local3.sh
 
 This will add 3 nodes to the network. The web pages should show the
 additional nodes.
@@ -132,10 +128,6 @@ netstat -ltp | grep irdmi
 netstat -ltp | grep 8000
 Both commands will check whether an application is already using the 
 port.
-
-If you are not able to load the yaws module during boot _and_ are running
-R11, unpack the yaws-R11.tgz in the contrib-directory. Thereafter, run
-make clean && make.
 
 Firewall
 ========
@@ -157,12 +149,12 @@ us to run several Scalaris nodes on the same host.
 Overview of directories
 =======================
 
-bin		the executables (.sh and .beam)
-contrib		necessary third party packages
-doc		generated erlang documentation
-docroot		root directory of the integrated webserver
-java-api	a java api to Scalaris
-log		log files
-src		the erlang source code
-tests		unit tests for Scalaris
+bin             the executables (.sh and .beam)
+contrib         necessary third party packages
+doc             generated erlang documentation
+docroot         root directory of the integrated webserver
+java-api        a java api to Scalaris
+log             log files
+src             the erlang source code
+tests           unit tests for Scalaris
 user-dev-guide  users and developers guide
