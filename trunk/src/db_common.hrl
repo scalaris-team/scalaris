@@ -196,11 +196,24 @@ check_db(DB) ->
 record_changes({DB, CKInt, CKDB}, NewInterval) ->
     {DB, intervals:union(CKInt, NewInterval), CKDB}.
 
-%% @doc Stops recording changes and deletes all entries of the table of changed
-%%      keys.
+%% @doc Stops recording changes and removes all entries from the table of
+%%      changed keys.
 stop_record_changes({DB, _CKInt, CKDB}) ->
     ?CKETS:delete_all_objects(CKDB),
     {DB, intervals:empty(), CKDB}.
+
+%% @doc Stops recording changes in the given interval and removes all such
+%%      entries from the table of changed keys.
+stop_record_changes({DB, CKInt, CKDB}, Interval) ->
+    F = fun (DBEntry, _) ->
+                 Key = db_entry:get_key(DBEntry),
+                 case intervals:in(Key, Interval) of
+                     true -> ?CKETS:delete(CKDB, Key);
+                     _    -> true
+                 end
+        end,
+    ?CKETS:foldl(F, true, CKDB),
+    {DB, intervals:minus(CKInt, Interval), CKDB}.
 
 %% @doc Gets the changed keys database from the state (seperate function to
 %%      make dialyzer happy with get_changes/1 calling get_changes_helper/4).

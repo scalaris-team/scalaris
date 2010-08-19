@@ -36,7 +36,8 @@
 -export([update_entries/4]).
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
 -export([check_db/1]).
--export([record_changes/2, stop_record_changes/1, get_changes/1, get_changes/2]).
+-export([record_changes/2, stop_record_changes/1, stop_record_changes/2,
+         get_changes/1, get_changes/2]).
 
 -spec new(NodeId::?RT:key()) -> db().
 -spec close(DB::db()) -> any().
@@ -82,6 +83,7 @@
 
 -spec record_changes(OldDB::db(), intervals:interval()) -> NewDB::db().
 -spec stop_record_changes(OldDB::db()) -> NewDB::db().
+-spec stop_record_changes(OldDB::db(), intervals:interval()) -> NewDB::db().
 -spec get_changes(DB::db()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 -spec get_changes(DB::db(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 
