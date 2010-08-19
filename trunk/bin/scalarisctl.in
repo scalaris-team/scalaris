@@ -16,7 +16,8 @@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 datarootdir=@datarootdir@
-ERL=erl
+ERL=@ERL@
+EPMD=@EPMD@
 
 # /bin
 BINDIR=$DESTDIR@bindir@
@@ -61,6 +62,7 @@ usage(){
     echo "    node restart         restart normal node"
     echo "    debug                connect to boot server"
     echo "    checkinstallation    test installation"
+    echo "    list                 list erlang processes"
     exit 0
 }
 
@@ -256,6 +258,10 @@ nodestop(){
     popd > /dev/null
 }
 
+list_erlang_processes(){
+    $EPMD -names || echo "could run epmd"
+}
+
 fix_paths
 
 while getopts "hife" optionName; do
@@ -271,6 +277,8 @@ done
 shift $(($OPTIND-1))
 
 case $1 in
+    list)
+        list_erlang_processes;;
     checkinstallation)
         checkinstallation;;
     boot)
