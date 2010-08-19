@@ -259,7 +259,7 @@ nodestop(){
 }
 
 list_erlang_processes(){
-    $EPMD -names || echo "could run epmd"
+    $EPMD -names || echo "could not run epmd"
 }
 
 fix_paths
