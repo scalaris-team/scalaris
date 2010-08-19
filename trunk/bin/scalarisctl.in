@@ -150,10 +150,12 @@ checkinstallation() {
     ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
     JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
     if [ $ERLANGHOST != $JAVAHOST ]; then
-        echo "ERROR: the hostnames reported by Erlang and Java do not match"
+        echo -n "ERROR: the hostnames reported by Erlang and Java do not match"
         echo " please check that /etc/hosts and DNS are consistent"
-        echo "$ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
-        echo "$SCALARISCLIENT -lh"
+        echo "erlang: $ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
+        echo "     -> $ERLANGHOST"
+        echo "java:   $SCALARISCLIENT -lh"
+        echo "     -> $JAVAHOST"
         exit 1
     fi
 
