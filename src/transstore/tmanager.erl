@@ -68,7 +68,7 @@ start_manager(TransFun, SuccessFun, FailureFun, Owner, TID, InstanceId)->
         abort ->
             tsend:send_to_client(Owner, SuccessFun({user_abort, ResVal}));
         _ ->
-            io:format(standard_error, "readphase res: ~p ; resval: ~p~n", [Res, ResVal]),
+            log:log(error, "readphase res: ~p ; resval: ~p~n", [Res, ResVal]),
             tsend:send_to_client(Owner, FailureFun(Res))
     end.
 

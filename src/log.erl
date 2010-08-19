@@ -23,15 +23,30 @@
 
 -export([start_link/0]).
 -export([log/2, log/3, log/4]).
+-export([check_config/0]).
 
 -type log_level() :: warn | info | error | fatal | debug.
 
 -spec start_link() -> ignore.
 start_link() ->
     application:start(log4erl),
-    log4erl:add_console_appender(stdout,{info, config:read(log_format)}), 
+    log4erl:add_console_appender(stdout, {debug, config:read(log_format)}),
+    log4erl:add_file_appender(file, {preconfig:log_path(),
+                                     config:read(log_file_name),
+                                     {size, config:read(log_file_size)},
+                                     config:read(log_file_rotations),
+                                     "txt", debug}),
+    
+    % append a "Log4erl started" message including a timestamp
+    % since the file_appender does not delete old log files
+    % TODO: delete the old files manually
+    log4erl:change_format(stdout, "%j %T %l%n"),
+    log4erl:change_format(file, "%j %T %l%n"),
+    log(info, "~nLog4erl started~n"),
+    
     log4erl:change_log_level(config:read(log_level)),
-    log(info, "Log4erl started"),
+    log4erl:change_format(stdout, config:read(log_format)),
+    log4erl:change_format(file, config:read(log_format)),
     ignore.
 
 -spec log(Level::log_level(), LogMsg::any()) -> any().
@@ -45,3 +60,20 @@ log(Level, Log, Data) ->
 -spec log(Logger::atom(), Level::log_level(), LogMsg::any(), Data::any()) -> any().
 log(Logger, Level, Log, Data) ->
     log4erl:log(Logger, Level, Log, Data).
+
+%% @doc Checks whether config parameters of the log4erl process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_in(log_level, [warn, info, error, fatal, debug]) and
+    config:is_in(log_level_file, [warn, info, error, fatal, debug]) and
+    
+    config:is_string(log_file_name) and
+    
+    config:is_integer(log_file_size) and
+    config:is_greater_than(log_file_size, 0) and
+    
+    config:is_integer(log_file_rotations) and
+    config:is_greater_than(log_file_rotations, 0) and
+
+    config:is_string(log_format).

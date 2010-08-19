@@ -56,10 +56,10 @@ start_link(SupervisorType, Options) ->
         {ok, _Pid} ->
             ok;
         ignore ->
-            io:format("error in starting scalaris ~p supervisor: supervisor should not return ignore~n",
+            error_logger:error_msg("error in starting scalaris ~p supervisor: supervisor should not return ignore~n",
                       [SupervisorType]);
         {error, Error} ->
-            io:format("error in starting scalaris ~p supervisor: ~p~n",
+            error_logger:error_msg("error in starting scalaris ~p supervisor: ~p~n",
                       [SupervisorType, Error])
     end,
     scan_environment(),

@@ -31,7 +31,7 @@ log_path() ->
 %% @doc path to the scalaris log file
 -spec cs_log_file() -> string().
 cs_log_file() ->
-    filename:join(log_path(), "cs_log.txt").
+    filename:join(log_path(), "scalaris_error_logger.txt").
 
 %% @doc path to the mem log file
 -spec mem_log_file() -> string().
@@ -62,7 +62,7 @@ cs_port() ->
         X when is_list(X) -> X;
         X = {From, To} when is_integer(From) andalso is_integer(To) -> X;
         X ->
-            io:format("get_env(~w) returned ~w (expected integer(), [integer()] or {integer(), integer()})~n", [cs_port, X]),
+            error_logger:error_msg("get_env(~w) returned ~w (expected integer(), [integer()] or {integer(), integer()})~n", [cs_port, X]),
             erlang:exit(unsupported_type)
     end.
 
@@ -93,7 +93,7 @@ get_env(Env, Boot_Def, Scalaris_Def) ->
                 {ok, scalaris } -> Scalaris_Def;
                 undefined -> Boot_Def;
                 App ->
-                    io:format("application:get_application() returned ~w~n", [App]),
+                    error_logger:error_msg("application:get_application() returned ~w~n", [App]),
                     erlang:exit(unknown_application)
             end
     end.
@@ -106,7 +106,7 @@ get_int_from_env(Env, Boot_Def, Scalaris_Def) ->
         {ok, Val} when is_list(Val) -> list_to_integer(Val);
         {ok, Val} when is_integer(Val) -> Val;
         {ok, Val} when not is_integer(Val) ->
-            io:format("application:get_env(~w) returned ~w (expected string or integer)~n", [Env, Val]),
+            error_logger:error_msg("application:get_env(~w) returned ~w (expected string or integer)~n", [Env, Val]),
             erlang:exit(unsupported_type);
         _ ->
             case application:get_application() of
@@ -114,7 +114,7 @@ get_int_from_env(Env, Boot_Def, Scalaris_Def) ->
                 {ok, scalaris } -> Scalaris_Def;
                 undefined -> Boot_Def;
                 App ->
-                    io:format("application:get_application() returned ~w~n", [App]),
+                    error_logger:error_msg("application:get_application() returned ~w~n", [App]),
                     erlang:exit(unknown_application)
             end
     end.

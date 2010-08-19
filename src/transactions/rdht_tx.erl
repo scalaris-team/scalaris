@@ -210,7 +210,7 @@ commit(TLog) ->
             {tx_tm_rtm_commit_reply, ClientsId, Decision} ->
                 {Decision}; %% commit / abort;
             {tx_timeout, ClientsId} ->
-                io:format("No result for commit received!~n"),
+                log:log(error, "No result for commit received!~n"),
                 {failed, timeout}
         end.
 

@@ -22,8 +22,8 @@
 
 -include("scalaris.hrl").
 
--define(TRACE(X,Y), io:format(X,Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
 
 -export([new/1, new/3,
          get_key/1,

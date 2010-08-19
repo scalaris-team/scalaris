@@ -225,8 +225,8 @@ write_read_receive(ReplicaKeys, Operation, Cookie, State)->
                     % Outdated reply. Drop it.
                     write_read_receive(ReplicaKeys, Operation, Cookie, State);
                 Any ->
-                    io:format(standard_error,
-                              "transaction:write_read_receive: Oops, unknown message ~p~n", [Any]),
+                    log:log(error,
+                            "transaction:write_read_receive: Oops, unknown message ~p~n", [Any]),
                     write_read_receive(ReplicaKeys, Operation, Cookie, State)
             end
     end.
@@ -356,7 +356,8 @@ write_read_receive_parallel(Results, ReplicaKeys)->
         {write_read_receive_timeout, _Key} ->
             {fail, timeout};
         Any ->
-            io:format(standard_error, "transaction:write_read_receive_parallel: Oops, unknown message ~p~n", [Any]),
+            log:log(error,
+                    "transaction:write_read_receive_parallel: Oops, unknown message ~p~n", [Any]),
             write_read_receive_parallel(Results, ReplicaKeys)
     end.
 
