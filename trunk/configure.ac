@@ -107,6 +107,8 @@ AC_SUBST([ERLANG_TOKE_FLAGS])
 
 AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([you won't be able to run the unit tests without common_test]))
 
+AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([you won't be able to create the documentation or run 'make install']))
+
 AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
               [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/run_test])],
               [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/run_test,

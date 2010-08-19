@@ -562,6 +562,8 @@ DRIVER_OS
 DIALYZER_FLAGS
 EMAKEFILEDEFINES
 RUN_TEST
+ERLANG_LIB_VER_edoc
+ERLANG_LIB_DIR_edoc
 ERLANG_LIB_VER_common_test
 ERLANG_LIB_DIR_common_test
 ERLANG_TOKE_FLAGS
@@ -2440,6 +2442,85 @@ ERLANG_LIB_VER_common_test=$ac_cv_erlang_lib_ver_common_test
 if test "$ac_cv_erlang_lib_dir_common_test" = "not found"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: you won't be able to run the unit tests without common_test" >&5
 $as_echo "$as_me: you won't be able to run the unit tests without common_test" >&6;}
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'edoc' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'edoc' library subdirectory... " >&6; }
+if test "${ac_cv_erlang_lib_dir_edoc+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "cannot run test program while cross compiling
+See \`config.log' for more details." "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("edoc") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_edoc=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "test Erlang program execution failed
+See \`config.log' for more details." "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_edoc="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_edoc" >&5
+$as_echo "$ac_cv_erlang_lib_dir_edoc" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'edoc' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'edoc' library version... " >&6; }
+if test "${ac_cv_erlang_lib_ver_edoc+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_edoc" = "not found"; then :
+  ac_cv_erlang_lib_ver_edoc="not found"
+else
+  ac_cv_erlang_lib_ver_edoc=`$as_echo "$ac_cv_erlang_lib_dir_edoc" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_edoc" >&5
+$as_echo "$ac_cv_erlang_lib_ver_edoc" >&6; }
+ERLANG_LIB_DIR_edoc=$ac_cv_erlang_lib_dir_edoc
+
+ERLANG_LIB_VER_edoc=$ac_cv_erlang_lib_ver_edoc
+
+if test "$ac_cv_erlang_lib_dir_edoc" = "not found"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: you won't be able to create the documentation or run 'make install'" >&5
+$as_echo "$as_me: you won't be able to create the documentation or run 'make install'" >&6;}
 fi
 
 
