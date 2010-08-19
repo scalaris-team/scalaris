@@ -174,8 +174,7 @@ test_and_set(Key, OldValue, NewValue) ->
         {trans, {failure, Reason}} ->
             {fail, Reason};
         X ->
-            io:format("cs_api:test_and_set unexpected: Node ~w got ~p", [self(),X]),
-            log:log(warn,"[ Node ~w ] ~p", [self(),X]),
+            log:log(warn, "[ Node ~w ] cs_api:test_and_set unexpected: got ~p", [self(), X]),
             X
     end.
 

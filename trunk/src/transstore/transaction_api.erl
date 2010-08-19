@@ -282,7 +282,7 @@ jRead(Key, TransLog)->
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
 jParallel_reads(Keys, TransLog)->
-    io:format("~p~n", [TransLog]),
+%%     io:format("~p~n", [TransLog]),
     A = parallel_reads(Keys, TransLog),
-    io:format("~p~n", [A]),
+%%     io:format("~p~n", [A]),
     A.

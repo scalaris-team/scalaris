@@ -69,14 +69,12 @@ start_link(Files) ->
                    _Else ->
                        Files
                end,
-    io:format("Config files: ~p~n", [TheFiles]),
+    error_logger:info_msg("Config files: ~p~n", [TheFiles]),
     Owner = self(),
     Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
     receive
-        done ->
-            ok;
-        X ->
-            io:format("unknown config message  ~p", [X])
+        done -> ok;
+        X    -> error_logger:error_msg("unknown config message  ~p", [X])
     end,
     {ok, Link}.
 
@@ -108,11 +106,11 @@ populate_db(File) ->
             lists:map(fun process_term/1, Terms);
         {error, enoent} ->
             %% note: log4erl may not be available
-            io:format("Can't load config file ~p: File does not exist. Ignoring.\n", [File]),
+            error_logger:info_msg("Can't load config file ~p: File does not exist. Ignoring.\n", [File]),
             fail;
         {error, Reason} ->
             %% note: log4erl may not be available
-            io:format("Can't load config file ~p: ~p. Exiting.\n", [File, Reason]),
+            error_logger:error_msg("Can't load config file ~p: ~p. Exiting.\n", [File, Reason]),
             erlang:halt(1),
             fail
     end.
@@ -127,7 +125,8 @@ process_term({Key, Value}) ->
 %% @doc Checks whether config parameters of all processes exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    cyclon:check_config() and
+    log:check_config() and
+        cyclon:check_config() and
         acceptor:check_config() and
         gossip:check_config() and
         learner:check_config() and
@@ -146,8 +145,8 @@ check_config() ->
 exists(Key) ->
     case read(Key) of
         failed ->
-            io:format("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n",
-                      [Key]),
+            error_logger:error_msg("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n",
+                                       [Key]),
             false;
         _X -> true
     end.
@@ -159,8 +158,8 @@ test_and_error(Key, Pred, Msg) ->
     Value = read(Key),
     case exists(Key) andalso Pred(Value) of
         true -> true;
-        false -> io:format("~p = ~p ~s (see scalaris.cfg and scalaris.local.cfg)~n",
-                           [Key, Value, lists:flatten(Msg)]),
+        false -> error_logger:error_msg("~p = ~p ~s (see scalaris.cfg and scalaris.local.cfg)~n",
+                                            [Key, Value, lists:flatten(Msg)]),
                  false
     end.
 

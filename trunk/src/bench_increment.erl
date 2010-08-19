@@ -30,9 +30,9 @@
 
 make_tfun(Key) ->
     fun (TransLog)->
-	    {Counter, TransLog1} = read2(TransLog, Key),
-	    TransLog2 = write2(TransLog1, Key, Counter + 1),
-	    {{ok, ok}, TransLog2}
+             {Counter, TransLog1} = read2(TransLog, Key),
+             TransLog2 = write2(TransLog1, Key, Counter + 1),
+             {{ok, ok}, TransLog2}
     end.
 
 inc(Key) ->
@@ -65,16 +65,16 @@ process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
     comm:send_local(Parent , {done, AbortCount});
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
-	{success, {commit, _Y}} ->
-	    process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
-	{failure, abort} ->
-	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-	{failure, timeout} ->
-	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-	{failure, not_found} ->
-	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-	X ->
-	    io:format("~p~n", [X])
+        {success, {commit, _Y}} ->
+            process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
+        {failure, abort} ->
+            process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
+        {failure, timeout} ->
+            process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
+        {failure, not_found} ->
+            process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
+        X ->
+            log:log(warn, "~p~n", [X])
     end.
 
 process_iter_v2(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
@@ -82,16 +82,16 @@ process_iter_v2(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
 process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
     Result = inc(Key),
     case Result of
-	ok ->
-	    process_iter_v2(Parent, Key, Count - 1, SuccessFun, FailureFun, AbortCount);
-	{failure, abort} ->
-	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
-	{failure, timeout} ->
-	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
-	{failure, failed} ->
-	    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
-	X ->
-	    io:format("~p~n", [X])
+        ok ->
+            process_iter_v2(Parent, Key, Count - 1, SuccessFun, FailureFun, AbortCount);
+        {failure, abort} ->
+            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+        {failure, timeout} ->
+            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+        {failure, failed} ->
+            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+        X ->
+            log:log(warn, "~p~n", [X])
     end.
 
 bench() ->
@@ -145,7 +145,7 @@ wait_for_done(0) ->
     [];
 wait_for_done(Count) ->
     receive
-	{done, Aborts} ->
-	    io:format("aborts: ~p~n", [Aborts]),
-	    [Aborts |wait_for_done(Count - 1)]
+        {done, Aborts} ->
+            io:format("aborts: ~p~n", [Aborts]),
+            [Aborts |wait_for_done(Count - 1)]
     end.
