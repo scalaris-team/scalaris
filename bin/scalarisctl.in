@@ -99,7 +99,7 @@ checkinstallation() {
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: erl could not be run"
-        echo "erl -noinput -eval 'halt(0).'"
+        echo "We were trying to run: erl -noinput -eval 'halt(0).'"
         exit 1
     fi
 
@@ -109,11 +109,29 @@ checkinstallation() {
         exit 1
     fi
 
+    $ERL -noinput -name boot -eval 'halt(0).' > /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erl could not create a Erlang VM named 'boot'"
+        echo "Are you already running a Scalaris boot server?"
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
+        echo "We were trying to run: erl -noinput -name boot -eval 'halt(0).'"
+    fi
+
+    $ERL -noinput -name node -eval 'halt(0).' > /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erl could not create a Erlang VM named 'node'"
+        echo "Are you already running a Scalaris node?"
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
+        echo "We were trying to run: erl -noinput -name node -eval 'halt(0).'"
+    fi
+
     $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: erlang could not start the crypto module"
-        echo "$ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
+        echo "We were trying to run: $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
         exit 1
     fi
 
@@ -122,7 +140,7 @@ checkinstallation() {
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
             echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.cfg"
-            echo "$ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
             exit 1
         fi
     else
@@ -134,7 +152,7 @@ checkinstallation() {
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
             echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.local.cfg"
-            echo "$ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.local.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.local.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
             exit 1
         fi
     fi
@@ -143,7 +161,7 @@ checkinstallation() {
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: could not find Scalaris' beam files"
-        echo "$ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(dht_node)} of {{module,boot},{module,dht_node}} -> halt(0); X -> halt(1) end.'"
+        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(dht_node)} of {{module,boot},{module,dht_node}} -> halt(0); X -> halt(1) end.'"
         exit 1
     fi
 
@@ -173,7 +191,7 @@ checkinstallation() {
     if [ $FAILED -ne 0 ]; then
         echo "$CHECKCONFIGMSG"
         echo "ERROR: some parameters in the config files are wrong or missing"
-        echo "$ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0).\""
+        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0).\""
         exit 1
     fi
     exit 0
