@@ -89,9 +89,10 @@ fix_paths() {
 }
 
 checkinstallation() {
-    FQDN_SET=`hostname -f | grep "\.*\." | wc -l`
+    HN=`hostname -f`
+    FQDN_SET=`echo $HN | grep "\.*\." | wc -l`
     if [ "x0" = "x$FQDN_SET" ]; then
-        echo "you have to set a fully qualified domain name (FQDN)"
+        echo "you have to set a fully qualified domain name (FQDN), but \"hostname -f\" returns \"$HN\""
         exit -1
     fi
 
@@ -170,7 +171,8 @@ checkinstallation() {
     if [ $FAILED -ne 0 ]; then
         echo -n "INFO: could not find Scalaris' Java-API files. "
         echo "You won't be able to use the 'scalaris' command line script to access Scalaris."
-        echo "$SCALARISCLIENT"
+        echo "  'make java' will build the Java-API"
+        echo "We were trying to run: $SCALARISCLIENT"
     else
         ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
         JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
