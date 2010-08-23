@@ -92,7 +92,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
     Ganglia =
         util:sup_worker_desc(ganglia_server, ganglia, start_link),
     Logger =
-        util:sup_worker_desc(logger, log, start_link),
+        util:sup_supervisor_desc(logger, log, start_link),
     MonitorTiming =
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link, [ServiceGroup]),
     BootServer =

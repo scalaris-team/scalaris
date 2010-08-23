@@ -27,19 +27,38 @@
 
 -type log_level() :: warn | info | error | fatal | debug.
 
--spec start_link() -> ignore.
+%% @doc Starts the log4erl process, removes the error_logger and
+%%      error_logger_file_h report handlers and registers itself as the (only)
+%%      report handler. Note: requires a running config process and can only be
+%%      run once!
+-spec start_link() -> {ok, Pid::pid()} | ignore |
+                      {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link() ->
-    application:start(log4erl),
-    log4erl:add_console_appender(stdout, {config:read(log_level), config:read(log_format)}),
-    log4erl:add_file_appender(file, {preconfig:log_path(),
-                                     config:read(log_file_name),
-                                     {size, config:read(log_file_size)},
-                                     config:read(log_file_rotations),
-                                     "txt", config:read(log_level_file)}),
-    
-%%     log4erl:change_format(stdout, config:read(log_format)),
-    log4erl:change_format(file, config:read(log_format_file)),
-    ignore.
+    Link = log4erl:start(log4erl, []),
+    case Link of
+        {ok, _} ->
+            log4erl:add_console_appender(stdout, {config:read(log_level), config:read(log_format)}),
+            log4erl:add_file_appender(file, {preconfig:log_path(),
+                                             config:read(log_file_name),
+                                             {size, config:read(log_file_size)},
+                                             config:read(log_file_rotations),
+                                             "txt",
+                                             config:read(log_level_file)}),
+
+%%             log4erl:change_format(stdout, config:read(log_format)),
+            log4erl:change_format(file, config:read(log_format_file)),
+            
+            % remove the default error_logger's file and tty handlers
+            error_logger:delete_report_handler(error_logger_file_h),
+            error_logger:delete_report_handler(error_logger_tty_h),
+            % there should not be any previous log4erl handler - just in case, delete it:
+            error_logger:delete_report_handler(error_logger_log4erl_h),
+            % add a log4erl handler instead:
+            log4erl:error_logger_handler(),
+            ok;
+        _ -> ok
+    end,
+    Link.
 
 -spec log(Level::log_level(), LogMsg::any()) -> any().
 log(Level, Log) ->

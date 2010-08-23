@@ -60,7 +60,7 @@ init_per_suite(Config) ->
                         comm_server:start_link(pid_groups:new("comm_layer_")),
                         timer:sleep(1000),
                         comm_server:set_local_address({127,0,0,1},14195),
-                        application:start(log4erl),
+                        log:start_link(),
                         Owner ! {continue},
                         receive
                             {done} -> ok
