@@ -89,13 +89,6 @@ fix_paths() {
 }
 
 checkinstallation() {
-    HN=`hostname -f`
-    FQDN_SET=`echo $HN | grep "\.*\." | wc -l`
-    if [ "x0" = "x$FQDN_SET" ]; then
-        echo "you have to set a fully qualified domain name (FQDN), but \"hostname -f\" returns \"$HN\""
-        exit -1
-    fi
-
     $ERL -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
