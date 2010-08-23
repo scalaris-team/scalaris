@@ -71,6 +71,7 @@ spawn_config_processes() ->
 %%                        crypto:start(),
                        pid_groups:start_link(),
                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                       application:start(log4erl),
                        Owner ! {continue},
                        receive {done} -> ok
                        end
@@ -78,6 +79,14 @@ spawn_config_processes() ->
     receive {continue} -> ok
     end,
     Pid.
+
+-spec stop_config_processes(pid()) -> ok.
+stop_config_processes(Pid) ->
+    error_logger:tty(false),
+    log:set_log_level(none),
+    exit(Pid, kill),
+    unittest_helper:stop_pid_groups(),
+    ok.
 
 init_per_suite(Config) ->
     crypto:start(),
@@ -304,10 +313,7 @@ next_hop_no_neighbors(_Config) ->
     config:write(rt_size_use_neighbors, 0),
     iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) no neighbors"),
     iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) no neighbors"),
-    gen_component:kill(pid_groups),
-    catch unregister(pid_groups),
-    exit(Pid, kill),
-    ok.
+    stop_config_processes(Pid).
 
 next_hop_with_neighbors(_Config) ->
     Pid = spawn_config_processes(),
@@ -315,10 +321,7 @@ next_hop_with_neighbors(_Config) ->
     config:write(rt_size_use_neighbors, 10),
     iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) with neighbors"),
     iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) with neighbors"),
-    gen_component:kill(pid_groups),
-    catch unregister(pid_groups),
-    exit(Pid, kill),
-    ok.
+    stop_config_processes(Pid).
 
 pid_groups_lookup(_Config) ->
     {ok, _Pid} = pid_groups:start_link(),
@@ -327,7 +330,9 @@ pid_groups_lookup(_Config) ->
                           pid_groups:pid_of(atom_to_list(?MODULE),
                                             pid_groups)
                   end, "pid_of by group and process name"),
-    gen_component:kill(pid_groups),
+    error_logger:tty(false),
+    log:set_log_level(none),
+    unittest_helper:stop_pid_groups(),
     ok.
 
 pid_groups_lookup_by_pid(_Config) ->
@@ -336,7 +341,9 @@ pid_groups_lookup_by_pid(_Config) ->
     iter(count(), fun () ->
                           pid_groups:group_and_name_of(self())
                   end, "group_and_name_of pid"),
-    gen_component:kill(pid_groups),
+    error_logger:tty(false),
+    log:set_log_level(none),
+    unittest_helper:stop_pid_groups(),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

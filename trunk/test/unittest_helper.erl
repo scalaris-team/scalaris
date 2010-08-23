@@ -22,7 +22,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([make_ring_with_ids/1, make_ring/1, stop_ring/1,
+-export([make_ring_with_ids/1, make_ring/1, stop_ring/1, stop_pid_groups/0,
 
         check_ring_size/1, wait_for_stable_ring/0, wait_for_stable_ring_deep/0]).
 
@@ -108,11 +108,11 @@ stop_ring(Pid) ->
     try
         begin
             error_logger:tty(false),
+            log:set_log_level(none),
             exit(Pid, kill),
             timer:sleep(1000),
             wait_for_process_to_die(Pid),
-            gen_component:kill(pid_groups),
-            wait_for_table_to_disappear(pid_groups),
+            stop_pid_groups(),
             timer:sleep(2000),
             ok
         end
@@ -127,6 +127,13 @@ stop_ring(Pid) ->
             ct:pal("exception in stop_ring: ~p~n", [Reason]),
             throw(Reason)
     end.
+
+-spec stop_pid_groups() -> ok.
+stop_pid_groups() ->
+    gen_component:kill(pid_groups),
+    wait_for_table_to_disappear(pid_groups),
+    catch unregister(pid_groups),
+    ok.
 
 -spec wait_for_process_to_die(pid()) -> ok.
 wait_for_process_to_die(Pid) ->

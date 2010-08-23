@@ -101,11 +101,11 @@ init_per_suite(Config) ->
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
-    reset_config(),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    gen_component:kill(pid_groups),
     error_logger:tty(false),
+    log:set_log_level(none),
     exit(Pid, kill),
+    unittest_helper:stop_pid_groups(),
     Config.
 
 init_per_testcase(_TestCase, Config) ->

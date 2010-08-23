@@ -9,8 +9,8 @@
 -define(DEFAULT_LOGGER, default_logger).
 -define(DEFAULT_LOGGER_GUARD, default_logger_guard).
 
--define(FILE_OPTIONS,[write, raw, binary, append]).
--define(FILE_OPTIONS_ROTATE,[write, raw, binary]).
+-define(FILE_OPTIONS,[write, raw, binary, delayed_write]).
+-define(FILE_OPTIONS_ROTATE,[write, raw, binary, delayed_write]).
 
 %-define(DEBUG, true).
 
