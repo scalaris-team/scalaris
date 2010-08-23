@@ -70,7 +70,7 @@ spawn_config_processes() ->
                         crypto:start(),
                         pid_groups:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                        application:start(log4erl),
+                        log:start_link(),
                         Owner ! {continue},
                         receive {done} -> ok
                         end
