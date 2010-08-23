@@ -109,7 +109,7 @@ public class Main {
 			try {
 				Scalaris sc = new Scalaris();
 				sc.write(key, value);
-				System.out.println("write(" + key + ", " + value + ")");
+				System.out.println("write(" + key + ", " + value + "): ok");
 			} catch (ConnectionException e) {
 				printException("write failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
@@ -129,7 +129,7 @@ public class Main {
 			try {
 				Scalaris sc = new Scalaris();
 				sc.publish(topic, content);
-				System.out.println("publish(" + topic + ", " + content + ")");
+				System.out.println("publish(" + topic + ", " + content + "): ok");
 			} catch (ConnectionException e) {
 				printException("publish failed with connection error", e, verbose);
 			}
@@ -141,7 +141,7 @@ public class Main {
 			try {
 				Scalaris sc = new Scalaris();
 				sc.subscribe(topic, url);
-				System.out.println("subscribe(" + topic + ", " + url + ")");
+				System.out.println("subscribe(" + topic + ", " + url + "): ok");
 			} catch (ConnectionException e) {
 				printException("subscribe failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
@@ -157,7 +157,7 @@ public class Main {
 			try {
 				Scalaris sc = new Scalaris();
 				sc.unsubscribe(topic, url);
-				System.out.println("unsubscribe(" + topic + ", " + url + ")");
+				System.out.println("unsubscribe(" + topic + ", " + url + "): ok");
 			} catch (ConnectionException e) {
 				printException("unsubscribe failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
