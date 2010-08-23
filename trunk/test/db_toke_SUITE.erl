@@ -37,4 +37,4 @@ all() -> [].
 %%      hit a timeout (depending on the speed of the DB implementation).
 -spec max_rw_tests_per_suite() -> pos_integer().
 max_rw_tests_per_suite() ->
-    100.
+    50.
