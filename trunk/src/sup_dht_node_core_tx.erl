@@ -28,7 +28,9 @@
 
 -export([start_link/1, init/1]).
 
--spec start_link(pid_groups:groupname()) -> {ok, Pid::pid()} | ignore | {error, Error::{already_started, Pid::pid()} | term()}.
+-spec start_link(pid_groups:groupname())
+        -> {ok, Pid::pid()} | ignore |
+           {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link(DHTNodeGroup) ->
     supervisor:start_link(?MODULE, [DHTNodeGroup]).
 
