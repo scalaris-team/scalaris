@@ -48,11 +48,7 @@ add_node(Options) ->
 add_nodes(0) ->
     ok;
 add_nodes(Count) ->
-    [ begin
-          Desc = util:sup_supervisor_desc(randoms:getRandomId(),
-                                          sup_dht_node, start_link),
-          supervisor:start_child(main_sup, Desc)
-      end || _ <- lists:seq(1, Count) ],
+    [ add_node([]) || _ <- lists:seq(1, Count) ],
     ok.
 %% userdevguide-end admin:add_nodes
 
