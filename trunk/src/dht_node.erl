@@ -196,7 +196,7 @@ on({lookup_tp, Message}, State) ->
             State
     end;
 
-        %% answer - lookup for replicated transaction manager
+%% answer - lookup for replicated transaction manager
 on({init_rtm, Message}, State) ->
     transaction:initRTM(State, Message);
 
