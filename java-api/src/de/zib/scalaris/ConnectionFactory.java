@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.ericsson.otp.erlang.OtpSelf;
 
-import de.zib.scalaris.ConnectionException;
 import de.zib.tools.PropertyLoader;
 
 /**
@@ -241,10 +240,10 @@ public class ConnectionFactory {
 	public Connection createConnection(String clientName,
 			boolean clientNameAppendUUID, ConnectionPolicy connectionPolicy)
 			throws ConnectionException {
+		if (clientNameAppendUUID) {
+			clientName = clientName + "_" + clientNameUUID.getAndIncrement();
+		}
 		try {
-			if (clientNameAppendUUID) {
-				clientName = clientName + "_" + clientNameUUID.getAndIncrement();
-			}
 			OtpSelf self = new OtpSelf(clientName, cookie);
 			return new Connection(self, connectionPolicy);
 		} catch (Exception e) {
@@ -323,7 +322,7 @@ public class ConnectionFactory {
 	 *            the name of the node to use
 	 * 
 	 * @return the node's official host name as returned by
-	 *         {@link InetAddress#getCanonicalHostName()}
+	 *         {@link InetAddress#getHostName()}
 	 */
 	public static String fixLocalhostName(String node) {
 		if (node.endsWith("@localhost")) {
@@ -342,7 +341,7 @@ public class ConnectionFactory {
 		String hostname = "localhost";
 		try {
 			InetAddress addr = InetAddress.getLocalHost();
-			hostname = addr.getCanonicalHostName();
+			hostname = addr.getHostName();
 		} catch (UnknownHostException e) {
 		}
 		return hostname;
