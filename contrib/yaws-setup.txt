@@ -5,4 +5,4 @@
 5) copy src/mime_types.erl and src/yaws_generated.erl to their respective folders in <scalaris>/contrib/yaws
 6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
 %-define(HAVE_SENDFILE, true).
-7) that's it, go back to <scalaris>/ and run configure && make
+7) that's it, go back to <scalaris>/ and run ./configure && make

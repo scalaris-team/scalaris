@@ -70,6 +70,7 @@ spawn_config_processes() ->
                         crypto:start(),
                         pid_groups:start_link(),
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                        application:start(log4erl),
                         Owner ! {continue},
                         receive {done} -> ok
                         end
@@ -85,8 +86,6 @@ rw_suite_runs(Desired) ->
     erlang:min(Desired, max_rw_tests_per_suite()).
 
 init_per_suite(Config) ->
-    application:start(log4erl),
-    crypto:start(),
     ct:pal("DB suite running with: ~p~n", [?TEST_DB]),
     file:set_cwd("../bin"),
     Pid = spawn_config_processes(),
@@ -98,8 +97,10 @@ end_per_suite(Config) ->
         false ->
             ok;
         {wrapper_pid, Pid} ->
-            gen_component:kill(pid_groups),
-            exit(Pid, kill)
+            error_logger:tty(false),
+            log:set_log_level(none),
+            exit(Pid, kill),
+            unittest_helper:stop_pid_groups()
     end,
     ok.
 
