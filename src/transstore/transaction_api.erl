@@ -66,25 +66,28 @@
 %% * for {fail, fail} the reason is currently unknown, should 
 %%   not occur 
 quorum_read(Key)->
-%%    pid_groups:join(pid_groups:group_with(dht_node)),
     RTO = config:read(quorum_read_timeout),
-    transaction:quorum_read(Key, comm:this()),
-    receive
-        {single_read_return, {value, empty_val, _Version}}->
-            ?TLOG2("single read return fail", [Page]),
-            {fail, not_found};
-        {single_read_return, {value, Page, Version}}->
-            ?TLOG2("read_page returned", [Page]),
-            {Page, Version};
-        {single_read_return, {fail, Reason}}->
-            ?TLOG("single read return fail"),
-            {fail, Reason};
-        _X ->
-            ?TLOG2("read_page got the message ~p~n", [_X]),
-            {fail, fail}
-    after RTO ->
-            ?TLOG("single read return fail - timeout"),
-            {fail, timeout}
+    case pid_groups:find_a(dht_node) of
+        failed -> {fail, fail};
+        LocalDHTNode ->
+            LocalDHTNode ! {read, comm:this(), Key},
+            receive
+                {single_read_return, {value, empty_val, _Version}} ->
+                    ?TLOG2("single read return fail", [Page]),
+                    {fail, not_found};
+                {single_read_return, {value, Page, Version}} ->
+                    ?TLOG2("read_page returned", [Page]),
+                    {Page, Version};
+                {single_read_return, {fail, Reason}}->
+                    ?TLOG("single read return fail"),
+                    {fail, Reason};
+                _X ->
+                    ?TLOG2("read_page got the message ~p~n", [_X]),
+                    {fail, fail}
+            after RTO ->
+                    ?TLOG("single read return fail - timeout"),
+                    {fail, timeout}
+            end
     end.
 
 %% Use this function to do parallel quorum reads on a list of keys with a commit phase
@@ -235,15 +238,11 @@ abort()->
 delete(Key, Timeout) ->
     case pid_groups:find_a(dht_node) of
         failed ->
-	    {fail, node_not_found};
-	LocalDHTNode ->
-	    LocalDHTNode ! {delete, comm:this(), Key},
-	    receive
-		{delete_result, Result} ->
-		    Result
-	    after
-		Timeout ->
-		    {fail, timeout}
+            {fail, node_not_found};
+        LocalDHTNode ->
+            LocalDHTNode ! {delete, comm:this(), Key},
+            receive {delete_result, Result} -> Result
+            after Timeout -> {fail, timeout}
 	    end
     end.
 

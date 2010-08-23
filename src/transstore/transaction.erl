@@ -158,7 +158,7 @@ read_or_write(Key, Value, TransLog, Operation) ->
 %%--------------------------------------------------------------------
 quorum_read(Key, SourcePID)->
     InstanceId = pid_groups:my_groupname(),
-    spawn(transaction, do_quorum_read, [Key, SourcePID, InstanceId]).
+    spawn_link(transaction, do_quorum_read, [Key, SourcePID, InstanceId]).
 
 do_quorum_read(Key, SourcePID, InstanceId)->
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
@@ -241,7 +241,7 @@ write_read_receive(ReplicaKeys, Operation, Cookie, State)->
 -spec parallel_quorum_reads(Keys::[iodata() | integer()], TransLog::any(), SourcePID::comm:mypid()) -> pid().
 parallel_quorum_reads(Keys, TransLog, SourcePID) ->
     InstanceId = pid_groups:my_groupname(),
-    spawn(transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
+    spawn_link(transaction, do_parallel_reads, [Keys, SourcePID, TransLog, InstanceId]).
 
 -spec do_parallel_reads(Keys::[iodata() | integer()], SourcePID::comm:mypid(), TransLog::any(), InstanceId::pid_groups:groupname()) -> ok.
 do_parallel_reads(Keys, SourcePID, TransLog, InstanceId)->
@@ -468,9 +468,8 @@ getRTMKeys(TID)->
 
 initRTM(State, Message)->
     TransID = Message#tm_message.transaction_id,
-    ERTMPID = spawn(tmanager,
-                    start_replicated_manager,
-                    [Message, pid_groups:my_groupname()]),
+    ERTMPID = spawn_link(tmanager, start_replicated_manager,
+                         [Message, pid_groups:my_groupname()]),
     RTMPID = comm:make_global(ERTMPID),
     %% update transaction log: store mapping between transaction ID and local TM
     TransLog = dht_node_state:get(State, trans_log),
@@ -484,7 +483,7 @@ initRTM(State, Message)->
 -spec delete(SourcePid::comm:mypid(), Key::iodata() | integer()) -> ok.
 delete(SourcePID, Key) ->
     InstanceId = pid_groups:my_groupname(),
-    spawn(transaction, do_delete, [Key, SourcePID, InstanceId]),
+    spawn_link(transaction, do_delete, [Key, SourcePID, InstanceId]),
     ok.
 
 -spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::pid_groups:groupname()) -> ok.
