@@ -31,11 +31,9 @@
 
 -include("scalaris.hrl").
 
-%% @type process_id() = {inet:ip_address(), integer(), pid()}.
 -type(process_id() :: {inet:ip_address(), integer(), pid()}).
 
 %% @doc send message via tcp, if target is not in same Erlang VM.
-%% @spec send(process_id(), term()) -> ok
 -spec send(process_id(), term()) -> ok.
 send({{_IP1, _IP2, _IP3, _IP4} = IP, Port, Pid} = Target, Message) ->
     {MyIP,MyPort} = comm_server:get_local_address_port(),

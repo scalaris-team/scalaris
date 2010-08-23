@@ -211,8 +211,9 @@ members(GrpName) ->
 
 -spec members_by_name(groupname()) -> [pidname()].
 members_by_name(GrpName) ->
-    PidNameList = ets:match(?MODULE, {{GrpName, '$1'}, '_'}),
-    lists:sort(lists:flatten(PidNameList)).
+    MatchList = ets:match(?MODULE, {{GrpName, '$1'}, '_'}),
+    PidNameList = [ X || [X] <- MatchList ],
+    lists:sort(PidNameList).
 
 %% global information
 -spec processes() -> [pid()]. %% for fprof for example
@@ -234,8 +235,13 @@ tab2list() -> ets:tab2list(?MODULE).
 -spec get_web_debug_info(groupname(), nonempty_string()) ->
    {struct, [{pairs, {array, {struct, [{key | value, nonempty_string()}]}}}]}.
 get_web_debug_info(GrpName, PidNameString) ->
-    KVs =
+    Pid =
         case pid_of(GrpName, list_to_atom(PidNameString)) of
+            failed -> pid_of(GrpName, PidNameString);
+            X -> X
+        end,
+    KVs =
+        case Pid of
             failed -> [{"process", "unknown"}];
             Pid ->
                 comm:send_local(Pid , {web_debug_info, self()}),
@@ -328,6 +334,7 @@ on({'EXIT', FromPid, _Reason}, State) ->
 
 %% Internal functions
 -spec toString(atom() | nonempty_string()) -> nonempty_string().
+%%toString(X) -> io_lib:write_string(X).
 toString(X) when is_atom(X) -> atom_to_list(X);
 toString(X)                 -> X.
 

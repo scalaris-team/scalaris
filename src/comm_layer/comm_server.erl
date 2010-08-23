@@ -26,9 +26,7 @@
 -include("scalaris.hrl").
 
 -export([start_link/1, init/1, on/2]).
-
--export([send/2]).
-
+-export([send/2, tcp_options/0]).
 -export([unregister_connection/2, register_connection/4,
         set_local_address/2, get_local_address_port/0]).
 
@@ -47,22 +45,46 @@ init([]) ->
     ets:new(?MODULE, [set, protected, named_table]),
     _State = null.
 
+-spec tcp_options() -> [{term(), term()}].
+tcp_options() ->
+%    [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}].
+    [{active, once},
+     {nodelay, true},
+     {keepalive, true},
+     {reuseaddr, true},
+     {delay_send, true},
+     {send_timeout, config:read(tcp_send_timeout)}
+].
+
 -spec send({inet:ip_address(), integer(), pid()}, term()) -> ok.
 send({Address, Port, Pid}, Message) ->
-    ?MODULE ! {send, Address, Port, Pid, Message}, ok.
+    ConnPid =
+        case ets:lookup(?MODULE, {Address, Port}) of
+            [{{Address, Port}, X}] -> X;
+            [] ->
+                %% start Erlang process responsible for the connection
+                ?MODULE ! {comm_server_create_connection,
+                           Address, Port, self()},
+                receive {comm_server_create_connection_done, X} -> ok end,
+                X
+    end,
+    ConnPid ! {send, Pid, Message}.
 
 -spec unregister_connection(inet:ip_address(), integer()) -> ok.
 unregister_connection(Adress, Port) ->
-    ?MODULE ! {unregister_conn, Adress, Port}, ok.
+    ?MODULE ! {unregister_conn, Adress, Port, self()},
+    receive {unregister_conn_done} ->  ok end.
 
 -spec register_connection(inet:ip_address(), integer(),
                           pid(), inet:socket()) -> ok.
 register_connection(Adress, Port, Pid, Socket) ->
-    ?MODULE ! {register_conn, Adress, Port, Pid, Socket}, ok.
+    ?MODULE ! {register_conn, Adress, Port, Pid, Socket, self()},
+    receive {register_conn_done} -> ok end.
 
 -spec set_local_address(inet:ip_address() | undefined, integer()) -> ok.
 set_local_address(Address, Port) ->
-    ?MODULE ! {set_local_address, Address, Port}, ok.
+    ?MODULE ! {set_local_address, Address, Port, self()},
+    receive {set_local_address_done} -> ok end.
 
 %% @doc returns the local ip address and port
 -spec(get_local_address_port() -> {inet:ip_address(),integer()}
@@ -83,65 +105,33 @@ get_local_address_port() ->
         Value -> Value
     end.
 
-
 %% @doc message handler
 -spec on(term(), term()) -> term().
-on({send, Address, Port, Pid, Message}, State) ->
-    send(Address, Port, Pid, Message, State);
-
-on({unregister_conn, Address, Port}, State) ->
-    ets:delete(?MODULE, {Address, Port}),
+on({comm_server_create_connection, Address, Port, ClientPid}, State) ->
+    case ets:lookup(?MODULE, {Address, Port}) of
+        [] ->
+            {ok, Pid} = comm_connection:start_link(pid_groups:my_groupname(),
+                                                   Address, Port),
+            ets:insert(?MODULE, {{Address, Port}, Pid});
+        [{_, Pid}] -> ok
+    end,
+    ClientPid ! {comm_server_create_connection_done, Pid},
     State;
 
-on({register_conn, Address, Port, Pid, Socket}, State) ->
+on({unregister_conn, Address, Port, Client}, State) ->
+    ets:delete(?MODULE, {Address, Port}),
+    Client ! {unregister_conn_done},
+    State;
+
+on({register_conn, Address, Port, Pid, Socket, Client}, State) ->
     case ets:lookup(?MODULE, {Address, Port}) of
         [] -> ets:insert(?MODULE, {{Address, Port}, {Pid, Socket}});
         _ -> ok
     end,
+    Client ! {register_conn_done},
     State;
 
-on({set_local_address, Address, Port}, State) ->
+on({set_local_address, Address, Port, Client}, State) ->
     ets:insert(?MODULE, {local_address_port, {Address, Port}}),
+    Client ! {set_local_address_done},
     State.
-
-
-%% Internal functions
-
-send(Address, Port, Pid, Message, State) ->
-    {DepAddr,DepPort} = get_local_address_port(),
-    if
-        DepAddr =:= undefined ->
-            open_sync_connection(Address, Port, Pid, Message, State);
-        true ->
-            case ets:lookup(?MODULE, {Address, Port}) of
-                [{{Address, Port}, {ConnPid, _Socket}}] ->
-                    ConnPid ! {send, Pid, Message};
-                [] ->
-                    ConnPid = comm_connection:open_new_async(Address, Port,
-                                                             DepAddr, DepPort),
-                    ets:insert(?MODULE, {{Address, Port}, {ConnPid, undef}}),
-                    ConnPid ! {send, Pid, Message}
-            end
-    end,
-    State.
-
-open_sync_connection(Address, Port, Pid, Message, State) ->
-    {DepAddr,DepPort} = get_local_address_port(),
-    case comm_connection:open_new(Address, Port, DepAddr, DepPort) of
-        {local_ip, MyIP, MyPort, MyPid, MySocket} ->
-            comm_connection:send({Address, Port, MySocket}, Pid, Message),
-            log:log(info,"[ CC ] this() == ~w", [{MyIP, MyPort}]),
-                                                %                   set_local_address(t, {MyIP,MyPort}}),
-                                                %                   register_connection(Address, Port, MyPid, MySocket),
-            ets:insert(?MODULE, {local_address_port, {MyIP,MyPort}}),
-            ets:insert(?MODULE, {{Address, Port}, {MyPid, MySocket}}),
-            {reply, ok, State};
-        fail ->
-                                                % drop message (remote node not reachable, failure detector will notice)
-            {reply, fail, State};
-        {connection, LocalPid, NewSocket} ->
-            comm_connection:send({Address, Port, NewSocket}, Pid, Message),
-            ets:insert(?MODULE, {{Address, Port}, {LocalPid, NewSocket}}),
-                                                %                   register_connection(Address, Port, LPid, NewSocket),
-            {reply, ok, State}
-    end.
