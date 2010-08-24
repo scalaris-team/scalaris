@@ -81,7 +81,7 @@ on({send, DestPid, Message}, State) ->
              end,
     case Socket of
         fail ->
-            log:log(warning, "~p Connection failed drop message ~p~n",
+            log:log(warn, "~p Connection failed drop message ~p~n",
                     [pid_groups:my_pidname(), Message]),
             State;
         _ ->
@@ -174,7 +174,9 @@ on({web_debug_info, Requestor}, State) ->
     State.
 
 -spec send({inet:ip_address(), integer(), inet:socket()}, pid(), term()) ->
-                   ok.
+                   notconnected | port();
+          ({inet:ip_address(), integer(), inet:socket()}, unpack_msg_bundle, [{pid(), term()}]) ->
+                   notconnected | port().
 send({Address, Port, Socket}, Pid, Message) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message}),
     NewSocket =

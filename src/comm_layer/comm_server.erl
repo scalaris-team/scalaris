@@ -68,7 +68,8 @@ send({Address, Port, Pid}, Message) ->
                 receive {comm_server_create_connection_done, X} -> ok end,
                 X
     end,
-    ConnPid ! {send, Pid, Message}.
+    ConnPid ! {send, Pid, Message},
+    ok.
 
 -spec unregister_connection(inet:ip_address(), integer()) -> ok.
 unregister_connection(Adress, Port) ->
