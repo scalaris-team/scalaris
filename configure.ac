@@ -105,6 +105,8 @@ AS_IF([test "x$TOKEPREFIX" != xno],
             ])
 AC_SUBST([ERLANG_TOKE_FLAGS])
 
+AC_ERLANG_CHECK_LIB(tools, , AC_MSG_FAILURE([you won't be able compile the erlang sources]))
+
 AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([you won't be able to run the unit tests without common_test]))
 
 AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([you won't be able to create the documentation or run 'make install']))
