@@ -118,7 +118,7 @@ get_msg_tag(Message) when is_tuple(Message) andalso is_atom(erlang:element(1, Me
 -spec send_local_after(Delay::non_neg_integer(), Dest::erl_local_pid() , Message::message()) -> reference().
 -spec make_global(erl_pid_plain()) -> mypid().
 -spec get(erl_pid_plain(), mypid()) -> mypid().
--spec is_valid(any()) -> boolean().
+-spec is_valid(mypid() | any()) -> boolean().
 
 -ifdef(TCP_LAYER).
 
