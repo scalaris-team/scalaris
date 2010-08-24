@@ -33,7 +33,7 @@ start(normal, NodeType) ->
     pid_groups:start_link(),
     Sup = sup_scalaris:start_link(NodeType),
     Size = config:read(nodes_per_vm),
-    log:log(info,"Do ~p~n",[Size]),
+    log:log(info, "Starting ~B nodes", [Size]),
     admin:add_nodes(Size-1),
     Sup;
 start(_, _) ->

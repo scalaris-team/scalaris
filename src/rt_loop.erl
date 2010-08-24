@@ -128,7 +128,7 @@ on({update_rt, NewId, NewPred, NewSucc},
 %% userdevguide-begin rt_loop:trigger
 on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
     % start periodic stabilization
-    % log:log(info, "[ RT ] stabilize~n"),
+    % log:log(debug, "[ RT ] stabilize"),
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
     ?RT:check(RTState, NewRTState, Id, Pred, Succ),
     % trigger next stabilization

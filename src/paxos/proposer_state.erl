@@ -101,7 +101,7 @@ add_ack_msg(InState, InAckRound, InAckValue, InAckRLast) ->
                     false -> InState; %% old ack message -> drop it
                     true ->
                         % we only receive msgs for round we started ourselves
-                        log:log(error, "~nmust not happen~n~n"),
+                        log:log(error, "~nmust not happen~n"),
                         InState
                 end
         end,

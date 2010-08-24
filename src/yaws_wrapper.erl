@@ -52,7 +52,7 @@ try_link(DocRoot, SL, GL) ->
             yaws_api:setconf(GC, [SCs]),
             Link;
         false ->
-           log:log(warn,"[ Yaws ] could not start yaws, maybe port ~p is in use~n", [SC#sconf.port]),
+           log:log(warn,"[ Yaws ] could not start yaws, maybe port ~p is in use", [SC#sconf.port]),
             ignore
     end.
 

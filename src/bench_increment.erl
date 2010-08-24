@@ -74,7 +74,7 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
         {failure, not_found} ->
             process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
         X ->
-            log:log(warn, "~p~n", [X])
+            log:log(warn, "~p", [X])
     end.
 
 process_iter_v2(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
@@ -91,7 +91,7 @@ process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
         {failure, failed} ->
             process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
         X ->
-            log:log(warn, "~p~n", [X])
+            log:log(warn, "~p", [X])
     end.
 
 bench() ->

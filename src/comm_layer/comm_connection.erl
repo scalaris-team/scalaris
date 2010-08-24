@@ -81,7 +81,7 @@ on({send, DestPid, Message}, State) ->
              end,
     case Socket of
         fail ->
-            log:log(warn, "~p Connection failed drop message ~p~n",
+            log:log(warn, "~p Connection failed drop message ~p",
                     [pid_groups:my_pidname(), Message]),
             State;
         _ ->

@@ -130,7 +130,7 @@ getVivaldiMap() ->
         receive
             {get_list_response, X} -> X
         after 2000 ->
-            log:log(error,"[ WH ] boot_server:node_list failed~n"),
+            log:log(error,"[ WH ] boot_server:node_list failed"),
             {failed}
         end,
     CC_list = lists:map(fun (Pid) -> get_vivaldi(Pid) end, Nodes),
