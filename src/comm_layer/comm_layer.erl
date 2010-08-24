@@ -57,6 +57,6 @@ this() ->
     {LocalIP, LocalPort} = comm_server:get_local_address_port(),
     {LocalIP, LocalPort, self()}.
 
--spec is_valid(process_id()) -> boolean().
+-spec is_valid(process_id() | any()) -> boolean().
 is_valid({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid}) -> true;
 is_valid(_) -> false.
