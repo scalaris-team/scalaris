@@ -2444,7 +2444,7 @@ ERLANG_LIB_VER_tools=$ac_cv_erlang_lib_ver_tools
 if test "$ac_cv_erlang_lib_dir_tools" = "not found"; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error "you won't be able compile the erlang sources
+as_fn_error "erlang-tools not found - you won't be able compile the erlang sources
 See \`config.log' for more details." "$LINENO" 5; }
 fi
 
@@ -2523,8 +2523,8 @@ ERLANG_LIB_DIR_common_test=$ac_cv_erlang_lib_dir_common_test
 ERLANG_LIB_VER_common_test=$ac_cv_erlang_lib_ver_common_test
 
 if test "$ac_cv_erlang_lib_dir_common_test" = "not found"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: you won't be able to run the unit tests without common_test" >&5
-$as_echo "$as_me: you won't be able to run the unit tests without common_test" >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang-common_test not found - you won't be able to run the unit tests without common_test" >&5
+$as_echo "$as_me: erlang-common_test not found - you won't be able to run the unit tests without common_test" >&6;}
 fi
 
 
@@ -2602,8 +2602,8 @@ ERLANG_LIB_DIR_edoc=$ac_cv_erlang_lib_dir_edoc
 ERLANG_LIB_VER_edoc=$ac_cv_erlang_lib_ver_edoc
 
 if test "$ac_cv_erlang_lib_dir_edoc" = "not found"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: you won't be able to create the documentation or run 'make install'" >&5
-$as_echo "$as_me: you won't be able to create the documentation or run 'make install'" >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang-edoc not found - you won't be able to create the documentation or run 'make install'" >&5
+$as_echo "$as_me: erlang-edoc not found - you won't be able to create the documentation or run 'make install'" >&6;}
 fi
 
 
