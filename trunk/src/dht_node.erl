@@ -192,7 +192,7 @@ on({lookup_tp, Message}, State) ->
             comm:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, comm:this()}),
             State;
         false ->
-            log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not in ~p~n", [Message#tp_message.item_key, MyRange]),
+            log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not in ~p", [Message#tp_message.item_key, MyRange]),
             State
     end;
 
@@ -271,13 +271,13 @@ on({get_key, Source_PID, HashedKey}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     case intervals:in(HashedKey, MyRange) of
         true ->
-%%             log:log(info, "[ ~w | I | Node   | ~w ] get_key ~s~n",
+%%             log:log(info, "[ ~w | I | Node   | ~w ] get_key ~s",
 %%                     [calendar:universal_time(), self(), HashedKey]),
             comm:send(Source_PID,
                       {get_key_response, HashedKey,
                        ?DB:read(dht_node_state:get(State, db), HashedKey)});
         false ->
-            log:log(info, "[ Node ] get_Key: Got Request for Key ~p, it is not in ~p~n",
+            log:log(info, "[ Node ] get_Key: Got Request for Key ~p, it is not in ~p",
                     [HashedKey, MyRange])
     end,
     State;
@@ -313,7 +313,7 @@ on({delete_key, Source_PID, Key}, State) ->
             comm:send(Source_PID, {delete_key_response, Key, Result}),
             dht_node_state:set_db(State, DB2);
         false ->
-            log:log(info,"[ Node ] delete_Key: Got Request for Key ~p, it is not in ~p~n", [Key, MyRange]),
+            log:log(info,"[ Node ] delete_Key: Got Request for Key ~p, it is not in ~p", [Key, MyRange]),
             State
     end;
 

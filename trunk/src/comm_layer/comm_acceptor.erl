@@ -93,10 +93,10 @@ open_listen_port([Port | Rest], IP) ->
     case gen_tcp:listen(Port, [binary, {packet, 4}, {ip, IP}]
                         ++ comm_server:tcp_options()) of
         {ok, Socket} ->
-            log:log(info,"[ CC ] listening on ~p:~p~n", [IP, Port]),
+            log:log(info,"[ CC ] listening on ~p:~p", [IP, Port]),
             Socket;
         {error, Reason} ->
-            log:log(error,"[ CC ] can't listen on ~p: ~p~n", [Port, Reason]),
+            log:log(error,"[ CC ] can't listen on ~p: ~p", [Port, Reason]),
             open_listen_port(Rest, IP)
     end;
 open_listen_port([], _) ->

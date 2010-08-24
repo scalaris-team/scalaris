@@ -83,7 +83,7 @@ loop() ->
             end;
         {trace, Pid, spawn, Pid2, {M, F, Args}} ->
             %io:format(" SPAWN: ~p -> ~p in ~p~n", [Pid, Pid2, {M, F, Args}]),
-            %log:log2file("TRACER",lists:flatten(io_lib:format(" SPAWN: ~p -> ~p in ~p~n", [Pid, Pid2, {M, F, Args}]))),
+            %log:log(debug "[ TRACER ] SPAWN: ~p -> ~p in ~p", [Pid, Pid2, {M, F, Args}]),
             ets:insert(tracer, {Pid, Pid2, {M, F, Args}}),
             loop();
         _X ->

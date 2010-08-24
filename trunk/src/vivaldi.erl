@@ -102,7 +102,7 @@ start_link(DHTNodeGroup) ->
 
 -spec init(module()) -> vivaldi:state().
 init(Trigger) ->
-    log:log(info,"[ Vivaldi ~p ] starting~n", [comm:this()]),
+    log:log(info,"[ Vivaldi ~p ] starting", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:now(TriggerState),
     {random_coordinate(), 1.0, TriggerState2}.

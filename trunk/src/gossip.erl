@@ -181,7 +181,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> full_state().
 init(Trigger) ->
-    log:log(info,"[ Gossip ~p ] starting~n", [comm:this()]),
+    log:log(info,"[ Gossip ~p ] starting", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:now(TriggerState),
     PreviousState = gossip_state:new_state(),
@@ -450,7 +450,7 @@ update(MyState, OtherValues) ->
             false ->
                 % this case should not happen since the on/2 handlers should only
                 % call update/2 if the rounds match
-                log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring): ~p", [comm:this(),util:get_stacktrace()]),
+                log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring):~nstacktrace: ~p", [comm:this(),util:get_stacktrace()]),
                 MyValues
         end,
     % now check whether all average-based values changed less than epsilon percent:

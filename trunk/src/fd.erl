@@ -199,7 +199,7 @@ on({crash, Target}, State) ->
     fd_db:del_pinger(Target),
     case fd_db:get_subscribers(Target) of
         [] ->
-            log:log(error, "[ FD ] shouldn't happen1");
+            log:log(error, "[ FD ] shouldn't happen!");
         Subscribers ->
             %% notify with cookies and unsubscribe
             [ begin

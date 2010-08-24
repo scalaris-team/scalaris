@@ -89,7 +89,7 @@ inc_readlock(DBEntry) -> set_readlock(DBEntry, get_readlock(DBEntry) + 1).
 -spec dec_readlock(DBEntry::entry()) -> entry().
 dec_readlock(DBEntry) ->
     case get_readlock(DBEntry) of
-        0 -> log:log(warn, "Decreasing empty readlock~n"), DBEntry;
+        0 -> log:log(warn, "Decreasing empty readlock"), DBEntry;
         N -> set_readlock(DBEntry, N - 1)
     end.
 

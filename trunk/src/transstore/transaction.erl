@@ -226,7 +226,7 @@ write_read_receive(ReplicaKeys, Operation, Cookie, State)->
                     write_read_receive(ReplicaKeys, Operation, Cookie, State);
                 Any ->
                     log:log(error,
-                            "transaction:write_read_receive: Oops, unknown message ~p~n", [Any]),
+                            "transaction:write_read_receive: Oops, unknown message ~p", [Any]),
                     write_read_receive(ReplicaKeys, Operation, Cookie, State)
             end
     end.
@@ -357,7 +357,7 @@ write_read_receive_parallel(Results, ReplicaKeys)->
             {fail, timeout};
         Any ->
             log:log(error,
-                    "transaction:write_read_receive_parallel: Oops, unknown message ~p~n", [Any]),
+                    "transaction:write_read_receive_parallel: Oops, unknown message ~p", [Any]),
             write_read_receive_parallel(Results, ReplicaKeys)
     end.
 

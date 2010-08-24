@@ -75,7 +75,7 @@ get_ring_details() ->
     Nodes = receive
                 {get_list_response, N} -> N
             after 2000 ->
-                log:log(error,"ST: Timeout~n"),
+                log:log(error,"ST: Timeout"),
                 {failed}
             end,
     lists:sort(fun compare_node_details/2,
@@ -102,13 +102,13 @@ get_node_details(Pid) ->
         {{get_node_details_response, Details}, Pid} -> {ok, Details}
     after
         2000 ->
-            log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response from ~p~n",[Pid]),
+            log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response from ~p",[Pid]),
             receive
                 {{get_node_details_response, Details}, Pid} ->
                     {ok, Details}
             after
                 4000 ->
-                    log:log(error,"[ ST ]: 6sec Timeout by waiting on get_node_details_response from ~p~n",[Pid]),
+                    log:log(error,"[ ST ]: 6sec Timeout by waiting on get_node_details_response from ~p",[Pid]),
                     {failed}
             end
     end.

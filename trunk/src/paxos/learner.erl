@@ -76,7 +76,7 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
             of
                 true ->
                     log:log(error,
-                            "duplicate learner initialize for id ~p~n",
+                            "duplicate learner initialize for id ~p",
                             [PaxosID]);
                 false ->
                     TmpState = learner_state:set_majority(StateForID, Majority),

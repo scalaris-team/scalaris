@@ -181,7 +181,7 @@ process_join_msg({lookup_timeout}, State) ->
 
 % Catch all other messages until the join procedure is complete
 process_join_msg(Msg, {join, Details, QueuedMessages}) ->
-    %log:log(info("[dhtnode] [~p] postponed delivery of ~p~n", [self(), Msg]),
+    %log:log(info("[dhtnode] [~p] postponed delivery of ~p", [self(), Msg]),
     {join, Details, msg_queue:add(QueuedMessages, Msg)}.
 
 -spec get_local_dht_node_reregister_pid() -> pid().

@@ -126,7 +126,7 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
                                        Majority, MaxProposers, InitialRound),
                     ETSTableName);
         _ ->
-            log:log(error, "Duplicate proposer:initialize for paxos id ~p~n"
+            log:log(error, "Duplicate proposer:initialize for paxos id ~p"
                            "Just triggering instead~n", [PaxosID])
     end,
     on({proposer_trigger, PaxosID, InitialRound}, State);
