@@ -149,9 +149,16 @@ wait_for_unregister(PID) ->
             wait_for_unregister(PID)
     end.
 
+%% @doc Gets the current stack trace. Use this method in order to get a stack
+%%      trace if no exception was thrown.
 -spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()]}].
 get_stacktrace() ->
-    erlang:get_stacktrace().
+    % throw an exception for erlang:get_stacktrace/0 to return the actual stack trace
+    [{util,get_stacktrace,0} | ST] =
+        try erlang:exit(a)
+        catch exit:_ -> erlang:get_stacktrace()
+        end,
+    ST.
 
 %% @doc Extracts a given ItemInfo from an ItemList that has been returned from
 %%      e.g. erlang:process_info/2 for the dump* methods.
