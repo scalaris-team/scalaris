@@ -111,7 +111,7 @@ end_per_suite(Config) ->
                     {DB_EQUALS_PATTERN_DB, ExpectedPattern} -> DB_EQUALS_PATTERN_DB;
                     {DB_EQUALS_PATTERN_DB, Any} ->
                         ct:pal("Failed: Stacktrace ~p~n",
-                               [erlang:get_stacktrace()]),
+                               [util:get_stacktrace()]),
                         ?ct_fail("~p evaluated to \"~p\" which is "
                                "not the expected ~p",
                                [??Actual, Any, ??ExpectedPattern]),

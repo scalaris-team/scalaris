@@ -43,7 +43,7 @@
                     ExpectedVal -> ok;
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
-                               [erlang:get_stacktrace()]),
+                               [util:get_stacktrace()]),
                         ?ct_fail("~s evaluated to \"~w\" which is "
                                "not the expected ~s that evaluates to \"~w\"~n",
                                [??Actual, Any, ??Expected, ExpectedVal])
@@ -59,7 +59,7 @@
                     ExpectedVal -> ok;
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
-                               [erlang:get_stacktrace()]),
+                               [util:get_stacktrace()]),
                         ?ct_fail("~s evaluated to \"~w\" which is "
                                "not the expected ~s that evaluates to \"~w\"~n"
                                "(~s)~n",
@@ -74,7 +74,7 @@
                     ExpectedPattern -> ok;
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
-                               [erlang:get_stacktrace()]),
+                               [util:get_stacktrace()]),
                         ?ct_fail("~s evaluated to \"~w\" which is "
                                "not the expected ~s~n",
                                [??Actual, Any, ??ExpectedPattern])
@@ -88,7 +88,7 @@
                     ExpectedPattern -> ok;
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
-                               [erlang:get_stacktrace()]),
+                               [util:get_stacktrace()]),
                         ?ct_fail("~s evaluated to \"~w\" which is "
                                "not the expected ~s~n"
                                "(~s)~n",
@@ -102,7 +102,7 @@
                 try Cmd of
                     Any -> 
                         ct:pal("Failed: Stacktrace ~p~n",
-                               [erlang:get_stacktrace()]),
+                               [util:get_stacktrace()]),
                         ?ct_fail("~s evaluated to \"~w\"; exception "
                                "~s:~s was expected~n",
                                [??Cmd, Any, ??ExceptionType, ??ExceptionPattern])
@@ -110,7 +110,7 @@
                     ExceptionType: ExceptionPattern -> ok;
                     OtherType: OtherException ->
                         ct:pal("Failed: Stacktrace ~p~n",
-                               [erlang:get_stacktrace()]),
+                               [util:get_stacktrace()]),
                         ?ct_fail("~s threw exception \"~w:~w\" but exception "
                                "~s:~s was expected~n",
                                [??Cmd, OtherType, OtherException, ??ExceptionType, ??ExceptionPattern])
