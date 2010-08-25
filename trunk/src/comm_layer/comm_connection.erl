@@ -204,7 +204,12 @@ new_connection(Address, Port, MyPort) ->
         {ok, Socket} ->
             % send end point data
             case inet:sockname(Socket) of
-                {ok, {MyAddress, _MyPort}} ->
+                {ok, {MyAddress, _SocketPort}} ->
+                    case comm_server:get_local_address_port() of
+                        {undefined,_} ->
+                            comm_server:set_local_address(MyAddress, MyPort);
+                        _ -> ok
+                    end,
                     Message = term_to_binary({endpoint, MyAddress, MyPort}),
                     gen_tcp:send(Socket, Message),
                     case inet:peername(Socket) of
