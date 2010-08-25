@@ -124,9 +124,9 @@ on({unregister_conn, Address, Port, Client}, State) ->
     Client ! {unregister_conn_done},
     State;
 
-on({register_conn, Address, Port, Pid, Socket, Client}, State) ->
+on({register_conn, Address, Port, Pid, _Socket, Client}, State) ->
     case ets:lookup(?MODULE, {Address, Port}) of
-        [] -> ets:insert(?MODULE, {{Address, Port}, {Pid, Socket}});
+        [] -> ets:insert(?MODULE, {{Address, Port}, Pid});
         _ -> ok
     end,
     Client ! {register_conn_done},
