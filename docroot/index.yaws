@@ -12,23 +12,37 @@
   <body onload="load()" onunload="GUnload()">
 
     <div class="menubar">
-       	  <div class="nothighlighted">
+      <div class="nothighlighted">
 	    <h2>Scalaris</h2>
 	  </div>
-       	  <div class="highlighted">
+      <div class="highlighted">
 	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
-          <div class="nothighlighted">
-            <a class="menua" href="ring.yaws">Ring</a>
-	  </div>
-          <div class="nothighlighted">
-            <a class="menua" href="indexed-ring.yaws">Indexed Ring</a>
-	  </div>
+	  
+<erl>
+out(Arg) ->
+    case application:get_application() of
+        {ok, boot_cs} ->
+            {html,
+"      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"ring.yaws\">Ring</a>
+      </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
+      </div>
+"};
+        _ -> {html, ""}
+    end.
+</erl>
+
 	  <div class="nothighlighted">
 	    <a class="menua" href="documentation.yaws">Docu</a>
 	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="debug.yaws">Debug</a>
+      </div>
 	  <div class="nothighlightedlast">
-	    <a class="menua" href="debug.yaws">Debug</a>
+	    <a class="menua" href="logger.yaws">Message Stats</a>
 	  </div>
     </div><div class="middle">
       <div class="middleleft">
@@ -214,6 +228,7 @@ Last update:
 </div>
 <br class="br_class">&nbsp;
 </div>
-    <div class="bottom">
-    </div>
+<div class="bottom">
+</div>
+</body>
 </html>

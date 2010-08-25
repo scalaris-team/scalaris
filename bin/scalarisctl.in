@@ -29,8 +29,6 @@ SCALARISDIR=$DESTDIR@libdir@/scalaris
 BEAMDIR=$DESTDIR@libdir@/scalaris/ebin
 # /lib/scalaris/docroot
 DOCROOTDIR=$SCALARISDIR/docroot
-# /lib/scalaris/docroot_node
-NODEDOCROOTDIR=$SCALARISDIR/docroot_node
 # /share/doc/scalaris
 DOCDIR=$DESTDIR@docdir@
 # /share/java
@@ -79,8 +77,6 @@ fix_paths() {
         BEAMDIR=$SCALARISDIR/ebin
         # scalaris/docroot
         DOCROOTDIR=$SCALARISDIR/docroot
-        # scalaris/docroot_node
-        NODEDOCROOTDIR=$SCALARISDIR/docroot_node
         # scalaris/log
         LOGDIR=$SCALARISDIR/log
         # /usr/bin/scalaris
@@ -257,7 +253,7 @@ nodestart(){
         -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
         -yaws embedded true \
         -scalaris log_path "\"$LOGDIR/$NODE_NAME\"" \
-        -scalaris docroot "\"$NODEDOCROOTDIR\"" \
+        -scalaris docroot "\"$DOCROOTDIR\"" \
         -scalaris config "\"$ETCDIR/scalaris.cfg\"" \
         -scalaris local_config "\"$ETCDIR/scalaris.local.cfg\"" \
         -connect_all false -hidden -name $NODE_NAME \

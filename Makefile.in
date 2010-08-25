@@ -44,8 +44,6 @@ SCALARISDIR = $(DESTDIR)@libdir@/scalaris
 BEAMDIR = $(DESTDIR)@libdir@/scalaris/ebin
 # /lib/scalaris/docroot
 DOCROOTDIR=$(SCALARISDIR)/docroot
-# /lib/scalaris/docroot_node
-NODEDOCROOTDIR=$(SCALARISDIR)/docroot_node
 # /share/doc/scalaris
 DOCDIR=$(DESTDIR)@docdir@
 # /share/java
@@ -252,9 +250,6 @@ install-erlang: compile
 	           docroot/images/default/grid/*.gif
 	install -m 644 -t $(DOCROOTDIR)/images/default/grid \
 	           docroot/images/default/grid/*.png
-	install -d $(NODEDOCROOTDIR)
-	install -m 644 -t $(NODEDOCROOTDIR) \
-	           docroot_node/*.yaws
 	install -d $(SCALARISDIR)/contrib/yaws/ebin
 	install -d $(SCALARISDIR)/contrib/yaws/include
 	install -m 644 -t $(SCALARISDIR)/contrib/yaws/ebin \
