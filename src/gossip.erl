@@ -96,7 +96,7 @@
     {cy_cache, RandomNodes::[node:node_type()]} |
     {get_values_all, SourcePid::comm:erl_local_pid()} | 
     {get_values_best, SourcePid::comm:erl_local_pid()} |
-    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
+    {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
