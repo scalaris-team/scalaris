@@ -208,6 +208,29 @@ on({crash, Target}, State) ->
               end
               || {Subscriber, Cookie} <- Subscribers]
     end,
+    State;
+
+on({web_debug_info, Requestor}, State) ->
+    Subscriptions = fd_db:get_subscriptions(),
+    % not get better names for remote nodes:
+    S2 = [begin
+              case comm:is_local(TargetPid) of
+                  true -> {Subscriber, {webhelpers:pid_to_name(comm:make_local(TargetPid)), Cookie}};
+                  _ ->
+                      comm:send(comm:get(pid_groups, TargetPid),
+                                {group_and_name_of, TargetPid, comm:this()}),
+                      receive
+                          {group_and_name_of_response, Name} ->
+                              {Subscriber, {webhelpers:pid_to_name2(Name), Cookie}}
+                      after 2000 -> X
+                      end
+              end
+          end || X = {Subscriber, {TargetPid, Cookie}} <- Subscriptions],
+    KeyValueList =
+        [{"subscriptions", length(Subscriptions)},
+         {"subscriptions (subscriber, {target, cookie}):", ""} |
+         [{webhelpers:pid_to_name(Pid), lists:flatten(io_lib:format("~p", [X]))} || {Pid, X} <- S2]],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
 %%% Internal functions

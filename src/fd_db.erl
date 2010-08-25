@@ -26,7 +26,8 @@
 %% Exported Functions
 -export([add_subscription/3, del_subscription/3]).
 -export([add_pinger/2, del_pinger/1]).
--export([get_subscribers/1, get_subscribers/2, get_subscriptions/1]).
+-export([get_subscribers/1, get_subscribers/2,
+         get_subscriptions/0, get_subscriptions/1]).
 
 -export([get_pinger/1, init/0]).
 
@@ -56,6 +57,10 @@ get_subscribers(Target) ->
 get_subscribers(Target, Cookie) ->
     [ Result || {_, {_Pid, XCookie} = Result} <- ets:lookup(fd_ts_table, Target),
                 XCookie =:= Cookie].
+
+-spec get_subscriptions() -> [{Subscriber::pid(), {Target::comm:mypid(), Cookie::fd:cookie()}}].
+get_subscriptions() ->
+    ets:tab2list(fd_st_table).
 
 -spec get_subscriptions(Subscriber::pid()) -> [{Target::comm:mypid(), Cookie::fd:cookie()}].
 get_subscriptions(Subscriber) ->

@@ -42,11 +42,13 @@
 -include("scalaris.hrl").
 
 -export([send/2, send_local_after/3 , this/0, get/2, send_to_group_member/3,
-         send_local/2, make_global/1, is_valid/1, get_msg_tag/1,
-         this_with_cookie/1, self_with_cookie/1]).
+         send_local/2, make_global/1, make_local/1, is_valid/1, is_local/1,
+         get_msg_tag/1, this_with_cookie/1, self_with_cookie/1]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0, message_tag/0, mypid/0, erl_local_pid/0]).
+% for comm_layer
+-export_type([erl_pid_plain/0]).
 -endif.
 
 -type cookie() :: any().
@@ -116,9 +118,11 @@ get_msg_tag(Message) when is_tuple(Message) andalso is_atom(erlang:element(1, Me
 -spec send(Dest::mypid(), Message::message() | group_message()) -> ok.
 -spec send_local(Dest::erl_local_pid(), Message::message()) -> ok.
 -spec send_local_after(Delay::non_neg_integer(), Dest::erl_local_pid() , Message::message()) -> reference().
--spec make_global(erl_pid_plain()) -> mypid().
+-spec make_global(LocalPid::erl_pid_plain()) -> GlobalPid::mypid().
+-spec make_local(GlobalPid::mypid()) -> LocalPid::erl_pid_plain().
 -spec get(erl_pid_plain(), mypid()) -> mypid().
 -spec is_valid(mypid() | any()) -> boolean().
+-spec is_local(mypid()) -> boolean().
 
 -ifdef(TCP_LAYER).
 
@@ -156,6 +160,16 @@ send_local_after(Delay, Pid, Message) ->
 %%      for use in send/2.
 make_global(Pid) ->
     get(Pid, comm:this()).
+
+%% @doc TCP_LAYER: Converts a global mypid() of the current node to a local
+%%      erlang pid.
+make_local(Pid) ->
+    comm_layer:make_local(Pid).
+
+%% @doc TCP_LAYER: Checks whether a global mypid() can be converted to a local
+%%      pid of the current node.
+is_local(Pid) ->
+    comm_layer:is_local(Pid).
 
 %% @doc TCP_LAYER: Creates the pid a process with name Name would have on node
 %%      _Node.
@@ -205,6 +219,16 @@ send_local_after(Delay, Pid, Message) ->
 %%      are the same as local pids) for use in send/2.
 make_global(Pid) ->
     Pid.
+
+%% @doc BUILTIN: Returns the given pid (with BUILTIN communication, global pids
+%%      are the same as local pids).
+make_local(Pid) ->
+    Pid.
+
+%% @doc BUILTIN: Checks whether a pid is located at the same node than the
+%%      current process.
+is_local(Pid) ->
+    erlang:node(Pid) =:= node().
 
 %% @doc BUILTIN: Creates the pid a process with name Name would have on node
 %%      _Node.

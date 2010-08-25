@@ -138,8 +138,8 @@ get_replica_keys(Key) ->
 
 %% userdevguide-begin rt_simple:dump
 %% @doc Dumps the RT state for output in the web interface.
--spec dump(RT::rt()) -> KeyValueList::[{Index::non_neg_integer(), Node::string()}].
-dump(Succ) -> [{0, lists:flatten(io_lib:format("~p", [Succ]))}].
+-spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
+dump(Succ) -> [{"0", lists:flatten(io_lib:format("~p", [Succ]))}].
 %% userdevguide-end rt_simple:dump
 
 %% @doc Checks whether config parameters of the rt_simple process exist and are
