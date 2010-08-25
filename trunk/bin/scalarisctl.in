@@ -201,13 +201,14 @@ bootstart(){
     if [ $empty -eq 1 ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs empty true"
     fi
+    mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
         -pa $SCALARISDIR/contrib/log4erl/ebin \
         -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
         -yaws embedded true \
-        -boot_cs log_path "\"$LOGDIR\"" \
+        -boot_cs log_path "\"$LOGDIR/$NODE_NAME\"" \
         -boot_cs docroot "\"$DOCROOTDIR\"" \
         -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
         -boot_cs local_config "\"$ETCDIR/scalaris.local.cfg\"" \
@@ -245,16 +246,17 @@ nodestart(){
     if [ $interactive -eq 0 ]; then
         BACKGROUND="-detached"
     fi
-    pushd $BEAMDIR > /dev/null
     if [ $first -eq 1 ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris first true"
     fi
+    mkdir -p "$LOGDIR/$NODE_NAME"
+    pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -pa $SCALARISDIR/contrib/yaws/ebin \
         -pa $SCALARISDIR/contrib/log4erl/ebin \
         -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
         -yaws embedded true \
-        -scalaris log_path "\"$LOGDIR\"" \
+        -scalaris log_path "\"$LOGDIR/$NODE_NAME\"" \
         -scalaris docroot "\"$NODEDOCROOTDIR\"" \
         -scalaris config "\"$ETCDIR/scalaris.cfg\"" \
         -scalaris local_config "\"$ETCDIR/scalaris.local.cfg\"" \
