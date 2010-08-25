@@ -36,7 +36,7 @@
 -type(bulkowner_message() ::
       {bulk_owner, I::intervals:interval(), Msg::comm:message()} |
       {start_bulk_owner, I::intervals:interval(), Msg::comm:message()} |
-      {bulkowner_deliver, Range::intervals:interval(), {bulk_read_with_version, Issuer::comm:mypid()}}).
+      {bulkowner_deliver, Range::intervals:interval(), {bulk_read_entry, Issuer::comm:mypid()}}).
 
 -type(database_message() ::
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
@@ -332,10 +332,10 @@ on({start_bulk_owner, I, Msg}, State) ->
     bulkowner:bulk_owner(State, I, Msg),
     State;
 
-on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
+on({bulkowner_deliver, Range, {bulk_read_entry, Issuer}}, State) ->
     NowDone = dht_node_state:get(State, my_range),
     Data = ?DB:get_entries(dht_node_state:get(State, db), Range),
-    comm:send(Issuer, {bulk_read_with_version_response, NowDone, Data}),
+    comm:send(Issuer, {bulk_read_entry_response, NowDone, Data}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

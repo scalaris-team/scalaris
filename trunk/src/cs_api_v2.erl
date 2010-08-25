@@ -130,7 +130,7 @@ test_and_set(Key, OldValue, NewValue) ->
 range_read(From, To) ->
     Interval = intervals:new('[', From, To, ']'),
     bulkowner:issue_bulk_owner(Interval,
-                               {bulk_read_with_version, comm:this()}),
+                               {bulk_read_entry, comm:this()}),
     TimerRef =
         comm:send_local_after(config:read(range_read_timeout), self(), {range_read_timeout}),
     range_read_loop(Interval, intervals:empty(), [], TimerRef).
@@ -140,7 +140,7 @@ range_read_loop(Interval, Done, Data, TimerRef) ->
     receive
         {range_read_timeout} ->
             {timeout, lists:flatten(Data)};
-        {bulk_read_with_version_response, NowDone, NewData} ->
+        {bulk_read_entry_response, NowDone, NewData} ->
             Done2 = intervals:union(NowDone, Done),
             case intervals:is_subset(Interval, Done2) of
                 false ->
