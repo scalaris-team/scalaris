@@ -294,26 +294,25 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
     State;
 
 %% for unit testing only: allow direct DB manipulation
-on({get_key_entry, Source_PID, Key}, State) ->
-    Entry = ?DB:get_entry(dht_node_state:get(State, db), Key),
+on({get_key_entry, Source_PID, HashedKey}, State) ->
+    Entry = ?DB:get_entry(dht_node_state:get(State, db), HashedKey),
     comm:send(Source_PID, {get_key_entry_reply, Entry}),
     State;
 
 on({set_key_entry, Source_PID, Entry}, State) ->
-    Key = db_entry:get_key(Entry),
     NewDB = ?DB:set_entry(dht_node_state:get(State, db), Entry),
     comm:send(Source_PID, {set_key_entry_reply, Entry}),
     dht_node_state:set_db(State, NewDB);
 
-on({delete_key, Source_PID, Key}, State) ->
+on({delete_key, Source_PID, HashedKey}, State) ->
     MyRange = dht_node_state:get(State, my_range),
-    case intervals:in(Key, MyRange) of
+    case intervals:in(HashedKey, MyRange) of
         true ->
-            {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), Key),
-            comm:send(Source_PID, {delete_key_response, Key, Result}),
+            {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), HashedKey),
+            comm:send(Source_PID, {delete_key_response, HashedKey, Result}),
             dht_node_state:set_db(State, DB2);
         false ->
-            log:log(info,"[ Node ] delete_Key: Got Request for Key ~p, it is not in ~p", [Key, MyRange]),
+            log:log(info,"[ Node ] delete_Key: Got Request for Key ~p, it is not in ~p", [HashedKey, MyRange]),
             State
     end;
 
@@ -334,8 +333,9 @@ on({start_bulk_owner, I, Msg}, State) ->
     State;
 
 on({bulkowner_deliver, Range, {bulk_read_with_version, Issuer}}, State) ->
-    comm:send(Issuer, {bulk_read_with_version_response, dht_node_state:get(State, my_range),
-                       ?DB:get_entries(dht_node_state:get(State, db), Range)}),
+    NowDone = dht_node_state:get(State, my_range),
+    Data = ?DB:get_entries(dht_node_state:get(State, db), Range),
+    comm:send(Issuer, {bulk_read_with_version_response, NowDone, Data}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -382,13 +382,6 @@ on({web_debug_info, Requestor}, State) ->
             DataList 
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
-    State;
-
-
-%% unit_tests
-on({bulkowner_deliver, Range, {unit_test_bulkowner, Owner}}, State) ->
-    Res = ?DB:get_entries(dht_node_state:get(State, db), Range),
-    comm:send_local(Owner, {unit_test_bulkowner_response, Res, dht_node_state:get(State, node_id)}),
     State;
 
 %% @TODO buggy ...
