@@ -59,7 +59,7 @@
     {get_node_details_response, node_details:node_details()} |
     {get_ages, SourcePid::comm:erl_local_pid()} |
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
-    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
+    {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.

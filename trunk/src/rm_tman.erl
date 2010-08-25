@@ -61,7 +61,7 @@
     {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {update_id, NewId::?RT:key()} |
-    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
+    {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup

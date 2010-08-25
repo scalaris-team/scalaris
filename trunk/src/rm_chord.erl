@@ -48,7 +48,7 @@
     {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
     {update_id, NewId::?RT:key()} |
-    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
+    {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup

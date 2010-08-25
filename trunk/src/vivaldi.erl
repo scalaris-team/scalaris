@@ -55,7 +55,7 @@
     {vivaldi_shuffle, SourcePid::comm:mypid(), network_coordinate(), error()} |
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |
     {get_coordinate, comm:mypid()} |
-    {'$gen_cast', {debug_info, Requestor::comm:erl_local_pid()}}).
+    {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
