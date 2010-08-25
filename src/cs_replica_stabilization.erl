@@ -74,7 +74,7 @@ start_fetchers(Index, [Interval | Tail]) ->
     
 
 init({Owner, Index, Interval}) ->
-    bulkowner:issue_bulk_owner(Interval,{bulk_read_with_version, comm:this()}),
+    bulkowner:issue_bulk_owner(Interval,{bulk_read_entry, comm:this()}),
     comm:send_local_after(5000, self(), {timeout}),
     {Owner, Index, Interval, [], []}.
 
@@ -83,7 +83,7 @@ on({timeout}, {Owner, Index, Interval, Done, FetchedData}) ->
     comm:send_local_after(5000, self(), {timeout}),
     {Owner, Index, Interval, Done, FetchedData};
 
-on({bulk_read_with_version_response, Interval, NewData}, {Owner, Index, Interval, Done, FetchedData}) ->
+on({bulk_read_entry_response, Interval, NewData}, {Owner, Index, Interval, Done, FetchedData}) ->
     Done2 = intervals:union(Interval, Done),
     %TODO: this test is always be true!
     case intervals:is_subset(Interval, Done2) of

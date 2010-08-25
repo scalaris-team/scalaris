@@ -53,7 +53,7 @@ count(_Config) ->
     ?equals(transaction_api:single_write("j", 3), commit),
     ?equals(transaction_api:single_write("k", 5), commit),
     ?equals(transaction_api:single_write("l", 7), commit),
-    bulkowner:issue_bulk_owner(intervals:all(), {bulk_read_with_version, comm:this()}),
+    bulkowner:issue_bulk_owner(intervals:all(), {bulk_read_entry, comm:this()}),
     ?equals(collect(0), 68),
     ok.
 
@@ -62,12 +62,12 @@ collect(Sum) ->
 	Sum < 68 ->
 %%         ct:pal("sum: ~p ~p~n", [Sum, Sum]),
 	    receive
-            {bulk_read_with_version_response, _NowDone, Data} ->
+            {bulk_read_entry_response, _NowDone, Data} ->
                 collect(Sum + reduce(Data))
         end;
 	Sum == 68 ->
 	    receive
-            {bulk_read_with_version_response, _NowDone, Data} ->
+            {bulk_read_entry_response, _NowDone, Data} ->
                 Sum + reduce(Data)
 	    after 1000 ->
 		    Sum
