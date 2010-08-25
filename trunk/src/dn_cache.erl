@@ -33,7 +33,8 @@
     {{pong}, node:node_type()} |
     {add_zombie_candidate, node:node_type()} |
     {subscribe, comm:erl_local_pid()} |
-    {unsubscribe, comm:erl_local_pid()}).
+    {unsubscribe, comm:erl_local_pid()} |
+    {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 -type(state() :: {fix_queue:fix_queue(), gb_set(), trigger:state()}).
 
@@ -95,7 +96,20 @@ on({subscribe, Node}, {Queue, Subscriber, TriggerState}) ->
     {Queue, gb_sets:insert(Node, Subscriber), TriggerState};
 
 on({unsubscribe, Node}, {Queue, Subscriber, TriggerState}) ->
-    {Queue, gb_sets:del_element(Node, Subscriber), TriggerState}.
+    {Queue, gb_sets:del_element(Node, Subscriber), TriggerState};
+
+on({web_debug_info, Requestor}, {Queue, Subscriber, _TriggerState} = State) ->
+    KeyValueList =
+        lists:flatten(
+          [{"max_length", fix_queue:max_length(Queue)},
+           {"queue length", fix_queue:length(Queue)},
+           {"queue (node):", ""},
+           [{"", lists:flatten(io_lib:format("~p", [Node]))} || Node <- queue:to_list(fix_queue:queue(Queue))],
+           {"subscribers", gb_sets:size(Subscriber)},
+           {"subscribers (pid):", ""},
+           [{"", webhelpers:pid_to_name(Pid)} || Pid <- gb_sets:to_list(Subscriber)]]),
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State.
 
 %% @doc Gets the pid of the dn_cache process in the same group as the calling
 %%      process. 

@@ -137,9 +137,9 @@ get_replica_keys(Key) ->
     ].
 
 %% @doc Dumps the RT state for output in the web interface.
--spec dump(RT::rt()) -> KeyValueList::[{Index::non_neg_integer(), Node::string()}].
+-spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 dump(RT) ->
-    [{Index, lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- gb_trees:to_list(RT)].
+    [{lists:flatten(io_lib:format("~p", [Index])), lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- gb_trees:to_list(RT)].
 
 %% userdevguide-begin rt_chord:stabilize
 %% @doc Updates one entry in the routing table and triggers the next update.

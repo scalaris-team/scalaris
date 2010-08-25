@@ -27,32 +27,31 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([send/2, this/0, is_valid/1]).
+-export([send/2, this/0, is_valid/1, is_local/1, make_local/1]).
 
 -include("scalaris.hrl").
 
--type(process_id() :: {inet:ip_address(), integer(), pid()}).
+-type(process_id() :: {inet:ip_address(), integer(), comm:erl_pid_plain()}).
 
 %% @doc send message via tcp, if target is not in same Erlang VM.
 -spec send(process_id(), term()) -> ok.
-send({{_IP1, _IP2, _IP3, _IP4} = IP, Port, Pid} = Target, Message) ->
-    {MyIP,MyPort} = comm_server:get_local_address_port(),
-    case {IP, Port} of
-        {MyIP, MyPort} ->
-            ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
-            Pid ! Message,
-            ok;
-        _ ->
-            comm_server:send(Target, Message)
-    end;
-
 send(Target, Message) ->
-    log:log(error,"[ CL ] wrong call to comm:send: ~w ! ~w", [Target, Message]),
-    log:log(error,"[ CL ] stacktrace: ~w", [util:get_stacktrace()]),
-    ok.
+    IsLocal = is_local(Target),
+    case is_valid(Target) of
+        true when IsLocal ->
+            ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
+            make_local(Target) ! Message,
+            ok;
+        true ->
+            comm_server:send(Target, Message);
+        _ ->
+            log:log(error,"[ CL ] wrong call to comm:send: ~w ! ~w", [Target, Message]),
+            log:log(error,"[ CL ] stacktrace: ~w", [util:get_stacktrace()]),
+            ok
+    end.
 
 %% @doc returns process descriptor for the calling process
--spec(this/0 :: () -> process_id()).
+-spec this() -> process_id().
 this() ->
     {LocalIP, LocalPort} = comm_server:get_local_address_port(),
     {LocalIP, LocalPort, self()}.
@@ -60,3 +59,12 @@ this() ->
 -spec is_valid(process_id() | any()) -> boolean().
 is_valid({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid}) -> true;
 is_valid(_) -> false.
+
+-spec is_local(process_id()) -> boolean().
+is_local({IP, Port, _Pid}) ->
+    {MyIP, MyPort} = comm_server:get_local_address_port(),
+    {IP, Port} =:= {MyIP, MyPort}.
+
+-spec make_local(process_id()) -> comm:erl_pid_plain().
+make_local({_IP, _Port, Pid}) ->
+    Pid.

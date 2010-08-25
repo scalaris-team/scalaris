@@ -26,19 +26,20 @@
 -export_type([fix_queue/0]).
 -endif.
 
--export([new/1, add/2, map/2]).
+-export([new/1, add/2, map/2,
+         length/1, max_length/1, queue/1]).
 
--type(fix_queue() :: {MaxLength :: pos_integer(),
+-opaque(fix_queue()::{MaxLength :: pos_integer(),
                       Length    :: non_neg_integer(),
                       Queue     :: queue()}).
 
 %% @doc Creates a new fixed-size queue.
--spec new(MaxLength :: pos_integer()) -> fix_queue().
+-spec new(MaxLength::pos_integer()) -> fix_queue().
 new(MaxLength) ->
     {MaxLength, 0, queue:new()}.
 
 %% @doc Adds an element to the given queue. 
--spec add(Element :: term(), Queue :: fix_queue()) -> fix_queue().
+-spec add(Element::term(), Queue::fix_queue()) -> fix_queue().
 add(Elem, {MaxLength, Length, Queue}) ->
     {_, NewQueue} =
         case Length =:= MaxLength of
@@ -52,6 +53,15 @@ add(Elem, {MaxLength, Length, Queue}) ->
     {MaxLength, NewLength, NewQueue}.
 
 %% @doc Maps a function to all elements of the given queue.
--spec map(fun((term()) -> E), Queue :: fix_queue()) -> [E].
+-spec map(fun((term()) -> E), Queue::fix_queue()) -> [E].
 map(Fun, {_MaxLength, _Length, Queue}) ->
    lists:map(Fun, queue:to_list(Queue)).
+
+-spec length(fix_queue()) -> non_neg_integer().
+length({_MaxLength, Length, _Queue}) -> Length.
+
+-spec max_length(fix_queue()) -> pos_integer().
+max_length({MaxLength, _Length, _Queue}) -> MaxLength.
+
+-spec queue(fix_queue()) -> queue().
+queue({_MaxLength, _Length, Queue}) -> Queue.

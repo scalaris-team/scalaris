@@ -93,6 +93,7 @@
 -type(message() ::
     {pid_groups_add, groupname(), pidname(), pid()} |
     {drop_state} |
+    {group_and_name_of, Pid::comm:mypid(), Source::comm:mypid()} |
     {'EXIT', pid(), Reason::any()}).
 
 %%% group creation
@@ -324,6 +325,12 @@ on({drop_state}, State) ->
     Links = ets:match(?MODULE, {'_', '$1'}),
     [unlink(Pid) || [Pid] <- Links],
     ets:delete_all_objects(?MODULE),
+    State;
+
+on({group_and_name_of, Pid, Source}, State) ->
+    % only for web debug interface
+    Name = pid_groups:group_and_name_of(comm:make_local(Pid)),
+    comm:send(Source, {group_and_name_of_response, Name}),
     State;
 
 on({'EXIT', FromPid, _Reason}, State) ->
