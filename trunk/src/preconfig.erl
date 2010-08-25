@@ -41,7 +41,7 @@ mem_log_file() ->
 %% @doc document root for the application yaws server
 -spec docroot() -> string().
 docroot() ->
-    get_env(docroot, "../docroot", "../docroot_node").
+    get_env(docroot, "../docroot", "../docroot").
 
 %% @doc path to the scalaris config file
 -spec config() -> string().
