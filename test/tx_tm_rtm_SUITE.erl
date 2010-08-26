@@ -37,7 +37,6 @@ all() ->
 suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_suite(Config) ->
-    file:set_cwd("../bin"),
     Pid = unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
     ?equals(?CS_API:write(0, "initial0"), ok),
     %% make a 2nd write, so versiondec does not result in -1 in the DB

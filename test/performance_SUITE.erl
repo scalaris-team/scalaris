@@ -64,10 +64,10 @@ suite() ->
 
 -spec spawn_config_processes() -> pid().
 spawn_config_processes() ->
+    unittest_helper:fix_cwd(),
     Owner = self(),
     Pid =
         spawn(fun () ->
-                       file:set_cwd("../bin"),
 %%                        crypto:start(),
                        pid_groups:start_link(),
                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),

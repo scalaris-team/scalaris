@@ -38,7 +38,6 @@ suite() ->
 
 init_per_suite(Config) ->
     error_logger:tty(true),
-    file:set_cwd("../bin"),
     Pid = unittest_helper:make_ring(4),
     [{wrapper_pid, Pid} | Config].
 
