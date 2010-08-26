@@ -65,19 +65,14 @@ suite() ->
 
 -spec spawn_config_processes() -> pid().
 spawn_config_processes() ->
-    Owner = self(),
-    Pid = spawn(fun() ->
-                        crypto:start(),
-                        pid_groups:start_link(),
-                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                        log:start_link(),
-                        Owner ! {continue},
-                        receive {done} -> ok
-                        end
-                end),
-    receive {continue} -> ok
-    end,
-    Pid.
+    unittest_helper:fix_cwd(),
+    unittest_helper:start_process(
+      fun() ->
+              crypto:start(),
+              pid_groups:start_link(),
+              config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+              log:start_link()
+      end).
 
 %% @doc Returns the min of Desired and max_rw_tests_per_suite().
 %%      Should be used to limit the number of executions of r/w suites.
@@ -87,9 +82,7 @@ rw_suite_runs(Desired) ->
 
 init_per_suite(Config) ->
     ct:pal("DB suite running with: ~p~n", [?TEST_DB]),
-    unittest_helper:fix_cwd(),
     Pid = spawn_config_processes(),
-    timer:sleep(100),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->

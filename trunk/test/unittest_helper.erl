@@ -25,7 +25,9 @@
 -export([fix_cwd/0,
          make_ring_with_ids/1, make_ring/1, stop_ring/1, stop_pid_groups/0,
          check_ring_size/1,
-         wait_for_stable_ring/0, wait_for_stable_ring_deep/0]).
+         wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
+         start_process/1, start_process/2,
+         start_subprocess/1, start_subprocess/2]).
 
 -include("scalaris.hrl").
 
@@ -211,4 +213,39 @@ check_ring_size(Size) ->
         _ ->
             timer:sleep(1000),
             check_ring_size(Size)
+    end.
+
+-spec start_process(StartFun::fun(() -> any())) -> pid().
+start_process(StartFun) ->
+    start_process(StartFun, fun() -> receive {done} -> ok end end).
+
+-spec start_process(StartFun::fun(() -> any()), RunFun::fun(() -> any())) -> pid().
+start_process(StartFun, RunFun) ->
+    Owner = self(),
+    Node = spawn(
+             fun() ->
+                     StartFun(),
+                     Owner ! {started, self()},
+                     RunFun()
+             end),
+    receive
+        {started, Node} -> Node
+    end.
+
+-spec start_subprocess(StartFun::fun(() -> any())) -> pid().
+start_subprocess(StartFun) ->
+    start_subprocess(StartFun, fun() -> receive {done} -> ok end end).
+
+-spec start_subprocess(StartFun::fun(() -> any()), RunFun::fun(() -> any())) -> pid().
+start_subprocess(StartFun, RunFun) ->
+    process_flag(trap_exit, true),
+    Owner = self(),
+    Node = spawn_link(
+             fun() ->
+                     StartFun(),
+                     Owner ! {started, self()},
+                     RunFun()
+             end),
+    receive
+        {started, Node} -> Node
     end.

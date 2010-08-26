@@ -32,8 +32,7 @@ all() ->
      get_keys_for_replica_int,
      get_keys_for_replica_string,
      md5,
-     next_hop_no_neighbors,
-     next_hop_with_neighbors,
+     {group, with_config},
      pid_groups_lookup,
      pid_groups_lookup_by_pid,
      ets_ordset_insert1,
@@ -62,23 +61,37 @@ suite() ->
      {timetrap, {seconds, 20}}
     ].
 
+groups() ->
+    [{with_config, [sequence], [next_hop_no_neighbors, next_hop_with_neighbors]}].
+
+init_per_group(GroupName, Config) ->
+    case GroupName of
+        with_config ->
+            Pid = spawn_config_processes(),
+            [{config_pid, Pid} | Config];
+        _ -> Config
+    end.
+
+end_per_group(GroupName, Config) ->
+    case GroupName of
+        with_config ->
+            case lists:keyfind(config_pid, 1, Config) of
+                false -> ok;
+                {config_pid, Pid} -> stop_config_processes(Pid)
+            end;
+        _ -> ok
+    end.
+
 -spec spawn_config_processes() -> pid().
 spawn_config_processes() ->
     unittest_helper:fix_cwd(),
-    Owner = self(),
-    Pid =
-        spawn(fun () ->
-%%                        crypto:start(),
-                       pid_groups:start_link(),
-                       config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                       log:start_link(),
-                       Owner ! {continue},
-                       receive {done} -> ok
-                       end
-              end),
-    receive {continue} -> ok
-    end,
-    Pid.
+    unittest_helper:start_process(
+      fun() ->
+%%               crypto:start(),
+              pid_groups:start_link(),
+              config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+              log:start_link()
+      end).
 
 -spec stop_config_processes(pid()) -> ok.
 stop_config_processes(Pid) ->
@@ -308,20 +321,18 @@ next_hop_setup() ->
     _State = dht_node_state:new(RT, Neighbors, db).
 
 next_hop_no_neighbors(_Config) ->
-    Pid = spawn_config_processes(),
     State = next_hop_setup(),
     config:write(rt_size_use_neighbors, 0),
     iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) no neighbors"),
     iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) no neighbors"),
-    stop_config_processes(Pid).
+    ok.
 
 next_hop_with_neighbors(_Config) ->
-    Pid = spawn_config_processes(),
     State = next_hop_setup(),
     config:write(rt_size_use_neighbors, 10),
     iter(count(), fun() -> rt_chord:next_hop(State, 42) end, "next_hop(42) with neighbors"),
     iter(count(), fun() -> rt_chord:next_hop(State, 5) end, "next_hop(5) with neighbors"),
-    stop_config_processes(Pid).
+    ok.
 
 pid_groups_lookup(_Config) ->
     {ok, _Pid} = pid_groups:start_link(),
