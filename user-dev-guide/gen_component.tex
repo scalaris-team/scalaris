@@ -249,7 +249,7 @@ messages of the form: \code{\{ping, _\}} as such messages are consumed by
 
 We equipped \erlmodule{gen\_component} with a debugging interface, which
 especially is beneficial, when testing the interplay between several
-\erlmodule{gen\_component}s. It supports breakpoints which can pause the
+\erlmodule{gen\_component}s. It supports breakpoints (bp) which can pause the
 \erlmodule{gen\_component} depending on the arriving messages or depending
 on user defined conditions. If a breakpoint is reached, the execution can be
 continued step-wise (message by message) or until the next breakpoint is
@@ -288,30 +288,30 @@ Breakpoints are managed by the following functions:
   Delay all further handling of breakpoint requests until a breakpoint is
   actually entered.
 
-  Note, that the following call sequence may not catch the breakpoint at
+  \emph{Note, that the following call sequence may not catch the breakpoint at
   all, as during the sleep the component not necessarily consumes a
-  \code{ping} message and the set breakpoint may already be deleted before a
-  ping arrives.
+  \code{ping} message and the set breakpoint `\code{sample_bp}' may already
+  be deleted before a ping message arrives.}
 
   \begin{lstlisting}
-  gen_component:bp_set(Pid, ping, bp_ping),
+  gen_component:bp_set(Pid, ping, sample_bp),
   timer:sleep(10),
-  gen_component:bp_del(Pid, bp_ping),
+  gen_component:bp_del(Pid, sample_bp),
   gen_component:bp_cont(Pid).
   \end{lstlisting}
 
-  This is where \erlfun{gen\_component}{bp\_barrier}{/1} can be used:
+  \emph{To overcome this, \erlfun{gen\_component}{bp\_barrier}{/1} can be used:}
 
   \begin{lstlisting}
-  gen_component:bp_set(Pid, ping, bp_ping),
+  gen_component:bp_set(Pid, ping, sample_bp),
   gen_component:bp_barrier(Pid),
-  %% the following breakpoint requests will not be handled before a
-  %% breakpoint is reached.
-  %% the gen_component itself is still active and handles messages as usual
-  %% up to the next breakpoint
-  gen_component:bp_del(Pid, bp_ping),
-  % the breakpoint was entered once, so we delete.
-  % next we leave the breakpoint and continue the gen_component
+  %% After the bp_barrier request, following breakpoint requests
+  %% will not be handled before a breakpoint is actually entered.
+  %% The gen_component itself is still active and handles messages as usual
+  %% until it enters a breakpoint.
+  gen_component:bp_del(Pid, sample_bp),
+  % Delete the breakpoint after it was entered once (ensured by bp_barrier).
+  % Release the gen_component from the breakpoint and continue.
   gen_component:bp_cont(Pid).
   \end{lstlisting}
 \end{description}
@@ -319,8 +319,8 @@ Breakpoints are managed by the following functions:
 None of the calls in the sample listing above is blocking. It just schedules
 all the operations, including the \code{bp_barrier}, for the
 \erlmodule{gen\_component} and immediately finishes. The actual events of
-entering and continuing the breakpoint in the \erlmodule{gen\_component} can
-happen independently later on, when the next \code{ping} message arrives.
+entering and continuing the breakpoint in the \erlmodule{gen\_component}
+happens independently later on, when the next \code{ping} message arrives.
 
 \subsubsection{Managing execution.}
 
