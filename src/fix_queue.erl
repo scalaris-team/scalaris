@@ -26,7 +26,7 @@
 -export_type([fix_queue/0]).
 -endif.
 
--export([new/1, add/2, map/2,
+-export([new/1, add/2, add_unique_head/4, map/2,
          length/1, max_length/1, queue/1]).
 
 -opaque(fix_queue()::{MaxLength :: pos_integer(),
@@ -41,21 +41,41 @@ new(MaxLength) ->
 %% @doc Adds an element to the given queue. 
 -spec add(Element::term(), Queue::fix_queue()) -> fix_queue().
 add(Elem, {MaxLength, Length, Queue}) ->
-    {_, NewQueue} =
+    {NewLength, NewQueue} =
         case Length =:= MaxLength of
-            true ->
-                NewLength = Length,
-                queue:out(queue:in(Elem, Queue));
-            false ->
-                NewLength = Length + 1,
-                {foo, queue:in(Elem, Queue)}
+            true -> {Length, queue:in(Elem, queue:drop(Queue))};
+            _    -> {Length + 1, queue:in(Elem, Queue)}
+        end,
+    {MaxLength, NewLength, NewQueue}.
+
+%% @doc Adds an element to the given queue. If there is already an equal
+%%      element at the "head" (rear) of the queue, it will be replaced by the
+%%      element selected by SelectFun.
+%%      Note that this is much cheaper than checking all elements!
+-spec add_unique_head(Element, Queue::fix_queue(),
+        EqFun::fun((Element, Element) -> boolean()),
+        SelectFun::fun((Element, Element) -> Element)) -> fix_queue().
+add_unique_head(Elem, {MaxLength, Length, Queue}, EqFun, SelectFun) ->
+    {NewL1, NewQ1} =
+        case queue:peek_r(Queue) of
+            {value, Item} ->
+                case EqFun(Item, Elem) of
+                    true -> {Length, queue:in(SelectFun(Item, Elem), queue:drop_r(Queue))};
+                    _    -> {Length + 1, queue:in(Elem, Queue)}
+                end;
+            empty -> {1, queue:in(Elem, Queue)}
+        end,
+    {NewLength, NewQueue} =
+        case NewL1 > MaxLength of
+            true -> {MaxLength, queue:drop(NewQ1)};
+            _    -> {Length, NewQ1}
         end,
     {MaxLength, NewLength, NewQueue}.
 
 %% @doc Maps a function to all elements of the given queue.
 -spec map(fun((term()) -> E), Queue::fix_queue()) -> [E].
 map(Fun, {_MaxLength, _Length, Queue}) ->
-   lists:map(Fun, queue:to_list(Queue)).
+    lists:map(Fun, queue:to_list(Queue)).
 
 -spec length(fix_queue()) -> non_neg_integer().
 length({_MaxLength, Length, _Queue}) -> Length.
