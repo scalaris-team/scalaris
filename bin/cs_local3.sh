@@ -18,10 +18,7 @@ NAME="node$ID"
 CSPORT=$((14195+$ID))
 YAWSPORT=$((8000+$ID))
 
-export SCALARIS_NODE_NAME="$NAME"
-export SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port $CSPORT -scalaris yaws_port $YAWSPORT"
-
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
-$DIRNAME/scalarisctl -i node start $*
+$DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT node start $*
