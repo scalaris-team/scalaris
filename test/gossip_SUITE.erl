@@ -83,21 +83,15 @@ suite() ->
 init_per_suite(Config) ->
     unittest_helper:fix_cwd(),
     error_logger:tty(true),
-    Owner = self(),
-    Pid = spawn(fun() ->
-                        crypto:start(),
-                        pid_groups:start_link(),
-                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                        comm_server:start_link(pid_groups:new("comm_layer_")),
-                        timer:sleep(1000),
-                        comm_server:set_local_address({127,0,0,1},14195),
-                        log:start_link(),
-                        Owner ! {continue},
-                        receive {done} -> ok
-                        end
-                end),
-    receive {continue} -> ok
-    end,
+    Pid = unittest_helper:start_process(
+            fun() ->
+                    crypto:start(),
+                    pid_groups:start_link(),
+                    config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                    log:start_link(),
+                    comm_server:start_link(pid_groups:new("comm_layer_")),
+                    comm_server:set_local_address({127,0,0,1},14195)
+            end),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
@@ -1231,16 +1225,5 @@ get_ptrigger_delay(Delay) ->
     trigger:init('trigger_periodic', fun () -> Delay end, 'trigger').
 
 fake_dht_node() ->
-    DHT_Node = spawn(?MODULE, fake_dht_node_start, [self()]),
-    receive
-        {started, DHT_Node} -> DHT_Node
-    end.
-
-fake_dht_node_start(Supervisor) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    Supervisor ! {started, self()},
-    fake_process().
-
-fake_process() ->
-    ?consume_message({ok}, 1000),
-    fake_process().
+    unittest_helper:start_subprocess(
+      fun() -> pid_groups:join_as("gossip_group", dht_node) end).

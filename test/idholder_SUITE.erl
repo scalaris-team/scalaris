@@ -37,20 +37,15 @@ suite() ->
 
 init_per_suite(Config) ->
     unittest_helper:fix_cwd(),
-    Self = self(),
-    Pid = spawn(fun () ->
-                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                        crypto:start(),
-                        pid_groups:start_link(),
-                        idholder:start_link("foo", []),
-                        Self ! continue,
-                        timer:sleep(5000)
-                end),
-    timer:sleep(1000),
-    receive
-        continue ->
-            ok
-    end,
+    error_logger:tty(true),
+    Pid = unittest_helper:start_process(
+            fun() ->
+                    crypto:start(),
+                    pid_groups:start_link(),
+                    config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                    log:start_link(),
+                    idholder:start_link("foo", [])
+            end),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->

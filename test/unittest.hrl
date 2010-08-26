@@ -153,8 +153,20 @@
     receive
         Message -> ok
     after
-        Timeout -> ok
+        Timeout -> timeout
     end).
+
+-define(consume_all_messages(Message),
+        % recursive anonymous function:
+        fun() ->
+                Fun = fun(F) ->
+                              case ?consume_message(Message, 0) of
+                                  ok -> F(F);
+                                  timeout -> ok
+                              end
+                      end,
+                Fun(Fun)
+        end()).
 
 -define(expect_message_ignore_timeout(MsgPattern, IgnoredMessage, Timeout),
         % wrap in function so that the internal variables are out of the calling function's scope

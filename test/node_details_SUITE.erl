@@ -52,23 +52,15 @@ suite() ->
 init_per_suite(Config) ->
     unittest_helper:fix_cwd(),
     error_logger:tty(true),
-    Owner = self(),
-    Pid = spawn(fun () ->
-                        crypto:start(),
-                        pid_groups:start_link(),
-                        config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
-                        comm_server:start_link(pid_groups:new("comm_layer_")),
-                        timer:sleep(1000),
-                        comm_server:set_local_address({127,0,0,1},14195),
-                        log:start_link(),
-                        Owner ! {continue},
-                        receive
-                            {done} -> ok
-                        end
-                end),
-    receive
-        {continue} -> ok
-    end,
+    Pid = unittest_helper:start_process(
+            fun() ->
+                    crypto:start(),
+                    pid_groups:start_link(),
+                    config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                    log:start_link(),
+                    comm_server:start_link(pid_groups:new("comm_layer_")),
+                    comm_server:set_local_address({127,0,0,1},14195)
+            end),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
