@@ -74,6 +74,7 @@ init([DestIP, DestPort, LocalListenPort, Socket]) ->
 on({send, DestPid, Message}, State) ->
     Socket = case socket(State) of
                  notconnected ->
+                     log:log(info, "Connecting to ~p:~p", [dest_ip(State), dest_port(State)]),
                      new_connection(dest_ip(State),
                                     dest_port(State),
                                     local_listen_port(State));
@@ -81,9 +82,10 @@ on({send, DestPid, Message}, State) ->
              end,
     case Socket of
         fail ->
-            log:log(warn, "~p Connection failed drop message ~p",
+            log:log(warn, "~p Connection failed, drop message ~p",
                     [pid_groups:my_pidname(), Message]),
-            State;
+            %%reconnect
+            set_socket(State, notconnected);
         _ ->
             {_, MQL} = process_info(self(), message_queue_len),
             QL = msg_queue_len(State),
@@ -94,7 +96,7 @@ on({send, DestPid, Message}, State) ->
                             %% io:format("MQL ~p~n", [MQL]),
                             T1 = set_msg_queue(State, [{DestPid, Message}]),
                             T2 = set_msg_queue_len(T1, QL + 1),
-                            set_desired_bundle_size(T2, MQL);
+                            set_desired_bundle_size(T2, util:min(MQL,200));
                        true ->
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},
@@ -135,6 +137,7 @@ on({tcp, Socket, Data}, State) ->
                 inet:setopts(Socket, [{active, once}]),
                 inc_r_msg_count(State);
             {user_close} ->
+                log:log(warn,"[ CC ] tcp user_close request", []),
                 gen_tcp:close(Socket),
                 set_socket(State, notconnected);
             {youare, _Address, _Port} ->
@@ -149,6 +152,7 @@ on({tcp, Socket, Data}, State) ->
     NewState;
 
 on({tcp_closed, Socket}, State) ->
+    log:log(warn,"[ CC ] tcp closed info", []),
     gen_tcp:close(Socket),
     set_socket(State, notconnected);
 
@@ -187,10 +191,15 @@ send({Address, Port, Socket}, Pid, Message) ->
                 ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
                 Socket;
             {error, closed} ->
+                log:log(warn,"[ CC ] sending closed connection", []),
                 gen_tcp:close(Socket),
                 notconnected;
+            {error, timeout} ->
+                log:log(error,"[ CC ] couldn't send to ~p:~p (~p). retrying.",
+                        [Address, Port, timeout]),
+                send({Address, Port, Socket}, Pid, Message);
             {error, Reason} ->
-                log:log(error,"[ CC ] couldn't send to ~p:~p (~p)",
+                log:log(error,"[ CC ] couldn't send to ~p:~p (~p). closing connection",
                         [Address, Port, Reason]),
                 gen_tcp:close(Socket),
                 notconnected
@@ -199,7 +208,8 @@ send({Address, Port, Socket}, Pid, Message) ->
 
 -spec(new_connection(inet:ip_address(), integer(), integer()) -> inet:socket() | fail).
 new_connection(Address, Port, MyPort) ->
-    case gen_tcp:connect(Address, Port, [binary, {packet, 4}] ++ comm_server:tcp_options(),
+    case gen_tcp:connect(Address, Port, [binary, {packet, 4}]
+                         ++ comm_server:tcp_options(),
                          config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
             % send end point data

@@ -80,11 +80,11 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
                 false ->
                     [comm:send(Server, Message) || Server <- ServerList],
                     io:format("Collecting results... ~n"),
-                    [receive {done, Time} -> io:format("BS: ~p~n",[Time]),Time end || _Server <- ServerList];
+                    [receive {done, X, Time} -> io:format("BS: ~p @ ~p~n",[Time, X]),Time end || _Server <- ServerList];
                 true ->
                     Result = fprof:apply(fun () ->
                                                  [comm:send(Server, Message) || Server <- ServerList],
-                                                 [receive {done, Time} -> Time end || _Server <- ServerList]
+                                                 [receive {done, X, Time} -> Time end || _Server <- ServerList]
                                          end,
                                          [], [{procs, pid_groups:processes()}]),
                     fprof:profile(),
@@ -125,7 +125,7 @@ bench_increment(Threads, Iterations, Owner) ->
                                             Iterations)
             end,
     {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    comm:send(Owner, {done, Time}),
+    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
     ok.
 
 bench_increment_v2(Threads, Iterations, Owner) ->
@@ -134,7 +134,7 @@ bench_increment_v2(Threads, Iterations, Owner) ->
                     bench_increment:process_v2(Parent, Key, Iterations)
             end,
     {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    comm:send(Owner, {done, Time}),
+    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
     ok.
 
 %% @doc run the read bench locally
@@ -145,7 +145,7 @@ bench_read(Threads, Iterations, Owner) ->
                     run_bench_read(Parent, Key, Iterations)
             end,
     {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    comm:send(Owner, {done, Time}),
+    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
     ok.
 
 bench_read_v2(Threads, Iterations, Owner) ->
@@ -154,7 +154,7 @@ bench_read_v2(Threads, Iterations, Owner) ->
                     run_bench_read_v2(Parent, Key, Iterations, 0)
             end,
     {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    comm:send(Owner, {done, Time}),
+    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
     ok.
 
 -spec(bench_runner/3 :: (integer(), integer(), any()) -> ok).
@@ -222,14 +222,16 @@ start_link() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_and_init_key() ->
     Key = ?RT:hash_key(randoms:getRandomId()),
-    case transaction_api:single_write(Key, 0) of
-        commit ->
+    case cs_api_v2:write(Key, 0) of
+        ok ->
             Key;
         {fail, abort} ->
+            io:format("geT_and_init_key 1 failed, retrying~n", []),
+            get_and_init_key();
+        {fail, failed} ->
             io:format("geT_and_init_key 1 failed, retrying~n", []),
             get_and_init_key();
         {fail, timeout} ->
             io:format("geT_and_init_key 2 timeout, retrying~n", []),
             get_and_init_key()
     end.
-

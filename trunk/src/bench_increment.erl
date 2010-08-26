@@ -90,6 +90,8 @@ process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
             process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
         {failure, failed} ->
             process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+        {failure, not_found} ->
+            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
         X ->
             log:log(warn, "~p", [X])
     end.
