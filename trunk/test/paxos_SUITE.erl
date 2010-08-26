@@ -36,7 +36,6 @@ suite() ->
     [{timetrap, {seconds, 40}}].
 
 init_per_suite(Config) ->
-    file:set_cwd("../bin"),
     Pid = unittest_helper:make_ring(2),
     comm_server:set_local_address({127,0,0,1},14195),
     [{wrapper_pid, Pid} | Config].

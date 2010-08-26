@@ -34,7 +34,6 @@ suite() ->
     [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
-    file:set_cwd("../bin"),
     Pid = unittest_helper:make_ring(4),
     [{wrapper_pid, Pid} | Config].
 

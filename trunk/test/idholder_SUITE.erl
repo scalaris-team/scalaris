@@ -36,7 +36,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    file:set_cwd("../bin"),
+    unittest_helper:fix_cwd(),
     Self = self(),
     Pid = spawn(fun () ->
                         config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),

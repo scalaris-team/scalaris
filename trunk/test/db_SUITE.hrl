@@ -87,7 +87,7 @@ rw_suite_runs(Desired) ->
 
 init_per_suite(Config) ->
     ct:pal("DB suite running with: ~p~n", [?TEST_DB]),
-    file:set_cwd("../bin"),
+    unittest_helper:fix_cwd(),
     Pid = spawn_config_processes(),
     timer:sleep(100),
     [{wrapper_pid, Pid} | Config].

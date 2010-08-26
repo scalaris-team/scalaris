@@ -50,7 +50,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    file:set_cwd("../bin"),
+    unittest_helper:fix_cwd(),
     error_logger:tty(true),
     Owner = self(),
     Pid = spawn(fun () ->

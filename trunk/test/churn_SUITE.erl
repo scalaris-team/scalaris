@@ -37,7 +37,6 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    file:set_cwd("../bin"),
     Pid = unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
     [{wrapper_pid, Pid} | Config].
 

@@ -22,14 +22,31 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([make_ring_with_ids/1, make_ring/1, stop_ring/1, stop_pid_groups/0,
-
-        check_ring_size/1, wait_for_stable_ring/0, wait_for_stable_ring_deep/0]).
+-export([fix_cwd/0,
+         make_ring_with_ids/1, make_ring/1, stop_ring/1, stop_pid_groups/0,
+         check_ring_size/1,
+         wait_for_stable_ring/0, wait_for_stable_ring_deep/0]).
 
 -include("scalaris.hrl").
 
+%% @doc Sets the current working directory to "../bin" if it does not end with
+%%      "/bin" yet. Assumes that the current working directory is a sub-dir of
+%%      our top-level, e.g. "test". This is needed in order for the config
+%%      process to find its (default) config files.
+-spec fix_cwd() -> ok | {error, Reason::file:ext_posix()}.
+fix_cwd() ->
+    case file:get_cwd() of
+        {ok, CurCWD} ->
+            case string:rstr(CurCWD, "/bin") =/= (length(CurCWD) - 4 + 1) of
+                true -> file:set_cwd("../bin");
+                _    -> ok
+            end;
+        Error -> Error
+    end.
+
 -spec make_ring_with_ids(list(?RT:key())) -> pid().
 make_ring_with_ids(Ids) ->
+    fix_cwd(),
     error_logger:tty(true),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
     Owner = self(),
@@ -68,6 +85,7 @@ make_ring_with_ids(Ids) ->
 
 -spec make_ring(pos_integer()) -> pid().
 make_ring(Size) ->
+    fix_cwd(),
     error_logger:tty(true),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
     Owner = self(),
