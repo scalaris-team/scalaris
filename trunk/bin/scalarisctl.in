@@ -42,16 +42,21 @@ SCALARIS_COOKIE="chocolate chip cookie"
 
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
-interactive=0
+daemonize=0
 first=0
 empty=0
+port=""
+yawsport=""
 
 usage(){
     echo "usage: scalarisctl [options] <cmd>"
     echo "    -h                   help"
-    echo "    -i                   interactive"
+    echo "    -d                   daemonize"
     echo "    -f                   marks this node as the first"
     echo "    -e                   start boot server with no scalaris nodes (empty)"
+    echo "    -n <name>            name for the Erlang VM"
+    echo "    -p <port>            TCP port for the Scalaris node"
+    echo "    -y <port>            TCP port for the built-in webserver"
     echo "    boot start           start boot server"
     echo "    boot stop            stop boot server"
     echo "    boot restart         restart boot server"
@@ -191,11 +196,17 @@ checkinstallation() {
 
 bootstart(){
     NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
-    if [ $interactive -eq 0 ]; then
+    if [ $daemonize -ne 0 ]; then
         BACKGROUND="-detached"
     fi
     if [ $empty -eq 1 ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs empty true"
+    fi
+    if [ "$port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs cs_port $port"
+    fi
+    if [ "$yawsport" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs yaws_port $yaws_port"
     fi
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
@@ -239,11 +250,17 @@ bootstop(){
 
 nodestart(){
     NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
-    if [ $interactive -eq 0 ]; then
+    if [ $daemonize -ne 0 ]; then
         BACKGROUND="-detached"
     fi
     if [ $first -eq 1 ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris first true"
+    fi
+    if [ "$port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris cs_port $port"
+    fi
+    if [ "$yawsport" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris yaws_port $yaws_port"
     fi
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
@@ -286,12 +303,16 @@ list_erlang_processes(){
 
 fix_paths
 
-while getopts "hife" optionName; do
+while getopts "dhifen:p:y:" optionName; do
     case "$optionName" in
+        d) daemonize=1;;
         e) empty=1;;
         f) first=1;;
         h) usage 0;;
-        i) interactive=1;;
+        i) echo "WARN: interactive is now default";;
+        n) SCALARIS_NODE_NAME=$OPTARG;;
+        p) port=$OPTARG;;
+        y) yawsport=$OPTARG;;
         [?]) usage "$badOptionHelp";;
     esac
 done
