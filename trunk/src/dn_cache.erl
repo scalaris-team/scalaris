@@ -90,7 +90,7 @@ on({{pong}, Zombie}, {Queue, Subscriber, TriggerState}) ->
         {Queue, Subscriber, TriggerState};
 
 on({add_zombie_candidate, Node}, {Queue, Subscriber, TriggerState}) ->
-    {fix_queue:add(Node, Queue), Subscriber, TriggerState};
+    {fix_queue:add_unique_head(Node, Queue, fun node:same_process/2, fun node:newer/2), Subscriber, TriggerState};
 
 on({subscribe, Node}, {Queue, Subscriber, TriggerState}) ->
     {Queue, gb_sets:insert(Node, Subscriber), TriggerState};
