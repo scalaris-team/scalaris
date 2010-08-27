@@ -51,38 +51,22 @@ make_ring_with_ids(Ids) ->
     fix_cwd(),
     error_logger:tty(true),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Owner = self(),
     undefined = ets:info(config_ets),
-    Pid = spawn(fun () ->
-                        %timer:sleep(1000),
-                        ct:pal("Trying to build Scalaris~n"),
-                        randoms:start(),
-                        pid_groups:start_link(),
-                        %timer:sleep(1000),
-                        sup_scalaris:start_link(boot,
-                                                [{{idholder, id}, hd(Ids)}]),
-                        %timer:sleep(1000),
-                        boot_server:connect(),
-                        [admin:add_node_at_id(Id) || Id <- tl(Ids)],
-                        Owner ! {continue},
-                        receive
-                            {done} ->
-                                ok
-                        end
-                end),
-    %erlang:monitor(process, Pid),
-    receive
-        {'DOWN', _Ref, process, _Pid2, Reason} ->
-            ct:pal("process died: ~p ~n", [Reason]);
-        {continue} ->
-            ok
-    end,
-    timer:sleep(1000),
+    Pid = start_process(
+            fun() ->
+                    ct:pal("Trying to build Scalaris~n"),
+                    randoms:start(),
+                    pid_groups:start_link(),
+                    sup_scalaris:start_link(boot, [{{idholder, id}, hd(Ids)}]),
+                    boot_server:connect(),
+                    [admin:add_node_at_id(Id) || Id <- tl(Ids)],
+                    ok
+            end),
+%%     timer:sleep(1000),
     check_ring_size(length(Ids)),
     wait_for_stable_ring(),
     check_ring_size(length(Ids)),
     ct:pal("Scalaris has booted~n"),
-%    timer:sleep(30000),
     Pid.
 
 -spec make_ring(pos_integer()) -> pid().
@@ -90,37 +74,22 @@ make_ring(Size) ->
     fix_cwd(),
     error_logger:tty(true),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Owner = self(),
     undefined = ets:info(config_ets),
-    Pid = spawn(fun () ->
-                        %timer:sleep(1000),
-                        ct:pal("Trying to build Scalaris~n"),
-                        randoms:start(),
-                        pid_groups:start_link(),
-                        %timer:sleep(1000),
-                        sup_scalaris:start_link(boot),
-                        %timer:sleep(1000),
-                        boot_server:connect(),
-                        admin:add_nodes(Size - 1),
-                        Owner ! {continue},
-                        receive
-                            {done} ->
-                                ok
-                        end
-                end),
-    %erlang:monitor(process, Pid),
-    receive
-        {'DOWN', _Ref, process, _Pid2, Reason} ->
-            ct:pal("process died: ~p ~n", [Reason]);
-        {continue} ->
-            ok
-    end,
-    timer:sleep(1000),
+    Pid = start_process(
+            fun() ->
+                    ct:pal("Trying to build Scalaris~n"),
+                    randoms:start(),
+                    pid_groups:start_link(),
+                    sup_scalaris:start_link(boot),
+                    boot_server:connect(),
+                    admin:add_nodes(Size - 1),
+                    ok
+            end),
+%%     timer:sleep(1000),
     check_ring_size(Size),
     wait_for_stable_ring(),
     check_ring_size(Size),
     ct:pal("Scalaris has booted~n"),
-%    timer:sleep(30000),
     Pid.
 
 -spec stop_ring(pid()) -> ok.
@@ -130,10 +99,8 @@ stop_ring(Pid) ->
             error_logger:tty(false),
             log:set_log_level(none),
             exit(Pid, kill),
-            timer:sleep(1000),
             wait_for_process_to_die(Pid),
             stop_pid_groups(),
-            timer:sleep(2000),
             ok
         end
     catch
@@ -158,21 +125,17 @@ stop_pid_groups() ->
 -spec wait_for_process_to_die(pid()) -> ok.
 wait_for_process_to_die(Pid) ->
     case is_process_alive(Pid) of
-        true ->
-            timer:sleep(500),
-            wait_for_process_to_die(Pid);
-        false ->
-            ok
+        true -> timer:sleep(100),
+                wait_for_process_to_die(Pid);
+        _    -> ok
     end.
 
 -spec wait_for_table_to_disappear(tid() | atom()) -> ok.
 wait_for_table_to_disappear(Table) ->
     case ets:info(Table) of
-        undefined ->
-            ok;
-        _ ->
-            timer:sleep(500),
-            wait_for_table_to_disappear(Table)
+        undefined -> ok;
+        _         -> timer:sleep(100),
+                     wait_for_table_to_disappear(Table)
     end.
 
 -spec wait_for_stable_ring() -> ok.
@@ -180,11 +143,9 @@ wait_for_stable_ring() ->
     R = admin:check_ring(),
     ct:pal("CheckRing: ~p~n",[R]),
     case R of
-        ok ->
-            ok;
-        _ ->
-            timer:sleep(1000),
-            wait_for_stable_ring()
+        ok -> ok;
+        _  -> timer:sleep(500),
+              wait_for_stable_ring()
     end.
 
 -spec wait_for_stable_ring_deep() -> ok.
@@ -192,27 +153,21 @@ wait_for_stable_ring_deep() ->
     R = admin:check_ring_deep(),
     ct:pal("CheckRingDeep: ~p~n",[R]),
     case R of
-        ok ->
-            ok;
-        _ ->
-            timer:sleep(1000),
-            wait_for_stable_ring_deep()
+        ok -> ok;
+        _  -> timer:sleep(500),
+              wait_for_stable_ring_deep()
     end.
 
 -spec check_ring_size(non_neg_integer()) -> ok.
 check_ring_size(Size) ->
     boot_server:number_of_nodes(),
-    RSize = receive
-        {get_list_length_response,L} ->
-            L
-    end,
+    RSize = receive {get_list_length_response, L} -> L
+            end,
     ct:pal("Size: ~p~n",[RSize]),
     case (RSize =:= Size) of
-        true ->
-            ok;
-        _ ->
-            timer:sleep(1000),
-            check_ring_size(Size)
+        true -> ok;
+        _    -> timer:sleep(500),
+                check_ring_size(Size)
     end.
 
 -spec start_process(StartFun::fun(() -> any())) -> pid().
