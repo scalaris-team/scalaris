@@ -94,17 +94,29 @@ change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 
 %% requests regarding breakpoint processing
+-spec bp_set(Pid::com:erl_local_pid(), MsgTag::comm:message_tag(), BPName::any()) -> ok.
 bp_set(Pid, MsgTag, BPName) ->
-    Pid ! {'$gen_component', bp, bp_set, MsgTag, BPName}.
+    Pid ! {'$gen_component', bp, bp_set, MsgTag, BPName},
+    ok.
 
 %% @doc Module:Function(Message, State, Params) will be evaluated to decide
 %% whether a BP is reached. Params can be used as a payload.
+-spec bp_set_cond(Pid::comm:erl_local_pid(),
+                  Cond::{module(), atom(), 2} | fun((comm:message(), State::any()) -> boolean()),
+                  BPName::any()) -> ok.
 bp_set_cond(Pid, {_Module, _Function, _Params = 2} = Cond, BPName) ->
-    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName}.
+    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
+    ok;
+bp_set_cond(Pid, Cond, BPName) when is_function(Cond) ->
+    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
+    ok.
 
+-spec bp_del(Pid::comm:erl_local_pid(), BPName::any()) -> ok.
 bp_del(Pid, BPName) ->
-    Pid ! {'$gen_component', bp, bp_del, BPName}.
+    Pid ! {'$gen_component', bp, bp_del, BPName},
+    ok.
 
+-spec bp_step(Pid::comm:erl_local_pid()) -> {module(), On::atom(), comm:message()}.
 bp_step(Pid) ->
     Pid !  {'$gen_component', bp, breakpoint, step, self()},
     receive {'$gen_component', bp, breakpoint, step_done,
@@ -114,12 +126,16 @@ bp_step(Pid) ->
             {Module, On, Message}
     end.
 
+-spec bp_cont(Pid::comm:erl_local_pid()) -> ok.
 bp_cont(Pid) ->
-    Pid !  {'$gen_component', bp, breakpoint, cont}.
+    Pid !  {'$gen_component', bp, breakpoint, cont},
+    ok.
 
 %% @doc delay further breakpoint requests until a breakpoint actually occurs
+-spec bp_barrier(Pid::comm:erl_local_pid()) -> ok.
 bp_barrier(Pid) ->
-    Pid ! {'$gen_component', bp, barrier}.
+    Pid ! {'$gen_component', bp, barrier},
+    ok.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
