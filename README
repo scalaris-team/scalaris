@@ -27,6 +27,9 @@ through some basic tests:
 
 The following command will start scalaris on a single node:
 [root@csr-pc11 ~]# scalarisctl boot start
+Use the "-d" flag to detach the process from the current shell, i.e. run it
+as a daemon:
+[root@csr-pc11 ~]# scalarisctl -d boot start
 
 With the scalaris command line tool you can issue simple
 read/write/publish/subscribe commands. The following writes the
