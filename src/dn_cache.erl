@@ -80,13 +80,15 @@ init(Trigger) ->
 
 -spec on(message(), state()) -> state().
 on({trigger}, {Queue, Subscriber, TriggerState}) ->
-        fix_queue:map(fun(X) -> comm:send(node:pidX(X), {ping, comm:this_with_cookie(X)}) end, Queue), 
-        NewTriggerState = trigger:next(TriggerState),
-        {Queue, Subscriber, NewTriggerState};
+    fix_queue:map(fun(X) -> comm:send(node:pidX(X), {ping, comm:this_with_cookie(X)}) end, Queue),
+    NewTriggerState = trigger:next(TriggerState),
+    {Queue, Subscriber, NewTriggerState};
 
 on({{pong}, Zombie}, {Queue, Subscriber, TriggerState}) ->
-        gb_sets:fold(fun(X, _) -> comm:send_local(X, {zombie, Zombie}) end, 0, Subscriber),
-        {Queue, Subscriber, TriggerState};
+    log:log(warn,"[ dn_cache ~p ] found zombie ~p", [comm:this(), Zombie]),
+    gb_sets:fold(fun(X, _) -> comm:send_local(X, {zombie, Zombie}) end, 0, Subscriber),
+    NewQueue = fix_queue:remove(Zombie, Queue, fun node:same_process/2),
+    {NewQueue, Subscriber, TriggerState};
 
 on({add_zombie_candidate, Node}, {Queue, Subscriber, TriggerState}) ->
     {fix_queue:add_unique_head(Node, Queue, fun node:same_process/2, fun node:newer/2), Subscriber, TriggerState};
