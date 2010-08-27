@@ -53,7 +53,7 @@ get_id() ->
 
 %% @doc Starts the idholder process, registers it with the process dictionary
 %%      and returns its pid for use by a supervisor.
--spec start_link(pid_groups:groupname(), list(tuple())) -> {ok, pid()}.
+-spec start_link(pid_groups:groupname(), [{{idholder, id}, Id::?RT:key()} | tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
     gen_component:start_link(?MODULE, Options, [{pid_groups_join_as, DHTNodeGroup, idholder}]).
 
@@ -71,12 +71,14 @@ reinit() ->
 
 %% userdevguide-begin gen_component:sample
 %% @doc Initialises the idholder with a random key and a counter of 0.
--spec init([]) -> state().
+-spec init([{{idholder, id}, Id::?RT:key()} | tuple()]) -> state().
 init(Options) ->
-    case lists:keyfind({idholder, id}, 1, Options) of
-        {{idholder, id}, Id} -> {Id, 0};
-        _ -> {?RT:get_random_node_id(), 0}
-    end.
+    Id = case lists:keyfind({idholder, id}, 1, Options) of
+             {{idholder, id}, IdX} -> IdX;
+             _ -> ?RT:get_random_node_id()
+         end,
+    log:log(info, "[ idholder ~w ] init: ~p", [comm:this(), Id]),
+    {Id, 0}.
 
 -spec on(message(), state()) -> state().
 on({reinit}, _State) ->

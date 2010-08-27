@@ -44,7 +44,9 @@ init_per_suite(Config) ->
                     pid_groups:start_link(),
                     config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
                     log:start_link(),
-                    idholder:start_link("foo", [])
+                    comm_server:start_link(pid_groups:new("comm_layer_")),
+                    comm_server:set_local_address({127,0,0,1},14195),
+                    idholder:start_link("idholder_SUITE", [])
             end),
     [{wrapper_pid, Pid} | Config].
 
@@ -57,7 +59,7 @@ end_per_suite(Config) ->
     ok.
 
 getset_key(_Config) ->
-    pid_groups:join_as("foo", foo),
+    pid_groups:join_as("idholder_SUITE", foo),
     idholder:get_id(),
     _X = receive
              {idholder_get_id_response, D, _Dversion} -> D

@@ -414,12 +414,12 @@ on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec init([[any()]]) -> {join, {as_first}, msg_queue:msg_queue()} | {join, {phase1}, msg_queue:msg_queue()}.
-init([Options]) ->
+-spec init(Options::[tuple()]) -> {join, {as_first | phase1}, msg_queue:msg_queue()}.
+init(Options) ->
     % io:format("~p~n", [application:get_env(scalaris, first)]),
     % first node in this vm and also vm is marked as first
     % or unit-test
-    case lists:member(first, Options) andalso
+    case lists:member({first}, Options) andalso
           (is_unittest() orelse
           application:get_env(boot_cs, first) =:= {ok, true} orelse
           application:get_env(scalaris, first) =:= {ok, true}) of
@@ -435,9 +435,9 @@ init([Options]) ->
 
 %% userdevguide-begin dht_node:start_link
 %% @doc spawns a scalaris node, called by the scalaris supervisor process
--spec start_link(pid_groups:groupname(), [any()]) -> {ok, pid()}.
+-spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
-    gen_component:start_link(?MODULE, [Options],
+    gen_component:start_link(?MODULE, Options,
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
 

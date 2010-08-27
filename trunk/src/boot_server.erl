@@ -88,7 +88,6 @@ on({connect}, State) ->
 
 -spec init([]) -> state().
 init(_Arg) ->
-    log:log(info,"[ Boot | ~w ] Starting Bootserver",[self()]),
     case application:get_env(boot_cs, empty) of
         {ok, true} ->
             % ugly hack to get a valid ip-address into the comm-layer

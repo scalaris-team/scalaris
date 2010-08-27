@@ -181,7 +181,6 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> full_state().
 init(Trigger) ->
-    log:log(info,"[ Gossip ~p ] starting", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:now(TriggerState),
     PreviousState = gossip_state:new_state(),

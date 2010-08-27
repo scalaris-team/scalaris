@@ -157,7 +157,6 @@ init(Trigger) ->
     comm:send_local_after(100, self(), {check_state}),
     TriggerState = trigger:init(Trigger, ?MODULE),
     TriggerState2 = trigger:now(TriggerState),
-    log:log(info,"[ CY ] Cyclon spawn: ~p", [comm:this()]),
     {cyclon_cache:new(), null, 0, TriggerState2}.
 
 %% @doc message handler

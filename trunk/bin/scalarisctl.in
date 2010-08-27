@@ -47,9 +47,11 @@ first=0
 empty=0
 port=""
 yawsport=""
+first_id=""
 
 usage(){
     echo "usage: scalarisctl [options] <cmd>"
+    echo " options:"
     echo "    -h                   help"
     echo "    -d                   daemonize"
     echo "    -f                   marks this node as the first"
@@ -57,6 +59,8 @@ usage(){
     echo "    -n <name>            name for the Erlang VM"
     echo "    -p <port>            TCP port for the Scalaris node"
     echo "    -y <port>            TCP port for the built-in webserver"
+    echo "    -k <key>             the first dht_node in the created VM joins at the given key"
+    echo " commands:"
     echo "    boot start           start boot server"
     echo "    boot stop            stop boot server"
     echo "    boot restart         restart boot server"
@@ -208,6 +212,9 @@ bootstart(){
     if [ "$yawsport" != "" ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs yaws_port $yaws_port"
     fi
+    if [ "$first_id" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs first_id $first_id"
+    fi
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
@@ -262,6 +269,9 @@ nodestart(){
     if [ "$yawsport" != "" ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris yaws_port $yaws_port"
     fi
+    if [ "$first_id" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris first_id $first_id"
+    fi
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
@@ -303,7 +313,7 @@ list_erlang_processes(){
 
 fix_paths
 
-while getopts "dhifen:p:y:" optionName; do
+while getopts "dhifen:p:y:k:" optionName; do
     case "$optionName" in
         d) daemonize=1;;
         e) empty=1;;
@@ -313,6 +323,7 @@ while getopts "dhifen:p:y:" optionName; do
         n) SCALARIS_NODE_NAME=$OPTARG;;
         p) port=$OPTARG;;
         y) yawsport=$OPTARG;;
+        k) first_id=$OPTARG;;
         [?]) usage "$badOptionHelp";;
     esac
 done

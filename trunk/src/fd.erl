@@ -150,7 +150,6 @@ start_link(ServiceGroup) ->
 -spec init(any()) -> state().
 init(_Args) ->
     fd_db:init(),
-    log:log(info,"[ FD ~p ] starting FD", [self()]),
     %% Linker = start_linker(),
     {null}.
 
@@ -238,7 +237,7 @@ on({web_debug_info, Requestor}, State) ->
 make_pinger(Target) ->
     case fd_db:get_pinger(Target) of
         none ->
-            log:log(info,"[ FD ~p ] starting pinger for ~p", [self(), Target]),
+            log:log(info,"[ FD ~p ] starting pinger for ~p", [comm:this(), Target]),
             Pinger = start_pinger(Target),
             fd_db:add_pinger(Target, Pinger),
             ok;
@@ -279,7 +278,5 @@ my_fd_pid() ->
         undefined ->
             log:log(error, "[ FD ] call of my_fd_pid undefined"),
             failed;
-        PID ->
-            %% log:log(info, "[ FD ] find right pid"),
-            PID
+        PID -> PID
     end.

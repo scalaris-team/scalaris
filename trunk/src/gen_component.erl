@@ -21,8 +21,9 @@
 %% @end
 %% @version $Id$
 -module(gen_component).
--include("scalaris.hrl").
 -vsn('$Id$').
+
+-include("scalaris.hrl").
 
 %% breakpoint tracing
 %-define(TRACE_BP(X,Y), io:format("~p", [self()]), io:format(X,Y)).
@@ -125,11 +126,11 @@ bp_barrier(Pid) ->
 %% generic framework
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % profile
--spec(start_link/2 :: (module(), term()) -> {ok, pid()}).
+-spec start_link(module(), term()) -> {ok, pid()}.
 start_link(Module, Args) ->
     start_link(Module, Args, []).
 
--spec(start_link/3 :: (module(), term(), list()) -> {ok, pid()}).
+-spec start_link(module(), term(), list()) -> {ok, pid()}.
 start_link(Module, Args, Options) ->
     Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
     receive
@@ -137,11 +138,11 @@ start_link(Module, Args, Options) ->
             {ok, Pid}
     end.
 
--spec(start/2 :: (module(), term()) -> {ok, pid()}).
+-spec start(module(), term()) -> {ok, pid()}.
 start(Module, Args) ->
     start(Module, Args, []).
 
--spec(start/3 :: (module(), term(), list()) -> {ok, pid()}).
+-spec start(module(), term(), list()) -> {ok, pid()}.
 start(Module, Args, Options) ->
     Pid = spawn(?MODULE, start, [Module, Args, Options, self()]),
     receive
@@ -149,14 +150,15 @@ start(Module, Args, Options) ->
             {ok, Pid}
     end.
 
--spec(start/4 :: (module(), any(), list(), comm:erl_local_pid()) -> ok).
+-spec start(module(), term(), list(), comm:erl_local_pid()) -> ok.
 start(Module, Args, Options, Supervisor) ->
-    %% io:format("Starting ~p~n",[Module]),
     case lists:keysearch(pid_groups_join_as, 1, Options) of
         {value, {pid_groups_join_as, GroupId, PidName}} ->
             pid_groups:join_as(GroupId, PidName),
+            log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
             ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self());
-        false -> ok
+        false ->
+            log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module])
     end,
     case lists:keysearch(erlang_register, 1, Options) of
         {value, {erlang_register, Name}} ->

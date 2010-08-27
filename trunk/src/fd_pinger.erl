@@ -43,7 +43,6 @@ start_link([Module, Pid]) ->
 
 -spec init([module() | comm:mypid()]) -> state().
 init([Module, Pid]) ->
-    log:log(info,"[ fd_pinger ~p ] starting Node", [self()]),
     comm:send(Pid, {ping, comm:this()}),
     comm:send_local_after(failureDetectorInterval(), self(), {timeout, 0}),
     {Module, Pid, 0}.
