@@ -267,12 +267,3 @@ get_db_entries(Keys) ->
           end
       end
       || X <- Keys ].
-
-wait_for(F) ->
-    case F() of
-        true ->
-            ok;
-        false ->
-            timer:sleep(1000),
-            wait_for(F)
-    end.
