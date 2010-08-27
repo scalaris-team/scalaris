@@ -77,7 +77,6 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState::trigger:state()}.
 init(Trigger) ->
-    log:log(info,"[ RM ~p ] starting ring maintainer TMAN", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     comm:send_local(get_pid_dnc(), {subscribe, self()}),
     comm:send_local(get_cs_pid(), {init_rm, self()}),

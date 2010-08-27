@@ -84,7 +84,11 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
     Config =
         util:sup_worker_desc(config, config, start_link,
                              [[preconfig:config(), preconfig:local_config()]]),
-    DHTNodeOptions = [first | Options],
+    FirstId = case preconfig:get_env(first_id, random) of
+                  random -> [];
+                  Id     -> [{{idholder, id}, Id}]
+              end,
+    DHTNodeOptions = FirstId ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNode =
         util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
     FailureDetector =
@@ -110,8 +114,8 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                               ]),
     %% order in the following list is the start order
     PreBootServer = [Config,
-                     Service,
                      Logger,
+                     Service,
                      MonitorTiming,
                      CommLayer,
                      FailureDetector,

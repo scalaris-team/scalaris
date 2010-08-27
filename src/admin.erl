@@ -37,7 +37,7 @@
 add_node_at_id(Id) ->
     add_node([{{idholder, id}, Id}]).
 
--spec add_node(list(tuple())) -> ok.
+-spec add_node([tuple()]) -> ok.
 add_node(Options) ->
     Desc = util:sup_supervisor_desc(randoms:getRandomId(),
                                     sup_dht_node, start_link, [Options]),

@@ -47,7 +47,6 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, trigger:state()}.
 init(Trigger) ->
-    log:log(info,"[ DNC ~p ] starting Dead Node Cache", [comm:this()]),
     TriggerState = trigger:init(Trigger, ?MODULE),
     {uninit, TriggerState}.
       

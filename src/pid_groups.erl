@@ -87,7 +87,7 @@
 -export_type([groupname/0]).
 -endif.
 
--type(pidname() :: atom()).
+-type(pidname() :: atom() | nonempty_string()).
 -type(groupname() :: nonempty_string()).
 
 -type(message() ::

@@ -30,19 +30,19 @@
 
 -export([start_link/2, init/1]).
 
--spec start_link(pid_groups:groupname(), [any()]) ->
+-spec start_link(pid_groups:groupname(), Options::[tuple()]) ->
                         {ok, Pid::pid()} | ignore |
                         {error, Error::{already_started, Pid::pid()} |
                                        shutdown | term()}.
 start_link(DHTNodeGroup, Options) ->
-    supervisor:start_link(?MODULE, [DHTNodeGroup, Options]).
+    supervisor:start_link(?MODULE, {DHTNodeGroup, Options}).
 
 %% userdevguide-begin sup_dht_node_core:init
--spec init([pid_groups:groupname() | [any()]]) ->
+-spec init({pid_groups:groupname(), Options::[tuple()]}) ->
                   {ok, {{one_for_all, MaxRetries::pos_integer(),
                          PeriodInSeconds::pos_integer()},
                         [ProcessDescr::any()]}}.
-init([DHTNodeGroup, Options]) ->
+init({DHTNodeGroup, Options}) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     Proposer =
         util:sup_worker_desc(proposer, proposer, start_link, [DHTNodeGroup]),
