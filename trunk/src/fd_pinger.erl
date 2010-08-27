@@ -78,7 +78,7 @@ check_config() ->
 %% @private
 -spec report_crash(comm:mypid(), module()) -> ok.
 report_crash(Pid, Module) ->
-    log:log(warn,"[ FD ] ~p crashed",[Pid]),
+    log:log(warn,"[ FD ~p ] ~p crashed",[comm:this(), Pid]),
     comm:send_local(Module, {crash, Pid}).
 
 %% @doc The interval between two failure detection runs.

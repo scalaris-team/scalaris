@@ -26,7 +26,7 @@
 -export_type([fix_queue/0]).
 -endif.
 
--export([new/1, add/2, add_unique_head/4, map/2,
+-export([new/1, add/2, add_unique_head/4, map/2, remove/3,
          length/1, max_length/1, queue/1]).
 
 -opaque(fix_queue()::{MaxLength :: pos_integer(),
@@ -76,6 +76,13 @@ add_unique_head(Elem, {MaxLength, Length, Queue}, EqFun, SelectFun) ->
 -spec map(fun((term()) -> E), Queue::fix_queue()) -> [E].
 map(Fun, {_MaxLength, _Length, Queue}) ->
     lists:map(Fun, queue:to_list(Queue)).
+
+-spec remove(Element, Queue::fix_queue(),
+        EqFun::fun((Element, Element) -> boolean())) -> fix_queue().
+remove(Elem, {MaxLength, _Length, Queue}, EqFun) ->
+    NewQueue = queue:filter(fun(X) -> not EqFun(X, Elem) end, Queue),
+    NewLength = queue:len(NewQueue),
+    {MaxLength, NewLength, NewQueue}.
 
 -spec length(fix_queue()) -> non_neg_integer().
 length({_MaxLength, Length, _Queue}) -> Length.
