@@ -94,7 +94,7 @@ java-clean:
 	ant -buildfile java-api/build.xml clean
 
 java-test: compile java
-	SCALARIS_ADDITIONAL_PARAMETERS="-noinput" ./bin/scalarisctl -i boot start > log/java-test.log & \
+	SCALARIS_ADDITIONAL_PARAMETERS="-noinput" ./bin/scalarisctl boot start > log/java-test.log & \
 	ant -buildfile java-api/build.xml test ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl boot stop ; \
@@ -110,10 +110,11 @@ java-test: compile java
 	fi
 
 java-bench: compile java
-	./bin/scalarisctl boot start ; \
-	SCALARIS_NODE_NAME="node1" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14196 -scalaris yaws_port 8001" ./bin/scalarisctl node start ; \
-	SCALARIS_NODE_NAME="node2" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14197 -scalaris yaws_port 8002" ./bin/scalarisctl node start ; \
-	SCALARIS_NODE_NAME="node3" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14198 -scalaris yaws_port 8003" ./bin/scalarisctl node start ; \
+# replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
+	./bin/scalarisctl -d -k 0 boot start ; \
+	SCALARIS_NODE_NAME="node1" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14196 -scalaris yaws_port 8001" ./bin/scalarisctl -d -k 85070591730234615865843651857942052864 node start ; \
+	SCALARIS_NODE_NAME="node2" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14197 -scalaris yaws_port 8002" ./bin/scalarisctl -d -k 170141183460469231731687303715884105728 node start ; \
+	SCALARIS_NODE_NAME="node3" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14198 -scalaris yaws_port 8003" ./bin/scalarisctl -d -k 255211775190703847597530955573826158592 node start ; \
 	sleep 5s ; \
 	./java-api/scalaris --noconfig -b ; \
 	./bin/scalarisctl boot stop ; \
