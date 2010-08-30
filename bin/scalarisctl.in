@@ -46,7 +46,7 @@ daemonize=0
 first=0
 empty=0
 port=""
-yawsport=""
+yaws_port=""
 first_id=""
 
 usage(){
@@ -209,7 +209,7 @@ bootstart(){
     if [ "$port" != "" ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs cs_port $port"
     fi
-    if [ "$yawsport" != "" ]; then
+    if [ "$yaws_port" != "" ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs yaws_port $yaws_port"
     fi
     if [ "$first_id" != "" ]; then
@@ -266,7 +266,7 @@ nodestart(){
     if [ "$port" != "" ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris cs_port $port"
     fi
-    if [ "$yawsport" != "" ]; then
+    if [ "$yaws_port" != "" ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris yaws_port $yaws_port"
     fi
     if [ "$first_id" != "" ]; then
@@ -322,7 +322,7 @@ while getopts "dhifen:p:y:k:" optionName; do
         i) echo "WARN: interactive is now default";;
         n) SCALARIS_NODE_NAME=$OPTARG;;
         p) port=$OPTARG;;
-        y) yawsport=$OPTARG;;
+        y) yaws_port=$OPTARG;;
         k) first_id=$OPTARG;;
         [?]) usage "$badOptionHelp";;
     esac
