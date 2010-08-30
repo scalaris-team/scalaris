@@ -37,12 +37,11 @@
     {get_list, Ping_PID::comm:mypid()} |
     {be_the_first, Ping_PID::comm:mypid()} |
     {get_list_length, Ping_PID::comm:mypid()} |
-    {pid_groups_join_as, Ping_PID::comm:mypid()} |
+    {register, Ping_PID::comm:mypid()} |
     {connect}).
 
-% internal state
--type(state()::{Nodes::gb_set() % known nodes
-               }).
+% internal state (known nodes)
+-type(state()::Nodes::gb_set()).
 
 %% @doc trigger a message with  the number of nodes known to the boot server
 -spec number_of_nodes() -> ok.
@@ -65,26 +64,56 @@ node_list() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on(message(), state()) -> state().
-on({crash, PID}, {Nodes}) ->
+on({crash, PID}, Nodes) ->
     NewNodes = gb_sets:delete_any(PID, Nodes),
-    {NewNodes};
+    dn_cache:add_zombie_candidate(PID),
+    NewNodes;
 
-on({get_list, Ping_PID}, {Nodes} = State) ->
+on({get_list, Ping_PID}, Nodes) ->
     comm:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
-    State;
+    Nodes;
 
-on({get_list_length, Ping_PID}, {Nodes} = State) ->
+on({get_list_length, Ping_PID}, Nodes) ->
     comm:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
-    State;
+    Nodes;
 
-on({pid_groups_join_as, Ping_PID}, {Nodes}) ->
+on({register, Ping_PID}, Nodes) ->
     fd:subscribe(Ping_PID),
     NewNodes = gb_sets:add(Ping_PID, Nodes),
-    {NewNodes};
+    NewNodes;
 
 on({connect}, State) ->
     % ugly work around for finding the local ip by setting up a socket first
-    State.
+    State;
+
+% dead-node-cache reported dead node to be alive again
+on({zombie_pid, Ping_PID}, Nodes) ->
+    fd:subscribe(Ping_PID),
+    NewNodes = gb_sets:add(Ping_PID, Nodes),
+    NewNodes;
+
+on({web_debug_info, Requestor}, Nodes) ->
+    RegisteredNodes = gb_sets:to_list(Nodes),
+    % resolve (local and remote) pids to names:
+    S2 = [begin
+              case comm:is_local(Node) of
+                  true -> webhelpers:pid_to_name(comm:make_local(Node));
+                  _ ->
+                      comm:send(comm:get(pid_groups, Node),
+                                {group_and_name_of, Node, comm:this()}),
+                      receive
+                          {group_and_name_of_response, Name} ->
+                              webhelpers:pid_to_name2(Name)
+                      after 2000 -> Node
+                      end
+              end
+          end || Node <- RegisteredNodes],
+    KeyValueList =
+        [{"registered nodes", length(RegisteredNodes)},
+         {"registered nodes (node):", ""} |
+         [{"", Pid} || Pid <- S2]],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    Nodes.
 
 -spec init([]) -> state().
 init(_Arg) ->
@@ -95,7 +124,8 @@ init(_Arg) ->
         _ ->
             ok
     end,
-    {gb_sets:empty()}.
+    dn_cache:subscribe(),
+    gb_sets:empty().
 
 %% @doc starts the server; called by the boot supervisor
 %% @see sup_scalaris

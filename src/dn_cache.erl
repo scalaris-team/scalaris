@@ -30,8 +30,8 @@
 -export([add_zombie_candidate/1, subscribe/0, unsubscribe/0]).
 -type(message() ::
     {trigger} |
-    {{pong}, node:node_type()} |
-    {add_zombie_candidate, node:node_type()} |
+    {{pong}, node:node_type() | comm:mypid()} |
+    {add_zombie_candidate, node:node_type() | comm:mypid()} |
     {subscribe, comm:erl_local_pid()} |
     {unsubscribe, comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
@@ -42,7 +42,7 @@
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec add_zombie_candidate(node:node_type()) -> ok.
+-spec add_zombie_candidate(node:node_type() | comm:mypid()) -> ok.
 add_zombie_candidate(Node) ->
     comm:send_local(get_pid(), {add_zombie_candidate, Node}).
 
@@ -80,18 +80,42 @@ init(Trigger) ->
 
 -spec on(message(), state()) -> state().
 on({trigger}, {Queue, Subscriber, TriggerState}) ->
-    fix_queue:map(fun(X) -> comm:send(node:pidX(X), {ping, comm:this_with_cookie(X)}) end, Queue),
+    fix_queue:map(fun(X) ->
+                          Pid = case node:is_valid(X) of
+                                    true -> node:pidX(X);
+                                    _    -> X
+                                end,
+                          comm:send(Pid, {ping, comm:this_with_cookie(X)})
+                  end, Queue),
     NewTriggerState = trigger:next(TriggerState),
     {Queue, Subscriber, NewTriggerState};
 
 on({{pong}, Zombie}, {Queue, Subscriber, TriggerState}) ->
     log:log(warn,"[ dn_cache ~p ] found zombie ~p", [comm:this(), Zombie]),
-    gb_sets:fold(fun(X, _) -> comm:send_local(X, {zombie, Zombie}) end, 0, Subscriber),
-    NewQueue = fix_queue:remove(Zombie, Queue, fun node:same_process/2),
+    NewQueue =
+        case node:is_valid(Zombie) of
+            true ->
+                gb_sets:fold(fun(X, _) ->
+                                     comm:send_local(X, {zombie, Zombie})
+                             end, 0, Subscriber),
+                fix_queue:remove(Zombie, Queue, fun node:same_process/2);
+            _ ->
+                gb_sets:fold(fun(X, _) ->
+                                     comm:send_local(X, {zombie_pid, Zombie})
+                             end, 0, Subscriber),
+                fix_queue:remove(Zombie, Queue, fun erlang:'=:='/2)
+    end,
     {NewQueue, Subscriber, TriggerState};
 
 on({add_zombie_candidate, Node}, {Queue, Subscriber, TriggerState}) ->
-    {fix_queue:add_unique_head(Node, Queue, fun node:same_process/2, fun node:newer/2), Subscriber, TriggerState};
+    case node:is_valid(Node) of
+        true ->
+            {fix_queue:add_unique_head(Node, Queue, fun node:same_process/2, fun node:newer/2),
+             Subscriber, TriggerState};
+        _ ->
+            {fix_queue:add_unique_head(Node, Queue, fun erlang:'=:='/2, fun(_Old, New) -> New end),
+             Subscriber, TriggerState}
+    end;
 
 on({subscribe, Node}, {Queue, Subscriber, TriggerState}) ->
     {Queue, gb_sets:insert(Node, Subscriber), TriggerState};

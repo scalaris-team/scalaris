@@ -93,6 +93,9 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
         util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
     FailureDetector =
         util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
+    DeadNodeCache =
+        util:sup_worker_desc(deadnodecache, dn_cache, start_link,
+                             [ServiceGroup]),
     Ganglia =
         util:sup_worker_desc(ganglia_server, ganglia, start_link),
     Logger =
@@ -119,6 +122,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                      MonitorTiming,
                      CommLayer,
                      FailureDetector,
+                     DeadNodeCache,
                      AdminServer],
     %% do we want to run an empty boot-server?
     PostBootServer = case application:get_env(boot_cs, empty) of

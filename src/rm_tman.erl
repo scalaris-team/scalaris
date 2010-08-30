@@ -78,7 +78,7 @@ start_link(DHTNodeGroup) ->
 -spec init(module()) -> {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState::trigger:state()}.
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, ?MODULE),
-    comm:send_local(get_pid_dnc(), {subscribe, self()}),
+    dn_cache:subscribe(),
     comm:send_local(get_cs_pid(), {init_rm, self()}),
     {uninit, msg_queue:new(), TriggerState}.
 
@@ -427,9 +427,6 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
                           _    -> RandViewSize
                       end,
     {NewNeighborhood, NewRandViewSize, NewInterval, NewTriggerState, NewCache, NewChurn}.
-
--spec get_pid_dnc() -> pid() | failed.
-get_pid_dnc() -> pid_groups:get_my(dn_cache).
 
 % get Pid of assigned dht_node
 -spec get_cs_pid() -> pid() | failed.
