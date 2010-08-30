@@ -133,15 +133,39 @@ getVivaldiMap() ->
             log:log(error,"[ WH ] Timeout getting node list from boot server"),
             throw('boot_server_timeout')
         end,
-    CC_list = lists:map(fun (Pid) -> get_vivaldi(Pid) end, Nodes),
+    This = self(),
+    [erlang:spawn(
+       fun() ->
+               SourcePid = comm:get(This, comm:this_with_cookie(Pid)),
+               comm:send_to_group_member(Pid, vivaldi, {get_coordinate, SourcePid})
+       end) || Pid <- Nodes],
+    CC_list = get_vivaldi(Nodes, [], 0),
     renderVivaldiMap(CC_list, Nodes).
 
--spec get_vivaldi(Pid::comm:mypid()) -> vivaldi:network_coordinate().
-get_vivaldi(Pid) ->
-    comm:send_to_group_member(Pid, vivaldi, {get_coordinate, comm:this()}),
-    receive
-        {vivaldi_get_coordinate_response, Coordinate, _Confidence} ->
-            Coordinate
+-spec get_vivaldi(Pids::[comm:mypid()], [vivaldi:network_coordinate()], TimeInMS::non_neg_integer()) -> [vivaldi:network_coordinate()].
+get_vivaldi([], Coords, _TimeInS) -> Coords;
+get_vivaldi(Pids, Coords, TimeInMS) ->
+    Continue =
+        if
+            TimeInMS =:= 2000 ->
+                log:log(error,"[ WH ]: 2sec Timeout waiting for vivaldi_get_coordinate_response from ~p",[Pids]),
+                continue;
+            TimeInMS >= 6000 ->
+                log:log(error,"[ WH ]: 6sec Timeout waiting for vivaldi_get_coordinate_response from ~p",[Pids]),
+                stop;
+            true -> continue
+    end,
+    case Continue of
+        continue ->
+            receive
+                {{vivaldi_get_coordinate_response, Coordinate, _Confidence}, Pid} ->
+                    get_vivaldi(lists:delete(Pid, Pids), [Coordinate | Coords],
+                                TimeInMS)
+            after
+                10 ->
+                    get_vivaldi(Pids, Coords, TimeInMS + 10)
+            end;
+        _ -> Coords
     end.
 
 -spec renderVivaldiMap(CC_list::[vivaldi:network_coordinate()], Nodes::[comm:mypid()]) -> SVG::string().
