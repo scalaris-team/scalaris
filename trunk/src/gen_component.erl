@@ -94,7 +94,7 @@ change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 
 %% requests regarding breakpoint processing
--spec bp_set(Pid::com:erl_local_pid(), MsgTag::comm:message_tag(), BPName::any()) -> ok.
+-spec bp_set(Pid::comm:erl_local_pid(), MsgTag::comm:message_tag(), BPName::any()) -> ok.
 bp_set(Pid, MsgTag, BPName) ->
     Pid ! {'$gen_component', bp, bp_set, MsgTag, BPName},
     ok.
