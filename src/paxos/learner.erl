@@ -27,7 +27,7 @@
 
 -include("scalaris.hrl").
 
--export([start_paxosid/5]).
+-export([start_paxosid/5, start_paxosid_local/5]).
 -export([stop_paxosids/2]).
 
 -export([start_link/1]).
@@ -40,6 +40,10 @@ msg_decide(Client, ClientCookie, PaxosID, Val) ->
 start_paxosid(Learner, PaxosID, Majority, ProcessToInform, ClientCookie) ->
     comm:send(Learner, {learner_initialize, PaxosID, Majority,
                            ProcessToInform, ClientCookie}).
+
+start_paxosid_local(Learner, PaxosID, Majority, ProcessToInform, ClientCookie) ->
+    comm:send_local(Learner, {learner_initialize, PaxosID, Majority,
+                              ProcessToInform, ClientCookie}).
 
 stop_paxosids(Learner, ListOfPaxosIDs) ->
     comm:send(Learner, {learner_deleteids, ListOfPaxosIDs}).
