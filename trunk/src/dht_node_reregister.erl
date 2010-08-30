@@ -28,7 +28,7 @@
 -export([start_link/1]).
 -export([init/1, on/2, get_base_interval/0]).
 
--type(message() :: {go} | {trigger}).
+-type(message() :: {register}).
 
 -type(state() :: {init | uninit, trigger:state()}).
 
@@ -47,7 +47,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an uninitialized state.
 -spec init(module()) -> {uninit, trigger:state()}.
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, ?MODULE),
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0, register),
     {uninit, TriggerState}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -55,37 +55,32 @@ init(Trigger) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on(message(), state()) -> state().
-on({go}, {uninit, TriggerState}) ->
+on({register}, {uninit, TriggerState}) ->
     NewTriggerState = trigger:now(TriggerState),
     {init, NewTriggerState};
 
 on(_, {uninit, _TriggerState} = State) ->
     State;
 
-on({trigger}, {init, TriggerState}) ->
-    trigger_reregister(),
-    NewTriggerState = trigger:next(TriggerState),
-    {init, NewTriggerState};
-
-on({go}, {init, TriggerState}) ->
+on({register}, {init, TriggerState}) ->
     trigger_reregister(),
     NewTriggerState = trigger:next(TriggerState),
     {init, NewTriggerState}.
 
 -spec trigger_reregister() -> ok.
 trigger_reregister() ->
-    RegisterMessage = {pid_groups_join_as, get_dht_node_this()},
+    RegisterMessage = {register, get_dht_node_this()},
     reregister(config:read(register_hosts), RegisterMessage).
 
 -spec reregister(failed | [comm:mypid()],
-                 Message::{pid_groups_join_as, ThisNode::comm:mypid()}) -> ok.
+                 Message::{register, ThisNode::comm:mypid()}) -> ok.
 reregister(failed, Message)->
     comm:send(bootPid(), Message);
 reregister(Hosts, Message) ->
     lists:foreach(fun(Host) -> comm:send(Host, Message) end, Hosts),
     ok.
 
-%% @doc Gets the zombie detector interval set in scalaris.cfg.
+%% @doc Gets the interval to trigger re-registering the node set in scalaris.cfg.
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
     config:read(reregister_interval).

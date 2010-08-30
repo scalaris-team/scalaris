@@ -53,8 +53,8 @@ add(Elem, {MaxLength, Length, Queue}) ->
 %%      element selected by SelectFun.
 %%      Note that this is much cheaper than checking all elements!
 -spec add_unique_head(Element, Queue::fix_queue(),
-        EqFun::fun((Element, Element) -> boolean()),
-        SelectFun::fun((Element, Element) -> Element)) -> fix_queue().
+        EqFun::fun((Old::Element, New::Element) -> boolean()),
+        SelectFun::fun((Old::Element, New::Element) -> Element)) -> fix_queue().
 add_unique_head(Elem, {MaxLength, Length, Queue}, EqFun, SelectFun) ->
     {NewL1, NewQ1} =
         case queue:peek_r(Queue) of

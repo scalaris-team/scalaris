@@ -78,7 +78,7 @@ process_join_msg({idholder_get_id_response, Id, IdVersion},
     NewState = dht_node_state:new(?RT:empty_ext(Me),
                                   nodelist:new_neighborhood(Me),
                                   ?DB:new(Id)),
-    comm:send_local(get_local_dht_node_reregister_pid(), {go}),
+    comm:send_local(get_local_dht_node_reregister_pid(), {register}),
     msg_queue:send(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
     NewState;  % join complete, State is the first "State"
@@ -162,7 +162,7 @@ process_join_msg({join_response, Pred, Data},
     State = dht_node_state:new(?RT:empty_ext(Succ),
                                nodelist:new_neighborhood(Pred, Me, Succ), DB),
     cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
-    comm:send_local(get_local_dht_node_reregister_pid(), {go}),
+    comm:send_local(get_local_dht_node_reregister_pid(), {register}),
     msg_queue:send(QueuedMessages),
     State;
 %% userdevguide-end dht_node_join:join_other_p4

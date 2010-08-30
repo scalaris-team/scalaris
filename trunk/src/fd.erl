@@ -211,7 +211,7 @@ on({crash, Target}, State) ->
 
 on({web_debug_info, Requestor}, State) ->
     Subscriptions = fd_db:get_subscriptions(),
-    % not get better names for remote nodes:
+    % resolve (local and remote) pids to names:
     S2 = [begin
               case comm:is_local(TargetPid) of
                   true -> {Subscriber, {webhelpers:pid_to_name(comm:make_local(TargetPid)), Cookie}};
