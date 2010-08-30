@@ -23,7 +23,11 @@
 
 -include("scalaris.hrl").
 
--type ring_element() :: {ok, Details::node_details:node_details()} | {failed}.
+-ifdef(with_export_type_support).
+-export_type([ring/0, ring_element/0]).
+-endif.
+
+-type ring_element() :: {ok, Details::node_details:node_details()} | {failed, comm:mypid()}.
 -type ring() :: [ring_element()].
 
 -spec get_total_load(Ring::ring()) -> node_details:load().
@@ -58,59 +62,77 @@ get_load_std_deviation(Ring) ->
 -spec get_load(ring_element()) -> node_details:load().
 get_load({ok, Details}) ->
     node_details:get(Details, load);
-get_load({failed}) ->
+get_load({failed, _}) ->
     0.
 
 -spec get_memory(ring_element()) -> node_details:memory().
 get_memory({ok, Details}) ->
     node_details:get(Details, memory);
-get_memory({failed}) ->
+get_memory({failed, _}) ->
     0.
 
 %% @doc Returns a sorted list of all known nodes.
 %%      See compare_node_details/2 for a definition of the order.
+%%      Note: throws 'boot_server_timeout' if the boot server does not respond
+%%      within 2s.
 -spec get_ring_details() -> ring().
 get_ring_details() ->
     boot_server:node_list(),
     Nodes = receive
                 {get_list_response, N} -> N
             after 2000 ->
-                log:log(error,"ST: Timeout"),
-                {failed}
+                log:log(error,"[ ST ] Timeout getting node list from boot server"),
+                throw('boot_server_timeout')
             end,
-    lists:sort(fun compare_node_details/2,
-               lists:map(fun (Pid) -> get_node_details(Pid) end, Nodes)).
+    This = self(),
+    [erlang:spawn(
+       fun() ->
+               SourcePid = comm:get(This, comm:this_with_cookie(Pid)),
+               comm:send(Pid, {get_node_details, SourcePid})
+       end) || Pid <- Nodes],
+    Ring = get_node_details(Nodes, [], 0),
+    lists:sort(fun compare_node_details/2, Ring).
 
-%% @doc Defines an order of {ok, node_details:node_details()} | {failed} terms
-%%      so that {failed} terms are considered the smallest.
+%% @doc Defines an order of ring_element() terms so that {failed, Pid} terms
+%%      are considered the smallest but sorted by their pids.
 %%      Terms like {ok, node_details:node_details()} are compared using the
 %%      order of their node ids.
--spec compare_node_details({failed}, {ok, node_details:node_details()} | {failed}) -> true;
-                          ({ok, node_details:node_details()}, {failed}) -> false;
-                          ({ok, node_details:node_details()}, {ok, node_details:node_details()}) -> boolean().
+-spec compare_node_details(ring_element(), ring_element()) -> boolean().
 compare_node_details({ok, X}, {ok, Y}) ->
     node:id(node_details:get(X, node)) < node:id(node_details:get(Y, node));
-compare_node_details({failed}, _) ->
+compare_node_details({failed, X}, {failed, Y}) ->
+    X =< Y;
+compare_node_details({failed, _}, {ok, _}) ->
     true;
-compare_node_details({ok, _}, _) ->
+compare_node_details({ok, _}, {failed, _}) ->
     false.
 
--spec get_node_details(Pid::comm:mypid()) -> ring_element().
-get_node_details(Pid) ->
-    comm:send(Pid, {get_node_details, comm:this_with_cookie(Pid)}),
-    receive
-        {{get_node_details_response, Details}, Pid} -> {ok, Details}
-    after
-        2000 ->
-            log:log(error,"[ ST ]: 2sec Timeout by waiting on get_node_details_response from ~p",[Pid]),
+-spec get_node_details(Pids::[comm:mypid()], ring(), TimeInMS::non_neg_integer()) -> ring().
+get_node_details([], Ring, _TimeInS) -> Ring;
+get_node_details(Pids, Ring, TimeInMS) ->
+    Continue =
+        if
+            TimeInMS =:= 2000 ->
+                log:log(error,"[ ST ]: 2sec Timeout waiting for get_node_details_response from ~p",[Pids]),
+                continue;
+            TimeInMS >= 6000 ->
+                log:log(error,"[ ST ]: 6sec Timeout waiting for get_node_details_response from ~p",[Pids]),
+                stop;
+            true -> continue
+    end,
+    case Continue of
+        continue ->
             receive
                 {{get_node_details_response, Details}, Pid} ->
-                    {ok, Details}
+                    get_node_details(lists:delete(Pid, Pids),
+                                     [{ok, Details} | Ring],
+                                     TimeInMS)
             after
-                4000 ->
-                    log:log(error,"[ ST ]: 6sec Timeout by waiting on get_node_details_response from ~p",[Pid]),
-                    {failed}
-            end
+                10 ->
+                    get_node_details(Pids, Ring, TimeInMS + 10)
+            end;
+        _ -> Failed = [{failed, Pid} || Pid <- Pids],
+             lists:append(Failed, Ring)
     end.
 
 %%%-------------------------------RT----------------------------------
@@ -136,12 +158,12 @@ get_rt_size_std_deviation(Ring) ->
 -spec get_rt(ring_element()) -> node_details:rt_size().
 get_rt({ok, Details}) ->
     node_details:get(Details, rt_size);
-get_rt({failed}) ->
+get_rt({failed, _}) ->
     0.
 
 -spec is_valid({ok, Details::node_details:node_details()}) -> true;
-              ({failed}) -> false.
+              ({failed, _}) -> false.
 is_valid({ok, _}) ->
     true;
-is_valid({failed}) ->
+is_valid({failed, _}) ->
     false.

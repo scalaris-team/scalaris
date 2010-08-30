@@ -84,7 +84,7 @@ get_load([Head | Tail]) ->
         {get_node_details_response, NodeDetails} ->
             [{ok, Head, node_details:get(NodeDetails, load)} | get_load(Tail)]
     after 2000 ->
-	    [{failed, Head} | get_load(Tail)]
+            [{failed, Head} | get_load(Tail)]
     end;
 get_load([]) ->
     [].
@@ -98,8 +98,8 @@ getLoadRendered() ->
     {table, [{bgcolor, "#cccccc"}, {border, "0"}, {cellpadding, "2"}, {cellspacing, "2"}, {width, "90%"}],
      [{tr, [],
        [
-	{td, [{bgcolor, "#336699"}, {width, "48%"}], {font, [{color, "white"}], "Node"}},
-	{td, [{bgcolor, "#336699"}, {valign, "top"}, {width, "16%"}], {font, [{color, "white"}], "Load"}}
+        {td, [{bgcolor, "#336699"}, {width, "48%"}], {font, [{color, "white"}], "Node"}},
+        {td, [{bgcolor, "#336699"}, {valign, "top"}, {width, "16%"}], {font, [{color, "white"}], "Load"}}
        ]},
       renderLoad(Load)
      ]
@@ -130,8 +130,8 @@ getVivaldiMap() ->
         receive
             {get_list_response, X} -> X
         after 2000 ->
-            log:log(error,"[ WH ] boot_server:node_list failed"),
-            {failed}
+            log:log(error,"[ WH ] Timeout getting node list from boot server"),
+            throw('boot_server_timeout')
         end,
     CC_list = lists:map(fun (Pid) -> get_vivaldi(Pid) end, Nodes),
     renderVivaldiMap(CC_list, Nodes).
@@ -264,7 +264,7 @@ pid_to_name2({GrpName, PidName}) ->
 -spec getRingChart() -> html_type().
 getRingChart() ->
     RealRing = statistics:get_ring_details(),
-    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
+    Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
     RingSize = length(Ring),
     if
         RingSize =:= 0 ->
@@ -285,7 +285,7 @@ getRingChart() ->
             end
     end.
 
--spec renderRingChart(Ring::[{ok, node_details:node_details()},...]) -> string().
+-spec renderRingChart(Ring::[node_details:node_details(),...]) -> string().
 renderRingChart(Ring) ->
     try
         URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
@@ -298,10 +298,10 @@ renderRingChart(Ring) ->
                                  Y            -> Y
                              end * 100 / MaxKey,
                       io_lib:format("~f", [Diff])
-                  end || {ok,Node} <- Ring ],
+                  end || Node <- Ring ],
         Hostinfos = [ node_details:get(Node, hostname) ++ " (" ++
                           integer_to_list(node_details:get(Node, load)) ++ ")"
-                    || {ok,Node} <- Ring ],
+                    || Node <- Ring ],
         CHD = "chd=t:" ++ string:join(Sizes, ","),
         CHS = "chs=600x350",
         CHL = "chl=" ++ string:join(Hostinfos, "|"),
@@ -314,53 +314,54 @@ renderRingChart(Ring) ->
 -spec getRingRendered() -> html_type().
 getRingRendered() ->
     RealRing = statistics:get_ring_details(),
-    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
+    Ring = [X || X = {ok, _} <- RealRing],
     RingSize = length(Ring),
     if
-	RingSize =:= 0 ->
-	    {p, [], "empty ring"};
-	true ->
-	    {p, [],
-	      [
-	      {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
-	       [
-		{tr, [{bgcolor, '#000099'}],
-		 [
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load (std. deviation)"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Real Ring Size"}}}
-		 ]
-		},
-		{tr, [],
-		 [
+        RingSize =:= 0 ->
+            {p, [], "empty ring"};
+        true ->
+            {p, [],
+              [
+              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+               [
+                {tr, [{bgcolor, '#000099'}],
+                 [
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load (std. deviation)"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Real Ring Size"}}}
+                 ]
+                },
+                {tr, [],
+                 [
                                {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
                                {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
                                {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
                                {td, [], io_lib:format('~p', [RingSize])}
                            ]
-		}
-	       ]
-	      },
-	      {br, []},
-	      {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
-	       [{tr, [{bgcolor, '#000099'}],
-		 [
-		  {td, [{align, "center"}, {width,"200px"}], {strong, [], {font, [{color, "white"}], "Host"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Pred"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succ"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
-		 ]},
-		lists:map(fun (Node) -> renderRing(Node) end, Ring)
-	       ]
-	      }
-	     ]
-	    }
+                }
+               ]
+              },
+              {br, []},
+              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+               [{tr, [{bgcolor, '#000099'}],
+                 [
+                  {td, [{align, "center"}, {width,"200px"}], {strong, [], {font, [{color, "white"}], "Host"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Preds"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
+                 ]},
+                lists:append([renderRing(X) ||  X = {ok, _} <- RealRing],
+                             [renderRing(X) ||  X = {failed, _} <- RealRing])
+               ]
+              }
+             ]
+            }
     end.
 
--spec renderRing(Node::{ok, Details::node_details:node_details()} | {failed}) -> html_type().
+-spec renderRing(Node::statistics:ring_element()) -> html_type().
 renderRing({ok, Details}) ->
     Hostname = node_details:get(Details, hostname),
     PredList = node_details:get(Details, predlist),
@@ -377,11 +378,12 @@ renderRing({ok, Details}) ->
        {td, [], io_lib:format('~p', [RTSize])},
        {td, [], io_lib:format('~p', [Load])}
       ]};
-renderRing({failed}) ->
+renderRing({failed, Pid}) ->
     {tr, [], 
       [
        {td, [], "-"},
        {td, [], "-"},
+       {td, [], io_lib:format('- (~p)', [Pid])},
        {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"}
@@ -390,65 +392,76 @@ renderRing({failed}) ->
 -spec getIndexedRingRendered() -> html_type().
 getIndexedRingRendered() ->
     RealRing = statistics:get_ring_details(),
-    Ring = lists:filter(fun (X) -> is_valid(X) end, RealRing),
-    RingSize = length(Ring),
-    if
-	RingSize =:= 0 ->
-	    {p, [], "empty ring"};
-	true ->
-	    {p, [],
-	      [
-	      {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
-	       [
-		{tr, [{bgcolor, '#000099'}],
-		 [
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load (std. deviation)"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Real Ring Size"}}}
-		 ]
-		},
-		{tr, [],
-		 [
-		  {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
-		  {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
-		  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-		  {td, [], io_lib:format('~p', [RingSize])}
-		 ]
-		}
-	       ]
-	      },
-	      {br, []},
-	      {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
-	       [{tr, [{bgcolor, '#000099'}],
-		 [
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Host"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Pred Offset"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node Index"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succ Offsets"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
-		  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
-		 ]},
-		lists:map(fun (Node) -> renderIndexedRing(Node, Ring) end, Ring)
-	       ]
-	      }
-	     ]
-	    }
-    end.
+    % table with mapping node_id -> index
+    ets:new(webhelpers_indexed_ring, [ordered_set, private, named_table]),
+    [begin
+         Size = ets:info(webhelpers_indexed_ring, size),
+         ets:insert(webhelpers_indexed_ring,
+                    {node:id(node_details:get(NodeDetails, node)), Size})
+     end || {ok, NodeDetails} <- RealRing],
+    RingSize = ets:info(webhelpers_indexed_ring, size),
+    EHtml =
+        if
+        RingSize =:= 0 ->
+            {p, [], "empty ring"};
+        true ->
+            {p, [],
+              [
+              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+               [
+                {tr, [{bgcolor, '#000099'}],
+                 [
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load (std. deviation)"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Real Ring Size"}}}
+                 ]
+                },
+                {tr, [],
+                 [
+                  {td, [], io_lib:format('~p', [statistics:get_total_load(RealRing)])},
+                  {td, [], io_lib:format('~p', [statistics:get_average_load(RealRing)])},
+                  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(RealRing)])},
+                  {td, [], io_lib:format('~p', [RingSize])}
+                 ]
+                }
+               ]
+              },
+              {br, []},
+              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+               [{tr, [{bgcolor, '#000099'}],
+                 [
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Host"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Preds Offset"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node Index"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs Offsets"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
+                 ]},
+                lists:append([renderIndexedRing(X) ||  X = {ok, _} <- RealRing],
+                             [renderIndexedRing(X) ||  X = {failed, _} <- RealRing])
+               ]
+              }
+             ]
+            }
+    end,
+    ets:delete(webhelpers_indexed_ring),
+    EHtml.
 
--spec renderIndexedRing({ok, Details::node_details:node_details()} | {failed},
-                        Ring::[{ok, node_details:node_details()}]) -> html_type().
-renderIndexedRing({ok, Details}, Ring) ->
+%% @doc Renders an indexed ring into ehtml.
+%%      Precond: existing webhelpers_indexed_ring ets table with
+%%      node_id -> index mapping.
+-spec renderIndexedRing(Node::statistics:ring_element()) -> html_type().
+renderIndexedRing({ok, Details}) ->
     Hostname = node_details:get(Details, hostname),
     PredList = node_details:get(Details, predlist),
     Node = node_details:get(Details, node),
     SuccList = node_details:get(Details, succlist),
     RTSize = node_details:get(Details, rt_size),
     Load = node_details:get(Details, load),
-    MyIndex = get_indexed_id(Node, Ring),
-    NIndex = length(Ring),
-    PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, Ring, MyIndex, NIndex) end, PredList),
-    SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, Ring, MyIndex, NIndex) end, SuccList),
+    MyIndex = get_indexed_id(Node),
+    PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, MyIndex) end, PredList),
+    SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, MyIndex) end, SuccList),
     [FirstSuccIndex|_] = SuccIndices,
     {tr, [],
       [
@@ -468,11 +481,12 @@ renderIndexedRing({ok, Details}, Ring) ->
        {td, [], io_lib:format('~p', [Load])}
       ]};
 
-renderIndexedRing({failed}, _Ring) ->
+renderIndexedRing({failed, Pid}) ->
     {tr, [],
       [
        {td, [], "-"},
        {td, [], "-"},
+       {td, [], io_lib:format('- (~p)', [Pid])},
        {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"}
@@ -484,53 +498,39 @@ dead_node() ->
     "dead node?".
 
 -spec get_indexed_pred_id(Node::node:node_type(),
-                          Ring::[{ok, node_details:node_details()} | {failed}],
-                          MyIndex::non_neg_integer() | string(),
-                          NIndex::non_neg_integer()) -> integer() | string().
-get_indexed_pred_id(Node, Ring, MyIndex, NIndex) ->
-    NodeIndex = get_indexed_id(Node, Ring),
+                          MyIndex::non_neg_integer() | string()) -> integer() | string().
+get_indexed_pred_id(Node, MyIndex) ->
+    NodeIndex = get_indexed_id(Node),
+    RingSize = ets:info(webhelpers_indexed_ring, size),
     case NodeIndex =:= dead_node() orelse MyIndex =:= dead_node() of
         true -> dead_node();
-        _    -> ((NodeIndex - MyIndex + NIndex) rem NIndex) - NIndex
+        _    ->
+            case NodeIndex =:= MyIndex of
+                true -> 0;
+                _    ->
+                    ((NodeIndex - MyIndex + RingSize) rem RingSize) - RingSize
+            end
     end.
 
 -spec get_indexed_succ_id(Node::node:node_type(),
-                          Ring::[{ok, node_details:node_details()} | {failed}],
-                          MyIndex::non_neg_integer() | string(),
-                          NIndex::non_neg_integer()) -> integer() | string().
-get_indexed_succ_id(Node, Ring, MyIndex, NIndex) ->
-    NodeIndex = get_indexed_id(Node, Ring),
+                          MyIndex::non_neg_integer() | string()) -> integer() | string().
+get_indexed_succ_id(Node, MyIndex) ->
+    NodeIndex = get_indexed_id(Node),
+    RingSize = ets:info(webhelpers_indexed_ring, size),
     case NodeIndex =:= dead_node() orelse MyIndex =:= dead_node() of
         true -> dead_node();
-        _    -> (NodeIndex - MyIndex + NIndex) rem NIndex
+        _    -> (NodeIndex - MyIndex + RingSize) rem RingSize
     end.
 
--spec get_indexed_id(Node::node:node_type(),
-                     Ring::[{ok, node_details:node_details()} | {failed}])
-        -> non_neg_integer() | string().
-get_indexed_id(Node, Ring) ->
-    get_indexed_id(Node, Ring, 0).
-
--spec get_indexed_id(Node::node:node_type(),
-                     Ring::[{ok, node_details:node_details()} | {failed}],
-                     Index::non_neg_integer()) -> non_neg_integer() | string().
-get_indexed_id(Node, [{ok, Details} | Ring], Index) ->
-    case node:id(Node) =:= node:id(node_details:get(Details, node)) of
-        true -> Index;
-        _    -> get_indexed_id(Node, Ring, Index + 1)
-    end;
-get_indexed_id(_Node, [], _Index) ->
-    dead_node().
+-spec get_indexed_id(Node::node:node_type()) -> non_neg_integer() | string().
+get_indexed_id(Node) ->
+    case ets:lookup(webhelpers_indexed_ring, node:id(Node)) of
+        [] -> dead_node();
+        [{_, Index}] -> Index
+    end.
 
 -spec get_flag(Hostname::node_details:hostname()) -> html_type().
 get_flag(Hostname) ->
     Country = string:substr(Hostname, 1 + string:rchr(Hostname, $.)),
     URL = string:concat("icons/", string:concat(Country, ".gif")),
     {img, [{src, URL}, {width, 26}, {height, 16}], []}.
-
--spec is_valid({ok, Details::node_details:node_details()}) -> true;
-              ({failed}) -> false.
-is_valid({ok, _}) ->
-    true;
-is_valid({failed}) ->
-    false.
