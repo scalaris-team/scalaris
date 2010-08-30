@@ -231,7 +231,8 @@ get_proc_in_vms(Proc) ->
         receive
             {get_list_response, X} -> X
         after 2000 ->
-            {failed}
+            log:log(error,"[ util ] Timeout getting node list from boot server"),
+            throw('boot_server_timeout')
         end,
     lists:usort([comm:get(Proc, DHTNode) || DHTNode <- Nodes]).
 

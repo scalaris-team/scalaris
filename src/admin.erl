@@ -27,6 +27,9 @@
 
 -include("scalaris.hrl").
 
+-type check_ring_deep_error() ::
+        {error, Node::node:node_type(), Preds::nodelist:non_empty_snodelist(), Succs::nodelist:non_empty_snodelist()}.
+
 %%====================================================================
 %% API functions
 %%====================================================================
@@ -75,7 +78,7 @@ del_single_node([{Key, _, _, _} | T]) ->
         _ -> del_single_node(T)
     end.
 
-%% @doc Contact boot server and check ring.
+%% @doc Contact boot server and check that each node's successor is correct.
 -spec check_ring() -> {error, string()} | ok.
 check_ring() ->
     Nodes = statistics:get_ring_details(),
@@ -84,56 +87,11 @@ check_ring() ->
         _ -> ok
     end.
 
--spec check_ring_deep() -> {error, list(), list()} | ok.
-check_ring_deep() ->
-    case check_ring() of
-        ok ->
-            Nodes = statistics:get_ring_details(),
-            NodePids = strip_node_details(Nodes),
-            case lists:foldl(fun check_ring_deep_foldl/2,
-                             {ok, NodePids}, Nodes) of
-                {ok, NodePids} ->
-                    ok;
-                X ->
-                    X
-            end;
-        X ->
-            X
-    end.
-
-strip_node_details([]) -> [];
-strip_node_details([{ok, NodeDetails} | Rest]) ->
-    [node_details:get(NodeDetails, node) | strip_node_details(Rest)];
-strip_node_details([_ | Rest]) ->
-    strip_node_details(Rest).
-
-check_ring_deep_foldl({ok, NodeDetails}, {ok, NodePids}) ->
-    PredList = node_details:get(NodeDetails, predlist),
-    SuccList = node_details:get(NodeDetails, succlist),
-    CheckIsKnownNode = fun (Node) ->
-                               lists:member(Node, NodePids)
-                       end,
-    case lists:all(CheckIsKnownNode, PredList) andalso
-          lists:all(CheckIsKnownNode, SuccList) of
-        true ->
-            {ok, NodePids};
-        _ ->
-            {error, PredList, SuccList}
-    end;
-check_ring_deep_foldl(X, {ok, _}) ->
-    X;
-check_ring_deep_foldl(_, X) ->
-    X.
-
--spec check_ring_foldl(NodeState::{ok, node_details:node_details()} | {failed},
+-spec check_ring_foldl(NodeState::statistics:ring_element(),
                        Acc::first | ?RT:key())
         -> first | {error, Reason::string()} | ?RT:key().
 check_ring_foldl({ok, NodeDetails}, first) ->
     node:id(node_details:get(NodeDetails, succ));
-check_ring_foldl({failed}, Previous) ->
-    Previous;
-check_ring_foldl(_, {error, Message}) ->
-    {error, Message};
 check_ring_foldl({ok, NodeDetails}, PredsSucc) ->
     MyId = node:id(node_details:get(NodeDetails, node)),
     if
@@ -141,7 +99,43 @@ check_ring_foldl({ok, NodeDetails}, PredsSucc) ->
             node:id(node_details:get(NodeDetails, succ));
         true ->
             {error, lists:flatten(io_lib:format("~p didn't match ~p", [MyId, PredsSucc]))}
+    end;
+check_ring_foldl({failed, _}, Previous) ->
+    Previous;
+check_ring_foldl(_, Previous = {error, _Message}) ->
+    Previous.
+
+%% @doc Contact boot server and check that each node's successor and
+%%      predecessor lists are correct.
+-spec check_ring_deep() -> ok | check_ring_deep_error().
+check_ring_deep() ->
+    case check_ring() of
+        ok ->
+            Ring = statistics:get_ring_details(),
+            Nodes = [node_details:get(Details, node) || {ok, Details} <- Ring],
+            case lists:foldl(fun check_ring_deep_foldl/2, {ok, Nodes}, Ring) of
+                {ok, _} -> ok;
+                X       -> X
+            end;
+        X -> X
     end.
+
+-spec check_ring_deep_foldl(Element::statistics:ring_element(),
+        {ok, Nodes::[node:node_type()]} | check_ring_deep_error())
+            -> {ok, Nodes::[node:node_type()]} | check_ring_deep_error().
+check_ring_deep_foldl({ok, NodeDetails}, {ok, Nodes}) ->
+    PredList = node_details:get(NodeDetails, predlist),
+    SuccList = node_details:get(NodeDetails, succlist),
+    CheckIsKnownNode = fun (Node) -> lists:member(Node, Nodes) end,
+    case lists:all(CheckIsKnownNode, PredList) andalso
+          lists:all(CheckIsKnownNode, SuccList) of
+        true -> {ok, Nodes};
+        _    -> {error, node_details:get(NodeDetails, node), PredList, SuccList}
+    end;
+check_ring_deep_foldl({failed, _}, Previous) ->
+    Previous;
+check_ring_deep_foldl(_, Previous = {error, _Node, _Preds, _Succs}) ->
+    Previous.
 
 -spec number_of_nodes() -> non_neg_integer() | timeout.
 number_of_nodes() ->
