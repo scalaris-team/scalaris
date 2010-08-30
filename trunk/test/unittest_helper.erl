@@ -27,7 +27,8 @@
          check_ring_size/1,
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
          start_process/1, start_process/2,
-         start_subprocess/1, start_subprocess/2]).
+         start_subprocess/1, start_subprocess/2,
+         get_all_children/1]).
 
 -include("scalaris.hrl").
 
@@ -204,3 +205,11 @@ start_subprocess(StartFun, RunFun) ->
     receive
         {started, Node} -> Node
     end.
+
+-spec get_all_children(Supervisor::pid()) -> [pid()].
+get_all_children(Supervisor) ->
+    AllChilds = [X || X = {_, Pid, _, _} <- supervisor:which_children(Supervisor),
+                      Pid =/= undefined],
+    WorkerChilds = [Pid ||  {_Id, Pid, worker, _Modules} <- AllChilds],
+    SupChilds = [Pid || {_Id, Pid, supervisor, _Modules} <- AllChilds],
+    lists:flatten([WorkerChilds | [get_all_children(S) || S <- SupChilds]]).
