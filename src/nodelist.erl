@@ -682,10 +682,12 @@ lupdate_ids(L1, L2) ->
     {L1Upd, L2Upd}.
 
 %% @doc Returns whether NId is between MyId and Id and not equal to Id.
+%%      If MyId and Id are the same, every other id is less than Id.
 -spec less_than_id(NId::?RT:key(), Id::?RT:key(), MyId::?RT:key()) -> boolean().
 less_than_id(NId, Id, MyId) ->
     % note: succ_ord_id = less than or equal
-    not succ_ord_id(Id, NId, MyId).
+    (NId =/= Id) andalso (MyId =:= Id orelse
+                              succ_ord_id(NId, Id, MyId)).
 
 %% @doc Look-up largest node in the NodeList that has an ID smaller than Id.
 %%      NodeList must be sorted with the largest key first (reverse order of
@@ -699,20 +701,20 @@ best_node_maxfirst(MyId, Id, [H | T], LastFound) ->
     % note: succ_ord_id = less than or equal
     HId = node:id(H),
     LTId = less_than_id(HId, Id, MyId),
-    case LTId andalso succ_ord_id(node:id(LastFound), HId, MyId) of
+    case LTId andalso succ_ord_id(node:id(LastFound), HId, Id) of
         true        -> H;
-        _ when LTId -> best_node_maxfirst2(MyId, T, LastFound);
+        _ when LTId -> best_node_maxfirst2(Id, T, LastFound);
         _           -> best_node_maxfirst(MyId, Id, T, LastFound)
     end.
 %% @doc Helper for best_node_maxfirst/4 which assumes that all nodes in
 %%      NodeList are in a valid range, i.e. between MyId and the target Id.
--spec best_node_maxfirst2(MyId::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_maxfirst2(_MyId, [], LastFound) -> LastFound;
-best_node_maxfirst2(MyId, [H | T], LastFound) ->
+-spec best_node_maxfirst2(Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
+best_node_maxfirst2(_Id, [], LastFound) -> LastFound;
+best_node_maxfirst2(Id, [H | T], LastFound) ->
     % note: succ_ord_id = less than or equal
-    case succ_ord_id(node:id(LastFound), node:id(H), MyId) of
+    case succ_ord_id(node:id(LastFound), node:id(H), Id) of
         true        -> H;
-        _           -> best_node_maxfirst2(MyId, T, LastFound)
+        _           -> best_node_maxfirst2(Id, T, LastFound)
     end.
 
 %% @doc Similar to best_node_maxfirst/4 but with a NodeList that must be sorted
@@ -725,7 +727,7 @@ best_node_minfirst(MyId, Id, [H | T], LastFound) ->
     HId = node:id(H),
     LTId = less_than_id(HId, Id, MyId),
     case LTId andalso
-             succ_ord_id(node:id(LastFound), HId, MyId) of
+             succ_ord_id(node:id(LastFound), HId, Id) of
         true        -> best_node_minfirst(MyId, Id, T, H);
         _ when LTId -> best_node_minfirst(MyId, Id, T, LastFound);
         _           -> LastFound
@@ -759,5 +761,5 @@ largest_smaller_than({Preds, BaseNode, Succs}, Id, LastFound) ->
                            LastFound::node:node_type()) -> node:node_type().
 largest_smaller_than(Preds, BaseNode, Succs, Id, LastFound) ->
     MyId = node:id(BaseNode),
-    BestSucc = best_node_maxfirst(MyId, Id, lists:reverse(Succs), LastFound),
+    BestSucc = best_node_maxfirst(MyId, Id, lists:reverse([BaseNode | Succs]), LastFound),
     _Best = best_node_minfirst(MyId, Id, lists:reverse(Preds), BestSucc).
