@@ -30,6 +30,8 @@
          unregister_from_node_change/1, unregister_from_node_change/2,
          unregister_all_from_node_change/1, trigger_known_nodes/0]).
 
+-export([is_first/1]).
+
 % state of the dht_node loop
 -type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
 
@@ -419,10 +421,7 @@ init(Options) ->
     % io:format("~p~n", [application:get_env(scalaris, first)]),
     % first node in this vm and also vm is marked as first
     % or unit-test
-    case lists:member({first}, Options) andalso
-          (is_unittest() orelse
-          application:get_env(boot_cs, first) =:= {ok, true} orelse
-          application:get_env(scalaris, first) =:= {ok, true}) of
+    case is_first(Options) of
         true ->
             trigger_known_nodes(),
             idholder:get_id(),
@@ -507,3 +506,11 @@ unregister_from_node_change(Pid, FunToExecute) ->
 is_unittest() ->
     code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
     lists:member(ct_logs, registered()).
+
+-spec is_first([tuple()]) -> boolean().
+is_first(Options) ->
+    lists:member({first}, Options)
+        andalso
+          (is_unittest() orelse
+           application:get_env(boot_cs, first) =:= {ok, true} orelse
+           application:get_env(scalaris, first) =:= {ok, true}).
