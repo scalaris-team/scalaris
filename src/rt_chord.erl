@@ -239,59 +239,6 @@ handle_custom_message(_Message, _State) ->
 empty_ext(_Succ) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty_ext
 
-%% @doc Returns whether NId is between MyId and Id and not equal to Id.
--spec less_than_id(NId::?RT:key(), Id::?RT:key(), MyId::?RT:key()) -> boolean().
-less_than_id(NId, Id, MyId) ->
-    % note: succ_ord_id = less than or equal
-    not nodelist:succ_ord_id(Id, NId, MyId).
-
-%% @doc Look-up largest node in the NodeList that has an ID smaller than Id.
-%%      NodeList must be sorted with the largest key first (reverse order of
-%%      a neighborhood's successor list).
-%%      Note: this implementation does not use intervals because comparing keys
-%%      with succ_ord is (slightly) faster. Also this is faster than a
-%%      lists:fold*/3.
--spec best_node_maxfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::nodelist:snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_maxfirst(_MyId, _Id, [], LastFound) -> LastFound;
-best_node_maxfirst(MyId, Id, [H | T], LastFound) ->
-    % note: succ_ord_id = less than or equal
-%%     ct:pal("~w~n", [H]),
-    HId = node:id(H),
-    LTId = less_than_id(HId, Id, MyId),
-    case LTId andalso nodelist:succ_ord_id(node:id(LastFound), HId, MyId) of
-        true        -> H;
-        _ when LTId -> best_node_maxfirst2(MyId, T, LastFound);
-        _           -> best_node_maxfirst(MyId, Id, T, LastFound)
-    end.
-%% @doc Helper for best_node_maxfirst/4 which assumes that all nodes in
-%%      NodeList are in a valid range, i.e. between MyId and the target Id.
--spec best_node_maxfirst2(MyId::?RT:key(), NodeList::nodelist:snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_maxfirst2(_MyId, [], LastFound) -> LastFound;
-best_node_maxfirst2(MyId, [H | T], LastFound) ->
-    % note: succ_ord_id = less than or equal
-%%     ct:pal("~w~n", [H]),
-    case nodelist:succ_ord_id(node:id(LastFound), node:id(H), MyId) of
-        true        -> H;
-        _           -> best_node_maxfirst2(MyId, T, LastFound)
-    end.
-
-%% @doc Similar to best_node_maxfirst/4 but with a NodeList that must be sorted
-%%      with the smallest key first (reverse order of a neighborhood's
-%%      predecessor list).
--spec best_node_minfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::nodelist:snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_minfirst(_MyId, _Id, [], LastFound) -> LastFound;
-best_node_minfirst(MyId, Id, [H | T], LastFound) ->
-    % note: succ_ord_id = less than or equal
-%%     ct:pal("~w~n", [H]),
-    HId = node:id(H),
-    LTId = less_than_id(HId, Id, MyId),
-    case LTId andalso
-             nodelist:succ_ord_id(node:id(LastFound), HId, MyId) of
-        true        -> best_node_minfirst(MyId, Id, T, H);
-        _ when LTId -> best_node_minfirst(MyId, Id, T, LastFound);
-        _           -> LastFound
-    end.
-
 %% userdevguide-begin rt_chord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
 %%      If the routing table has less entries than the rt_size_use_neighbors
@@ -316,22 +263,14 @@ next_hop(State, Id) ->
                              {_Key, N} = gb_trees:largest(RT),
                              N
                      end,
-%%             ct:pal("rt: ~w~n", [NodeRT]),
             FinalNode =
                 case RTSize < config:read(rt_size_use_neighbors) of
                     false -> NodeRT;
                     _     ->
                         % check neighborhood:
-                        MyId = dht_node_state:get(State, node_id),
-                        NodeNeigh1 =
-                            best_node_maxfirst(MyId, Id,
-                                               lists:reverse(tl(dht_node_state:get(State, succlist))),
-                                               NodeRT),
-                        best_node_minfirst(MyId, Id,
-                                           lists:reverse(dht_node_state:get(State, predlist)),
-                                           NodeNeigh1)
+                        nodelist:largest_smaller_than(
+                          dht_node_state:get(State, neighbors), Id, NodeRT)
                 end,
-%%             ct:pal("final: ~w~n", [FinalNode]),
             node:pidX(FinalNode)
     end.
 %% userdevguide-end rt_chord:next_hop

@@ -20,6 +20,8 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
+-compile([export_all]).
+
 -export([% constructors:
          new_neighborhood/1, new_neighborhood/2, new_neighborhood/3,
          mk_neighborhood/2, mk_neighborhood/4,
@@ -45,7 +47,8 @@
          % miscellaneous:
          succ_ord_node/2, succ_ord_id/2,
          succ_ord_node/3, succ_ord_id/3,
-         lupdate_ids/2, lremove_outdated/1, lremove_outdated/2]).
+         lupdate_ids/2, lremove_outdated/1, lremove_outdated/2,
+         largest_smaller_than/2, largest_smaller_than/3]).
 
 -include("scalaris.hrl").
 
@@ -677,3 +680,84 @@ lupdate_ids(L1, L2) ->
 
     ets:delete(L1L2Tab),
     {L1Upd, L2Upd}.
+
+%% @doc Returns whether NId is between MyId and Id and not equal to Id.
+-spec less_than_id(NId::?RT:key(), Id::?RT:key(), MyId::?RT:key()) -> boolean().
+less_than_id(NId, Id, MyId) ->
+    % note: succ_ord_id = less than or equal
+    not succ_ord_id(Id, NId, MyId).
+
+%% @doc Look-up largest node in the NodeList that has an ID smaller than Id.
+%%      NodeList must be sorted with the largest key first (reverse order of
+%%      a neighborhood's successor list).
+%%      Note: this implementation does not use intervals because comparing keys
+%%      with succ_ord is (slightly) faster. Also this is faster than a
+%%      lists:fold*/3.
+-spec best_node_maxfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
+best_node_maxfirst(_MyId, _Id, [], LastFound) -> LastFound;
+best_node_maxfirst(MyId, Id, [H | T], LastFound) ->
+    % note: succ_ord_id = less than or equal
+    HId = node:id(H),
+    LTId = less_than_id(HId, Id, MyId),
+    case LTId andalso succ_ord_id(node:id(LastFound), HId, MyId) of
+        true        -> H;
+        _ when LTId -> best_node_maxfirst2(MyId, T, LastFound);
+        _           -> best_node_maxfirst(MyId, Id, T, LastFound)
+    end.
+%% @doc Helper for best_node_maxfirst/4 which assumes that all nodes in
+%%      NodeList are in a valid range, i.e. between MyId and the target Id.
+-spec best_node_maxfirst2(MyId::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
+best_node_maxfirst2(_MyId, [], LastFound) -> LastFound;
+best_node_maxfirst2(MyId, [H | T], LastFound) ->
+    % note: succ_ord_id = less than or equal
+    case succ_ord_id(node:id(LastFound), node:id(H), MyId) of
+        true        -> H;
+        _           -> best_node_maxfirst2(MyId, T, LastFound)
+    end.
+
+%% @doc Similar to best_node_maxfirst/4 but with a NodeList that must be sorted
+%%      with the smallest key first (reverse order of a neighborhood's
+%%      predecessor list).
+-spec best_node_minfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
+best_node_minfirst(_MyId, _Id, [], LastFound) -> LastFound;
+best_node_minfirst(MyId, Id, [H | T], LastFound) ->
+    % note: succ_ord_id = less than or equal
+    HId = node:id(H),
+    LTId = less_than_id(HId, Id, MyId),
+    case LTId andalso
+             succ_ord_id(node:id(LastFound), HId, MyId) of
+        true        -> best_node_minfirst(MyId, Id, T, H);
+        _ when LTId -> best_node_minfirst(MyId, Id, T, LastFound);
+        _           -> LastFound
+    end.
+
+%% @doc Returns the node among all know neighbors (including the base node)
+%%      with the largest id smaller than Id.
+-spec largest_smaller_than(Neighbors::neighborhood(), Id::?RT:key()) -> node:node_type() | null.
+largest_smaller_than({Preds, BaseNode, Succs}, Id) ->
+    BaseNodeId = node:id(BaseNode),
+    case BaseNodeId =/= Id of
+        true -> largest_smaller_than(Preds, BaseNode, Succs, Id, BaseNode);
+        _ -> % take first pred if valid
+            Pred = hd(Preds),
+            case node:id(Pred) =/= Id of
+                true -> Pred;
+                _    -> node:null()
+            end
+    end.
+
+%% @doc Returns the node among all know neighbors (including the base node)
+%%      with the largest id smaller than Id given that a previous search found
+%%      LastFound as its Node with the largest id smaller than id.
+-spec largest_smaller_than(Neighbors::neighborhood(), Id::?RT:key(), LastFound::node:node_type()) -> node:node_type().
+largest_smaller_than({Preds, BaseNode, Succs}, Id, LastFound) ->
+    largest_smaller_than(Preds, BaseNode, Succs, Id, LastFound).
+
+%% @doc Helper for largest_smaller_than/2 and largest_smaller_than/3.
+-spec largest_smaller_than(Preds::non_empty_snodelist(), BaseNode::node:node_type(),
+                           Succs::non_empty_snodelist(), Id::?RT:key(),
+                           LastFound::node:node_type()) -> node:node_type().
+largest_smaller_than(Preds, BaseNode, Succs, Id, LastFound) ->
+    MyId = node:id(BaseNode),
+    BestSucc = best_node_maxfirst(MyId, Id, lists:reverse(Succs), LastFound),
+    _Best = best_node_minfirst(MyId, Id, lists:reverse(Preds), BestSucc).
