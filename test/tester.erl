@@ -36,7 +36,7 @@ test(Module, Func, Arity, Iterations) ->
     ParseState = try collect_fun_info(Module, Func, Arity,
                                       EmptyParseState)
     catch
-        throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, {exception, Term2}]);
+        throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(): ~p~n", [Module, Func, {exception, Term2}]);
         % special handling for exits that come from a ct:fail() call:
         exit:{test_case_failed, Reason2} -> ?ct_fail("error ~p:~p() failed with ~p~n", [Module, Func, Reason2]);
         exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n", [Module, Func, {exception, Reason2}]);
