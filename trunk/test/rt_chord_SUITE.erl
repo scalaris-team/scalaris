@@ -106,7 +106,7 @@ next_hop2(_Config) ->
                                   SuccSucc, 2, 2),
     State = dht_node_state:new(RT, Neighbors, ?DB:new(node:id(MyNode))),
     config:write(rt_size_use_neighbors, 10),
-    ?equals(rt_chord:next_hop(State, 0), lists:nth(6, DHTNodes)),
+    ?equals(rt_chord:next_hop(State, 0), node:pidX(Pred)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
     ?equals(rt_chord:next_hop(State, 2), node:pidX(Succ)),
     ?equals(rt_chord:next_hop(State, 3), node:pidX(SuccSucc)),
