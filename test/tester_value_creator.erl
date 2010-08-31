@@ -144,7 +144,11 @@ create_value({record, Module, TypeName}, Size, ParseState) ->
         none ->
             ?ct_fail("error: unknown record type: ~p:~p", [Module, TypeName])
     end;
+create_value({record, _Module, TypeName, FieldTypes}, Size, ParseState) ->
+    create_record_value(TypeName, FieldTypes, Size, ParseState);
 create_value({typed_record_field, _Name, Type}, Size, ParseState) ->
+    create_value(Type, Size, ParseState);
+create_value({field_type, _Name, Type}, Size, ParseState) ->
     create_value(Type, Size, ParseState);
 %%create_value({typedef, tester, test_any}, Size, TypeInfo) ->
     %% @todo
@@ -161,6 +165,11 @@ create_value({typedef, Module, TypeName}, Size, ParseState) ->
                                 {record, Types :: [type_spec()]},
                                 Size :: non_neg_integer(),
                                 ParseState :: #parse_state{}) -> tuple().
+create_record_value(RecordName, Types, Size, ParseState) when is_list(Types) ->
+    RecordLength = length(Types),
+    NewSize = erlang:max(1, (Size - RecordLength) div RecordLength),
+    RecordElements = [create_value(Type, NewSize, ParseState) || Type <- Types],
+    erlang:list_to_tuple([RecordName | RecordElements]);
 create_record_value(RecordName, {record, Types}, Size, ParseState) ->
     RecordLength = length(Types),
     NewSize = erlang:max(1, (Size - RecordLength) div RecordLength),
