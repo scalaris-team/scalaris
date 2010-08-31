@@ -51,15 +51,13 @@
                 proposer   :: pid(),
                 nc_subscr  :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}] % subscribers to node change events, i.e. node ID changes
                }).
--opaque state() :: #state{
-                rt         :: ?RT:external_rt(),
-                neighbors  :: nodelist:neighborhood(),
-                join_time  :: join_time(),
-                trans_log  :: #translog{},
-                db         :: ?DB:db(),
-                tx_tp_db   :: any(),
-                proposer   :: pid(),
-                nc_subscr  :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}]}.
+% TODO: copy field declarations from record definition with their types into #state{}
+%       (erlang otherwise thinks of a field type as 'unknown' | type())
+%       http://www.erlang.org/doc/reference_manual/typespec.html#id2272601
+%       dialyzer up to R14A can not handle these definitions though
+%       http://www.erlang.org/cgi-bin/ezmlm-cgi?2:mss:1979:cbgdipmboiafbbcfaifn
+%       -> be careful when using this type with the tester module!
+-opaque state() :: #state{}.
 
 %% userdevguide-begin dht_node_state:state
 -spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(),
