@@ -71,61 +71,16 @@ create_value(nonempty_string, Size, ParseState) ->
     NewSize = erlang:max(1, (Size - ListLength) div ListLength),
     [create_value(Type, NewSize, ParseState) || _ <- lists:seq(1, ListLength)];
 create_value(integer, _Size, ParseState) ->
-    case crypto:rand_uniform(0, 2) of
-        0 ->
-            % take one of the collected integers
-            Integers = tester_parse_state:get_integers(ParseState),
-            case length(Integers) of
-                0 ->
-                    crypto:rand_uniform(integer_min(), integer_max() + 1);
-                Length ->
-                    lists:nth(crypto:rand_uniform(1 , Length + 1), Integers)
-            end;
-        1 ->
-            crypto:rand_uniform(integer_min(), integer_max() + 1)
-    end;
+    create_integer(integer_min(), integer_max(), fun (_) -> true end,
+                   tester_parse_state:get_integers(ParseState));
 % 1..
 create_value(pos_integer, _Size, ParseState) ->
-    case crypto:rand_uniform(0, 2) of
-        0 ->
-            % take one of the collected integers
-            Integers = tester_parse_state:get_integers(ParseState),
-            case length(Integers) of
-                0 ->
-                    crypto:rand_uniform(1, integer_max() + 1);
-                Length ->
-                    N = lists:nth(crypto:rand_uniform(1 , Length + 1), Integers),
-                    case N < 1 of
-                        true ->
-                            1;
-                        false ->
-                            N
-                    end
-            end;
-        1 ->
-            crypto:rand_uniform(1, integer_max() + 1)
-    end;
+    create_integer(1, integer_max(), fun (X) -> X >= 1 end,
+                   tester_parse_state:get_integers(ParseState));
 % 0..
 create_value(non_neg_integer, _Size, ParseState) ->
-    case crypto:rand_uniform(0, 2) of
-        0 ->
-            % take one of the collected integers
-            Integers = tester_parse_state:get_integers(ParseState),
-            case length(Integers) of
-                0 ->
-                    crypto:rand_uniform(0, integer_max() + 1);
-                Length ->
-                    N = lists:nth(crypto:rand_uniform(1 , Length + 1), Integers),
-                    case N < 0 of
-                        true ->
-                            0;
-                        false ->
-                            N
-                    end
-            end;
-        1 ->
-            crypto:rand_uniform(0, integer_max() + 1)
-    end;
+    create_integer(0, integer_max(), fun (X) -> X >= 0 end,
+                   tester_parse_state:get_integers(ParseState));
 create_value({integer, Value}, _Size, _ParseState) ->
     Value;
 create_value({atom, Value}, _Size, _ParseState) ->
@@ -211,3 +166,20 @@ create_record_value(RecordName, {record, Types}, Size, ParseState) ->
     NewSize = erlang:max(1, (Size - RecordLength) div RecordLength),
     RecordElements = [create_value(Type, NewSize, ParseState) || Type <- Types],
     erlang:list_to_tuple([RecordName | RecordElements]).
+
+-spec create_integer(integer, integer, fun(), list(integer())) ->
+    integer().
+create_integer(Min, Max, Filter, Integers) ->
+    case crypto:rand_uniform(0, 2) of
+        0 ->
+            % take one of the collected integers
+            GoodIntegers = [X || X <- Integers, Filter],
+            case length(GoodIntegers) of
+                0 ->
+                    crypto:rand_uniform(Min, Max + 1);
+                Length ->
+                    lists:nth(crypto:rand_uniform(1 , Length + 1), GoodIntegers)
+            end;
+        1 ->
+            crypto:rand_uniform(Min, Max + 1)
+    end.
