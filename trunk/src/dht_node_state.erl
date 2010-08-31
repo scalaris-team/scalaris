@@ -51,7 +51,15 @@
                 proposer   :: pid(),
                 nc_subscr  :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}] % subscribers to node change events, i.e. node ID changes
                }).
--opaque state() :: #state{}.
+-opaque state() :: #state{
+                rt         :: ?RT:external_rt(),
+                neighbors  :: nodelist:neighborhood(),
+                join_time  :: join_time(),
+                trans_log  :: #translog{},
+                db         :: ?DB:db(),
+                tx_tp_db   :: any(),
+                proposer   :: pid(),
+                nc_subscr  :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}]}.
 
 %% userdevguide-begin dht_node_state:state
 -spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(),
@@ -97,6 +105,7 @@ new(RT, Neighbors, DB) ->
 %%      </ul>
 -spec get(state(), rt) -> ?RT:external_rt();
          (state(), rt_size) -> non_neg_integer();
+         (state(), neighbors) -> nodelist:neighborhood();
          (state(), succlist) -> nodelist:non_empty_snodelist();
          (state(), succ) -> node:node_type();
          (state(), succ_id) -> ?RT:key();
@@ -122,6 +131,7 @@ get(#state{rt=RT, neighbors=Neighbors, join_time=JoinTime,
     case Key of
         rt         -> RT;
         rt_size    -> ?RT:get_size(RT);
+        neighbors  -> Neighbors;
         succlist   -> nodelist:succs(Neighbors);
         succ       -> nodelist:succ(Neighbors);
         succ_id    -> node:id(nodelist:succ(Neighbors));

@@ -47,7 +47,14 @@
                        hostname    :: hostname(),
                        rt_size     :: rt_size(),
                        memory      :: memory()}).
--type(node_details_record() :: #node_details{}).
+-type(node_details_record() :: #node_details{
+                       predlist    :: nodelist:non_empty_snodelist(),
+                       node        :: node:node_type(),
+                       succlist    :: nodelist:non_empty_snodelist(),
+                       load        :: load(),
+                       hostname    :: hostname(),
+                       rt_size     :: rt_size(),
+                       memory      :: memory()}).
 
 -type(node_details_list() ::
     [{predlist, nodelist:non_empty_snodelist()} |
