@@ -66,8 +66,8 @@ make_ring_with_ids(Ids) ->
 %%     timer:sleep(1000),
     check_ring_size(length(Ids)),
     wait_for_stable_ring(),
-    check_ring_size(length(Ids)),
-    ct:pal("Scalaris has booted~n"),
+    Size = check_ring_size(length(Ids)),
+    ct:pal("Scalaris has booted with ~p nodes...~n", [Size]),
     Pid.
 
 -spec make_ring(pos_integer()) -> pid().
@@ -90,7 +90,7 @@ make_ring(Size) ->
     check_ring_size(Size),
     wait_for_stable_ring(),
     check_ring_size(Size),
-    ct:pal("Scalaris has booted~n"),
+    ct:pal("Scalaris has booted with ~p nodes..~n", [Size]),
     Pid.
 
 -spec stop_ring(pid()) -> ok.
@@ -164,9 +164,8 @@ check_ring_size(Size) ->
     boot_server:number_of_nodes(),
     RSize = receive {get_list_length_response, L} -> L
             end,
-    ct:pal("Size: ~p~n",[RSize]),
     case (RSize =:= Size) of
-        true -> ok;
+        true -> Size;
         _    -> timer:sleep(500),
                 check_ring_size(Size)
     end.
