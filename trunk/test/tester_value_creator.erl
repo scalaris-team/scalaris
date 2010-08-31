@@ -162,7 +162,7 @@ create_value({typedef, Module, TypeName}, Size, ParseState) ->
 
 %% @doc creates a record value
 -spec create_record_value/4 :: (RecordName :: type_name(),
-                                {record, Types :: [type_spec()]},
+                                {record, Types :: [type_spec()]} | [type_spec()],
                                 Size :: non_neg_integer(),
                                 ParseState :: #parse_state{}) -> tuple().
 create_record_value(RecordName, Types, Size, ParseState) when is_list(Types) ->
@@ -171,10 +171,7 @@ create_record_value(RecordName, Types, Size, ParseState) when is_list(Types) ->
     RecordElements = [create_value(Type, NewSize, ParseState) || Type <- Types],
     erlang:list_to_tuple([RecordName | RecordElements]);
 create_record_value(RecordName, {record, Types}, Size, ParseState) ->
-    RecordLength = length(Types),
-    NewSize = erlang:max(1, (Size - RecordLength) div RecordLength),
-    RecordElements = [create_value(Type, NewSize, ParseState) || Type <- Types],
-    erlang:list_to_tuple([RecordName | RecordElements]).
+    create_record_value(RecordName, Types, Size, ParseState).
 
 -spec create_integer(integer, integer, fun(), list(integer())) ->
     integer().

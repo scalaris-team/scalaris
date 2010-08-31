@@ -104,13 +104,13 @@
 
 -type(type_spec() ::
       {'fun', type_spec(), type_spec()}
-    | {product, [type_spec]}
-    | {tuple, [type_spec]}
+    | {product, [type_spec()]}
+    | {tuple, [type_spec()]}
     | {tuple, {typedef, tester, test_any}}
-    | {list, type_spec}
-    | {nonempty_list, type_spec}
+    | {list, type_spec()}
+    | {nonempty_list, type_spec()}
     | {range, {integer, integer()}, {integer, integer()}}
-    | {union, [type_spec]}
+    | {union, [type_spec()]}
     | {record, atom(), atom()}
     | nonempty_string
     | integer
