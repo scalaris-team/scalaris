@@ -33,8 +33,15 @@
 -spec test/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
 test(Module, Func, Arity, Iterations) ->
     EmptyParseState = tester_parse_state:new_parse_state(),
-    ParseState = collect_fun_info(Module, Func, Arity,
-                                  EmptyParseState),
+    ParseState = try collect_fun_info(Module, Func, Arity,
+                                      EmptyParseState)
+    catch
+        throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, {exception, Term2}]);
+        % special handling for exits that come from a ct:fail() call:
+        exit:{test_case_failed, Reason2} -> ?ct_fail("error ~p:~p() failed with ~p~n", [Module, Func, Reason2]);
+        exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n", [Module, Func, {exception, Reason2}]);
+        error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n", [Module, Func, {exception, {Reason2, erlang:get_stacktrace()}}])
+    end,
     run(Module, Func, Arity, Iterations, ParseState),
     ok.
 
@@ -234,12 +241,18 @@ parse_type({type, _Line, TypeName, []}, Module, ParseState) ->
     end;
 parse_type({type, _Line, record, [{atom, _Line2, TypeName}]}, Module, ParseState) ->
     {{record, Module, TypeName}, ParseState};
+parse_type({type, _Line, record, [{atom, _Line2, TypeName} | Fields]}, Module, ParseState) ->
+    {RecordType, ParseState2} = parse_type_list(Fields, Module, ParseState),
+    {{record, Module, TypeName, RecordType}, ParseState2};
 parse_type({typed_record_field, {record_field, _Line, {atom, _Line2, FieldName}}, Field}, Module, ParseState) ->
     {FieldType, ParseState2} = parse_type(Field, Module, ParseState),
     {{typed_record_field, FieldName, FieldType}, ParseState2};
 parse_type({typed_record_field, {record_field, _Line, {atom, _Line2, FieldName}, _Default}, Field}, Module, ParseState) ->
     {FieldType, ParseState2} = parse_type(Field, Module, ParseState),
     {{typed_record_field, FieldName, FieldType}, ParseState2};
+parse_type({type, _, field_type, [{atom, _, FieldName}, Field]}, Module, ParseState) ->
+    {FieldType, ParseState2} = parse_type(Field, Module, ParseState),
+    {{field_type, FieldName, FieldType}, ParseState2};
 parse_type({record_field, _Line, {atom, _Line2, FieldName}}, _Module, ParseState) ->
     {{untyped_record_field, FieldName}, ParseState};
 parse_type({record_field, _Line, {atom, _Line2, FieldName}, _Default}, _Module, ParseState) ->
@@ -256,7 +269,7 @@ parse_type(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
             {RecordType, ParseState2} = parse_type_list(TypeSpecs, Module, ParseState),
             {{record, RecordType}, ParseState2};
         _ ->
-            io:format("potentially unknown type2: ~p~n", [TypeSpecs]),
+            ct:pal("potentially unknown type2: ~p~n", [TypeSpecs]),
             unknown
     end;
 parse_type({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
@@ -292,24 +305,50 @@ run_helper(Module, Func, 0, Iterations, {'fun', _ArgType, _ResultType} = FunType
         X ->
             ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, [], X])
     catch
-        throw:Term -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Term}]);
+        throw:Term -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n",
+                               [Module, Func, [], {exception, Term}]);
         % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, Reason} -> ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, [], Reason]);
-        exit:Reason -> ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, Reason}]);
-        error:Reason -> ?ct_fail("exception (error) in ~p:~p(~p): ~p~n", [Module, Func, [], {exception, {Reason, erlang:get_stacktrace()}}])
+        exit:{test_case_failed, Reason} ->
+            ?ct_fail("error ~p:~p(~p) failed with ~p~n",
+                     [Module, Func, [], Reason]);
+        exit:Reason ->
+            ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n",
+                                [Module, Func, [], {exception, Reason}]);
+        error:Reason ->
+            ?ct_fail("exception (error) in ~p:~p(~p): ~p~n",
+                     [Module, Func, [], {exception, {Reason, erlang:get_stacktrace()}}])
     end;
 run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunType, ParseState) ->
     Size = 30,
-    Args = tester_value_creator:create_value(ArgType, Size, ParseState),
+    Args = try tester_value_creator:create_value(ArgType, Size, ParseState)
+           catch
+               throw:Term ->
+                   ?ct_fail("exception (throw) in ~p:~p(): ~p~n",
+                            [Module, Func, {exception, Term}]);
+               exit:Reason ->
+                   ?ct_fail("exception (exit) in ~p:~p(): ~p~n",
+                            [Module, Func, {exception, Reason}]);
+               error:Reason ->
+                   ?ct_fail("exception (error) in ~p:~p(): ~p~n",
+                            [Module, Func, {exception, {Reason, erlang:get_stacktrace()}}])
+    end,
     try erlang:apply(Module, Func, Args) of
         true ->
             run_helper(Module, Func, Arity, Iterations - 1, FunType, ParseState);
         X ->
             ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, X])
     catch
-        throw:Term -> ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Term}]);
+        throw:Term2 ->
+            ?ct_fail("exception (throw) in ~p:~p(~p): ~p~n",
+                     [Module, Func, Args, {exception, Term2}]);
         % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, Reason} -> ?ct_fail("error ~p:~p(~p) failed with ~p~n", [Module, Func, Args, Reason]);
-        exit:Reason -> ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, Reason}]);
-        error:Reason -> ?ct_fail("exception (error) in ~p:~p(~p): ~p~n", [Module, Func, Args, {exception, {Reason, erlang:get_stacktrace()}}])
+        exit:{test_case_failed, Reason2} ->
+            ?ct_fail("error ~p:~p(~p) failed with ~p~n",
+                     [Module, Func, Args, Reason2]);
+        exit:Reason2 ->
+            ?ct_fail("exception (exit) in ~p:~p(~p): ~p~n",
+                     [Module, Func, Args, {exception, Reason2}]);
+        error:Reason2 ->
+            ?ct_fail("exception (error) in ~p:~p(~p): ~p~n",
+                     [Module, Func, Args, {exception, {Reason2, erlang:get_stacktrace()}}])
     end.
