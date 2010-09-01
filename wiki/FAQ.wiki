@@ -7,8 +7,7 @@
 
 == Is the store persisted on disk? ==
 
-No its not persistent on disk (see also next question). Persistent storage is an often demanded feature, but it is not as easy to do as
-one might think. Lets explain why:
+No its not persistent on disk (see also next question). Persistent storage is an often demanded feature, but it is not as easy to do as one might think. Lets explain why:
 
 === Why persistent storage? ===
 
@@ -51,7 +50,7 @@ snapshots, that can be done also without interrupting the service.
 
 == Can I store more data in Scalaris than ram+swapspace is available in the cluster? ==
 
-Yes. We have several database backends, e.g. src/db_ets.erl (ets) and src/db_tcerl (tokyocabinet). The former uses the main memory for storing data, while the latter uses tokyocabinet for storing data on disk. With tokycoabinet, only your local disks should limit the total size of your database. Note however, that this still does not provide persistency.
+Yes. We have several database backends, e.g. src/db_ets.erl (ets) and src/db_toke (tokyocabinet). The former uses the main memory for storing data, while the latter uses tokyocabinet for storing data on disk. With tokycoabinet, only your local disks should limit the total size of your database. Note however, that this still does not provide persistency.
 
 For instructions on switching the database backend to tokyocabinet see [Tokyocabinet].
 
@@ -64,7 +63,7 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 === Optional requirements ===
 
   * Java-API, CLI: Java >= 5, Ant
-  * Storage on disk: Tokycabinet, tcerl, tcerl-drv
+  * Storage on disk: Tokycabinet, toke
 
 == Prebuild packages ==
 
@@ -95,7 +94,7 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || Ubuntu || 9.10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.10/] ||
 || Ubuntu || 10.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_10.04/] ||
 
-Inside those repositories you will also find erlang packages - you don't need this if you already have a recent enough erlang version.
+Inside those repositories you will also find erlang packages - you don't need these if you already have a recent enough erlang version - the package dependencies are set accordingly.
 
 === How to add deb-based repositories (Debian, Ubuntu)? ===
 
@@ -123,17 +122,17 @@ No. Well, maybe.
 
   # install Erlang (http://www.erlang.org/download.html)
   # install OpenSSL (for crypto module) (http://www.slproweb.com/products/Win32OpenSSL.html)
-  # checkout scalaris code from SVN
+  # checkout Scalaris code from SVN
   # adapt the path to your Erlang installation in build.bat
-  # start a cmd.exe
-  # go to the scalaris directory
-  # run build.bat in the cmd window
+  # start a `cmd.exe`
+  # go to the Scalaris directory
+  # run `build.bat` in the cmd window
   # check that there were no errors during the compilation; warnings are fine
-  # go to the bin sub-directory
-  # adapt the path to your Erlang installation in boot.bat, cs_local.bat, cs_local2.bat and cs_local3.bat
-  # run boot.bat in the cmd window
+  # go to the `bin` sub-directory
+  # adapt the path to your Erlang installation in `boot.bat`, `cs_local.bat`, `cs_local2.bat` and `cs_local3.bat`
+  # run `boot.bat` in the cmd window
 
-If you have Erlang < !R13B04, you will need to adapt the Emakefile that build.bat generates if it doesn't find one. There will be empty lines in the first three blocks ending with " ]}." - add the following to these lines (note the first ","!) and try to compile again, using build.bat. It should work now.
+If you have Erlang < !R13B04, you will need to adapt the `Emakefile` that `build.bat` generates if it doesn't find one. There will be empty lines in the first three blocks ending with " ]}." - add the following to these lines (note the first ","!) and try to compile again, using build.bat. It should work now.
 {{{
 , {d, type_forward_declarations_are_not_allowed}, {d, forward_or_recursive_types_are_not_allowed}
 }}}
@@ -145,28 +144,70 @@ Note: we do not support Scalaris on Windows at the moment.
 
 == How can I change the web server port/yaws port? ==
 
-For changing the yaws port of the boot server add "-boot_cs yaws_port XXXX" to the erl call in bin/boot.sh, where XXXX is the port. 
-
-For changing the yaws port of a normal server change in bin/cs_local?.sh "-chordsharp yaws_port XXXX", where XXXX is the port.
+For changing the yaws port of the boot server or a normal node change the `YAWSPORT` variable in its start script, e.g. `bin/boot.sh` or `bin/cs_local?.sh`.
 
 == The Java-client cannot connect to Scalaris. What is wrong? ==
 
-Probably your hostname configuration needs some adjustments. Erlang and Java use different mechanisms to determine the full qualified domain name (FQDN), but both have to come to the same result.
+If you do not use our client script (java-api/scalaris) your hostname configuration probably needs some adjustments. Erlang and Java use different mechanisms to determine the full qualified domain name (FQDN), but both have to come to the same result in order to be able to connect.
 
 You may check your installation using:
 
-`scalarisctl checkinstallation`
+{{{
+scalarisctl checkinstallation
+}}}
 
-For getting the node name Erlang uses, call:
+which will guide you further.
 
-`erl -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt()."`
+  * For getting the node name Erlang uses, call:
+    {{{
+    erl -noinput -name boot -eval 'io:format("~s~n", [node()]), halt().'
+    }}}
+    If this gives you a strange erlang error, replace "boot" in the line above with some arbitrary name.
+  * For getting the hostname the Java-API uses, call:
+    * installed with an RPM:
+      {{{
+      scalaris --noerl -lh
+      }}}
+    * inside the source directory:
+      {{{
+      ./java-api/scalaris --noconfig --noerl -lh
+      }}}
 
-For getting the hostname java uses, call:
-
-`hostname -f`
-
+The domain name from Erlang should be the same as the name printed by the Java client. If not, you may need to change your `/etc/hosts` or `/etc/hostname` for it to work.
 
 = Usage =
+
+== What is the difference between a boot server and an ordinary node? ==
+
+Scalaris has two types of nodes:
+  * a boot server and
+  * a Scalaris node.
+
+Formerly the boot-server was required to add new nodes to the system, hence its name. Today the boot-server only maintains a list of all Scalaris nodes in the system and provides a web-interface for debugging including different plots of the ring. It has no administrative tasks. A ring could be created without one.
+
+Note that for historical reasons `./bin/boot.sh` starts an Erlang VM with both, a boot server and a Scalaris node which is marked as the _first_ node.
+
+== Why is one Scalaris node marked as _first_? ==
+
+When starting a Scalaris ring we have to mark exactly one node as the first node. This node will not try contacting any other node and simply wait for connections. It thus creates a new ring.
+
+We are currently using a command line parameter `-boot_cs first true` (non-empty boot server) / `-scalaris first true` (ordinary Scalaris nodes) to mark the first Scalaris node inside an Erlang VM as being the first (see `bin/scalarisctl` and `dht_node:init/1`).
+
+== How do I start a ring? ==
+
+{{{
+./bin/boot.sh`
+}}}
+
+starts both a boot server and a Scalaris node - a ring of size 1.
+Further clients can be started using
+{{{
+./bin/cs_local.sh
+./bin/cs_local2.sh
+./bin/cs_local3.sh
+}}}
+
+Alternatively, `scalarisctl boot start` starts a boot server and `scalarisctl node start` starts a client similar to `cs_local.sh`. A boot server without a Scalaris node can be started by providing it with the option `-e` (empty) and a first node can be started with `-f`. To start Scalaris in the background, use `-d`. Refer to the help `scalarisctl -h` for further options.
 
 == How do I delete a key? ==
 
@@ -187,16 +228,14 @@ In Java you can call delete(key) or delete(key, timeout) from the Scalaris objec
 
 == What does the "discarded messages" error message mean? ==
 
-When you stop an scalaris node and immediately restart it, you can get the following message:
+If you stop a Scalaris node and immediately restart it, you can get messages like the following:
 {{{
-=ERROR REPORT==== 20-Jul-2009::14:51:06 ===
-Discarding message {ping,{{127,0,0,1},14195,<8031.110.0>},4} from <0.99.0> to <0.106.0> 
-in an old incarnation (3) of this node (1)
+[error] Discarding message {ping,{{127,0,0,1},14195,<9148.128.0>}} from <0.108.0> to <0.102.0> in an old incarnation (3) of this node (1)
 }}}
-It is not so much an error but a message by the Erlang runtime, that this particular message was sent to the last "incarnation" of this scalaris node. Here it is the failure detector sending a ping message. After a couple of seconds, the failure detector will notice the change and the messages will stop to appear.
+It is not so much an error but a message created by the Erlang runtime that this particular message was sent to the last "incarnation" of this Scalaris node. Here it is the failure detector sending a ping message. After a couple of seconds, the failure detector will notice the change and the messages will stop to appear.
 
 = Known Issues =
 
 == Publishing topics with Erlang !R13B01 may fail ==
 
-The httpc_handler module of the !R13B01 distribution sporadically crashes when a message is published to a web server. This can be seen using our integrated java tests. There have been some changes to that module in !R13B02 which seem to have fixed this bug. We haven't observed this behavior in Erlang !R13B02 - !R13B04.
+The httpc_handler module of the !R13B01 distribution sporadically crashes when a message is published to a web server. This can be seen using our integrated java tests. There have been some changes to that module in !R13B02 which seem to have fixed this bug. We haven't observed this behavior in Erlang !R13B02 - !R14A.
