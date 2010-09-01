@@ -117,8 +117,8 @@ on({web_debug_info, Requestor}, Nodes) ->
 
 -spec init([]) -> state().
 init(_Arg) ->
-    case application:get_env(boot_cs, empty) of
-        {ok, true} ->
+    case preconfig:get_env(empty, false) of
+        true ->
             % ugly hack to get a valid ip-address into the comm-layer
             dht_node:trigger_known_nodes();
         _ ->
