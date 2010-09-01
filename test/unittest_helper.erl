@@ -47,8 +47,12 @@ fix_cwd() ->
         Error -> Error
     end.
 
--spec make_ring_with_ids(list(?RT:key())) -> pid().
-make_ring_with_ids(Ids) ->
+-spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()])) -> pid().
+make_ring_with_ids(Ids) when is_list(Ids) ->
+    make_ring_with_ids(fun () -> Ids end);
+make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
+    % note: do not call IdsFun before the initial setup
+    %       (it might use config or another process)
     fix_cwd(),
     error_logger:tty(true),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
@@ -58,12 +62,15 @@ make_ring_with_ids(Ids) ->
                     ct:pal("Trying to build Scalaris~n"),
                     randoms:start(),
                     pid_groups:start_link(),
-                    sup_scalaris:start_link(boot, [{{idholder, id}, hd(Ids)}]),
+                    sup_scalaris:start_link(boot, [{boot_server, empty}]),
                     boot_server:connect(),
+                    Ids = IdsFun(),
+                    admin:add_node([{first}, {{idholder, id}, hd(Ids)}]),
                     [admin:add_node_at_id(Id) || Id <- tl(Ids)],
                     ok
             end),
 %%     timer:sleep(1000),
+    Ids = IdsFun(),
     check_ring_size(length(Ids)),
     wait_for_stable_ring(),
     Size = check_ring_size(length(Ids)),
