@@ -23,7 +23,8 @@
 -vsn('$Id$').
 
 -export([fix_cwd/0,
-         make_ring_with_ids/1, make_ring/1, stop_ring/1, stop_pid_groups/0,
+         make_ring_with_ids/1, make_ring/1, stop_ring/0, stop_ring/1,
+         stop_pid_groups/0,
          check_ring_size/1,
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
          start_process/1, start_process/2,
@@ -60,6 +61,7 @@ make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
     Pid = start_process(
             fun() ->
                     ct:pal("Trying to build Scalaris~n"),
+                    erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     pid_groups:start_link(),
                     sup_scalaris:start_link(boot, [{boot_server, empty}]),
@@ -86,6 +88,7 @@ make_ring(Size) ->
     Pid = start_process(
             fun() ->
                     ct:pal("Trying to build Scalaris~n"),
+                    erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     pid_groups:start_link(),
                     sup_scalaris:start_link(boot),
@@ -100,6 +103,13 @@ make_ring(Size) ->
     ct:pal("Scalaris has booted with ~p nodes..~n", [Size]),
     Pid.
 
+%% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1.
+-spec stop_ring() -> ok.
+stop_ring() ->
+    stop_ring(erlang:whereis(ct_test_ring)).
+
+%% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1
+%%      when the process' pid is known.
 -spec stop_ring(pid()) -> ok.
 stop_ring(Pid) ->
     try
@@ -109,6 +119,7 @@ stop_ring(Pid) ->
             exit(Pid, kill),
             wait_for_process_to_die(Pid),
             stop_pid_groups(),
+            catch unregister(ct_test_ring),
             ok
         end
     catch
