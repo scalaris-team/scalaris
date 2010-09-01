@@ -266,7 +266,7 @@ get_erlang_node_name() {
     COUNT=0
     while [ -z "$NODE_NAME" ]; do
       COUNT=$(($COUNT+1))
-      NODE_NAME_FULL=`$ERL -noinput -name "boot$COUNT" -eval 'io:format("~s~n", [node()]), halt().'`
+      NODE_NAME_FULL=`$ERL -noinput -name "scalaris-java-api-$COUNT" -eval 'io:format("~s~n", [node()]), halt().'`
       FAILED=$?
       if [ $FAILED -eq 0 ]; then
         NODE_NAME=`echo "$NODE_NAME_FULL" | cut -d '@' -f 2`
