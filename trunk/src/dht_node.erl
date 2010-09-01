@@ -418,7 +418,6 @@ on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
 %% @doc joins this node in the ring and calls the main loop
 -spec init(Options::[tuple()]) -> {join, {as_first | phase1}, msg_queue:msg_queue()}.
 init(Options) ->
-    % io:format("~p~n", [application:get_env(scalaris, first)]),
     % first node in this vm and also vm is marked as first
     % or unit-test
     case is_first(Options) of
@@ -509,8 +508,5 @@ is_unittest() ->
 
 -spec is_first([tuple()]) -> boolean().
 is_first(Options) ->
-    lists:member({first}, Options)
-        andalso
-          (is_unittest() orelse
-           application:get_env(boot_cs, first) =:= {ok, true} orelse
-           application:get_env(scalaris, first) =:= {ok, true}).
+    lists:member({first}, Options) andalso
+        (is_unittest() orelse preconfig:get_env(first, false) =:= true).

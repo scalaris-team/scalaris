@@ -125,16 +125,9 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                      DeadNodeCache,
                      AdminServer],
     %% do we want to run an empty boot-server?
-    PostBootServer = case application:get_env(boot_cs, empty) of
-                         {ok, true} ->
-                             [YAWS,
-                              BenchServer,
-                              Ganglia];
-                         _ ->
-                             [YAWS,
-                              BenchServer,
-                              Ganglia,
-                              DHTNode]
+    PostBootServer = case preconfig:get_env(empty, false) of
+                         true -> [YAWS, BenchServer, Ganglia];
+                         _    -> [YAWS, BenchServer, Ganglia, DHTNode]
                      end,
     % check whether to start the boot server
     case SupervisorType of

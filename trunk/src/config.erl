@@ -63,11 +63,9 @@ write(Key, Value) ->
 
 -spec start_link(Files::[file:name()]) -> {ok, pid()}.
 start_link(Files) ->
-    TheFiles = case application:get_env(add_config) of
-                   {ok, ConfigFile} ->
-                       lists:append(Files, [ConfigFile]);
-                   _Else ->
-                       Files
+    TheFiles = case preconfig:get_env(add_config, []) of
+                   []         -> Files;
+                   ConfigFile -> lists:append(Files, [ConfigFile])
                end,
     error_logger:info_msg("Config files: ~p~n", [TheFiles]),
     Owner = self(),
