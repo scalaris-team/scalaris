@@ -21,7 +21,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([start_link/1,
+-export([start_link/2,
          number_of_nodes/0,
          node_list/0,
          connect/0]).
@@ -115,9 +115,9 @@ on({web_debug_info, Requestor}, Nodes) ->
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     Nodes.
 
--spec init([]) -> state().
-init(_Arg) ->
-    case preconfig:get_env(empty, false) of
+-spec init(Options::[tuple()]) -> state().
+init(Options) ->
+    case lists:member({empty}, Options) of
         true ->
             % ugly hack to get a valid ip-address into the comm-layer
             dht_node:trigger_known_nodes();
@@ -129,9 +129,9 @@ init(_Arg) ->
 
 %% @doc starts the server; called by the boot supervisor
 %% @see sup_scalaris
--spec start_link(pid_groups:groupname()) -> {ok, pid()}.
-start_link(ServiceGroup) ->
-     gen_component:start_link(?MODULE, [],
+-spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
+start_link(ServiceGroup, Options) ->
+     gen_component:start_link(?MODULE, Options,
                               [{erlang_register, boot},
                                {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 

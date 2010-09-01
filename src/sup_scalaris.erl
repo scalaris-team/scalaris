@@ -102,8 +102,14 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
         util:sup_supervisor_desc(logger, log, start_link),
     MonitorTiming =
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link, [ServiceGroup]),
+    EmptyBootServer = preconfig:get_env(empty, false) orelse
+                          lists:member({boot_server, empty}, Options),
+    BootServerOptions = case EmptyBootServer of
+                            false -> [];
+                            _     -> [{empty}]
+                        end,
     BootServer =
-        util:sup_worker_desc(boot_server, boot_server, start_link, [ServiceGroup]),
+        util:sup_worker_desc(boot_server, boot_server, start_link, [ServiceGroup, BootServerOptions]),
     Service =
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link, [ServiceGroup]),
     YAWS =
@@ -125,7 +131,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                      DeadNodeCache,
                      AdminServer],
     %% do we want to run an empty boot-server?
-    PostBootServer = case preconfig:get_env(empty, false) of
+    PostBootServer = case EmptyBootServer of
                          true -> [YAWS, BenchServer, Ganglia];
                          _    -> [YAWS, BenchServer, Ganglia, DHTNode]
                      end,
