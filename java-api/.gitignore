@@ -3,6 +3,7 @@
 /doc-doxygen
 /.classpath
 /.project
+/scalaris
 /scalaris-examples.jar
 /chordsharp4j-examples.jar
 /Scalaris.properties
