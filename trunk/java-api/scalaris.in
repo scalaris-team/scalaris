@@ -18,6 +18,7 @@
 
 OTP_VERSION=1.5.3
 JAKARTA_COMMONS_VERSION=1.2
+ERL=@ERL@
 
 # Extract launch and scalaris arguments, (see details below).
 scalaris_exec_args=
@@ -255,9 +256,31 @@ if [ -n "$SCALARIS_JAVA_CONFIG" ]; then
   scalaris_java_config="-Dscalaris.java.config=\"$SCALARIS_JAVA_CONFIG\""
 fi
 
+get_erlang_node_name() {
+  # test whether erlang is installed
+  $ERL -noinput -eval 'halt(0).' > /dev/null 2>/dev/null
+  FAILED=$?
+  if [ $FAILED -eq 0 ]; then
+    # if erlang is available, get the domain part erlang uses for local nodes
+    NODE_NAME=""
+    COUNT=0
+    while [ -z "$NODE_NAME" ]; do
+      COUNT=$(($COUNT+1))
+      NODE_NAME_FULL=`$ERL -noinput -name "boot$COUNT" -eval 'io:format("~s~n", [node()]), halt().'`
+      FAILED=$?
+      if [ $FAILED -eq 0 ]; then
+        NODE_NAME=`echo "$NODE_NAME_FULL" | cut -d '@' -f 2`
+      fi
+      echo -n $NODE_NAME
+    done
+  fi
+}
+
+ERLANG_NODE_NAME="`get_erlang_node_name`"
+
 # Execute scalaris using eval/exec to preserve spaces in paths,
 # java options, and scalaris args
-scalaris_exec_command="exec \"$JAVACMD\" $SCALARIS_OPTS -classpath \"$LOCALCLASSPATH\" -Dscalaris.java.home=\"$SCALARIS_JAVA_HOME\" $scalaris_java_config de.zib.scalaris.Main $SCALARIS_ARGS $scalaris_exec_args"
+scalaris_exec_command="exec \"$JAVACMD\" $SCALARIS_OPTS -classpath \"$LOCALCLASSPATH\" -Dscalaris.java.home=\"$SCALARIS_JAVA_HOME\" -Dscalaris.erlang.nodename=\"$ERLANG_NODE_NAME\" $scalaris_java_config de.zib.scalaris.Main $SCALARIS_ARGS $scalaris_exec_args"
 if $scalaris_exec_debug ; then
     echo $scalaris_exec_command
 fi

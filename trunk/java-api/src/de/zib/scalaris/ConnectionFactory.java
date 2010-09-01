@@ -55,11 +55,18 @@ import de.zib.tools.PropertyLoader;
  * Note: {@code scalaris.node} can be a whitespace, ',' or ';' separated list of
  * available nodes. See {@link DefaultConnectionPolicy} about how this list is
  * used when connections are setup or when existing connections fail.
+ * Since Java and Erlang both need to known the same node name in order to
+ * connect, any "@localhost" in such a name is translated using
+ * {@link #fixLocalhostName(String)} to a real node name. The best method of
+ * changing this name is to use the name Erlang uses - it can be provided by
+ * setting the <tt>scalaris.erlang.nodename</tt> system property. If this is
+ * not set or empty, we will try to look-up the name ourselves (see
+ * {@link #getLocalhostName()}.
  * 
  * The {@link #connectionPolicy} set will be passed on to created connections.
- * Changing it through {@link #setConnectionPolicy(ConnectionPolicy)} will leave
- * previously created connections with the old policy. By default,
- * {@link DefaultConnectionPolicy} is used.
+ * Changing it via {@link #setConnectionPolicy(ConnectionPolicy)} will not
+ * change previously created connections - they keep the old policy. By
+ * default, {@link DefaultConnectionPolicy} is used.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.3
@@ -333,17 +340,27 @@ public class ConnectionFactory {
 
 	/**
 	 * Returns the name of the local host (or at least what Java thinks it is).
+	 * If the system property <tt>scalaris.erlang.nodename</tt> is set, this
+	 * will be returned, otherwise we look-up our hostname with
+	 * {@link InetAddress#getHostName()}.
 	 * 
-	 * @return the local host' name or <tt>localhost</tt> if no IP address could
-	 *         be found
+	 * @return the local host' name or <tt>localhost</tt> if no IP address was
+	 *         found
 	 */
 	public static final String getLocalhostName() {
 		String hostname = "localhost";
-		try {
-			InetAddress addr = InetAddress.getLocalHost();
-			hostname = addr.getHostName();
-		} catch (UnknownHostException e) {
+		
+		String erlangNodeName = System.getProperty("scalaris.erlang.nodename");
+		if (erlangNodeName == null || erlangNodeName.length() == 0) {
+			try {
+				InetAddress addr = InetAddress.getLocalHost();
+				hostname = addr.getHostName();
+			} catch (UnknownHostException e) {
+			}
+		} else {
+			hostname = erlangNodeName;
 		}
+		
 		return hostname;
 	}
 	
