@@ -37,7 +37,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    Pid = unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
+    Pid = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
     [{wrapper_pid, Pid} | Config].
 
 end_per_suite(Config) ->
