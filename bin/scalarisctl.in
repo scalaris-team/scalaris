@@ -175,14 +175,22 @@ checkinstallation() {
         ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
         JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
         if [ "$ERLANGHOST" != "$JAVAHOST" ]; then
-            echo "ERROR: the hostnames reported by Erlang and Java do not match. You won't be able to connect to erlang using the Java-API."
-            echo " Please refer to your system's manual to set your hostname, e.g. change the values in /etc/hosts or /etc/hostname, and check that it is consistent with the DNS."
-            echo " Alternatively specify the hostname reported by erlang in the scalaris.properties file"
+            echo "WARNING: the hostnames reported by Erlang and Java do not match. You won't be"
+            echo " able to connect to erlang using the Java-API through scalaris.jar. Also, the"
+            echo " java unit tests will probably not work."
+            echo " The java-api/scalaris script will work around this by asking erlang for its"
+            echo " hostname and using this for both."
+            echo " If you implement your own application either do not use \"@localhost\" in the"
+            echo " scalaris.properties file or set the scalaris.erlang.nodename system property"
+            echo " with the correct hostname (only the domain name part after the \"@\") or fix"
+            echo " your hostname setup system-wide."
+            echo " Please refer to your system's manual to set your hostname, e.g. change the"
+            echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
+            echo " the DNS."
             echo "erlang: $ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
             echo "     -> $ERLANGHOST"
             echo "java:   $SCALARISCLIENT -lh"
             echo "     -> $JAVAHOST"
-            exit 1
         fi
     fi
 
