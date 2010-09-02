@@ -53,9 +53,6 @@ init({DHTNodeGroup, Options}) ->
     DHTNode =
         util:sup_worker_desc(dht_node, dht_node, start_link,
                              [DHTNodeGroup, Options]),
-    Delayer =
-        util:sup_worker_desc(msg_delay, msg_delay, start_link,
-                             [DHTNodeGroup]),
     TX =
         util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
                                  [DHTNodeGroup]),
@@ -63,7 +60,6 @@ init({DHTNodeGroup, Options}) ->
           [
            Proposer, Acceptor, Learner,
            DHTNode,
-           Delayer,
            TX
           ]}}.
 %% userdevguide-end sup_dht_node_core:init

@@ -75,41 +75,42 @@ init({SupervisorType, Options}) ->
 
 -spec my_process_list/3 :: (supervisor_type(), pid_groups:groupname(), list(tuple())) -> [any()].
 my_process_list(SupervisorType, ServiceGroup, Options) ->
+    EmptyBootServer = preconfig:get_env(empty, false) orelse
+                          lists:member({boot_server, empty}, Options),
+    
     AdminServer =
         util:sup_worker_desc(admin_server, admin, start_link),
     BenchServer =
         util:sup_worker_desc(bench_server, bench_server, start_link),
-    CommLayer =
-        util:sup_supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
-    Config =
-        util:sup_worker_desc(config, config, start_link,
-                             [[preconfig:config(), preconfig:local_config()]]),
-    FirstId = case preconfig:get_env(first_id, random) of
-                  random -> [];
-                  Id     -> [{{idholder, id}, Id}]
-              end,
-    DHTNodeOptions = FirstId ++ [{first} | Options], % this is the first dht_node in this VM
-    DHTNode =
-        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
-    FailureDetector =
-        util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
-    DeadNodeCache =
-        util:sup_worker_desc(deadnodecache, dn_cache, start_link,
-                             [ServiceGroup]),
-    Ganglia =
-        util:sup_worker_desc(ganglia_server, ganglia, start_link),
-    Logger =
-        util:sup_supervisor_desc(logger, log, start_link),
-    MonitorTiming =
-        util:sup_worker_desc(monitor_timing, monitor_timing, start_link, [ServiceGroup]),
-    EmptyBootServer = preconfig:get_env(empty, false) orelse
-                          lists:member({boot_server, empty}, Options),
     BootServerOptions = case EmptyBootServer of
                             false -> [];
                             _     -> [{empty}]
                         end,
     BootServer =
         util:sup_worker_desc(boot_server, boot_server, start_link, [ServiceGroup, BootServerOptions]),
+    BootServerDNCache =
+        util:sup_worker_desc(deadnodecache, dn_cache, start_link,
+                             [ServiceGroup]),
+    CommLayer =
+        util:sup_supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
+    Config =
+        util:sup_worker_desc(config, config, start_link,
+                             [[preconfig:config(), preconfig:local_config()]]),
+    DHTNodeFirstId = case preconfig:get_env(first_id, random) of
+                  random -> [];
+                  Id     -> [{{idholder, id}, Id}]
+              end,
+    DHTNodeOptions = DHTNodeFirstId ++ [{first} | Options], % this is the first dht_node in this VM
+    DHTNode =
+        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [DHTNodeOptions]),
+    FailureDetector =
+        util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
+    Ganglia =
+        util:sup_worker_desc(ganglia_server, ganglia, start_link),
+    Logger =
+        util:sup_supervisor_desc(logger, log, start_link),
+    MonitorTiming =
+        util:sup_worker_desc(monitor_timing, monitor_timing, start_link, [ServiceGroup]),
     Service =
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link, [ServiceGroup]),
     YAWS =
@@ -121,6 +122,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                                 {access_log, false},
                                 {logdir, preconfig:log_path()}]
                               ]),
+    
     %% order in the following list is the start order
     PreBootServer = [Config,
                      Logger,
@@ -128,7 +130,6 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                      MonitorTiming,
                      CommLayer,
                      FailureDetector,
-                     DeadNodeCache,
                      AdminServer],
     %% do we want to run an empty boot-server?
     PostBootServer = case EmptyBootServer of
@@ -138,7 +139,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
     % check whether to start the boot server
     case SupervisorType of
         boot ->
-            lists:flatten([PreBootServer, BootServer, PostBootServer]);
+            lists:flatten([PreBootServer, BootServerDNCache, BootServer, PostBootServer]);
         node ->
             lists:flatten([PreBootServer, PostBootServer])
     end.
