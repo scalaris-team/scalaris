@@ -30,6 +30,9 @@ out(Arg) ->
       <div class=\"highlighted\">
         <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
       </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
+      </div>
 "};
         _ -> {html, ""}
     end.
@@ -78,7 +81,7 @@ Last update:
  
  out(Arg) ->
 	{Date, {Hour, Minute, Second}} = calendar:local_time(),
-    {html, io_lib:format("~w:~w:~w", [Hour, Minute, Second])}.
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
 </erl>
 </p>
 </div>
