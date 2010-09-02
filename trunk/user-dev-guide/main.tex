@@ -37,6 +37,7 @@
 %        pagebackref=true,
         pdfborder={0 0 0}]{hyperref}
 \usepackage{listings}
+\usepackage{etextools}
 
 \renewcommand{\headrulewidth}{0pt}    % Width of head rule
 \renewcommand{\footrulewidth}{0.3pt}  % Width of head rule
@@ -163,23 +164,12 @@
 {\hfill\emph{Description is based on SVN revision #1.}\medskip}
 
 \newcommand{\erlparamsorarity}[1]{%
-\ifthenelse{\equal{/0}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/1}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/2}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/3}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/4}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/5}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/6}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/7}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/8}{#1}}{\texttt{#1}}{%
-\ifthenelse{\equal{/9}{#1}}{\texttt{#1}}{%
-(\texttt{#1})
-}}}}}}}}}}}
+\ifthenelse{\equal{0}{\gettokslistindex{/}{#1}}}{\texttt{#1}}{(\texttt{#1})}}
 \newcommand{\erlfun}[4][index]{%
 \ifthenelse{\equal{index}{#1}}%
 {\index{#2@\texttt{#2}!#3@\texttt{#3}}}%
 {}%
-\texttt{#2}:\-\texttt{#3}\erlparamsorarity{#4}}
+\texttt{#2}:\-\texttt{#3}\texttt{\erlparamsorarity{#4}}}
 
 \newcommand{\erlfunindex}[2]{%
 \index{#1@\texttt{#1}!#2@\texttt{#2}|bfref}}%
@@ -592,15 +582,18 @@ need this if you already have a recent enough erlang version!
 
 \section{Logging}
 \label{sec:logging}
+\svnrev{r1083}
 
 \scalaris{} uses the log4erl library (see \code{contrib/log4erl}) for
 logging status information and error messages. The log level can be
-configured in \code{bin/scalaris.cfg}. The default value is
-{\tt error}; only errors and severe problems are logged.
+configured in \code{bin/scalaris.cfg} for both the stdout and file logger.
+The default value is {\tt warn}; only warnings, errors and severe problems are
+logged.
 
 \begin{lstlisting}[language=erlang]
 %% @doc Loglevel: debug < info < warn < error < fatal < none
-{log_level, error}.
+{log_level, warn}.
+{log_level_file, warn}.
 \end{lstlisting}
 
 In some cases, it might be necessary to get more complete logging
@@ -611,6 +604,7 @@ detail, here the {\tt info} level provides more detailed information.
 \begin{lstlisting}[language=erlang]
 %% @doc Loglevel: debug < info < warn < error < fatal < none
 {log_level, info}.
+{log_level_file, info}.
 \end{lstlisting}
 
 \chapter{Using the system}
@@ -945,11 +939,11 @@ firewalls.
 \item Use \erlmodule{gen\_component} to implement additional processes
 \item Don't use receive by yourself (Exception: to implement single threaded
   user API calls (cs\_api, yaws\_calls, etc)
-\item Don't use \erlfun{erlang}{now}{}, \erlfun{erlang}{send\_after}{},
-  \erlmodule{receive after} etc. in performance critical code, consider
+\item Don't use \erlfun{erlang}{now}{/0}, \erlfun{erlang}{send\_after}{/3},
+  \code{receive after} etc. in performance critical code, consider
   using \erlmodule{msg\_delay} instead.
-\item Don't use \erlfun{timer}{tc}{} as it catches exceptions. Use
-  \erlfun{util}{tc}{} instead.
+\item Don't use \erlfun{timer}{tc}{/3} as it catches exceptions. Use
+  \erlfun{util}{tc}{/3} instead.
 \end{itemize}
 
 \section{Testing Your Modifications and Extensions}
@@ -968,7 +962,8 @@ firewalls.
 \label{sec:digging}
 
 \begin{itemize}
-\item use \erlfun{ets}{i} to get details on the local state of some processes
+\item use \erlfun{ets}{i}{/0,1} to get details on the local state of some
+      processes
 \item consider changing pdb.erl to use ets instead of erlang:put/get
 \item Have a look at strace -f -p PID of beam process
 \item Get message statistics via the Web-interface
@@ -1437,46 +1432,32 @@ calls itself using tail-recursion in each branch. The loop works on a
 
 \section{Starting additional local nodes after boot}
 \label{sec:start-addit-local}
+\svnrev{r1083}
 
 After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
 by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the boot
 process opened~\footnote{Increase the log level to {\tt info} to get
-the detailed startup logs. See Section~\sieheref{sec:logging}}.
+more detailed startup logs. See Section~\sieheref{sec:logging}}.
 
 
 \lstset{language=erlang}
 \begin{lstlisting}
-scalaris/bin> ./boot.sh
+scalaris> ./bin/boot.sh 
 [...]
-=INFO REPORT==== 12-May-2009::16:24:18 ===
-Yaws: Listening to 0.0.0.0:8000 for servers
- - http://localhost:8000 under ../docroot
-[info] [ CC ] this() == {{127,0,0,1},14195}
-[info] [ DNC <0.96.0> ] starting DeadNodeCache
-[info] [ DNC <0.96.0> ] starting Dead Node Cache
-[info] [ RM <0.97.0> ] starting ring maintainer
-
-[info] [ RT <0.99.0> ] starting routingtable
-[info] [ Node <0.101.0> ] joining 315238232250031455306327244779560426902
-[info] [ Node <0.101.0> ] join as first 315238232250031455306327244779560426902
-[info] [ FD <0.74.0> ] starting pinger for {{127,0,0,1},14195,<0.101.0>}
-[info] [ Node <0.101.0> ] joined
-[info] [ CY ] Cyclon spawn: {{127,0,0,1},14195,<0.102.0>}
 (boot@csr-pc9)1> admin:add_nodes(10)
 \end{lstlisting}
 
 In the following we will trace what this function does in order to add
 additional nodes to the system.
-
 The function \code{admin:add_nodes(int)} is defined as follows.
 
 \codesnippet{admin.erl}{admin:add_nodes}{../src/admin.erl}
 
-It calls \code{add_nodes_loop(Count, Delay)} with a delay of 0. This
-function starts a new child for the main supervisor \code{main_sup}.
+It calls \erlfun{admin}{add\_node}{[]} Count times. This function starts a new
+child with the given options for the main supervisor \code{main_sup}.
 As defined by the parameters, to actually perform the start, the
-function \erlfun{sup\_dht\_node}{start\_link} is called by the Erlang
+function \erlfun{sup\_dht\_node}{start\_link}{/1} is called by the Erlang
 supervisor mechanism.  For more details on the OTP supervisor
 mechanism see Chapter~18 of the Erlang book~\cite{erlang-book} or the
 online documentation at
@@ -1484,31 +1465,49 @@ online documentation at
 
 \subsection{Supervisor-tree of a \scalaris{} node}
 
-When starting a new node in the system, the following supervisor tree is
-created:
+When a new Erlang VM with a Scalaris node is started, a
+\erlmodule{sup\_scalaris} supervisor is started that creates further
+workers and supervisors according to the following scheme
+(processes starting order: left to right, top to bottom):
 
 \medskip
-{\centering\includegraphics[width=0.9\linewidth]{supervision}}
+{\centering\includegraphics[width=\linewidth]{supervision}}
 
-\subsection{Starting the or-supervisor and general processes of a node}
+When new nodes are started using \erlfun{admin}{add\_node}{/1}, only new
+\code{sup_dht_node} supervisors are started.
 
-Starting supervisors is a two step process: the supervisor mechanism
-first calls the \code{init()} function of the defined module
-(\erlfun{sup\_dht\_node}{init} in this case) and then calls the start
-function (\code{start_link} here.
+\subsection{Starting the sup\_dht\_node supervisor and general processes of a node}
 
-So, lets have a look at \erlfun{sup\_dht\_node}{init}, the 'Scalaris
-\emph{or} supervisor'.
+Starting supervisors is a two step process: a call to
+\erlfun{supervisor}{start\_link}{/2,3}, e.g. from a supervisor's own
+\code{start_link} method, will start the supervisor process. It will then
+call \erlfun[]{Module}{init}{/1} to find out about the restart strategy,
+maximum restart frequency and child processes.
+Note that \erlfun{supervisor}{start\_link}{/2,3} will not return until
+\erlfun[]{Module}{init}{/1} has returned and all child processes have been
+started.
+
+Let's have a look at \erlfun{sup\_dht\_node}{init}{/1}, the 'DHT node
+ supervisor'.
 
 \codesnippet{sup_dht_node.erl}{sup_dht_node:init}{../src/sup_dht_node.erl}
 
 
-The return value of the \code{init()} function specifies the child
+The return value of the \code{init/1} function specifies the child
 processes of the supervisor and how to start them. Here, we define a
 list of processes to be observed by a \code{one_for_one}
-supervisor. The processes are: \code{KeyHolder}, \code{DeadNodeCache},
-\code{RingMaintenance}, \code{RoutingTable}, and a
-\code{Supervisor_AND} process.
+supervisor. The processes are:
+\code{Delayer},
+\code{Reregister},
+\code{DeadNodeCache},
+\code{IdHolder},
+\code{RoutingTable},
+\code{SupDHTNodeCore_AND},
+\code{Cyclon},
+\code{RingMaintenance},
+\code{Vivaldi},
+\code{DC_Clustering} and a
+\code{Gossip} process in this order.
 
 The term \code{\{one_for_one, 10, 1\}} specifies that the supervisor
 should try 10 times to restart each process before giving
@@ -1516,33 +1515,28 @@ up. \code{one_for_one} supervision means, that if a single process
 stops, only that process is restarted. The other processes run
 independently.
 
-The \erlfun{sup\_dht\_node}{init}{} is finished and the supervisor module,
+The \erlfun{sup\_dht\_node}{init}{/1} is finished and the supervisor module,
 starts all the defined processes by calling the functions that were
-defined in the list of the \erlfun{sup\_dht\_node}{init}{}.
+defined in the returned list.
 
 For a join of a new node, we are only interested in the starting of
-the \code{Supervisor_AND} process here. At that point in time, all
+the \code{SupDHTNodeCore_AND} process here. At that point in time, all
 other defined processes are already started and running.
 
-\subsection{Starting the and-supervisor with a peer and its local database}
+\subsection{Starting the sup\_dht\_node\_core supervisor with a peer and some paxos processes}
 
-Again, the OTP will first call the \code{init()} function of the
-corresponding module:
+Similarly, the supervisor will call the
+\erlfun[]{sup\_dht\_node\_core}{init}{/1} function:
 
 \codesnippet{sup_dht_node_core.erl}{sup_dht_node_core:init}{../src/sup_dht_node_core.erl}
 
-It defines three processes, that have to be observed using an
+It defines five processes, that have to be observed using an
 \code{one_for_all}-supervisor, which means, that if one fails, all have to
-be restarted. Passed to the \code{init} function is the \code{InstanceId}, a
-random number to make nodes unique. It was calculated a bit earlier in
-the code. Exercise: Try to find where.
+be restarted. Passed to the \code{init} function is the processes' group
+that is used with the \erlmodule{pid\_groups} module and a list of options for
+the \erlmodule{dht\_node}. The process group name was calculated
+a bit earlier in the code. Exercise: Try to find where.
 
-As you can see from the list, the \code{DB} is started before the
-\code{Node}. This is intended and important, because \code{dht_node} uses
-the database, but not vice versa. The supervisor first completely
-initializes the DB process and afterwards calls
-\erlfun{dht\_node}{start\_link}{}. We only go into details here, for the
-latter.
 
 \codesnippet{dht_node.erl}{dht_node:start_link}{../src/dht_node.erl}
 
@@ -1550,7 +1544,7 @@ latter.
 component was developed by us to enable us to write code which is
 similar in syntax and semantics to the examples in~\cite{rachid-book}.
 Similar to the \code{supervisor} behaviour, the component has to
-provide an \code{init} function, but here it is used to initialize the
+provide an \code{init/1} function, but here it is used to initialize the
 state of the component. This function is described in the next
 section.
 
@@ -1568,7 +1562,7 @@ we moved this code into the behaviour. If the \code{dht_node} is the
 first node, it will start immediately by triggering all known nodes
 (to initialize the comm layer) and entering the join process
 accordingly. The node also retrieves its \code{Id} from the idholder:
-\code{idholder:get_id()}. In the first call, a random identifier is
+\erlfun{idholder}{get\_id}{}. In the first call, a random identifier is
 returned, otherwise the latest set value. If the \code{dht_node}-process
 failed and is restarted by its supervisor, this call to the idholder
 ensures, that the node still keeps its \code{Id}, assuming that the
@@ -1641,7 +1635,7 @@ message in phase 4 of the join protocol. The next steps after the
 message is received from the old node are to initialize the
 maintenance components for the ring and routing table, the database
 and the state of the \code{dht_node}.
-The \erlfun{cs\_replica\_stabilization}{recreate\_replicas}{} function is
+The \erlfun{cs\_replica\_stabilization}{recreate\_replicas}{/1} function is
 called, which is not yet implemented. It would recreat necessary replicas
 that were lost due to load-balancing, node failures and lost updates during
 the data transfer.
@@ -1660,15 +1654,6 @@ be queued and re-send when the join is complete.
   be triggered by the load-balancing? This is a bug, that should be
   fixed!!!}
 
-% \subsection{FAQ}
-
-% \paragraph{Question:} How are the routing-table, load-balancing and paxos 
-%   processes started, that can be seen in the supervisor tree?
-
-%   \paragraph{Answer:} They are currently not implemented as separate Erlang
-%   processes. All the requests are handled by the loop started by
-%   \erlfun{dht_node}{start}. Nevertheless, they could be implemented as
-%   separate processes to make the software architecture cleaner.
 
 \chapter{Directory Structure of the Source Code}
 

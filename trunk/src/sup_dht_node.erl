@@ -49,44 +49,49 @@ init(Options) ->
     DHTNodeGroup = pid_groups:new("dht_node_"),
     pid_groups:join_as(DHTNodeGroup, sup_dht_node),
     boot_server:connect(),
-    KeyHolder =
-        util:sup_worker_desc(idholder, idholder, start_link,
-                             [DHTNodeGroup, Options]),
-    SupDHTNodeCore_AND =
-        util:sup_supervisor_desc(sup_dht_node_core, sup_dht_node_core,
-                                 start_link, [DHTNodeGroup, Options]),
-    RingMaintenance =
-        util:sup_worker_desc(?RM, ?RM, start_link, [DHTNodeGroup]),
-    RoutingTable =
-        util:sup_worker_desc(routingtable, rt_loop, start_link,
+    
+    Cyclon = util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
+    DC_Clustering =
+        util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
                              [DHTNodeGroup]),
     DeadNodeCache =
         util:sup_worker_desc(deadnodecache, dn_cache, start_link,
                              [DHTNodeGroup]),
-    Vivaldi =
-        util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
+    Delayer =
+        util:sup_worker_desc(msg_delay, msg_delay, start_link,
+                             [DHTNodeGroup]),
+    Gossip =
+        util:sup_worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
+    IdHolder =
+        util:sup_worker_desc(idholder, idholder, start_link,
+                             [DHTNodeGroup, Options]),
     Reregister =
         util:sup_worker_desc(dht_node_reregister, dht_node_reregister,
                              start_link, [DHTNodeGroup]),
-    DC_Clustering =
-        util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
+    RingMaintenance =
+        util:sup_worker_desc(?RM, ?RM, start_link, [DHTNodeGroup]),
+    RoutingTable =
+        util:sup_worker_desc(routingtable, rt_loop, start_link,
+    SupDHTNodeCore_AND =
+        util:sup_supervisor_desc(sup_dht_node_core, sup_dht_node_core,
+                                 start_link, [DHTNodeGroup, Options]),
                              [DHTNodeGroup]),
-    Cyclon =
-        util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
-    Gossip =
-        util:sup_worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
+    Vivaldi =
+        util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
+    
+    %% order in the following list is the start order
     {ok, {{one_for_one, 10, 1},
           [
+           Delayer,
            Reregister,
-           KeyHolder,
+           DeadNodeCache,
+           IdHolder,
            RoutingTable,
            SupDHTNodeCore_AND,
            Cyclon,
-           DeadNodeCache,
            RingMaintenance,
            Vivaldi,
            DC_Clustering,
            Gossip
-           %% _RSE
           ]}}.
 %% userdevguide-end sup_dht_node:init
