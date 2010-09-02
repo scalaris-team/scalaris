@@ -15,22 +15,22 @@
       <div class="nothighlighted">
 	    <h2>Scalaris</h2>
 	  </div>
-   	  <div class="nothighlighted">
+      <div class="nothighlighted">
 	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
-      
+	  
 <erl>
 out(Arg) ->
     case application:get_application() of
         {ok, boot_cs} ->
             {html,
-"      <div class=\"highlighted\">
+"      <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"ring.yaws\">Ring</a>
       </div>
       <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
       </div>
-      <div class=\"nothighlighted\">
+      <div class=\"highlighted\">
         <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
       </div>
 "};
@@ -44,38 +44,18 @@ out(Arg) ->
       <div class="nothighlighted">
         <a class="menua" href="debug.yaws">Debug</a>
       </div>
-      <div class="nothighlightedlast">
-        <a class="menua" href="logger.yaws">Message Stats</a>
-      </div>
+	  <div class="nothighlightedlast">
+	    <a class="menua" href="logger.yaws">Message Stats</a>
+	  </div>
     </div><div class="middle">
       <div class="middleleft">
-<h2>Ring</h2>
+<h2>Vivaldi Map</h2>
 
-Number of nodes: 
-<erl> 
- out(Arg) ->
-    boot_server:number_of_nodes(),
-    receive
-        {get_list_length_response,Res} ->
-            ok
-    end,
-    {html, integer_to_list(Res)}.
-</erl>
-
-<p>
-<erl>
-out(A) ->
-    {ehtml, webhelpers:getRingChart()}.
-</erl>
-</p>
-
-<p>
-<erl>
-out(A) ->
-    {ehtml, webhelpers:getRingRendered()}.
-</erl>
-</p>
-
+<object data="vivaldiMap.yaws" type="image/svg+xml"
+        width="400" height="400">
+    <embed src="vivaldiMap.yaws" type="image/svg+xml"
+            width="400" height="400" />
+</object>
 
 Last update:
 <erl>

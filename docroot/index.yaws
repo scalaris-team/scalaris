@@ -18,7 +18,7 @@
       <div class="highlighted">
 	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
-	  
+
 <erl>
 out(Arg) ->
     case application:get_application() of
@@ -29,6 +29,9 @@ out(Arg) ->
       </div>
       <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
+      </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
       </div>
 "};
         _ -> {html, ""}
@@ -46,22 +49,23 @@ out(Arg) ->
 	  </div>
     </div><div class="middle">
       <div class="middleleft">
+      
+<erl>
+out(Arg) ->
+    case application:get_application() of
+        {ok, boot_cs} ->
+            boot_server:number_of_nodes(),
+            NrNodes =
+                receive {get_list_length_response, Res} -> integer_to_list(Res)
+                after 6000 -> "n/a"
+                end,
+            {html, io_lib:format("
 <h2>Scalaris Boot Server Info Page</h2>
-
-Number of nodes: 
-<erl> 
- out(Arg) ->
-    boot_server:number_of_nodes(),
-    receive
-        {get_list_length_response,Res} ->
-            ok
-    end,
-    {html, integer_to_list(Res)}.
+<p>Number of nodes: ~s</p>", [NrNodes])};
+        _  -> {html, "<h2>Scalaris Node Info Page</h2>"}
+    end.
 </erl>
 
-
-
-<p>
 <h3>Simple Storage </h3>
 <h4>Add Key Value</h4>
 
@@ -195,14 +199,6 @@ out(A) ->
 </erl>
 </p>
 
-<h3>Vivaldi Map</h3>
-
-<object data="vivaldiMap.yaws" type="image/svg+xml"
-        width="400" height="400">
-    <embed src="vivaldiMap.yaws" type="image/svg+xml"
-            width="400" height="400" />
-</object>
-
 <h3>Args</h3>
 <p>
 <erl>
@@ -222,9 +218,8 @@ Last update:
  
  out(Arg) ->
 	{Date, {Hour, Minute, Second}} = calendar:local_time(),
-    {html, io_lib:format("~w:~w:~w", [Hour, Minute, Second])}.
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
 </erl>
-</p>
 </div>
 <br class="br_class">&nbsp;
 </div>
