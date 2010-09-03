@@ -82,6 +82,9 @@
         groups_as_json/0,
         members_by_name_as_json/1]).
 
+%% for unittests when group is in breakpoint
+-export([hide/1, unhide/1]).
+
 -ifdef(with_export_type_support).
 -export_type([pidname/0]).
 -export_type([groupname/0]).
@@ -283,6 +286,19 @@ members_by_name_as_json(GrpName) ->
           || El <- PidList ],
     {array, PidListAsJson}.
 
+%% @doc hide a group of processes temporarily (for paused groups in
+%% unit tests)
+-spec hide(groupname()) -> ok.
+hide(GrpName) ->
+    comm:send_local(pid_groups_manager(),
+                    {pid_groups_hide, GrpName, self()}),
+    receive {pid_groups_hide_done, GrpName} -> ok end.
+
+-spec unhide(groupname()) -> ok.
+unhide(GrpName) ->
+    comm:send_local(pid_groups_manager(),
+                    {pid_groups_unhide, GrpName, self()}),
+    receive {pid_groups_unhide_done, GrpName} -> ok end.
 
 %%
 %% pid_groups manager process (gen_component)
@@ -300,6 +316,7 @@ init(_Args) ->
 %%  ets:new(call_counter, [set, public, named_table]),
 %%  ets:insert(call_counter, {lookup_pointer, 0}),
     ets:new(?MODULE, [set, protected, named_table]),
+    ets:new(pid_groups_hidden, [set, protected, named_table]),
     %% required to gracefully eliminate dead, but registered processes
     %% from the ets-table
     process_flag(trap_exit, true),
@@ -331,6 +348,23 @@ on({group_and_name_of, Pid, Source}, State) ->
     % only for web debug interface
     Name = pid_groups:group_and_name_of(comm:make_local(Pid)),
     comm:send(Source, {group_and_name_of_response, Name}),
+    State;
+
+on({pid_groups_hide, GrpName, Source}, State) ->
+    [ begin
+          ets:delete_object(?MODULE, X),
+          ets:insert(pid_groups_hidden, X)
+      end || X <- tab2list(), GrpName =:= element(1, element(1, X)) ],
+    comm:send_local(Source, {pid_groups_hide_done, GrpName}),
+    State;
+
+on({pid_groups_unhide, GrpName, Source}, State) ->
+    [ begin
+          ets:delete_object(pid_groups_hidden, X),
+          ets:insert(?MODULE, X)
+      end || X <- ets:tab2list(pid_groups_hidden), GrpName =:= element(1, element(1, X)) ],
+    ets:delete(pid_groups_hidden, GrpName),
+    comm:send_local(Source, {pid_groups_unhide_done, GrpName}),
     State;
 
 on({'EXIT', FromPid, _Reason}, State) ->
