@@ -59,7 +59,7 @@
 new(ItemId) ->
     ReplDeg = config:read(replication_factor),
     {ItemId, tx_item_state, undefined_tx_id, empty_tlog_entry,
-     majority_for_prepared(ReplDeg), majority_for_abort(ReplDeg),
+     quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
      false, 0, 0, _no_paxIds = [], uninitialized, _HoldBack = []}.
 new(ItemId, TxId, TLogEntry) ->
     %% expand TransLogEntry to replicated translog entries
@@ -69,7 +69,7 @@ new(ItemId, TxId, TLogEntry) ->
     PaxIDsRTLogsTPs = lists:zip3(PaxosIds, RTLogEntries, TPs),
     ReplDeg = config:read(replication_factor),
     {ItemId, tx_item_state, TxId, TLogEntry,
-     majority_for_prepared(ReplDeg), majority_for_abort(ReplDeg),
+     quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
      false, 0, 0, PaxIDsRTLogsTPs,
      uninitialized, _HoldBack = []}.
 
@@ -113,6 +113,3 @@ set_tp_for_paxosid(State, TP, PaxosId) ->
     Entry = lists:keyfind(PaxosId, 1, TPList),
     NewTPList = lists:keyreplace(PaxosId, 1, TPList, setelement(3, Entry, TP)),
     set_paxosids_rtlogs_tps(State, NewTPList).
-
-majority_for_prepared(ReplDeg) -> ReplDeg div 2 + 1.
-majority_for_abort(ReplDeg) -> ReplDeg div 2 + ReplDeg rem 2.

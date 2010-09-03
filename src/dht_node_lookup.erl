@@ -31,8 +31,8 @@
 lookup_aux(State, Key, Hops, Msg) ->
     case intervals:in(Key, dht_node_state:get(State, succ_range)) of
         true -> % found node -> terminate
-            comm:send(dht_node_state:get(State, succ_pid),
-                      {lookup_fin, Hops + 1, Msg});
+            P = dht_node_state:get(State, succ_pid),
+            comm:send(P, {lookup_fin, Key, Hops + 1, Msg});
         _ ->
             P = ?RT:next_hop(State, Key),
             comm:send(P, {lookup_aux, Key, Hops + 1, Msg})
