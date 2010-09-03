@@ -262,8 +262,14 @@ on({lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on({lookup_fin, _Hops, Msg}, State) ->
-    comm:send_local(self(), Msg),
+on({lookup_fin, Key, Hops, Msg}, State) ->
+    MyRange = dht_node_state:get(State, my_range),
+    case intervals:in(Key, MyRange) of
+        true -> comm:send_local(self(), Msg);
+        false ->
+            ct:pal("Routing is damaged!! Trying again...~n"),
+            dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
+    end,
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -285,14 +291,9 @@ on({get_key, Source_PID, HashedKey}, State) ->
     State;
 
 on({get_key, Source_PID, SourceId, HashedKey}, State) ->
-%      case 0 =:= randoms:rand_uniform(0,6) of
-%          true ->
-%              io:format("drop get_key request~n");
-%          false ->
-    comm:send(Source_PID,
-              {get_key_with_id_reply, SourceId, HashedKey,
-               ?DB:read(dht_node_state:get(State, db), HashedKey)}),
-%    end,
+    Msg = {get_key_with_id_reply, SourceId, HashedKey,
+           ?DB:read(dht_node_state:get(State, db), HashedKey)},
+    comm:send(Source_PID, Msg),
     State;
 
 %% for unit testing only: allow direct DB manipulation

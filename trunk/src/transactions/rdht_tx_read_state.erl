@@ -34,8 +34,8 @@
          get_numreplied/1,
          is_client_informed/1,
          set_client_informed/1,
-         add_reply/4,
-         update_decided/2,
+         add_reply/5,
+         update_decided/3,
          is_newly_decided/1]).
 
 %% {Id,
@@ -73,9 +73,9 @@ set_client_informed(State) -> setelement(8, State, true).
 get_numreplied(State) ->
     get_numok(State) + get_numfailed(State).
 
-add_reply(State, Val, Vers, Maj) ->
-    ?TRACE("rdht_tx_read_state:add_reply state val vers maj ~p ~p ~p ~p~n", [State, Val, Vers, Maj]),
-   {OldVal, OldVers} = get_result(State),
+add_reply(State, Val, Vers, MajOk, MajDeny) ->
+    ?TRACE("rdht_tx_read_state:add_reply state val vers majok majdeny ~p ~p ~p ~p ~p~n", [State, Val, Vers, MajOk, MajDeny]),
+    {OldVal, OldVers} = get_result(State),
     NewResult = case Vers > OldVers of
                     true -> {Val, Vers};
                     false -> {OldVal, OldVers}
@@ -85,17 +85,16 @@ add_reply(State, Val, Vers, Maj) ->
                    true -> inc_numok(TmpState);
                    false -> inc_numfailed(TmpState)
                end,
-    update_decided(NewState, Maj).
+    update_decided(NewState, MajOk, MajDeny).
 
-update_decided(State, Maj) ->
+update_decided(State, MajOk, MajDeny) ->
     ?TRACE("rdht_tx_read_state:update_decided state maj ~p ~p~n", [State, Maj]),
-    NumOk = get_numok(State),
-    NumFailed = get_numfailed(State),
-    if (NumOk >= Maj) ->
-            set_decided(State, value);
-       (NumFailed >= Maj) ->
-            set_decided(State, not_found);
-       true -> State
+    OK = get_numok(State) >= MajOk,
+    Abort = get_numfailed(State) >= MajDeny,
+    case {OK, Abort} of
+        {true, false} -> set_decided(State, value);
+        {false, true} -> set_decided(State, not_found);
+        _ -> State
     end.
 
 is_newly_decided(State) ->

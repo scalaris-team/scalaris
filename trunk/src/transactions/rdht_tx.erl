@@ -130,7 +130,7 @@ collect_results_and_do_translogops({[], [], [RdhtOpWithReqId], [], []}
 %% all translogops done -> wait for a RdhtOpReply
 collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
                                     Delayed, []} = Args) ->
-    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [_Args]),
+    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [Args]),
     Reply = receive_answer(),
     ?TRACE("rdht reply was ~p~n", [Reply]),
     {_, RdhtId, RdhtTlog, RdhtResult} = Reply,
@@ -189,13 +189,13 @@ do_translogops([{Num, Entry} | TransLogOpsTail], {TLog, OldResults}) ->
 
 %% commit phase
 commit(TLog) ->
-    ?TRACE("rdht_tx:commit(~p, ~p, ~p)~n", [Client, ClientsID, TLog]),
     %% set steering parameters, we need for the transactions engine:
     %% number of retries, etc?
     %% some parameters are checked via the individual operations
     %% rdht_tx_read, rdht_tx_write which implement the behaviour tx_op_beh.
     Client = comm:this(),
     ClientsId = {commit_client_id, util:get_global_uid()},
+    ?TRACE("rdht_tx:commit(Client ~p, ~p, TLog ~p)~n", [Client, ClientsId, TLog]),
     case pid_groups:find_a(tx_tm) of
         failed ->
             Msg = io_lib:format("No tx_tm found.~n", []),
@@ -222,7 +222,7 @@ receive_answer() ->
         {tx_timeout, _} ->
             %% probably an outdated commit reply: drop it.
             receive_answer();
-        Any -> Any
+        {_Op, _RdhtId, _RdhtTlog, _RdhtResult} = Reply -> Reply
     end.
 
 %%% delete

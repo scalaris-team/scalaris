@@ -80,7 +80,7 @@ work_phase(ClientPid, ReqId, Request) ->
     ok.
 
 quorum_read(CollectorPid, ReqId, Request) ->
-    ?TRACE("rdht_tx_read:quorum_read~n", []),
+    ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
     Key = element(2, Request),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ lookup:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
@@ -90,7 +90,7 @@ quorum_read(CollectorPid, ReqId, Request) ->
 %% validate_prefilter(TransLogEntry) ->
 %%   [TransLogEntries] (replicas)
 validate_prefilter(TLogEntry) ->
-    ?TRACE("rdht_tx_read:validate_prefilter(~p)~n", [TLog]),
+    ?TRACE("rdht_tx_read:validate_prefilter(~p)~n", [TLogEntry]),
     Key = erlang:element(2, TLogEntry),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ setelement(2, TLogEntry, X) || X <- RKeys ].
@@ -162,19 +162,21 @@ init([]) ->
     %% use random table name provided by ets to *not* generate an atom
     %% Table = ets:new(?MODULE, [set, private]),
     Reps = config:read(replication_factor),
-    Maj = config:read(quorum_factor),
-    _State = {Reps, Maj, Table}.
+    MajOk = quorum:majority_for_accept(Reps),
+    MajDeny = quorum:majority_for_deny(Reps),
+
+    _State = {Reps, MajOk, MajDeny, Table}.
 
 %% reply triggered by lookup:unreliable_get_key/3
 on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
-   {Reps, Maj, Table} = State) ->
-    ?TRACE("rdht_tx_read:on(get_key_with_id_reply)~n", []),
+   {Reps, MajOk, MajDeny, Table} = State) ->
+    ?TRACE("~p rdht_tx_read:on(get_key_with_id_reply) ID ~p~n", [self(), Id]),
     Entry = my_get_entry(Id, Table),
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
     %% @todo got replies from all reps? -> delete ets entry
-    TmpEntry = rdht_tx_read_state:add_reply(Entry, Val, Vers, Maj),
+    TmpEntry = rdht_tx_read_state:add_reply(Entry, Val, Vers, MajOk, MajDeny),
     case {rdht_tx_read_state:is_newly_decided(TmpEntry),
           rdht_tx_read_state:get_client(TmpEntry)} of
         {true, unknown} ->
@@ -193,8 +195,8 @@ on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
     State;
 
 %% triggered by ?MODULE:work_phase/3
-on({client_is, Id, Pid, Key}, {Reps, _Maj, Table} = State) ->
-    ?TRACE("rdht_tx_read:on(client_is)~n", []),
+on({client_is, Id, Pid, Key}, {Reps, _MajOk, _MajDeny, Table} = State) ->
+    ?TRACE("~p rdht_tx_read:on(client_is)~n", [self()]),
     Entry = my_get_entry(Id, Table),
     Tmp1Entry = rdht_tx_read_state:set_client(Entry, Pid),
     TmpEntry = rdht_tx_read_state:set_key(Tmp1Entry, Key),
@@ -209,8 +211,8 @@ on({client_is, Id, Pid, Key}, {Reps, _Maj, Table} = State) ->
     State;
 
 %% triggered periodically
-on({timeout_id, Id}, {_Reps, _Maj, Table} = State) ->
-    ?TRACE("rdht_tx_read:on(timeout)~n", []),
+on({timeout_id, Id}, {_Reps, _MajOk, _MajDeny, Table} = State) ->
+    ?TRACE("~p rdht_tx_read:on(timeout) Id ~p~n", [self(), Id]),
     case pdb:get(Id, Table) of
         undefined -> ok;
         Entry ->
