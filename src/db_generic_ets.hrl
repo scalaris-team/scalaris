@@ -111,3 +111,25 @@ get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
                  end
         end,
     ?ETS:foldl(F, [], DB).
+
+%% @doc Deletes all objects in the given Range or (if a function is provided)
+%%      for which the FilterFun returns true from the DB.
+delete_entries(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+    F = fun(DBEntry, _) ->
+                case FilterFun(DBEntry) of
+                    false -> ok;
+                    _     -> Key = db_entry:get_key(DBEntry),
+                             ?ETS:delete(DB, Key),
+                             case intervals:in(Key, CKInt) of
+                                 true -> ?CKETS:insert(CKDB, {Key});
+                                 _    -> ok
+                             end,
+                             ok
+                end
+        end,
+    ?ETS:foldl(F, ok, DB),
+    State;
+delete_entries(State, Interval) ->
+    delete_entries(State, fun(E) ->
+                                  intervals:in(db_entry:get_key(E), Interval)
+                          end).

@@ -34,6 +34,7 @@
          set_read_lock/2, unset_read_lock/2]).
 -export([get_entries/2, get_entries/3]).
 -export([update_entries/4]).
+-export([delete_entries/2]).
 -export([get_load/1, split_data/2, get_data/1, add_data/2]).
 -export([check_db/1]).
 -export([record_changes/2, stop_record_changes/1, stop_record_changes/2,
@@ -73,6 +74,10 @@
 -spec update_entries(DB::db(), Values::[db_entry:entry()],
                      Pred::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> boolean()),
                      UpdateFun::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> UpdatedEntry::db_entry:entry()))
+        -> NewDB::db().
+-spec delete_entries(DB::db(),
+                     RangeOrFun::intervals:interval() |
+                                 fun((DBEntry::db_entry:entry()) -> boolean()))
         -> NewDB::db().
 
 -spec get_load(DB::db()) -> Load::integer().

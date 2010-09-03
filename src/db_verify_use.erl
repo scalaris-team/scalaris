@@ -229,6 +229,13 @@ update_entries({DB, Counter} = DB_, NewEntries, Pred, UpdateFun) ->
     verify_counter(Counter),
     {?BASE_DB:update_entries(DB, NewEntries, Pred, UpdateFun), update_counter(Counter)}.
 
+%% @doc Deletes all objects in the given Range or (if a function is provided)
+%%      for which the FilterFun returns true from the DB.
+delete_entries({DB, Counter} = DB_, RangeOrFilterFun) ->
+    ?TRACE2(get_entries, DB_, RangeOrFilterFun),
+    verify_counter(Counter),
+    {?BASE_DB:delete_entries(DB, RangeOrFilterFun), update_counter(Counter)}.
+
 check_db({DB, Counter} = DB_) ->
     ?TRACE1(check_db, DB_),
     verify_counter(Counter),
