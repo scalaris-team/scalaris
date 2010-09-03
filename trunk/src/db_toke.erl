@@ -128,6 +128,7 @@ add_data(State = {DB, CKInt, CKDB}, Data) ->
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
 split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
+    % first collect all toke keys to remove from my db (can not delete while doing fold!)
     F = fun(_K, DBEntry_, HisList) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case intervals:in(db_entry:get_key(DBEntry), MyNewInterval) of
@@ -160,6 +161,32 @@ get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
                  end
         end,
     toke_drv:fold(F, [], DB).
+
+%% @doc Deletes all objects in the given Range or (if a function is provided)
+%%      for which the FilterFun returns true from the DB.
+delete_entries(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+    % first collect all toke keys to delete (can not delete while doing fold!)
+    F = fun(KeyToke, DBEntry_, ToDelete) ->
+                DBEntry = erlang:binary_to_term(DBEntry_),
+                case FilterFun(DBEntry) of
+                    false -> ToDelete;
+                    _     ->
+                        Key = db_entry:get_key(DBEntry),
+                        case intervals:in(Key, CKInt) of
+                            true -> ?CKETS:insert(CKDB, {Key});
+                            _    -> ok
+                        end,
+                        [KeyToke | ToDelete]
+                end
+        end,
+    KeysToDelete = toke_drv:fold(F, [], DB),
+    % delete all entries with these keys
+    [toke_drv:delete(DB, KeyToke) || KeyToke <- KeysToDelete],
+    State;
+delete_entries(State, Interval) ->
+    delete_entries(State, fun(E) ->
+                                  intervals:in(db_entry:get_key(E), Interval)
+                          end).
 
 %% @doc Returns all DB entries.
 get_data({DB, _CKInt, _CKDB}) ->

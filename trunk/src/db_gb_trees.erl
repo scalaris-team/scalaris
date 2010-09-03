@@ -113,17 +113,17 @@ split_data({DB, CKInt, CKDB}, MyNewInterval) ->
     % the tree using gb_trees:from_orddict could be faster than continuously
     % deleting entries - we do not know this beforehand though
     % -> do single deletes here
-    F = fun (DBEntry, {HisList, MyTree}) ->
-                 Key = db_entry:get_key(DBEntry),
-                 case intervals:in(Key, MyNewInterval) of
-                     true -> {HisList, MyTree};
-                     _    -> NewTree = gb_trees:delete(Key, MyTree),
-                             ?CKETS:delete(CKDB, Key),
-                             case db_entry:is_empty(DBEntry) of
-                                 false -> {[DBEntry | HisList], NewTree};
-                                 _     -> {HisList, NewTree}
-                             end
-                end
+    F = fun(DBEntry, {HisList, MyTree}) ->
+                Key = db_entry:get_key(DBEntry),
+                case intervals:in(Key, MyNewInterval) of
+                    true -> {HisList, MyTree};
+                    _    -> NewTree = gb_trees:delete(Key, MyTree),
+                            ?CKETS:delete(CKDB, Key),
+                            case db_entry:is_empty(DBEntry) of
+                                false -> {[DBEntry | HisList], NewTree};
+                                _     -> {HisList, NewTree}
+                            end
+               end
         end,
     {HisList, MyNewTree} = lists:foldr(F, {[], DB}, gb_trees:values(DB)),
     {{MyNewTree, CKInt, CKDB}, HisList}.
@@ -131,13 +131,38 @@ split_data({DB, CKInt, CKDB}, MyNewInterval) ->
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
 get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
-    F = fun (_Key, DBEntry, Data) ->
-                 case FilterFun(DBEntry) of
-                     true -> [ValueFun(DBEntry) | Data];
-                     _    -> Data
-                 end
+    F = fun(_Key, DBEntry, Data) ->
+                case FilterFun(DBEntry) of
+                    true -> [ValueFun(DBEntry) | Data];
+                    _    -> Data
+                end
         end,
     util:gb_trees_foldl(F, [], DB).
+
+%% @doc Deletes all objects in the given Range or (if a function is provided)
+%%      for which the FilterFun returns true from the DB.
+delete_entries({DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+    % depending on the number of removed entries, a complete re-construction of
+    % the tree using gb_trees:from_orddict could be faster than continuously
+    % deleting entries - we do not know this beforehand though
+    % -> do single deletes here
+    F = fun(DBEntry, AccDB) ->
+                case FilterFun(DBEntry) of
+                    false -> AccDB;
+                    _     -> Key = db_entry:get_key(DBEntry),
+                             case intervals:in(Key, CKInt) of
+                                 true -> ?CKETS:insert(CKDB, {Key});
+                                 _    -> ok
+                             end,
+                             gb_trees:delete(Key, AccDB)
+                end
+        end,
+    NewDB = lists:foldr(F, DB, gb_trees:values(DB)),
+    {NewDB, CKInt, CKDB};
+delete_entries(State, Interval) ->
+    delete_entries(State, fun(E) ->
+                                  intervals:in(db_entry:get_key(E), Interval)
+                          end).
 
 %% @doc Returns all DB entries.
 get_data({DB, _CKInt, _CKDB}) ->

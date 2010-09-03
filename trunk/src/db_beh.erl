@@ -44,6 +44,7 @@ behaviour_info(callbacks) ->
      {get_data, 1}, {add_data, 2},
      {get_entries, 2}, {get_entries, 3},
      {update_entries, 4},
+     {delete_entries, 2},
      % record changes
      {record_changes, 2}, {stop_record_changes, 1}, {stop_record_changes, 2},
      {get_changes, 1}, {get_changes, 2},
