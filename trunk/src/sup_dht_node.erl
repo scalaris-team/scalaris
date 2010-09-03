@@ -72,10 +72,10 @@ init(Options) ->
         util:sup_worker_desc(?RM, ?RM, start_link, [DHTNodeGroup]),
     RoutingTable =
         util:sup_worker_desc(routingtable, rt_loop, start_link,
+                             [DHTNodeGroup]),
     SupDHTNodeCore_AND =
         util:sup_supervisor_desc(sup_dht_node_core, sup_dht_node_core,
                                  start_link, [DHTNodeGroup, Options]),
-                             [DHTNodeGroup]),
     Vivaldi =
         util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     
