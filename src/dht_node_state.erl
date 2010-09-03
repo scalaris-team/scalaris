@@ -49,7 +49,7 @@
                 db         :: ?DB:db(),
                 tx_tp_db   :: any(),
                 proposer   :: pid(),
-                nc_subscr  :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}] % subscribers to node change events, i.e. node ID changes
+                nc_subscr = [] :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}] % subscribers to node change events, i.e. node ID changes
                }).
 % TODO: copy field declarations from record definition with their types into #state{}
 %       (erlang otherwise thinks of a field type as 'unknown' | type())
