@@ -106,7 +106,10 @@ make_ring(Size) ->
 %% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1.
 -spec stop_ring() -> ok.
 stop_ring() ->
-    stop_ring(erlang:whereis(ct_test_ring)).
+    case erlang:whereis(ct_test_ring) of
+        undefined -> ok;
+        Pid       -> stop_ring(Pid)
+    end.
 
 %% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1
 %%      when the process' pid is known.
