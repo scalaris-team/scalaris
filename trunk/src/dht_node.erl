@@ -365,9 +365,9 @@ on({dump}, State) ->
 on({web_debug_info, Requestor}, State) ->
     Load = dht_node_state:get(State, load),
     % get a list of up to 50 KV pairs to display:
-    DataListTmp = [{lists:flatten(io_lib:format("~p", [Key])),
-                    lists:flatten(io_lib:format("~p", [Value]))}
-                  || {Key, Value} <-
+    DataListTmp = [{"",
+                    lists:flatten(io_lib:format("~p", [DBEntry]))}
+                  || DBEntry <-
                          lists:sublist(?DB:get_data(dht_node_state:get(State, db)), 50)],
     DataList = case Load > 50 of
                    true  -> lists:append(DataListTmp, [{"...", ""}]);
@@ -388,7 +388,7 @@ on({web_debug_info, Requestor}, State) ->
 %%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
 %%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
          {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
-         {"data (hashed_key, {value, writelock, readlocks, version}):", ""} |
+         {"data (db_entry):", ""} |
             DataList 
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
