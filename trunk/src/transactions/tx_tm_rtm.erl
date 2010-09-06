@@ -87,7 +87,7 @@ init([]) ->
 %% forward to local acceptor but add my role to the paxos id
 on({proposer_accept, Proposer, PaxosID, Round, Value} = _Msg,
    {_RTMs, _TableName, Role, LAcceptor, _LLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on(~p)~n", [_Msg]),
+    ?TRACE("tx_tm_rtm:on(~p) as ~p~n", [_Msg, Role]),
     comm:send_local(LAcceptor, {proposer_accept, Proposer, {PaxosID, Role}, Round, Value}),
     State;
 
@@ -155,7 +155,7 @@ on({learner_decide, ItemId, _PaxosID, Value} = Msg,
 
 on({tx_tm_rtm_commit, Client, ClientsID, TransLog},
    {RTMs, _TableName, _Role, _LAcceptor, LLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on({commit, ...}) for TLog ~p~n", [TransLog]),
+    ?TRACE("tx_tm_rtm:on({commit, ...}) for TLog ~p as ~p~n", [TransLog, _Role]),
     NewTid = {tx_id, util:get_global_uid()},
     NewTxItemIds = [ {tx_item_id, util:get_global_uid()} || _ <- TransLog ],
     TLogTxItemIds = lists:zip(TransLog, NewTxItemIds),
@@ -369,7 +369,7 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg,
 on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
    {_RTMs, _TableName, Role, _LAcceptor, _LLearner} = State) ->
     %% TODO merge register_TP and accept messages to a single message
-    ?TRACE("tx_tm_rtm:on(~p)~n", [Msg]),
+    ?TRACE("tx_tm_rtm:on(~p) as ~p~n", [Msg, Role]),
     {ErrCodeTx, TmpTxState} = my_get_tx_entry(Tid, State),
     case ok =/= ErrCodeTx of
         true -> %% new / uninitialized
@@ -439,6 +439,7 @@ on({get_rtm_reply, InKey, InPid},
    {RTMs, TableName, Role, LAcceptor, LLearner} = _State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:get_rtm_reply in Pid ~p for Pid ~p and State ~p~n", [self(), InPid, _State]),
     NewRTMs = my_update_rtm_entry(RTMs, InKey, InPid),
+    rtms_of_same_dht_node(NewRTMs),
     {NewRTMs, TableName, Role, LAcceptor, LLearner};
 
 on(_, _State) ->
@@ -465,6 +466,7 @@ on_init({get_rtm_reply, InKey, InPid},
     NewRTMs = my_update_rtm_entry(RTMs, InKey, InPid),
     case lists:keyfind(unknown, 2, NewRTMs) of %% filled all entries?
         false ->
+            rtms_of_same_dht_node(NewRTMs),
             gen_component:change_handler(
               {NewRTMs, TableName, Role, LAcceptor, LLearner}, on);
         _ -> {NewRTMs, TableName, Role, LAcceptor, LLearner}
@@ -623,6 +625,17 @@ my_trigger_delete_if_done(TxState) ->
                 false -> ok
             end
     end, ok.
+
+rtms_of_same_dht_node(InRTMs) ->
+    {_Keys, RTMPids, _Nth}  = lists:unzip3(InRTMs),
+    Groups = lists:usort([catch(pid_groups:group_of(element(3, X)))
+                          || X <- RTMPids]),
+    case length(Groups) of
+        4 -> false;
+        _ ->
+            log:log(warn, "RTMs of same DHT node are used. Please start more Scalaris nodes.~n"),
+            true
+    end.
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.
