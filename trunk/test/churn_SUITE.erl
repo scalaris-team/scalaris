@@ -55,10 +55,17 @@ init_per_testcase(TestCase, Config) ->
 %%             {skip, "temporarily"}
     end.
 
+init_per_suite(Config) ->
+    Config.
+
 end_per_testcase(_TestCase, Config) ->
     %error_logger:tty(false),
     {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
     unittest_helper:stop_ring(Pid),
+    ok.
+
+end_per_suite(_Config) ->
+    unittest_helper:stop_ring(),
     ok.
 
 transactions_1_failure_4_nodes_read(_) ->
