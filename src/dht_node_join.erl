@@ -29,6 +29,7 @@
 -include("scalaris.hrl").
 
 -type(join_message() ::
+    {join, NewPred::node:node_type()} | % join request
     {idholder_get_id_response, Id::?RT:key(), IdVersion::non_neg_integer()} |
     {known_hosts_timeout} |
     {get_dht_nodes_response, Nodes::[node:node_type()]} |
@@ -67,7 +68,12 @@ join_request(State, NewPred) ->
 
 % join protocol
 %% @doc Processes a DHT node's join messages (the node joining a Scalaris DHT).
--spec process_join_msg(join_message() | any(), join_state()) -> dht_node_state:state().
+-spec process_join_msg(dht_node:message(), join_state()) -> dht_node_state:state().
+% request from a joining node at a existing node:
+%% userdevguide-begin dht_node_join:join_request1
+process_join_msg({join, NewPred}, State) ->
+    join_request(State, NewPred);
+%% userdevguide-end dht_node_join:join_request1
 % first node
 %% userdevguide-begin dht_node_join:join_first
 process_join_msg({idholder_get_id_response, Id, IdVersion},

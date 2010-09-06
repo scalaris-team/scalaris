@@ -1432,7 +1432,7 @@ calls itself using tail-recursion in each branch. The loop works on a
 
 \section{Starting additional local nodes after boot}
 \label{sec:start-addit-local}
-\svnrev{r1086}
+\svnrev{r1093}
 
 After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
@@ -1611,15 +1611,16 @@ fails for some reason, it is tried again.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_other_p3}{../src/dht_node_join.erl}
 
-If its (future) successor is found, this new node will send a \code{join}
+If its (future) successor is found, this new node will send a \code{join_request}
 message including a reference to itself and the chosen \code{Id}.
-This message is received by the old node in \code{dht_node.erl}:
+This message is received by the old node in \code{dht_node.erl}
 
 \codesnippet{dht_node.erl}{dht_node:join_message}{../src/dht_node.erl}
 
-This triggers a call to \erlfun{dht\_node\_join}{join\_request}{/2} on the
-old node.
+and finally triggers a call to \erlfun{dht\_node\_join}{join\_request}{/2}
+on the old node:
 
+\codesnippet{dht_node_join.erl}{dht_node_join:join_request1}{../src/dht_node_join.erl}
 \codesnippet{dht_node_join.erl}{dht_node_join:join_request}{../src/dht_node_join.erl}
 
 The \code{dht_node} will update the interval it is responsible for and

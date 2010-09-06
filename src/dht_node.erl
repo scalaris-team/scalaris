@@ -32,6 +32,10 @@
 
 -export([is_first/1]).
 
+-ifdef(with_export_type_support).
+-export_type([message/0]).
+-endif.
+
 % state of the dht_node loop
 -type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
 
@@ -76,9 +80,12 @@
 %% @doc message handler
 -spec on(message(), state()) -> state().
 
-% Join messages (see dht_node_join.erl)
-on(Msg, State) when element(1, State) =:= join ->
+%% Join messages (see dht_node_join.erl)
+%% userdevguide-begin dht_node:join_message
+on(Msg, State) when element(1, State) =:= join
+                        orelse element(1, Msg) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
+%% userdevguide-end dht_node:join_message
 
 on({get_node, Source_PID, Key}, State) ->
     comm:send(Source_PID, {get_node_response, Key, dht_node_state:get(State, node)}),
@@ -390,12 +397,6 @@ on({web_debug_info, Requestor}, State) ->
 %% @TODO buggy ...
 %on({get_node_response, _, _}, State) ->
 %    State;
-
-%% join messages (see dht_node_join.erl)
-%% userdevguide-begin dht_node:join_message
-on({join, NewPred}, State) ->
-    dht_node_join:join_request(State, NewPred);
-%% userdevguide-end dht_node:join_message
 
 on({known_hosts_timeout}, State) ->
     % will ignore these messages after join
