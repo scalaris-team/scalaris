@@ -633,7 +633,7 @@ rtms_of_same_dht_node(InRTMs) ->
     case length(Groups) of
         4 -> false;
         _ ->
-            log:log(warn, "RTMs of same DHT node are used. Please start more Scalaris nodes.~n"),
+            log:log(info, "RTMs of same DHT node are used. Please start more Scalaris nodes.~n"),
             true
     end.
 
