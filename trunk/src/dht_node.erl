@@ -53,7 +53,7 @@
 
 -type(lookup_message() ::
       {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
-      {lookup_fin, Hops::pos_integer(), Msg::comm:message()}).
+      {lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
 
 -type(rm_message() ::
       {init_rm, Pid::comm:erl_local_pid()} |
