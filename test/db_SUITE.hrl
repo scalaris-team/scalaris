@@ -34,6 +34,7 @@ tests_avail() ->
      tester_delete, tester_add_data,
      tester_get_entries2, tester_get_entries3_1, tester_get_entries3_2,
      tester_split_data, tester_update_entries,
+     tester_delete_entries1, tester_delete_entries2,
      tester_changed_keys_get_entry,
      tester_changed_keys_set_entry,
      tester_changed_keys_update_entry,
@@ -48,6 +49,8 @@ tests_avail() ->
      tester_changed_keys_get_entries2,
      tester_changed_keys_get_entries4,
      tester_changed_keys_update_entries,
+     tester_changed_keys_delete_entries1,
+     tester_changed_keys_delete_entries2,
      tester_changed_keys_get_load,
      tester_changed_keys_split_data1,
      tester_changed_keys_split_data2,
@@ -662,10 +665,9 @@ prop_add_data(Data) ->
     UniqueData = lists:usort(fun(A, B) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
                              end, lists:reverse(Data)),
-    UniqueKeys = length(lists:usort([db_entry:get_key(DBEntry) || DBEntry <- Data])),
     
     DB2 = ?TEST_DB:add_data(DB, Data),
-    check_db2(DB2, UniqueKeys, UniqueData, "check_db_add_data_1"),
+    check_db2(DB2, length(UniqueData), UniqueData, "check_db_add_data_1"),
     
     ?TEST_DB:close(DB2),
     true.
@@ -862,6 +864,60 @@ prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData) ->
 
 tester_update_entries(_Config) ->
     tester:test(?MODULE, prop_update_entries, 2, rw_suite_runs(1000)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% ?TEST_DB:delete_entries/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_delete_entries1(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_delete_entries1(Data, Range_) ->
+    % use a range to delete entries
+    Range = intervals:normalize(Range_),
+    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB2 = ?TEST_DB:add_data(DB, Data),
+    
+    DB3 = ?TEST_DB:delete_entries(DB2, Range),
+    
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    UniqueRemainingData = [DBEntry || DBEntry <- UniqueData,
+                                      not intervals:in(db_entry:get_key(DBEntry), Range)],
+    check_db2(DB3, length(UniqueRemainingData), UniqueRemainingData, "check_db_delete_entries1_1"),
+    
+    ?TEST_DB:close(DB3),
+    true.
+
+-spec prop_delete_entries2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
+prop_delete_entries2(Data, Range_) ->
+    % use a range to delete entries
+    Range = intervals:normalize(Range_),
+    FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
+    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB2 = ?TEST_DB:add_data(DB, Data),
+    
+    DB3 = ?TEST_DB:delete_entries(DB2, FilterFun),
+    
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    UniqueRemainingData = [DBEntry || DBEntry <- UniqueData,
+                                      intervals:in(db_entry:get_key(DBEntry), Range)],
+    check_db2(DB3, length(UniqueRemainingData), UniqueRemainingData, "check_db_delete_entries2_1"),
+    
+    ?TEST_DB:close(DB3),
+    true.
+
+tester_delete_entries1(_Config) ->
+    tester:test(?MODULE, prop_delete_entries1, 2, rw_suite_runs(1000)).
+
+tester_delete_entries2(_Config) ->
+    tester:test(?MODULE, prop_delete_entries2, 2, rw_suite_runs(1000)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -1155,6 +1211,61 @@ prop_changed_keys_update_entries(Data, ChangesInterval_, Entry1, Entry2) ->
     ?TEST_DB:close(DB5),
     true.
 
+-spec prop_changed_keys_delete_entries1(
+        Data::?TEST_DB:db_as_list(), Range::intervals:interval(),
+        ChangesInterval::intervals:interval()) -> true.
+prop_changed_keys_delete_entries1(Data, ChangesInterval_, Range_) ->
+    % use a range to delete entries
+    ChangesInterval = intervals:normalize(ChangesInterval_),
+    Range = intervals:normalize(Range_),
+    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB2 = ?TEST_DB:add_data(DB, Data),
+    DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
+    
+    DB4 = ?TEST_DB:delete_entries(DB3, Range),
+    
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    DeletedKeys = [{db_entry:get_key(DBEntry), true}
+                  || DBEntry <- UniqueData,
+                     intervals:in(db_entry:get_key(DBEntry), Range)],
+    check_changes(DB4, ChangesInterval, "delete_entries1_1"),
+    check_keys_in_deleted(DB4, ChangesInterval, DeletedKeys, "delete_entries1_2"),
+    
+    ?TEST_DB:close(DB3),
+    true.
+
+-spec prop_changed_keys_delete_entries2(
+        Data::?TEST_DB:db_as_list(), Range::intervals:interval(),
+        ChangesInterval::intervals:interval()) -> true.
+prop_changed_keys_delete_entries2(Data, ChangesInterval_, Range_) ->
+    % use a range to delete entries
+    ChangesInterval = intervals:normalize(ChangesInterval_),
+    Range = intervals:normalize(Range_),
+    FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
+    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB2 = ?TEST_DB:add_data(DB, Data),
+    DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
+    
+    DB4 = ?TEST_DB:delete_entries(DB3, FilterFun),
+    
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    DeletedKeys = [{db_entry:get_key(DBEntry), true}
+                  || DBEntry <- UniqueData,
+                     not intervals:in(db_entry:get_key(DBEntry), Range)],
+    check_changes(DB4, ChangesInterval, "delete_entries2_1"),
+    check_keys_in_deleted(DB4, ChangesInterval, DeletedKeys, "delete_entries2_2"),
+    
+    ?TEST_DB:close(DB3),
+    true.
+
 -spec prop_changed_keys_get_load(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_get_load(Data, ChangesInterval_) ->
@@ -1420,7 +1531,8 @@ check_changes2(DB, ChangesInterval, GetChangesInterval, Note) ->
                    DeletedKeys2, FinalInterval, lists:flatten(Note)])).
 
 %% @doc Checks that a key is present exactly once in the list of deleted
-%%      keys returned by ?TEST_DB:get_changes/1.
+%%      keys returned by ?TEST_DB:get_changes/1 if no lock is set on a
+%%      previously existing entry.
 -spec check_key_in_deleted(
         DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Key::?RT:key(),
         {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> true.
@@ -1431,11 +1543,28 @@ check_key_in_deleted(DB, ChangesInterval, Key, {OldExists, OldEntry}, Note) ->
         true ->
             {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
             length([K || K <- DeletedKeys, K =:= Key]) =:= 1 orelse
-                ?ct_fail("~s evaluated to \"~w\" and did not contain 1x key ~w~n(~s)~n",
-                  ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys,
-                   Key, lists:flatten(Note)]);
+                ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated to \"~w\" and did not contain 1x key ~w~n(~s)~n",
+                  [DeletedKeys, Key, lists:flatten(Note)]);
         _    -> true
     end.
+
+%% @doc Checks that all given keys are present exactly once in the list of
+%%      deleted keys returned by ?TEST_DB:get_changes/1.
+-spec check_keys_in_deleted(
+        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(),
+        Keys::[{?RT:key(), OldExists::boolean()}], Note::string()) -> true.
+check_keys_in_deleted(DB, ChangesInterval, Keys, Note) ->
+    {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
+    [begin
+         case intervals:in(Key, ChangesInterval) andalso OldExists of
+             true ->
+                 length([K || K <- DeletedKeys, K =:= Key]) =:= 1 orelse
+                     ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated to \"~w\" and did not contain 1x key ~w~n(~s)~n",
+                              [DeletedKeys, Key, lists:flatten(Note)]);
+             _    -> true
+         end
+     end || {Key, OldExists} <- Keys],
+    true.
 
 %% @doc Checks that an entry is present exactly once in the list of changed
 %%      entries returned by ?TEST_DB:get_changes/1.
@@ -1495,6 +1624,12 @@ tester_changed_keys_get_entries4(_Config) ->
 
 tester_changed_keys_update_entries(_Config) ->
     tester:test(?MODULE, prop_changed_keys_update_entries, 4, rw_suite_runs(1000)).
+
+tester_changed_keys_delete_entries1(_Config) ->
+    tester:test(?MODULE, prop_changed_keys_delete_entries1, 3, rw_suite_runs(1000)).
+
+tester_changed_keys_delete_entries2(_Config) ->
+    tester:test(?MODULE, prop_changed_keys_delete_entries2, 3, rw_suite_runs(1000)).
 
 tester_changed_keys_get_load(_Config) ->
     tester:test(?MODULE, prop_changed_keys_get_load, 2, rw_suite_runs(1000)).
