@@ -65,7 +65,11 @@ on(_, {uninit, _TriggerState} = State) ->
 on({register}, {init, TriggerState}) ->
     trigger_reregister(),
     NewTriggerState = trigger:next(TriggerState),
-    {init, NewTriggerState}.
+    {init, NewTriggerState};
+
+on({web_debug_info, Requestor}, State) ->
+    comm:send_local(Requestor, {web_debug_info_reply, []}),
+    State.
 
 -spec trigger_reregister() -> ok.
 trigger_reregister() ->
