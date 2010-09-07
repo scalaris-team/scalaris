@@ -96,4 +96,19 @@ on({msg_delay_periodic} = Trigger, {TableName, Counter} = _State) ->
             pdb:delete(Counter, TableName)
     end,
     comm:send_local_after(1000, self(), Trigger),
-    {TableName, Counter + 1}.
+    {TableName, Counter + 1};
+
+on({web_debug_info, Requestor}, {TableName, Counter} = State) ->
+    KeyValueList =
+        [{"queued messages (in 0-10s, messages):", ""} |
+         [begin
+              Future = trunc(Counter + Seconds),
+              Queue = case pdb:get(Future, TableName) of
+                          undefined -> none;
+                          {_, Q}    -> Q
+                      end,
+              {lists:flatten(io_lib:format("~p", [Seconds])),
+               lists:flatten(io_lib:format("~p", [Queue]))}
+          end || Seconds <- lists:seq(0, 10)]],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State.
