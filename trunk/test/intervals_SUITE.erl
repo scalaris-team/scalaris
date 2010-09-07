@@ -24,6 +24,8 @@ all() ->
      tester_new2_bounds,
      tester_new4_well_formed, tester_new4, tester_new4_continuous,
      tester_new4_bounds,
+     tester_from_elements1_well_formed,
+     tester_from_elements1,
      tester_mk_from_node_ids_well_formed, tester_mk_from_node_ids, tester_mk_from_node_ids_continuous,
      tester_mk_from_nodes_well_formed, tester_mk_from_nodes, tester_mk_from_nodes_continuous,
      tester_normalize_well_formed, tester_normalize,
@@ -264,6 +266,28 @@ tester_new4_bounds(_Config) ->
 
 tester_new4(_Config) ->
     tester:test(intervals_SUITE, prop_new4, 4, 5000).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:from_elements/1 and intervals:in/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_from_elements1_well_formed([intervals:key()]) -> boolean().
+prop_from_elements1_well_formed(X) ->
+    intervals:is_well_formed(intervals:from_elements(X)).
+
+-spec prop_from_elements1([intervals:key()]) -> true.
+prop_from_elements1(X) ->
+    I = intervals:from_elements(X),
+    ?equals(?implies(X =/= [], not intervals:is_empty(I)), true),
+    [?equals(intervals:in(K, I), true) || K <- X],
+    true.
+
+tester_from_elements1_well_formed(_Config) ->
+    tester:test(intervals_SUITE, prop_from_elements1_well_formed, 1, 5000).
+
+tester_from_elements1(_Config) ->
+    tester:test(intervals_SUITE, prop_from_elements1, 1, 5000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

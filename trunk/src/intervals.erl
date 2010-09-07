@@ -31,7 +31,7 @@
 
 -include("scalaris.hrl").
 
--export([empty/0, new/1, new/4, all/0,
+-export([empty/0, new/1, new/4, all/0, from_elements/1,
          % testing / comparing intervals
          is_empty/1, is_subset/2, is_continuous/1,
          is_adjacent/2, in/2,
@@ -86,6 +86,11 @@ new(X) -> {element, X}.
 -spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval().
 new(LeftBr, Begin, End, RightBr) ->
     normalize_simple({interval, LeftBr, Begin, End, RightBr}).
+
+%% @doc Creates an interval from a list of elements.
+-spec from_elements(Elements::[key()]) -> interval().
+from_elements(Elements) ->
+    normalize([new(E) || E <- Elements]).
 
 %% @doc Checks whether the given interval is empty.
 -spec is_empty(interval()) -> boolean().
