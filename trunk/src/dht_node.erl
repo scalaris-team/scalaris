@@ -274,7 +274,10 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
     case intervals:in(Key, MyRange) of
         true -> comm:send_local(self(), Msg);
         false ->
-            ct:pal("Routing is damaged!! Trying again...~n"),
+            log:log(warn,
+                    "Routing is damaged!! Trying again...~n  myrange:~p~n  Key:~p",
+                           [intervals:get_bounds(dht_node_state:get(State, my_range)),
+                            Key]),
             dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
     end,
     State;
