@@ -87,7 +87,13 @@ on({get_id, PID}, {Id, IdVersion} = State) ->
     comm:send_local(PID, {idholder_get_id_response, Id, IdVersion}),
     State;
 on({set_id, NewId, NewIdVersion}, _State) ->
-    {NewId, NewIdVersion}.
+    {NewId, NewIdVersion};
+on({web_debug_info, Requestor}, {Id, IdVersion} = State) ->
+    KeyValueList =
+        [{"id", lists:flatten(io_lib:format("~p", [Id]))},
+         {"id_version", lists:flatten(io_lib:format("~p", [IdVersion]))}],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State.
 %% userdevguide-end gen_component:sample
 
 %% @doc Gets the pid of the idholder process in the same group as the calling
