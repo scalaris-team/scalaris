@@ -388,6 +388,7 @@ on({web_debug_info, Requestor}, State) ->
 %%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
 %%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
          {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
+         {"nc_subscr", lists:flatten(io_lib:format("~p", [{webhelpers:pid_to_name(Pid), Fun}|| {Pid, Fun} <- dht_node_state:get(State, nc_subscr)]))},
          {"data (db_entry):", ""} |
             DataList 
         ],
