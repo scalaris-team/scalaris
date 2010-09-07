@@ -170,18 +170,18 @@ delete_entries(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun)
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case FilterFun(DBEntry) of
                     false -> ToDelete;
-                    _     ->
-                        Key = db_entry:get_key(DBEntry),
-                        case intervals:in(Key, CKInt) of
-                            true -> ?CKETS:insert(CKDB, {Key});
-                            _    -> ok
-                        end,
-                        [KeyToke | ToDelete]
+                    _     -> [{KeyToke, db_entry:get_key(DBEntry)} | ToDelete]
                 end
         end,
     KeysToDelete = toke_drv:fold(F, [], DB),
     % delete all entries with these keys
-    [toke_drv:delete(DB, KeyToke) || KeyToke <- KeysToDelete],
+    [begin
+         toke_drv:delete(DB, KeyToke),
+         case intervals:in(Key, CKInt) of
+             true -> ?CKETS:insert(CKDB, {Key});
+             _    -> ok
+         end
+     end || {KeyToke, Key} <- KeysToDelete],
     State;
 delete_entries(State, Interval) ->
     delete_entries(State, fun(E) ->
