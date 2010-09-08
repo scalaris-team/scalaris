@@ -80,14 +80,14 @@ process_join_msg({idholder_get_id_response, Id, IdVersion},
                  {join, {as_first}, QueuedMessages}) ->
     log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Id]),
     Me = node:new(comm:this(), Id, IdVersion),
-    rt_loop:initialize(Id, Me, Me),
-    NewState = dht_node_state:new(?RT:empty_ext(Me),
-                                  nodelist:new_neighborhood(Me),
-                                  ?DB:new(Id)),
+    State = dht_node_state:new(?RT:empty_ext(Me),
+                               nodelist:new_neighborhood(Me),
+                               ?DB:new(Id)),
+    dht_node:activate_subprocesses(State),
     comm:send_local(get_local_dht_node_reregister_pid(), {register}),
     msg_queue:send(QueuedMessages),
     %log:log(info,"[ Node ~w ] joined",[self()]),
-    NewState;  % join complete, State is the first "State"
+    State;  % join complete, State is the first "State"
 %% userdevguide-end dht_node_join:join_first
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -163,10 +163,11 @@ process_join_msg({join_response, Pred, Data},
     % @TODO data shouldn't be moved here, might be large
     log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),
     DB = ?DB:add_data(?DB:new(Id), Data),
-    rt_loop:initialize(Id, Pred, Succ),
     rm_beh:notify_new_succ(node:pidX(Pred), Me),
+    rm_beh:notify_new_pred(node:pidX(Succ), Me),
     State = dht_node_state:new(?RT:empty_ext(Succ),
                                nodelist:new_neighborhood(Pred, Me, Succ), DB),
+    dht_node:activate_subprocesses(State),
     cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
     comm:send_local(get_local_dht_node_reregister_pid(), {register}),
     msg_queue:send(QueuedMessages),

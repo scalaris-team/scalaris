@@ -33,7 +33,9 @@
 -export([start_link/1]).
 
 % functions gen_component, the trigger and the config module use
--export([init/1, on/2, get_base_interval/0, check_config/0]).
+-export([init/1, on_startup/2, on/2,
+         activate/0,
+         get_base_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
 -export([get_subset_rand/1, get_subset_rand/2,
@@ -45,11 +47,14 @@
 %% {Cache, Node, Cycles, TriggerState}
 %% Node: the scalaris node of this cyclon-task
 %% Cycles: the amount of shuffle-cycles
--type(state() :: {RandomNodes::cyclon_cache:cache(),
-                  MyNode::node:node_type() | null,
-                  Cycles::integer(), TriggerState::trigger:state()}).
+-type(state_init() :: {RandomNodes::cyclon_cache:cache(),
+                       MyNode::node:node_type() | null,
+                       Cycles::integer(), TriggerState::trigger:state()}).
+-type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
+                         TriggerState :: trigger:state()}).
+%% -type(state() :: state_init() | state_uninit()).
 
-% accepted messages of cyclon process
+% accepted messages of an initialized cyclon process
 -type(message() ::
     {trigger} |
     {node_update, Node::node:node_type()} |
@@ -60,6 +65,12 @@
     {get_ages, SourcePid::comm:erl_local_pid()} |
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
+
+%% @doc Sends an initialization message to the node's cyclon process.
+-spec activate() -> ok.
+activate() ->
+    Pid = pid_groups:get_my(cyclon),
+    comm:send_local(Pid, {init_cyclon}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -150,17 +161,34 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, cyclon}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> state().
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
 init(Trigger) ->
-    request_node_details([node, pred, succ]),
-    dht_node:register_for_node_change(self()),
-    comm:send_local_after(100, self(), {check_state}),
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:now(TriggerState),
-    {cyclon_cache:new(), null, 0, TriggerState2}.
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
+                                 on_startup).
 
-%% @doc message handler
--spec(on/2 :: (message(), state()) -> state()).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Message Loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Message handler during start up phase (will. change to on/2 when a
+%%      'init_cyclon' message is received)
+-spec on_startup(message(), state_uninit()) -> state_uninit();
+                ({init_cyclon}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
+on_startup({init_cyclon}, {uninit, QueuedMessages, TriggerState}) ->
+    dht_node:register_for_node_change(self()),
+    request_node_details([node, pred, succ]),
+    comm:send_local_after(100, self(), {check_state}),
+    TriggerState2 = trigger:now(TriggerState),
+    msg_queue:send(QueuedMessages),
+    gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2},
+                                 on);
+
+on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
+
+%% @doc Message handler when the module is fully initialized.
+-spec on(message(), state_init()) -> state_init().
 on({trigger}, {Cache, Node, Cycles, TriggerState} = State)  ->
     NewCache =
         case check_state(State) of
@@ -260,7 +288,7 @@ request_node_details(Details) ->
 %% @doc Checks the current state. If the cache is empty or the current node is
 %%      unknown, the local dht_node will be asked for these values and the check
 %%      will be re-scheduled after 1s.
--spec check_state(state()) -> ok | fail.
+-spec check_state(state_init()) -> ok | fail.
 check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
     % if the own node is unknown or the cache is empty (it should at least
     % contain the nodes predecessor and successor), request this information

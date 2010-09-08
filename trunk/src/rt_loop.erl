@@ -26,9 +26,9 @@
 
 % for routing table implementation
 -export([start_link/1]).
--export([init/1, on/2, get_base_interval/0, check_config/0,
+-export([init/1, on_startup/2, on/2, get_base_interval/0, check_config/0,
          get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2,
-         initialize/3, update_state/3]).
+         activate/3, update_state/3]).
 
 -ifdef(with_export_type_support).
 -export_type([state_init/0]).
@@ -41,21 +41,21 @@
                          Succ         :: node:node_type(),
                          RTState      :: ?RT:rt(),
                          TriggerState :: trigger:state()}).
--type(state_uninit() :: {uninit, MessageQueue::msg_queue:msg_queue(), TriggerState::trigger:state()}).
--type(state() :: state_init() | state_uninit()).
+-type(state_uninit() :: {uninit, MessageQueue::msg_queue:msg_queue(),
+                         TriggerState::trigger:state()}).
+%% -type(state() :: state_init() | state_uninit()).
 %% userdevguide-end rt_loop:state
 
 % accepted messages of rt_loop processes
 -type(message() ::
-    {init_rt, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
     {update, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
     {stabilize} |
     {crash, DeadPid::comm:mypid()} |
     ?RT:custom_message()).
 
 %% @doc Sends an initialization message to the node's routing table.
--spec initialize(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
-initialize(Id, Pred, Succ) ->
+-spec activate(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
+activate(Id, Pred, Succ) ->
     Pid = pid_groups:get_my(routing_table),
     comm:send_local(Pid, {init_rt, Id, Pred, Succ}).
 
@@ -78,36 +78,35 @@ start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, routing_table}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> state_uninit().
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
 init(Trigger) ->
     % Note: no need to call dht_node:register_for_node_change(self()) since we
     % get notified of a new node ID via the update_state/3 method that is
     % called in dht_node's rm_update_neighbors handler
     TriggerState = trigger:init(Trigger, ?MODULE),
-    {uninit, msg_queue:new(), TriggerState}.
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
+                                 on_startup).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Private Code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc message handler
--spec on(message(), state()) -> state() | unknown_event.
-
-on({init_rt, Id, Pred, Succ}, {uninit, QueuedMessages, TriggerState}) ->
+%% @doc Message handler during start up phase (will change to on/2 when a
+%%      'init_rt' message is received).
+-spec on_startup(message(), state_uninit()) -> state_uninit();
+                ({init_rt, Id::?RT:key(), Pred::node:node_type(),
+                  Succ::node:node_type()}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
+on_startup({init_rt, Id, Pred, Succ}, {uninit, QueuedMessages, TriggerState}) ->
     TriggerState2 = trigger:next(TriggerState),
     msg_queue:send(QueuedMessages),
-    {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2};
+    gen_component:change_handler(
+      {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2}, on);
 
-on(Message, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, msg_queue:add(QueuedMessages, Message), TriggerState};
+on_startup(Message, {uninit, QueuedMessages, TriggerState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Message), TriggerState}.
 
-% re-initialize routing table
-on({init_rt, NewId, NewPred, NewSucc},
-   {_OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
-    NewRT = ?RT:empty(NewSucc),
-    ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
-    new_state(NewId, NewPred, NewSucc, NewRT, TriggerState);
-
+%% @doc Message handler when the module is fully initialized.
+-spec on(message(), state_init()) -> state_init() | unknown_event.
 %% userdevguide-begin rt_loop:update_rt
 % update routing table with changed ID, pred and/or succ
 on({update_rt, NewId, NewPred, NewSucc},

@@ -86,12 +86,12 @@ init(Options) ->
            Reregister,
            DeadNodeCache,
            IdHolder,
-           RoutingTable,
-           SupDHTNodeCore_AND,
-           Cyclon,
            RingMaintenance,
+           RoutingTable,
+           Cyclon,
            Vivaldi,
            DC_Clustering,
-           Gossip
+           Gossip,
+           SupDHTNodeCore_AND
           ]}}.
 %% userdevguide-end sup_dht_node:init

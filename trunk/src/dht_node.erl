@@ -26,6 +26,7 @@
 -behaviour(gen_component).
 
 -export([start_link/2, on/2, init/1,
+         activate_subprocesses/1,
          register_for_node_change/1, register_for_node_change/2,
          unregister_from_node_change/1, unregister_from_node_change/2,
          unregister_all_from_node_change/1, trigger_known_nodes/0]).
@@ -108,13 +109,6 @@ on({die}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance (see rm_beh.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% {init_rm, pid()}
-on({init_rm, Pid}, State) ->
-    comm:send_local(Pid, {init_rm, dht_node_state:get(State, node),
-                                   dht_node_state:get(State, pred),
-                                   dht_node_state:get(State, succ)}),
-    State;
-
 %% {rm_update_neighbors, Neighbors::nodelist:neighborhood()}
 on({rm_update_neighbors, Neighbors}, State) ->
     OldPred = dht_node_state:get(State, pred),
@@ -444,6 +438,20 @@ start_link(DHTNodeGroup, Options) ->
     gen_component:start_link(?MODULE, Options,
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
+
+-spec activate_subprocesses(State::dht_node_state:state()) -> ok.
+activate_subprocesses(State) ->
+    Me = dht_node_state:get(State, node),
+    Id = node:id(Me),
+    Pred = dht_node_state:get(State, pred),
+    Succ = dht_node_state:get(State, succ),
+    ?RM:activate(Me, Pred, Succ),
+    rt_loop:activate(Id, Pred, Succ),
+    cyclon:activate(),
+    vivaldi:activate(),
+    dc_clustering:activate(),
+    gossip:activate(),
+    ok.
 
 %% @doc Find existing nodes and as a side-effect initialize the comm_layer.
 -spec trigger_known_nodes() -> ok.
