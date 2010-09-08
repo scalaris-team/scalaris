@@ -83,6 +83,7 @@ runnable(Pid) ->
         true -> true
     end.
 
+-spec get_state(Pid::pid()) -> term().
 get_state(Pid) ->
     Pid ! {'$gen_component', get_state, self()},
     receive
@@ -90,6 +91,8 @@ get_state(Pid) ->
     end.
 
 %% @doc change the handler for handling messages
+-spec change_handler(State, Handler::atom())
+        -> {'$gen_component', [{on_handler, Handler::atom()}], State}.
 change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 

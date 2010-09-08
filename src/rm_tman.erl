@@ -28,7 +28,8 @@
 -behavior(rm_beh).
 
 -export([start_link/1]).
--export([init/1, on/2, leave/0]).
+-export([init/1, on_startup/2, on/2,
+         activate/3, leave/0]).
 
 -export([get_base_interval/0, get_min_interval/0, get_max_interval/0,
          check_config/0]).
@@ -41,11 +42,10 @@
                        Churn          :: boolean()}).
 -type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
                          TriggerState :: trigger:state()}).
--type(state() :: state_init() | state_uninit()).
+%% -type(state() :: state_init() | state_uninit()).
 
-% accepted messages
+% accepted messages of an initialized rm_tman process
 -type(message() ::
-    {init_rm, Me::node:node_type(), Predecessor::node:node_type(), Successor::node:node_type()} |
     {trigger} |
     {cy_cache, Cache::[node:node_type()]} |
     {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
@@ -63,6 +63,13 @@
     {update_id, NewId::?RT:key()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
+%% @doc Sends an initialization message to the node's rm_tman process.
+-spec activate(Me::node:node_type(), Pred::node:node_type(),
+                 Succ::node:node_type()) -> ok.
+activate(Me, Pred, Succ) ->
+    Pid = pid_groups:get_my(ring_maintenance),
+    comm:send_local(Pid, {init_rm, Me, Pred, Succ}).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -75,32 +82,38 @@ start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, ring_maintenance}]).
 
 %% @doc Initialises the module with an uninitialized state.
--spec init(module()) -> {uninit, QueuedMessages::msg_queue:msg_queue(), TriggerState::trigger:state()}.
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, ?MODULE),
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
+                                 on_startup).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Message Loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Message handler during start up phase (will change to on/2 when a
+%%      'init_rm' message is received).
+-spec on_startup(message(), state_uninit()) -> state_uninit();
+                ({init_rm, Me::node:node_type(), Pred::node:node_type(),
+                  Succ::node:node_type()}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
+on_startup({init_rm, Me, Pred, Succ}, {uninit, QueuedMessages, TriggerState}) ->
     dn_cache:subscribe(),
-    comm:send_local(get_cs_pid(), {init_rm, self()}),
-    {uninit, msg_queue:new(), TriggerState}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Internal Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% @doc message handler
--spec on(message(), state()) -> state().
-on({init_rm, Me, Predecessor, Successor}, {uninit, QueuedMessages, TriggerState}) ->
-    Neighborhood = nodelist:new_neighborhood(Predecessor, Me, Successor),
+    Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     NewTriggerState = trigger:now(TriggerState),
     % make Pred++Succ unique and subscribe to fd:
-    fd:subscribe(lists:usort([node:pidX(Predecessor), node:pidX(Successor)])),
+    fd:subscribe(lists:usort([node:pidX(Pred), node:pidX(Succ)])),
     cyclon:get_subset_rand_next_interval(1),
     msg_queue:send(QueuedMessages),
-    {Neighborhood, config:read(cyclon_cache_size), min_interval,
-     NewTriggerState, [], true};
+    gen_component:change_handler(
+      {Neighborhood, config:read(cyclon_cache_size), min_interval,
+       NewTriggerState, [], true}, on);
 
-on(Msg, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState};
+on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
 
+%% @doc Message handler when the module is fully initialized.
+-spec on(message(), state_init()) -> state_init() | {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
 on({trigger},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
     % Trigger an update of the Random view
@@ -264,7 +277,8 @@ on({leave, SourcePid},
     comm:send_to_group_member(node:pidX(Succ), ring_maintenance, {pred_left, Me, Pred}),
     comm:send_to_group_member(node:pidX(Pred), ring_maintenance, {succ_left, Me, Succ}),
     comm:send_local(SourcePid, {leave_response}),
-    {uninit, msg_queue:new(), TriggerState};
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
+                                 on_startup);
 
 on({pred_left, OldPred, PredsPred}, State) ->
     update_nodes(State, [PredsPred], [OldPred], null);
@@ -427,10 +441,6 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
                           _    -> RandViewSize
                       end,
     {NewNeighborhood, NewRandViewSize, NewInterval, NewTriggerState, NewCache, NewChurn}.
-
-% get Pid of assigned dht_node
--spec get_cs_pid() -> pid() | failed.
-get_cs_pid() -> pid_groups:get_my(dht_node).
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() -> config:read(stabilization_interval_base).

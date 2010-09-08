@@ -29,7 +29,8 @@
 
 -export([start_link/1]).
 
--export([on/2, init/1]).
+-export([init/1, on_startup/2, on/2,
+         activate/0]).
 
 -type(relative_size() :: float()).
 -type(centroid() :: vivaldi:network_coordinate()).
@@ -37,11 +38,15 @@
 -type(sizes() :: [relative_size()]).
 
 % state of the clustering loop
--type(state() :: {Centroids::centroids(), Sizes::sizes(),
-                  ResetTriggerState::trigger:state(),
-                  ClusterTriggerState::trigger:state()}).
+-type(state_init() :: {Centroids::centroids(), Sizes::sizes(),
+                       ResetTriggerState::trigger:state(),
+                       ClusterTriggerState::trigger:state()}).
+-type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
+                         ResetTriggerState::trigger:state(),
+                         ClusterTriggerState::trigger:state()}).
+%% -type(state() :: state_init() | state_uninit()).
 
-% accepted messages of cluistering process
+% accepted messages of an initialized dc_clustering process
 -type(message() :: 
     {start_clustering_shuffle} |
     {reset_clustering} |
@@ -50,6 +55,17 @@
     {clustering_shuffle, comm:mypid(), centroids(), sizes()} |
     {clustering_shuffle_reply, comm:mypid(), centroids(), sizes()} |
     {query_clustering, comm:mypid()}).
+
+%% @doc Sends an initialization message to the node's dc_clustering process.
+-spec activate() -> ok | ignore.
+activate() ->
+    case config:read(dc_clustering_enable) of
+        true ->
+            Pid = pid_groups:get_my(dc_clustering),
+            comm:send_local(Pid, {init_clustering});
+        false ->
+            ignore
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
@@ -63,29 +79,44 @@ start_link(DHTNodeGroup) ->
         true ->
             ResetTrigger = config:read(dc_clustering_reset_trigger),
             ClusterTrigger = config:read(dc_clustering_cluster_trigger),
-            gen_component:start_link(?MODULE, {ResetTrigger, ClusterTrigger}, [{pid_groups_join_as, DHTNodeGroup, dc_clustering}]);
+            gen_component:start_link(?MODULE, {ResetTrigger, ClusterTrigger},
+                                     [{pid_groups_join_as, DHTNodeGroup, dc_clustering}]);
         false ->
             ignore
     end.
 
 %% @doc Initialises the module with an empty state.
--spec init({module(), module()}) -> state().
+-spec init({module(), module()}) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
 init({ResetTrigger, ClusterTrigger}) ->
     ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
-    ResetTriggerState2 = trigger:now(ResetTriggerState),
     ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
-    ClusterTriggerState2 = trigger:now(ClusterTriggerState),
-    {[], [], ResetTriggerState2, ClusterTriggerState2}.
+    gen_component:change_handler({uninit, msg_queue:new(), ResetTriggerState, ClusterTriggerState},
+                                 on_startup).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% start new clustering shuffle
-%% @doc message handler
--spec on(Message::message(), State::state()) -> state().
+%% @doc Message handler during start up phase (will change to on/2 when a
+%%      'init_clustering' message is received).
+-spec on_startup(message(), state_uninit()) -> state_uninit();
+                ({init_clustering}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
+on_startup({init_clustering},
+           {uninit, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
+    ResetTriggerState2 = trigger:now(ResetTriggerState),
+    ClusterTriggerState2 = trigger:now(ClusterTriggerState),
+    msg_queue:send(QueuedMessages),
+    gen_component:change_handler({[], [], ResetTriggerState2, ClusterTriggerState2},
+                                 on);
+
+on_startup(Msg, {uninit, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Msg), ResetTriggerState, ClusterTriggerState}.
+
+%% @doc Message handler when the module is fully initialized.
+-spec on(Message::message(), State::state_init()) -> state_init().
 on({start_clustering_shuffle},
    {Centroids, Sizes, ResetTriggerState, ClusterTriggerState}) ->
+    % start new clustering shuffle
     %io:format("~p~n", [State]),
     NewClusterTriggerState = trigger:next(ClusterTriggerState),
     cyclon:get_subset_rand(1),

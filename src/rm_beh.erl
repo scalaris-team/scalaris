@@ -32,6 +32,7 @@ behaviour_info(callbacks) ->
     [
      {start_link, 1},
      {leave, 0},
+     {activate, 3},
      {check_config, 0}
     ];
 

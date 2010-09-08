@@ -73,7 +73,7 @@ init(Trigger) ->
     {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new(), TriggerState2}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Internal Loop
+% Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc the Token takes care, that there is only one timermessage for stabilize 

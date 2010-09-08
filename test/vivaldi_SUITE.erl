@@ -59,9 +59,18 @@ end_per_testcase(_TestCase, Config) ->
 
 test_init(Config) ->
     config:write(vivaldi_interval, 100),
-    InitialState1 = vivaldi:init('trigger_periodic'),
+    EmptyMsgQueue = msg_queue:new(),
+    FullState1 = vivaldi:init('trigger_periodic'),
+    ?equals_pattern(FullState1,
+                    {'$gen_component', [{on_handler, on_startup}],
+                     {uninit, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}}),
+    {'$gen_component', [{on_handler, on_startup}], InitialState1} = FullState1,
+    ?expect_no_message(),
     
-    ?equals_pattern(InitialState1, {[_X, _Y], 1.0, {'trigger_periodic', _TriggerState}}),
+    FullState2 = vivaldi:on_startup({init_vivaldi}, InitialState1),
+    ?equals_pattern(FullState2,
+                    {'$gen_component', [{on_handler, on}],
+                     {[_X, _Y], 1.0, {'trigger_periodic', _TriggerState}}}),
     ?expect_message({trigger}),
     ?expect_no_message(),
     Config.

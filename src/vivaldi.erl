@@ -31,13 +31,15 @@
 -export([start_link/1]).
 
 % functions gen_component, the trigger and the config module use
--export([on/2, init/1, get_base_interval/0, check_config/0]).
+-export([init/1, on_startup/2, on/2,
+         activate/0,
+         get_base_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
 -export([get_coordinate/0, get_coordinate/1]).
 
 -ifdef(with_export_type_support).
--export_type([error/0, latency/0, network_coordinate/0, state/0]).
+-export_type([error/0, latency/0, network_coordinate/0]).
 -endif.
 
 % vivaldi types
@@ -46,7 +48,10 @@
 -type(latency() :: number()).
 
 % state of the vivaldi loop
--opaque(state() :: {network_coordinate(), error(), trigger:state()}).
+-type(state_init() :: {network_coordinate(), error(), trigger:state()}).
+-type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
+                         TriggerState :: trigger:state()}).
+%% -type(state() :: state_init() | state_uninit()).
 
 % accepted messages of vivaldi processes
 -type(message() ::
@@ -56,6 +61,12 @@
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |
     {get_coordinate, comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
+
+%% @doc Sends an initialization message to the node's vivaldi process.
+-spec activate() -> ok.
+activate() ->
+    Pid = pid_groups:get_my(vivaldi),
+    comm:send_local(Pid, {init_vivaldi}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -100,20 +111,33 @@ start_link(DHTNodeGroup) ->
     Trigger = config:read(vivaldi_trigger),
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, vivaldi}]).
 
--spec init(module()) -> vivaldi:state().
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:now(TriggerState),
-    {random_coordinate(), 1.0, TriggerState2}.
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
+                                 on_startup).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% start new vivaldi shuffle
-%% @doc message handler
--spec on(Message::message(), State::state()) -> state().
+%% @doc Message handler during start up phase (will change to on/2 when a
+%%      'init_vivaldi' message is received).
+-spec on_startup(message(), state_uninit()) -> state_uninit();
+                ({init_vivaldi}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
+on_startup({init_vivaldi}, {uninit, QueuedMessages, TriggerState}) ->
+    TriggerState2 = trigger:now(TriggerState),
+    msg_queue:send(QueuedMessages),
+    gen_component:change_handler({random_coordinate(), 1.0, TriggerState2},
+                                 on);
+
+on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
+
+%% @doc Message handler when the module is fully initialized.
+-spec on(message(), state_init()) -> state_init().
 on({trigger}, {Coordinate, Confidence, TriggerState} ) ->
+    % start new vivaldi shuffle
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
     NewTriggerState = trigger:next(TriggerState),
     cyclon:get_subset_rand(1),

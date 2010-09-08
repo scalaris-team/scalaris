@@ -70,7 +70,9 @@
 -export([start_link/1]).
 
 % functions gen_component, the trigger and the config module use
--export([on/2, init/1, get_base_interval/0, check_config/0]).
+-export([init/1, on_startup/2, on/2,
+         activate/0,
+         get_base_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
 -export([get_values_best/0, get_values_best/1,
@@ -82,9 +84,12 @@
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
 %% -> previous and current state, queued messages (get_state messages received
 %% before local values are known) and the state of the trigger.
--type(full_state() :: {PreviousState::state(), CurrentState::state(),
+-type(full_state_init() :: {PreviousState::state(), CurrentState::state(),
                        MessageQueue::msg_queue:msg_queue(),
                        TriggerState::trigger:state()}).
+-type(full_state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
+                         TriggerState :: trigger:state()}).
+%% -type(full_state() :: full_state_init() | full_state_uninit()).
 
 % accepted messages of gossip processes
 -type(message() ::
@@ -97,6 +102,12 @@
     {get_values_all, SourcePid::comm:erl_local_pid()} | 
     {get_values_best, SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
+
+%% @doc Sends an initialization message to the node's gossip process.
+-spec activate() -> ok.
+activate() ->
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local(Pid, {init_gossip}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -179,20 +190,32 @@ start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> full_state().
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on}], State::full_state_uninit()}.
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, ?MODULE),
-    TriggerState2 = trigger:now(TriggerState),
-    PreviousState = gossip_state:new_state(),
-    State = gossip_state:new_state(),
-    {PreviousState, State, [], TriggerState2}.
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
+                                 on_startup).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc message handler
--spec on(message(), full_state()) -> full_state().
+%% @doc Message handler during start up phase (will change to on/2 when a
+%%      'init_gossip' message is received).
+-spec on_startup(message(), full_state_uninit()) -> full_state_uninit();
+                ({init_gossip}, full_state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::full_state_init()}.
+on_startup({init_gossip}, {uninit, QueuedMessages, TriggerState}) ->
+    TriggerState2 = trigger:now(TriggerState),
+    PreviousState = gossip_state:new_state(),
+    State = gossip_state:new_state(),
+    msg_queue:send(QueuedMessages),
+    gen_component:change_handler({PreviousState, State, [], TriggerState2}, on);
+
+on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
+
+%% @doc Message handler when the module is fully initialized.
+-spec on(message(), full_state_init()) -> full_state_init().
 on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
     % this message is received continuously when the Trigger calls
     % see gossip_trigger and gossip_interval in the scalaris.cfg file
