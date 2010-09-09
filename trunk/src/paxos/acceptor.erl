@@ -76,7 +76,7 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, paxos_acceptor}]).
 
 %% initialize: return initial state.
--spec init([pid_groups:groupname() | [any()]]) -> any().
+-spec init([]) -> atom().
 init([]) ->
     ?TRACE("Starting acceptor for DHT node: ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
@@ -129,7 +129,7 @@ on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = Sta
                          {acceptor_delete_if_no_learner, PaxosID});
         _ -> ok
     end,
-    case acceptor_state:add_accept_msg(StateForID, InRound, InProposal) of
+    _ = case acceptor_state:add_accept_msg(StateForID, InRound, InProposal) of
         {ok, NewState} ->
             my_set_entry(NewState, ETSTableName),
             inform_learners(PaxosID, NewState);
@@ -139,7 +139,7 @@ on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = Sta
 
 on({acceptor_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
     ?TRACE("acceptor:deleteids~n", []),
-    [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
+    _ = [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
     State;
 
 on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->

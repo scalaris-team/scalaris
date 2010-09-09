@@ -56,7 +56,7 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, paxos_learner}]).
 
 %% initialize: return initial state.
--spec init([pid_groups:groupname() | [any()]]) -> any().
+-spec init([]) -> atom().
 init([]) ->
     ?TRACE("Starting learner for DHT node: ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
@@ -116,7 +116,7 @@ on({acceptor_accepted, PaxosID, Round, Value}, ETSTableName = State) ->
     State;
 
 on({learner_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
-    [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
+    _ = [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
     State;
 
 on({learner_deleteid_if_still_no_client, PaxosID}, ETSTableName = State) ->

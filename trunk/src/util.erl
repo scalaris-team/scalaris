@@ -33,8 +33,7 @@
          zipfoldl/5,
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
-         smerge2/2, smerge2/3, smerge2/4,
-         for_each_line_in_file/4]).
+         smerge2/2, smerge2/3, smerge2/4]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
@@ -236,7 +235,7 @@ get_proc_in_vms(Proc) ->
         end,
     lists:usort([comm:get(Proc, DHTNode) || DHTNode <- Nodes]).
 
--spec sleep_for_ever() -> none().
+-spec sleep_for_ever() -> no_return().
 sleep_for_ever() ->
     timer:sleep(5000),
     sleep_for_ever().
@@ -344,7 +343,8 @@ get_pids_uid() ->
     erlang:put(pids_uid_counter, Result),
     Result.
 
--spec get_global_uid() -> {pos_integer(), comm:mypid()}.
+-type global_uid() :: {pos_integer(), comm:mypid()}.
+-spec get_global_uid() -> global_uid().
 get_global_uid() ->
     _Result = {get_pids_uid(), comm:this()}
     %% , term_to_binary(_Result)
@@ -492,22 +492,3 @@ smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
         false -> smerge2_helper([], T2, Lte, EqSelect, ML)
     end.
 
--spec for_each_line_in_file(Name::file:name(), Proc::fun((string(), AccT) -> AccT),
-                            Mode::[read | write | append | raw | binary |
-                                   {delayed_write, Size::integer(), Delay::integer()} |
-                                   delayed_write | {read_ahead, Size::integer()} |
-                                   read_ahead | compressed],
-                            AccT) -> AccT.
-for_each_line_in_file(Name, Proc, Mode, Accum0) ->
-    {ok, Device} = file:open(Name, Mode),
-    for_each_line(Device, Proc, Accum0).
-
--spec for_each_line(Device::file:io_device(), Proc::fun((string(), AccT) -> AccT), AccT) -> AccT.
-for_each_line(Device, Proc, Accum) ->
-    case io:get_line(Device, "") of
-        eof  -> file:close(Device), Accum;
-        Line -> 
-        CleanLine = string:substr(Line, 1, string:len(Line) - 1),
-        NewAccum = Proc(CleanLine, Accum),
-        for_each_line(Device, Proc, NewAccum)
-    end.

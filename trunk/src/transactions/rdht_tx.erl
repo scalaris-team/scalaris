@@ -54,10 +54,9 @@ process_request_list(TLog, PlainReqList) ->
     %% Now all op lists are empty.
     %% @TODO only if TransLog is ok, do the validation here if requested
     CommitResult = case Commit of
-        [] -> none;
-        [{_Num,{commit}}] ->
-            commit(NewTLog)
-    end,
+                       []                -> none;
+                       [{_Num,{commit}}] -> commit(NewTLog)
+                   end,
     TransLogResult = NewTLog,
     %% Sort resultlist and eliminate numbering
     {_, Tmp2ResultList} = lists:unzip(
@@ -118,27 +117,25 @@ collect_results_and_do_translogops({TLog, Results, [], [], []}) ->
 %% single request and empty translog, done separately for optimization only
 collect_results_and_do_translogops({[], [], [RdhtOpWithReqId], [], []}
                                    = Args) ->
-    Reply = receive_answer(),
-    {_, RdhtId, RdhtTlog, RdhtResult} = Reply,
+    {_, RdhtId, RdhtTlog, RdhtResult} = receive_answer(),
     case lists:keyfind(RdhtId, 1, [RdhtOpWithReqId]) of
         false ->
             %% Drop outdated result...
             collect_results_and_do_translogops(Args);
-        _ -> ok
-    end,
-    {[RdhtTlog], [{1, RdhtResult}], [], [], []};
+        _ -> {[RdhtTlog], [{1, RdhtResult}], [], [], []}
+    end;
+
 %% all translogops done -> wait for a RdhtOpReply
 collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
                                     Delayed, []} = Args) ->
     ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [Args]),
-    Reply = receive_answer(),
-    ?TRACE("rdht reply was ~p~n", [Reply]),
-    {_, RdhtId, RdhtTlog, RdhtResult} = Reply,
-    case lists:keyfind(RdhtId, 1, RdhtOpsWithReqIds) of
+    {_, TRdhtId, TRdhtTlog, TRdhtResult} = TReply = receive_answer(),
+    {_, RdhtId, RdhtTlog, RdhtResult} =
+        case lists:keyfind(TRdhtId, 1, RdhtOpsWithReqIds) of
         false ->
             %% Drop outdated result...
             collect_results_and_do_translogops(Args);
-        _ -> ok
+        _ -> TReply
     end,
     %% add TLog entry, as it is guaranteed a new entry
     NewTLog = [RdhtTlog | TLog],

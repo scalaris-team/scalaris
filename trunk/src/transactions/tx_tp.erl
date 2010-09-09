@@ -60,7 +60,7 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
                                      _Acceptors = RTMs, Proposal,
                                      _Maj = 3, _MaxProposers = 4, 0),
     %% send registerTP to each RTM (send with it the learner id)
-    [ comm:send(X, {register_TP, {Tid, ItemId, PaxId, comm:this()}})
+    _ = [ comm:send(X, {register_TP, {Tid, ItemId, PaxId, comm:this()}})
       || X <- [TM | RTMs]],
     %% (optimized: embed the proposer's accept message in registerTP message)
     dht_node_state:set_db(DHT_Node_State, NewDB).

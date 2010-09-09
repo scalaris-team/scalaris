@@ -47,7 +47,7 @@ process_request_list(TLog, ReqList) ->
                          commit -> Entry
                      end || Entry <- ReqList ],
     %% sanity checks on ReqList:
-    %% @TODO Scan for fail in TransLog, then return imediately?
+    %% @TODO Scan for fail in TransLog, then return immediately?
     {TmpTransLogResult, {results, TmpResultList}} =
         rdht_tx:process_request_list(TLog, RDHT_ReqList),
 %%     TransLogResult = [ case element(1, Entry) of

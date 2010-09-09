@@ -213,15 +213,15 @@ start(Module, Args, Options, Supervisor) ->
         % note: if init throws up, we will not send 'started' to the supervisor
         % this process will die and the supervisor will try to restart it
         throw:Term ->
-            log:log(error,"exception in init/loop of ~p: ~p",
+            log:log(error,"exception in init/loop of ~p: ~.0p",
                     [Module, Term]),
             throw(Term);
         exit:Reason ->
-            log:log(error,"exception in init/loop of ~p: ~p",
+            log:log(error,"exception in init/loop of ~p: ~.0p",
                     [Module, Reason]),
             throw(Reason);
         error:Reason ->
-            log:log(error,"exception in init/loop of ~p: ~p",
+            log:log(error,"exception in init/loop of ~p: ~.0p",
                     [Module, {Reason, erlang:get_stacktrace()}]),
             throw(Reason)
     end.
@@ -275,7 +275,7 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                     NextComponentState = bp_step_done(Module, On, Message, NewComponentState),
                     loop(Module, On, NewState, NextComponentState);
                 {exception, Exception} ->
-                    log:log(error,"Error: exception ~p during handling of ~p in module ~p in (~p)",
+                    log:log(error,"Error: exception ~p during handling of ~.0p in module ~p in (~.0p)",
                             [Exception, Message, Module, State]),
                     NextComponentState = bp_step_done(Module, On, Message, TmpComponentState),
                     loop(Module, On, State, NextComponentState);
@@ -461,7 +461,7 @@ handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
     end.
 
 handle_unknown_event(UnknownMessage, State, ComponentState, Module, On) ->
-   log:log(error,"unknown message: ~p in Module: ~p and handler ~p~n in State ~p",[UnknownMessage,Module,On,State]),
+   log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,Module,On,State]),
     {State, ComponentState}.
 
 bp_state_new() ->
