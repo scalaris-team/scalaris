@@ -176,7 +176,7 @@ init(Trigger) ->
 -spec on_startup(message(), state_uninit()) -> state_uninit();
                 ({init_cyclon}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
 on_startup({init_cyclon}, {uninit, QueuedMessages, TriggerState}) ->
-    dht_node:register_for_node_change(self()),
+    rm_loop:register_for_node_change(self()),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),

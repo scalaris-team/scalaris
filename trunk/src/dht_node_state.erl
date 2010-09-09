@@ -24,13 +24,10 @@
 
 -export([new/3,
          get/2,
-         set_neighbors/2,
          dump/1,
          set_rt/2,
          set_db/2,
          details/1, details/2,
-         add_nc_subscr/3, rm_nc_subscr/3, rm_nc_subscr/2,
-         update_node/2,
          %%transactions
          set_trans_log/2,
          set_tx_tp_db/2]).
@@ -43,13 +40,12 @@
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
 -record(state, {rt         :: ?RT:external_rt(),
-                neighbors  :: nodelist:neighborhood(),
+                neighbors  :: tid(),
                 join_time  :: join_time(),
                 trans_log  :: #translog{},
                 db         :: ?DB:db(),
                 tx_tp_db   :: any(),
-                proposer   :: pid(),
-                nc_subscr = [] :: [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}] % subscribers to node change events, i.e. node ID changes
+                proposer   :: pid()
                }).
 % TODO: copy field declarations from record definition with their types into #state{}
 %       (erlang otherwise thinks of a field type as 'unknown' | type())
@@ -60,11 +56,10 @@
 -opaque state() :: #state{}.
 
 %% userdevguide-begin dht_node_state:state
--spec new(?RT:external_rt(), Neighbors::nodelist:neighborhood(),
-          ?DB:db()) -> state().
-new(RT, Neighbors, DB) ->
+-spec new(?RT:external_rt(), Neighbors::tid(), ?DB:db()) -> state().
+new(RT, NeighbTable, DB) ->
     #state{rt = RT,
-           neighbors = Neighbors,
+           neighbors = NeighbTable,
            join_time = now(),
            trans_log = #translog{tid_tm_mapping = dict:new(),
                                  decided        = gb_trees:empty(),
@@ -99,7 +94,6 @@ new(RT, Neighbors, DB) ->
 %%        <li>tx_tp_db = transaction participant DB,</li>
 %%        <li>proposer = paxos proposer PID,</li>
 %%        <li>load = the load of the own node (provided for convenience).</li>
-%%        <li>nc_subscr = list of (local) processes that subscribed to node change events, i.e. node ID changes.</li>
 %%      </ul>
 -spec get(state(), rt) -> ?RT:external_rt();
          (state(), rt_size) -> non_neg_integer();
@@ -121,29 +115,30 @@ new(RT, Neighbors, DB) ->
          (state(), db) -> ?DB:db();
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();
-         (state(), load) -> integer();
-         (state(), nc_subscr) -> [{Subscriber::comm:erl_local_pid(), fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())}].
-get(#state{rt=RT, neighbors=Neighbors, join_time=JoinTime,
-           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
-           nc_subscr=NCSubscr}, Key) ->
+         (state(), load) -> integer().
+get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
+           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer},
+    Key) ->
     case Key of
         rt         -> RT;
         rt_size    -> ?RT:get_size(RT);
-        neighbors  -> Neighbors;
-        succlist   -> nodelist:succs(Neighbors);
-        succ       -> nodelist:succ(Neighbors);
-        succ_id    -> node:id(nodelist:succ(Neighbors));
-        succ_pid   -> node:pidX(nodelist:succ(Neighbors));
-        predlist   -> nodelist:preds(Neighbors);
-        pred       -> nodelist:pred(Neighbors);
-        pred_id    -> node:id(nodelist:pred(Neighbors));
-        pred_pid   -> node:pidX(nodelist:pred(Neighbors));
-        node       -> nodelist:node(Neighbors);
-        node_id    -> nodelist:nodeid(Neighbors);
-        my_range   -> node:mk_interval_between_nodes(
+        neighbors  -> rm_loop:get_neighbors(NeighbTable);
+        succlist   -> nodelist:succs(rm_loop:get_neighbors(NeighbTable));
+        succ       -> nodelist:succ(rm_loop:get_neighbors(NeighbTable));
+        succ_id    -> node:id(nodelist:succ(rm_loop:get_neighbors(NeighbTable)));
+        succ_pid   -> node:pidX(nodelist:succ(rm_loop:get_neighbors(NeighbTable)));
+        predlist   -> nodelist:preds(rm_loop:get_neighbors(NeighbTable));
+        pred       -> nodelist:pred(rm_loop:get_neighbors(NeighbTable));
+        pred_id    -> node:id(nodelist:pred(rm_loop:get_neighbors(NeighbTable)));
+        pred_pid   -> node:pidX(nodelist:pred(rm_loop:get_neighbors(NeighbTable)));
+        node       -> nodelist:node(rm_loop:get_neighbors(NeighbTable));
+        node_id    -> nodelist:nodeid(rm_loop:get_neighbors(NeighbTable));
+        my_range   -> Neighbors = rm_loop:get_neighbors(NeighbTable),
+                      node:mk_interval_between_nodes(
                         nodelist:pred(Neighbors),
                         nodelist:node(Neighbors));
-        succ_range -> node:mk_interval_between_nodes(
+        succ_range -> Neighbors = rm_loop:get_neighbors(NeighbTable),
+                      node:mk_interval_between_nodes(
                         nodelist:node(Neighbors),
                         nodelist:succ(Neighbors));
         join_time  -> JoinTime;
@@ -151,13 +146,8 @@ get(#state{rt=RT, neighbors=Neighbors, join_time=JoinTime,
         db         -> DB;
         tx_tp_db   -> TxTpDb;
         proposer   -> Proposer;
-        load       -> ?DB:get_load(DB);
-        nc_subscr  -> NCSubscr
+        load       -> ?DB:get_load(DB)
     end.
-
-%% @doc Sets the neighborhood of the current node.
--spec set_neighbors(State::state(), NewNeighbors::nodelist:neighborhood()) -> state().
-set_neighbors(State, Neighbors) -> State#state{neighbors = Neighbors}.
 
 -spec set_tx_tp_db(State::state(), NewTxTpDb::any()) -> state().
 set_tx_tp_db(State, DB) -> State#state{tx_tp_db = DB}.
@@ -172,30 +162,6 @@ set_rt(State, RT) -> State#state{rt = RT}.
 -spec set_trans_log(State::state(), NewLog::#translog{}) -> state().
 set_trans_log(State, NewLog) ->
     State#state{trans_log = NewLog}.
-
--spec add_nc_subscr(State::state(), Subscriber::comm:erl_local_pid(),
-                    fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type())
-                        -> any()))
-        -> state().
-add_nc_subscr(State = #state{nc_subscr=OldNCSubscr}, Pid, FunToExecute) ->
-    State#state{nc_subscr = [{Pid, FunToExecute} | OldNCSubscr]}.
-
--spec rm_nc_subscr(State::state(), Subscriber::comm:erl_local_pid(),
-                   fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type())
-                       -> any()))
-        -> state().
-rm_nc_subscr(State = #state{nc_subscr=OldNCSubscr}, Pid, FunToExecute) ->
-    SubscrTuple = {Pid, FunToExecute},
-    State#state{nc_subscr = [X || X <- OldNCSubscr, X =/= SubscrTuple]}.
-
--spec rm_nc_subscr(State::state(), Subscriber::comm:erl_local_pid())
-        -> state().
-rm_nc_subscr(State = #state{nc_subscr=OldNCSubscr}, Pid) ->
-    State#state{nc_subscr = [E || E = {Subscr, _Fun} <- OldNCSubscr, Subscr =/= Pid]}.
-
--spec update_node(state(), node:node_type()) -> state().
-update_node(State = #state{neighbors=Neighbors}, Node) ->
-    State#state{neighbors = nodelist:update_node(Neighbors, Node)}.
 
 %%% util
 -spec dump(state()) -> ok.

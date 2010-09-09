@@ -59,6 +59,12 @@ next_hop(_Config) ->
     MyNode = node:new(fake_dht_node(), 0, 0),
     Succ = node:new(fake_dht_node(), 1, 0),
     Pred = node:new(fake_dht_node(), 1000000, 0),
+    % note: the ets table will be deleted automatically since ct starts a
+    % process for each test case (an ets table dies with its owner)
+    TableName = list_to_atom("performance_SUITE:rm_tman"),
+    NeighbTable = ets:new(TableName, [ordered_set, private]),
+    Neighbors = nodelist:new_neighborhood(Pred, MyNode, Succ),
+    ets:insert(NeighbTable, {neighbors, Neighbors}),
     DHTNodes = [fake_dht_node() || _ <- lists:seq(1, 6)],
     RT = gb_trees:from_orddict([{1, Succ},
                                 {2, node:new(lists:nth(1, DHTNodes), 2, 0)},
@@ -69,7 +75,7 @@ next_hop(_Config) ->
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
-    State = dht_node_state:new(RT, nodelist:new_neighborhood(Pred, MyNode, Succ), ?DB:new(node:id(MyNode))),
+    State = dht_node_state:new(RT, NeighbTable, ?DB:new(node:id(MyNode))),
     config:write(rt_size_use_neighbors, 0),
     ?equals(rt_chord:next_hop(State, 0), lists:nth(6, DHTNodes)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
@@ -100,11 +106,16 @@ next_hop2(_Config) ->
                                 {16, node:new(lists:nth(4, DHTNodes), 16, 0)},
                                 {32, node:new(lists:nth(5, DHTNodes), 32, 0)},
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
-    % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
-    % which will fail here -> however, we don't need this process
+    % note: the ets table will be deleted automatically since ct starts a
+    % process for each test case (an ets table dies with its owner)
+    TableName = list_to_atom("performance_SUITE:rm_tman"),
+    NeighbTable = ets:new(TableName, [ordered_set, private]),
     Neighbors = nodelist:add_node(nodelist:new_neighborhood(Pred, MyNode, Succ),
                                   SuccSucc, 2, 2),
-    State = dht_node_state:new(RT, Neighbors, ?DB:new(node:id(MyNode))),
+    ets:insert(NeighbTable, {neighbors, Neighbors}),
+    % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
+    % which will fail here -> however, we don't need this process
+    State = dht_node_state:new(RT, NeighbTable, ?DB:new(node:id(MyNode))),
     config:write(rt_size_use_neighbors, 10),
     ?equals(rt_chord:next_hop(State, 0), node:pidX(Pred)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
