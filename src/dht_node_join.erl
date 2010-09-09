@@ -60,7 +60,7 @@ join_request(State, NewPred) ->
               {join_response, dht_node_state:get(State, pred), HisData}),
     % TODO: better already update our range here directly than waiting for an
     % updated state from the ring_maintenance?
-    rm_beh:notify_new_pred(comm:this(), NewPred),
+    rm_loop:notify_new_pred(comm:this(), NewPred),
     dht_node_state:set_db(State, DB).
 %% userdevguide-end dht_node_join:join_request
 
@@ -80,14 +80,7 @@ process_join_msg({idholder_get_id_response, Id, IdVersion},
                  {join, {as_first}, QueuedMessages}) ->
     log:log(info,"[ Node ~w ] joining as first: ~p",[self(), Id]),
     Me = node:new(comm:this(), Id, IdVersion),
-    State = dht_node_state:new(?RT:empty_ext(Me),
-                               nodelist:new_neighborhood(Me),
-                               ?DB:new(Id)),
-    dht_node:activate_subprocesses(State),
-    comm:send_local(get_local_dht_node_reregister_pid(), {register}),
-    msg_queue:send(QueuedMessages),
-    %log:log(info,"[ Node ~w ] joined",[self()]),
-    State;  % join complete, State is the first "State"
+    finish_join(Me, Me, Me, ?DB:new(Id), QueuedMessages);  % join complete, State is the first "State"
 %% userdevguide-end dht_node_join:join_first
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -163,15 +156,11 @@ process_join_msg({join_response, Pred, Data},
     % @TODO data shouldn't be moved here, might be large
     log:log(info, "[ Node ~w ] got pred ~w",[self(), Pred]),
     DB = ?DB:add_data(?DB:new(Id), Data),
-    rm_beh:notify_new_succ(node:pidX(Pred), Me),
-    rm_beh:notify_new_pred(node:pidX(Succ), Me),
-    State = dht_node_state:new(?RT:empty_ext(Succ),
-                               nodelist:new_neighborhood(Pred, Me, Succ), DB),
-    dht_node:activate_subprocesses(State),
-    cs_replica_stabilization:recreate_replicas(dht_node_state:get(State, my_range)),
-    comm:send_local(get_local_dht_node_reregister_pid(), {register}),
-    msg_queue:send(QueuedMessages),
-    State;
+    rm_loop:notify_new_succ(node:pidX(Pred), Me),
+    rm_loop:notify_new_pred(node:pidX(Succ), Me),
+    cs_replica_stabilization:recreate_replicas(
+      node:mk_interval_between_nodes(Pred, Me)),
+    finish_join(Me, Pred, Succ, DB, QueuedMessages);
 %% userdevguide-end dht_node_join:join_other_p4
 
 % ignore some messages that appear too late for them to be used, e.g. if a new
@@ -190,6 +179,24 @@ process_join_msg({lookup_timeout}, State) ->
 process_join_msg(Msg, {join, Details, QueuedMessages}) ->
     %log:log(info("[dhtnode] [~p] postponed delivery of ~p", [self(), Msg]),
     {join, Details, msg_queue:add(QueuedMessages, Msg)}.
+
+-spec finish_join(Me::node:node_type(), Pred::node:node_type(),
+                  Succ::node:node_type(), DB::?DB:db(),
+                  QueuedMessages::msg_queue:msg_queue())
+        -> dht_node_state:state().
+finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
+    rm_loop:activate(Me, Pred, Succ),
+    % wait for the ring maintenance to initialize and tell us its table ID
+    NeighbTable = rm_loop:get_neighbors_table(),
+    Id = node:id(Me),
+    rt_loop:activate(Id, Pred, Succ),
+    cyclon:activate(),
+    vivaldi:activate(),
+    dc_clustering:activate(),
+    gossip:activate(),
+    comm:send_local(get_local_dht_node_reregister_pid(), {register}),
+    msg_queue:send(QueuedMessages),
+    dht_node_state:new(?RT:empty_ext(Succ), NeighbTable, DB).
 
 -spec get_local_dht_node_reregister_pid() -> pid().
 get_local_dht_node_reregister_pid() ->

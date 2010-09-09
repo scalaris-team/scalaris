@@ -24,100 +24,49 @@
 
 -include("scalaris.hrl").
 
--behavior(gen_component).
 -behavior(rm_beh).
 
--export([start_link/1]).
--export([init/1, on_startup/2, on/2,
-         activate/3, leave/0]).
+-export([get_base_interval/0, get_min_interval/0, get_max_interval/0]).
 
--export([get_base_interval/0, get_min_interval/0, get_max_interval/0,
-         check_config/0]).
+-type(state() :: {RandomViewSize :: pos_integer(),
+                  Interval       :: base_interval | min_interval | max_interval,
+                  TriggerState   :: trigger:state(),
+                  Cache          :: [node:node_type()], % random cyclon nodes
+                  Churn          :: boolean()}).
 
--type(state_init() :: {Neighborhood   :: nodelist:neighborhood(),
-                       RandomViewSize :: pos_integer(),
-                       Interval       :: base_interval | min_interval | max_interval,
-                       TriggerState   :: trigger:state(),
-                       Cache          :: [node:node_type()], % random cyclon nodes
-                       Churn          :: boolean()}).
--type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
-                         TriggerState :: trigger:state()}).
-%% -type(state() :: state_init() | state_uninit()).
+-include("rm_beh.hrl").
 
-% accepted messages of an initialized rm_tman process
--type(message() ::
+% accepted messages of an initialized rm_tman process in addition to rm_loop
+-type(custom_message() ::
     {trigger} |
     {cy_cache, Cache::[node:node_type()]} |
-    {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
-    {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()} |
     {get_node_details_response, NodeDetails::node_details:node_details()} |
-    {zombie, Node::node:node_type()} |
-    {crash, DeadPid::comm:mypid()} |
-    {check_ring, Token::non_neg_integer(), Master::node:node_type()} |
-    {init_check_ring, Token::non_neg_integer()} |
-    {notify_new_pred, NewPred::node:node_type()} |
-    {notify_new_succ, NewSucc::node:node_type()} |
-    {leave, SourcePid::comm:erl_local_pid()} |
-    {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
-    {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
-    {update_id, NewId::?RT:key()} |
-    {web_debug_info, Requestor::comm:erl_local_pid()}).
-
-%% @doc Sends an initialization message to the node's rm_tman process.
--spec activate(Me::node:node_type(), Pred::node:node_type(),
-                 Succ::node:node_type()) -> ok.
-activate(Me, Pred, Succ) ->
-    Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {init_rm, Me, Pred, Succ}).
+    {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
+    {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Starts a chord-like ring maintenance process, registers it with the
-%%      process dictionary and returns its pid for use by a supervisor.
--spec start_link(pid_groups:groupname()) -> {ok, pid()}.
-start_link(DHTNodeGroup) ->
+%% @doc Initialises the state when rm_loop receives an init_rm message.
+init(Table, Me, Pred, Succ) ->
     Trigger = config:read(ringmaintenance_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, ring_maintenance}]).
-
-%% @doc Initialises the module with an uninitialized state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
-init(Trigger) ->
-    TriggerState = trigger:init(Trigger, ?MODULE),
-    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
-                                 on_startup).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Message Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc Message handler during start up phase (will change to on/2 when a
-%%      'init_rm' message is received).
--spec on_startup(message(), state_uninit()) -> state_uninit();
-                ({init_rm, Me::node:node_type(), Pred::node:node_type(),
-                  Succ::node:node_type()}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
-on_startup({init_rm, Me, Pred, Succ}, {uninit, QueuedMessages, TriggerState}) ->
-    dn_cache:subscribe(),
+    TriggerState1 = trigger:init(Trigger, ?MODULE),
+    TriggerState2 = trigger:now(TriggerState1),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
-    NewTriggerState = trigger:now(TriggerState),
-    % make Pred++Succ unique and subscribe to fd:
-    fd:subscribe(lists:usort([node:pidX(Pred), node:pidX(Succ)])),
+    rm_loop:update_neighbors(Table, Neighborhood),
     cyclon:get_subset_rand_next_interval(1),
-    msg_queue:send(QueuedMessages),
-    gen_component:change_handler(
-      {Neighborhood, config:read(cyclon_cache_size), min_interval,
-       NewTriggerState, [], true}, on);
+    {config:read(cyclon_cache_size), min_interval, TriggerState2, [], true}.
 
-on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Message Loop (custom messages not already handled by rm_loop:on/2)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the module is fully initialized.
--spec on(message(), state_init()) -> state_init() | {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
-on({trigger},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
+on({trigger}, {RandViewSize, Interval, TriggerState, Cache, Churn} = State,
+   NeighbTable) ->
     % Trigger an update of the Random view
-    %
+    Neighborhood = rm_loop:get_neighbors(NeighbTable),
     RndView = get_RndView(RandViewSize, Cache),
     %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
     {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
@@ -126,8 +75,6 @@ on({trigger},
     case nodelist:has_real_pred(Neighborhood) andalso
              nodelist:has_real_succ(Neighborhood) of
         false -> % our node is the only node in the system
-            %TODO: do we need to tell the DHT node here? doesn't it already know?
-            rm_beh:update_dht_node(Neighborhood),
             % no need to set a new trigger - we will be actively called by
             % any new node and set the trigger then (see handling of
             % notify_new_succ and notify_new_pred)
@@ -152,19 +99,20 @@ on({trigger},
                 _ -> ok
             end,
             NewTriggerState = trigger:next(TriggerState, Interval),
-            {Neighborhood, RandViewSize, base_interval, NewTriggerState, Cache, Churn}
+            {RandViewSize, base_interval, NewTriggerState, Cache, Churn}
     end;
 
 % got empty cyclon cache
 on({cy_cache, []},
-   {_Neighborhood, RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State)  ->
+   {RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State,
+   _NeighbTable)  ->
     % ignore empty cache from cyclon
     cyclon:get_subset_rand_next_interval(RandViewSize),
     State;
 
 % got cyclon cache
-on({cy_cache, NewCache},
-   {Neighborhood, RandViewSize, Interval, TriggerState, _Cache, Churn}) ->
+on({cy_cache, NewCache}, {RandViewSize, Interval, TriggerState, _Cache, Churn},
+   NeighbTable) ->
     % increase RandViewSize (no error detected):
     RandViewSizeNew =
         case (RandViewSize < config:read(cyclon_cache_size)) of
@@ -174,16 +122,19 @@ on({cy_cache, NewCache},
     % trigger new cyclon cache request
     cyclon:get_subset_rand_next_interval(RandViewSizeNew),
     MyRndView = get_RndView(RandViewSizeNew, NewCache),
+    Neighborhood = rm_loop:get_neighbors(NeighbTable),
     NewNeighborhood =
         trigger_update(Neighborhood, MyRndView,
                        nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
                                                 get_pred_list_length(),
                                                 get_succ_list_length())),
-    {NewNeighborhood, RandViewSizeNew, Interval, TriggerState, NewCache, Churn};
+    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
+    {RandViewSizeNew, Interval, TriggerState, NewCache, Churn};
 
 % got shuffle request
 on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
+   {RandViewSize, _Interval, _TriggerState, Cache, _Churn} = State, NeighbTable) ->
+    Neighborhood = rm_loop:get_neighbors(NeighbTable),
     MyRndView = get_RndView(RandViewSize, Cache),
     MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
     OtherNode = nodelist:node(OtherNeighbors),
@@ -205,113 +156,59 @@ on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
                               ring_maintenance,
                               {rm_buffer_response, NeighborsToSend}),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
-    {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
+    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
+    State;
 
 on({rm_buffer_response, OtherNeighbors},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
+   {RandViewSize, Interval, TriggerState, Cache, Churn}, NeighbTable) ->
+    Neighborhood = rm_loop:get_neighbors(NeighbTable),
     MyRndView = get_RndView(RandViewSize, Cache),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
+    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
     % increase RandViewSize (no error detected):
     NewRandViewSize =
         case RandViewSize < config:read(cyclon_cache_size) of
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    {NewNeighborhood, NewRandViewSize, Interval, TriggerState, Cache, Churn};
+    {NewRandViewSize, Interval, TriggerState, Cache, Churn};
 
 % we asked another node we wanted to add for its node object -> now add it
-on({get_node_details_response, NodeDetails}, State) ->
-    update_nodes(State, [node_details:get(NodeDetails, node)], [], null);
+on({get_node_details_response, NodeDetails}, State, NeighbTable) ->
+    update_nodes(State, NeighbTable, [node_details:get(NodeDetails, node)], [], null).
 
-% dead-node-cache reported dead node to be alive again
-on({zombie, Node}, State) ->
-    % this node could potentially be useful as it has been in our state before
-    update_nodes(State, [Node], [], null);
-
-% failure detector reported dead node
-on({crash, DeadPid}, State) ->
-    update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1);
-
-% trigger by admin:dd_check_ring
-on({check_ring, Token, Master},
-   {Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
-    Me = nodelist:node(Neighborhood),
-    case {Token, Master} of
-        {0, Me} ->
-            io:format(" [RM ] CheckRing   OK  ~n");
-        {0, _} ->
-            io:format(" [RM ] CheckRing  reach TTL in Node ~p not in ~p~n", [Master, Me]);
-        {Token, Me} ->
-            io:format(" [RM ] Token back with Value: ~p~n",[Token]);
-        {Token, _} ->
-            {Pred, _Succ} = get_safe_pred_succ(Neighborhood, []),
-            comm:send_to_group_member(node:pidX(Pred), ring_maintenance,
-                                      {check_ring, Token - 1, Master})
-    end,
-    State;
-
-% trigger by admin:dd_check_ring
-on({init_check_ring, Token},
-   {Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
-    Me = nodelist:node(Neighborhood),
-    {Pred, _Succ} = get_safe_pred_succ(Neighborhood, []),
-    comm:send_to_group_member(node:pidX(Pred), ring_maintenance,
-                              {check_ring, Token - 1, Me}),
-    State;
-
-on({notify_new_pred, NewPred}, State) ->
+new_pred(State, NeighbTable, NewPred) ->
     % if we do not want to trust notify_new_pred messages to provide an alive node, use this instead:
 %%     trigger_update(OldNeighborhood, [], nodelist:new_neighborhood(nodelist:node(OldNeighborhood), NewPred)),
     % we trust NewPred to be alive -> integrate node:
-    update_nodes(State, [NewPred], [], null);
+    update_nodes(State, NeighbTable, [NewPred], [], null).
 
-on({notify_new_succ, NewSucc}, State) ->
-    % same as notify_new_pred
-    update_nodes(State, [NewSucc], [], null);
+new_succ(State, NeighbTable, NewSucc) ->
+    % similar to new_pred/2
+    update_nodes(State, NeighbTable, [NewSucc], [], null).
 
-on({leave, SourcePid},
-   {Neighborhood, _RandViewSize, _Interval, TriggerState, _Cache, _Churn}) ->
-    Me = nodelist:node(Neighborhood),
-    Pred = nodelist:pred(Neighborhood),
-    Succ = nodelist:succ(Neighborhood),
-    comm:send_to_group_member(node:pidX(Succ), ring_maintenance, {pred_left, Me, Pred}),
-    comm:send_to_group_member(node:pidX(Pred), ring_maintenance, {succ_left, Me, Succ}),
-    comm:send_local(SourcePid, {leave_response}),
-    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
-                                 on_startup);
+remove_pred(State, NeighbTable, OldPred, PredsPred) ->
+    update_nodes(State, NeighbTable, [PredsPred], [OldPred], null).
 
-on({pred_left, OldPred, PredsPred}, State) ->
-    update_nodes(State, [PredsPred], [OldPred], null);
+remove_succ(State, NeighbTable, OldSucc, SuccsSucc) ->
+    update_nodes(State, NeighbTable, [SuccsSucc], [OldSucc], null).
 
-on({succ_left, OldSucc, SuccsSucc}, State) ->
-    update_nodes(State, [SuccsSucc], [OldSucc], null);
-
-on({update_id, NewId},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
-    NewMe = node:update_id(nodelist:node(Neighborhood), NewId),
-    NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
-    rm_beh:update_dht_node(Neighborhood, NewNeighborhood),
+updated_node({RandViewSize, Interval, TriggerState, Cache, Churn}, _NeighbTable, _OldMe, _NewMe) ->
     NewTriggerState = trigger:now(TriggerState), % inform neighbors
-    {NewNeighborhood, RandViewSize, Interval, NewTriggerState, Cache, Churn};
+    {RandViewSize, Interval, NewTriggerState, Cache, Churn}.
 
-on({web_debug_info, Requestor},
-   {Neighborhood, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State) ->
-    comm:send_local(Requestor,
-                    {web_debug_info_reply,
-                     [{"algorithm", lists:flatten(io_lib:format("~p", [?MODULE]))},
-                      {"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
-                      {"preds", lists:flatten(io_lib:format("~p", [nodelist:preds(Neighborhood)]))},
-                      {"succs", lists:flatten(io_lib:format("~p", [nodelist:succs(Neighborhood)]))}]}),
-    State.
+leave(_State, _NeighbTable) -> ok.
 
-%% @doc Notifies the successor and predecessor that the current dht_node is
-%%      going to leave / left. Will reset the ring_maintenance state to uninit
-%%      and respond with a {leave_response} message.
-%%      Note: only call this method from inside the dht_node process!
--spec leave() -> ok.
-leave() ->
-    comm:send_local(pid_groups:get_my(ring_maintenance),
-                    {leave, self()}).
+% failure detector reported dead node
+crashed_node(State, NeighbTable, DeadPid) ->
+    update_nodes(State, NeighbTable, [], [DeadPid], fun dn_cache:add_zombie_candidate/1).
+
+% dead-node-cache reported dead node to be alive again
+zombie_node(State, NeighbTable, Node) ->
+    % this node could potentially be useful as it has been in our state before
+    update_nodes(State, NeighbTable, [Node], [], null).
+
+get_web_debug_info(_State, _NeighbTable) -> [].
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.
@@ -399,14 +296,16 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
 %%      occurred or was already determined, min_interval if chosen for the next
 %%      interval, otherwise max_interval. If the successor or predecessor
 %%      changes, the trigger will be called immediately.
--spec update_nodes(State::state_init(), NodesToAdd::[node:node_type()],
+-spec update_nodes(State::state(), NeighbTable::tid(),
+                   NodesToAdd::[node:node_type()],
                    NodesToRemove::[node:node_type() | comm:mypid() | pid()],
                    RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
-        -> NewState::state_init().
-update_nodes(State, [], [], _RemoveNodeEvalFun) ->
+        -> NewState::state().
+update_nodes(State, _NeighbTable, [], [], _RemoveNodeEvalFun) ->
     State;
-update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, Churn},
-             NodesToAdd, NodesToRemove, RemoveNodeEvalFun) ->
+update_nodes({RandViewSize, _Interval, TriggerState, OldCache, Churn},
+             NeighbTable, NodesToAdd, NodesToRemove, RemoveNodeEvalFun) ->
+    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
     % keep all nodes that are not in NodesToRemove - note: NodesToRemove should
     % have 0 or 1 element - so lists:member/2 is not expensive
     FilterFun = fun(N) -> not lists:any(fun(B) -> node:same_process(N, B) end, NodesToRemove) end,
@@ -422,9 +321,8 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
     NewNeighborhood = nodelist:add_nodes(Nbh1, NodesToAdd,
                                          get_pred_list_length(),
                                          get_succ_list_length()),
+    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
     
-    rm_beh:update_dht_node(OldNeighborhood, NewNeighborhood),
-    rm_beh:update_failuredetector(OldNeighborhood, NewNeighborhood),
     NewChurn = has_churn(OldNeighborhood, NewNeighborhood),
     NewInterval = case Churn orelse NewChurn of
                       true -> min_interval; % increase ring maintenance frequency
@@ -440,7 +338,7 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
                           true -> 0;
                           _    -> RandViewSize
                       end,
-    {NewNeighborhood, NewRandViewSize, NewInterval, NewTriggerState, NewCache, NewChurn}.
+    {NewRandViewSize, NewInterval, NewTriggerState, NewCache, NewChurn}.
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() -> config:read(stabilization_interval_base).

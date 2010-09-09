@@ -69,9 +69,9 @@ init(Options) ->
         util:sup_worker_desc(dht_node_reregister, dht_node_reregister,
                              start_link, [DHTNodeGroup]),
     RingMaintenance =
-        util:sup_worker_desc(?RM, ?RM, start_link, [DHTNodeGroup]),
+        util:sup_worker_desc(ring_maintenance, rm_loop, start_link, [DHTNodeGroup]),
     RoutingTable =
-        util:sup_worker_desc(routingtable, rt_loop, start_link,
+        util:sup_worker_desc(routing_table, rt_loop, start_link,
                              [DHTNodeGroup]),
     SupDHTNodeCore_AND =
         util:sup_supervisor_desc(sup_dht_node_core, sup_dht_node_core,

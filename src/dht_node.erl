@@ -26,10 +26,7 @@
 -behaviour(gen_component).
 
 -export([start_link/2, on/2, init/1,
-         activate_subprocesses/1,
-         register_for_node_change/1, register_for_node_change/2,
-         unregister_from_node_change/1, unregister_from_node_change/2,
-         unregister_all_from_node_change/1, trigger_known_nodes/0]).
+         trigger_known_nodes/0]).
 
 -export([is_first/1]).
 
@@ -58,7 +55,7 @@
 
 -type(rm_message() ::
       {init_rm, Pid::comm:erl_local_pid()} |
-      {rm_update_neighbors, Neighbors::nodelist:neighborhood()} |
+      {rm_update_neighbors, OldNeighbors::nodelist:neighborhood()} |
       {reg_for_nc, Pid::comm:erl_local_pid(),
        fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())} |
       {unreg_from_nc, Pid::comm:erl_local_pid(),
@@ -109,44 +106,27 @@ on({die}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ring Maintenance (see rm_beh.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% {rm_update_neighbors, Neighbors::nodelist:neighborhood()}
-on({rm_update_neighbors, Neighbors}, State) ->
-    OldPred = dht_node_state:get(State, pred),
-    OldSucc = dht_node_state:get(State, succ),
-    OldNode = dht_node_state:get(State, node),
-    Pred = nodelist:pred(Neighbors), Succ = nodelist:succ(Neighbors),
-    Node = nodelist:node(Neighbors),
-    NewRT = case node:id(Node) =/= node:id(OldNode) orelse
-                     Pred =/= OldPred orelse Succ =/= OldSucc of
+%% {rm_update_neighbors, OldNeighbors::nodelist:neighborhood()}
+on({rm_update_neighbors, OldNeighbors}, State) ->
+    NewNeighbors = dht_node_state:get(State, neighbors),
+    OldPred = nodelist:pred(OldNeighbors),
+    OldSucc = nodelist:succ(OldNeighbors),
+    OldNode = nodelist:node(OldNeighbors),
+    NewPred = nodelist:pred(NewNeighbors),
+    NewSucc = nodelist:succ(NewNeighbors),
+    NewNode = nodelist:node(NewNeighbors),
+    NewRT = case node:id(NewNode) =/= node:id(OldNode) orelse
+                     NewPred =/= OldPred orelse NewSucc =/= OldSucc of
                 true ->
                     % for now use an "empty" external routing table state,
                     % rt_loop will change the routing table and eventually send
                     % us an updated table
-                    rt_loop:update_state(node:id(Node), Pred, Succ),
-                    ?RT:empty_ext(Succ);
+                    rt_loop:update_state(node:id(NewNode), NewPred, NewSucc),
+                    ?RT:empty_ext(NewSucc);
                 _ ->
                     dht_node_state:get(State, rt)
             end,
-
-    case node:is_newer(Node, OldNode) of
-        true ->
-            [Fun(Pid, Node) || {Pid, Fun} <- dht_node_state:get(State, nc_subscr)],
-            idholder:set_id(node:id(Node), node:id_version(Node));
-        _ -> ok
-    end,
-
-    State_NewNeighbors = dht_node_state:set_neighbors(State, Neighbors),
-    dht_node_state:set_rt(State_NewNeighbors, NewRT);
-
-%% add Pid to the node change subscriber list
-on({reg_for_nc, Pid, Fun}, State) ->
-    dht_node_state:add_nc_subscr(State, Pid, Fun);
-
-on({unreg_from_nc, Pid, Fun}, State) ->
-    dht_node_state:rm_nc_subscr(State, Pid, Fun);
-
-on({unreg_from_nc, Pid}, State) ->
-    dht_node_state:rm_nc_subscr(State, Pid);
+    dht_node_state:set_rt(State, NewRT);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance
@@ -373,8 +353,6 @@ on({web_debug_info, Requestor}, State) ->
     KeyValueList =
         [{"rt_algorithm", lists:flatten(io_lib:format("~p", [?RT]))},
          {"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
-         {"succs", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, succlist)]))},
-         {"preds", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, predlist)]))},
          {"me", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, node)]))},
          {"my_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, my_range)]))},
          {"load", lists:flatten(io_lib:format("~p", [Load]))},
@@ -385,7 +363,6 @@ on({web_debug_info, Requestor}, State) ->
 %%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
 %%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
          {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
-         {"nc_subscr", lists:flatten(io_lib:format("~p", [{webhelpers:pid_to_name(Pid), Fun}|| {Pid, Fun} <- dht_node_state:get(State, nc_subscr)]))},
          {"data (db_entry):", ""} |
             DataList 
         ],
@@ -439,20 +416,6 @@ start_link(DHTNodeGroup, Options) ->
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
 
--spec activate_subprocesses(State::dht_node_state:state()) -> ok.
-activate_subprocesses(State) ->
-    Me = dht_node_state:get(State, node),
-    Id = node:id(Me),
-    Pred = dht_node_state:get(State, pred),
-    Succ = dht_node_state:get(State, succ),
-    ?RM:activate(Me, Pred, Succ),
-    rt_loop:activate(Id, Pred, Succ),
-    cyclon:activate(),
-    vivaldi:activate(),
-    dc_clustering:activate(),
-    gossip:activate(),
-    ok.
-
 %% @doc Find existing nodes and as a side-effect initialize the comm_layer.
 -spec trigger_known_nodes() -> ok.
 trigger_known_nodes() ->
@@ -467,52 +430,6 @@ trigger_known_nodes() ->
         false ->
             trigger_known_nodes()
     end.
-
-%% @doc Default fun for node change updates.
--spec send_node_change(Pid::comm:erl_local_pid(), NewNode::node:node_type()) -> ok.
-send_node_change(Pid, NewNode) ->
-    comm:send_local(Pid, {node_update, NewNode}).
-
-%% @doc Registers the given process to receive {node_update, Node} messages if
-%%      the dht_node changes its id.
--spec register_for_node_change(Pid::comm:erl_local_pid()) -> ok.
-register_for_node_change(Pid) ->
-    comm:send_local(pid_groups:get_my(dht_node),
-                    {reg_for_nc, Pid, fun send_node_change/2}).
-
-%% @doc Registers the given function to be called when the dht_node changes its
-%%      id. It will get the given Pid and the new node as its parameters.
--spec register_for_node_change(Pid::comm:erl_local_pid(),
-                               fun((Subscriber::comm:erl_local_pid(),
-                                    NewNode::node:node_type()) -> any())) -> ok.
-register_for_node_change(Pid, FunToExecute) ->
-    comm:send_local(pid_groups:get_my(dht_node),
-                    {reg_for_nc, Pid, FunToExecute}).
-
-%% @doc Un-registers the given process from node change updates using the
-%%      default send_node_change/2 handler sending {node_update, Node} messages.
--spec unregister_from_node_change(Pid::comm:erl_local_pid()) -> ok.
-unregister_from_node_change(Pid) ->
-    comm:send_local(pid_groups:get_my(dht_node),
-                    {unreg_from_nc, Pid, fun send_node_change/2}).
-
-%% @doc Un-registers the given process from all node change updates using
-%%      any(!) message handler.
--spec unregister_all_from_node_change(Pid::comm:erl_local_pid()) -> ok.
-unregister_all_from_node_change(Pid) ->
-    comm:send_local(pid_groups:get_my(dht_node),
-                    {unreg_from_nc, Pid}).
-
-%% @doc Un-registers the given process from node change updates using
-%%      the given message handler.
-%%      Note that locally created funs may not be eligible for this as a newly
-%%      created fun may not compare equal to the previously created one.
--spec unregister_from_node_change(Pid::comm:erl_local_pid(),
-                                  fun((Subscriber::comm:erl_local_pid(),
-                                       NewNode::node:node_type()) -> any())) -> ok.
-unregister_from_node_change(Pid, FunToExecute) ->
-    comm:send_local(pid_groups:get_my(dht_node),
-                    {unreg_from_nc, Pid, FunToExecute}).
 
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
