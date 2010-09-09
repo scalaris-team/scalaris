@@ -97,7 +97,7 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, paxos_proposer}]).
 
 %% initialize: return initial state.
--spec init([]) -> any().
+-spec init([]) -> atom().
 init([]) ->
     ?TRACE("Starting proposer for DHT node: ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
@@ -155,7 +155,7 @@ on({proposer_trigger, PaxosID, Round}, ETSTableName = State) ->
             Acceptors = proposer_state:get_acceptors(StateForID),
             ReplyTo = proposer_state:get_replyto(StateForID),
             Proposal = proposer_state:get_proposal(StateForID),
-            case Round of
+            _ = case Round of
                 0 -> [msg_accept(X, ReplyTo,
                                  PaxosID, Round,
                                  Proposal)
@@ -174,7 +174,7 @@ on({proposer_trigger, PaxosID, Round}, ETSTableName = State) ->
 
 on({acceptor_ack, PaxosID, Round, Value, RLast}, ETSTableName = State) ->
     ?TRACE("proposer:ack for paxos id ~p round ~p~n", [PaxosID, Round]),
-    case pdb:get(PaxosID, ETSTableName) of
+    _ = case pdb:get(PaxosID, ETSTableName) of
         undefined ->
             %% What to do when this PaxosID does not already exist? Think!
             %% -> Proposers don't get messages, they not requested.
@@ -210,7 +210,7 @@ on({acceptor_naccepted, PaxosID, Round}, _ETSTableName = State) ->
     State;
 
 on({proposer_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
-    [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
+    _ = [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
     State;
 
 on(_, _State) ->

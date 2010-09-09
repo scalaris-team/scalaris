@@ -155,7 +155,7 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
 %% initialize: return initial state.
--spec init([]) -> any().
+-spec init([]) -> null.
 init([]) ->
     ?TRACE("rdht_tx_write: Starting rdht_tx_write for DHT node: ~p~n",
            [pid_groups:my_groupname()]),

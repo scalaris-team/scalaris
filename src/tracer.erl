@@ -48,21 +48,21 @@ start_perf() ->
     end,
     ok.
 
--spec tracer(Pid::comm:erl_local_pid()) -> none().
+-spec tracer(Pid::comm:erl_local_pid()) -> no_return().
 tracer(Pid) ->
     erlang:trace(all, true, [send, procs]),
     comm:send_local(Pid, {done}),
-    ets:new(tracer, [set, protected, named_table]),
+    _ = ets:new(tracer, [set, protected, named_table]),
     loop().
 
--spec tracer_perf(Pid::comm:erl_local_pid()) -> none().
+-spec tracer_perf(Pid::comm:erl_local_pid()) -> no_return().
 tracer_perf(Pid) ->
     erlang:trace(all, true, [running, timestamp]),
     comm:send_local(Pid, {done}),
-    ets:new(tracer_perf, [set, protected, named_table]),
+    _ = ets:new(tracer_perf, [set, protected, named_table]),
     loop_perf().
 
--spec loop() -> none().
+-spec loop() -> no_return().
 loop() ->
     receive
         {trace, Pid, send_to_non_existing_process, Msg, To} ->
@@ -90,7 +90,7 @@ loop() ->
             loop()
     end.
 
--spec loop_perf() -> none().
+-spec loop_perf() -> no_return().
 loop_perf() ->
     receive
         {trace_ts, Pid, in, _, TS} ->

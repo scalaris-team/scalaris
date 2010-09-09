@@ -83,7 +83,7 @@ quorum_read(CollectorPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
     Key = element(2, Request),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    [ lookup:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
+    _ = [ lookup:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
     ok.
 
 %% May make several ones from a single TransLog item (item replication)
@@ -149,8 +149,10 @@ start_link(DHTNodeGroup) ->
                              [],
                              [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
+-type state() :: {integer(), integer(), integer(), atom()}.
+
 %% initialize: return initial state.
--spec init([]) -> any().
+-spec init([]) -> state().
 init([]) ->
     DHTNodeGroup = pid_groups:my_groupname(),
     ?TRACE("rdht_tx_read: Starting rdht_tx_read for DHT node: ~p~n", [DHTNodeGroup]),
@@ -177,20 +179,20 @@ on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
     %% get a newer entry?
     %% @todo got replies from all reps? -> delete ets entry
     TmpEntry = rdht_tx_read_state:add_reply(Entry, Val, Vers, MajOk, MajDeny),
-    case {rdht_tx_read_state:is_newly_decided(TmpEntry),
-          rdht_tx_read_state:get_client(TmpEntry)} of
-        {true, unknown} ->
-            %% when we get a client, we will inform it
-            pdb:set(TmpEntry, Table);
-        {true, Client} ->
-            my_inform_client(Client, TmpEntry),
-            NewEntry = rdht_tx_read_state:set_client_informed(TmpEntry),
-            pdb:set(NewEntry, Table);
-        {false, unknown} ->
-            pdb:set(TmpEntry, Table);
-        {false, _Client} ->
-            pdb:set(TmpEntry, Table),
-            my_delete_if_all_replied(TmpEntry, Reps, Table)
+    _ = case {rdht_tx_read_state:is_newly_decided(TmpEntry),
+              rdht_tx_read_state:get_client(TmpEntry)} of
+            {true, unknown} ->
+                %% when we get a client, we will inform it
+                pdb:set(TmpEntry, Table);
+            {true, Client} ->
+                my_inform_client(Client, TmpEntry),
+                NewEntry = rdht_tx_read_state:set_client_informed(TmpEntry),
+                pdb:set(NewEntry, Table);
+            {false, unknown} ->
+                pdb:set(TmpEntry, Table);
+            {false, _Client} ->
+                pdb:set(TmpEntry, Table),
+                my_delete_if_all_replied(TmpEntry, Reps, Table)
         end,
     State;
 
@@ -200,7 +202,7 @@ on({client_is, Id, Pid, Key}, {Reps, _MajOk, _MajDeny, Table} = State) ->
     Entry = my_get_entry(Id, Table),
     Tmp1Entry = rdht_tx_read_state:set_client(Entry, Pid),
     TmpEntry = rdht_tx_read_state:set_key(Tmp1Entry, Key),
-    case rdht_tx_read_state:is_newly_decided(TmpEntry) of
+    _ = case rdht_tx_read_state:is_newly_decided(TmpEntry) of
         true ->
             my_inform_client(Pid, TmpEntry),
             Tmp2Entry = rdht_tx_read_state:set_client_informed(TmpEntry),
