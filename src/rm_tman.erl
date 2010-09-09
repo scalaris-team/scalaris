@@ -34,8 +34,6 @@
                   Cache          :: [node:node_type()], % random cyclon nodes
                   Churn          :: boolean()}).
 
--include("rm_beh.hrl").
-
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
     {trigger} |
@@ -43,6 +41,9 @@
     {get_node_details_response, NodeDetails::node_details:node_details()} |
     {rm_buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm_buffer_response, OtherNeighbors::nodelist:neighborhood()}).
+
+% note include after the type definitions for erlang < R13B04!
+-include("rm_beh.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
