@@ -28,9 +28,19 @@
          set_rt/2,
          set_db/2,
          details/1, details/2,
-         %%transactions
+         % node responsibilities:
+         is_responsible/2,
+         is_db_responsible/2,
+         % transactions:
          set_trans_log/2,
-         set_tx_tp_db/2]).
+         set_tx_tp_db/2,
+         % node moves:
+         get_slide_op/2,
+         set_slide/3,
+         add_msg_fwd/3,
+         rm_msg_fwd/2,
+         add_db_range/2,
+         rm_db_range/2]).
 
 -ifdef(with_export_type_support).
 -export_type([state/0]).
@@ -45,7 +55,11 @@
                 trans_log  :: #translog{},
                 db         :: ?DB:db(),
                 tx_tp_db   :: any(),
-                proposer   :: pid()
+                proposer   :: pid(),
+                slide_pred = null :: slide_op:slide_op() | null, % slide with pred (must not overlap with 'slide with succ'!)
+                slide_succ = null :: slide_op:slide_op() | null, % slide with succ (must not overlap with 'slide with pred'!)
+                msg_fwd    = []   :: [{intervals:interval(), comm:mypid()}],
+                db_range   = intervals:empty() :: intervals:interval() % additional range to respond to during a move
                }).
 % TODO: copy field declarations from record definition with their types into #state{}
 %       (erlang otherwise thinks of a field type as 'unknown' | type())
@@ -94,6 +108,8 @@ new(RT, NeighbTable, DB) ->
 %%        <li>tx_tp_db = transaction participant DB,</li>
 %%        <li>proposer = paxos proposer PID,</li>
 %%        <li>load = the load of the own node (provided for convenience).</li>
+%%        <li>slide_pred = information about the node's current slide operation with its predecessor.</li>
+%%        <li>slide_succ = information about the node's current slide operation with its successor.</li>
 %%      </ul>
 -spec get(state(), rt) -> ?RT:external_rt();
          (state(), rt_size) -> non_neg_integer();
@@ -109,16 +125,21 @@ new(RT, NeighbTable, DB) ->
          (state(), node) -> node:node_type();
          (state(), node_id) -> ?RT:key();
          (state(), my_range) -> intervals:interval();
+         (state(), db_range) -> intervals:interval();
          (state(), succ_range) -> intervals:interval();
          (state(), join_time) -> join_time();
          (state(), trans_log) -> #translog{};
          (state(), db) -> ?DB:db();
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();
-         (state(), load) -> integer().
+         (state(), load) -> integer();
+         (state(), slide_pred) -> slide_op:slide_op() | null;
+         (state(), slide_succ) -> slide_op:slide_op() | null;
+         (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}].
 get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
-           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer},
-    Key) ->
+           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
+           slide_pred=SlidePred, slide_succ=SlideSucc, msg_fwd=MsgFwd,
+           db_range=DBRange}, Key) ->
     case Key of
         rt         -> RT;
         rt_size    -> ?RT:get_size(RT);
@@ -137,6 +158,7 @@ get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
                       node:mk_interval_between_nodes(
                         nodelist:pred(Neighbors),
                         nodelist:node(Neighbors));
+        db_range   -> DBRange;
         succ_range -> Neighbors = rm_loop:get_neighbors(NeighbTable),
                       node:mk_interval_between_nodes(
                         nodelist:node(Neighbors),
@@ -146,7 +168,48 @@ get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
         db         -> DB;
         tx_tp_db   -> TxTpDb;
         proposer   -> Proposer;
-        load       -> ?DB:get_load(DB)
+        load       -> ?DB:get_load(DB);
+        slide_pred -> SlidePred;
+        slide_succ -> SlideSucc;
+        msg_fwd    -> MsgFwd
+    end.
+
+%% @doc Checks whether the given key is in the node's range, i.e. the node is
+%%      responsible for this key.
+-spec is_responsible(Key::intervals:key(), State::state()) -> boolean().
+is_responsible(Key, #state{neighbors=NeighbTable}) ->
+    Neighbors = rm_loop:get_neighbors(NeighbTable),
+    intervals:in(Key,
+                 node:mk_interval_between_nodes(
+                   nodelist:pred(Neighbors), nodelist:node(Neighbors))).
+
+%% @doc Checks whether the node is responsible for the given key either by its
+%%      current range or for a range the node is temporarily responsible for
+%%      during a slide operation, i.e. we temporarily read/modify data a
+%%      neighbor is responsible for but hasn't yet received the data from us.
+-spec is_db_responsible(Key::intervals:key(), State::state()) -> boolean().
+is_db_responsible(Key, State = #state{db_range=DBRange}) ->
+    is_responsible(Key, State) orelse
+        intervals:in(Key, DBRange).
+
+%% @doc Tries to find a slide operation with the given MoveFullId and returns
+%%      it including its type (pred or succ) if successful and its pred/succ
+%%      info is correct. Otherwise returns {fail, wrong_pred} if the
+%%      predecessor info is wrong (slide with pred) and {fail, wrong_succ} if
+%%      the successor info is wrong (slide with succ). If not found,
+%%      {fail, not_found} is returned.
+-spec get_slide_op(State::state(), MoveFullId::slide_op:id()) ->
+        {Type::pred | succ, SlideOp::slide_op:slide_op()} |
+        not_found.
+get_slide_op(#state{slide_pred=SlidePred, slide_succ=SlideSucc}, MoveFullId) ->
+    IsSlidePred = SlidePred =/= null andalso
+                      slide_op:get_id(SlidePred) =:= MoveFullId,
+    IsSlideSucc = SlideSucc =/= null andalso
+                      slide_op:get_id(SlideSucc) =:= MoveFullId,
+    if
+        IsSlidePred -> {pred, SlidePred};
+        IsSlideSucc -> {succ, SlideSucc};
+        true        -> not_found
     end.
 
 -spec set_tx_tp_db(State::state(), NewTxTpDb::any()) -> state().
@@ -162,6 +225,38 @@ set_rt(State, RT) -> State#state{rt = RT}.
 -spec set_trans_log(State::state(), NewLog::#translog{}) -> state().
 set_trans_log(State, NewLog) ->
     State#state{trans_log = NewLog}.
+
+-spec set_slide(state(), pred | succ, slide_op:slide_op() | null) -> state().
+set_slide(State, pred, SlidePred) -> State#state{slide_pred=SlidePred};
+set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
+
+%% @doc Adds a (temporary) message forward to the given process.
+%%      Beware: intervals of different forwards must not overlap (which is not
+%%      checked)!
+-spec add_msg_fwd(State::state(), Interval::intervals:interval(),
+                  ForwardTo::comm:mypid()) -> state().
+add_msg_fwd(State = #state{msg_fwd=OldMsgFwd}, Interval, Pid) ->
+    case OldMsgFwd of
+        []      -> ok;
+        [_]     -> ok;
+        [_,_|_] -> log:log(fatal, "[ Node ~w] adding a third message forward - there should only be two!~"
+                                  "(OldFwds: ~w, NewFwd: ~w)~nstacktrace: ~w~n",
+                           [comm:this(), OldMsgFwd, {Interval, Pid},
+                            util:get_stacktrace()])
+    end,
+    State#state{msg_fwd = [{Interval, Pid} | OldMsgFwd]}.
+
+-spec rm_msg_fwd(State::state(), Interval::intervals:interval()) -> state().
+rm_msg_fwd(State = #state{msg_fwd=OldMsgFwd}, Interval) ->
+    State#state{msg_fwd = [X || X = {I, _} <- OldMsgFwd, I =/= Interval]}.
+
+-spec add_db_range(State::state(), Interval::intervals:interval()) -> state().
+add_db_range(State = #state{db_range=DBRange}, Interval) ->
+    State#state{db_range = intervals:union(DBRange, Interval)}.
+
+-spec rm_db_range(State::state(), Interval::intervals:interval()) -> state().
+rm_db_range(State = #state{db_range=DBRange}, Interval) ->
+    State#state{db_range = intervals:minus(DBRange, Interval)}.
 
 %%% util
 -spec dump(state()) -> ok.

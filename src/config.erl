@@ -137,7 +137,9 @@ check_config() ->
         vivaldi:check_config() and
         vivaldi_latency:check_config() and
         ?RM:check_config() and
-        fd_pinger:check_config().
+        fd_pinger:check_config() and
+        dht_node_move:check_config() and
+        dht_node_join:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->

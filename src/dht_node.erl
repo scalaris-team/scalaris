@@ -63,21 +63,24 @@
       database_message() |
       lookup_message() |
       dht_node_join:join_message() |
-      rt_message()).
+      rt_message() |
+      dht_node_move:move_message()).
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
 
 %% Join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
-on(Msg, State) when element(1, State) =:= join
-                        orelse element(1, Msg) =:= join ->
+on(Msg, State) when element(1, State) =:= join ->
+    dht_node_join:process_join_state(Msg, State);
+on(Msg, State) when element(1, Msg) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 %% userdevguide-end dht_node:join_message
 
-on({get_node, Source_PID, Key}, State) ->
-    comm:send(Source_PID, {get_node_response, Key, dht_node_state:get(State, node)}),
-    State;
+% Move messages (see dht_node_move.erl)
+on(Msg, State) when element(1, Msg) =:= move orelse
+     (is_tuple(Msg) andalso erlang:element(1, Msg) =:= move)->
+    dht_node_move:process_move_msg(Msg, State);
 
 %% Kill Messages
 on({kill}, _State) ->
@@ -134,15 +137,8 @@ on({do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Own
 %% answer - lookup for transaction participant
 on({lookup_tp, Message}, State) ->
     {Leader} = Message#tp_message.message,
-    MyRange = dht_node_state:get(State, my_range),
-    case intervals:in(Message#tp_message.item_key, MyRange) of
-        true ->
-            comm:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, comm:this()}),
-            State;
-        false ->
-            log:log(info,"[ Node ] LookupTP: Got Request for Key ~p, it is not in ~p", [Message#tp_message.item_key, MyRange]),
-            State
-    end;
+    comm:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, comm:this()}),
+    State;
 
 %% answer - lookup for replicated transaction manager
 on({init_rtm, Message}, State) ->
@@ -208,16 +204,26 @@ on({lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on({lookup_fin, Key, Hops, Msg}, State) ->
-    MyRange = dht_node_state:get(State, my_range),
-    case intervals:in(Key, MyRange) of
-        true -> comm:send_local(self(), Msg);
-        false ->
-            log:log(warn,
-                    "Routing is damaged!! Trying again...~n  myrange:~p~n  Key:~p",
+on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
+    MsgFwd = dht_node_state:get(State, msg_fwd),
+    FwdList = [P || {I, P} <- MsgFwd, intervals:in(Key, I)],
+    case FwdList of
+        []    ->
+            case dht_node_state:is_db_responsible(Key, State) of
+                true -> comm:send_local(self(), Msg);
+                false ->
+                    DBRange = dht_node_state:get(State, db_range),
+                    DBRange2 = case intervals:is_continuous(DBRange) of
+                                   true -> intervals:get_bounds(DBRange);
+                                   _    -> DBRange
+                               end,
+                    log:log(warn,
+                            "Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  Key:~p",
                            [intervals:get_bounds(dht_node_state:get(State, my_range)),
-                            Key]),
-            dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
+                            DBRange2, Key]),
+                    dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
+            end;
+        [Pid] -> comm:send(Pid, CompleteMsg)
     end,
     State;
 
@@ -225,18 +231,9 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
 % Database
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_key, Source_PID, HashedKey}, State) ->
-    MyRange = dht_node_state:get(State, my_range),
-    case intervals:in(HashedKey, MyRange) of
-        true ->
-%%             log:log(info, "[ ~w | I | Node   | ~w ] get_key ~s",
-%%                     [calendar:universal_time(), self(), HashedKey]),
-            comm:send(Source_PID,
-                      {get_key_response, HashedKey,
-                       ?DB:read(dht_node_state:get(State, db), HashedKey)});
-        false ->
-            log:log(info, "[ Node ] get_Key: Got Request for Key ~p, it is not in ~p",
-                    [HashedKey, MyRange])
-    end,
+    comm:send(Source_PID,
+              {get_key_response, HashedKey,
+               ?DB:read(dht_node_state:get(State, db), HashedKey)}),
     State;
 
 on({get_key, Source_PID, SourceId, HashedKey}, State) ->
@@ -257,16 +254,9 @@ on({set_key_entry, Source_PID, Entry}, State) ->
     dht_node_state:set_db(State, NewDB);
 
 on({delete_key, Source_PID, HashedKey}, State) ->
-    MyRange = dht_node_state:get(State, my_range),
-    case intervals:in(HashedKey, MyRange) of
-        true ->
-            {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), HashedKey),
-            comm:send(Source_PID, {delete_key_response, HashedKey, Result}),
-            dht_node_state:set_db(State, DB2);
-        false ->
-            log:log(info,"[ Node ] delete_Key: Got Request for Key ~p, it is not in ~p", [HashedKey, MyRange]),
-            State
-    end;
+    {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), HashedKey),
+    comm:send(Source_PID, {delete_key_response, HashedKey, Result}),
+    dht_node_state:set_db(State, DB2);
 
 on({drop_data, Data, Sender}, State) ->
     comm:send(Sender, {drop_data_ack}),
@@ -285,9 +275,20 @@ on({start_bulk_owner, I, Msg}, State) ->
     State;
 
 on({bulkowner_deliver, Range, {bulk_read_entry, Issuer}}, State) ->
-    NowDone = dht_node_state:get(State, my_range),
-    Data = ?DB:get_entries(dht_node_state:get(State, db), Range),
-    comm:send(Issuer, {bulk_read_entry_response, NowDone, Data}),
+    MsgFwd = dht_node_state:get(State, msg_fwd),
+    
+    F = fun({FwdInt, FwdPid}, AccI) ->
+                case intervals:is_subset(FwdInt, AccI) of
+                    true ->
+                        FwdRange = intervals:intersection(AccI, FwdInt),
+                        comm:send(FwdPid, {bulkowner_deliver, FwdRange, {bulk_read_entry, Issuer}}),
+                        intervals:minus(AccI, FwdRange);
+                    _    -> AccI
+                end
+        end,
+    MyRange = lists:foldl(F, Range, MsgFwd),
+    Data = ?DB:get_entries(dht_node_state:get(State, db), MyRange),
+    comm:send(Issuer, {bulk_read_entry_response, MyRange, Data}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -320,33 +321,23 @@ on({web_debug_info, Requestor}, State) ->
          {"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
          {"me", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, node)]))},
          {"my_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, my_range)]))},
+         {"db_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db_range)]))},
          {"load", lists:flatten(io_lib:format("~p", [Load]))},
-%%          {"lb", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, lb)]))},
-%%          {"deadnodes", lists:flatten(io_lib:format("~p", [dht_node_state:???(State)]))},
          {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))]))},
 %%          {"db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db)]))},
 %%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
 %%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
          {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
+         {"slide_pred", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, slide_pred)]))},
+         {"slide_succ", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, slide_succ)]))},
+         {"msg_fwd", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, msg_fwd)]))},
          {"data (db_entry):", ""} |
             DataList 
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-%% @TODO buggy ...
-%on({get_node_response, _, _}, State) ->
-%    State;
-
-on({known_hosts_timeout}, State) ->
-    % will ignore these messages after join
-    State;
-
 on({get_dht_nodes_response, _KnownHosts}, State) ->
-    % will ignore these messages after join
-    State;
-
-on({lookup_timeout}, State) ->
     % will ignore these messages after join
     State;
 
