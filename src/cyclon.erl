@@ -57,7 +57,7 @@
 % accepted messages of an initialized cyclon process
 -type(message() ::
     {trigger} |
-    {node_update, Node::node:node_type()} |
+    {rm_changed, OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()} |
     {check_state} |
     {cy_subset, SourcePid::comm:mypid(), PSubset::cyclon_cache:cache()} |
     {cy_subset_response, QSubset::cyclon_cache:cache(), PSubset::cyclon_cache:cache()} |
@@ -176,7 +176,7 @@ init(Trigger) ->
 -spec on_startup(message(), state_uninit()) -> state_uninit();
                 ({init_cyclon}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
 on_startup({init_cyclon}, {uninit, QueuedMessages, TriggerState}) ->
-    rm_loop:register_for_node_change(self()),
+    rm_loop:subscribe(self()),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),
@@ -198,7 +198,8 @@ on({trigger}, {Cache, Node, Cycles, TriggerState} = State)  ->
     TriggerState2 = trigger:next(TriggerState),
     {NewCache, Node, Cycles + 1, TriggerState2};
 
-on({node_update, Node}, {Cache, _OldNode, Cycles, TriggerState}) ->
+on({rm_changed, _OldNeighbors, NewNeighbors}, {Cache, _OldNode, Cycles, TriggerState}) ->
+    Node = nodelist:node(NewNeighbors),
     {Cache, Node, Cycles, TriggerState};
 
 on({check_state}, State) ->

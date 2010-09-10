@@ -53,15 +53,6 @@
       {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
       {lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
 
--type(rm_message() ::
-      {init_rm, Pid::comm:erl_local_pid()} |
-      {rm_update_neighbors, OldNeighbors::nodelist:neighborhood()} |
-      {reg_for_nc, Pid::comm:erl_local_pid(),
-       fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())} |
-      {unreg_from_nc, Pid::comm:erl_local_pid(),
-       fun((Subscriber::comm:erl_local_pid(), NewNode::node:node_type()) -> any())} |
-      {unreg_from_nc, Pid::comm:erl_local_pid()}).
-
 -type(rt_message() ::
       {rt_update, RoutingTable::?RT:external_rt()} |
       {rt_get_node, Source_PID::comm:mypid(), Index::rt_chord:index()}).
@@ -71,7 +62,6 @@
       bulkowner_message() |
       database_message() |
       lookup_message() |
-      rm_message() |
       dht_node_join:join_message() |
       rt_message()).
 
@@ -102,31 +92,6 @@ on({halt}, _State) ->
 
 on({die}, _State) ->
     kill;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Ring Maintenance (see rm_beh.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% {rm_update_neighbors, OldNeighbors::nodelist:neighborhood()}
-on({rm_update_neighbors, OldNeighbors}, State) ->
-    NewNeighbors = dht_node_state:get(State, neighbors),
-    OldPred = nodelist:pred(OldNeighbors),
-    OldSucc = nodelist:succ(OldNeighbors),
-    OldNode = nodelist:node(OldNeighbors),
-    NewPred = nodelist:pred(NewNeighbors),
-    NewSucc = nodelist:succ(NewNeighbors),
-    NewNode = nodelist:node(NewNeighbors),
-    NewRT = case node:id(NewNode) =/= node:id(OldNode) orelse
-                     NewPred =/= OldPred orelse NewSucc =/= OldSucc of
-                true ->
-                    % for now use an "empty" external routing table state,
-                    % rt_loop will change the routing table and eventually send
-                    % us an updated table
-                    rt_loop:update_state(node:id(NewNode), NewPred, NewSucc),
-                    ?RT:empty_ext(NewSucc);
-                _ ->
-                    dht_node_state:get(State, rt)
-            end,
-    dht_node_state:set_rt(State, NewRT);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance

@@ -28,7 +28,7 @@
 -export([start_link/1]).
 -export([init/1, on_startup/2, on/2, get_base_interval/0, check_config/0,
          get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2,
-         activate/3, update_state/3]).
+         activate/3]).
 
 -ifdef(with_export_type_support).
 -export_type([state_init/0]).
@@ -59,13 +59,6 @@ activate(Id, Pred, Succ) ->
     Pid = pid_groups:get_my(routing_table),
     comm:send_local(Pid, {init_rt, Id, Pred, Succ}).
 
-%% @doc Notifies the node's routing table of a changed node ID, predecessor
-%%      and/or successor.
--spec update_state(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
-update_state(Id, Pred, Succ) ->
-    comm:send_local(pid_groups:get_my(routing_table),
-                    {update_rt, Id, Pred, Succ}).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -80,15 +73,12 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
 init(Trigger) ->
-    % Note: no need to call dht_node:register_for_node_change(self()) since we
-    % get notified of a new node ID via the update_state/3 method that is
-    % called in dht_node's rm_update_neighbors handler
     TriggerState = trigger:init(Trigger, ?MODULE),
     gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
                                  on_startup).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Private Code
+% Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler during start up phase (will change to on/2 when a
@@ -98,6 +88,8 @@ init(Trigger) ->
                   Succ::node:node_type()}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
 on_startup({init_rt, Id, Pred, Succ}, {uninit, QueuedMessages, TriggerState}) ->
     TriggerState2 = trigger:next(TriggerState),
+    rm_loop:subscribe(self(), fun rm_loop:subscribe_dneighbor_change_filter/2,
+                      fun rm_send_update/3),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
       {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2}, on);
@@ -157,6 +149,10 @@ on({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
 on(Message, State) ->
     ?RT:handle_custom_message(Message, State).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% rt_loop:state_init() handling
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % handling rt_loop's (opaque) state - these handlers should at least be used
 % outside this module:
 
@@ -180,7 +176,20 @@ get_rt(State) -> element(4, State).
 -spec set_rt(State::state_init(), RT::?RT:rt()) -> NewState::state_init().
 set_rt(State, RT) -> setelement(4, State, RT).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Misc.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Notifies the node's routing table of a changed node ID, predecessor
+%%      and/or successor. Used to subscribe to the ring maintenance. 
+-spec rm_send_update(Subscriber::comm:erl_local_pid(),
+                     OldNeighbors::nodelist:neighborhood(),
+                     NewNeighbors::nodelist:neighborhood()) -> ok.
+rm_send_update(Pid, _OldNeighbors, NewNeighbors) ->
+    NewId = nodelist:nodeid(NewNeighbors),
+    NewPred = nodelist:pred(NewNeighbors),
+    NewSucc = nodelist:succ(NewNeighbors),
+    comm:send_local(Pid, {update_rt, NewId, NewPred, NewSucc}).
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
