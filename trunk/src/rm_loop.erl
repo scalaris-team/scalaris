@@ -30,21 +30,29 @@
          get_neighbors/1, get_neighbors_table/0,
          notify_new_pred/2, notify_new_succ/2,
          % node change subscriptions:
-         register_for_node_change/1, register_for_node_change/2,
-         unregister_from_node_change/1, unregister_from_node_change/2,
-         unregister_all_from_node_change/1]).
+         subscribe/1, subscribe/3,
+         unsubscribe/1, unsubscribe/3,
+         unsubscribe_all/1,
+         send_changes_to_subscriber/3,
+         subscribe_default_filter/2, subscribe_node_change_filter/2,
+         subscribe_dneighbor_change_filter/2]).
 % for rm_* modules only:
 -export([update_neighbors/2]).
 
--type subscriber_fun() :: fun((Subscriber::comm:erl_local_pid(),
-                               NewNode::node:node_type()) -> any()).
+-type subscriber_filter_fun() :: fun((OldNeighbors::nodelist:neighborhood(),
+                                      NewNeighbors::nodelist:neighborhood()) -> boolean()).
+-type subscriber_exec_fun() :: fun((Subscriber::comm:erl_local_pid(),
+                                    OldNeighbors::nodelist:neighborhood(),
+                                    NewNeighbors::nodelist:neighborhood()) -> any()).
+% TODO: change subscriptions to FilterFun -> [{Pid, ExecFun}] to minimize FilterFun executions (their may be duplicate funs)
 -type subscriber_list() :: [{Subscriber::comm:erl_local_pid(),
-                             ExecFun::subscriber_fun()}].
+                             FilterFun::subscriber_filter_fun(),
+                             ExecFun::subscriber_exec_fun()}].
 -type state_init() ::
-          {NeighbTable   :: tid(),
-           RM_State      :: ?RM:state(),
+          {NeighbTable :: tid(),
+           RM_State    :: ?RM:state(),
            % subscribers to node change events, i.e. node ID changes:
-           NCSubscribers :: subscriber_list()}.
+           Subscribers :: subscriber_list()}.
 -type(state_uninit() :: {uninit, QueuedMessages :: msg_queue:msg_queue()}).
 %% -type(state() :: state_init() | state_uninit()).
 
@@ -61,7 +69,10 @@
     {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {update_id, NewId::?RT:key()} |
-    {web_debug_info, Requestor::comm:erl_local_pid()}).
+    {web_debug_info, Requestor::comm:erl_local_pid()} |
+    {subscribe, Pid::comm:erl_local_pid(), subscriber_filter_fun(), subscriber_exec_fun()} |
+    {unsubscribe, Pid::comm:erl_local_pid(), subscriber_filter_fun(), subscriber_exec_fun()} |
+    {unsubscribe, Pid::comm:erl_local_pid()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -118,47 +129,63 @@ update_id(NewId) ->
     Pid = pid_groups:get_my(ring_maintenance),
     comm:send_local(Pid, {update_id, NewId}).
 
-%% @doc Default fun for node change updates.
--spec send_node_change(Pid::comm:erl_local_pid(), NewNode::node:node_type()) -> ok.
-send_node_change(Pid, NewNode) ->
-    comm:send_local(Pid, {node_update, NewNode}).
+%% @doc Default function to send changes to a subscriber when the neighborhood
+%%      changes.
+%% TODO: do not send new neighbors - the process can get it from the RM process
+-spec send_changes_to_subscriber(Pid::comm:erl_local_pid(),
+        OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> ok.
+send_changes_to_subscriber(Pid, OldNeighbors, NewNeighbors) ->
+    comm:send_local(Pid, {rm_changed, OldNeighbors, NewNeighbors}).
+
+-spec subscribe_default_filter(OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> boolean().
+subscribe_default_filter(OldNeighbors, NewNeighbors) ->
+    OldNeighbors =/= NewNeighbors.
+
+-spec subscribe_node_change_filter(OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> boolean().
+subscribe_node_change_filter(OldNeighbors, NewNeighbors) ->
+    nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors).
+
+%% @doc Returns true if the pred, succ or base node changed. 
+-spec subscribe_dneighbor_change_filter(OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> boolean().
+subscribe_dneighbor_change_filter(OldNeighbors, NewNeighbors) ->
+    nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
+        nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors) orelse
+        nodelist:succ(OldNeighbors) =/= nodelist:succ(NewNeighbors).
 
 %% @doc Registers the given process to receive {node_update, Node} messages if
 %%      the dht_node changes its id.
--spec register_for_node_change(Pid::comm:erl_local_pid()) -> ok.
-register_for_node_change(RegPid) ->
-    Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {reg_for_nc, RegPid, fun send_node_change/2}).
+-spec subscribe(Pid::comm:erl_local_pid()) -> ok.
+subscribe(RegPid) ->
+    subscribe(RegPid, fun subscribe_default_filter/2, fun send_changes_to_subscriber/3).
 
 %% @doc Registers the given function to be called when the dht_node changes its
 %%      id. It will get the given Pid and the new node as its parameters.
--spec register_for_node_change(Pid::comm:erl_local_pid(), subscriber_fun()) -> ok.
-register_for_node_change(RegPid, FunToExecute) ->
+-spec subscribe(Pid::comm:erl_local_pid(), subscriber_filter_fun(), subscriber_exec_fun()) -> ok.
+subscribe(RegPid, FilterFun, ExecFun) ->
     Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {reg_for_nc, RegPid, FunToExecute}).
+    comm:send_local(Pid, {subscribe, RegPid, FilterFun, ExecFun}).
 
 %% @doc Un-registers the given process from node change updates using the
 %%      default send_node_change/2 handler sending {node_update, Node} messages.
--spec unregister_from_node_change(Pid::comm:erl_local_pid()) -> ok.
-unregister_from_node_change(RegPid) ->
-    Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {unreg_from_nc, RegPid, fun send_node_change/2}).
-
-%% @doc Un-registers the given process from all node change updates using
-%%      any(!) message handler.
--spec unregister_all_from_node_change(Pid::comm:erl_local_pid()) -> ok.
-unregister_all_from_node_change(RegPid) ->
-    Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {unreg_from_nc, RegPid}).
+-spec unsubscribe(Pid::comm:erl_local_pid()) -> ok.
+unsubscribe(RegPid) ->
+    unsubscribe(RegPid, fun subscribe_default_filter/2, fun send_changes_to_subscriber/3).
 
 %% @doc Un-registers the given process from node change updates using
 %%      the given message handler.
 %%      Note that locally created funs may not be eligible for this as a newly
 %%      created fun may not compare equal to the previously created one.
--spec unregister_from_node_change(Pid::comm:erl_local_pid(), subscriber_fun()) -> ok.
-unregister_from_node_change(RegPid, FunToExecute) ->
+-spec unsubscribe(Pid::comm:erl_local_pid(), subscriber_filter_fun(), subscriber_exec_fun()) -> ok.
+unsubscribe(RegPid, FilterFun, ExecFun) ->
     Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {unreg_from_nc, RegPid, FunToExecute}).
+    comm:send_local(Pid, {unsubscribe, RegPid, FilterFun, ExecFun}).
+
+%% @doc Un-registers the given process from all node change updates using
+%%      any(!) message handler.
+-spec unsubscribe_all(Pid::comm:erl_local_pid()) -> ok.
+unsubscribe_all(RegPid) ->
+    Pid = pid_groups:get_my(ring_maintenance),
+    comm:send_local(Pid, {unsubscribe, RegPid}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -204,27 +231,27 @@ on_startup(Msg, {uninit, QueuedMessages}) ->
         ({leave, SourcePid::comm:erl_local_pid()}, state_init())
             -> {'$gen_component', [{on_handler, Handler::on_startup}],
                 State::state_uninit()}.
-on({get_neighb_tid, SourcePid}, {NeighbTable, _RM_State, _NCSubscribers} = State) ->
+on({get_neighb_tid, SourcePid}, {NeighbTable, _RM_State, _Subscribers} = State) ->
     comm:send_local(SourcePid, {get_neighb_tid_response, NeighbTable}),
     State;
 
-on({notify_new_pred, NewPred}, {NeighbTable, RM_State, NCSubscribers}) ->
+on({notify_new_pred, NewPred}, {NeighbTable, RM_State, Subscribers}) ->
     RMFun = fun() -> ?RM:new_pred(RM_State, NeighbTable, NewPred) end,
-    update_state(NeighbTable, NCSubscribers, RMFun);
+    update_state(NeighbTable, Subscribers, RMFun);
 
-on({notify_new_succ, NewSucc}, {NeighbTable, RM_State, NCSubscribers}) ->
+on({notify_new_succ, NewSucc}, {NeighbTable, RM_State, Subscribers}) ->
     RMFun = fun() -> ?RM:new_succ(RM_State, NeighbTable, NewSucc) end,
-    update_state(NeighbTable, NCSubscribers, RMFun);
+    update_state(NeighbTable, Subscribers, RMFun);
 
-on({pred_left, OldPred, PredsPred}, {NeighbTable, RM_State, NCSubscribers}) ->
+on({pred_left, OldPred, PredsPred}, {NeighbTable, RM_State, Subscribers}) ->
     RMFun = fun() -> ?RM:remove_pred(RM_State, NeighbTable, OldPred, PredsPred) end,
-    update_state(NeighbTable, NCSubscribers, RMFun);
+    update_state(NeighbTable, Subscribers, RMFun);
 
-on({succ_left, OldSucc, SuccsSucc}, {NeighbTable, RM_State, NCSubscribers}) ->
+on({succ_left, OldSucc, SuccsSucc}, {NeighbTable, RM_State, Subscribers}) ->
     RMFun = fun() -> ?RM:remove_succ(RM_State, NeighbTable, OldSucc, SuccsSucc) end,
-    update_state(NeighbTable, NCSubscribers, RMFun);
+    update_state(NeighbTable, Subscribers, RMFun);
 
-on({update_id, NewId}, {NeighbTable, RM_State, NCSubscribers} = State) ->
+on({update_id, NewId}, {NeighbTable, RM_State, Subscribers} = State) ->
     Neighborhood = get_neighbors(NeighbTable),
     OldMe = nodelist:node(Neighborhood),
     NewMe = node:update_id(OldMe, NewId),
@@ -236,7 +263,7 @@ on({update_id, NewId}, {NeighbTable, RM_State, NCSubscribers} = State) ->
                     update_neighbors(NeighbTable,
                                      nodelist:update_node(Neighborhood, NewMe)),
                     RMFun = fun() -> ?RM:updated_node(RM_State, NeighbTable, OldMe, NewMe) end,
-                    update_state(NeighbTable, NCSubscribers, RMFun)
+                    update_state(NeighbTable, Subscribers, RMFun)
                 end
             catch
                 throw:_ ->
@@ -249,7 +276,7 @@ on({update_id, NewId}, {NeighbTable, RM_State, NCSubscribers} = State) ->
         _ -> State
     end;
 
-on({leave, SourcePid}, {NeighbTable, RM_State, _NCSubscribers}) ->
+on({leave, SourcePid}, {NeighbTable, RM_State, _Subscribers}) ->
     Neighborhood = get_neighbors(NeighbTable),
     Me = nodelist:node(Neighborhood),
     Pred = nodelist:pred(Neighborhood),
@@ -261,31 +288,32 @@ on({leave, SourcePid}, {NeighbTable, RM_State, _NCSubscribers}) ->
     gen_component:change_handler({uninit, msg_queue:new()}, on_startup);
 
 % failure detector reported dead node
-on({crash, DeadPid}, {NeighbTable, RM_State, NCSubscribers}) ->
+on({crash, DeadPid}, {NeighbTable, RM_State, Subscribers}) ->
     RMFun = fun() -> ?RM:crashed_node(RM_State, NeighbTable, DeadPid) end,
-    update_state(NeighbTable, NCSubscribers, RMFun);
+    update_state(NeighbTable, Subscribers, RMFun);
 
 % dead-node-cache reported dead node to be alive again
-on({zombie, Node}, {NeighbTable, RM_State, NCSubscribers}) ->
+on({zombie, Node}, {NeighbTable, RM_State, Subscribers}) ->
     RMFun = fun() -> ?RM:zombie_node(RM_State, NeighbTable, Node) end,
-    update_state(NeighbTable, NCSubscribers, RMFun);
+    update_state(NeighbTable, Subscribers, RMFun);
 
 %% add Pid to the node change subscriber list
-on({reg_for_nc, Pid, FunToExecute}, {NeighbTable, RM_State, OldNCSubscr}) ->
-    NewNCSubscribers = [{Pid, FunToExecute} | OldNCSubscr],
-    {NeighbTable, RM_State, NewNCSubscribers};
+on({subscribe, Pid, FilterFun, ExecFun}, {NeighbTable, RM_State, OldSubscr}) ->
+    NewSubscribers = [{Pid, FilterFun, ExecFun} | OldSubscr],
+    {NeighbTable, RM_State, NewSubscribers};
 
-on({unreg_from_nc, Pid, FunToExecute}, {NeighbTable, RM_State, OldNCSubscr}) ->
-    SubscrTuple = {Pid, FunToExecute},
-    NewNCSubscribers = [X || X <- OldNCSubscr, X =/= SubscrTuple],
-    {NeighbTable, RM_State, NewNCSubscribers};
+on({unsubscribe, Pid, FilterFun, ExecFun}, {NeighbTable, RM_State, OldSubscr}) ->
+    SubscrTuple = {Pid, FilterFun, ExecFun},
+    NewSubscribers = [X || X <- OldSubscr, X =/= SubscrTuple],
+    {NeighbTable, RM_State, NewSubscribers};
 
-on({unreg_from_nc, Pid}, {NeighbTable, RM_State, OldNCSubscr}) ->
-    NewNCSubscribers = [X || X = {Subscr, _Fun} <- OldNCSubscr, Subscr =/= Pid],
-    {NeighbTable, RM_State, NewNCSubscribers};
+on({unsubscribe, Pid}, {NeighbTable, RM_State, OldSubscr}) ->
+    NewSubscribers = [X || X = {Subscr, _FilterFun, _ExecFun} <- OldSubscr,
+                             Subscr =/= Pid],
+    {NeighbTable, RM_State, NewSubscribers};
 
 % triggered by admin:dd_check_ring
-on({check_ring, Token, Master}, {NeighbTable, _RM_State, _NCSubscribers} = State) ->
+on({check_ring, Token, Master}, {NeighbTable, _RM_State, _Subscribers} = State) ->
     Neighborhood = get_neighbors(NeighbTable),
     Me = nodelist:node(Neighborhood),
     case {Token, Master} of
@@ -301,7 +329,7 @@ on({check_ring, Token, Master}, {NeighbTable, _RM_State, _NCSubscribers} = State
     State;
 
 % trigger by admin:dd_check_ring
-on({init_check_ring, Token}, {NeighbTable, _RM_State, _NCSubscribers} = State) ->
+on({init_check_ring, Token}, {NeighbTable, _RM_State, _Subscribers} = State) ->
     Neighborhood = get_neighbors(NeighbTable),
     Me = nodelist:node(Neighborhood),
     Pred = nodelist:pred(Neighborhood),
@@ -309,7 +337,7 @@ on({init_check_ring, Token}, {NeighbTable, _RM_State, _NCSubscribers} = State) -
                               {check_ring, Token - 1, Me}),
     State;
 
-on({web_debug_info, Requestor}, {NeighbTable, RM_State, NCSubscribers} = State) ->
+on({web_debug_info, Requestor}, {NeighbTable, RM_State, Subscribers} = State) ->
     Neighborhood = get_neighbors(NeighbTable),
     Preds = [{"preds:", ""} | make_indexed_nodelist(nodelist:preds(Neighborhood))],
     Succs = [{"succs:", ""} | make_indexed_nodelist(nodelist:succs(Neighborhood))],
@@ -319,35 +347,35 @@ on({web_debug_info, Requestor}, {NeighbTable, RM_State, NCSubscribers} = State) 
                     {web_debug_info_reply,
                      [{"algorithm", lists:flatten(io_lib:format("~p", [?RM]))},
                       {"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
-                      {"nc_subscr", lists:flatten(io_lib:format("~p", [[{webhelpers:pid_to_name(Pid), Fun} || {Pid, Fun} <- NCSubscribers]]))} |
+                      {"nc_subscr", lists:flatten(io_lib:format("~p", [[{webhelpers:pid_to_name(Pid), Fun} || {Pid, Fun} <- Subscribers]]))} |
                       lists:append(PredsSuccs, RM_Info)]}),
     State;
 
-on(Message, {NeighbTable, RM_State, NCSubscribers}) ->
+on(Message, {NeighbTable, RM_State, Subscribers}) ->
     % similar to update_state/2 but handle unknown_event differently
     OldNeighborhood = get_neighbors(NeighbTable),
     case ?RM:on(Message, RM_State, NeighbTable) of
         unknown_event -> unknown_event;
         NewRM_State   ->
             NewNeighborhood = get_neighbors(NeighbTable),
-            update_dht_node(OldNeighborhood, NewNeighborhood, NCSubscribers),
+            call_subscribers(OldNeighborhood, NewNeighborhood, Subscribers),
             update_failuredetector(OldNeighborhood, NewNeighborhood),
-            {NeighbTable, NewRM_State, NCSubscribers}
+            {NeighbTable, NewRM_State, Subscribers}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec update_state(NeighbTable::tid(), NCSubscribers::subscriber_list(),
+-spec update_state(NeighbTable::tid(), Subscribers::subscriber_list(),
                    RMFun::fun(() -> ?RM:state())) -> state_init().
-update_state(NeighbTable, NCSubscribers, RMFun) ->
+update_state(NeighbTable, Subscribers, RMFun) ->
     OldNeighborhood = get_neighbors(NeighbTable),
     NewRM_State = RMFun(),
     NewNeighborhood = get_neighbors(NeighbTable),
-    update_dht_node(OldNeighborhood, NewNeighborhood, NCSubscribers),
+    call_subscribers(OldNeighborhood, NewNeighborhood, Subscribers),
     update_failuredetector(OldNeighborhood, NewNeighborhood),
-    {NeighbTable, NewRM_State, NCSubscribers}.
+    {NeighbTable, NewRM_State, Subscribers}.
 
 %% @doc Updates the stored neighborhood object. Only use inside the rm_loop
 %%      process, i.e. in the rm_* modules called from here. Fails otherwise.
@@ -379,24 +407,24 @@ update_failuredetector(OldNeighborhood, NewNeighborhood) ->
     fd:update_subscriptions(OldPids, NewPids).
 
 %% @doc Inform the dht_node of a new neighborhood.
--spec update_dht_node(OldNeighborhood::nodelist:neighborhood(),
-                      NewNeighborhood::nodelist:neighborhood(),
-                      NCSubscribers::subscriber_list()) -> ok.
-update_dht_node(OldNeighborhood, NewNeighborhood, NCSubscribers) ->
-    case OldNeighborhood =/= NewNeighborhood of
-        true ->
-            OldNode = nodelist:node(OldNeighborhood),
-            NewNode = nodelist:node(NewNeighborhood),
-            case node:is_newer(NewNode, OldNode) of
-                true ->
-                    [Fun(Pid, NewNode) || {Pid, Fun} <- NCSubscribers],
-                    idholder:set_id(node:id(NewNode), node:id_version(NewNode));
-                _ -> ok
-            end,
-            comm:send_local(pid_groups:get_my(dht_node),
-                            {rm_update_neighbors, OldNeighborhood});
+-spec call_subscribers(OldNeighborhood::nodelist:neighborhood(),
+                       NewNeighborhood::nodelist:neighborhood(),
+                       Subscribers::subscriber_list()) -> ok.
+call_subscribers(OldNeighborhood, NewNeighborhood, Subscribers) ->
+    %TODO: change hard-coded id-holder subscription to an ordinary subscription
+    OldNode = nodelist:node(OldNeighborhood),
+    NewNode = nodelist:node(NewNeighborhood),
+    case node:is_newer(NewNode, OldNode) of
+        true -> idholder:set_id(node:id(NewNode), node:id_version(NewNode));
         _ -> ok
-    end.
+    end,
+    [begin
+         case FilterFun(OldNeighborhood, NewNeighborhood) of
+             true -> ExecFun(Pid, OldNeighborhood, NewNeighborhood);
+             _    -> ok
+         end
+     end || {Pid, FilterFun, ExecFun} <- Subscribers],
+    ok.
 
 %% @doc Helper for the web_debug_info handler. Converts the given node list to
 %%      an indexed node list containing string representations of the nodes.
