@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc    TODO: Add description to rm_loop
+%% @doc    Shared process for the ring maintenance implementations.
 %% @end
 %% @version $Id$
 -module(rm_loop).
