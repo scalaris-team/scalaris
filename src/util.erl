@@ -23,6 +23,10 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([global_uid/0]).
+-endif.
+
 -export([escape_quotes/1,
          min/2, max/2, logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
@@ -37,6 +41,8 @@
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
+
+-type global_uid() :: {pos_integer(), comm:mypid()}.
 
 %% @doc Applies start_link in the given Module with the given Parameters.
 -spec parameterized_start_link(Module::module(), Parameters::list()) -> term() | none().
@@ -343,7 +349,6 @@ get_pids_uid() ->
     erlang:put(pids_uid_counter, Result),
     Result.
 
--type global_uid() :: {pos_integer(), comm:mypid()}.
 -spec get_global_uid() -> global_uid().
 get_global_uid() ->
     _Result = {get_pids_uid(), comm:this()}
