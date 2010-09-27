@@ -92,9 +92,25 @@ parse_expression({atom, _, Atom}, ParseState) ->
 parse_expression({bin, _, [{bin_element,_,{string,_,String},default,default}]},
                  ParseState) ->
     tester_parse_state:add_binary(list_to_binary(String), ParseState);
-parse_expression({bin,_,[{bin_element,_,{var,_,_},{integer,_,128},default}]},
+parse_expression({bin, _, [{bin_element,_,{var,_,_},{integer,_,_},default}]},
                  ParseState) ->
     ParseState;
+parse_expression({bin, _, [{bin_element,_,{var,_,_},{integer,_,_},[binary]}]},
+                 ParseState) ->
+    ParseState;
+parse_expression({bin, _, [{bin_element,_,{var,_,_},default,[binary]}]},
+                 ParseState) ->
+    ParseState;
+parse_expression({bin, _, []}, ParseState) ->
+    ParseState;
+parse_expression({bin, _, Elements}, ParseState) when is_list(Elements) ->
+    BinStrings =
+        [String ||
+         {bin_element,_,{string,_,String},default,default} <- Elements],
+    lists:foldl(
+      fun(String, Acc) ->
+              tester_parse_state:add_binary(list_to_binary(String), Acc)
+      end, ParseState, BinStrings);
 parse_expression({float, _, Float}, ParseState) ->
     tester_parse_state:add_float(Float, ParseState);
 parse_expression({char, _, _Char}, ParseState) ->
