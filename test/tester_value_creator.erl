@@ -167,13 +167,13 @@ create_record_value(RecordName, Types, Size, ParseState) when is_list(Types) ->
 create_record_value(RecordName, {record, Types}, Size, ParseState) ->
     create_record_value(RecordName, Types, Size, ParseState).
 
--spec create_integer(integer, integer, fun(), list(integer())) ->
+-spec create_integer(integer(), integer(), fun((integer()) -> boolean()), [integer()]) ->
     integer().
 create_integer(Min, Max, Filter, Integers) ->
     case crypto:rand_uniform(0, 2) of
         0 ->
             % take one of the collected integers
-            GoodIntegers = [X || X <- Integers, Filter],
+            GoodIntegers = [X || X <- Integers, Filter(X)],
             case length(GoodIntegers) of
                 0 ->
                     crypto:rand_uniform(Min, Max + 1);

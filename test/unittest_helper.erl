@@ -37,7 +37,7 @@
 %%      "/bin" yet. Assumes that the current working directory is a sub-dir of
 %%      our top-level, e.g. "test". This is needed in order for the config
 %%      process to find its (default) config files.
--spec fix_cwd() -> ok | {error, Reason::file:ext_posix()}.
+-spec fix_cwd() -> ok | {error, Reason::file:posix()}.
 fix_cwd() ->
     case file:get_cwd() of
         {ok, CurCWD} ->
