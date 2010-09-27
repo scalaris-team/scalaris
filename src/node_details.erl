@@ -24,6 +24,7 @@
          contains/2, get/2, set/3]).
 
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
 -export_type([node_details/0, node_details_name/0,
@@ -40,19 +41,13 @@
                              succlist | load | hostname | rt_size |
                              message_log | memory).
 
--record(node_details, {predlist    :: nodelist:non_empty_snodelist(),
-                       node        :: node:node_type(),
-                       succlist    :: nodelist:non_empty_snodelist(),
-                       load        :: load(),
-                       hostname    :: hostname(),
-                       rt_size     :: rt_size(),
-                       memory      :: memory()}).
-% TODO: copy field declarations from record definition with their types into #node_details{}
-%       (erlang otherwise thinks of a field type as 'unknown' | type())
-%       http://www.erlang.org/doc/reference_manual/typespec.html#id2272601
-%       dialyzer up to R14A can not handle these definitions though
-%       http://www.erlang.org/cgi-bin/ezmlm-cgi?2:mss:1979:cbgdipmboiafbbcfaifn
-%       -> be careful when using this type with the tester module!
+-record(node_details, {predlist = ?required(node_details, predlist) :: nodelist:non_empty_snodelist(),
+                       node     = ?required(node_details, node)     :: node:node_type(),
+                       succlist = ?required(node_details, succlist) :: nodelist:non_empty_snodelist(),
+                       load     = ?required(node_details, load)     :: load(),
+                       hostname = ?required(node_details, hostname) :: hostname(),
+                       rt_size  = ?required(node_details, rt_size)  :: rt_size(),
+                       memory   = ?required(node_details, memory)   :: memory()}).
 -type(node_details_record() :: #node_details{}).
 
 -type(node_details_list() ::

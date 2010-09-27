@@ -28,18 +28,15 @@
 -export([mk_interval_between_ids/2, mk_interval_between_nodes/2]).
 
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
 -export_type([node_type/0]).
 -endif.
 
--record(node, {pid :: comm:mypid(), id :: ?RT:key(), id_version :: non_neg_integer()}).
-% TODO: copy field declarations from record definition with their types into #node{}
-%       (erlang otherwise thinks of a field type as 'unknown' | type())
-%       http://www.erlang.org/doc/reference_manual/typespec.html#id2272601
-%       dialyzer up to R14A can not handle these definitions though
-%       http://www.erlang.org/cgi-bin/ezmlm-cgi?2:mss:1979:cbgdipmboiafbbcfaifn
-%       -> be careful when using this type with the tester module!
+-record(node, {pid        = ?required(node, pid)        :: comm:mypid(),
+               id         = ?required(node, id)         :: ?RT:key(),
+               id_version = ?required(node, id_version) :: non_neg_integer()}).
 -opaque(node_type() :: #node{}).
 
 %% @doc Creates a new node.

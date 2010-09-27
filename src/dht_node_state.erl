@@ -21,6 +21,7 @@
 
 -include("transstore/trecords.hrl").
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 -export([new/3,
          get/2,
@@ -49,24 +50,18 @@
 -type join_time() :: {MegaSecs::non_neg_integer(), Secs::non_neg_integer(), MicroSecs::non_neg_integer()}.
 
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
--record(state, {rt         :: ?RT:external_rt(),
-                neighbors  :: tid(),
-                join_time  :: join_time(),
-                trans_log  :: #translog{},
-                db         :: ?DB:db(),
-                tx_tp_db   :: any(),
-                proposer   :: pid(),
+-record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
+                neighbors  = ?required(state, neighbors) :: tid(),
+                join_time  = ?required(state, join_time) :: join_time(),
+                trans_log  = ?required(state, trans_log) :: #translog{},
+                db         = ?required(state, db)        :: ?DB:db(),
+                tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
+                proposer   = ?required(state, proposer)  :: pid(),
                 slide_pred = null :: slide_op:slide_op() | null, % slide with pred (must not overlap with 'slide with succ'!)
                 slide_succ = null :: slide_op:slide_op() | null, % slide with succ (must not overlap with 'slide with pred'!)
                 msg_fwd    = []   :: [{intervals:interval(), comm:mypid()}],
                 db_range   = intervals:empty() :: intervals:interval() % additional range to respond to during a move
                }).
-% TODO: copy field declarations from record definition with their types into #state{}
-%       (erlang otherwise thinks of a field type as 'unknown' | type())
-%       http://www.erlang.org/doc/reference_manual/typespec.html#id2272601
-%       dialyzer up to R14A can not handle these definitions though
-%       http://www.erlang.org/cgi-bin/ezmlm-cgi?2:mss:1979:cbgdipmboiafbbcfaifn
-%       -> be careful when using this type with the tester module!
 -opaque state() :: #state{}.
 
 %% userdevguide-begin dht_node_state:state
