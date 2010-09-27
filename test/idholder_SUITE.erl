@@ -25,6 +25,7 @@
 
 -compile(export_all).
 
+-include("scalaris.hrl").
 -include("unittest.hrl").
 
 all() ->
@@ -65,11 +66,11 @@ getset_key(_Config) ->
              {idholder_get_id_response, D, _Dversion} -> D
          end,
     %ct:pal("X: ~p~n",[_X]),
-    idholder:set_id("getset_key", 1),
+    NewId = ?RT:hash_key("getset_key"),
+    idholder:set_id(NewId, 1),
     idholder:get_id(),
     Res = receive
               {idholder_get_id_response, Id, IdVersion} -> {Id, IdVersion}
-    end,
-    ?equals(Res, {"getset_key", 1}),
+          end,
+    ?equals(Res, {NewId, 1}),
     ok.
-

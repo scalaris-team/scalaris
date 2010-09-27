@@ -51,17 +51,17 @@ end_per_suite(_Config) ->
     ok.
 
 new(_Config) ->
-    ?assert(intervals:is_well_formed(intervals:new('[', "a", "b", ']'))),
+    ?assert(intervals:is_well_formed(intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'))),
     ?equals(intervals:new(minus_infinity), intervals:new('(',plus_infinity,minus_infinity,']')).
 
 is_empty(_Config) ->
-    NotEmpty = intervals:new('[', "a", "b", ']'),
+    NotEmpty = intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'),
     Empty = intervals:empty(),
     ?assert(not intervals:is_empty(NotEmpty)),
     ?assert(intervals:is_empty(Empty)).
 
 intersection(_Config) ->
-    NotEmpty = intervals:new('[', "a", "b", ']'),
+    NotEmpty = intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'),
     Empty = intervals:empty(),
     ?assert(intervals:is_empty(intervals:intersection(NotEmpty, Empty))),
     ?assert(intervals:is_empty(intervals:intersection(Empty, NotEmpty))),
@@ -242,18 +242,15 @@ prop_new4_bounds(XBr, X, Y, YBr) ->
 
 -spec prop_new4(intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()) -> boolean().
 prop_new4(XBr, X, Y, YBr) ->
+    I = intervals:new(XBr, X, Y, YBr),
     ?implies(XBr =:= '(' andalso YBr =:= ')' andalso X =:= Y,
-             intervals:is_empty(intervals:new(XBr, X, Y, YBr))) andalso
-        ?implies(XBr =:= '[' orelse YBr =:= ']',
-             not intervals:is_empty(intervals:new(XBr, X, Y, YBr))) andalso
-        ?implies(XBr =:= '[',
-             intervals:in(X, intervals:new(XBr, X, Y, YBr))) andalso
-        ?implies(XBr =:= '(',
-             not intervals:in(X, intervals:new(XBr, X, Y, YBr))) andalso
-        ?implies(YBr =:= ']',
-             intervals:in(Y, intervals:new(XBr, X, Y, YBr))) andalso
-        ?implies(XBr =:= ')',
-             not intervals:in(Y, intervals:new(XBr, X, Y, YBr))).
+             intervals:is_empty(I)) andalso
+    ?implies(XBr =:= '[' orelse YBr =:= ']',
+             not intervals:is_empty(I)) andalso
+    ?implies(XBr =:= '[', intervals:in(X, I)) andalso
+    ?implies(XBr =:= '(', not intervals:in(X, I)) andalso
+    ?implies(YBr =:= ']', intervals:in(Y, I)) andalso
+    ?implies(YBr =:= ')', not intervals:in(Y, I)).
 
 tester_new4_well_formed(_Config) ->
     tester:test(intervals_SUITE, prop_new4_well_formed, 4, 5000).

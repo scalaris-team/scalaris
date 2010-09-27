@@ -47,23 +47,23 @@ end_per_suite(Config) ->
 
 make_tfun(Key) ->
     fun (TransLog)->
-	    {Result, TransLog1} = transaction_api:read(Key, TransLog),
-	    {Result2, TransLog2} =
-		if
-		    Result =:= fail ->
-			Value = 0,
-			transaction_api:write(Key, Value, TransLog);
-		    true ->
-			{value, Val} = Result,
-			Value = Val + 1,
-			transaction_api:write(Key, Value, TransLog1)
-		end,
-	    if
-		Result2 =:= ok ->
-		    {{ok, Value}, TransLog2};
-		true ->
-		    {{fail, abort}, TransLog2}
-	    end
+             {Result, TransLog1} = transaction_api:read(Key, TransLog),
+             {Result2, TransLog2} =
+                 case Result of
+                     {fail, _} ->
+                         Value = 0,
+                         transaction_api:write(Key, Value, TransLog);
+                     _ ->
+                         {value, Val} = Result,
+                         Value = Val + 1,
+                         transaction_api:write(Key, Value, TransLog1)
+                 end,
+             if
+                 Result2 =:= ok ->
+                     {{ok, Value}, TransLog2};
+                 true ->
+                     {{fail, abort}, TransLog2}
+             end
     end.
 
 process(Parent, Key, Count) ->

@@ -12,6 +12,7 @@
 
 -compile(export_all).
 
+-include("scalaris.hrl").
 -include("unittest.hrl").
 
 all() ->
@@ -61,16 +62,19 @@ test_init(Config) ->
     config:write(vivaldi_interval, 100),
     EmptyMsgQueue = msg_queue:new(),
     FullState1 = vivaldi:init('trigger_periodic'),
+    Trigger1 = trigger:init('trigger_periodic', vivaldi),
     ?equals_pattern(FullState1,
                     {'$gen_component', [{on_handler, on_startup}],
-                     {uninit, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}}),
+                     {uninit, EmptyMsgQueue, Trigger1}}),
     {'$gen_component', [{on_handler, on_startup}], InitialState1} = FullState1,
     ?expect_no_message(),
     
+    Trigger2 = trigger:now(Trigger1),
+    ?expect_message({trigger}),
     FullState2 = vivaldi:on_startup({init_vivaldi}, InitialState1),
     ?equals_pattern(FullState2,
                     {'$gen_component', [{on_handler, on}],
-                     {[_X, _Y], 1.0, {'trigger_periodic', _TriggerState}}}),
+                     {[_X, _Y], 1.0, Trigger2}}),
     ?expect_message({trigger}),
     ?expect_no_message(),
     Config.
@@ -79,13 +83,16 @@ test_on_trigger(Config) ->
     pid_groups:join_as(atom_to_list(?MODULE), cyclon),
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
-    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    Trigger1 = get_ptrigger_nodelay(),
+    InitialState = {Coordinate, Confidence, Trigger1},
     {NewCoordinate, NewConfidence, NewTriggerState} =
         vivaldi:on({trigger}, InitialState),
 
     Self = self(),
     ?equals(Coordinate, NewCoordinate),
     ?equals(Confidence, NewConfidence),
+    % note: cannot compare with an opaque trigger state from trigger:next/1
+    % since the timer ref will be different
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({get_subset_rand, 1, Self}),
     ?expect_message({trigger}),
@@ -130,7 +137,7 @@ test_on_cy_cache2(Config) ->
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
-    Cache = [node:new(comm:make_global(self()), 10, 0)],
+    Cache = [node:new(comm:make_global(self()), ?RT:hash_key(10), 0)],
     NewState =
         vivaldi:on({cy_cache, Cache}, InitialState),
 
@@ -148,7 +155,7 @@ test_on_cy_cache3(Config) ->
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
     % non-empty node cache
-    Cache = [node:new(comm:make_global(self()), 10, 0)],
+    Cache = [node:new(comm:make_global(self()), ?RT:hash_key(10), 0)],
     NewState =
         vivaldi:on({cy_cache, Cache}, InitialState),
 
