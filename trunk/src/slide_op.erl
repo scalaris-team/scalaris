@@ -29,6 +29,7 @@
          get_phase/1, set_phase/2]).
 
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
 -export_type([slide_op/0, id/0, slide_phase/0]).
@@ -44,12 +45,12 @@
         wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
         wait_for_data | wait_for_delta. % receiving node
 
--record(slide_op, {type                       :: 'send' | 'rcv',
-                   id                         :: id(),
-                   node                       :: comm:mypid(), % the node, data is received from
-                   interval                   :: intervals:interval(), % receive data in this range
-                   target_id                  :: ?RT:key(), % ID to move the predecessor to
-                   tag                        :: any(),
+-record(slide_op, {type       = ?required(slide_op, type)      :: 'send' | 'rcv',
+                   id         = ?required(slide_op, id)        :: id(),
+                   node       = ?required(slide_op, node)      :: comm:mypid(), % the node, data is sent to/received from
+                   interval   = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
+                   target_id  = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
+                   tag        = ?required(slide_op, tag)       :: any(),
                    source_pid = null          :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
                    timer      = {null, nomsg} :: {reference(), comm:message()} | {null, nomsg}, % timeout timer
                    timeouts   = 0             :: non_neg_integer(),

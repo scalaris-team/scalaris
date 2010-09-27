@@ -21,6 +21,7 @@
 %%%-------------------------------------------------------------------
 %% @version $Id$
 -include_lib("../include/scalaris.hrl").
+-include("record_helpers.hrl").
 
 -type(test_any() ::
    % | none()

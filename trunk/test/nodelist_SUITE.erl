@@ -2615,13 +2615,10 @@ prop_largest_smaller_than2(BaseNode, AddNodes_, PredsLength, SuccsLength, Id) ->
     AddNodes_2 = lists:usort(fun(A, B) -> node:pidX(A) =< node:pidX(B) end, AddNodes_),
     AddNodes = [Node || Node <- AddNodes_2,
                         not node:same_process(Node, BaseNode),
-                        node:id(Node) =/= node:id(BaseNode),
-                        node:id(Node) =/= undefined],
+                        node:id(Node) =/= node:id(BaseNode)],
         
-    ?implies(node:id(BaseNode) =/= undefined,
-             prop_largest_smaller_than2_fixed_types(
-               BaseNode, AddNodes, PredsLength, SuccsLength, Id)),
-    true.
+    prop_largest_smaller_than2_fixed_types(
+      BaseNode, AddNodes, PredsLength, SuccsLength, Id).
 
 -spec prop_largest_smaller_than2_fixed_types(BaseNode::node:node_type(), AddNodes::[node:node_type()], PredsLength::pos_integer(), SuccsLength::pos_integer(), Id::?RT:key()) -> true.
 prop_largest_smaller_than2_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLength, Id) ->
@@ -2643,7 +2640,8 @@ prop_largest_smaller_than2_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLen
                          intervals:in(node:id(Node),
                                       intervals:new('(', node:id(LSTNode), Id, ')'))],
             ?equals([LSTNode | BetterNodes], [LSTNode])
-    end.
+    end,
+    true.
 
 tester_largest_smaller_than2(_Config) ->
     tester:test(?MODULE, prop_largest_smaller_than2, 5, 5000).
@@ -2652,8 +2650,8 @@ largest_smaller_than2(_Config) ->
     % some tests that previously failed:
     prop_largest_smaller_than2(
       {node, {{{197,151,185,165},1,{one,'ct@csr-pc40'}}, c,{}}, 1,0},
-      [{node,undefined,3,5},
-       {node, {{{39,220,200,75},3,{two,'ct@csr-pc40'}}, c,101.41898888632392},4,undefined},
+      [{node, {{{197,151,185,165},1,{one,'ct@csr-pc40'}}, c,{}}, 3,5},
+       {node, {{{39,220,200,75},3,{two,'ct@csr-pc40'}}, c,101.41898888632392},4,0},
        {node, {{10,87,88,118},1,{three,'ct@csr-pc40'}}, 5,4}],
       1, 1, 5),
     
@@ -2666,7 +2664,7 @@ largest_smaller_than2(_Config) ->
         4,1},
        {node,
         {{{12076,15918,45197,41953,9328,37838,58170,26800}, 4,one}, c,42},
-        5,undefined},
+        5,0},
        {node, {{{25,8,53,113}, 5, {four,'ct@csr-pc40'}}, c, {3}}, 2,4}],
       1, 1, 5).
 
@@ -2676,13 +2674,11 @@ prop_largest_smaller_than3(BaseNode, AddNodes_, PredsLength, SuccsLength, Id) ->
     AddNodes_2 = lists:usort(fun(A, B) -> node:pidX(A) =< node:pidX(B) end, AddNodes_),
     AddNodes = [Node || Node <- AddNodes_2,
                         not node:same_process(Node, BaseNode),
-                        node:id(Node) =/= node:id(BaseNode),
-                        node:id(Node) =/= undefined],
+                        node:id(Node) =/= node:id(BaseNode)],
         
-    ?implies(node:id(BaseNode) =/= undefined andalso AddNodes =/= [],
+    ?implies(AddNodes =/= [],
              prop_largest_smaller_than3_fixed_types(
-               BaseNode, AddNodes, PredsLength, SuccsLength, Id, util:randomelem(AddNodes))),
-    true.
+               BaseNode, AddNodes, PredsLength, SuccsLength, Id, util:randomelem(AddNodes))).
 
 -spec prop_largest_smaller_than3_fixed_types(BaseNode::node:node_type(), AddNodes::[node:node_type()], PredsLength::pos_integer(), SuccsLength::pos_integer(), Id::?RT:key(), LastFound::node:node_type()) -> true.
 prop_largest_smaller_than3_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLength, Id, LastFound) ->
@@ -2708,7 +2704,8 @@ prop_largest_smaller_than3_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLen
                                               intervals:new('(', node:id(LSTNode), Id, ')'))],
                     ?equals([LSTNode | BetterNodes], [LSTNode])
             end
-    end.
+    end,
+    true.
 
 tester_largest_smaller_than3(_Config) ->
     tester:test(?MODULE, prop_largest_smaller_than3, 5, 5000).
@@ -2722,11 +2719,11 @@ largest_smaller_than3(_Config) ->
     
     prop_largest_smaller_than3_fixed_types(
         {node, proc1, 2, 1},
-        [{node, proc2, 5, undefined}, {node, proc3, 4, 4}],
+        [{node, proc2, 5, 0}, {node, proc3, 4, 4}],
         2, 5, 3, {node, proc4, 5, 0}),
     
     prop_largest_smaller_than3_fixed_types(
       {node, proc1, 2, 1},
-      [{node, proc2, 5, undefined}, {node, proc3, 3, 1}],
+      [{node, proc2, 5, 0}, {node, proc3, 3, 1}],
       1, 1, 2, {node, proc3, 3, 1})
 .
