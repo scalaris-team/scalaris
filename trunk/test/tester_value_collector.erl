@@ -87,11 +87,11 @@ parse_expression({remote, _, Module, Fun}, ParseState) ->
     parse_expression(Module, parse_expression(Fun, ParseState));
 parse_expression({var, _, _Variable}, ParseState) ->
     ParseState;
-
 parse_expression({atom, _, Atom}, ParseState) ->
     tester_parse_state:add_atom(Atom, ParseState);
-parse_expression({bin, _, Binary}, ParseState) ->
-    tester_parse_state:add_binary(Binary, ParseState);
+parse_expression({bin, _, [{bin_element,_,{string,_,String},default,default}]},
+                 ParseState) ->
+    tester_parse_state:add_binary(list_to_binary(String), ParseState);
 parse_expression({float, _, Float}, ParseState) ->
     tester_parse_state:add_float(Float, ParseState);
 parse_expression({char, _, _Char}, ParseState) ->

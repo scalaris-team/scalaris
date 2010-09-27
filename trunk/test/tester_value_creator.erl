@@ -91,13 +91,7 @@ create_value(binary, _Size, ParseState) ->
         0 ->
             ?ct_fail("error: cannot create binaries~n", []);
         Length ->
-            Binary = lists:nth(crypto:rand_uniform(1 , Length + 1), Binaries),
-            case Binary of
-                [{bin_element,_,{string,_,String},default,default}] ->
-                    list_to_binary(String);
-                _ ->
-                    ?ct_fail("cannot a create a binary out of: ~w", [Binary])
-            end
+            lists:nth(crypto:rand_uniform(1 , Length + 1), Binaries)
     end;
 create_value(bool, _Size, _ParseState) ->
     case crypto:rand_uniform(0, 2) of
