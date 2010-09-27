@@ -22,7 +22,7 @@ MAKE = make
 VERSION=0.0.1
 OTP_ERLANG_VERSION=1.5.3
 
-.PHONY: all compile test test-vts java java-clean clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test test-clean
+.PHONY: all compile test test-vts java java-clean clean docs svn dialyzer rrd-init install install-erlang install-java install-docs java-test test-clean %_SUITE %_SUITE-dialyzer
 
 YAWS_PATH= /usr/local/lib/yaws
 
@@ -152,6 +152,9 @@ svn:
 
 dialyzer: compile
 	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ --no_native
+
+%_SUITE-dialyzer: compile
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/$*_SUITE.erl --no_native
 
 plt: compile
 	dialyzer --plt_info > /dev/null ; \
