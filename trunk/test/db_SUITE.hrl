@@ -18,8 +18,7 @@
 %%% @end
 %% @version $Id$
 
--include("../include/scalaris.hrl").
-
+-include("scalaris.hrl").
 -include("unittest.hrl").
 
 tests_avail() ->

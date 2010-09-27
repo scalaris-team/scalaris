@@ -20,8 +20,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--include_lib("unittest.hrl").
--include_lib("tester.hrl").
+-include("unittest.hrl").
+-include("tester.hrl").
 
 -export([create_value/3]).
 

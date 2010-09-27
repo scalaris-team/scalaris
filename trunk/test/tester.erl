@@ -27,8 +27,8 @@
 
 -export([test/4]).
 
--include_lib("tester.hrl").
--include_lib("unittest.hrl").
+-include("tester.hrl").
+-include("unittest.hrl").
 
 -spec test/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
 test(Module, Func, Arity, Iterations) ->

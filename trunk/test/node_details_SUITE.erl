@@ -27,8 +27,8 @@
 
 -compile(export_all).
 
--include("../include/scalaris.hrl").
--include_lib("unittest.hrl").
+-include("scalaris.hrl").
+-include("unittest.hrl").
 
 all() ->
     [tester_new0, tester_new7,

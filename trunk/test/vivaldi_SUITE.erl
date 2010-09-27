@@ -12,7 +12,7 @@
 
 -compile(export_all).
 
--include_lib("unittest.hrl").
+-include("unittest.hrl").
 
 all() ->
     [test_init,

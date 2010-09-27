@@ -44,7 +44,7 @@
 
          is_known_type/3, lookup_type/2]).
 
--include_lib("tester.hrl").
+-include("tester.hrl").
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
