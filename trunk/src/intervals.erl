@@ -44,7 +44,7 @@
         ]).
 
 -ifdef(with_export_type_support).
--export_type([interval/0, key/0]).
+-export_type([interval/0, key/0, left_bracket/0, right_bracket/0]).
 -endif.
 
 -type(left_bracket() :: '(' | '[').
