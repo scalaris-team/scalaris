@@ -26,7 +26,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--include_lib("unittest.hrl").
+-include("unittest.hrl").
 
 -export([parse_expression/2]).
 

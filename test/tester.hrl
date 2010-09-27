@@ -20,7 +20,7 @@
 %%% Created :  30 April 2010 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @version $Id$
--include_lib("../include/scalaris.hrl").
+-include("scalaris.hrl").
 -include("record_helpers.hrl").
 
 -type(test_any() ::

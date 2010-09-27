@@ -27,8 +27,7 @@
 
 -compile(export_all).
 
--include("../include/scalaris.hrl").
-
+-include("scalaris.hrl").
 -include("unittest.hrl").
 
 all() ->
