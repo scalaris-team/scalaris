@@ -1199,24 +1199,34 @@ test_on_get_values_all6(Config) ->
     Config.
 
 % helper functions:
+% note: use manageable values for Triggered, Msg_exch, Converge_avg_count!
+-spec create_gossip_state(Values::gossip_state:values_internal(),
+                          Initialized::boolean(),
+                          Triggered::0..1000,
+                          Msg_exch::0..1000,
+                          Converge_avg_count::0..1000)
+        -> gossip_state:state().
 create_gossip_state(Values, Initialized, Triggered, Msg_exch, Converge_avg_count) ->
     S1 = gossip_state:new_state(Values),
     S2 = case Initialized of
              true -> gossip_state:set_initialized(S1);
              false -> S1
          end,
-    S3 = case Triggered of
-             0 -> S2;
-             _ -> lists:foldl(fun(_, LastState) -> gossip_state:inc_triggered(LastState) end, S2, lists:seq(1, Triggered))
-         end,
-    S4 = case Msg_exch of
-             0 -> S3;
-             _ -> lists:foldl(fun(_, LastState) -> gossip_state:inc_msg_exch(LastState) end, S3, lists:seq(1, Msg_exch))
-         end,
-    _S5 = case Converge_avg_count of
-             0 -> S4;
-             _ -> lists:foldl(fun(_, LastState) -> gossip_state:inc_converge_avg_count(LastState) end, S4, lists:seq(1, Converge_avg_count))
-         end.
+    S3 = inc_triggered(S2, Triggered),
+    S4 = inc_msg_exch(S3, Msg_exch),
+    _S5 = inc_converge_avg_count(S4, Converge_avg_count).
+
+-spec inc_triggered(State::gossip_state:state(), Count::non_neg_integer()) -> gossip_state:state().
+inc_triggered(State, 0) -> State;
+inc_triggered(State, Count) -> inc_triggered(gossip_state:inc_triggered(State), Count - 1).
+
+-spec inc_msg_exch(State::gossip_state:state(), Count::non_neg_integer()) -> gossip_state:state().
+inc_msg_exch(State, 0) -> State;
+inc_msg_exch(State, Count) -> inc_msg_exch(gossip_state:inc_msg_exch(State), Count - 1).
+
+-spec inc_converge_avg_count(State::gossip_state:state(), Count::non_neg_integer()) -> gossip_state:state().
+inc_converge_avg_count(State, 0) -> State;
+inc_converge_avg_count(State, Count) -> inc_converge_avg_count(gossip_state:inc_converge_avg_count(State), Count - 1).
 
 reset_config() ->
     config:write(gossip_interval, 1000),

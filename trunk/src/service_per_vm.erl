@@ -79,12 +79,14 @@ get_live_dht_nodes() ->
 -spec get_round_trip(GPid::comm:mypid(), Iterations::pos_integer()) -> float().
 get_round_trip(GPid, Iterations) ->
     Start = erlang:now(),
-    [ begin
-          comm:send(GPid, {ping, comm:this()}),
-          receive
-              _Any -> ok
-          end
-      end
-      || _ <- lists:seq(1, Iterations) ],
+    get_round_trip_helper(GPid, Iterations),
     End = erlang:now(),
     timer:now_diff(End, Start) / Iterations.
+
+-spec get_round_trip_helper(GPid::comm:mypid(), Iterations::pos_integer()) -> ok.
+get_round_trip_helper(_GPid, 0) ->
+    ok;
+get_round_trip_helper(GPid, Iterations) ->
+    comm:send(GPid, {ping, comm:this()}),
+    receive _Any -> ok end,
+    get_round_trip_helper(GPid, Iterations - 1).

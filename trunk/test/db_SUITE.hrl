@@ -321,7 +321,7 @@ tester_set_entry(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_update_entry(DBEntry1::db_entry:entry(), Value2::?DB:value(), WriteLock2::boolean(),
-                        ReadLock2::non_neg_integer(), Version2::?DB:version()) -> true.
+                        ReadLock2::0..10, Version2::?DB:version()) -> true.
 prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DBEntry2 = create_db_entry(db_entry:get_key(DBEntry1), Value2, WriteLock2, ReadLock2, Version2),
     DB = ?TEST_DB:new(?RT:hash_key(1)),
@@ -603,7 +603,7 @@ tester_write_read_lock(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_delete(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                  ReadLock::non_neg_integer(), Version::?DB:version(), Key2::?RT:key()) -> true.
+                  ReadLock::0..10, Version::?DB:version(), Key2::?RT:key()) -> true.
 prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     DB = ?TEST_DB:new(?RT:hash_key(1)),
     DBEntry = create_db_entry(Key, Value, WriteLock, ReadLock, Version),
@@ -1666,18 +1666,20 @@ check_entry(DB, Key, ExpDBEntry, ExpRead, ExpExists, Note) ->
     ?equals_w_note(?TEST_DB:read(DB, Key), ExpRead, Note),
     true.
 
+% note: use manageable values for ReadLock!
 -spec create_db_entry(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                      ReadLock::non_neg_integer(), Version::?DB:version() | -1) -> db_entry:entry().
+                      ReadLock::0..1000, Version::?DB:version() | -1) -> db_entry:entry().
 create_db_entry(Key, Value, WriteLock, ReadLock, Version) ->
     E1 = db_entry:new(Key, Value, Version),
     E2 = case WriteLock of
              true -> db_entry:set_writelock(E1);
              _    -> E1
          end,
-    _E3 = case ReadLock of
-              0 -> E2;
-              _ -> lists:foldl(fun(_, ETmp) -> db_entry:inc_readlock(ETmp) end, E2, lists:seq(1, ReadLock))
-          end.
+    _E3 = inc_readlock(E2, ReadLock).
+
+-spec inc_readlock(DBEntry::db_entry:entry(), Count::non_neg_integer()) -> db_entry:entry().
+inc_readlock(DBEntry, 0) -> DBEntry;
+inc_readlock(DBEntry, Count) -> inc_readlock(db_entry:inc_readlock(DBEntry), Count - 1).
 
 -spec check_db(DB::?TEST_DB:db(),
                ExpCheckDB::{true, []} | {false, InvalidEntries::?TEST_DB:db_as_list()},

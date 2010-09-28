@@ -48,11 +48,10 @@ add_node(Options) ->
     ok.
 
 -spec add_nodes(non_neg_integer()) -> ok.
-add_nodes(0) ->
-    ok;
+add_nodes(0) -> ok;
 add_nodes(Count) ->
-    [ add_node([]) || _ <- lists:seq(1, Count) ],
-    ok.
+    add_node([]),
+    add_nodes(Count - 1).
 %% userdevguide-end admin:add_nodes
 
 %% @doc Deletes nodes started with add_nodes();
@@ -60,10 +59,10 @@ add_nodes(Count) ->
 %%      Beware: Other processes in main_sup must not be started with
 %%      a list as their name!
 -spec del_nodes(integer()) -> ok.
+del_nodes(0) -> ok;
 del_nodes(Count) ->
-    [ del_single_node(supervisor:which_children(main_sup))
-      || _ <- lists:seq(1, Count) ],
-    ok.
+    del_single_node(supervisor:which_children(main_sup)),
+    del_nodes(Count - 1).
 
 %% @doc Delete a single node if its Id, i.e. name, is a list.
 -spec del_single_node([{Id::term() | undefined, Child::pid() | undefined,
