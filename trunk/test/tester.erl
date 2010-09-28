@@ -50,48 +50,45 @@ test(Module, Func, Arity, Iterations) ->
 % collect necessary type information
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec collect_fun_info/4 :: (module(), atom(), non_neg_integer(), #parse_state{}) -> #parse_state{}.
+-spec collect_fun_info/4 :: (module(), atom(), non_neg_integer(), tester_parse_state:state()) -> tester_parse_state:state().
 collect_fun_info(Module, Func, Arity, ParseState) ->
-    ParseState2 = case tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState) of
-                    {value, _} ->
-                        ParseState;
-                    none ->
-                        {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
-                            = beam_lib:chunks(code:where_is_file(atom_to_list(Module) ++ ".beam"), [abstract_code]),
-                        lists:foldl(fun (Chunk, InnerParseState) ->
-                                            parse_chunk(Chunk, Module, InnerParseState)
-                                    end, ParseState, AbstractCode)
-                end,
-    ParseState3 = case tester_parse_state:get_unknown_types(ParseState2) of
-        [] ->
-            ParseState2;
-        UnknownTypes ->
-            collect_unknown_type_infos(UnknownTypes, ParseState2, 100)
-    end,
+    ParseState2 =
+        case tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState) of
+            {value, _} -> ParseState;
+            none ->
+                ModuleFile = code:where_is_file(atom_to_list(Module) ++ ".beam"),
+                {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
+                    = beam_lib:chunks(ModuleFile, [abstract_code]),
+                lists:foldl(fun(Chunk, InnerParseState) ->
+                                    parse_chunk(Chunk, Module, InnerParseState)
+                            end, ParseState, AbstractCode)
+        end,
+    ParseState3 = case tester_parse_state:has_unknown_types(ParseState2) of
+                      false -> ParseState2;
+                      true  -> collect_unknown_type_infos(ParseState2, 100)
+                  end,
     case tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState3) of
-        {value, _} ->
-            ParseState3;
-        none ->
-            ?ct_fail("unknown function ~p:~p/~p~n", [Module, Func, Arity])
+        {value, _} -> tester_parse_state:finalize(ParseState3);
+        none -> ?ct_fail("unknown function ~p:~p/~p~n", [Module, Func, Arity])
     end.
 
--spec collect_unknown_type_infos/3 :: (list(type_name()), #parse_state{}, non_neg_integer()) -> #parse_state{}.
-collect_unknown_type_infos(UnknownTypes, ParseState, 0) ->
-    ct:pal("warning still looking for unknown types: ~p~n", [tester_parse_state:get_unknown_types(ParseState)]),
-    collect_unknown_type_infos(UnknownTypes, ParseState, 100);
-collect_unknown_type_infos(UnknownTypes, ParseState, Counter) ->
+-spec collect_unknown_type_infos(tester_parse_state:state(), non_neg_integer()) -> tester_parse_state:state().
+collect_unknown_type_infos(ParseState, 0) ->
+    {_, UnknownTypes} = tester_parse_state:get_unknown_types(ParseState),
+    ct:pal("warning still looking for unknown types: ~p~n", [UnknownTypes]),
+    collect_unknown_type_infos(ParseState, 100);
+collect_unknown_type_infos(ParseState, Counter) ->
+    {_, UnknownTypes} = tester_parse_state:get_unknown_types(ParseState),
     ParseState2 = tester_parse_state:reset_unknown_types(ParseState),
-    ParseState3 = lists:foldl(fun ({type, Module, TypeName}, InnerParseState) ->
-                                        collect_type_info(Module, TypeName, InnerParseState)
-                                end, ParseState2, UnknownTypes),
-    case tester_parse_state:get_unknown_types(ParseState3) of
-        [] ->
-            ParseState3;
-        NewUnknownTypes ->
-            collect_unknown_type_infos(NewUnknownTypes, ParseState3, Counter - 1)
+    ParseState3 = lists:foldl(fun({type, Module, TypeName}, InnerParseState) ->
+                                      collect_type_info(Module, TypeName, InnerParseState)
+                              end, ParseState2, UnknownTypes),
+    case tester_parse_state:has_unknown_types(ParseState3) of
+        false -> ParseState3;
+        true  -> collect_unknown_type_infos(ParseState3, Counter - 1)
     end.
 
--spec collect_type_info/3 :: (module(), atom(), #parse_state{}) -> #parse_state{}.
+-spec collect_type_info/3 :: (module(), atom(), tester_parse_state:state()) -> tester_parse_state:state().
 collect_type_info(Module, Type, ParseState) ->
     case tester_parse_state:is_known_type(Module, Type, ParseState) of
         true ->
@@ -105,7 +102,7 @@ collect_type_info(Module, Type, ParseState) ->
     end.
 
 
--spec parse_chunk/3 :: (any(), module(), #parse_state{}) -> #parse_state{}.
+-spec parse_chunk/3 :: (any(), module(), tester_parse_state:state()) -> tester_parse_state:state().
 parse_chunk({attribute, _Line, type, {{record, TypeName}, ATypeSpec, _List}}, Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
     tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec, NewParseState);
@@ -128,7 +125,7 @@ parse_chunk({function, _Line, _FunName, _FunArity, FunCode}, _Module, ParseState
 parse_chunk({eof, _Line}, _Module, ParseState) ->
     ParseState.
 
--spec parse_type/3 :: (any(), module(), #parse_state{}) -> {type_spec() , #parse_state{}}.
+-spec parse_type/3 :: (any(), module(), tester_parse_state:state()) -> {type_spec() , tester_parse_state:state()}.
 parse_type({type, _Line, 'fun', [Arg, Result]}, Module, ParseState) ->
     {ArgType, ParseState2} = parse_type(Arg, Module, ParseState),
     {ResultType, ParseState3} = parse_type(Result, Module, ParseState2),
@@ -278,7 +275,7 @@ parse_type(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p", [TypeSpec, Module]),
     {unkown, ParseState}.
 
--spec parse_type_list/3 :: (list(type_spec()), module(), #parse_state{}) -> {list(type_spec()), #parse_state{}}.
+-spec parse_type_list/3 :: (list(type_spec()), module(), tester_parse_state:state()) -> {list(type_spec()), tester_parse_state:state()}.
 parse_type_list(List, Module, ParseState) ->
     case List of
         [] ->
@@ -289,13 +286,13 @@ parse_type_list(List, Module, ParseState) ->
             {[Type | TypeList], ParseState3}
     end.
 
--spec run/5 :: (module(), atom(), non_neg_integer(), non_neg_integer(), #parse_state{}) -> ok.
+-spec run/5 :: (module(), atom(), non_neg_integer(), non_neg_integer(), tester_parse_state:state()) -> ok.
 run(Module, Func, Arity, Iterations, ParseState) ->
     {value, FunType} = tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState),
     run_helper(Module, Func, Arity, Iterations, FunType, ParseState).
 
 -spec run_helper/6 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
-                       {'fun', type_spec(), type_spec()}, #parse_state{}) -> ok.
+                       {'fun', type_spec(), type_spec()}, tester_parse_state:state()) -> ok.
 run_helper(_Module, _Func, _Arity, 0, _FunType, _TypeInfos) ->
     ok;
 run_helper(Module, Func, 0, Iterations, {'fun', _ArgType, _ResultType} = FunType, TypeInfos) ->

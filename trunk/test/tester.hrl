@@ -1,6 +1,5 @@
 %  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,13 +11,9 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    tester.hrl
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    test generator record definitions
-%%% @end
-%%% Created :  30 April 2010 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    test generator type definitions
 %% @version $Id$
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -49,7 +44,6 @@
            ).
 
 
--type(type_infos() :: gb_tree()).
 -type(builtin_type() ::
       dict
     | gb_tree
@@ -136,13 +130,3 @@
     | {record, list(record_field_type())}
      ).
 -endif.
-
--record(parse_state,  {type_infos :: type_infos(),
-                       unknown_types :: gb_set(),
-                       atoms :: gb_set(),
-                       binaries :: gb_set(),
-                       integers :: gb_set(),
-                       floats :: gb_set(),
-                       strings :: gb_set()
-                       }).
-
