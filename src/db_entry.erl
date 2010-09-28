@@ -51,16 +51,16 @@ new(Key) -> {Key, empty_val, false, 0, -1}.
 new(Key, Value, Version) -> {Key, Value, false, 0, Version}.
 
 -spec get_key(DBEntry::entry()) -> ?RT:key().
-get_key(DBEntry) ->            element(1, DBEntry).
+get_key(DBEntry) -> element(1, DBEntry).
 
 -spec get_value(DBEntry::entry()) -> ?DB:value().
-get_value(DBEntry) ->          element(2, DBEntry).
+get_value(DBEntry) -> element(2, DBEntry).
 
 -spec set_value(DBEntry::entry(), Value::?DB:value()) -> entry().
-set_value(DBEntry, Value) ->     setelement(2, DBEntry, Value).
+set_value(DBEntry, Value) -> setelement(2, DBEntry, Value).
 
 -spec get_writelock(DBEntry::entry()) -> WriteLock::boolean().
-get_writelock(DBEntry) ->      element(3, DBEntry).
+get_writelock(DBEntry) -> element(3, DBEntry).
 
 -spec set_writelock(DBEntry::entry(), WriteLock::boolean()) -> entry().
 set_writelock(DBEntry, WriteLock) -> setelement(3, DBEntry, WriteLock).
@@ -78,10 +78,10 @@ set_writelock(DBEntry) -> set_writelock(DBEntry, true).
 unset_writelock(DBEntry) -> set_writelock(DBEntry, false).
 
 -spec get_readlock(DBEntry::entry()) -> ReadLock::non_neg_integer().
-get_readlock(DBEntry) ->       element(4, DBEntry).
+get_readlock(DBEntry) -> element(4, DBEntry).
 
 -spec set_readlock(DBEntry::entry(), ReadLock::non_neg_integer()) -> entry().
-set_readlock(DBEntry, ReadLock) ->  setelement(4, DBEntry, ReadLock).
+set_readlock(DBEntry, ReadLock) -> setelement(4, DBEntry, ReadLock).
 
 -spec inc_readlock(DBEntry::entry()) -> entry().
 inc_readlock(DBEntry) -> set_readlock(DBEntry, get_readlock(DBEntry) + 1).
@@ -94,13 +94,13 @@ dec_readlock(DBEntry) ->
     end.
 
 -spec get_version(DBEntry::entry()) -> ?DB:version().
-get_version(DBEntry) ->        element(5, DBEntry).
+get_version(DBEntry) -> element(5, DBEntry).
 
 -spec inc_version(DBEntry::entry()) -> entry().
-inc_version(DBEntry) ->        setelement(5, DBEntry, get_version(DBEntry) + 1).
+inc_version(DBEntry) -> setelement(5, DBEntry, get_version(DBEntry) + 1).
 
 -spec set_version(DBEntry::entry(), Version::?DB:version()) -> entry().
-set_version(DBEntry, Version) ->   setelement(5, DBEntry, Version).
+set_version(DBEntry, Version) -> setelement(5, DBEntry, Version).
 
 -spec reset_locks(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::false,

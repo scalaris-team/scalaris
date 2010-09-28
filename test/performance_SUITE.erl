@@ -405,10 +405,15 @@ iter2_inner(N, F) ->
 iter2_foldl(Count, F, Acc0, Tag) ->
     F(0, Acc0),
     Start = erlang:now(),
-    FinalAcc = lists:foldl(F, Acc0, lists:seq(1, Count)),
+    FinalAcc = iter2_foldl_helper(Count, F, Acc0),
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = Count / ElapsedTime,
     ct:pal("~p foldl iterations of ~p took ~ps: ~p1/s",
            [Count, Tag, ElapsedTime, Frequency]),
     FinalAcc.
+
+-spec iter2_foldl_helper(Count::pos_integer(), F::fun((Count::pos_integer(), Acc) -> Acc), Acc) -> Acc.
+iter2_foldl_helper(0, _F, Acc) -> Acc;
+iter2_foldl_helper(Count, F, Acc) ->
+    iter2_foldl_helper(Count, F, F(Count, Acc)).
