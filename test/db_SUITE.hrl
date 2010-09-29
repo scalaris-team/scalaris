@@ -1095,7 +1095,10 @@ prop_changed_keys_unset_write_lock(Data, ChangesInterval_, Key) ->
     {DB4, _Status} = ?TEST_DB:unset_write_lock(DB3, Key),
     NewEntry = ?TEST_DB:get_entry(DB4, Key),
     check_changes(DB4, ChangesInterval, "unset_write_lock_1"),
-    check_entry_in_changes(DB4, ChangesInterval, NewEntry, Old, "unset_write_lock_2"),
+    case db_entry:is_empty(element(2, Old)) of
+        true -> check_key_in_deleted(DB4, ChangesInterval, Key, Old, "unset_write_lock_2a");
+        _    -> check_entry_in_changes(DB4, ChangesInterval, NewEntry, Old, "unset_write_lock_2b")
+    end,
     
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "unset_write_lock_3"),
 
