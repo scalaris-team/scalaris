@@ -19,7 +19,7 @@
 -author('schintke@onscale.de').
 -vsn('$Id$').
 
-%-include("trecords.hrl").
+-include("scalaris.hrl").
 
 %% Operations on TransLogs
 -export([empty/0]).
@@ -35,23 +35,44 @@
 -export([get_entry_status/1]).
 -export([get_entry_value/1]).
 -export([get_entry_version/1]).
--export([get_entry_as_tm_item/1]).
 
 %% TranslogEntry: {Operation, Key, Status, Value, Version}
 %% Sample: {read,"key3",ok,"value3",0}
 
+-ifdef(with_export_type_support).
+-export_type([tlog/0, tlog_entry/0]).
+-export_type([tx_status/0]).
+-endif.
+
+-type tx_status() :: {fail, atom()} | value | not_found.
+-type tx_op() :: read | write | rdht_tx_read | rdht_tx_write.
+-type tlog_entry() ::
+        { tx_op(),     %% operation
+          ?RT:key(),   %% key
+          tx_status(), %% status
+          any(),       %% value
+          integer()    %% version
+        }.
+
+-type tlog() :: [tlog_entry()].
+
 % @doc create an empty list
+-spec empty() -> [].
 empty() -> [].
 
+-spec add_entry(tlog(), tlog_entry()) -> tlog().
 add_entry(TransLog, Entry) ->
     [ Entry | TransLog ].
 
+-spec filter_by_key(tlog(), ?RT:key()) -> tlog().
 filter_by_key(TransLog, Key) ->
     [ X || X <- TransLog, Key =:= get_entry_key(X) ].
 
+-spec filter_by_status(tlog(), tx_status()) -> tlog().
 filter_by_status(TransLog, Status) ->
     [ X || X <- TransLog, Status =:= get_entry_status(X) ].
 
+-spec update_entry(tlog(), ?RT:key() | tlog_entry(), tx_op(), any()) -> tlog().
 update_entry(TransLog, {read,LogKey,LogSuccess,_,LogVers} = Element,
              write, Value) ->
     UnchangedPart = lists:delete(Element, TransLog),
@@ -70,20 +91,17 @@ update_entry(TransLog, Key, write, Value) ->
 
 
 %% Operations on Elements of TransLogs
+-spec new_entry(tx_op(), ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
 new_entry(Op, Key, Status, Val, Vers) ->
+%    #tlog_entry{op = Op, key = Key, status = Status, val = Val, vers = Vers}.
     {Op, Key, Status, Val, Vers}.
-get_entry_operation(Element) ->
-    erlang:element(1, Element).
-get_entry_key(Element) ->
-    erlang:element(2, Element).
-get_entry_status(Element) ->
-    erlang:element(3, Element).
-get_entry_value(Element) ->
-    erlang:element(4, Element).
-get_entry_version(Element) ->
-    erlang:element(5, Element).
-get_entry_as_tm_item(Element) ->
-    trecords:new_tm_item(get_entry_key(Element),
-                         get_entry_value(Element),
-                         get_entry_version(Element),
-                         get_entry_operation(Element)).
+-spec get_entry_operation(tlog_entry()) -> tx_op().
+get_entry_operation(Element) -> element(1, Element).
+-spec get_entry_key(tlog_entry()) -> ?RT:key().
+get_entry_key(Element)       -> element(2, Element).
+-spec get_entry_status(tlog_entry()) -> tx_status().
+get_entry_status(Element)    -> element(3, Element).
+-spec get_entry_value(tlog_entry()) -> any().
+get_entry_value(Element)     -> element(4, Element).
+-spec get_entry_version(tlog_entry()) -> integer().
+get_entry_version(Element)   -> element(5, Element).

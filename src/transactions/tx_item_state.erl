@@ -37,30 +37,40 @@
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).
 
-%% tx_item_state = {
-%%    1 TxItemId,                   % id of the item
-%%    2 tx_item_state,              % data type tag for debugging
-%%    3 TxId,                       % part of transaction with id TxId
-%%    4 TLogEntry,                  % corresponding transaction log entry
-%%    5 Majority_for_prepared,      % required prepare votes to decide prepared
-%%    6 Majority_for_abort,         % required abort votes to decide abort
-%%    7 Decided?,                   % current decision status
-%%    8 Numprepared,                % number of received prepare votes
-%%    9 Numabort,                   % number of received abort votes
-%%   10 [{PaxosID, RTLogEntry, TP}] % involved Paxos Consensus IDs
-%%   11 Status (new / uninitialized / ok) % item status
-%%   12 HoldBackQueue               % hold back queue when not initialized
-%% }
+-ifdef(with_export_type_support).
+-export_type([tx_item_id/0, tx_item_state/0]).
+-export_type([paxos_id/0]).
+-endif.
+
+-type paxos_id() :: {paxos_id, util:global_uid()}.
+-type tx_item_id() :: util:global_uid().
+-type tx_item_state() ::
+ {
+   tx_item_id(), %%  1 TxItemId, id of the item
+   tx_item_state,     %%  2 tx_item_state, data type tag for debugging
+   tx_state:tx_id() | undefined_tx_id,  %%  3 TxId, part of transaction with id TxId
+   tx_tlog:tlog_entry() | empty_tlog_entry, %%  4 TLogEntry, corresponding transaction log entry
+   non_neg_integer(), %%  5 Maj_for_prepared, prepare votes to decide prepared
+   non_neg_integer(), %%  6 Maj_for_abort, abort votes to decide abort
+   false | prepared | abort, %%  7 Decided?, current decision status
+   non_neg_integer(), %%  8 Numprepared, number of received prepare votes
+   non_neg_integer(), %%  9 Numabort, number of received abort votes
+   [{paxos_id(), tx_tlog:tlog_entry(), comm:mypid()}],         %% 10 [{PaxosID, RTLogEntry, TP}], involved PaxosIDs
+   new | uninitialized | ok, %% 11 Status, item status
+   [tuple()]          %% 12 HoldBackQueue, when not initialized
+ }.
 
 %% @TODO maybe the following entries are also necessary?:
 %%      tx_tm_helper_behaviour to use? needed? for what?,
 %%      timeout before the first RTM takes over
 
+-spec new(tx_item_id()) -> tx_item_state().
 new(ItemId) ->
     ReplDeg = config:read(replication_factor),
     {ItemId, tx_item_state, undefined_tx_id, empty_tlog_entry,
      quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
      false, 0, 0, _no_paxIds = [], uninitialized, _HoldBack = []}.
+-spec new(tx_item_id(), tx_state:tx_id(), any()) -> tx_item_state().
 new(ItemId, TxId, TLogEntry) ->
     %% expand TransLogEntry to replicated translog entries
     RTLogEntries = apply(element(1, TLogEntry), validate_prefilter, [TLogEntry]),
@@ -73,28 +83,48 @@ new(ItemId, TxId, TLogEntry) ->
      false, 0, 0, PaxIDsRTLogsTPs,
      uninitialized, _HoldBack = []}.
 
+-spec get_itemid(tx_item_state()) -> tx_item_id().
 get_itemid(State) ->         element(1, State).
+-spec set_itemid(tx_item_state(), tx_item_id()) -> tx_item_state().
 set_itemid(State, Val) ->    setelement(1, State, Val).
+-spec get_txid(tx_item_state()) -> tx_state:tx_id() | undefined_tx_id.
 get_txid(State) ->           element(3, State).
+-spec get_maj_for_prepared(tx_item_state()) -> non_neg_integer().
 get_maj_for_prepared(State) -> element(5, State).
+-spec get_maj_for_abort(tx_item_state()) -> non_neg_integer().
 get_maj_for_abort(State) ->  element(6, State).
+-spec get_decided(tx_item_state()) -> false | prepared | abort.
 get_decided(State) ->        element(7, State).
+-spec set_decided(tx_item_state(), false | prepared | abort) -> tx_item_state().
 set_decided(State, Val) ->   setelement(7, State, Val).
+-spec get_numprepared(tx_item_state()) -> non_neg_integer().
 get_numprepared(State) ->    element(8, State).
+-spec inc_numprepared(tx_item_state()) -> tx_item_state().
 inc_numprepared(State) ->    setelement(8, State, element(8,State) + 1).
+-spec get_numabort(tx_item_state()) -> non_neg_integer().
 get_numabort(State) ->       element(9, State).
+-spec inc_numabort(tx_item_state()) -> tx_item_state().
 inc_numabort(State) ->       setelement(9, State, element(9,State) + 1).
 
+-spec get_paxosids_rtlogs_tps(tx_item_state()) ->
+                                     [{paxos_id(), tx_tlog:tlog_entry(),
+                                       comm:mypid()}].
 get_paxosids_rtlogs_tps(State) -> element(10, State).
+-spec set_paxosids_rtlogs_tps(tx_item_state(), [{paxos_id(), tx_tlog:tlog_entry(), comm:mypid()}]) -> tx_item_state().
 set_paxosids_rtlogs_tps(State, NewTPList) -> setelement(10, State, NewTPList).
 
-%% new / uninitialized / ok.
+-spec get_status(tx_item_state()) -> new | uninitialized | ok.
 get_status(State) ->         element(11, State).
+-spec set_status(tx_item_state(), new | uninitialized | ok) -> tx_item_state().
 set_status(State, Status) -> setelement(11, State, Status).
+-spec hold_back(comm:message(), tx_item_state()) -> tx_item_state().
 hold_back(Msg, State) ->     setelement(12, State, [Msg | element(12, State)]).
+-spec get_hold_back(tx_item_state()) -> [comm:message()].
 get_hold_back(State) ->      element(12, State).
+-spec set_hold_back(tx_item_state(), [comm:message()]) -> tx_item_state().
 set_hold_back(State, Queue) -> setelement(12, State, Queue).
 
+-spec newly_decided(tx_item_state()) -> false | prepared | abort.
 newly_decided(State) ->
     case get_decided(State) of
         false ->
@@ -108,6 +138,7 @@ newly_decided(State) ->
         _Any -> false
     end.
 
+-spec set_tp_for_paxosid(tx_item_state(), any(), paxos_id()) -> tx_item_state().
 set_tp_for_paxosid(State, TP, PaxosId) ->
     TPList = get_paxosids_rtlogs_tps(State),
     Entry = lists:keyfind(PaxosId, 1, TPList),

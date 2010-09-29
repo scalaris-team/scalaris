@@ -44,13 +44,17 @@
 msg_reply(Id, TLogEntry, ResultEntry) ->
     {rdht_tx_read_reply, Id, TLogEntry, ResultEntry}.
 
-tlogentry_get_status(TLogEntry) ->
-    element(3, TLogEntry).
-tlogentry_get_value(TLogEntry) ->
-    element(4, TLogEntry).
-tlogentry_get_version(TLogEntry) ->
-    element(5, TLogEntry).
+-spec tlogentry_get_status(tx_tlog:tlog_entry()) -> tx_tlog:tx_status().
+tlogentry_get_status(TLogEntry)  -> tx_tlog:get_entry_status(TLogEntry).
+-spec tlogentry_get_value(tx_tlog:tlog_entry()) -> any().
+tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
+-spec tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
+tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 
+-spec work_phase(tx_tlog:tlog_entry(),
+                 {non_neg_integer(),
+                  rdht_tx:request()}) ->
+                        {tx_tlog:tlog_entry(), {non_neg_integer(), any()}}.
 work_phase(TLogEntry, {Num, Request}) ->
     ?TRACE("rdht_tx_read:work_phase~n", []),
     %% PRE no failed entries in TLog
@@ -62,10 +66,12 @@ work_phase(TLogEntry, {Num, Request}) ->
     Result =
         case Status of
             not_found -> {Num, {?MODULE, element(2, Request), {fail, Status}}};
-            value -> {Num, {?MODULE, element(2, Request), {Status, Value}}}
+            ok -> {Num, {?MODULE, element(2, Request), {Status, Value}}}
         end,
     {NewTLogEntry, Result}.
 
+-spec work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
+                 rdht_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -89,6 +95,8 @@ quorum_read(CollectorPid, ReqId, Request) ->
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
 %%   [TransLogEntries] (replicas)
+-spec validate_prefilter(tx_tlog:tlog_entry()) ->
+                                [tx_tlog:tlog_entry()].
 validate_prefilter(TLogEntry) ->
     ?TRACE("rdht_tx_read:validate_prefilter(~p)~n", [TLogEntry]),
     Key = erlang:element(2, TLogEntry),
@@ -96,6 +104,7 @@ validate_prefilter(TLogEntry) ->
     [ setelement(2, TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
+-spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
 validate(DB, RTLogEntry) ->
     ?TRACE("rdht_tx_read:validate)~n", []),
     %% contact DB to check entry
@@ -114,6 +123,7 @@ validate(DB, RTLogEntry) ->
             {DB, abort}
     end.
 
+-spec commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
 commit(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_read:commit)~n", []),
     %% perform op: nothing to do for 'read'
@@ -136,6 +146,7 @@ commit(DB, RTLogEntry, OwnProposalWas) ->
             DB
     end.
 
+-spec abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
 abort(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_read:abort)~n", []),
     %% same as when committing
@@ -169,6 +180,7 @@ init([]) ->
 
     _State = {Reps, MajOk, MajDeny, Table}.
 
+-spec on(comm:message(), state()) -> state().
 %% reply triggered by lookup:unreliable_get_key/3
 on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
    {Reps, MajOk, MajDeny, Table} = State) ->
@@ -222,11 +234,9 @@ on({timeout_id, Id}, {_Reps, _MajOk, _MajDeny, Table} = State) ->
             my_timeout_inform(Entry),
             pdb:delete(Id, Table)
     end,
-    State;
+    State.
 
-on(_, _State) ->
-    unknown_event.
-
+-spec my_get_entry(rdht_tx:req_id(), atom()) -> rdht_tx_read_state:read_state().
 my_get_entry(Id, Table) ->
     case pdb:get(Id, Table) of
         undefined ->
@@ -236,23 +246,27 @@ my_get_entry(Id, Table) ->
         Any -> Any
     end.
 
+-spec my_timeout_inform(rdht_tx_read_state:read_state()) -> ok.
 %% inform client on timeout if Id exists and client is not informed yet
 my_timeout_inform(Entry) ->
     case {rdht_tx_read_state:is_client_informed(Entry),
           rdht_tx_read_state:get_client(Entry)} of
         {_, unknown} -> ok;
         {false, Client} ->
-            TmpEntry = rdht_tx_read_state:set_decided(Entry, timeout),
+            TmpEntry = rdht_tx_read_state:set_decided(Entry, {fail, timeout}),
             my_inform_client(Client, TmpEntry);
         _ -> ok
     end.
 
+-spec my_inform_client(pid(), rdht_tx_read_state:read_state()) -> ok.
 my_inform_client(Client, Entry) ->
     Id = rdht_tx_read_state:get_id(Entry),
     Msg = msg_reply(Id, my_make_tlog_entry(Entry),
                     my_make_result_entry(Entry)),
-    comm:send_local(Client, Msg).
+    comm:send_local(Client, Msg), ok.
 
+-spec my_make_tlog_entry(rdht_tx_read_state:read_state()) ->
+                                tx_tlog:tlog_entry().
 my_make_tlog_entry(Entry) ->
     {Val, Vers} = rdht_tx_read_state:get_result(Entry),
     Key = rdht_tx_read_state:get_key(Entry),
@@ -263,9 +277,9 @@ my_make_result_entry(Entry) ->
     Key = rdht_tx_read_state:get_key(Entry),
     {Val, _Vers} = rdht_tx_read_state:get_result(Entry),
     case rdht_tx_read_state:get_decided(Entry) of
-        timeout -> {?MODULE, Key, {fail, timeout}};
+        {fail, timeout} -> {?MODULE, Key, {fail, timeout}};
         not_found -> {?MODULE, Key, {fail, not_found}};
-        value -> {?MODULE, Key, {value, Val}}
+        value -> {?MODULE, Key, {value, Val}};
     end.
 
 my_delete_if_all_replied(Entry, Reps, Table) ->

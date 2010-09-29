@@ -50,6 +50,10 @@
 -export([all_pax_decided/1]).
 -export([all_tps_registered/1]).
 
+-ifdef(with_export_type_support).
+-export_type([tx_id/0, tx_state/0]).
+-endif.
+
 -type tx_id() :: {tx_id, util:global_uid()}.
 -type tx_state() ::
         {tx_id(),                  %% Tid
@@ -57,7 +61,8 @@
          comm:mypid() | unknown,   %% Client
          any(),                    %% ClientsId,
          [{?RT:key(), comm:mypid(), non_neg_integer()}], %% [{Key, RTM, Nth}]
-         any(),                    %% _tlogtxitemids = [{TLogEntry, TxItemId}],
+         [{tx_tlog:tlog_entry(),
+           tx_item_state:tx_item_id()}], %% _tlogtxitemids = [{TLogEntry, TxItemId}],
          [comm:mypid()],           %% Learners,
          undecided | false | abort | commit, %% Status decided?
          non_neg_integer(),        %% NumIds,
@@ -101,7 +106,12 @@ get_rtms(State) ->                element(5, State).
 -spec set_rtms(tx_state(), [{?RT:key(), comm:mypid(), non_neg_integer()}])
               -> tx_state().
 set_rtms(State, Val) ->           setelement(5, State, Val).
+-spec get_tlog_txitemids(tx_state()) -> [{tx_tlog:tlog_entry(),
+                                          tx_item_state:tx_item_id()}].
 get_tlog_txitemids(State) ->      element(6, State).
+-spec set_tlog_txitemids(tx_state(),
+                         [{tx_tlog:tlog_entry(),
+                           tx_item_state:tx_item_id()}]) -> tx_state().
 set_tlog_txitemids(State, Val) -> setelement(6, State, Val).
 -spec get_learners(tx_state()) -> [comm:mypid()].
 get_learners(State) ->            element(7, State).

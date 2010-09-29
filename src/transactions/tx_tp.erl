@@ -29,6 +29,7 @@
 %%% functions for gen_component module and supervisor callbacks
 -export([init/0, on_init_TP/2, on_tx_commitreply/3]).
 
+-spec init() -> atom().
 init() ->
     InstanceID = pid_groups:my_groupname(),
     Table = list_to_atom(lists:flatten(
@@ -40,6 +41,12 @@ init() ->
 %% It runs inside the dht_node to get access to the ?DB
 %%
 
+-spec on_init_TP({tx_state:tx_id(),
+                  [comm:mypid()], comm:mypid(),
+                  any(),
+                  tx_item_state:tx_item_id(),
+                  tx_item_state:paxos_id()},
+                  dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
 on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
@@ -65,6 +72,8 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
     %% (optimized: embed the proposer's accept message in registerTP message)
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
+-spec on_tx_commitreply(tuple(), commit | abort, dht_node_state:state())
+                       -> dht_node_state:state().
 on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     ?TRACE("tx_tp:on_tx_commitreply({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.

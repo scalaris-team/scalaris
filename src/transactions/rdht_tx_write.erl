@@ -40,21 +40,31 @@
 -export([start_link/1]).
 -export([check_config/0]).
 
+-ifdef(with_export_type_support).
+-export_type([req_id/0]).
+-endif.
+
+-type req_id() :: {rdht_tx:req_id(), pid(), any()}.
+
 %% reply messages a client should expect (when calling asynch work_phase/3)
 msg_reply(Id, TLogEntry, ResultEntry) ->
     {rdht_tx_write_reply, Id, TLogEntry, ResultEntry}.
 
-tlogentry_get_status(TLogEntry) ->
-    element(3, TLogEntry).
-tlogentry_get_value(TLogEntry) ->
-    element(4, TLogEntry).
-tlogentry_get_version(TLogEntry) ->
-    element(5, TLogEntry).
+-spec tlogentry_get_status(tx_tlog:tlog_entry()) -> tx_tlog:tx_status().
+tlogentry_get_status(TLogEntry)  -> tx_tlog:get_entry_status(TLogEntry).
+-spec tlogentry_get_value(tx_tlog:tlog_entry()) -> any().
+tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
+-spec tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
+tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 
+-spec work_phase(tx_tlog:tlog_entry(), {non_neg_integer(),
+                                        rdht_tx:request()}) ->
+                        {tx_tlog:tlog_entry(), {non_neg_integer(), any()}}.
 work_phase(TLogEntry, {Num, Request}) ->
     {NewTLogEntry, Result} = my_make_tlog_result_entry(TLogEntry, Request),
     {NewTLogEntry, {Num, Result}}.
 
+-spec work_phase(pid(), rdht_tx:req_id(), rdht_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_write:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -70,6 +80,8 @@ work_phase(ClientPid, ReqId, Request) ->
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
 %%   [TransLogEntries] (replicas)
+-spec validate_prefilter(tx_tlog:tlog_entry()) ->
+                                [tx_tlog:tlog_entry()].
 validate_prefilter(TLogEntry) ->
     ?TRACE("rdht_tx_write:validate_prefilter(~p)~n", [TLog]),
     Key = erlang:element(2, TLogEntry),
@@ -77,6 +89,7 @@ validate_prefilter(TLogEntry) ->
     [ setelement(2, TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
+-spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
 validate(DB, RTLogEntry) ->
     %% contact DB to check entry
     %% set locks on DB
@@ -110,6 +123,7 @@ validate(DB, RTLogEntry) ->
             {DB, abort}
     end.
 
+-spec commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
 commit(DB, RTLogEntry, _OwnProposalWas) ->
     ?TRACE("rdht_tx_write:commit)~n", []),
     DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
@@ -128,6 +142,7 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
         end,
     ?DB:set_entry(DB, NewEntry).
 
+-spec abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
 abort(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
     %% abort operation
@@ -163,6 +178,7 @@ init([]) ->
 
 %% reply triggered by rdht_tx_write:work_phase/3
 %% ClientPid and WriteValue could also be stored in local process state via ets
+-spec on(comm:message(), null) -> null.
 on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
    State) ->
     Key = element(2, TLogEntry),
@@ -171,10 +187,7 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
         my_make_tlog_result_entry(TLogEntry, Request),
     Msg = msg_reply(Id, NewTLogEntry, NewResultEntry),
     comm:send_local(ClientPid, Msg),
-    State;
-
-on(_, _State) ->
-    unknown_event.
+    State.
 
 my_make_tlog_result_entry(TLogEntry, Request) ->
     Status = apply(element(1, TLogEntry), tlogentry_get_status, [TLogEntry]),
@@ -185,10 +198,10 @@ my_make_tlog_result_entry(TLogEntry, Request) ->
     %% validation and increment then in case of write.
     case Status of
         not_found ->
-            {{?MODULE, Key, value, WriteValue, Version},
+            {{?MODULE, Key, ok, WriteValue, Version},
              {?MODULE, Key, {value, WriteValue}}};
         value ->
-            {{?MODULE, Key, value, WriteValue, Version},
+            {{?MODULE, Key, ok, WriteValue, Version},
             {?MODULE, Key, {value, WriteValue}}};
         timeout ->
             {{?MODULE, Key, {fail, timeout}, WriteValue, Version},
