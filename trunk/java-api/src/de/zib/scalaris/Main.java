@@ -84,7 +84,16 @@ public class Main {
 		}
 
 		if (line.hasOption("minibench")) {
-	        Benchmark.minibench();
+			String[] optionValues = line.getOptionValues("minibench");
+			int testruns = 100;
+			int benchmarks = -1;
+			if (optionValues != null) {
+				checkArguments(optionValues, 2, options, "b");
+				testruns = Integer.parseInt(optionValues[0]);
+				String benchmarks_str = optionValues[1];
+				benchmarks = benchmarks_str.equals("all") ? -1 : Integer.parseInt(benchmarks_str);
+			}
+	        Benchmark.minibench(testruns, benchmarks);
 		} else if (line.hasOption("r")) { // read
 			String key = line.getOptionValue("read");
 			checkArguments(key, options, "r");
@@ -287,7 +296,11 @@ public class Main {
 		delete.setOptionalArg(true);
 		group.addOption(delete);
 
-		options.addOption(new Option("b", "minibench", false, "run mini benchmark"));
+		Option bench = new Option("b", "minibench", true, "run selected mini benchmark [1|...|9|all] (default: all benchmarks, 100 test runs)");
+		bench.setArgName("runs> <benchmark");
+		bench.setArgs(2);
+		bench.setOptionalArg(true);
+		group.addOption(bench);
 
 		options.addOption(new Option("lh", "localhost", false, "gets the local host's name as known to Java (for debugging purposes)"));
 
@@ -410,7 +423,7 @@ public class Main {
 
 	/**
 	 * Checks that the given option values as returned from e.g.
-	 * {@link CommandLine#getOptionValues(String)} does exist and contains
+	 * {@link CommandLine#getOptionValues(String)} do exist and contain
 	 * enough parameters. Prints an error message if not.
 	 * 
 	 * @param optionValues   the values to check

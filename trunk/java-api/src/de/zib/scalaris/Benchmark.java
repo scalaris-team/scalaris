@@ -69,22 +69,22 @@ public class Benchmark {
 	 * <li>and finally re-using a single {@link Transaction} object.</li>
 	 * </ul>
 	 */
-	public static void minibench() {
+	public static void minibench(int testruns, int benchmarks) {
 		long[][] results = new long[3][3];
 		String[] columns;
 		String[] rows;
 		
 		System.out.println("Benchmark of de.zib.scalaris.Scalaris:");
 
-		results[0][0] = scalarisBench1(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][0] = scalarisBench2(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][0] = scalarisBench3(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][1] = scalarisBench4(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][1] = scalarisBench5(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][1] = scalarisBench6(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][2] = scalarisBench7(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][2] = scalarisBench8(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][2] = scalarisBench9(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
+		results[0][0] = benchmarks == -1 || benchmarks == 1 ? scalarisBench1(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][0] = benchmarks == -1 || benchmarks == 2 ? scalarisBench2(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][0] = benchmarks == -1 || benchmarks == 3 ? scalarisBench3(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][1] = benchmarks == -1 || benchmarks == 4 ? scalarisBench4(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][1] = benchmarks == -1 || benchmarks == 5 ? scalarisBench5(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][1] = benchmarks == -1 || benchmarks == 6 ? scalarisBench6(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][2] = benchmarks == -1 || benchmarks == 7 ? scalarisBench7(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][2] = benchmarks == -1 || benchmarks == 8 ? scalarisBench8(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][2] = benchmarks == -1 || benchmarks == 9 ? scalarisBench9(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
 				"Scalaris.writeObject(OtpErlangString, OtpErlangBinary)",
@@ -94,22 +94,22 @@ public class Benchmark {
 				"separate connection",
 				"re-use connection",
 				"re-use Scalaris object" };
-		printResults(columns, rows, results);
+		printResults(columns, rows, results, testruns);
 		
 		
 		results = new long[3][3];
 		System.out.println("-----");
 		System.out.println("Benchmark of de.zib.scalaris.Transaction:");
 
-		results[0][0] = transBench1(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][0] = transBench2(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][0] = transBench3(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][1] = transBench4(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][1] = transBench5(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][1] = transBench6(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][2] = transBench7(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][2] = transBench8(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][2] = transBench9(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
+		results[0][0] = benchmarks == -1 || benchmarks == 1 ? transBench1(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][0] = benchmarks == -1 || benchmarks == 2 ? transBench2(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][0] = benchmarks == -1 || benchmarks == 3 ? transBench3(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][1] = benchmarks == -1 || benchmarks == 4 ? transBench4(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][1] = benchmarks == -1 || benchmarks == 5 ? transBench5(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][1] = benchmarks == -1 || benchmarks == 6 ? transBench6(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][2] = benchmarks == -1 || benchmarks == 7 ? transBench7(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][2] = benchmarks == -1 || benchmarks == 8 ? transBench8(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][2] = benchmarks == -1 || benchmarks == 9 ? transBench9(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
 				"Transaction.writeObject(OtpErlangString, OtpErlangBinary)",
@@ -119,7 +119,7 @@ public class Benchmark {
 				"separate connection",
 				"re-use connection",
 				"re-use transaction" };
-		printResults(columns, rows, results);
+		printResults(columns, rows, results, testruns);
 	}
 
 	/**
@@ -134,7 +134,8 @@ public class Benchmark {
 	 *            the results to print (results[i][j]: i = row, j = column)
 	 */
 	protected static void printResults(String[] columns, String[] rows,
-			long[][] results) {
+			long[][] results, int testruns) {
+		System.out.println("Test runs: " + testruns);
 		System.out
 				.println("                         \tspeed (transactions / second)");
 		final String firstColumn = new String("                         ");
@@ -149,7 +150,11 @@ public class Benchmark {
 					+ firstColumn.substring(0, firstColumn.length()
 							- rows[i].length() - 1));
 			for (int j = 0; j < columns.length; j++) {
-				System.out.print("\t" + results[i][j]);
+				if (results[i][j] == -1) {
+					System.out.print("\tn/a");
+				} else {
+					System.out.print("\t" + results[i][j]);
+				}
 			}
 			System.out.println();
 		}
