@@ -40,6 +40,7 @@
 -export([start_link/1]).
 -export([on/2, init/1]).
 
+-type state() :: atom(). % TableName
 %%% public function to start a new paxos instance gets as parameters:
 %%%   PaxosID: has to be unique in the system, user has to care about this
 %%%   Acceptors: a list of paxos_acceptor processes, that are used
@@ -58,34 +59,49 @@ msg_prepare(Dest, ReplyTo, PaxosID, Round) ->
     Msg = {proposer_prepare, ReplyTo, PaxosID, Round},
     comm:send(Dest, Msg).
 
+-spec msg_accept(comm:mypid(), comm:mypid(), any(),
+                 non_neg_integer(), any()) -> ok.
 msg_accept(Dest, ReplyTo, PaxosID, Round, Value) ->
     ?TRACE("Sending proposer_accept ~p, ~p Proposal ~p~n", [PaxosID, Round, Value]),
     Msg = {proposer_accept, ReplyTo, PaxosID, Round, Value},
     comm:send(Dest, Msg).
 
+-spec start_paxosid(comm:mypid(), any(), [ comm:mypid() ], any(),
+                    pos_integer(), pos_integer()) -> ok.
 start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
               Majority, MaxProposers) ->
     start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
                   Majority, MaxProposers, 1).
+-spec start_paxosid(comm:mypid(), any(), [ comm:mypid() ], any(),
+                    pos_integer(), pos_integer(), non_neg_integer()) -> ok.
 start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
               Majority, MaxProposers, InitialRound) ->
     Msg = {proposer_initialize, PaxosID, Acceptors, Proposal,
            Majority, MaxProposers, InitialRound},
     comm:send(Proposer, Msg).
 
+-spec start_paxosid_with_proxy(comm:mypid(), comm:mypid(),
+                               any(), [ comm:mypid() ], any(),
+                               pos_integer(), pos_integer()) -> ok.
 start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
                          Majority, MaxProposers) ->
     start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
                              Majority, MaxProposers, 1).
+-spec start_paxosid_with_proxy(comm:mypid(), comm:mypid(),
+                               any(), [ comm:mypid() ], any(),
+                               pos_integer(), pos_integer(), non_neg_integer())
+                              -> ok.
 start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
                          Majority, MaxProposers, InitialRound) ->
     Msg = {proposer_initialize, PaxosID, Acceptors, Proposal,
            Majority, MaxProposers, InitialRound, Proxy},
     comm:send(Proposer, Msg).
 
+-spec stop_paxosids(comm:mypid(), any()) -> ok.
 stop_paxosids(Proposer, PaxosIds) ->
     comm:send(Proposer, {proposer_deleteids, PaxosIds}).
 
+-spec trigger(comm:mypid(), any()) -> ok.
 trigger(Proposer, PaxosID) ->
     comm:send(Proposer, {proposer_trigger, PaxosID}).
 
@@ -108,6 +124,7 @@ init([]) ->
     TableName = pdb:new(?MODULE, [set, private]),
     _State = TableName.
 
+-spec on(comm:message(), state()) -> state().
 on({proposer_initialize, PaxosID, Acceptors, Proposal,
     Majority, MaxProposers, InitialRound},
    State) ->

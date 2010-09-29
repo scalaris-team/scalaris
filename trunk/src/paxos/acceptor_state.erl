@@ -29,23 +29,36 @@
 -export([add_prepare_msg/2]).
 -export([add_accept_msg/3]).
 
-%% acceptor_state: {PaxosID,
-%%                  Learners,
-%%                  Rack
-%%                  Raccepted
-%%                  Value}
+-type acceptor_state() ::
+        { any(),             %% PaxosID,
+          [ comm:mypid() ],  %% Learners,
+          non_neg_integer(), %% Rack
+          non_neg_integer() | -1, %% Raccepted
+          any()              %% Value
+        }.
 
+-spec new(any()) -> acceptor_state().
 new(PaxosID) ->
     {PaxosID, _Learners = [], _Rack = 0, _Raccepted = -1, paxos_no_value_yet}.
+-spec get_learners(acceptor_state()) -> [ comm:mypid() ].
 get_learners(State) ->           element(2, State).
+-spec set_learners(acceptor_state(), [ comm:mypid() ]) -> acceptor_state().
 set_learners(State, Learners) -> setelement(2, State, Learners).
+-spec get_rack(acceptor_state()) -> non_neg_integer().
 get_rack(State) ->             element(3, State).
+-spec set_rack(acceptor_state(), non_neg_integer()) -> acceptor_state().
 set_rack(State, Round) ->      setelement(3, State, Round).
+-spec get_raccepted(acceptor_state()) -> non_neg_integer().
 get_raccepted(State) ->        element(4, State).
+-spec set_raccepted(acceptor_state(), non_neg_integer()) -> acceptor_state().
 set_raccepted(State, Round) -> setelement(4, State, Round).
-set_value(State, Value) ->     setelement(5, State, Value).
+-spec get_value(acceptor_state()) -> any().
 get_value(State) ->            element(5, State).
+-spec set_value(acceptor_state(), any()) -> acceptor_state().
+set_value(State, Value) ->     setelement(5, State, Value).
 
+-spec add_prepare_msg(acceptor_state(), non_neg_integer()) ->
+                      {ok, acceptor_state()} | {dropped, non_neg_integer()}.
 add_prepare_msg(State, InRound) ->
     Rack = get_rack(State),
     case (InRound > Rack) andalso (InRound > get_raccepted(State)) of
@@ -53,6 +66,8 @@ add_prepare_msg(State, InRound) ->
         false -> {dropped, Rack}
     end.
 
+-spec add_accept_msg(acceptor_state(), non_neg_integer(), any()) ->
+                      {ok, acceptor_state()} | {dropped, non_neg_integer()}.
 add_accept_msg(State, InRound, InProposal) ->
     Rack = get_rack(State),
     case (InRound >= Rack) andalso (InRound > get_raccepted(State)) of

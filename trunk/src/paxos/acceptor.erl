@@ -36,15 +36,20 @@
 -export([check_config/0]).
 
 %% Messages to expect from this module
+-spec msg_ack(comm:mypid(), any(), non_neg_integer(), any(), non_neg_integer())
+             -> ok.
 msg_ack(Proposer, PaxosID, InRound, Val, Raccepted) ->
     comm:send(Proposer, {acceptor_ack, PaxosID, InRound, Val, Raccepted}).
 
+-spec msg_nack(comm:mypid(), any(), non_neg_integer()) -> ok.
 msg_nack(Proposer, PaxosID, NewerRound) ->
     comm:send(Proposer, {acceptor_nack, PaxosID, NewerRound}).
 
+-spec msg_naccepted(comm:mypid(), any(), non_neg_integer()) -> ok.
 msg_naccepted(Proposer, PaxosID, NewerRound) ->
     comm:send(Proposer, {acceptor_naccepted, PaxosID, NewerRound}).
 
+-spec msg_accepted(comm:mypid(), any(), non_neg_integer(), any()) -> ok.
 msg_accepted(Learner, PaxosID, Raccepted, Val) ->
     comm:send(Learner, {acceptor_accepted, PaxosID, Raccepted, Val}).
 
@@ -56,15 +61,18 @@ msg_accepted(Learner, PaxosID, Raccepted, Val) ->
 %%%   Majority: how many responses from acceptors have to be collected?
 %%%   InitialRound (optional): start with paxos round number (default 1)
 %%%     if InitialRound is 0, a Fast-Paxos is executed
+-spec start_paxosid(any(), [ comm:mypid() ]) -> ok.
 start_paxosid(PaxosID, Learners) ->
     Acceptor = pid_groups:get_my(paxos_acceptor),
     start_paxosid_local(Acceptor, PaxosID, Learners).
 
+-spec start_paxosid_local(pid(), any(), [ comm:mypid() ]) -> ok.
 start_paxosid_local(LAcceptor, PaxosID, Learners) ->
     %% find the groups acceptor process
     Message = {acceptor_initialize, PaxosID, Learners},
     comm:send_local(LAcceptor, Message).
 
+-spec start_paxosid(comm:mypid(), any(), [ comm:mypid() ]) -> ok.
 start_paxosid(Acceptor, PaxosID, Learners) ->
     comm:send(Acceptor, {acceptor_initialize, PaxosID, Learners}).
 
@@ -86,6 +94,7 @@ init([]) ->
     TableName = pdb:new(?MODULE, [set, protected]),
     _State = TableName.
 
+-spec on(comm:message(), atom()) -> atom().
 on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
     ?TRACE("acceptor:initialize for paxos id: Pid ~p Learners ~p~n", [PaxosID, Learners]),
     {_, StateForID} = my_get_entry(PaxosID, ETSTableName),
