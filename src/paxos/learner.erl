@@ -34,17 +34,25 @@
 -export([on/2, init/1]).
 -export([check_config/0]).
 
+-type state() :: atom(). % table name
+
+-spec msg_decide(comm:mypid(), any(), any(), any()) -> ok.
 msg_decide(Client, ClientCookie, PaxosID, Val) ->
     comm:send(Client, {learner_decide, ClientCookie, PaxosID, Val}).
 
+-spec start_paxosid(comm:mypid(), any(), pos_integer(), comm:mypid(), any())
+                   -> ok.
 start_paxosid(Learner, PaxosID, Majority, ProcessToInform, ClientCookie) ->
     comm:send(Learner, {learner_initialize, PaxosID, Majority,
                            ProcessToInform, ClientCookie}).
 
+-spec start_paxosid_local(pid(), any(), pos_integer(), comm:mypid(), any())
+                         -> ok.
 start_paxosid_local(Learner, PaxosID, Majority, ProcessToInform, ClientCookie) ->
     comm:send_local(Learner, {learner_initialize, PaxosID, Majority,
                               ProcessToInform, ClientCookie}).
 
+-spec stop_paxosids(comm:mypid(), [any()]) -> ok.
 stop_paxosids(Learner, ListOfPaxosIDs) ->
     comm:send(Learner, {learner_deleteids, ListOfPaxosIDs}).
 
@@ -66,6 +74,7 @@ init([]) ->
     TableName = pdb:new(?MODULE, [set, protected]),
     _State = TableName.
 
+-spec on(comm:message(), state()) -> state().
 on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
    ETSTableName = State) ->
     ?TRACE("learner:initialize for paxos id: ~p~n", [PaxosID]),
@@ -103,7 +112,7 @@ on({acceptor_accepted, PaxosID, Round, Value}, ETSTableName = State) ->
                       msg_delay:send_local(
                         config:read(learner_noinit_timeout) / 1000, self(),
                         {learner_deleteid_if_still_no_client, PaxosID}),
-                      learner_state:new(PaxosID, unknown, none, no_cookie);
+                      learner_state:new(PaxosID, 128, none, no_cookie);
                   StateForID -> StateForID
               end,
     case learner_state:add_accepted_msg(MyState, Round, Value) of
@@ -139,7 +148,7 @@ decide(PaxosID, State) ->
     ?TRACE("learner:decide for paxosid '~p' in round '~p' and value '~p'~n",
            [PaxosID, learner_state:get_round(State), learner_state:get_value(State)]),
     case learner_state:get_process_to_inform(State) of
-        unknown -> ok; % will be informed later when learner is initialized
+        none -> ok; % will be informed later when learner is initialized
         Pid -> msg_decide(Pid, learner_state:get_client_cookie(State),
                           PaxosID, learner_state:get_value(State))
     end.

@@ -38,44 +38,62 @@
 -export([add_ack_msg/4]).
 -export([reset_state/1]).
 
-%% proposer_state: {PaxosID,
-%%                  ReplyTo,
-%%                  Acceptors,
-%%                  Own_proposal,
-%%                  Majority,
-%%                  MaxProposers,
-%%                  Round, (current round)
-%%                  RLast_highest,
-%%                  Latest_value,
-%%                  Ack_rec_count}
-%% Sample: {[P1, P2, P3], 7, prepared, 3, abort, 3}
+-type proposer_state() ::
+        { any(),            % paxos_id
+          comm:mypid(),     % ReplyTo,
+          [ comm:mypid() ], % Acceptors,
+          any(),            % Own_proposal (e.g. prepared / abort),
+          pos_integer(),    % Majority,
+          pos_integer(),    % MaxProposers,
+          non_neg_integer(),    % Round, (current round)
+          non_neg_integer(),    % RLast_highest,
+          any(),            % Latest_value,
+          non_neg_integer()     % Ack_rec_count
+        }.
 
+-spec new(any(), comm:mypid(), [comm:mypid()], any(),
+          pos_integer(), pos_integer()) -> proposer_state().
 new(PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers) ->
     new(PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers, 0).
 
+-spec new(any(), comm:mypid(), [comm:mypid()], any(), pos_integer(), pos_integer(), non_neg_integer()) -> proposer_state().
 new(PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers, Round) ->
     {PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers,
      Round, 0, paxos_no_value_yet, 0}.
 
+-spec get_replyto(proposer_state()) -> comm:mypid().
 get_replyto(State) ->           element(2, State).
+-spec get_acceptors(proposer_state()) -> [ comm:mypid() ].
 get_acceptors(State) ->         element(3, State).
+-spec get_proposal(proposer_state()) -> any().
 get_proposal(State) ->          element(4, State).
+-spec get_majority(proposer_state()) -> pos_integer().
 get_majority(State) ->          element(5, State).
+-spec get_max_proposers(proposer_state()) -> pos_integer().
 get_max_proposers(State) ->     element(6, State).
+-spec get_round(proposer_state()) -> non_neg_integer().
 get_round(State) ->             element(7, State).
+-spec set_round(proposer_state(), non_neg_integer()) -> proposer_state().
 set_round(State, Round) ->      setelement(7, State, Round).
+-spec get_latest_value(proposer_state()) -> any().
 get_latest_value(State) ->      element(9, State).
+-spec set_latest_value(proposer_state(), any()) -> proposer_state().
 set_latest_value(State, Val) -> setelement(9, State, Val).
+-spec get_ack_count(proposer_state()) -> non_neg_integer().
 get_ack_count(State) ->         element(10, State).
+-spec inc_ack_count(proposer_state()) -> proposer_state().
 inc_ack_count(State) ->         setelement(10, State,
                                            get_ack_count(State) + 1).
+-spec inc_round(proposer_state()) -> proposer_state().
 inc_round(State) ->
     set_round(State, get_round(State) + get_max_proposers(State)).
 
+-spec reset_state(proposer_state()) -> proposer_state().
 reset_state(State) ->
-     {PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers, Round, RLast, Value, _} = State,
-     {PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers, Round, RLast, Value, 0}.
+    setelement(10, State, 0).
 
+-spec add_ack_msg(proposer_state(), non_neg_integer(), any(),
+                  non_neg_integer()) -> {ok | majority_acked, proposer_state()}.
 add_ack_msg(InState, InAckRound, InAckValue, InAckRLast) ->
     {PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers,
      StateRound, StateRLast_highest, StateLatestValue, AckRecCount}
