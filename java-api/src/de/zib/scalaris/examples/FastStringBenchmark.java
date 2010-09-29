@@ -39,12 +39,22 @@ public class FastStringBenchmark extends Benchmark {
 	/**
 	 * Runs a mini benchmark of the {@link Transaction} class using custom
 	 * objects provided by {@link CustomOtpFastStringObject}.
+	 * Accepts the same parameters as the
+	 * {@link de.zib.scalaris.Main#main(String[])} method's benchmark
+	 * parameter. 
 	 * 
 	 * @param args
 	 *            command line arguments
 	 */
 	public static void main(String[] args) {
-		minibench();
+		int testruns = 100;
+		int benchmarks = -1;
+		if (args != null && args.length == 2) {
+			testruns = Integer.parseInt(args[0]);
+			String benchmarks_str = args[1];
+			benchmarks = benchmarks_str.equals("all") ? -1 : Integer.parseInt(benchmarks_str);
+		}
+		minibench(testruns, benchmarks);
 	}
 	
 	/**
@@ -58,32 +68,37 @@ public class FastStringBenchmark extends Benchmark {
 	 *  <li>writing {@link String} objects by converting them to {@link OtpErlangBinary}s
 	 *      (random data, size = {@link #BENCH_DATA_SIZE})</li>
 	 * </ol>
-	 * each {@link #BENCH_TEST_RUNS} times
+	 * each testruns times
 	 * <ul>
 	 *  <li>first using a new {@link Transaction} for each test,</li> 
 	 *  <li>then using a new {@link Transaction} but re-using a single {@link Connection},</li>
 	 *  <li>and finally re-using a single {@link Transaction} object.</li>
 	 * </ul>
+	 * 
+	 * @param testruns
+	 *            the number of test runs to execute
+	 * @param benchmarks
+	 *            the benchmarks to run (1-12 or -1 for all benchmarks)
 	 */
-    public static void minibench() {
+    public static void minibench(int testruns, int benchmarks) {
 		long[][] results = new long[3][4];
 		String[] columns;
 		String[] rows;
 		
 		System.out.println("Benchmark of de.zib.scalaris.Scalaris:");
 
-		results[0][0] = Benchmark.scalarisBench1(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][0] = Benchmark.scalarisBench2(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][0] = Benchmark.scalarisBench3(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][1] = Benchmark.scalarisBench4(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][1] = Benchmark.scalarisBench5(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][1] = Benchmark.scalarisBench6(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][2] = Benchmark.scalarisBench7(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][2] = Benchmark.scalarisBench8(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][2] = Benchmark.scalarisBench9(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-    	results[0][3] = fastScalarisBench1(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-    	results[1][3] = fastScalarisBench2(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-    	results[2][3] = fastScalarisBench3(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
+		results[0][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench1(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench2(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench3(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][1] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench4(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][1] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench5(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][1] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench6(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][2] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench7(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][2] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench8(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][2] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench9(BENCH_DATA_SIZE, testruns) : -1;
+    	results[0][3] = benchmarks == -1 || benchmarks == 1 ? fastScalarisBench1(BENCH_DATA_SIZE, testruns) : -1;
+    	results[1][3] = benchmarks == -1 || benchmarks == 1 ? fastScalarisBench2(BENCH_DATA_SIZE, testruns) : -1;
+    	results[2][3] = benchmarks == -1 || benchmarks == 1 ? fastScalarisBench3(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
 				"Scalaris.writeObject(OtpErlangString, OtpErlangBinary)",
@@ -94,25 +109,25 @@ public class FastStringBenchmark extends Benchmark {
 				"separate connection",
 				"re-use connection",
 				"re-use Scalaris object" };
-		printResults(columns, rows, results);
+		printResults(columns, rows, results, testruns);
 		
 		
 		results = new long[3][4];
 		System.out.println("-----");
 		System.out.println("Benchmark of de.zib.scalaris.Transaction:");
 
-		results[0][0] = Benchmark.transBench1(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][0] = Benchmark.transBench2(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][0] = Benchmark.transBench3(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][1] = Benchmark.transBench4(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][1] = Benchmark.transBench5(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][1] = Benchmark.transBench6(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[0][2] = Benchmark.transBench7(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[1][2] = Benchmark.transBench8(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-		results[2][2] = Benchmark.transBench9(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-    	results[0][3] = fastTransBench1(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-    	results[1][3] = fastTransBench2(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
-    	results[2][3] = fastTransBench3(BENCH_DATA_SIZE, BENCH_TEST_RUNS);
+		results[0][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench1(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench2(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench3(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][1] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench4(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][1] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench5(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][1] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench6(BENCH_DATA_SIZE, testruns) : -1;
+		results[0][2] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench7(BENCH_DATA_SIZE, testruns) : -1;
+		results[1][2] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench8(BENCH_DATA_SIZE, testruns) : -1;
+		results[2][2] = benchmarks == -1 || benchmarks == 1 ? Benchmark.transBench9(BENCH_DATA_SIZE, testruns) : -1;
+    	results[0][3] = benchmarks == -1 || benchmarks == 1 ? fastTransBench1(BENCH_DATA_SIZE, testruns) : -1;
+    	results[1][3] = benchmarks == -1 || benchmarks == 1 ? fastTransBench2(BENCH_DATA_SIZE, testruns) : -1;
+    	results[2][3] = benchmarks == -1 || benchmarks == 1 ? fastTransBench3(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
 				"Transaction.writeObject(OtpErlangString, OtpErlangBinary)",
@@ -123,7 +138,7 @@ public class FastStringBenchmark extends Benchmark {
 				"separate connection",
 				"re-use connection",
 				"re-use transaction" };
-		printResults(columns, rows, results);
+		printResults(columns, rows, results, testruns);
 	}
 
 	/**

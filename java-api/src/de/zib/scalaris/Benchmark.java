@@ -35,10 +35,6 @@ public class Benchmark {
 	 */
 	protected static final int BENCH_DATA_SIZE = 1000;
 	/**
-	 * The number of test runs.
-	 */
-	protected static final int BENCH_TEST_RUNS = 100;
-	/**
 	 * The time when the (whole) benchmark suite was started.
 	 * 
 	 * This is used to create different erlang keys for each run.
@@ -61,13 +57,18 @@ public class Benchmark {
 	 * <li>writing {@link String} objects (random data, size =
 	 * {@link #BENCH_DATA_SIZE})</li>
 	 * </ol>
-	 * each {@link #BENCH_TEST_RUNS} times
+	 * each testruns times
 	 * <ul>
 	 * <li>first using a new {@link Transaction} for each test,</li>
 	 * <li>then using a new {@link Transaction} but re-using a single
 	 * {@link Connection},</li>
 	 * <li>and finally re-using a single {@link Transaction} object.</li>
 	 * </ul>
+	 * 
+	 * @param testruns
+	 *            the number of test runs to execute
+	 * @param benchmarks
+	 *            the benchmarks to run (1-9 or -1 for all benchmarks)
 	 */
 	public static void minibench(int testruns, int benchmarks) {
 		long[][] results = new long[3][3];
