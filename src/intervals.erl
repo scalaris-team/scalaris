@@ -53,10 +53,10 @@
 -type simple_interval() :: {element, key()} | {interval, left_bracket(), key(), key(), right_bracket()} | all.
 -opaque interval() :: [simple_interval()]. %todo: make opaque (gives wrong dialyzer warnings with erlang =< R14B)
 
-% @type interval() = [] | [simple_interval(),...].
+% @type interval() = [simple_interval()].
 % [] -> empty interval
 % [simple_interval(),...] -> union of the simple intervals
-% @type simple_interval() = 
+% @type simple_interval() = {element, key()} | {interval, left_bracket(), key(), key(), right_bracket()} | all.
 % {element, term()} -> one element interval
 % {interval, '[', A::term(), B::term(), ']'} -> closed interval [A, B]
 % {interval, '(', A::term(), B::term(), ']'} -> half-open interval (A, B], aka ]A, B]
