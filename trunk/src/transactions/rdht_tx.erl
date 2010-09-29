@@ -26,6 +26,17 @@
 -export([process_request_list/2]).
 -export([check_config/0]).
 
+-include("scalaris.hrl").
+
+-ifdef(with_export_type_support).
+-export_type([req_id/0, request/0]).
+-endif.
+
+-type req_id() :: {rdht_req_id, util:global_uid()}.
+-type request() :: {atom(), ?RT:key()} | {atom(), ?RT:key(), any()} | {commit}.
+
+-spec process_request_list(tx_tlog:tlog(), [request()]) ->
+        {tx_tlog:tlog(), any()}.
 %% single request and empty translog, done separately for optimization only
 process_request_list([], [SingleReq]) ->
     RdhtOpWithReqId = initiate_rdht_ops([{1, SingleReq}]),
@@ -129,7 +140,7 @@ collect_results_and_do_translogops({[], [], [RdhtOpWithReqId], [], []}
 collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
                                     Delayed, []} = Args) ->
     ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [Args]),
-    {_, TRdhtId, TRdhtTlog, TRdhtResult} = TReply = receive_answer(),
+    {_, TRdhtId, _, _} = TReply = receive_answer(),
     {_, RdhtId, RdhtTlog, RdhtResult} =
         case lists:keyfind(TRdhtId, 1, RdhtOpsWithReqIds) of
         false ->
