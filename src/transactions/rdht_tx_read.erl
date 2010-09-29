@@ -279,7 +279,7 @@ my_make_result_entry(Entry) ->
     case rdht_tx_read_state:get_decided(Entry) of
         {fail, timeout} -> {?MODULE, Key, {fail, timeout}};
         not_found -> {?MODULE, Key, {fail, not_found}};
-        value -> {?MODULE, Key, {value, Val}};
+        value -> {?MODULE, Key, {value, Val}}
     end.
 
 my_delete_if_all_replied(Entry, Reps, Table) ->
