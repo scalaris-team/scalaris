@@ -130,6 +130,7 @@ read_write_lock(_Config) ->
     prop_read_write_lock(?RT:hash_key("ReadWriteLockKey1"), "Value1", 1).
 
 write_read_lock(_Config) ->
+    prop_write_read_lock(100, empty_val, 2),
     prop_write_read_lock(?RT:hash_key("WriteReadLockKey1"), "Value1", 1).
 
 delete(_Config) ->
