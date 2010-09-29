@@ -89,7 +89,7 @@ tc1(_Config) ->
               intervals:new('[', 36721483204272088954146455621100499974,
                             187356034246551717222654062087646951235, ']'))),
 
-    ?equals(intervals:union({interval,'[', minus_infinity, plus_infinity,')'},
+    ?equals(intervals:union([{interval,'[', minus_infinity, plus_infinity,')'}],
                             [{interval,'[',minus_infinity,4,']'},
                              {element,plus_infinity}]),
             intervals:all()),
