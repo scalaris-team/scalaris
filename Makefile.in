@@ -116,7 +116,7 @@ java-bench: compile java
 	SCALARIS_NODE_NAME="node2" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14197 -scalaris yaws_port 8002" ./bin/scalarisctl -d -k 170141183460469231731687303715884105728 node start ; \
 	SCALARIS_NODE_NAME="node3" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14198 -scalaris yaws_port 8003" ./bin/scalarisctl -d -k 255211775190703847597530955573826158592 node start ; \
 	sleep 5s ; \
-	./java-api/scalaris --noconfig -b ; \
+	./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl boot stop ; \
 	SCALARIS_NODE_NAME="node1" ./bin/scalarisctl node stop ; \
 	SCALARIS_NODE_NAME="node2" ./bin/scalarisctl node stop ; \
