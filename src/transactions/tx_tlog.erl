@@ -37,7 +37,7 @@
 -export([get_entry_version/1]).
 
 %% TranslogEntry: {Operation, Key, Status, Value, Version}
-%% Sample: {read,"key3",ok,"value3",0}
+%% Sample: {read,"key3",value,"value3",0}
 
 -ifdef(with_export_type_support).
 -export_type([tlog/0, tlog_entry/0]).
