@@ -62,11 +62,11 @@ work_phase(TLogEntry, {Num, Request}) ->
     Value = apply(element(1, TLogEntry), tlogentry_get_value, [TLogEntry]),
     Version = apply(element(1, TLogEntry), tlogentry_get_version, [TLogEntry]),
     NewTLogEntry =
-        {?MODULE, element(2, Request), Status, Value, Version},
+        tx_tlog:new_entry(?MODULE, element(2, Request), Status, Value, Version),
     Result =
         case Status of
             not_found -> {Num, {?MODULE, element(2, Request), {fail, Status}}};
-            ok -> {Num, {?MODULE, element(2, Request), {Status, Value}}}
+            value -> {Num, {?MODULE, element(2, Request), {Status, Value}}}
         end,
     {NewTLogEntry, Result}.
 
@@ -271,7 +271,7 @@ my_make_tlog_entry(Entry) ->
     {Val, Vers} = rdht_tx_read_state:get_result(Entry),
     Key = rdht_tx_read_state:get_key(Entry),
     Status = rdht_tx_read_state:get_decided(Entry),
-    {?MODULE, Key, Status, Val, Vers}.
+    tx_tlog:new_entry(?MODULE, Key, Status, Val, Vers).
 
 my_make_result_entry(Entry) ->
     Key = rdht_tx_read_state:get_key(Entry),

@@ -189,6 +189,8 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
     comm:send_local(ClientPid, Msg),
     State.
 
+-spec my_make_tlog_result_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
+        {tx_tlog:tlog_entry(), rdht_tx:result_entry()}.
 my_make_tlog_result_entry(TLogEntry, Request) ->
     Status = apply(element(1, TLogEntry), tlogentry_get_status, [TLogEntry]),
     Version = apply(element(1, TLogEntry), tlogentry_get_version, [TLogEntry]),
@@ -198,13 +200,14 @@ my_make_tlog_result_entry(TLogEntry, Request) ->
     %% validation and increment then in case of write.
     case Status of
         not_found ->
-            {{?MODULE, Key, ok, WriteValue, Version},
+            {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
              {?MODULE, Key, {value, WriteValue}}};
         value ->
-            {{?MODULE, Key, ok, WriteValue, Version},
+            {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
             {?MODULE, Key, {value, WriteValue}}};
         timeout ->
-            {{?MODULE, Key, {fail, timeout}, WriteValue, Version},
+            {tx_tlog:new_entry(?MODULE, Key, {fail, timeout},
+                               WriteValue, Version),
              {?MODULE, Key, {fail, timeout}}}
     end.
 

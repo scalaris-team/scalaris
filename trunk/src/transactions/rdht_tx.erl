@@ -29,11 +29,13 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([req_id/0, request/0]).
+-export_type([req_id/0, request/0, result_entry/0, result/0]).
 -endif.
 
 -type req_id() :: {rdht_req_id, util:global_uid()}.
 -type request() :: {atom(), ?RT:key()} | {atom(), ?RT:key(), any()} | {commit}.
+-type result_entry() :: any(). %% TODO: specify more strict.
+-type result() :: [ result_entry() ].
 
 -spec process_request_list(tx_tlog:tlog(), [request()]) ->
         {tx_tlog:tlog(), any()}.
