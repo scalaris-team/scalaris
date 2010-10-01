@@ -223,8 +223,9 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
         true ->
             % TODO: implement step-wise join
             MoveFullId = {util:get_pids_uid(), comm:this()},
-            SlideOp = slide_op:new_sending_slide(MoveFullId, node:pidX(NewPred),
-                                                pred, TargetId, join, null, State),
+            SlideOp = slide_op:new_sending_slide_join(MoveFullId,
+                                                      node:pidX(NewPred),
+                                                      TargetId, State),
             SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update),
             rm_loop:subscribe(self(), fun dht_node_move:rm_pred_changed/2,
                               fun dht_node_move:rm_notify_new_pred/3),
