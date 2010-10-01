@@ -798,7 +798,7 @@ abort_slide(State, SlideOp, Pred_or_Succ, Reason, NotifyNode) ->
             [SlideOp, Pred_or_Succ, Reason]),
     slide_op:reset_timer(SlideOp), % reset previous timeouts
     % potentially set up for joining nodes (slide with pred):
-    case Pred_or_Succ =:= pred andalso slide_op:get_tag(SlideOp) =:= join of
+    case Pred_or_Succ =:= pred andalso slide_op:is_join(SlideOp) of
         true -> rm_loop:unsubscribe(self(),
                                     fun dht_node_move:rm_pred_changed/2,
                                     fun dht_node_move:rm_notify_new_pred/3);
