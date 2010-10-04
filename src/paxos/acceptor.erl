@@ -27,8 +27,9 @@
 
 -include("scalaris.hrl").
 
-%%% public interface for initiating a paxos acceptor for a new PoxosID
+%%% public interface for initiating a paxos acceptor for a new PaxosID
 -export([start_paxosid/2, start_paxosid_local/3, start_paxosid/3]).
+-export([stop_paxosids/2]).
 -export([msg_accepted/4]).
 %%% functions for gen_component module and supervisor callbacks
 -export([start_link/1]).
@@ -75,6 +76,10 @@ start_paxosid_local(LAcceptor, PaxosID, Learners) ->
 -spec start_paxosid(comm:mypid(), any(), [ comm:mypid() ]) -> ok.
 start_paxosid(Acceptor, PaxosID, Learners) ->
     comm:send(Acceptor, {acceptor_initialize, PaxosID, Learners}).
+
+-spec stop_paxosids(comm:mypid(), list(any())) -> ok.
+stop_paxosids(Acceptor, PaxosIds) ->
+    comm:send(Acceptor, {acceptor_deleteids, PaxosIds}).
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.

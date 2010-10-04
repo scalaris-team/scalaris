@@ -28,7 +28,7 @@
 -export([start_link/2, on/2, init/1,
          trigger_known_nodes/0]).
 
--export([is_first/1]).
+-export([is_first/1, is_alive/1]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0]).
@@ -397,3 +397,6 @@ is_unittest() ->
 is_first(Options) ->
     lists:member({first}, Options) andalso
         (is_unittest() orelse preconfig:get_env(first, false) =:= true).
+
+is_alive(Pid) ->
+    element(1, gen_component:get_state(Pid)) =:= state.
