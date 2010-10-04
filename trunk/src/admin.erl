@@ -43,7 +43,7 @@ add_node_at_id(Id) ->
 -spec add_node([tuple()]) -> ok.
 add_node(Options) ->
     Desc = util:sup_supervisor_desc(randoms:getRandomId(),
-                                    sup_dht_node, start_link, [Options]),
+                                    config:read(dht_node_sup), start_link, [Options]),
     supervisor:start_child(main_sup, Desc),
     ok.
 
