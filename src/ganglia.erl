@@ -105,9 +105,7 @@ monitor_vivaldi_errors(Group, Idx) ->
             end
     end.
 
--spec monitor_per_dht_node(fun((pid_groups:groupname(), Idx::non_neg_integer()) -> any()), [pid_groups:groupname(),...] | failed) -> ok | non_neg_integer().
-monitor_per_dht_node(_, failed) ->
-    ok;
+-spec monitor_per_dht_node(fun((pid_groups:groupname(), Idx::non_neg_integer()) -> any()), [pid_groups:groupname(),...] | failed) -> non_neg_integer().
 monitor_per_dht_node(F, Nodes) ->
     DHTNodes = lists:sort(Nodes),
     lists:foldl(fun (Group, Idx) ->
