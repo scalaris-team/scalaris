@@ -64,6 +64,7 @@ usage(){
     echo "    boot start           start boot server"
     echo "    boot stop            stop boot server"
     echo "    boot restart         restart boot server"
+    echo "    group start          start scalaris2"
     echo "    node start           start normal node"
     echo "    node stop            stop normal node"
     echo "    node restart         restart normal node"
@@ -315,6 +316,47 @@ nodestop(){
     popd > /dev/null
 }
 
+groupstart(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
+    if [ $daemonize -ne 0 ]; then
+        BACKGROUND="-detached"
+    fi
+    if [ $empty -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs empty true"
+    fi
+    if [ "$port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs cs_port $port"
+    fi
+    if [ "$yaws_port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs yaws_port $yaws_port"
+    fi
+    if [ "$first_id" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs first_id $first_id"
+    fi
+    mkdir -p "$LOGDIR/$NODE_NAME"
+    pushd $BEAMDIR > /dev/null
+    $ERL -setcookie "$SCALARIS_COOKIE" \
+        -pa $SCALARISDIR/contrib/yaws/ebin \
+        -pa $SCALARISDIR/contrib/log4erl/ebin \
+        -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
+        -yaws embedded true \
+        -scalaris2 log_path "\"$LOGDIR/$NODE_NAME\"" \
+        -scalaris2 docroot "\"$DOCROOTDIR\"" \
+        -scalaris2 config "\"$ETCDIR/scalaris.cfg\"" \
+        -scalaris2 local_config "\"$ETCDIR/scalaris.local.cfg\"" \
+        -scalaris2 first true \
+        -connect_all false -hidden -name $NODE_NAME \
+        $SCALARIS_ADDITIONAL_PARAMETERS \
+        -s scalaris2 $*;
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not start scalaris"
+        echo "  consider running scalarisctl checkinstallation"
+        exit 1
+    fi
+    popd > /dev/null
+}
+
 list_erlang_processes(){
     $EPMD -names || echo "could not run epmd"
 }
@@ -366,6 +408,12 @@ case $1 in
         elif [ $2 == "restart" ]; then
             nodestop;
             nodestart;
+        fi;;
+    group)
+        #[ 2 -eq $# ] || usage;
+        if [ $2 == "start" ]; then
+            shift 2
+            groupstart $*;
         fi;;
     *) usage;;
 esac

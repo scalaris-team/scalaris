@@ -84,16 +84,20 @@ get_env(Env, Def) ->
 %% @doc get an application environment with defaults
 -spec get_env(Env::atom(), BootDef::T, NodeDef::T) -> T.
 get_env(Env, Boot_Def, Scalaris_Def) ->
-    %% io:format("preconfig:get_env(~p,~p,~p) -> ~p~n", [Env, Boot_Def, Scalaris_Def, application:get_env(Env)]),
+    %% ct:pal("preconfig:get_env(~p,~p,~p) -> ~p~n", [Env, Boot_Def, Scalaris_Def,
+    %%                                               application:get_env(Env)]),
+    %% ct:pal("~p~n", [application:get_application()]),
     case application:get_env(Env) of
         {ok, Val} -> Val;
         _ ->
             case application:get_application() of
                 {ok, boot_cs} -> Boot_Def;
                 {ok, scalaris } -> Scalaris_Def;
+                {ok, scalaris2 } -> Scalaris_Def;
                 undefined -> Boot_Def;
                 App ->
-                    error_logger:error_msg("application:get_application() returned ~w~n", [App]),
+                    error_logger:error_msg("application:get_application() returned ~w~n",
+                                           [App]),
                     erlang:exit(unknown_application)
             end
     end.
@@ -112,6 +116,7 @@ get_int_from_env(Env, Boot_Def, Scalaris_Def) ->
             case application:get_application() of
                 {ok, boot_cs} -> Boot_Def;
                 {ok, scalaris } -> Scalaris_Def;
+                {ok, scalaris2 } -> Scalaris_Def;
                 undefined -> Boot_Def;
                 App ->
                     error_logger:error_msg("application:get_application() returned ~w~n", [App]),
