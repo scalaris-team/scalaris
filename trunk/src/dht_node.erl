@@ -387,16 +387,10 @@ trigger_known_nodes() ->
             trigger_known_nodes()
     end.
 
-%% @doc Try to check whether common-test is running.
--spec is_unittest() -> boolean().
-is_unittest() ->
-    code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
-    lists:member(ct_logs, registered()).
-
 -spec is_first([tuple()]) -> boolean().
 is_first(Options) ->
     lists:member({first}, Options) andalso
-        (is_unittest() orelse preconfig:get_env(first, false) =:= true).
+        (util:is_unittest() orelse preconfig:get_env(first, false) =:= true).
 
 is_alive(Pid) ->
     element(1, gen_component:get_state(Pid)) =:= state.

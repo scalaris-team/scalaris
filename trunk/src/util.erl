@@ -37,7 +37,8 @@
          zipfoldl/5,
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
-         smerge2/2, smerge2/3, smerge2/4]).
+         smerge2/2, smerge2/3, smerge2/4,
+        is_unittest/0]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
@@ -496,4 +497,10 @@ smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
         true  -> lists:reverse(ML, L2);
         false -> smerge2_helper([], T2, Lte, EqSelect, ML)
     end.
+
+%% @doc Try to check whether common-test is running.
+-spec is_unittest() -> boolean().
+is_unittest() ->
+    code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
+    lists:member(ct_logs, registered()).
 
