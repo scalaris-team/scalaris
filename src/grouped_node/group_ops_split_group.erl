@@ -21,7 +21,7 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
--export([ops_request/2, ops_decision/3]).
+-export([ops_request/2, ops_decision/3, rejected_proposal/3]).
 
 -type(proposal_type() :: {group_split, Proposer::comm:mypid(),
                           SplitKey::?RT:key(), LeftGroup::list(comm:mypid()),
@@ -42,6 +42,7 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
         {true, true} ->
             case group_paxos_utils:propose(Proposal, GroupState) of
                 {success, NewGroupState} ->
+                    io:format("proposed split~n", []),
                     {joined, NodeState, NewGroupState, TriggerState};
                 _ ->
                     comm:send(Pid, {group_split_response, retry}),
@@ -65,38 +66,37 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
 ops_decision({joined, NodeState, GroupState, TriggerState} = State,
              {group_split, Proposer, SplitKey, LeftGroup, RightGroup} = Proposal,
              PaxosId) ->
+    io:format("decided split~n", []),
     CurrentPaxosId = group_state:get_next_expected_decision_id(GroupState),
     case CurrentPaxosId == PaxosId of
         true ->
             case group_state:get_proposal(GroupState, PaxosId) of
                 {value, Proposal} -> %my_proposal_was_accepted
-                    NewGroupState = split_group(GroupState, SplitKey, LeftGroup,
-                                                RightGroup),
-                    group_utils:notify_neighbors(NodeState, GroupState,
-                                                 NewGroupState),
+                    NewGroupState = execute_decision(GroupState, NodeState, Proposal),
                     comm:send(Proposer, {group_split_response, success}),
-                    update_fd(),
-                    {joined, NodeState,
-                     group_paxos_utils:init_paxos(NewGroupState),
+                    {joined, NodeState, NewGroupState,
                      TriggerState};
-                {value, _OtherProposal} -> % my_proposal_was_rejected ->
-                    log:log(group_node, error,
-                            "split_group: my proposal was rejected", []),
-                    State;
                 none -> % I had no proposal for this paxos instance
-                    NewGroupState = split_group(GroupState, SplitKey, LeftGroup,
-                                                RightGroup),
-                    group_utils:notify_neighbors(NodeState, GroupState,
-                                                 NewGroupState),
-                    update_fd(),
-                    {joined, NodeState,
-                     group_paxos_utils:init_paxos(NewGroupState), TriggerState}
+                    NewGroupState = execute_decision(GroupState, NodeState, Proposal),
+                    {joined, NodeState, NewGroupState, TriggerState};
+                {value, OtherProposal} -> % my_proposal_was_rejected ->
+                    NewGroupState = execute_decision(GroupState, NodeState, Proposal),
+                    NewState = {joined, NodeState, NewGroupState, TriggerState},
+                    group_ops:report_rejection(NewState, PaxosId, OtherProposal)
             end;
         false ->
             %@todo
             io:format("panic! 2~n", []),
             State
     end.
+
+execute_decision(GroupState, NodeState, {group_split, _Proposer, SplitKey, LeftGroup, RightGroup}) ->
+    NewGroupState = split_group(GroupState, SplitKey, LeftGroup,
+                                RightGroup),
+    group_utils:notify_neighbors(NodeState, GroupState,
+                                 NewGroupState),
+    update_fd(),
+    NewGroupState.
 
 -spec split_group(GroupState::group_state:group_state(),
                   SplitKey::?RT:key(),
@@ -110,12 +110,12 @@ split_group(GroupState, SplitKey, LeftGroup, RightGroup) ->
     case lists:member(comm:this(), LeftGroup) of
         true ->
             NewGroupId = group_state:get_new_group_id(OldGroupId, left),
-            NewInterval = intervals:new('(', LowerBound, SplitKey, ']'),
+            NewInterval = intervals:new('[', LowerBound, SplitKey, ')'),
             group_state:split_group(GroupState, NewGroupId, NewInterval,
                                          LeftGroup);
         false ->
             NewGroupId = group_state:get_new_group_id(OldGroupId, right),
-            NewInterval = intervals:new('(', SplitKey, UpperBound, ']'),
+            NewInterval = intervals:new('[', SplitKey, UpperBound, ')'),
             group_state:split_group(GroupState, NewGroupId, NewInterval,
                                          RightGroup)
     end.
@@ -123,3 +123,11 @@ split_group(GroupState, SplitKey, LeftGroup, RightGroup) ->
 update_fd() ->
     %@todo
     ok.
+
+-spec rejected_proposal(joined_state(), proposal_type(), paxos_id()) ->
+    joined_state().
+rejected_proposal(State,
+                  {group_split, Proposer, _SplitKey, _LeftGroup, _RightGroup},
+                  _PaxosId) ->
+    comm:send(Proposer, {group_split_response, retry}),
+    State.

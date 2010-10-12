@@ -52,9 +52,9 @@ init([Options]) ->
     Supervisor_AND =
         util:sup_supervisor_desc(cs_supervisor_and, sup_group_node_core, start_link,
                                  [InstanceId, Options]),
-    RingMaintenance =
+    _RingMaintenance =
         util:sup_worker_desc(?RM, ?RM, start_link, [InstanceId]),
-    RoutingTable =
+    _RoutingTable =
         util:sup_worker_desc(routingtable, rt_loop, start_link, [InstanceId]),
     _DeadNodeCache =
         util:sup_worker_desc(deadnodecache, dn_cache, start_link, [InstanceId]),
@@ -66,7 +66,7 @@ init([Options]) ->
     _DC_Clustering =
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
                              [InstanceId]),
-    Cyclon =
+    _Cyclon =
         util:sup_worker_desc(cyclon, cyclon, start_link, [InstanceId]),
     _Gossip =
         util:sup_worker_desc(gossip, gossip, start_link, [InstanceId]),

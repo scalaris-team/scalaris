@@ -21,7 +21,7 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
--export([ops_request/2, ops_decision/3]).
+-export([ops_request/2, ops_decision/3, rejected_proposal/3]).
 
 -type(proposal_type()::{group_node_remove, Pid::comm:mypid()}).
 
@@ -40,8 +40,7 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
                 {success, NewGroupState} ->
                     {joined, NodeState, NewGroupState, TriggerState};
                 _ ->
-                    comm:send(Pid, {group_node_remove_response,
-                                    Pid, retry}),
+                    comm:send(Pid, {group_node_remove_response, retry}),
                     State
             end
     end.
@@ -52,42 +51,41 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
                    Proposal::proposal_type(),
                    PaxosId::any()) -> joined_state().
 ops_decision({joined, NodeState, GroupState, TriggerState} = State,
-             {group_node_remove, Pid} = Proposal,
+             {group_node_remove, _Pid} = Proposal,
              PaxosId) ->
-    CurrentPaxosId = group_state:get_next_expected_decision_id(GroupState),
-    case CurrentPaxosId == PaxosId of
-        true ->
-            case group_state:get_proposal(GroupState, PaxosId) of
-                {value, Proposal} -> %my_proposal_was_accepted
-                    NewGroupState = group_state:remove_node(
-                                      group_state:remove_proposal(GroupState,
-                                                                       PaxosId),
-                                      Pid),
-                    group_utils:notify_neighbors(NodeState, GroupState,
-                                                 NewGroupState),
-                    % notify dead node
-                    Pred = group_local_state:get_predecessor(NodeState),
-                    Succ = group_local_state:get_successor(NodeState),
-                    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
-                    fd:unsubscribe(Pid),
-                    {joined, NodeState, group_paxos_utils:init_paxos(NewGroupState),
-                     TriggerState};
-                {value, _OtherProposal} -> % my_proposal_was_rejected ->
-                    % @todo check if my proposal was proposed (and accepted) by somebody else
-                    io:format("panic! 1~n", []),
-                    State;
-                none -> % I had no proposal for this paxos instance
-                    NewGroupState = group_state:remove_node(
-                                      GroupState, Pid),
-                    % notify dead node
-                    Pred = group_local_state:get_predecessor(NodeState),
-                    Succ = group_local_state:get_successor(NodeState),
-                    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
-                    {joined, NodeState, group_paxos_utils:init_paxos(NewGroupState),
-                     TriggerState}
-            end;
-        false ->
-            %@todo
-            io:format("panic! 2~n", []),
-            State
+    PaxosId = group_state:get_next_expected_decision_id(GroupState), %assert
+    case group_state:get_proposal(GroupState, PaxosId) of
+        {value, Proposal} -> %my_proposal_was_accepted
+            NewGroupState = execute_decision(GroupState, NodeState, Proposal, PaxosId),
+            {joined, NodeState, NewGroupState, TriggerState};
+        none -> % I had no proposal for this paxos instance
+            NewGroupState = execute_decision(GroupState, NodeState, Proposal, PaxosId),
+            {joined, NodeState, NewGroupState, TriggerState};
+        {value, OtherProposal} -> % my_proposal_was_rejected ->
+            NewGroupState = execute_decision(GroupState, NodeState, Proposal,
+                                             PaxosId),
+            NewState = {joined, NodeState, NewGroupState, TriggerState},
+            group_ops:report_rejection(NewState, PaxosId, OtherProposal)
     end.
+
+execute_decision(GroupState, NodeState, {group_node_remove, Pid}, PaxosId) ->
+    NewGroupState = group_state:remove_node(
+                      group_state:remove_proposal(GroupState,
+                                                  PaxosId),
+                      Pid),
+    group_utils:notify_neighbors(NodeState, GroupState,
+                                 NewGroupState),
+    % notify dead node
+    Pred = group_local_state:get_predecessor(NodeState),
+    Succ = group_local_state:get_successor(NodeState),
+    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
+    fd:unsubscribe(Pid),
+    NewGroupState.
+
+-spec rejected_proposal(joined_state(), proposal_type(), paxos_id()) ->
+    joined_state().
+rejected_proposal(State,
+                  {group_node_remove, Pid},
+                  _PaxosId) ->
+    comm:send(Pid, {group_node_remove_response, retry}),
+    State.

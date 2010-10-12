@@ -21,7 +21,7 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
--export([ops_request/2, ops_decision/3]).
+-export([ops_request/2, ops_decision/3, rejected_proposal/3]).
 
 -type(proposal_type()::{group_node_join, Pid::comm:mypid(),
                         Acceptor::comm:mypid(), Learner::comm:mypid()}).
@@ -40,9 +40,11 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
             case group_paxos_utils:propose({group_node_join, Pid, Acceptor,
                                             Learner}, GroupState) of
                 {success, NewGroupState} ->
+                    PaxosId = group_state:get_next_expected_decision_id(NewGroupState),
+                    io:format("proposed join of ~p in ~p~n", [Pid, PaxosId]),
                     {joined, NodeState, NewGroupState, TriggerState};
                 _ ->
-                    comm:send(Pid, {group_node_join_response, retry}),
+                    comm:send(Pid, {group_node_join_response, retry, propose_rejected}),
                     State
             end
     end.
@@ -52,42 +54,44 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
                    Proposal::proposal_type(),
                    PaxosId::paxos_id()) -> joined_state().
 ops_decision({joined, NodeState, GroupState, TriggerState} = State,
-             {group_node_join, Pid, Acceptor, Learner} = Proposal,
+             {group_node_join, _Pid, _Acceptor, _Learner} = Proposal,
              PaxosId) ->
-    CurrentPaxosId = group_state:get_next_expected_decision_id(GroupState),
-    case CurrentPaxosId == PaxosId of
-        true ->
-            case group_state:get_proposal(GroupState, PaxosId) of
-                {value, Proposal} -> %my_proposal_was_accepted
-                    NewGroupState = group_state:add_node(
-                                      group_state:remove_proposal(GroupState,
-                                                                       PaxosId),
-                                      Pid, Acceptor, Learner),
-                    group_utils:notify_neighbors(NodeState, GroupState,
-                                                 NewGroupState),
-                    Pred = group_local_state:get_predecessor(NodeState),
-                    Succ = group_local_state:get_successor(NodeState),
-                    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
-                    fd:subscribe(Pid),
-                    {joined, NodeState,
-                     group_paxos_utils:init_paxos(NewGroupState), TriggerState};
-                {value, _OtherProposal} -> % my_proposal_was_rejected ->
-                    io:format("panic! 1~n", []),
-                    State;
-                none -> % I had no proposal for this paxos instance
-                    NewGroupState = group_state:add_node(
-                                      GroupState, Pid, Acceptor, Learner),
-                    group_utils:notify_neighbors(NodeState, GroupState,
-                                                 NewGroupState),
-                    Pred = group_local_state:get_predecessor(NodeState),
-                    Succ = group_local_state:get_successor(NodeState),
-                    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
-                    fd:subscribe(Pid),
-                    {joined, NodeState,
-                     group_paxos_utils:init_paxos(NewGroupState), TriggerState}
-            end;
-        false ->
-            %@todo
-            io:format("panic! 2~n", []),
-            State
+    PaxosId = group_state:get_next_expected_decision_id(GroupState), %assert
+    case group_state:get_proposal(GroupState, PaxosId) of
+        {value, Proposal} -> %my_proposal_was_accepted
+            NewGroupState = execute_decision(GroupState, NodeState, Proposal,
+                                             PaxosId),
+            {joined, NodeState, NewGroupState, TriggerState};
+        none -> % I had no proposal for this paxos instance
+            NewGroupState = execute_decision(GroupState, NodeState, Proposal,
+                                             PaxosId),
+            {joined, NodeState, NewGroupState, TriggerState};
+        {value, OtherProposal} -> % my_proposal_was_rejected ->
+            NewGroupState = execute_decision(GroupState, NodeState, Proposal,
+                                             PaxosId),
+            NewState = {joined, NodeState, NewGroupState, TriggerState},
+            group_ops:report_rejection(NewState, PaxosId, OtherProposal)
     end.
+
+execute_decision(GroupState, NodeState,
+                 {group_node_join, Pid, Acceptor, Learner}, PaxosId) ->
+    io:format("adding ~p at ~p~n", [Pid, self()]),
+    NewGroupState = group_state:add_node(
+                      group_state:remove_proposal(GroupState,
+                                                  PaxosId),
+                      Pid, Acceptor, Learner),
+    group_utils:notify_neighbors(NodeState, GroupState,
+                                 NewGroupState),
+    Pred = group_local_state:get_predecessor(NodeState),
+    Succ = group_local_state:get_successor(NodeState),
+    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
+    fd:subscribe(Pid),
+    NewGroupState.
+
+-spec rejected_proposal(joined_state(), proposal_type(), paxos_id()) ->
+    joined_state().
+rejected_proposal(State,
+                  {group_node_join, Pid, _Acceptor, _Learner},
+                  _PaxosId) ->
+    comm:send(Pid, {group_node_join_response, retry, different_proposal_accepted}),
+    State.

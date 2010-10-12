@@ -51,6 +51,8 @@ get_split_key(Interval) ->
     end.
 
 -spec split_group(list(comm:mypid())) -> {list(comm:mypid()), list(comm:mypid())}.
+split_group([]) ->
+    {[], []};
 split_group([El]) ->
     {[El], []};
 split_group([El1, El2|Rest]) ->
