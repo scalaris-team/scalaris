@@ -97,8 +97,8 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
                     NewState = learner_state:set_client_cookie(Tmp2State, ClientCookie),
                     pdb:set(NewState, ETSTableName),
                     case (Majority =< learner_state:get_accepted_count(NewState)) of
-                        true -> ok;
-                        false -> decide(PaxosID, NewState)
+                        true -> decide(PaxosID, NewState);
+                        false -> ok
                     end
             end
     end,
