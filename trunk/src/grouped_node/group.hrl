@@ -1,12 +1,12 @@
--type(ops() :: {group_node_join, Pid::comm:mypid(), Acceptor::comm:mypid(),
-                Learner::comm:mypid()}
-             | {group_node_remove, Pid::comm:mypid()}
-             | {read , Key::?RT:key(), Pid::comm:mypid(), Value::any(),
-                Proposer::comm:mypid()}
-             | {write, Key::?RT:key(), Pid::comm:mypid(), Value::any(),
-                Proposer::comm:mypid()}
-             | {group_split, Proposer::comm:mypid(), SplitKey::?RT:key(),
-                LeftGroup::list(comm:mypid()), RightGroup::list(comm:mypid())}).
+-type(proposal() :: {group_node_join, Pid::comm:mypid(), Acceptor::comm:mypid(),
+                      Learner::comm:mypid()}
+      | {group_node_remove, Pid::comm:mypid()}
+      | {read , Key::?RT:key(), Pid::comm:mypid(), Value::any(),
+         Proposer::comm:mypid()}
+      | {write, Key::?RT:key(), Pid::comm:mypid(), Value::any(),
+         Proposer::comm:mypid()}
+      | {group_split, Proposer::comm:mypid(), SplitKey::?RT:key(),
+         LeftGroup::list(comm:mypid()), RightGroup::list(comm:mypid())}).
 
 -type(group_id() :: non_neg_integer()).
 

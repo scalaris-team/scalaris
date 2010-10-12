@@ -36,6 +36,9 @@
          remove_node/2,
          made_proposal/3,
          remove_proposal/2,
+         postpone_decision/3,
+         get_postponed_decisions/1,
+         remove_postponed_decision/3,
          get_proposal/2,
          init_paxos/2,
          get_next_paxos_id/1,
@@ -48,7 +51,6 @@
 
 -type(group_member() :: comm:mypid()).
 -type(group_member_list() :: list(group_member())).
--type(proposal() :: ops()). % @todo make proper proposal type
 
 -record(group_state, {group_id :: group_id(),
                       current_paxos_version,
@@ -58,7 +60,8 @@
                       interval::intervals:interval(),
                       acceptors,
                       learners,
-                      proposals}).
+                      proposals,
+                      postponed_decisions :: gb_set()}).
 
 -opaque group_state() :: #group_state{}.
 
@@ -77,7 +80,8 @@ new_group_state(Interval) ->
                                              gb_trees:empty()),
                  learners = gb_trees:insert(comm:this(), Learner,
                                             gb_trees:empty()),
-                 proposals = gb_trees:empty()}.
+                 proposals = gb_trees:empty(),
+                 postponed_decisions = gb_sets:empty()}.
 
 -spec get_group_id(group_state()) -> any().
 get_group_id(#group_state{group_id=GroupId}) ->
@@ -158,7 +162,7 @@ get_next_expected_decision_id(#group_state{group_id=GroupId,
     {GroupId, CurrentPaxosVersion}.
 
 % @doc update state to reflect new proposal
--spec made_proposal(group_state(), paxos_id(), ops()) -> group_state().
+-spec made_proposal(group_state(), paxos_id(), proposal()) -> group_state().
 made_proposal(#group_state{group_id=GroupId,
                            current_paxos_version=CurrentPaxosVersion}
               = GroupState,
@@ -169,6 +173,21 @@ made_proposal(#group_state{group_id=GroupId,
       proposals =
       gb_trees:insert(PaxosId, Proposal,
                       GroupState#group_state.proposals)}.
+
+-spec postpone_decision(group_state(), paxos_id(), proposal()) -> group_state().
+postpone_decision(#group_state{postponed_decisions = PostPonedDecisions} = GroupState, PaxosId, Proposal) ->
+    GroupState#group_state{postponed_decisions = gb_sets:add({PaxosId, Proposal},
+                                                             PostPonedDecisions)}.
+
+-spec get_postponed_decisions(group_state()) -> list({paxos_id(), proposal()}).
+get_postponed_decisions(#group_state{postponed_decisions = PostPonedDecisions}) ->
+    gb_sets:to_list(PostPonedDecisions).
+
+-spec remove_postponed_decision(group_state(), paxos_id(), proposal()) -> group_state().
+remove_postponed_decision(#group_state{postponed_decisions = PostPonedDecisions} = GroupState,
+                           PaxosId, Proposal) ->
+    GroupState#group_state{postponed_decisions = gb_sets:delete_any({PaxosId, Proposal},
+                                                                    PostPonedDecisions)}.
 
 % @doc update state to reflect start of new paxos round
 -spec init_paxos(group_state(), paxos_id()) -> group_state().
@@ -181,9 +200,12 @@ init_paxos(#group_state{group_id=GroupId, next_proposal_version=NextProposalVers
 
 -spec remove_proposal(group_state(), paxos_id()) -> group_state().
 remove_proposal(GroupState, PaxosId) ->
-    GroupState#group_state{
-      proposals =
-      gb_trees:delete(PaxosId, GroupState#group_state.proposals)}.
+    GroupState.
+
+% @todo
+    % GroupState#group_state{
+    %   proposals =
+    %   gb_trees:delete_any(PaxosId, GroupState#group_state.proposals)}.
 
 -spec get_proposal(group_state(), paxos_id()) -> {value, proposal()} | none.
 get_proposal(GroupState, PaxosId) ->

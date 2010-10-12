@@ -21,9 +21,9 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
--export([propose/2, init_paxos/1, cleanup_paxos_states/2]).
+-export([propose/2, init_paxos/1, cleanup_paxos_states/1]).
 
--spec propose(ops(), group_state:group_state()) ->
+-spec propose(proposal(), group_state:group_state()) ->
     {success, group_state:group_state()} | failed.
 propose(Proposal, GroupState) ->
     case is_first_proposal_for_this_instance(GroupState) of
@@ -31,9 +31,8 @@ propose(Proposal, GroupState) ->
             PaxosId = group_state:get_next_proposal_id(GroupState),
             Proposer = comm:make_global(pid_groups:get_my(paxos_proposer)),
             Acceptors = group_state:get_acceptors(GroupState),
-            Majority = (length(Acceptors) + 1) div 2,
+            Majority = length(Acceptors) div 2 + 1,
             MaxProposers = length(Acceptors),
-            io:format("propose in ~p", [PaxosId]),
             proposer:start_paxosid(Proposer, PaxosId, Acceptors, Proposal, Majority,
                                    MaxProposers),
             {success, group_state:made_proposal(GroupState, PaxosId, Proposal)};
@@ -51,16 +50,22 @@ is_first_proposal_for_this_instance(GroupState) ->
 init_paxos(GroupState) ->
     PaxosId = group_state:get_next_paxos_id(GroupState),
     Learners = group_state:get_learners(GroupState),
+    Proposer = pid_groups:get_my(paxos_proposer),
     Acceptor = pid_groups:get_my(paxos_acceptor),
+    io:format("init_paxos ~p ~p~n", [PaxosId, Learners]),
     acceptor:start_paxosid_local(Acceptor, PaxosId, Learners),
     Learner = pid_groups:get_my(paxos_learner),
-    Majority = (group_state:get_size(GroupState) + 1) div 2,
-    io:format("init_paxos ~p~n", [PaxosId]),
+    Majority = group_state:get_size(GroupState) div 2 + 1,
     learner:start_paxosid_local(Learner, PaxosId, Majority, comm:this(), client_cookie),
+    proposer:trigger(comm:make_global(Proposer), PaxosId),
     group_state:init_paxos(GroupState, PaxosId).
 
 
-cleanup_paxos_states(_GroupState, {GroupId, PaxosId}) ->
+-spec cleanup_paxos_states(paxos_id()) -> ok.
+cleanup_paxos_states({GroupId, PaxosId}) ->
+    ok.
+
+foo({GroupId, PaxosId}) ->
     case PaxosId > 2 of
         true ->
             Learner = comm:make_global(pid_groups:get_my(paxos_learner)),
@@ -73,3 +78,5 @@ cleanup_paxos_states(_GroupState, {GroupId, PaxosId}) ->
         false ->
             ok
     end.
+
+% @todo re-add cleanup-code
