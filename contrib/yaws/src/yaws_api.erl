@@ -44,7 +44,9 @@
          replace_cookie_session/2, delete_cookie_session/1]).
 
 -export([getconf/0, 
-         setconf/2]).
+         setconf/2,
+         embedded_start_conf/1, embedded_start_conf/2,
+         embedded_start_conf/3, embedded_start_conf/4]).
 
 -export([set_status_code/1, reformat_header/1,
          reformat_request/1, reformat_response/1, reformat_url/1]).
@@ -358,7 +360,20 @@ do_header(Head) ->
         {value, {_,"form-data"++Line}} ->
             Parameters = parse_arg_line(Line),
             {value, {_,Name}} = lists:keysearch(name, 1, Parameters),
-            {Name, Parameters};
+            {Name,
+             lists:map(fun({"content-type", Val}) ->
+                               {content_type, Val};
+                          ({"content-transfer-encoding", Val}) ->
+                               {content_transfer_encoding, Val};
+                          ({"content-id", Val}) ->
+                               {content_id, Val};
+                          ({"content-description", Val}) ->
+                               {content_description, Val};
+                          (KV) ->
+                               KV
+                       end,
+                       Parameters ++ lists:keydelete("content-disposition", 1,
+                                                     Header))};
         _ ->
             {Header}
     end.
@@ -871,6 +886,8 @@ stream_process_deliver_final_chunk(Sock, IoList) ->
             end,
     stream_process_deliver(Sock, Chunk).
 
+stream_process_end(closed, YawsPid) ->
+    YawsPid ! {endofstreamcontent, closed};
 stream_process_end(Sock={sslsocket,_,_}, YawsPid) ->
     ssl:controlling_process(Sock, YawsPid),
     YawsPid ! endofstreamcontent;
@@ -1661,10 +1678,10 @@ parse_set_cookie(Str, Cookie) ->
     case Rest1 of
         [$=|Rest2] ->
             {Value,Quoted,Rest3} = parse_set_cookie_value(Rest2),
-            NewC=add_set_cookie(yaws:to_lower(Cookie),Key,Value,Quoted),
+            NewC=add_set_cookie(Cookie,yaws:to_lower(Key),Value,Quoted),
             parse_set_cookie(Rest3,NewC);
         [$;|Rest2] ->
-            NewC =add_set_cookie(yaws:to_lower(Cookie),Key,undefined,false),
+            NewC =add_set_cookie(Cookie,yaws:to_lower(Key),undefined,false),
             parse_set_cookie(Rest2,NewC);
         _ ->
             Cookie
@@ -1922,7 +1939,37 @@ getconf() ->
     gen_server:call(yaws_server, getconf, infinity).
 
 
-%% Function which invokeable typically from an index.yaws file
+embedded_start_conf(DocRoot) when is_list(DocRoot) ->
+    embedded_start_conf(DocRoot, []).
+embedded_start_conf(DocRoot, SL) when is_list(DocRoot), is_list(SL) ->
+    embedded_start_conf(DocRoot, SL, []).
+embedded_start_conf(DocRoot, SL, GL)
+  when is_list(DocRoot), is_list(SL), is_list(GL) ->
+    embedded_start_conf(DocRoot, SL, GL, "default").
+embedded_start_conf(DocRoot, SL, GL, Id)
+  when is_list(DocRoot), is_list(SL), is_list(GL) ->
+    case application:load(yaws) of
+        ok -> ok;
+        {error, {already_loaded,yaws}} -> ok;
+        _ -> exit("cannot load yaws")
+    end,
+    ok = application:set_env(yaws, embedded, true),
+    ok = application:set_env(yaws, id, Id),
+    ChildSpecs = yaws_sup:child_specs(),
+    GC = yaws:create_gconf(GL, Id),
+    SCList  = case SL of
+                  [] ->
+                      [[]];
+                  [Cnf|_] when is_tuple(Cnf) ->
+                      [[yaws:create_sconf(DocRoot, SL)]];
+                  [Cnf|_] when is_list(Cnf) ->
+                      [[yaws:create_sconf(DocRoot, SLItem)] || SLItem <- SL]
+              end,
+    SoapChild = yaws_config:add_yaws_soap_srv(GC, false),
+    {ok, SCList, GC, ChildSpecs ++ SoapChild}.
+
+
+%% Function which is invoked typically from an index.yaws file
 dir_listing(Arg) ->
     dir_listing(Arg, ".").
 dir_listing(Arg, RelDir) ->
@@ -1982,7 +2029,3 @@ redirect_self(A) ->
                 scheme_str = SchemeStr,
                 port = Port,
                 port_str = PortStr}.
-
-
-
-

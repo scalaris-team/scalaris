@@ -583,22 +583,24 @@ gserv_loop(GS, Ready, Rnum, Last) ->
         {_From, next, Accepted} when Ready == [] ->
  	    close_accepted_if_max(GS,Accepted),
  	    New = acceptor(GS),
- 	    GS2 = inc_con(GS),
+ 	    GS2 = GS#gs{connections=GS#gs.connections + 1},
             gserv_loop(GS2#gs{sessions = GS2#gs.sessions + 1}, Ready, Rnum, New);
         {_From, next, Accepted} ->
 	    close_accepted_if_max(GS,Accepted),
             [{_Then, R}|RS] = Ready,
             R ! {self(), accept},
- 	    GS2 = inc_con(GS),
+ 	    GS2 = GS#gs{connections=GS#gs.connections + 1},
             gserv_loop(GS2, RS, Rnum-1, R);
 	{_From, decrement} ->
- 	    GS2 = dec_con(GS),
+ 	    GS2 = GS#gs{connections=GS#gs.connections - 1},
  	    gserv_loop(GS2, Ready, Rnum, Last);
         {From, done_client, Int} ->
             GS2 = if
-		      Int == 0 -> dec_con(GS#gs{sessions = GS#gs.sessions - 1});
-		      Int > 0 -> dec_con(GS#gs{sessions = GS#gs.sessions - 1,
- 					       reqs = GS#gs.reqs + Int})
+		      Int == 0 -> GS#gs{sessions = GS#gs.sessions - 1,
+                                        connections = GS#gs.connections - 1};
+		      Int > 0 -> GS#gs{sessions = GS#gs.sessions - 1,
+                                       reqs = GS#gs.reqs + Int,
+                                       connections = GS#gs.connections - 1}
                   end,
             if
                 Rnum == 8 ->
@@ -692,7 +694,8 @@ gserv_loop(GS, Ready, Rnum, Last) ->
                     Ready2 = [],
 		    case ?sc_has_statistics(OldSc) of
 			true ->
-			    error_logger:info_msg("delete_sconf: Pid= ~p~n", [Pid]),
+			    error_logger:info_msg("delete_sconf: Pid= ~p~n",
+                                                  [Pid]),
 			    yaws_stats:stop(Pid);
 			false ->
 			    ok
@@ -778,7 +781,7 @@ gserv_loop(GS, Ready, Rnum, Last) ->
                                               true
                                       end
                               end, Ready),
-            gserv_loop(GS, R2, Rnum, Last)
+            gserv_loop(GS, R2, length(R2), Last)
     end.
 
 
@@ -885,7 +888,7 @@ ssl_listen_opts(GC, SSL) ->
                  false
          end,
          if ?gc_use_old_ssl(GC) ->
-                 false;
+                 {ssl_imp, old};
             true ->
                  {ssl_imp, new}
          end
@@ -908,7 +911,15 @@ initial_acceptor(GS) ->
 
 
 acceptor(GS) ->
-    proc_lib:spawn_link(?MODULE, acceptor0, [GS, self()]).
+    case (GS#gs.gconf)#gconf.process_options of
+        [] ->
+            proc_lib:spawn_link(?MODULE, acceptor0, [GS, self()]);
+        Opts ->
+            %% as we tightly controlled what is set in options, we can
+            %% blindly add "link" to get a linked process as per default
+            %% case and use the provided options.
+            proc_lib:spawn_opt(?MODULE, acceptor0, [GS, self()], [link | Opts])
+    end.
 acceptor0(GS, Top) ->
     ?TC([{record, GS, gs}]),
     put(gc, GS#gs.gconf),
@@ -1020,6 +1031,12 @@ acceptor0(GS, Top) ->
             %% This is what happens when we call yaws --stop
 	    Top ! {self(), decrement},
             exit(normal);
+        {error, Reason} when ((Reason == emfile) or
+                              (Reason == enfile)) ->
+            error_logger:format("yaws: Failed to accept - no more "
+                                "file descriptors - terminating: ~p~n",
+                                [Reason]),
+            exit(failaccept);
         ERR ->
             %% When we fail to accept, the correct thing to do
             %% is to terminate yaws as an application, if we're running
@@ -1075,9 +1092,11 @@ aloop(CliSock, GS, Num) ->
                  end,
             put(outh, #outh{}),
             put(sc, SC),
-	    yaws_stats:hit(),
+            yaws_stats:hit(),
+            check_keepalive_maxuses(GS, Num),
             Call = call_method(Req#http_request.method, CliSock, Req, H),
-            handle_method_result(Call, CliSock, IP, GS, Req, H, Num);
+            Call2 = fix_keepalive_maxuses(Call),
+            handle_method_result(Call2, CliSock, IP, GS, Req, H, Num);
         closed ->
             {ok, Num};
         _ ->
@@ -1085,6 +1104,34 @@ aloop(CliSock, GS, Num) ->
             exit(normal)
     end.
 
+%% Checks how many times keepalive has been used and updates the
+%% process dictionary outh variable if required to say that the 
+%% connection has exceeded its maxuses.
+check_keepalive_maxuses(GS, Num) ->
+    case (GS#gs.gconf)#gconf.keepalive_maxuses of
+        nolimit ->
+            ok;
+        0 ->
+            ok;
+        N when Num+1 < N ->
+            ok;
+        _N ->
+            put(outh, (get(outh))#outh{exceedmaxuses=true})
+    end.
+
+%% Change to Res to 'done' if we've exceeded our maxuses.
+fix_keepalive_maxuses(Res) ->
+    case Res of
+        continue ->
+            case (get(outh))#outh.exceedmaxuses of
+                true -> 
+                    done; %% no keepalive this time!
+                _ ->
+                    Res
+            end;
+        _ ->
+            Res
+    end.
 
 %% keep original dictionary but filter out eventual previous init_db
 %% in erase_transients/0
@@ -1144,11 +1191,13 @@ handle_method_result(Res, CliSock, IP, GS, Req, H, Num) ->
                     ok
             end,
             put (sc, (get(sc))#sconf{appmods = []}),
+            check_keepalive_maxuses(GS, Num),
             Call = call_method(Req#http_request.method,
                                CliSock,
                                Req#http_request{path = {abs_path, Page}},
                                H#headers{content_length = undefined}),
-            handle_method_result(Call, CliSock, IP, GS, Req, H, Num)
+            Call2 = fix_keepalive_maxuses(Call),
+            handle_method_result(Call2, CliSock, IP, GS, Req, H, Num)
     end.
 
 
@@ -1183,11 +1232,32 @@ fix_abs_uri(Req, H) ->
     end.
 
 
-%% case-insensitive compare servername and ignore any optional
-%% :Port postfix
-comp_sname(Hname, Sname) ->
-    hd(string:tokens(yaws:to_lower(Hname), ":")) =:=
-        hd(string:tokens(yaws:to_lower(Sname), ":")).
+%% Case-insensitive compare servername and ignore any optional :Port
+%% postfix. This is performance-sensitive code, so if you change it,
+%% measure it.
+comp_sname([], []) ->
+    true;
+comp_sname([$:|_], [$:|_]) ->
+    true;
+comp_sname([$:|_], []) ->
+    true;
+comp_sname([], [$:|_]) ->
+    true;
+comp_sname([$:|_], _) ->
+    false;
+comp_sname(_, [$:|_]) ->
+    false;
+comp_sname([], _) ->
+    false;
+comp_sname(_, []) ->
+    false;
+comp_sname([C1|T1], [C2|T2]) ->
+    case string:to_lower(C1) == string:to_lower(C2) of
+        true ->
+            comp_sname(T1, T2);
+        false ->
+            false
+    end.
 
 pick_sconf(GC, H, Group) ->
     case H#headers.host of
@@ -2085,16 +2155,28 @@ handle_ut(CliSock, ARG, UT = #urltype{type = php}, N) ->
     Req = ARG#arg.req,
     H = ARG#arg.headers,
     GC=get(gc),
+    SC=get(sc),
     yaws:outh_set_dyn_headers(Req, H, UT),
+    Fun = case SC#sconf.phpfcgi of
+	      undefined ->
+		  fun(A)->yaws_cgi:call_cgi(
+			    A,
+			    GC#gconf.phpexe,
+			    flatten(UT#urltype.fullpath))
+		  end;
+	      _Else ->
+                  {PhpFcgiHost, PhpFcgiPort} = SC#sconf.phpfcgi,
+		  fun(A)->yaws_cgi:call_fcgi_responder(
+			    A,
+			    [{app_server_host, PhpFcgiHost},
+			     {app_server_port, PhpFcgiPort}])
+		  end
+	  end,
     deliver_dyn_part(CliSock,
                      0, "php",
                      N,
                      ARG,UT,
-                     fun(A)->yaws_cgi:call_cgi(
-                               A,
-                               GC#gconf.phpexe,
-                               flatten(UT#urltype.fullpath))
-                     end,
+		     Fun,
                      fun(A)->finish_up_dyn_file(A, CliSock)
                      end
                     ).
@@ -2629,18 +2711,25 @@ wait_for_streamcontent_pid(Priv, CliSock, ContentPid) ->
     end,
     receive
         endofstreamcontent ->
-            erlang:demonitor(Ref),
-            %% should just use demonitor [flush] option instead?
-            receive
-                {'DOWN', Ref, _, _, _} ->
-                    ok
-            after 0 ->
-                    ok
-            end;
+            demonitor_streamcontent_pid(Ref);
+        {endofstreamcontent, closed} ->
+            H = get(outh),
+            put(outh, H#outh{doclose = true}),
+            demonitor_streamcontent_pid(Ref);
         {'DOWN', Ref, _, _, _} ->
             ok
     end,
     done_or_continue().
+
+demonitor_streamcontent_pid(Ref) ->
+    erlang:demonitor(Ref),
+    %% should just use demonitor [flush] option instead?
+    receive
+        {'DOWN', Ref, _, _, _} ->
+            ok
+    after 0 ->
+            ok
+    end.
 
 skip_data(List, Fd, Sz) when is_list(List) ->
     skip_data(list_to_binary(List), Fd, Sz);
@@ -4445,12 +4534,16 @@ vdirpath(SC, ARG, RequestPath) ->
     %% specified in conf file for the 'vdir' directive.
     Result.
 
+close_accepted_if_max(GS,{ok, _Socket})
+  when (GS#gs.gconf)#gconf.max_connections == nolimit ->
+    ok;
 close_accepted_if_max(GS,{ok, Socket}) ->
     MaxCon = (GS#gs.gconf)#gconf.max_connections,
     NumCon = GS#gs.connections,
-    if (MaxCon == nolimit) or (NumCon < MaxCon) ->
+    if
+        NumCon < MaxCon ->
 	    ok;
-       true ->
+        true ->
             S=case peername(Socket, GS#gs.ssl) of
                   {ok, {IP, Port}} ->
                       io_lib:format("~s:~w", [inet_parse:ntoa(IP), Port]);
@@ -4463,12 +4556,6 @@ close_accepted_if_max(GS,{ok, Socket}) ->
     end;
 close_accepted_if_max(_,_) ->
     ok.
-
-inc_con(GS) ->
-    GS#gs{connections=GS#gs.connections + 1}.
-
-dec_con(GS) ->
-    GS#gs{connections=GS#gs.connections - 1}.
 
 code_change(_OldVsn, Data, _Extra) ->
     {ok, Data}.

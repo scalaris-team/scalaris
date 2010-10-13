@@ -73,11 +73,16 @@
                logdir,          
                ebin_dir = [],
                runmods = [],       %% runmods for entire server
-               keepalive_timeout = 15000,
+               keepalive_timeout = 30000,
+               keepalive_maxuses = nolimit, %% nolimit or non negative integer
                max_num_cached_files = 400,
                max_num_cached_bytes = 1000000,  %% 1 MEG
                max_size_cached_file = 8000,
-	       max_connections = nolimit, %% max number of TCP connections 
+               max_connections = nolimit, %% max number of TCP connections 
+               process_options = [],      %% Override default connection handler processes
+                                          %% spawn options for performance/memory tuning.
+                                          %% [] | [{fullsweep_after, Number}, {min_heap_size, Size}]
+                                          %% other options such as monitor, link are ignored.
                large_file_chunk_size = 10240,
                mnesia_dir = [],
                log_wrap_size = 10000000,  % wrap logs after 10M
@@ -110,7 +115,7 @@
 %% flags for sconfs
 -define(SC_ACCESS_LOG,          1).
 -define(SC_ADD_PORT,            2).
--define(SC_STATISTICS,   4).
+-define(SC_STATISTICS,          4).
 -define(SC_TILDE_EXPAND,        8).
 -define(SC_DIR_LISTINGS,        16).
 -define(SC_DEFLATE,             32).
@@ -119,6 +124,7 @@
 -define(SC_FCGI_TRACE_PROTOCOL, 512).
 -define(SC_FCGI_LOG_APP_ERROR,  1024).
 -define(SC_FORWARD_PROXY,       2048).
+-define(SC_AUTH_SKIP_DOCROOT,   4096).
 
 
 -define(SC_DEF, ?SC_ACCESS_LOG bor ?SC_ADD_PORT).
@@ -145,6 +151,8 @@
         (((SC)#sconf.flags band ?SC_FCGI_LOG_APP_ERROR) /= 0)).
 -define(sc_forward_proxy(SC),
         (((SC)#sconf.flags band ?SC_FORWARD_PROXY) /= 0)).
+-define(sc_auth_skip_docroot(SC),
+        (((SC)#sconf.flags band ?SC_AUTH_SKIP_DOCROOT) /= 0)).
 
 
 -define(sc_set_access_log(SC, Bool), 
@@ -173,6 +181,8 @@
                                    Bool)}).
 -define(sc_set_forward_proxy(SC, Bool), 
         SC#sconf{flags = yaws:flag(SC#sconf.flags, ?SC_FORWARD_PROXY, Bool)}).
+-define(sc_set_auth_skip_docroot(SC, Bool),
+        SC#sconf{flags = yaws:flag(SC#sconf.flags,?SC_AUTH_SKIP_DOCROOT,Bool)}).
 
 
 
@@ -213,11 +223,8 @@
          soptions = [],
          extra_cgi_vars = [],
 	 stats,                       %% raw traffic statistics
-	 fcgi_app_server_host,        %% FastCGI application server host 
-                                      %% name or IP address
-
-         fcgi_app_server_port         %% FastCGI application server port number
-         
+         fcgi_app_server,             %% FastCGI application server {host,port}
+         phpfcgi                      %% {host, port} of a FastCGI php server
         }).
 
 %% we cannot compare sconfs directly due to the ets
@@ -266,6 +273,8 @@
 
           doclose,       %% bool
           chunked,       %% bool
+          exceedmaxuses=false,
+                         %% bool, true if hit keep-alive max uses
           encoding=identity,
                          %% identity, deflate
           contlen,       %% integer
@@ -294,7 +303,6 @@
 
 
           
--define(READ_TIMEOUT, 30000).
 
 
 
