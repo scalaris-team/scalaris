@@ -25,7 +25,7 @@
 -include("unittest.hrl").
 
 all() ->
-    [add_9].
+    [add_9, add_9_remove_4].
 
 suite() ->
     [
@@ -33,17 +33,32 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
+    ct:pal("~p", [util:is_unittest()]),
     Config.
 
 end_per_suite(_Config) ->
     ok.
 
-add_9(_Config) ->
-    ct:pal("~p", [node()]),
+init_per_testcase(_TestCase, Config) ->
     unittest_helper:fix_cwd(),
     scalaris2:start(),
+    Config.
+
+end_per_testcase(_TestCase, Config) ->
+    scalaris2:stop(),
+    Config.
+
+add_9(_Config) ->
     admin:add_nodes(9),
-    wait_for(check_version({1, 11})),
+    wait_for(check_version({1, 11}, 10)),
+    ok.
+
+add_9_remove_4(_Config) ->
+    admin:add_nodes(9),
+    wait_for(check_version({1, 11}, 10)),
+    admin:del_nodes(4),
+    timer:sleep(500),
+    wait_for(check_version({1, 15}, 6)),
     ok.
 
 wait_for(F) ->
@@ -55,10 +70,10 @@ wait_for(F) ->
             wait_for(F)
     end.
 
-check_version(Version) ->
+check_version(Version, Length) ->
     fun () ->
             Versions = [V || {_, V} <- group_debug:dbg_version()],
             ct:pal("~p ~p", [lists:usort(Versions), group_debug:dbg_version()]),
             [Version] ==
-                lists:usort(Versions)
+                lists:usort(Versions) andalso length(Versions) == Length
     end.

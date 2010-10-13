@@ -39,7 +39,7 @@
          start/4, start/2,
          start/3]).
 -export([kill/1, sleep/2, runnable/1,
-         get_state/1, change_handler/2]).
+         get_state/1, get_state/2, change_handler/2]).
 -export([bp_set/3, bp_set_cond/3, bp_del/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
@@ -88,6 +88,14 @@ get_state(Pid) ->
     Pid ! {'$gen_component', get_state, self()},
     receive
         {'$gen_component', get_state_response, State} -> State
+    end.
+
+-spec get_state(Pid::pid(), Timeout::non_neg_integer()) -> term().
+get_state(Pid, Timeout) ->
+    Pid ! {'$gen_component', get_state, self()},
+    receive
+        {'$gen_component', get_state_response, State} -> State
+    after Timeout -> failed
     end.
 
 %% @doc change the handler for handling messages

@@ -501,6 +501,14 @@ smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
 is_unittest() ->
-    code:is_loaded(ct) =/= false andalso code:is_loaded(ct_framework) =/= false andalso
-    lists:member(ct_logs, registered()).
+    Pid = self(),
+    spawn(fun () ->
+                  case ct:get_status() of
+                      {error, _} -> Pid ! {is_unittest, false};
+                      _ -> Pid ! {is_unittest, true}
+                  end
+          end),
+    receive
+        {is_unittest, Result} -> Result
+    end.
 
