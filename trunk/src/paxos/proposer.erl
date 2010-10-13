@@ -121,7 +121,7 @@ init([]) ->
     %%                          [pid_groups:my_groupname()]))),
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    TableName = pdb:new(?MODULE, [set, private]),
+    TableName = pdb:new(?MODULE, [set, protected]),
     _State = TableName.
 
 -spec on(comm:message(), state()) -> state().

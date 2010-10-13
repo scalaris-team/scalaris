@@ -26,7 +26,7 @@
 -spec dbg() -> any().
 dbg() ->
     gb_trees:to_list(lists:foldl(fun (Node, Stats) ->
-                        case gen_component:get_state(Node) of
+                        case gen_component:get_state(Node, 100) of
                             {joined, _LocalState, GroupState, _TriggerState} ->
                                 inc(Stats, group_state:get_group_id(GroupState));
                             _ ->
@@ -45,7 +45,7 @@ inc(Stats, Label) ->
 -spec dbg_version() -> any().
 dbg_version() ->
     lists:map(fun (Node) ->
-                      case gen_component:get_state(Node) of
+                      case gen_component:get_state(Node, 100) of
                           {joined, _LocalState, GroupState, _TriggerState} ->
                               {Node, group_state:get_current_paxos_id(GroupState)};
                           _ ->
@@ -56,7 +56,7 @@ dbg_version() ->
 -spec dbg3() -> any().
 dbg3() ->
     lists:map(fun (Node) ->
-                      case gen_component:get_state(Node) of
+                      case gen_component:get_state(Node, 100) of
                           {joined, _LocalState, GroupState, _TriggerState} ->
                               {Node, length(group_state:get_postponed_decisions(GroupState))};
                           _ ->
@@ -67,5 +67,5 @@ dbg3() ->
 -spec dbg_mode() -> any().
 dbg_mode() ->
     lists:map(fun (Node) ->
-                      {Node, element(1, gen_component:get_state(Node))}
+                      {Node, element(1, gen_component:get_state(Node, 100))}
               end, pid_groups:find_all(group_node)).

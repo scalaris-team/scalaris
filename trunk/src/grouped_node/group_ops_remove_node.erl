@@ -72,5 +72,5 @@ ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
 rejected_proposal(State,
                   {group_node_remove, Pid},
                   _PaxosId) ->
-    comm:send(Pid, {group_node_remove_response, retry}),
+    comm:send(Pid, {group_node_remove_response, retry, Pid}),
     State.

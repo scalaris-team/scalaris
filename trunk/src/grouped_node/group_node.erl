@@ -126,10 +126,28 @@ on({group_node_join_response,retry},
    {joined, _NodeState, _GroupState, _TriggerState} = State) ->
     % @todo: do nothing? well, we are already in the group.
     State;
+on({group_node_remove_response,retry, Pid},
+   {joined, _NodeState, GroupState, _TriggerState} = State) ->
+    case group_state:is_member(GroupState, Pid) of
+        true ->
+            comm:send_local(self(), {ops, {group_node_remove, Pid}}),
+            State;
+        false ->
+            State
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({crash, Pid},
+   {joined, _NodeState, GroupState, _TriggerState} = State) ->
+    case group_state:is_member(GroupState, Pid) of
+        true ->
+            comm:send_local(self(), {ops, {group_node_remove, Pid}}),
+            State;
+        false ->
+            State
+    end;
 on({group_node_join_response, retry, _Reason},
    {joined, _NodeState, _GroupState, _TriggerState} = State) ->
     State;
@@ -222,6 +240,8 @@ trigger_known_nodes() ->
     % note, comm:this() may be invalid at this moment
     [comm:send(KnownHost, {get_dht_nodes, comm:this()})
      || KnownHost <- KnownHosts],
+    comm:send_local(pid_groups:find_a(service_per_vm),
+                    {get_dht_nodes, comm:this()}),
     timer:sleep(100),
     case comm:is_valid(comm:this()) of
         true ->
