@@ -21,13 +21,13 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
--export([dbg/0, dbg2/0, dbg3/0, dbg_mode/0]).
+-export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0]).
 
 -spec dbg() -> any().
 dbg() ->
     gb_trees:to_list(lists:foldl(fun (Node, Stats) ->
                         case gen_component:get_state(Node) of
-                            {joined, LocalState, GroupState, TriggerState} ->
+                            {joined, _LocalState, GroupState, _TriggerState} ->
                                 inc(Stats, group_state:get_group_id(GroupState));
                             _ ->
                                 Stats
@@ -42,11 +42,11 @@ inc(Stats, Label) ->
             gb_trees:insert(Label, 1, Stats)
     end.
 
--spec dbg2() -> any().
-dbg2() ->
+-spec dbg_version() -> any().
+dbg_version() ->
     lists:map(fun (Node) ->
                       case gen_component:get_state(Node) of
-                          {joined, LocalState, GroupState, TriggerState} ->
+                          {joined, _LocalState, GroupState, _TriggerState} ->
                               {Node, group_state:get_current_paxos_id(GroupState)};
                           _ ->
                               {Node, '_'}
@@ -57,7 +57,7 @@ dbg2() ->
 dbg3() ->
     lists:map(fun (Node) ->
                       case gen_component:get_state(Node) of
-                          {joined, LocalState, GroupState, TriggerState} ->
+                          {joined, _LocalState, GroupState, _TriggerState} ->
                               {Node, length(group_state:get_postponed_decisions(GroupState))};
                           _ ->
                               {Node, '_'}

@@ -21,7 +21,7 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
--export([ops_request/2, ops_decision/3, rejected_proposal/3]).
+-export([ops_request/2, ops_decision/4, rejected_proposal/3]).
 
 -type(proposal_type() :: {group_split, Proposer::comm:mypid(),
                           SplitKey::?RT:key(), LeftGroup::list(comm:mypid()),
@@ -62,41 +62,21 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
 % @doc it was decided to split our group: execute the split
 -spec ops_decision(State::joined_state(),
                    Proposal::proposal_type(),
-                   PaxosId::any()) -> joined_state().
-ops_decision({joined, NodeState, GroupState, TriggerState} = State,
-             {group_split, Proposer, SplitKey, LeftGroup, RightGroup} = Proposal,
-             PaxosId) ->
+                   PaxosId::any(), Hint::decision_hint()) -> joined_state().
+ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
+             {group_split, Proposer, SplitKey, LeftGroup, RightGroup} = _Proposal,
+             PaxosId, Hint) ->
+    case Hint of
+      my_proposal_won -> comm:send(Proposer, {group_split_response, success});
+        _ -> ok
+    end,
     io:format("decided split~n", []),
-    CurrentPaxosId = group_state:get_next_expected_decision_id(GroupState),
-    case CurrentPaxosId == PaxosId of
-        true ->
-            case group_state:get_proposal(GroupState, PaxosId) of
-                {value, Proposal} -> %my_proposal_was_accepted
-                    NewGroupState = execute_decision(GroupState, NodeState, Proposal),
-                    comm:send(Proposer, {group_split_response, success}),
-                    {joined, NodeState, NewGroupState,
-                     TriggerState};
-                none -> % I had no proposal for this paxos instance
-                    NewGroupState = execute_decision(GroupState, NodeState, Proposal),
-                    {joined, NodeState, NewGroupState, TriggerState};
-                {value, OtherProposal} -> % my_proposal_was_rejected ->
-                    NewGroupState = execute_decision(GroupState, NodeState, Proposal),
-                    NewState = {joined, NodeState, NewGroupState, TriggerState},
-                    group_ops:report_rejection(NewState, PaxosId, OtherProposal)
-            end;
-        false ->
-            %@todo
-            io:format("panic! 2~n", []),
-            State
-    end.
-
-execute_decision(GroupState, NodeState, {group_split, _Proposer, SplitKey, LeftGroup, RightGroup}) ->
-    NewGroupState = split_group(GroupState, SplitKey, LeftGroup,
-                                RightGroup),
-    group_utils:notify_neighbors(NodeState, GroupState,
-                                 NewGroupState),
+    NewGroupState = group_state:remove_proposal(
+                      split_group(GroupState, SplitKey, LeftGroup, RightGroup),
+                      PaxosId),
+    group_utils:notify_neighbors(NodeState, GroupState, NewGroupState),
     update_fd(),
-    NewGroupState.
+    {joined, NodeState, NewGroupState, TriggerState}.
 
 -spec split_group(GroupState::group_state:group_state(),
                   SplitKey::?RT:key(),

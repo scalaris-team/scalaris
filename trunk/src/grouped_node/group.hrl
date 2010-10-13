@@ -28,3 +28,6 @@
 -type(group_node() :: {GroupId::group_id(),
                        Version::non_neg_integer(),
                        Members::list(comm:mypid())}).
+
+-type(decision_hint() :: my_proposal_won | had_no_proposal).
+
