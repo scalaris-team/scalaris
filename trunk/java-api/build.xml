@@ -24,7 +24,7 @@
 	<!-- directory where the classes are compiled to -->
 	<property name="scalaris.classes.dirname" value="classes" />
 	<!-- version of the OtpErlang jar file to bundle and compile against (OtpErlang-<version>.jar) -->
-	<property name="opterlang.version" value="1.5.3" />
+	<property name="opterlang.version" value="1.5.3.1" />
 	<!-- version of the jakarta-commons-cli jar file to bundle and compile against (jakarta-commons-cli-<version>.jar) -->
 	<property name="jakarta.commons.cli.version" value="1.2" />
 	<!-- version of the jetty jar file to bundle and compile the tests against (jetty-<version>.jar, jetty-util-<version>.jar) -->
