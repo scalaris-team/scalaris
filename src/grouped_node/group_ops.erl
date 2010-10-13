@@ -41,16 +41,25 @@ report_rejection(State, PaxosId, Proposal) ->
 % @doc execute decision
 -spec execute_decision(joined_state(), paxos_id(), proposal()) ->
     joined_state().
-execute_decision(State, PaxosId, Decision) ->
-    case Decision of
-        {group_split, _Pid, _SplitKey, _LeftGroup, _RightGroup} ->
-            group_ops_split_group:ops_decision(State, Decision,
-                                               PaxosId);
-        {group_node_remove, _Pid} ->
-            group_ops_remove_node:ops_decision(State, Decision,
-                                               PaxosId);
-        {group_node_join, _Pid, _Acceptor, _Learner} ->
-            group_ops_join_node:ops_decision(State, Decision,
-                                             PaxosId)
+execute_decision({joined, _, GroupState, _} = State, PaxosId, Proposal) ->
+    PaxosId = group_state:get_next_expected_decision_id(GroupState), %assert
+    case group_state:get_proposal(GroupState, PaxosId) of
+        {value, Proposal} -> % my proposal was accepted
+            dispatch_decision(State, PaxosId, Proposal, my_proposal_won);
+        none -> % I had no proposal for this paxos instance
+            dispatch_decision(State, PaxosId, Proposal, had_no_proposal);
+        {value, OtherProposal} -> % my proposal was rejected
+            NewState = dispatch_decision(State, PaxosId, Proposal, had_no_proposal),
+            group_ops:report_rejection(NewState, PaxosId, OtherProposal)
     end.
+
+-spec dispatch_decision(joined_state(), paxos_id(), proposal(), decision_hint()) ->
+    joined_state().
+dispatch_decision(State, PaxosId, {group_split, _, _, _, _} = Decision, Hint) ->
+    group_ops_split_group:ops_decision(State, Decision, PaxosId, Hint);
+dispatch_decision(State, PaxosId, {group_node_remove, _} = Decision, Hint) ->
+    group_ops_remove_node:ops_decision(State, Decision, PaxosId, Hint);
+dispatch_decision(State, PaxosId, {group_node_join, _, _, _} = Decision, Hint) ->
+    group_ops_join_node:ops_decision(State, Decision, PaxosId, Hint).
+
 

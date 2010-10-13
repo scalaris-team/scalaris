@@ -21,7 +21,7 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
--export([ops_request/2, ops_decision/3, rejected_proposal/3]).
+-export([ops_request/2, ops_decision/4, rejected_proposal/3]).
 
 -type(proposal_type()::{group_node_remove, Pid::comm:mypid()}).
 
@@ -49,26 +49,11 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
 % @doc it was decided to remove a node from our group: execute the removal
 -spec ops_decision(State::joined_state(),
                    Proposal::proposal_type(),
-                   PaxosId::any()) -> joined_state().
-ops_decision({joined, NodeState, GroupState, TriggerState} = State,
-             {group_node_remove, _Pid} = Proposal,
-             PaxosId) ->
-    PaxosId = group_state:get_next_expected_decision_id(GroupState), %assert
-    case group_state:get_proposal(GroupState, PaxosId) of
-        {value, Proposal} -> %my_proposal_was_accepted
-            NewGroupState = execute_decision(GroupState, NodeState, Proposal, PaxosId),
-            {joined, NodeState, NewGroupState, TriggerState};
-        none -> % I had no proposal for this paxos instance
-            NewGroupState = execute_decision(GroupState, NodeState, Proposal, PaxosId),
-            {joined, NodeState, NewGroupState, TriggerState};
-        {value, OtherProposal} -> % my_proposal_was_rejected ->
-            NewGroupState = execute_decision(GroupState, NodeState, Proposal,
-                                             PaxosId),
-            NewState = {joined, NodeState, NewGroupState, TriggerState},
-            group_ops:report_rejection(NewState, PaxosId, OtherProposal)
-    end.
-
-execute_decision(GroupState, NodeState, {group_node_remove, Pid}, PaxosId) ->
+                   PaxosId::any(),
+                   Hint::decision_hint()) -> joined_state().
+ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
+             {group_node_remove, Pid} = Proposal,
+             PaxosId, _Hint) ->
     NewGroupState = group_state:remove_node(
                       group_state:remove_proposal(GroupState,
                                                   PaxosId),
@@ -80,7 +65,7 @@ execute_decision(GroupState, NodeState, {group_node_remove, Pid}, PaxosId) ->
     Succ = group_local_state:get_successor(NodeState),
     comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
     fd:unsubscribe(Pid),
-    NewGroupState.
+    {joined, NodeState, NewGroupState, TriggerState}.
 
 -spec rejected_proposal(joined_state(), proposal_type(), paxos_id()) ->
     joined_state().
