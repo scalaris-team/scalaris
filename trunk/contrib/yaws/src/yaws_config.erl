@@ -20,7 +20,7 @@
          make_default_gconf/2, make_default_sconf/0,
          add_sconf/1,
          add_yaws_auth/1,
-         add_yaws_soap_srv/1,
+         add_yaws_soap_srv/1, add_yaws_soap_srv/2,
          search_sconf/2, search_group/2,
          update_sconf/2, delete_sconf/2,
          eq_sconfs/2, soft_setconf/4, hard_setconf/2,
@@ -80,16 +80,23 @@ load(E) ->
 
 
 add_yaws_soap_srv(GC) when GC#gconf.enable_soap == true ->
-    SoapStarted = (whereis(yaws_soap_srv) /= undefined),
-    if (SoapStarted == false) ->
-            Spec = {yaws_soap_srv, {yaws_soap_srv, start_link, [GC#gconf.soap_srv_mods] },
-                    permanent, 5000, worker, [yaws_soap_srv]},
-            spawn(fun() -> supervisor:start_child(yaws_sup, Spec) end);
+    add_yaws_soap_srv(GC, true);
+add_yaws_soap_srv(_GC) ->
+    [].
+add_yaws_soap_srv(GC, false) when GC#gconf.enable_soap == true ->
+    [{yaws_soap_srv, {yaws_soap_srv, start_link, [GC#gconf.soap_srv_mods]},
+      permanent, 5000, worker, [yaws_soap_srv]}];
+add_yaws_soap_srv(GC, true) when GC#gconf.enable_soap == true ->
+    Spec = add_yaws_soap_srv(GC, false),
+    case whereis(yaws_soap_srv) of
+        undefined ->
+            spawn(fun() -> supervisor:start_child(yaws_sup, hd(Spec)) end);
        true ->
             ok
-    end;
-add_yaws_soap_srv(_GC) -> 
-    ok.
+    end,
+    Spec;
+add_yaws_soap_srv(_GC, _Start) ->
+    [].
 
 
 add_yaws_auth(SCs) ->
@@ -99,8 +106,8 @@ add_yaws_auth(SCs) ->
 %% We search and setup www authenticate for each directory
 %% specified as an auth directory or containing a .yaws_auth file. 
 %% These are merged with server conf.
-setup_auth(#sconf{docroot = Docroot, authdirs = Authdirs}) ->
-    Authdirs1 = load_yaws_auth_from_docroot(Docroot),
+setup_auth(#sconf{docroot = Docroot, authdirs = Authdirs}=SC) ->
+    Authdirs1 = load_yaws_auth_from_docroot(Docroot, ?sc_auth_skip_docroot(SC)),
     Authdirs2 = load_yaws_auth_from_authdirs(Authdirs, Docroot, Authdirs1),
     Authdirs3 = ensure_auth_headers(Authdirs2),
     Authdirs4 = [{Dir, A} || A = #auth{dir = [Dir]} <- Authdirs3], % A->{Dir, A}
@@ -108,9 +115,11 @@ setup_auth(#sconf{docroot = Docroot, authdirs = Authdirs}) ->
     Authdirs4.
 
     
-load_yaws_auth_from_docroot(undefined) ->
+load_yaws_auth_from_docroot(_, true) ->
     [];
-load_yaws_auth_from_docroot(Docroot) ->
+load_yaws_auth_from_docroot(undefined, _) ->
+    [];
+load_yaws_auth_from_docroot(Docroot, _) ->
     Fun = fun (Path, Acc) ->
 		  %% Strip Docroot and then filename
 		  SP  = string:sub_string(Path, length(Docroot)+1),
@@ -218,19 +227,6 @@ parse_yaws_auth_file([{User, Password}|T], Auth0)
     Users = [{User, Password}|Auth0#auth.users],
     parse_yaws_auth_file(T, Auth0#auth{users = Users}).
 
-
-%% Not used anymore
-%% Replace all "//" and "///" with "/"
-%% Might be a better way to do this
-%% remove_multiple_slash(L) ->
-%%     remove_multiple_slash(L, []).
-
-%% remove_multiple_slash([], Acc)->
-%%     lists:reverse(Acc);
-%% remove_multiple_slash("//" ++ T, Acc) ->
-%%     remove_multiple_slash([$/|T], Acc);
-%% remove_multiple_slash([H|T], Acc) ->
-%%     remove_multiple_slash(T, [H|Acc]).
 
 %% This is the function that arranges sconfs into
 %% different server groups
@@ -396,22 +392,18 @@ del_tail2([H|T], Acc) ->
     del_tail2(T, [H|Acc]).
 
 
-
 string_to_host_and_port(String) ->
-    case string:rchr(String, $:) of
-        0 ->
-            {error, "missing colon (:) character."};
-        ColonPos ->
-            Host = string:left(String, ColonPos - 1),
-            PortStr = string:sub_string(String, ColonPos + 1),
-            case (catch list_to_integer(PortStr)) of
-                Port when is_integer(Port) and (Port >= 0) and (Port =< 65535) ->
-                    {ok, Host, Port};
-                _ ->
-                    {error, ?F("~p is not a valid port number.", [PortStr])}
-            end
+    case string:tokens(String, ":") of
+	[Host, Port] ->
+	    case string:to_integer(Port) of
+		{Integer, []} when Integer >= 0, Integer =< 65535 ->
+		    {ok, Host, Integer};
+		_Else ->
+                    {error, ?F("~p is not a valid port number", [Port])}
+	    end;
+	_Else ->
+            {error, ?F("bad host and port specifier, expected HOST:PORT", [])}
     end.
-
 
 
 %% two states, global, server
@@ -584,6 +576,15 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
 
+        ["process_options", '=', POpts] ->
+            case parse_process_options(POpts) of
+                {ok, ProcList} ->
+                    fload(FD, globals, GC#gconf{process_options=ProcList},
+                          C, Cs, Lno+1, Next);
+                {error, Str} ->
+                    {error, ?F("~s at line ~w", [Str, Lno])}
+            end;
+
         ["log_wrap_size", '=', Int] ->
             case (catch list_to_integer(Int)) of
                 I when is_integer(I) ->
@@ -647,6 +648,18 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                 I when is_integer(I) ->
                     fload(FD, globals, GC#gconf{keepalive_timeout = I},
                           C, Cs, Lno+1, Next);
+                _ ->
+                    {error, ?F("Expect integer at line ~w", [Lno])}
+            end;
+
+        ["keepalive_maxuses", '=', Int] ->
+            case (catch list_to_integer(Int)) of
+                I when is_integer(I) ->
+                    fload(FD, globals, GC#gconf{keepalive_maxuses = I},
+                          C, Cs, Lno+1, Next);
+                _ when Int == "nolimit" ->
+                    %% nolimit is the default
+                    fload(FD, globals, GC, C, Cs, Lno+1, Next);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -814,6 +827,14 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+        ["auth_skip_docroot",'=',Bool] ->
+            case is_bool(Bool) of
+                {true,Val} ->
+                    C2 = ?sc_set_auth_skip_docroot(C, Val),
+                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
         ["dav", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
@@ -974,8 +995,6 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
             fload(FD, server, GC, C2, Cs, Lno+1, Next);
 
         ["allowed_scripts", '=' | Suffixes] ->
-            io:format("Suf ~p~n", [Suffixes]),
-
             C2 = C#sconf{allowed_scripts = 
                          lists:map(fun(X)->element(1,mime_types:t(X)) end,
                                    Suffixes)},
@@ -990,7 +1009,7 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                             [$/|_Tail] ->
                                 Prefix;
                             Other ->
-                                lists:reverse([$/|Other])
+                                lists:reverse(Other)
                         end,
                     C2 = C#sconf{revproxy = [{P, URL} | C#sconf.revproxy]},
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
@@ -1018,16 +1037,16 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
+
         ["fcgi_app_server", '=', Val] ->
             case string_to_host_and_port(Val) of
                 {ok, Host, Port} ->
-                    C2 = C#sconf{fcgi_app_server_host = Host, fcgi_app_server_port = Port},
+                    C2 = C#sconf{fcgi_app_server = {Host, Port}},
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
                 {error, Reason} ->
-                    {error, ?F("Invalid fcgi_app_server ~p at line ~w: ~s", [Val, Lno, Reason])}
+                    {error, ?F("Invalid fcgi_app_server ~p at line ~w: ~s",
+                               [Val, Lno, Reason])}
             end;
-
-                
 
         ["fcgi_trace_protocol", '=', Bool] ->
             case is_bool(Bool) of
@@ -1045,6 +1064,17 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+
+	["phpfcgi", '=', HostPortSpec] ->
+	    case string_to_host_and_port(HostPortSpec) of
+		{ok, Host, Port} ->
+		    C2 = C#sconf{phpfcgi = {Host, Port}},
+		    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                {error, Reason} ->
+                    {error,
+                     ?F("Invalid php fcgi server ~p at line ~w: ~s",
+                        [HostPortSpec, Lno, Reason])}
             end;
 
         [H|T] ->
@@ -1467,6 +1497,39 @@ is_string_char([C|T]) ->
 is_special(C) ->
     lists:member(C, [$=, $<, $>, $,]).
 
+%% parse the argument string PLString which can either be the undefined atom
+%% or a proplist. Currently the only supported keys are fullsweep_after and
+%% min_heap_size. Any other key/values are ignored.
+parse_process_options(PLString) ->
+    case erl_scan:string(PLString ++ ".") of
+        {ok, PLTokens, _} ->
+            case erl_parse:parse_term(PLTokens) of
+                {ok, undefined} ->
+                    {ok, []};
+                {ok, []} ->
+                    {ok, []};
+                {ok, [Hd|_Tl]=PList} when is_atom(Hd); is_tuple(Hd) ->
+                    %% create new safe proplist of desired options
+                    {ok, proplists_int_copy([], PList, [fullsweep_after, min_heap_size])};
+                _ ->
+                    {error, "Expect undefined or proplist"}
+            end;
+        _ ->
+            {error, "Expect undefined or proplist"}
+    end.
+
+%% copy proplist integer values for the given keys from the 
+%% Src proplist to the Dest proplist. Ignored keys that are not
+%% found or have non-integer values. Returns the new Dest proplist.
+proplists_int_copy(Dest, _Src, []) ->
+    Dest;
+proplists_int_copy(Dest, Src, [Key|NextKeys]) ->
+    case proplists:get_value(Key, Src) of
+        Val when is_integer(Val) ->
+            proplists_int_copy([{Key, Val}|Dest], Src, NextKeys);
+        _ ->
+            proplists_int_copy(Dest, Src, NextKeys)
+    end.
 
 parse_soap_srv_mods(['<', Module, ',' , Handler, ',', WsdlFile, '>' | Tail], 
                     Ack) ->
@@ -1660,8 +1723,7 @@ eq_sconfs(S1,S2) ->
      S1#sconf.allowed_scripts == S2#sconf.allowed_scripts andalso
      S1#sconf.revproxy == S2#sconf.revproxy andalso
      S1#sconf.soptions == S2#sconf.soptions andalso
-     S1#sconf.fcgi_app_server_host == S2#sconf.fcgi_app_server_host andalso
-     S1#sconf.fcgi_app_server_port == S2#sconf.fcgi_app_server_port).
+     S1#sconf.fcgi_app_server == S2#sconf.fcgi_app_server).
 
 
 

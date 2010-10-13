@@ -55,7 +55,7 @@
          outh_set_content_length/1,
          outh_set_dcc/2,
          outh_set_transfer_encoding_off/0,
-	 outh_set_auth/1,
+         outh_set_auth/1,
          outh_fix_doclose/0,
          dcc/2]).
 
@@ -128,19 +128,12 @@ start_embedded(DocRoot, SL) when is_list(DocRoot),is_list(SL) ->
 
 start_embedded(DocRoot, SL, GL) when is_list(DocRoot),is_list(SL),is_list(GL) ->
     start_embedded(DocRoot, SL, GL, "default").
-start_embedded(DocRoot, SL, GL, Id) when is_list(DocRoot),is_list(SL),is_list(GL) ->
-    case application:load(yaws) of
-        ok -> ok;
-        {error, {already_loaded,yaws}} -> ok;
-        _ -> exit("Can not load yaws")
-    end,
-    ok = application:set_env(yaws, embedded, true),
-    ok = application:set_env(yaws, id, Id),
+start_embedded(DocRoot, SL, GL, Id)
+  when is_list(DocRoot), is_list(SL), is_list(GL) ->
+    {ok, SCList, GC, _} = yaws_api:embedded_start_conf(DocRoot, SL, GL, Id),
     application:start(yaws),
-    GC = create_gconf(GL, Id),
-    SC = create_sconf(DocRoot, SL),
     yaws_config:add_yaws_soap_srv(GC),
-    yaws_api:setconf(GC, [[SC]]).
+    yaws_api:setconf(GC, SCList).
 
 add_server(DocRoot, SL) when is_list(DocRoot),is_list(SL) ->
     SC  = create_sconf(DocRoot, SL),
@@ -243,6 +236,8 @@ set_gc_flags([{pick_first_virthost_on_nomatch, Bool}|T], Flags) ->
     set_gc_flags(T, flag(Flags, ?GC_PICK_FIRST_VIRTHOST_ON_NOMATCH,Bool));
 set_gc_flags([{use_fdsrv, Bool}|T], Flags) -> 
     set_gc_flags(T, flag(Flags,?GC_USE_FDSRV,Bool));
+set_gc_flags([{use_old_ssl, Bool}|T], Flags) -> 
+    set_gc_flags(T, flag(Flags,?GC_USE_OLD_SSL,Bool));
 set_gc_flags([_|T], Flags) -> 
     set_gc_flags(T, Flags);
 set_gc_flags([], Flags) -> 
@@ -290,15 +285,18 @@ setup_sconf(DocRoot, D, SL) ->
                             D#sconf.start_mod),
            allowed_scripts = lkup(allowed_scripts, SL, 
                                   D#sconf.allowed_scripts),
+           tilde_allowed_scripts = lkup(tilde_allowed_scripts, SL,
+                                        D#sconf.tilde_allowed_scripts),
            revproxy = lkup(revproxy, SL, 
                            D#sconf.revproxy),
            soptions = lkup(soptions, SL,
                            D#sconf.soptions),
+           extra_cgi_vars = lkup(extra_cgi_vars, SL,
+                                 D#sconf.extra_cgi_vars),
            stats = lkup(stats, SL, D#sconf.stats),
-           fcgi_app_server_host = lkup(fcgi_app_server_host, SL, 
-                                       D#sconf.fcgi_app_server_host),
-           fcgi_app_server_port = lkup(fcgi_app_server_port, SL, 
-                                       D#sconf.fcgi_app_server_port)}.
+           fcgi_app_server = lkup(fcgi_app_server, SL,
+                                  D#sconf.fcgi_app_server),
+           phpfcgi = lkup(phpfcgi, SL, D#sconf.phpfcgi)}.
 
 setup_sconf_ssl(SL, DefaultSSL) ->
     case lkup(ssl, SL, undefined) of
@@ -1310,7 +1308,10 @@ outh_fix_doclose() ->
 
 
 dcc(Req, Headers) ->
+    H = get(outh),
     DoClose = case Req#http_request.version of
+                  _ when H#outh.exceedmaxuses == true ->
+                      true; %% too many keepalives
                   {1, 0} -> 
                       case Headers#headers.connection of
                           "close" -> true;
@@ -1766,11 +1767,10 @@ ensure_exist(Path) ->
 %%
 %%
 
-
 do_recv(Sock, Num, nossl) ->
-    gen_tcp:recv(Sock, Num, ?READ_TIMEOUT);
+    gen_tcp:recv(Sock, Num, (get(gc))#gconf.keepalive_timeout);
 do_recv(Sock, Num, ssl) ->
-    ssl:recv(Sock, Num, ?READ_TIMEOUT).
+    ssl:recv(Sock, Num, (get(gc))#gconf.keepalive_timeout).
 
 cli_recv(S, Num, SslBool) ->
     Res = do_recv(S, Num, SslBool),
@@ -1899,11 +1899,11 @@ http_recv_request(CliSock, SSL) ->
             R;
         {ok, R} when is_record(R, http_response) ->
             R;
-        {error, {http_error, "\r\n"}} ->
+        {_, {http_error, "\r\n"}} ->
             http_recv_request(CliSock, SSL);
-        {error, {http_error, "\n"}} ->
+        {_, {http_error, "\n"}} ->
             http_recv_request(CliSock,SSL);
-        {error, {http_error, _}} ->
+        {_, {http_error, _}} ->
             bad_request;
         {error, closed} -> 
             closed;
@@ -1985,9 +1985,9 @@ http_collect_headers(CliSock, Req, H, SSL, Count) when Count < 1000 ->
         %% these are here to be a little forgiving to
         %% bad (typically test script) clients
 
-        {error, {http_error, "\r\n"}} ->
+        {_, {http_error, "\r\n"}} ->
             http_collect_headers(CliSock, Req, H,SSL, Count+1);
-        {error, {http_error, "\n"}} ->
+        {_, {http_error, "\n"}} ->
             http_collect_headers(CliSock, Req, H,SSL, Count+1);
 
         %% auxilliary headers we don't have builtin support for
