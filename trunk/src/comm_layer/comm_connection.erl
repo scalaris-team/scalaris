@@ -74,7 +74,7 @@ init([DestIP, DestPort, LocalListenPort, Socket]) ->
 on({send, DestPid, Message}, State) ->
     Socket = case socket(State) of
                  notconnected ->
-                     log:log(info, "Connecting to ~p:~p", [dest_ip(State), dest_port(State)]),
+                     log:log(info, "Connecting to ~.0p:~.0p", [dest_ip(State), dest_port(State)]),
                      new_connection(dest_ip(State),
                                     dest_port(State),
                                     local_listen_port(State));
@@ -82,7 +82,7 @@ on({send, DestPid, Message}, State) ->
              end,
     case Socket of
         fail ->
-            log:log(warn, "~p Connection failed, drop message ~p",
+            log:log(warn, "~.0p Connection failed, drop message ~.0p",
                     [pid_groups:my_pidname(), Message]),
             %%reconnect
             set_socket(State, notconnected);
@@ -145,7 +145,7 @@ on({tcp, Socket, Data}, State) ->
                 inet:setopts(Socket, [{active, once}]),
                 State;
             Unknown ->
-                log:log(warn,"[ CC ] unknown message ~p", [Unknown]),
+                log:log(warn,"[ CC ] unknown message ~.0p", [Unknown]),
                 inet:setopts(Socket, [{active, once}]),
                 State
     end,
@@ -186,7 +186,7 @@ send({Address, Port, Socket}, Pid, Message) ->
     NewSocket =
         case gen_tcp:send(Socket, BinaryMessage) of
             ok ->
-                ?TRACE("~p Sent message ~p~n",
+                ?TRACE("~.0p Sent message ~.0p~n",
                        [pid_groups:my_pidname(), Message]),
                 ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
                 Socket;
@@ -195,11 +195,11 @@ send({Address, Port, Socket}, Pid, Message) ->
                 gen_tcp:close(Socket),
                 notconnected;
             {error, timeout} ->
-                log:log(error,"[ CC ] couldn't send to ~p:~p (~p). retrying.",
+                log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
                         [Address, Port, timeout]),
                 send({Address, Port, Socket}, Pid, Message);
             {error, Reason} ->
-                log:log(error,"[ CC ] couldn't send to ~p:~p (~p). closing connection",
+                log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
                         [Address, Port, Reason]),
                 gen_tcp:close(Socket),
                 notconnected
@@ -228,19 +228,19 @@ new_connection(Address, Port, MyPort) ->
                             gen_tcp:send(Socket, YouAre),
                             Socket;
                         {error, Reason} ->
-                            log:log(error,"[ CC ] reconnect to ~p because socket is ~p",
+                            log:log(error,"[ CC ] reconnect to ~.0p because socket is ~.0p",
                                     [Address, Reason]),
                             gen_tcp:close(Socket),
                             new_connection(Address, Port, MyPort)
                     end;
                 {error, Reason} ->
-                    log:log(error,"[ CC ] reconnect to ~p because socket is ~p",
+                    log:log(error,"[ CC ] reconnect to ~.0p because socket is ~.0p",
                             [Address, Reason]),
                     gen_tcp:close(Socket),
                     new_connection(Address, Port, MyPort)
             end;
         {error, Reason} ->
-            log:log(info,"[ CC ] couldn't connect to ~p:~p (~p)",
+            log:log(info,"[ CC ] couldn't connect to ~.0p:~.0p (~.0p)",
                     [Address, Port, Reason]),
             fail
     end.
