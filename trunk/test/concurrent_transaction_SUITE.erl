@@ -106,7 +106,7 @@ increment_test_8(_Config) ->
     spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
 
     Aborts = wait_for_done(8),
-    ct:pal("aborts: ~p~n", [Aborts]),
+    ct:pal("aborts: ~w~n", [Aborts]),
     Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
     ?equals(8* Count, Total),
@@ -125,7 +125,7 @@ increment_test_4(_Config) ->
     spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
 
     Aborts = wait_for_done(4),
-    ct:pal("aborts: ~p~n", [Aborts]),
+    ct:pal("aborts: ~w~n", [Aborts]),
     Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
     ?equals(4 * Count, Total),
@@ -142,7 +142,7 @@ increment_test_2(_Config) ->
     spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
 
     Aborts = wait_for_done(2),
-    ct:pal("aborts: ~p~n", [Aborts]),
+    ct:pal("aborts: ~w~n", [Aborts]),
     Foo = transaction_api:quorum_read(Key),
     {Total, _} = Foo,
     ?equals(2* Count, Total),
