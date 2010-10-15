@@ -345,7 +345,16 @@ on({get_dht_nodes_response, _KnownHosts}, State) ->
 on({init_TP, Params}, State) ->
     tx_tp:on_init_TP(Params, State);
 on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
-    tx_tp:on_tx_commitreply(Id, Result, State).
+    tx_tp:on_tx_commitreply(Id, Result, State);
+%% messages handled as proxy for a proposer in the role of a
+%% transaction participant (TP) (possible replies from an acceptor)
+on({acceptor_ack, _PaxosId, _InRound, _Val, _Raccpeted} = Msg, State) ->
+    tx_tp:on_forward_to_proposer(Msg, State);
+on({acceptor_nack, _PaxosId, _NewerRound} = Msg, State) ->
+    tx_tp:on_forward_to_proposer(Msg, State);
+on({acceptor_naccepted, _PaxosId, _NewerRound} = Msg, State) ->
+    tx_tp:on_forward_to_proposer(Msg, State).
+
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
