@@ -28,6 +28,7 @@
 -export([bench/0, bench_raw/0, process/3]).
 -export([process_v2/3]).
 
+-spec make_tfun(Key::string()) -> fun((TransLog) -> {{ok, ok}, TransLog}).
 make_tfun(Key) ->
     fun (TransLog)->
              {Counter, TransLog1} = read2(TransLog, Key),
@@ -35,6 +36,7 @@ make_tfun(Key) ->
              {{ok, ok}, TransLog2}
     end.
 
+-spec inc(Key::string()) -> ok | {failure, Reason::term()}.
 inc(Key) ->
     {TLog1, {results, [{read, Key, ReadResult}]}} =
         cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{read, Key}]),
@@ -51,17 +53,22 @@ inc(Key) ->
             {failure, Reason}
     end.
 
+-spec process(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer()) -> ok.
 process(Parent, Key, Count) ->
     SuccessFun = fun(X) -> {success, X} end,
     FailureFun = fun(Reason)-> {failure, Reason} end,
     process_iter(Parent, make_tfun(Key), Count, SuccessFun, FailureFun, 0).
 
+-spec process_v2(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer()) -> ok.
 process_v2(Parent, Key, Count) ->
-    SuccessFun = fun(X) -> {success, X} end,
-    FailureFun = fun(Reason)-> {failure, Reason} end,
-    process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, 0).
+    process_iter_v2(Parent, Key, Count, 0).
 
-process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
+-spec process_iter(Parent::comm:erl_local_pid(), TFun::fun((TransLog) -> {{ok, ok}, TransLog}),
+                   Count::non_neg_integer(),
+                   SuccesFun::fun(({user_abort | commit, ok}) -> {success, {user_abort | commit, ok}}),
+                   FailFun::fun((Reason::abort | timeout | not_found) -> {failure, abort | timeout | not_found}),
+                   AbortCount::non_neg_integer()) -> ok.
+process_iter(Parent, _TFun, 0, _SuccessFun, _FailureFun, AbortCount) ->
     comm:send_local(Parent , {done, AbortCount});
 process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
     case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
@@ -77,28 +84,32 @@ process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
             log:log(warn, "~p", [X])
     end.
 
-process_iter_v2(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
+-spec process_iter_v2(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer(),
+                      AbortCount::non_neg_integer()) -> ok.
+process_iter_v2(Parent, _Key, 0, AbortCount) ->
     comm:send_local(Parent , {done, AbortCount});
-process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
+process_iter_v2(Parent, Key, Count, AbortCount) ->
     Result = inc(Key),
     case Result of
         ok ->
-            process_iter_v2(Parent, Key, Count - 1, SuccessFun, FailureFun, AbortCount);
+            process_iter_v2(Parent, Key, Count - 1, AbortCount);
         {failure, abort} ->
-            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+            process_iter_v2(Parent, Key, Count, AbortCount + 1);
         {failure, timeout} ->
-            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+            process_iter_v2(Parent, Key, Count, AbortCount + 1);
         {failure, failed} ->
-            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+            process_iter_v2(Parent, Key, Count, AbortCount + 1);
         {failure, not_found} ->
-            process_iter_v2(Parent, Key, Count, SuccessFun, FailureFun, AbortCount + 1);
+            process_iter_v2(Parent, Key, Count, AbortCount + 1);
         X ->
             log:log(warn, "~p", [X])
     end.
 
+-spec bench() -> pos_integer().
 bench() ->
     bench_raw().
 
+-spec bench_raw() -> pos_integer().
 bench_raw() ->
     Self = self(),
     Count = 1000,
@@ -112,6 +123,7 @@ bench_raw() ->
     wait_for_done(6),
     Count.
 
+-spec bench_cprof() -> pos_integer().
 bench_cprof() ->
     Self = self(),
     Count = 300,
@@ -123,6 +135,7 @@ bench_cprof() ->
     io:format("~p~n", [cprof:analyse()]),
     Count.
 
+-spec bench_fprof() -> pos_integer().
 bench_fprof() ->
     Count = fprof:apply(bench_increment, bench_raw, [], [{procs, pid_groups:processes()}]),
     fprof:profile(),
@@ -131,7 +144,7 @@ bench_fprof() ->
     Count.
 
 
-
+-spec increment_test() -> ok.
 increment_test() ->
     % init: i = 0
     Key = "i",
@@ -142,12 +155,12 @@ increment_test() ->
     %error_logger:tty(false),
     ok.
 
--spec(wait_for_done/1 :: (integer()) -> list(integer())).
+-spec wait_for_done(non_neg_integer()) -> [integer()].
 wait_for_done(0) ->
     [];
 wait_for_done(Count) ->
     receive
         {done, Aborts} ->
             io:format("aborts: ~p~n", [Aborts]),
-            [Aborts |wait_for_done(Count - 1)]
+            [Aborts | wait_for_done(Count - 1)]
     end.
