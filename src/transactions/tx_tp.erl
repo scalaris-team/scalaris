@@ -45,7 +45,7 @@ init() ->
 
 -spec on_init_TP({tx_state:tx_id(),
                   [comm:mypid()], comm:mypid(),
-                  any(),
+                  tx_tlog:tlog_entry(),
                   tx_item_state:tx_item_id(),
                   tx_item_state:paxos_id()},
                   dht_node_state:state()) -> dht_node_state:state().
@@ -55,7 +55,7 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
     %% need Acceptors (given via RTMs), Learner,
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),
-    {NewDB, Proposal} = apply(element(1, RTLogEntry),
+    {NewDB, Proposal} = apply(tx_tlog:get_entry_operation(RTLogEntry),
                               validate,
                               [DB, RTLogEntry]),
 
@@ -74,7 +74,8 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
     %% (optimized: embed the proposer's accept message in registerTP message)
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
--spec on_tx_commitreply(tuple(), commit | abort, dht_node_state:state())
+-spec on_tx_commitreply({tx_item_state:paxos_id(), tx_tlog:tlog_entry()},
+                        commit | abort, dht_node_state:state())
                        -> dht_node_state:state().
 on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     ?TRACE("tx_tp:on_tx_commitreply({, ...})~n", []),
@@ -91,7 +92,8 @@ on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     pdb:delete(PaxosId, TP_DB),
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
--spec on_tx_commitreply_fwd(tuple(), commit | abort, commit | abort,
+-spec on_tx_commitreply_fwd(tx_tlog:tlog_entry(),
+                            commit | abort, commit | abort,
                             dht_node_state:state())
                            -> dht_node_state:state().
 on_tx_commitreply_fwd(RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
@@ -108,11 +110,10 @@ on_forward_to_proposer(Msg, DHT_Node_State) ->
 update_db_or_forward(RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
     %% Check for DB responsibility:
     DB = dht_node_state:get(DHT_Node_State, db),
-    Key = element(2, RTLogEntry),
+    Key = tx_tlog:get_entry_key(RTLogEntry),
     case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
         true ->
-            %% call operation:Result={commit|abort} on DB
-            apply(element(1, RTLogEntry), Result,
+            apply(tx_tlog:get_entry_operation(RTLogEntry), Result,
                   [DB, RTLogEntry, OwnProposal]);
         false ->
             %% forward commit to now responsible node
