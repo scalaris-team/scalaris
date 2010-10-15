@@ -83,7 +83,7 @@ rw_suite_runs(Desired) ->
     erlang:min(Desired, max_rw_tests_per_suite()).
 
 init_per_suite(Config) ->
-    ct:pal("DB suite running with: ~p~n", [?TEST_DB]),
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
     Pid = spawn_config_processes(),
     [{wrapper_pid, Pid} | Config].
 

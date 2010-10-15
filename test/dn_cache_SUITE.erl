@@ -61,6 +61,7 @@ stop_config_processes(Pid) ->
     ok.
 
 init_per_suite(Config) ->
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
     Pid = spawn_config_processes(),
     [{wrapper_pid, Pid} | Config].
 

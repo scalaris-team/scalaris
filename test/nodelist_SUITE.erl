@@ -44,6 +44,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
     Config.
 
 end_per_suite(_Config) ->

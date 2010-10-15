@@ -56,6 +56,7 @@ init_per_testcase(TestCase, Config) ->
     end.
 
 init_per_suite(Config) ->
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
     Config.
 
 end_per_testcase(_TestCase, Config) ->

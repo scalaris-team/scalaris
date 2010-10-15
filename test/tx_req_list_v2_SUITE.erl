@@ -34,6 +34,7 @@ suite() ->
     [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
     Pid = unittest_helper:make_ring(4),
     [{wrapper_pid, Pid} | Config].
 
