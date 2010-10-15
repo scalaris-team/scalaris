@@ -89,59 +89,56 @@ process_iter(Parent, Key, Count, SuccessFun, FailureFun, AbortCount) ->
 increment_test_8(_Config) ->
     % init: i = 0
     Key = "i",
-    ?equals(transaction_api:single_write("i", 0), commit),
+    ?equals(cs_api_v2:write("i", 0), ok),
 
     Self = self(),
     Count = 100,
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
 
     Aborts = wait_for_done(8),
-    ct:pal("aborts: ~p~n", [Aborts]),
-    Foo = transaction_api:quorum_read(Key),
-    {Total, _} = Foo,
-    ?equals(8* Count, Total),
+    ct:pal("aborts: ~w~n", [Aborts]),
+    Total = cs_api_v2:read(Key),
+    ?equals(8*Count, Total),
     ok.
 
 increment_test_4(_Config) ->
     % init: i = 0
     Key = "i",
-    ?equals(transaction_api:single_write("i", 0), commit),
+    ?equals(cs_api_v2:write("i", 0), ok),
 
     Self = self(),
     Count = 100,
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
 
     Aborts = wait_for_done(4),
-    ct:pal("aborts: ~p~n", [Aborts]),
-    Foo = transaction_api:quorum_read(Key),
-    {Total, _} = Foo,
+    ct:pal("aborts: ~w~n", [Aborts]),
+    Total = cs_api_v2:read(Key),
     ?equals(4 * Count, Total),
     ok.
 
 increment_test_2(_Config) ->
     % init: i = 0
     Key = "i",
-    ?equals(transaction_api:single_write("i", 0), commit),
+    ?equals(cs_api_v2:write("i", 0), ok),
 
     Self = self(),
     Count = 100,
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
-    spawn(concurrent_transaction_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
+    spawn(concurrent_transaction_v2_SUITE, process, [Self, Key, Count]),
 
     Aborts = wait_for_done(2),
-    ct:pal("aborts: ~p~n", [Aborts]),
-    Foo = transaction_api:quorum_read(Key),
-    {Total, _} = Foo,
+    ct:pal("aborts: ~w~n", [Aborts]),
+    Total = cs_api_v2:read(Key),
     ?equals(2* Count, Total),
     ok.
 
