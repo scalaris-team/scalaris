@@ -23,7 +23,7 @@
 
 -export([propose/2, init_paxos/1, cleanup_paxos_states/1]).
 
--spec propose(proposal(), group_state:group_state()) ->
+-spec propose(group_types:proposal(), group_state:group_state()) ->
     {success, group_state:group_state()} | failed.
 propose(Proposal, GroupState) ->
     case is_first_proposal_for_this_instance(GroupState) of
@@ -61,7 +61,7 @@ init_paxos(GroupState) ->
     group_state:init_paxos(GroupState, PaxosId).
 
 
--spec cleanup_paxos_states(paxos_id()) -> ok.
+-spec cleanup_paxos_states(group_types:paxos_id()) -> ok.
 cleanup_paxos_states({GroupId, PaxosId}) ->
     ok.
 

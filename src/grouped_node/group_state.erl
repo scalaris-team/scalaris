@@ -49,13 +49,10 @@
          split_group/4,
          get_group_node/1]).
 
--type(group_member() :: comm:mypid()).
--type(group_member_list() :: list(group_member())).
-
--record(group_state, {group_id :: group_id(),
+-record(group_state, {group_id :: group_types:group_id(),
                       current_paxos_version,
                       next_proposal_version,
-                      members :: group_member_list(),
+                      members :: group_types:group_member_list(),
                       version::non_neg_integer(),
                       interval::intervals:interval(),
                       acceptors,
@@ -139,30 +136,30 @@ remove_node(#group_state{members=Members, version=Version,
      }.
 
 % @doc paxos_id for the next init_paxos call
--spec get_current_paxos_id(group_state()) -> paxos_id().
+-spec get_current_paxos_id(group_state()) -> group_types:paxos_id().
 get_current_paxos_id(GroupState) ->
     get_next_expected_decision_id(GroupState).
 
 % @doc paxos_id for the next init_paxos call
--spec get_next_paxos_id(group_state()) -> paxos_id().
+-spec get_next_paxos_id(group_state()) -> group_types:paxos_id().
 get_next_paxos_id(#group_state{group_id=GroupId,
                                current_paxos_version=CurrentPaxosVersion}) ->
     {GroupId, CurrentPaxosVersion + 1}.
 
 % @doc paxos_id for the next proposer:start_paxosid call
--spec get_next_proposal_id(group_state()) -> paxos_id().
+-spec get_next_proposal_id(group_state()) -> group_types:paxos_id().
 get_next_proposal_id(#group_state{group_id=GroupId,
                                   next_proposal_version=NextProposalVersion}) ->
     {GroupId, NextProposalVersion}.
 
 % @doc expected paxos_id for the next decision
--spec get_next_expected_decision_id(group_state()) -> paxos_id().
+-spec get_next_expected_decision_id(group_state()) -> group_types:paxos_id().
 get_next_expected_decision_id(#group_state{group_id=GroupId,
                                current_paxos_version=CurrentPaxosVersion}) ->
     {GroupId, CurrentPaxosVersion}.
 
 % @doc update state to reflect new proposal
--spec made_proposal(group_state(), paxos_id(), proposal()) -> group_state().
+-spec made_proposal(group_state(), group_types:paxos_id(), group_types:proposal()) -> group_state().
 made_proposal(#group_state{group_id=GroupId,
                            current_paxos_version=CurrentPaxosVersion}
               = GroupState,
@@ -174,23 +171,23 @@ made_proposal(#group_state{group_id=GroupId,
       gb_trees:insert(PaxosId, Proposal,
                       GroupState#group_state.proposals)}.
 
--spec postpone_decision(group_state(), paxos_id(), proposal()) -> group_state().
+-spec postpone_decision(group_state(), group_types:paxos_id(), group_types:proposal()) -> group_state().
 postpone_decision(#group_state{postponed_decisions = PostPonedDecisions} = GroupState, PaxosId, Proposal) ->
     GroupState#group_state{postponed_decisions = gb_sets:add({PaxosId, Proposal},
                                                              PostPonedDecisions)}.
 
--spec get_postponed_decisions(group_state()) -> list({paxos_id(), proposal()}).
+-spec get_postponed_decisions(group_state()) -> list({group_types:paxos_id(), group_types:proposal()}).
 get_postponed_decisions(#group_state{postponed_decisions = PostPonedDecisions}) ->
     gb_sets:to_list(PostPonedDecisions).
 
--spec remove_postponed_decision(group_state(), paxos_id(), proposal()) -> group_state().
+-spec remove_postponed_decision(group_state(), group_types:paxos_id(), group_types:proposal()) -> group_state().
 remove_postponed_decision(#group_state{postponed_decisions = PostPonedDecisions} = GroupState,
                            PaxosId, Proposal) ->
     GroupState#group_state{postponed_decisions = gb_sets:delete_any({PaxosId, Proposal},
                                                                     PostPonedDecisions)}.
 
 % @doc update state to reflect start of new paxos round
--spec init_paxos(group_state(), paxos_id()) -> group_state().
+-spec init_paxos(group_state(), group_types:paxos_id()) -> group_state().
 init_paxos(#group_state{group_id=GroupId, next_proposal_version=NextProposalVersion} = GroupState,
               {GroupId, PaxosVersion}) ->
     GroupState#group_state{
@@ -198,7 +195,7 @@ init_paxos(#group_state{group_id=GroupId, next_proposal_version=NextProposalVers
       next_proposal_version = util:max(PaxosVersion, NextProposalVersion)
       }.
 
--spec remove_proposal(group_state(), paxos_id()) -> group_state().
+-spec remove_proposal(group_state(), group_types:paxos_id()) -> group_state().
 remove_proposal(GroupState, PaxosId) ->
     GroupState.
 
@@ -207,18 +204,18 @@ remove_proposal(GroupState, PaxosId) ->
     %   proposals =
     %   gb_trees:delete_any(PaxosId, GroupState#group_state.proposals)}.
 
--spec get_proposal(group_state(), paxos_id()) -> {value, proposal()} | none.
+-spec get_proposal(group_state(), group_types:paxos_id()) -> {value, group_types:proposal()} | none.
 get_proposal(GroupState, PaxosId) ->
     gb_trees:lookup(PaxosId, GroupState#group_state.proposals).
 
--spec get_new_group_id(group_id(), left | right) ->
-    group_id().
+-spec get_new_group_id(group_types:group_id(), left | right) ->
+    group_types:group_id().
 get_new_group_id(GroupId, left) ->
     GroupId bsl 1 + 0;
 get_new_group_id(GroupId, right) ->
     GroupId bsl 1 + 1.
 
--spec split_group(OldGroupState::group_state(), NewGroupId::group_id(),
+-spec split_group(OldGroupState::group_state(), NewGroupId::group_types:group_id(),
                   NewInterval::intervals:interval(), NewMemberList::list(comm:mypid())) ->
     group_state().
 split_group(#group_state{acceptors=OldAcceptors,
@@ -245,7 +242,7 @@ split_group(#group_state{acceptors=OldAcceptors,
                  learners = Learners,
                  proposals = gb_trees:empty()}.
 
--spec get_group_node(GroupState::group_state()) -> group_node().
+-spec get_group_node(GroupState::group_state()) -> group_types:group_node().
 get_group_node(#group_state{group_id = GroupId, version = Version,
                             members = Members}) ->
     {GroupId, Version, Members}.

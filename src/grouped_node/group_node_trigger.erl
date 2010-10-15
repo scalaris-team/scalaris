@@ -25,7 +25,7 @@
 
 -export([trigger/1]).
 
--spec trigger(joined_state()) -> joined_state().
+-spec trigger(group_types:joined_state()) -> group_types:joined_state().
 trigger({joined, NodeState, GroupState, TriggerState} = _State) ->
     case length(group_state:get_members(GroupState)) > 10 of
         true ->

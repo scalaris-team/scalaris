@@ -41,7 +41,7 @@
 -type(message() :: any()).
 
 %% @doc message handler
--spec on(message(), state()) -> state().
+-spec on(message(), group_types:state()) -> group_types:state().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % join protocol

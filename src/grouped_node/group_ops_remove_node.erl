@@ -26,8 +26,8 @@
 -type(proposal_type()::{group_node_remove, Pid::comm:mypid()}).
 
 % @doc we got a request to remove a node from this group, do sanity checks and propose the removal
--spec ops_request(State::joined_state(),
-                  Proposal::proposal_type()) -> joined_state().
+-spec ops_request(State::group_types:joined_state(),
+                  Proposal::proposal_type()) -> group_types:joined_state().
 ops_request({joined, NodeState, GroupState, TriggerState} = State,
             {group_node_remove, Pid} = _Proposal) ->
     case group_state:is_member(GroupState, Pid) of
@@ -47,10 +47,10 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
 
 
 % @doc it was decided to remove a node from our group: execute the removal
--spec ops_decision(State::joined_state(),
+-spec ops_decision(State::group_types:joined_state(),
                    Proposal::proposal_type(),
                    PaxosId::any(),
-                   Hint::decision_hint()) -> joined_state().
+                   Hint::group_types:decision_hint()) -> group_types:joined_state().
 ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
              {group_node_remove, Pid} = Proposal,
              PaxosId, _Hint) ->
@@ -67,8 +67,9 @@ ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
     fd:unsubscribe(Pid),
     {joined, NodeState, NewGroupState, TriggerState}.
 
--spec rejected_proposal(joined_state(), proposal_type(), paxos_id()) ->
-    joined_state().
+-spec rejected_proposal(group_types:joined_state(), proposal_type(),
+                        group_types:paxos_id()) ->
+    group_types:joined_state().
 rejected_proposal(State,
                   {group_node_remove, Pid},
                   _PaxosId) ->
