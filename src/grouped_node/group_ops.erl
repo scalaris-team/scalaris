@@ -19,7 +19,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([execute_decision/3, report_rejection/3]).
 

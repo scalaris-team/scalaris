@@ -19,7 +19,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0]).
 
