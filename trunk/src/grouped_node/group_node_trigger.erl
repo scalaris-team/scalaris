@@ -21,7 +21,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([trigger/1]).
 

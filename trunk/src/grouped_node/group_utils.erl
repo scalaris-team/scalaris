@@ -21,7 +21,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([notify_neighbors/3]).
 

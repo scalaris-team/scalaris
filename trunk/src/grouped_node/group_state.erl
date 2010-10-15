@@ -21,7 +21,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([new_group_state/1,
          get_group_id/1,

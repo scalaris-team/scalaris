@@ -19,7 +19,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([propose/2, init_paxos/1, cleanup_paxos_states/1]).
 

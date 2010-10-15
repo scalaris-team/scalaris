@@ -21,7 +21,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([new/3,
         get_predecessor/1, get_successor/1,

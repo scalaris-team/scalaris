@@ -19,7 +19,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 -export([ops_request/2, ops_decision/4, rejected_proposal/3]).
 

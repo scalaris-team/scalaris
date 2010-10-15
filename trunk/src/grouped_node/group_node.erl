@@ -23,7 +23,6 @@
 -behaviour(gen_component).
 
 -include("scalaris.hrl").
--include("group.hrl").
 
 %% a group_node has two different kinds of state: (a)
 %% group_state() and (b)local_state(). the former is synchronized between the
