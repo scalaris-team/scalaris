@@ -27,40 +27,40 @@
         get_predecessor/1, get_successor/1,
         update_pred_succ/3, update_pred/2, update_succ/2]).
 
--record(local_state, {successor::group_node(),
-                      predecessor::group_node(),
+-record(local_state, {successor::group_types:group_node(),
+                      predecessor::group_types:group_node(),
                       rt,
                       db}).
 
 -opaque local_state() :: #local_state{}.
 
--spec new(Pred::group_node(), Succ::group_node(), DB::?DB:db()) -> local_state().
+-spec new(Pred::group_types:group_node(), Succ::group_types:group_node(),
+          DB::?DB:db()) -> local_state().
 new(Pred, Succ, DB) ->
     #local_state{
      predecessor = Pred,
      successor = Succ,
      db = DB}.
 
--spec get_predecessor(State::local_state()) ->
-    group_node().
+-spec get_predecessor(State::local_state()) -> group_types:group_node().
 get_predecessor(#local_state{predecessor=Predecessor}) ->
     Predecessor.
 
--spec get_successor(State::local_state()) ->
-    group_node().
+-spec get_successor(State::local_state()) -> group_types:group_node().
 get_successor(#local_state{successor=Successor}) ->
     Successor.
 
--spec update_pred_succ(local_state(), group_node(), group_node()) -> local_state().
+-spec update_pred_succ(local_state(), group_types:group_node(),
+                       group_types:group_node()) -> local_state().
 update_pred_succ(NodeState, Pred, Succ) ->
     update_pred(update_succ(NodeState, Succ), Pred).
 
--spec update_succ(local_state(), group_node()) -> local_state().
+-spec update_succ(local_state(), group_types:group_node()) -> local_state().
 update_succ(NodeState, Succ) ->
     % @todo: check if newer and update
     NodeState.
 
--spec update_pred(local_state(), group_node()) -> local_state().
+-spec update_pred(local_state(), group_types:group_node()) -> local_state().
 update_pred(NodeState, Pred) ->
     % @todo: check if newer and update
     NodeState.

@@ -28,8 +28,8 @@
                           RightGroup::list(comm:mypid())}).
 
 % @doc we got a request to split this group, do sanity checks and propose the split
--spec ops_request(State::joined_state(),
-                  Proposal::proposal_type()) -> joined_state().
+-spec ops_request(State::group_types:joined_state(),
+                  Proposal::proposal_type()) -> group_types:joined_state().
 ops_request({joined, NodeState, GroupState, TriggerState} = State,
             {group_split, Pid, SplitKey, LeftGroup, RightGroup} = Proposal) ->
     CurrentMemberList = group_state:get_members(GroupState),
@@ -60,9 +60,10 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
     end.
 
 % @doc it was decided to split our group: execute the split
--spec ops_decision(State::joined_state(),
+-spec ops_decision(State::group_types:joined_state(),
                    Proposal::proposal_type(),
-                   PaxosId::any(), Hint::decision_hint()) -> joined_state().
+                   PaxosId::any(), Hint::group_types:decision_hint()) ->
+    group_types:joined_state().
 ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
              {group_split, Proposer, SplitKey, LeftGroup, RightGroup} = _Proposal,
              PaxosId, Hint) ->
@@ -104,8 +105,9 @@ update_fd() ->
     %@todo
     ok.
 
--spec rejected_proposal(joined_state(), proposal_type(), paxos_id()) ->
-    joined_state().
+-spec rejected_proposal(group_types:joined_state(), proposal_type(),
+                        group_types:paxos_id()) ->
+    group_types:joined_state().
 rejected_proposal(State,
                   {group_split, Proposer, _SplitKey, _LeftGroup, _RightGroup},
                   _PaxosId) ->

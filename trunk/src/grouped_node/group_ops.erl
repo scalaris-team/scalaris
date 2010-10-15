@@ -23,8 +23,9 @@
 
 -export([execute_decision/3, report_rejection/3]).
 
--spec report_rejection(joined_state(), paxos_id(), proposal()) ->
-    joined_state().
+-spec report_rejection(group_types:joined_state(), group_types:paxos_id(),
+                       group_types:proposal()) ->
+    group_types:joined_state().
 report_rejection(State, PaxosId, Proposal) ->
     case Proposal of
         {group_split, _Pid, _SplitKey, _LeftGroup, _RightGroup} ->
@@ -39,8 +40,9 @@ report_rejection(State, PaxosId, Proposal) ->
     end.
 
 % @doc execute decision
--spec execute_decision(joined_state(), paxos_id(), proposal()) ->
-    joined_state().
+-spec execute_decision(group_types:joined_state(), group_types:paxos_id(),
+                       group_types:proposal()) ->
+    group_types:joined_state().
 execute_decision({joined, _, GroupState, _} = State, PaxosId, Proposal) ->
     PaxosId = group_state:get_next_expected_decision_id(GroupState), %assert
     case group_state:get_proposal(GroupState, PaxosId) of
@@ -53,8 +55,9 @@ execute_decision({joined, _, GroupState, _} = State, PaxosId, Proposal) ->
             group_ops:report_rejection(NewState, PaxosId, OtherProposal)
     end.
 
--spec dispatch_decision(joined_state(), paxos_id(), proposal(), decision_hint()) ->
-    joined_state().
+-spec dispatch_decision(group_types:joined_state(), group_types:paxos_id(),
+                        group_types:proposal(), group_types:decision_hint()) ->
+    group_types:joined_state().
 dispatch_decision(State, PaxosId, {group_split, _, _, _, _} = Decision, Hint) ->
     group_ops_split_group:ops_decision(State, Decision, PaxosId, Hint);
 dispatch_decision(State, PaxosId, {group_node_remove, _} = Decision, Hint) ->
