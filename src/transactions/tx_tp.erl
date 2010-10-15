@@ -86,13 +86,16 @@ on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
 
     Key = element(2, RTLogEntry),
     %% call operation:Result={commit|abort} on DB
-    %% Check for DB responsibility needed?
-    %% NewDB = case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
-    %%   true ->
-    NewDB = apply(element(1, RTLogEntry), Result,
-                  [DB, RTLogEntry, Proposal]),
-    %%   false -> ct:pal("No longer responsible~n"), DB
-    %% end,
+    %% Check for DB responsibility:
+    NewDB = case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
+                true ->
+                    apply(element(1, RTLogEntry), Result,
+                          [DB, RTLogEntry, Proposal]);
+                false ->
+                    log:log(warn, "[ Node ~.0p:tx_tp ] No longer responsible for key ~.0p, rtlog: ~.0p~n",
+                            [node:pidX(dht_node_state:get(DHT_Node_State, node)), Key, RTLogEntry]),
+                    DB
+            end,
     %% delete corresponding proposer state
     Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
