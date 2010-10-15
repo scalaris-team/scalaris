@@ -27,7 +27,8 @@
 %%% public interface
 
 %%% functions for gen_component module and supervisor callbacks
--export([init/0, on_init_TP/2, on_tx_commitreply/3]).
+-export([init/0, on_init_TP/2]).
+-export([on_tx_commitreply/3, on_tx_commitreply_fwd/4]).
 -export([on_forward_to_proposer/2]).
 
 -spec init() -> atom().
@@ -78,28 +79,23 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
 on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     ?TRACE("tx_tp:on_tx_commitreply({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.
-    DB = dht_node_state:get(DHT_Node_State, db),
-
     % get own proposal for lock release
     TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
     {PaxosId, Proposal} = pdb:get(PaxosId, TP_DB),
 
-    Key = element(2, RTLogEntry),
-    %% call operation:Result={commit|abort} on DB
-    %% Check for DB responsibility:
-    NewDB = case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
-                true ->
-                    apply(element(1, RTLogEntry), Result,
-                          [DB, RTLogEntry, Proposal]);
-                false ->
-                    log:log(warn, "[ Node ~.0p:tx_tp ] No longer responsible for key ~.0p, rtlog: ~.0p~n",
-                            [node:pidX(dht_node_state:get(DHT_Node_State, node)), Key, RTLogEntry]),
-                    DB
-            end,
+    NewDB = update_db_or_forward(RTLogEntry, Result, Proposal, DHT_Node_State),
+
     %% delete corresponding proposer state
     Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
     pdb:delete(PaxosId, TP_DB),
+    dht_node_state:set_db(DHT_Node_State, NewDB).
+
+-spec on_tx_commitreply_fwd(tuple(), commit | abort, commit | abort,
+                            dht_node_state:state())
+                           -> dht_node_state:state().
+on_tx_commitreply_fwd(RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
+    NewDB = update_db_or_forward(RTLogEntry, Result, OwnProposal, DHT_Node_State),
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
 -spec on_forward_to_proposer(tuple(),
@@ -108,3 +104,20 @@ on_forward_to_proposer(Msg, DHT_Node_State) ->
     Proposer = dht_node_state:get(DHT_Node_State, proposer),
     comm:send_local(Proposer, Msg),
     DHT_Node_State.
+
+update_db_or_forward(RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
+    %% Check for DB responsibility:
+    DB = dht_node_state:get(DHT_Node_State, db),
+    Key = element(2, RTLogEntry),
+    case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
+        true ->
+            %% call operation:Result={commit|abort} on DB
+            apply(element(1, RTLogEntry), Result,
+                  [DB, RTLogEntry, OwnProposal]);
+        false ->
+            %% forward commit to now responsible node
+            dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
+                                       {tx_tm_rtm_commit_reply_fwd, RTLogEntry,
+                                        Result, OwnProposal}),
+            DB
+    end.
