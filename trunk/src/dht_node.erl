@@ -346,6 +346,8 @@ on({init_TP, Params}, State) ->
     tx_tp:on_init_TP(Params, State);
 on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
     tx_tp:on_tx_commitreply(Id, Result, State);
+on({tx_tm_rtm_commit_reply_fwd, RTLogEntry, Result, OwnProposal}, State) ->
+    tx_tp:on_tx_commitreply_fwd(RTLogEntry, Result, OwnProposal, State);
 %% messages handled as proxy for a proposer in the role of a
 %% transaction participant (TP) (possible replies from an acceptor)
 on({acceptor_ack, _PaxosId, _InRound, _Val, _Raccpeted} = Msg, State) ->
