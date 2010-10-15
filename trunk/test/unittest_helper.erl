@@ -56,7 +56,6 @@ make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
     %       (it might use config or another process)
     fix_cwd(),
     error_logger:tty(true),
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
     undefined = ets:info(config_ets),
     Pid = start_process(
             fun() ->
@@ -83,7 +82,6 @@ make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
 make_ring(Size) ->
     fix_cwd(),
     error_logger:tty(true),
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
     undefined = ets:info(config_ets),
     Pid = start_process(
             fun() ->
@@ -100,7 +98,7 @@ make_ring(Size) ->
     check_ring_size(Size),
     wait_for_stable_ring(),
     check_ring_size(Size),
-    ct:pal("Scalaris has booted with ~p nodes..~n", [Size]),
+    ct:pal("Scalaris has booted with ~p node(s)...~n", [Size]),
     Pid.
 
 %% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1.

@@ -29,6 +29,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
     unittest_helper:fix_cwd(),
     error_logger:tty(true),
     Pid = unittest_helper:start_process(
