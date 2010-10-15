@@ -28,6 +28,7 @@
 
 %%% functions for gen_component module and supervisor callbacks
 -export([init/0, on_init_TP/2, on_tx_commitreply/3]).
+-export([on_forward_to_proposer/2]).
 
 -spec init() -> atom().
 init() ->
@@ -83,9 +84,24 @@ on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
     {PaxosId, Proposal} = pdb:get(PaxosId, TP_DB),
 
-    NewDB = apply(element(1, RTLogEntry), Result, [DB, RTLogEntry, Proposal]),
+    Key = element(2, RTLogEntry),
+    %% call operation:Result={commit|abort} on DB
+    %% Check for DB responsibility needed?
+    %% NewDB = case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
+    %%   true ->
+    NewDB = apply(element(1, RTLogEntry), Result,
+                  [DB, RTLogEntry, Proposal]),
+    %%   false -> ct:pal("No longer responsible~n"), DB
+    %% end,
     %% delete corresponding proposer state
     Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
     proposer:stop_paxosids(Proposer, [PaxosId]),
     pdb:delete(PaxosId, TP_DB),
     dht_node_state:set_db(DHT_Node_State, NewDB).
+
+-spec on_forward_to_proposer(tuple(),
+                             dht_node_state:state()) -> dht_node_state:state().
+on_forward_to_proposer(Msg, DHT_Node_State) ->
+    Proposer = dht_node_state:get(DHT_Node_State, proposer),
+    comm:send_local(Proposer, Msg),
+    DHT_Node_State.

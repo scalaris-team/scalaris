@@ -27,6 +27,7 @@
          stop_pid_groups/0,
          check_ring_size/1,
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
+         wait_for_process_to_die/1,
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
          get_all_children/1]).
