@@ -44,6 +44,10 @@ end_per_suite(_Config) ->
 init_per_testcase(_TestCase, Config) ->
     unittest_helper:fix_cwd(),
     scalaris2:start(),
+    config:write(dht_node_sup, sup_group_node),
+    config:write(dht_node, group_node),
+    config:write(group_node_trigger, trigger_periodic),
+    config:write(group_node_base_interval, 30000),
     Config.
 
 end_per_testcase(_TestCase, Config) ->
