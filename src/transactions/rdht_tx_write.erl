@@ -199,13 +199,13 @@ my_make_tlog_result_entry(TLogEntry, Request) ->
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.
     case Status of
-        not_found ->
-            {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
-             {?MODULE, Key, {value, WriteValue}}};
         value ->
             {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
             {?MODULE, Key, {value, WriteValue}}};
-        timeout ->
+        not_found ->
+            {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
+             {?MODULE, Key, {value, WriteValue}}};
+        {fail, timeout} ->
             {tx_tlog:new_entry(?MODULE, Key, {fail, timeout},
                                WriteValue, Version),
              {?MODULE, Key, {fail, timeout}}}

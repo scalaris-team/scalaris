@@ -65,8 +65,8 @@ work_phase(TLogEntry, {Num, Request}) ->
         tx_tlog:new_entry(?MODULE, element(2, Request), Status, Value, Version),
     Result =
         case Status of
-            not_found -> {Num, {?MODULE, element(2, Request), {fail, Status}}};
-            value -> {Num, {?MODULE, element(2, Request), {Status, Value}}}
+            value -> {Num, {?MODULE, element(2, Request), {Status, Value}}};
+            not_found -> {Num, {?MODULE, element(2, Request), {fail, Status}}}
         end,
     {NewTLogEntry, Result}.
 
@@ -277,9 +277,9 @@ my_make_result_entry(Entry) ->
     Key = rdht_tx_read_state:get_key(Entry),
     {Val, _Vers} = rdht_tx_read_state:get_result(Entry),
     case rdht_tx_read_state:get_decided(Entry) of
-        {fail, timeout} -> {?MODULE, Key, {fail, timeout}};
+        value -> {?MODULE, Key, {value, Val}};
         not_found -> {?MODULE, Key, {fail, not_found}};
-        value -> {?MODULE, Key, {value, Val}}
+        {fail, timeout} -> {?MODULE, Key, {fail, timeout}}
     end.
 
 my_delete_if_all_replied(Entry, Reps, Table) ->
