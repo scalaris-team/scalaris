@@ -158,7 +158,8 @@ get_next_expected_decision_id(#group_state{group_id=GroupId,
     {GroupId, CurrentPaxosVersion}.
 
 % @doc update state to reflect new proposal
--spec made_proposal(group_state(), group_types:paxos_id(), group_types:proposal()) -> group_state().
+-spec made_proposal(group_state(), group_types:paxos_id(),
+                    group_types:proposal()) -> group_state().
 made_proposal(#group_state{group_id=GroupId,
                            current_paxos_version=CurrentPaxosVersion}
               = GroupState,
@@ -170,7 +171,8 @@ made_proposal(#group_state{group_id=GroupId,
       gb_trees:insert(PaxosId, Proposal,
                       GroupState#group_state.proposals)}.
 
--spec postpone_decision(group_state(), group_types:paxos_id(), group_types:proposal()) -> group_state().
+-spec postpone_decision(group_state(), group_types:paxos_id(),
+                        group_types:proposal()) -> group_state().
 postpone_decision(#group_state{postponed_decisions = PostPonedDecisions} = GroupState, PaxosId, Proposal) ->
     GroupState#group_state{postponed_decisions = gb_sets:add({PaxosId, Proposal},
                                                              PostPonedDecisions)}.
@@ -179,7 +181,8 @@ postpone_decision(#group_state{postponed_decisions = PostPonedDecisions} = Group
 get_postponed_decisions(#group_state{postponed_decisions = PostPonedDecisions}) ->
     gb_sets:to_list(PostPonedDecisions).
 
--spec remove_postponed_decision(group_state(), group_types:paxos_id(), group_types:proposal()) -> group_state().
+-spec remove_postponed_decision(group_state(), group_types:paxos_id(), group_types:proposal()) ->
+    group_state().
 remove_postponed_decision(#group_state{postponed_decisions = PostPonedDecisions} = GroupState,
                            PaxosId, Proposal) ->
     GroupState#group_state{postponed_decisions = gb_sets:delete_any({PaxosId, Proposal},
@@ -203,7 +206,8 @@ remove_proposal(GroupState, PaxosId) ->
     %   proposals =
     %   gb_trees:delete_any(PaxosId, GroupState#group_state.proposals)}.
 
--spec get_proposal(group_state(), group_types:paxos_id()) -> {value, group_types:proposal()} | none.
+-spec get_proposal(group_state(), group_types:paxos_id()) ->
+    {value, group_types:proposal()} | none.
 get_proposal(GroupState, PaxosId) ->
     gb_trees:lookup(PaxosId, GroupState#group_state.proposals).
 
