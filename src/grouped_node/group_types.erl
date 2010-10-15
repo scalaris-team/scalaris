@@ -20,6 +20,8 @@
 
 -include("scalaris.hrl").
 
+-type(group_id() :: non_neg_integer()).
+
 -type(paxos_id() :: {group_id(), pos_integer()}).
 
 -type(proposal() :: {group_node_join, Pid::comm:mypid(), Acceptor::comm:mypid(),
@@ -27,8 +29,10 @@
                   | {group_node_remove, Pid::comm:mypid()}
                   | {group_split, Proposer::comm:mypid(), SplitKey::?RT:key(),
                      LeftGroup::list(comm:mypid()), RightGroup::list(comm:mypid())}
-                  | {read, Key::?RT:key(), Value::any(), Client::comm:mypid()}
-                  | {write, Key::?RT:key(), Value::any(), Client::comm:mypid()}).
+                  | {read, Key::?RT:key(), Value::any(), Version::pos_integer(),
+                     Client::comm:mypid(), Proposer::comm:mypid()}
+                  | {write, Key::?RT:key(), Value::any(), Version::pos_integer(),
+                     Client::comm:mypid(), Proposer::comm:mypid()}).
 
 -type(mode_type() :: joining | joined).
 
@@ -43,8 +47,6 @@
                          TriggerState::trigger:state()}).
 
 -type(decision_hint() :: my_proposal_won | had_no_proposal).
-
--type(group_id() :: non_neg_integer()).
 
 -type(group_node() :: {GroupId::group_id(),
                        Version::non_neg_integer(),
