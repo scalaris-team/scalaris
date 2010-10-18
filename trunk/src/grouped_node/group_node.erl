@@ -108,6 +108,17 @@ on({ops, {group_split, _Pid, _SplitKey, _LeftGroup, _RightGroup} = Proposal},
     group_ops_split_group:ops_request(State, Proposal);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% paxos_read
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({ops, {read, _HashedKey, _Value, _Version, _Client, _Proposer} = Proposal},
+   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+    group_ops_db:ops_request(State, Proposal);
+
+on({ops, {write, _HashedKey, _Value, _Version, _Client, _Proposer} = Proposal},
+   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+    group_ops_db:ops_request(State, Proposal);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % deliver
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({learner_decide, _Cookie, PaxosId, Proposal},
@@ -134,6 +145,33 @@ on({group_node_remove_response,retry, Pid},
         false ->
             State
     end;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% routing
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({route, Key, Hops, Message},
+   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+    group_router:route(Key, Hops, Message, State);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% simple DB
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({quorum_read, Client, HashedKey},
+   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+    % @todo
+   State;
+on({paxos_read, Client, HashedKey},
+   {joined, NodeState, _GroupState, _TriggerState} = State) ->
+    DB = group_local_state:get_db(NodeState),
+    {ok, Value, Version} = ?DB:read(DB, HashedKey),
+    Proposal = {read, HashedKey, Value, Version, Client, comm:this()},
+   on({ops, Proposal}, State);
+on({paxos_write, Client, HashedKey, Value},
+   {joined, NodeState, _GroupState, _TriggerState} = State) ->
+    DB = group_local_state:get_db(NodeState),
+    {ok, _Value, Version} = ?DB:read(DB, HashedKey),
+    Proposal = {write, HashedKey, Value, Version + 1, Client, comm:this()},
+   on({ops, Proposal}, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rest
@@ -214,8 +252,8 @@ init(Options) ->
             Interval = intervals:new('[', 0, 16#100000000000000000000000000000000, ')'),
             GroupState = group_state:new_group_state(Interval),
             We = group_state:get_group_node(GroupState),
-            DB = ?DB:new(group_state:get_group_id(GroupState)),
             TriggerState = trigger:now(trigger:init(Trigger, ?MODULE)),
+            DB = ?DB:new(group_state:get_group_id(GroupState)),
             {joined, group_local_state:new(We, We, DB),
              group_paxos_utils:init_paxos(GroupState), TriggerState};
         _ ->

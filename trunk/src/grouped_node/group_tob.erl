@@ -22,6 +22,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("group.hrl").
 
 -export([deliver/3]).
 
@@ -40,16 +41,16 @@ deliver(PaxosId, Proposal, {joined, _NodeState, GroupState, _TriggerState} = Sta
     IsDecisionFromOtherGroupId = is_decision_from_other_group_id(NextPaxosId, PaxosId),
     if
         IsCurrentDecision ->
-            io:format("deliver ~p at ~p~n", [PaxosId, self()]),
+            ?LOG("deliver ~p at ~p~n", [PaxosId, self()]),
             deliver_postponed_decisions(deliver_current_decision(PaxosId, Proposal, State));
         IsFutureDecision ->
-            io:format("got future decision~n", []),
+            ?LOG("got future decision~n", []),
             postpone_future_decision(PaxosId, Proposal, State);
         IsPastDecision ->
-            io:format("ignoring old decision ~p < ~p ~p~n", [PaxosId, NextPaxosId, self()]),
+            ?LOG("ignoring old decision ~p < ~p ~p~n", [PaxosId, NextPaxosId, self()]),
             State;
         IsDecisionFromOtherGroupId ->
-            io:format("panic decision from other group !?!: ~p, ~p, ~p~n",
+            ?LOG("panic decision from other group !?!: ~p, ~p, ~p~n",
                       [NextPaxosId, PaxosId, Proposal]),
             State
     end.
