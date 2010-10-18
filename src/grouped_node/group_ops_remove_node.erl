@@ -48,7 +48,7 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
 % @doc it was decided to remove a node from our group: execute the removal
 -spec ops_decision(State::group_types:joined_state(),
                    Proposal::proposal_type(),
-                   PaxosId::any(),
+                   PaxosId::group_types:paxos_id(),
                    Hint::group_types:decision_hint()) -> group_types:joined_state().
 ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
              {group_node_remove, Pid} = Proposal,

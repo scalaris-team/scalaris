@@ -28,14 +28,15 @@
 report_rejection(State, PaxosId, Proposal) ->
     case Proposal of
         {group_split, _Pid, _SplitKey, _LeftGroup, _RightGroup} ->
-            group_ops_split_group:rejected_proposal(State, Proposal,
-                                                    PaxosId);
+            group_ops_split_group:rejected_proposal(State, Proposal, PaxosId);
         {group_node_remove, _Pid} ->
-            group_ops_remove_node:rejected_proposal(State, Proposal,
-                                                    PaxosId);
+            group_ops_remove_node:rejected_proposal(State, Proposal, PaxosId);
         {group_node_join, _Pid, _Acceptor, _Learner} ->
-            group_ops_join_node:rejected_proposal(State, Proposal,
-                                                  PaxosId)
+            group_ops_join_node:rejected_proposal(State, Proposal, PaxosId);
+        {read, _, _, _, _, _} ->
+            group_ops_db:rejected_proposal(State, Proposal, PaxosId);
+        {write, _, _, _, _, _} ->
+            group_ops_db:rejected_proposal(State, Proposal, PaxosId)
     end.
 
 % @doc execute decision
@@ -62,6 +63,10 @@ dispatch_decision(State, PaxosId, {group_split, _, _, _, _} = Decision, Hint) ->
 dispatch_decision(State, PaxosId, {group_node_remove, _} = Decision, Hint) ->
     group_ops_remove_node:ops_decision(State, Decision, PaxosId, Hint);
 dispatch_decision(State, PaxosId, {group_node_join, _, _, _} = Decision, Hint) ->
-    group_ops_join_node:ops_decision(State, Decision, PaxosId, Hint).
+    group_ops_join_node:ops_decision(State, Decision, PaxosId, Hint);
+dispatch_decision(State, PaxosId, {read, _, _, _, _, _} = Decision, Hint) ->
+    group_ops_db:ops_decision(State, Decision, PaxosId, Hint);
+dispatch_decision(State, PaxosId, {write, _, _, _, _, _} = Decision, Hint) ->
+    group_ops_db:ops_decision(State, Decision, PaxosId, Hint).
 
 

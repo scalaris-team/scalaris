@@ -19,6 +19,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("group.hrl").
 
 -export([propose/2, init_paxos/1, cleanup_paxos_states/1]).
 
@@ -51,20 +52,17 @@ init_paxos(GroupState) ->
     Learners = group_state:get_learners(GroupState),
     Proposer = pid_groups:get_my(paxos_proposer),
     Acceptor = pid_groups:get_my(paxos_acceptor),
-    io:format("init_paxos ~p ~p~n", [PaxosId, Learners]),
+    ?LOG("init_paxos ~p ~p~n", [PaxosId, Learners]),
     acceptor:start_paxosid_local(Acceptor, PaxosId, Learners),
     Learner = pid_groups:get_my(paxos_learner),
     Majority = group_state:get_size(GroupState) div 2 + 1,
     learner:start_paxosid_local(Learner, PaxosId, Majority, comm:this(), client_cookie),
-    proposer:trigger(comm:make_global(Proposer), PaxosId),
+    %proposer:trigger(comm:make_global(Proposer), PaxosId),
     group_state:init_paxos(GroupState, PaxosId).
 
 
 -spec cleanup_paxos_states(group_types:paxos_id()) -> ok.
 cleanup_paxos_states({GroupId, PaxosId}) ->
-    ok.
-
-foo({GroupId, PaxosId}) ->
     case PaxosId > 2 of
         true ->
             Learner = comm:make_global(pid_groups:get_my(paxos_learner)),
@@ -77,5 +75,3 @@ foo({GroupId, PaxosId}) ->
         false ->
             ok
     end.
-
-% @todo re-add cleanup-code
