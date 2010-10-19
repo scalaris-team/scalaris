@@ -1869,7 +1869,7 @@ public class ScalarisTest {
 		}
 	}
 	
-	private class SubscriptionHandler extends AbstractHandler {
+	private static class SubscriptionHandler extends AbstractHandler {
 		public Map<String, Vector<String>> notifications;
 		
 		public SubscriptionHandler(Map<String, Vector<String>> notifications) {

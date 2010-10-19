@@ -734,7 +734,7 @@ public class DefaultConnectionPolicyTest {
 			p.nodeFailed(p3);
 			TimeUnit.MILLISECONDS.sleep(10);
 			assertEquals(p1, p.selectNode());
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			fail();
 		}
 		

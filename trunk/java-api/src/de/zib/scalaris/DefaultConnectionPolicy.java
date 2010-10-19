@@ -76,7 +76,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
 	 * @version 2.3
 	 * @since 2.3
 	 */
-	private class BadNodesComparator implements Comparator<PeerNode>, java.io.Serializable {
+	private static class BadNodesComparator implements Comparator<PeerNode>, java.io.Serializable {
 		/**
 		 * ID for serialisation purposes.
 		 */
@@ -143,7 +143,6 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
 				return compByTime;
 			}
 		}
-		
 	}
 	
 	// we could use synchronised lists and sets as provided by

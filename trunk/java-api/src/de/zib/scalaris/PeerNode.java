@@ -96,7 +96,7 @@ public class PeerNode {
 	 * 
 	 * @return the date of the last connection failure (or {@code null})
 	 */
-	public Date getLastFailedConnect() {
+	synchronized public Date getLastFailedConnect() {
 		return lastFailedConnection;
 	}
 
@@ -128,7 +128,7 @@ public class PeerNode {
 	 * 
 	 * @return the last connection success
 	 */
-	public Date getLastConnectSuccess() {
+	synchronized public Date getLastConnectSuccess() {
 		return lastConnectSuccess;
 	}
 
