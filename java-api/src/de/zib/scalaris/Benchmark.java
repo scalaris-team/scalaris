@@ -139,7 +139,7 @@ public class Benchmark {
 		System.out.println("Test runs: " + testruns);
 		System.out
 				.println("                         \tspeed (transactions / second)");
-		final String firstColumn = new String("                         ");
+		final String firstColumn = "                         ";
 		System.out.print(firstColumn);
 		for (int i = 0; i < columns.length; ++i) {
 			System.out.print("\t(" + (i + 1) + ")");
