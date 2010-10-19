@@ -42,27 +42,32 @@ public class Main {
 	 * <code>
 	 * > java -jar scalaris.jar -help
 	 * usage: scalaris [Options]
+	 *  -h,--help                        print this message
+	 *  -v,--verbose                     print verbose information, e.g. the
+	 *                                   properties read
+	 *  -lh,--localhost                  gets the local host's name as known to
+	 *                                   Java (for debugging purposes)
 	 *  -b,--minibench                   run mini benchmark
+	 *  -r,--read <key>                  read an item
+	 *  -w,--write <key> <value>         write an item
 	 *  -d,--delete <key> <[timeout]>    delete an item (default timeout: 2000ms)
 	 *                                   WARNING: This function can lead to
 	 *                                   inconsistent data (e.g. deleted items
 	 *                                   can re-appear). Also when re-creating an
 	 *                                   item the version before the delete can
 	 *                                   re-appear.
-	 *  -g,--getsubscribers <topic>      get subscribers of a topic
-	 *  -h,--help                        print this message
-	 *  -lh,--localhost                  gets the local host's name as known to
-	 *                                   Java (for debugging purposes)
 	 *  -p,--publish <topic> <message>   publish a new message for the given
 	 *                                   topic
-	 *  -r,--read <key>                  read an item
 	 *  -s,--subscribe <topic> <url>     subscribe to a topic
+	 *  -g,--getsubscribers <topic>      get subscribers of a topic
 	 *  -u,--unsubscribe <topic> <url>   unsubscribe from a topic
-	 *  -v,--verbose                     print verbose information, e.g. the
-	 *                                   properties read
-	 *  -w,--write <key> <value>         write an item
 	 * </code>
 	 * </pre>
+	 * 
+	 * In order to override node and cookie to use for a connection, specify
+	 * the <tt>SCALARIS_JAPI_NODE</tt> or <tt>SCALARIS_JAPI_COOKIE</tt>
+	 * environment variables. Their values will be used instead of the values
+	 * defined in the config file!
 	 * 
 	 * @param args
 	 *            command line arguments
@@ -82,7 +87,7 @@ public class Main {
 	        verbose = true;
 	        ConnectionFactory.getInstance().printProperties();
 		}
-
+		
 		if (line.hasOption("minibench")) {
 			String[] optionValues = line.getOptionValues("minibench");
 			int testruns = 100;
@@ -302,9 +307,9 @@ public class Main {
 		bench.setOptionalArg(true);
 		group.addOption(bench);
 
-		options.addOption(new Option("lh", "localhost", false, "gets the local host's name as known to Java (for debugging purposes)"));
-
 		options.addOptionGroup(group);
+
+		options.addOption(new Option("lh", "localhost", false, "gets the local host's name as known to Java (for debugging purposes)"));
 
 		return options;
 	}
