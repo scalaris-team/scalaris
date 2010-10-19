@@ -35,3 +35,4 @@
   {outdir, "contrib/yaws/ebin/"},
   {i, "contrib/yaws/include"}
  ]}.
+@EMAKEFILECOMPILECOMPAT@
