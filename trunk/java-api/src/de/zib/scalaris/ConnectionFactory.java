@@ -69,7 +69,7 @@ import de.zib.tools.PropertyLoader;
  * default, {@link DefaultConnectionPolicy} is used.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.3
+ * @version 2.4
  * @since 2.0
  */
 public class ConnectionFactory {
@@ -151,6 +151,13 @@ public class ConnectionFactory {
 	 * <li><tt>scalaris.client.name = "java_client"</tt></li>
 	 * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
 	 * </ul>
+	 * 
+	 * Node and cookie to use for a connection can be overridden with the
+	 * <tt>SCALARIS_JAPI_NODE</tt> and <tt>SCALARIS_JAPI_COOKIE</tt>
+	 * environment variables. Their values will be used instead of the values
+	 * defined in the config file!
+	 * 
+	 * @version 2.4
 	 */
 	public ConnectionFactory() {
 		Properties properties = new Properties();
@@ -160,6 +167,17 @@ public class ConnectionFactory {
 		}
 //		System.out.println("loading config file: " + configFile);
 		PropertyLoader.loadProperties(properties, configFile);
+		
+		String node = System.getenv("SCALARIS_JAPI_NODE");
+		if (node != null && !node.isEmpty()) {
+			properties.setProperty("scalaris.node", node);
+		}
+
+		String cookie = System.getenv("SCALARIS_JAPI_COOKIE");
+		if (cookie != null && !cookie.isEmpty()) {
+			properties.setProperty("scalaris.cookie", cookie);
+		}
+		
 		setProperties(properties);
 	}
 
