@@ -156,12 +156,12 @@ init(_Args) ->
 %% @private
 -spec on(message(), state()) -> state().
 on({subscribe_list, Subscriber, PidList, Cookie}, State) ->
-    [make_pinger(Pid) || Pid <- PidList],
-    [fd_db:add_subscription(Subscriber, Pid, Cookie) || Pid <- PidList],
+    _ = [make_pinger(Pid) || Pid <- PidList],
+    _ = [fd_db:add_subscription(Subscriber, Pid, Cookie) || Pid <- PidList],
     State;
 on({unsubscribe_list, Subscriber, PidList, Cookie}, State) ->
     %% my_unsubscribe itself checks whether to kill pinger
-    [my_unsubscribe(Subscriber, Pid, Cookie) || Pid <- PidList ],
+    _ = [my_unsubscribe(Subscriber, Pid, Cookie) || Pid <- PidList ],
     State;
 
 on({get_subscribers, Client, GlobalPid}, State) ->
@@ -190,7 +190,7 @@ on({get_subscriptions, Subscriber}, State) ->
 
 on({remove_subscriber, Subscriber}, State) ->
     WatchedPids = fd_db:get_subscriptions(Subscriber),
-    [ my_unsubscribe(Subscriber, WatchedPid, Cookie)
+    _ = [ my_unsubscribe(Subscriber, WatchedPid, Cookie)
       || {WatchedPid, Cookie} <- WatchedPids ],
     State;
 
@@ -267,9 +267,9 @@ my_notify(Subscriber, Target, Cookie) ->
 -spec my_unsubscribe(Subscriber::pid(), Target::comm:mypid(), cookie()) -> true | failed.
 my_unsubscribe(Subscriber, Target, Cookie) ->
     fd_db:del_subscription(Subscriber, Target, Cookie),
-    case fd_db:get_subscribers(Target) of
-        [] -> kill_pinger(Target); %% make a send after and cache pinger?
-        _X -> true
+    case fd_db:member(Target) of
+        true -> true;
+        false -> kill_pinger(Target) %% make a send after and cache pinger?
     end.
 
 -spec my_fd_pid() -> pid() | failed.

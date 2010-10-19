@@ -26,6 +26,7 @@
 %% Exported Functions
 -export([add_subscription/3, del_subscription/3]).
 -export([add_pinger/2, del_pinger/1]).
+-export([member/1]).
 -export([get_subscribers/1, get_subscribers/2,
          get_subscriptions/0, get_subscriptions/1]).
 
@@ -34,9 +35,9 @@
 %% API Functions
 -spec init() -> ok.
 init() ->
-    ets:new(fd_ts_table, [duplicate_bag, protected, named_table]),
-    ets:new(fd_st_table, [duplicate_bag, protected, named_table]),
-    ets:new(fd_pinger_table, [set, protected, named_table]),
+    _ = ets:new(fd_ts_table, [duplicate_bag, protected, named_table]),
+    _ = ets:new(fd_st_table, [duplicate_bag, protected, named_table]),
+    _ = ets:new(fd_pinger_table, [set, protected, named_table]),
     ok.
 
 -spec add_subscription(Subscriber::pid(), Target::comm:mypid(), Cookie::fd:cookie()) -> true.
@@ -48,6 +49,10 @@ add_subscription(Subscriber, Target, Cookie) ->
 del_subscription(Subscriber, Target, Cookie) ->
     ets:delete_object(fd_st_table,{Subscriber, {Target, Cookie}}),
     ets:delete_object(fd_ts_table,{Target, {Subscriber, Cookie}}).
+
+-spec member(comm:mypid()) -> boolean().
+member(Target) ->
+    ets:member(fd_ts_table, Target).
 
 -spec get_subscribers(Target::comm:mypid()) -> [{pid(), fd:cookie()}].
 get_subscribers(Target) ->
