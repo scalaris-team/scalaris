@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -22,6 +23,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
+
+import com.ericsson.otp.erlang.OtpAuthException;
 
 /**
  * Implements a {@link ConnectionPolicy} by choosing nodes randomly.
@@ -352,6 +355,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
 	 * @see Connection#doRPC(String, String,
 	 *      com.ericsson.otp.erlang.OtpErlangObject[])
 	 */
+	@SuppressWarnings("unchecked")
 	public synchronized <E extends Exception> PeerNode selectNode(int retry,
 			PeerNode failedNode, E e) throws E {
 		if (retry <= maxRetries) {
@@ -364,7 +368,18 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
 				return badNodes.first();
 			}
 		} else {
-			throw e;
+			String newMessage = e.getMessage() + ", bad nodes: " + badNodes.toString() + ", good nodes: " + goodNodes.toString() + ", retries: " + (retry - 1);
+			if (e instanceof OtpAuthException) {
+				OtpAuthException e1 = new OtpAuthException(newMessage);
+				e1.setStackTrace(e.getStackTrace());
+				throw (E) e1;
+			} else if (e instanceof IOException) {
+				IOException e1 = new IOException(newMessage);
+				e1.setStackTrace(e.getStackTrace());
+				throw (E) e1;
+			} else {
+				throw e;
+			}
 		}
 	}
 
