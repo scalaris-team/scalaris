@@ -560,6 +560,7 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 DRIVER_OS
 DIALYZER_FLAGS
+EMAKEFILECOMPILECOMPAT
 EMAKEFILEDEFINES
 RUN_TEST
 ERLANG_LIB_VER_edoc
@@ -2979,8 +2980,36 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "cannot run test program while cross compiling
+See \`config.log' for more details." "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+httpc:set_option(max_sessions, 1)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: httpc is available" >&5
+$as_echo "$as_me: httpc is available" >&6;}
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: httpc unavailable, using wrapper module" >&5
+$as_echo "$as_me: httpc unavailable, using wrapper module" >&6;};EMAKEFILECOMPILECOMPAT="{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
 EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $TIDISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $EXPORTTYPESUPPORT"
 DIALYZER_FLAGS="$HAVETOKE_DIALYZER $GBTREESISBUILTIN_DIALYZER $TERMISBUILTIN_DIALYZER $NODEISBUILTIN_DIALYZER $MODULEISBUILTIN_DIALYZER $BOOLEANISBUILTIN_DIALYZER $TIDISBUILTIN_DIALYZER $RECURSIVETYPESALLOWED_DIALYZER $TYPEFORWARDDECLARATIONS_DIALYZER $FORWARDORRECURSIVE_DIALYZER $EXPORTTYPESUPPORT_DIALYZER"
+
 
 
 
