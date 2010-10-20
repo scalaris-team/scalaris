@@ -20,7 +20,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--export([new_receiving_slide/7, new_sending_slide/7,
+-export([new_receiving_slide/6, new_sending_slide/6,
          new_receiving_slide_join/4, new_sending_slide_join/4,
          is_join/1,
          get_id/1, get_node/1, get_interval/1, get_target_id/1,
@@ -38,7 +38,7 @@
 
 -define(special_tags, ['$join$', '$leave$']).
 
--type id() :: {LocalUUID::pos_integer(), ProcessPid::comm:mypid()}.
+-type id() :: util:global_uid().
 
 -type slide_phase() ::
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
@@ -64,7 +64,7 @@
 %% @doc Sets up a new slide operation for a joining node (see
 %%      dht_node_join.erl). MyKey is the joining node's new Id and will be used
 %%      as the target id of the slide operation.
--spec new_receiving_slide_join(MoveId::id(), Pred::node:node_type(),
+-spec new_receiving_slide_join(MoveId::util:global_uid(), Pred::node:node_type(),
                                Succ::node:node_type(), MyKey::?RT:key())
         -> slide_op().
 new_receiving_slide_join(MoveId, Pred, Succ, MyKey) ->
@@ -82,26 +82,28 @@ is_join(SlideOp) -> get_tag(SlideOp) =:= '$join$'.
 
 %% @doc Sets up a slide operation where the current node is receiving data from
 %%      the given target node. One of the nodes will change its ID to TargetId.
--spec new_receiving_slide(MoveId::id(),
-                          TargetNodePid::comm:mypid(),
+-spec new_receiving_slide(MoveId::util:global_uid(),
                           PredOrSucc::pred | succ, TargetId::?RT:key(), Tag::any(),
                           SourcePid::comm:mypid() | null,
                           State::dht_node_state:state()) -> slide_op().
-new_receiving_slide(MoveId, TargetNodePid, PredOrSucc, TargetId, Tag, SourcePid, State) ->
+new_receiving_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
     case lists:member(Tag, ?special_tags) of
         true ->
-            log:log(warn, "Using reserved tag in receiving slide(~p, ~p, ~p, ~p, ~p, ~p, ~p)",
-                    [MoveId, TargetNodePid, PredOrSucc, TargetId, Tag, SourcePid]);
+            log:log(warn, "Using reserved tag in receiving slide(~.0p, ~.0p, ~.0p, ~.0p, ~.0p, ~.0p)",
+                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid]);
         _ -> ok
     end,
-    IntervalToReceive = case PredOrSucc of
-                            pred -> node:mk_interval_between_ids(
-                                      TargetId,
-                                      dht_node_state:get(State, pred_id));
-                            succ -> node:mk_interval_between_ids(
-                                      dht_node_state:get(State, node_id),
-                                      TargetId)
-                        end,
+    {IntervalToReceive, TargetNodePid} =
+        case PredOrSucc of
+            pred ->
+                Pred = dht_node_state:get(State, pred),
+                Interval = node:mk_interval_between_ids(TargetId, node:id(Pred)),
+                {Interval, node:pidX(Pred)};
+            succ ->
+                Interval = node:mk_interval_between_ids(
+                             dht_node_state:get(State, node_id), TargetId),
+                {Interval, dht_node_state:get(State, succ_pid)}
+        end,
     #slide_op{type = 'rcv',
               id = MoveId,
               node = TargetNodePid,
@@ -111,27 +113,29 @@ new_receiving_slide(MoveId, TargetNodePid, PredOrSucc, TargetId, Tag, SourcePid,
               source_pid = SourcePid}.
 
 %% @doc Sets up a slide operation where the current node is sending data to
-%%      the given target node. One of the nodes will change its ID to TargetId.
--spec new_sending_slide(MoveId::id(),
-                        TargetNodePid::comm:mypid(),
+%%      the node given by PredOrSucc. One of the nodes will change its ID to TargetId.
+-spec new_sending_slide(MoveId::util:global_uid(),
                         PredOrSucc::pred | succ, TargetId::?RT:key(), Tag::any(),
                         SourcePid::comm:mypid() | null,
                         State::dht_node_state:state()) -> slide_op().
-new_sending_slide(MoveId, TargetNodePid, PredOrSucc, TargetId, Tag, SourcePid, State) ->
+new_sending_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
     case lists:member(Tag, ?special_tags) of
         true ->
-            log:log(warn, "Using reserved tag in sending slide(~p, ~p, ~p, ~p, ~p, ~p, ~p)",
-                    [MoveId, TargetNodePid, PredOrSucc, TargetId, Tag, SourcePid]);
+            log:log(warn, "Using reserved tag in sending slide(~.0p, ~.0p, ~.0p, ~.0p, ~.0p, ~.0p)",
+                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid]);
         _ -> ok
     end,
-    IntervalToSend = case PredOrSucc of
-                         pred -> node:mk_interval_between_ids(
-                                   dht_node_state:get(State, pred_id),
-                                   TargetId);
-                         succ -> node:mk_interval_between_ids(
-                                   TargetId,
-                                   dht_node_state:get(State, node_id))
-                     end,
+    {IntervalToSend, TargetNodePid} =
+        case PredOrSucc of
+            pred ->
+                Pred = dht_node_state:get(State, pred),
+                Interval = node:mk_interval_between_ids(node:id(Pred), TargetId),
+                {Interval, node:pidX(Pred)};
+            succ ->
+                Interval = node:mk_interval_between_ids(
+                             TargetId, dht_node_state:get(State, node_id)),
+                {Interval, dht_node_state:get(State, succ_pid)}
+        end,
     #slide_op{type = 'send',
               id = MoveId,
               node = TargetNodePid,
@@ -142,7 +146,7 @@ new_sending_slide(MoveId, TargetNodePid, PredOrSucc, TargetId, Tag, SourcePid, S
 
 %% @doc Sets up a new slide operation for a node which sends a joining node
 %%      some of its data.
--spec new_sending_slide_join(MoveId::id(), TargetNodePid::comm:mypid(),
+-spec new_sending_slide_join(MoveId::util:global_uid(), TargetNodePid::comm:mypid(),
         TargetId::?RT:key(), State::dht_node_state:state()) -> slide_op().
 new_sending_slide_join(MoveId, TargetNodePid, TargetId, State) ->
     IntervalToSend = node:mk_interval_between_ids(
