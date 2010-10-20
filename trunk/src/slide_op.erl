@@ -84,7 +84,7 @@ is_join(SlideOp) -> get_tag(SlideOp) =:= '$join$'.
 %%      the given target node. One of the nodes will change its ID to TargetId.
 -spec new_receiving_slide(MoveId::util:global_uid(),
                           PredOrSucc::pred | succ, TargetId::?RT:key(), Tag::any(),
-                          SourcePid::comm:mypid() | null,
+                          SourcePid::comm:erl_local_pid() | null,
                           State::dht_node_state:state()) -> slide_op().
 new_receiving_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
     case lists:member(Tag, ?special_tags) of
@@ -116,7 +116,7 @@ new_receiving_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
 %%      the node given by PredOrSucc. One of the nodes will change its ID to TargetId.
 -spec new_sending_slide(MoveId::util:global_uid(),
                         PredOrSucc::pred | succ, TargetId::?RT:key(), Tag::any(),
-                        SourcePid::comm:mypid() | null,
+                        SourcePid::comm:erl_local_pid() | null,
                         State::dht_node_state:state()) -> slide_op().
 new_sending_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
     case lists:member(Tag, ?special_tags) of

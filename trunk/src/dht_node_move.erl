@@ -775,7 +775,7 @@ can_slide(MySlide, OtherSlide, TargetId) ->
              not intervals:in(TargetId, slide_op:get_interval(OtherSlide))).
 
 %% @doc Sends the source pid the given message if it is not 'null'.
--spec notify_source_pid(SourcePid::comm:mypid() | null, Message::result_message()) -> ok.
+-spec notify_source_pid(SourcePid::comm:erl_local_pid() | null, Message::result_message()) -> ok.
 notify_source_pid(SourcePid, Message) ->
     case comm:is_valid(SourcePid) of
         true -> comm:send_local(SourcePid, Message);
