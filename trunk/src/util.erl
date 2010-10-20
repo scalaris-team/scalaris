@@ -43,7 +43,7 @@
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
 
--type global_uid() :: {pos_integer(), comm:mypid()}.
+-opaque global_uid() :: {pos_integer(), comm:mypid()}.
 
 %% @doc Applies start_link in the given Module with the given Parameters.
 -spec parameterized_start_link(Module::module(), Parameters::list()) -> term() | none().

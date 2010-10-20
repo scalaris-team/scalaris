@@ -222,7 +222,7 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
     case KeyInRange andalso dht_node_move:can_slide_pred(State, TargetId) of
         true ->
             % TODO: implement step-wise join
-            MoveFullId = {util:get_pids_uid(), comm:this()},
+            MoveFullId = util:get_global_uid(),
             SlideOp = slide_op:new_sending_slide_join(MoveFullId,
                                                       node:pidX(NewPred),
                                                       TargetId, State),
@@ -231,7 +231,7 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
                               fun dht_node_move:rm_notify_new_pred/3),
             State1 = dht_node_state:add_db_range(
                        State, slide_op:get_interval(SlideOp1)),
-            send_join_response(State1, SlideOp1, NewPred, MoveFullId);
+            send_join_response(State1, SlideOp1, NewPred);
         _ when not KeyInRange ->
             comm:send(node:pidX(NewPred), {join, join_response, not_responsible}),
             State;
@@ -248,7 +248,7 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
                 _ when ResponseReceived -> State;
                 true ->
                     NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                    send_join_response(State, NewSlideOp, NewPred, MoveFullId);
+                    send_join_response(State, NewSlideOp, NewPred);
                 _ ->
                     % abort the slide operation set up for the join:
                     % (similar to dht_node_move:abort_slide/*)
@@ -326,9 +326,10 @@ send_join_request(Me, Succ, Timeouts) ->
 %% userdevguide-begin dht_node_join:join_request
 -spec send_join_response(State::dht_node_state:state(),
                          NewSlideOp::slide_op:slide_op(),
-                         NewPred::node:node_type(), MoveFullId::slide_op:id())
+                         NewPred::node:node_type())
         -> dht_node_state:state().
-send_join_response(State, SlideOp, NewPred, MoveFullId) ->
+send_join_response(State, SlideOp, NewPred) ->
+    MoveFullId = slide_op:get_id(SlideOp),
     NewSlideOp = slide_op:set_timer(SlideOp, get_join_response_timeout(),
                                    {join, join_response_timeout, NewPred, MoveFullId}),
     MyOldPred = dht_node_state:get(State, pred),
