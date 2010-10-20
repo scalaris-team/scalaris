@@ -28,7 +28,7 @@
 -include("db_SUITE.hrl").
 
 -ifdef(have_toke).
-all() -> tests_avail().
+all() -> lists:append(tests_avail(), [tester_reopen]).
 -else.
 all() -> [].
 -endif.
@@ -38,3 +38,26 @@ all() -> [].
 -spec max_rw_tests_per_suite() -> pos_integer().
 max_rw_tests_per_suite() ->
     50.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% db_toke:open/1, db_toke getters
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_reopen(Key::?RT:key()) -> true.
+prop_reopen(Key) ->
+    DB = db_toke:new(),
+    FileName = db_toke:get_name(DB),
+    check_db(DB, {true, []}, 0, [], "check_db_new_1"),
+    ?equals(db_toke:read(DB, Key), {ok, empty_val, -1}),
+    check_entry(DB, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_new_1"),
+    db_toke:close(DB, false),
+    DB2 = db_toke:open(FileName),
+    check_db(DB2, {true, []}, 0, [], "check_db_new_1"),
+    ?equals(db_toke:read(DB2, Key), {ok, empty_val, -1}),
+    check_entry(DB2, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_new_1"),
+    db_toke:close(DB2),
+    true.
+
+tester_reopen(_Config) ->
+    tester:test(?MODULE, prop_reopen, 1, rw_suite_runs(10)).

@@ -61,21 +61,43 @@ update_counter(Counter) ->
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc initializes a new database
-new(NodeId) ->
-    ?TRACE1(new, NodeId),
+%% @doc initializes a new database.
+new() ->
+    ?TRACE0(new),
     case erlang:get(?MODULE) of
         undefined -> ok;
         _         -> erlang:error({counter_defined, erlang:get(?MODULE)})
     end,
     erlang:put(?MODULE, 0),
-    {?BASE_DB:new(NodeId), 0}.
+    {?BASE_DB:new(), 0}.
 
-%% delete DB (missing function)
+%% @doc Re-opens a previously existing database.
+open(FileName) ->
+    ?TRACE1(open, FileName),
+    case erlang:get(?MODULE) of
+        undefined -> ok;
+        _         -> erlang:error({counter_defined, erlang:get(?MODULE)})
+    end,
+    erlang:put(?MODULE, 0),
+    {?BASE_DB:open(FileName), 0}.
+
+%% @doc Closes and deletes the DB.
 close({DB, _Counter} = DB_) ->
     ?TRACE1(close, DB_),
     erlang:erase(?MODULE),
     ?BASE_DB:close(DB).
+
+%% @doc Closes and (optionally) deletes the DB.
+close({DB, _Counter} = DB_, Delete) ->
+    ?TRACE2(close, DB_, Delete),
+    erlang:erase(?MODULE),
+    ?BASE_DB:close(DB, Delete).
+
+%% @doc Returns the name of the DB which can be used with open/1.
+get_name({DB, Counter} = DB_) ->
+    ?TRACE1(get_name, DB_),
+    verify_counter(Counter),
+    ?BASE_DB:get_name(DB).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned.

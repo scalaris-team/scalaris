@@ -25,8 +25,9 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     % init (node identifier)
-     {new, 1},
+     % init
+     {new, 0}, {open, 1},
+     {get_name, 1},
      % close, delete?
      {close, 1},
      % write locks

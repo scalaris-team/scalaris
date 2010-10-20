@@ -22,6 +22,11 @@
 %% @end
 %% @version $Id$
 
+%% @doc Closes the given DB and deletes all contents (this DB can thus not be
+%%      re-opened using open/1).
+close(State) ->
+    close(State, true).
+
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned.
 get_entry(State, Key) ->

@@ -57,7 +57,7 @@ process_join_state({idholder_get_id_response, Id, IdVersion},
                    {join, {as_first}, QueuedMessages}) ->
     log:log(info, "[ Node ~w ] joining as first: ~p",[self(), Id]),
     Me = node:new(comm:this(), Id, IdVersion),
-    finish_join(Me, Me, Me, ?DB:new(Id), QueuedMessages);  % join complete, State is the first "State"
+    finish_join(Me, Me, Me, ?DB:new(), QueuedMessages);  % join complete, State is the first "State"
 %% userdevguide-end dht_node_join:join_first
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -169,7 +169,7 @@ process_join_state({join, join_response, Pred, MoveId},
             rm_loop:notify_new_succ(node:pidX(Pred), Me),
             rm_loop:notify_new_pred(node:pidX(Succ), Me),
             
-            State = finish_join(Me, Pred, Succ, ?DB:new(MyKey), QueuedMessages),
+            State = finish_join(Me, Pred, Succ, ?DB:new(), QueuedMessages),
             SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, MyKey),
             SlideOp1 = slide_op:set_phase(SlideOp, wait_for_node_update),
             State1 = dht_node_state:set_slide(State, succ, SlideOp1),

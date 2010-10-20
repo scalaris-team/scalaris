@@ -36,22 +36,31 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc initializes a new database; returns the DB name.
-new(_NodeId) ->
+%% @doc Initializes a new database.
+new() ->
     % ets prefix: DB_ + random name
     RandomName = randoms:getRandomId(),
     DBname = list_to_atom(string:concat("db_", RandomName)),
     CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
     % better protected? All accesses would have to go to DB-process
-    {ets:new(DBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]), intervals:empty(), ?CKETS:new(CKDBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS])}
-%%     ets:new(DBname, [ordered_set, protected, named_table])
-%%     ets:new(DBname, [ordered_set, private, named_table])
-.
+    {ets:new(DBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]), intervals:empty(), ?CKETS:new(CKDBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS])}.
 
-%% delete DB (missing function)
-close({DB, _CKInt, CKDB}) ->
+%% @doc Re-opens a previously existing database (not supported by ets
+%%      -> create new DB).
+open(_FileName) ->
+    log:log(warn, "[ Node ~w:db_ets ] open/1 not supported, executing new/0 instead", [self()]),
+    new().
+
+%% @doc Closes and deletes the DB.
+close({DB, _CKInt, CKDB}, _Delete) ->
     ets:delete(DB),
     ?CKETS:delete(CKDB).
+
+%% @doc Returns an empty string.
+%%      Note: should return the name of the DB for open/1 which is not
+%%      supported by ets though).
+get_name(_State) ->
+    "".
 
 %% @doc Returns all DB entries.
 get_data({DB, _CKInt, _CKDB}) ->

@@ -38,7 +38,7 @@
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
          smerge2/2, smerge2/3, smerge2/4,
-        is_unittest/0]).
+         is_unittest/0, make_filename/1]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0]).
 -export([get_global_uid/0]).
@@ -513,3 +513,6 @@ is_unittest() ->
         {is_unittest, Result} -> Result
     end.
 
+-spec make_filename(string()) -> string().
+make_filename(Name) ->
+    re:replace(Name, "[^a-zA-Z0-9\-_@\.]", "_", [{return, list}, global]).
