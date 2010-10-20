@@ -42,10 +42,15 @@ ops_request(State, {read, _Key, _Value, _Version, Client, _Proposer} = Proposal)
             comm:send(Client, {read_response, retry, propose_rejected}),
             State
     end;
-ops_request(State, {write, _Key, _Value, _Version, Client, _Proposer} = Proposal) ->
+ops_request(State, {write, Key, _Value, Version, Client, _Proposer} = Proposal) ->
     View = group_state:get_view(State),
-    case group_paxos_utils:propose(Proposal, View) of
-        {success, NewView} ->
+    DB = group_state:get_db(State),
+    CurrentVersion = group_db:get_version(DB, Key),
+    case {Version =< CurrentVersion, group_paxos_utils:propose(Proposal, View)} of
+        {true, _} ->
+            comm:send(Client, {write_response, retry, old_version}),
+            State;
+        {false, {success, NewView}} ->
             _PaxosId = group_view:get_next_expected_decision_id(NewView),
             ?LOG("write ~p in ~p~n", [_Key, _PaxosId]),
             group_state:set_view(State, NewView);
@@ -59,24 +64,28 @@ ops_request(State, {write, _Key, _Value, _Version, Client, _Proposer} = Proposal
                    PaxosId::group_types:paxos_id(),
                    Hint::group_types:decision_hint()) -> group_state:state().
 ops_decision(State, {read, _Key, Value, Version, Client, Proposer} = _Proposal,
-             _PaxosId, _Hint) ->
+             PaxosId, _Hint) ->
+    View = group_state:get_view(State),
+    NewView = group_view:remove_proposal(View, PaxosId),
     case Proposer == comm:this() of
         true ->
             comm:send(Client, {paxos_read_response, {value, Value, Version}}),
-            State;
+            group_state:set_view(State, NewView);
         false ->
-            State
+            group_state:set_view(State, NewView)
     end;
 ops_decision(State, {write, Key, Value, Version, Client, Proposer} = _Proposal,
-             _PaxosId, _Hint) ->
+             PaxosId, _Hint) ->
     DB = group_state:get_db(State),
     DB2 = group_db:write(DB, Key, Value, Version),
+    View = group_state:get_view(State),
+    NewView = group_view:remove_proposal(View, PaxosId),
     case Proposer == comm:this() of
         true ->
             comm:send(Client, {paxos_write_response, {ok, Version}}),
-            group_state:set_db(State, DB2);
+            group_state:set_view(group_state:set_db(State, DB2), NewView);
         false ->
-            group_state:set_db(State, DB2)
+            group_state:set_view(group_state:set_db(State, DB2), NewView)
     end.
 
 -spec rejected_proposal(group_state:state(), proposal_type(),
