@@ -48,14 +48,14 @@ max_rw_tests_per_suite() ->
 prop_reopen(Key) ->
     DB = db_toke:new(),
     FileName = db_toke:get_name(DB),
-    check_db(DB, {true, []}, 0, [], "check_db_new_1"),
+    check_db(DB, {true, []}, 0, [], "check_db_reopen_1"),
     ?equals(db_toke:read(DB, Key), {ok, empty_val, -1}),
-    check_entry(DB, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_new_1"),
+    check_entry(DB, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_reopen_1"),
     db_toke:close(DB, false),
     DB2 = db_toke:open(FileName),
-    check_db(DB2, {true, []}, 0, [], "check_db_new_1"),
+    check_db(DB2, {true, []}, 0, [], "check_db_reopen_1"),
     ?equals(db_toke:read(DB2, Key), {ok, empty_val, -1}),
-    check_entry(DB2, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_new_1"),
+    check_entry(DB2, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_reopen_1"),
     db_toke:close(DB2),
     true.
 
