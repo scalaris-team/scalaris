@@ -98,7 +98,7 @@ process_move_msg({move, slide_succ, TargetId, Tag, SourcePid}, State) ->
             TargetNode = dht_node_state:get(State, succ),
             setup_slide_with(succ, State, SendOrReceive, MoveFullId, MyNode,
                              TargetNode, TargetId, Tag,
-                             get_max_transport_bytes(), SourcePid);
+                             get_max_transport_bytes(), SourcePid, true);
         true ->
             notify_source_pid(SourcePid,
                               {move, result, Tag, wrong_pred_succ_node}),
@@ -118,7 +118,7 @@ process_move_msg({move, slide_pred, TargetId, Tag, SourcePid}, State) ->
     TargetNode = dht_node_state:get(State, pred),
     setup_slide_with(pred, State, SendOrReceive, MoveFullId, MyNode,
                      TargetNode, TargetId, Tag, get_max_transport_bytes(),
-                     SourcePid);
+                     SourcePid, true);
 
 process_move_msg({move, jump, TargetId, Tag, SourcePid}, State) ->
     % check whether this is a slide_succ -> if so, do that instead
@@ -181,13 +181,13 @@ process_move_msg({move, notify_pred_timeout, MoveFullId}, MyState) ->
 process_move_msg({move, slide_pred, SendOrReceive, MoveFullId, OtherNode,
                   OtherTargetNode, TargetId, Tag, MaxTransportBytes}, State) ->
     setup_slide_with(pred, State, SendOrReceive, MoveFullId, OtherTargetNode,
-                     OtherNode, TargetId, Tag, MaxTransportBytes, null);
+                     OtherNode, TargetId, Tag, MaxTransportBytes, null, false);
 
 % notification from successor that it wants to slide with our node
 process_move_msg({move, slide_succ, SendOrReceive, MoveFullId, OtherNode,
                   OtherTargetNode, TargetId, Tag, MaxTransportBytes}, State) ->
     setup_slide_with(succ, State, SendOrReceive, MoveFullId, OtherTargetNode,
-                     OtherNode, TargetId, Tag, MaxTransportBytes, null);
+                     OtherNode, TargetId, Tag, MaxTransportBytes, null, false);
 
 % notification from pred that he could not aggree on a slide with us
 process_move_msg({move, slide_pred_abort, MoveFullId, Reason}, State) ->
@@ -457,10 +457,10 @@ notify_other_slide2(PredOrSucc, NewSlideOp, State, OtherNode,
                        MyNode::node:node_type(), TargetNode::node:node_type(),
                        TargetId::?RT:key(), Tag::any(),
                        MaxTransportBytes::pos_integer(),
-                       SourcePid::comm:erl_local_pid() | null)
+                       SourcePid::comm:erl_local_pid() | null, First::boolean())
         -> dht_node_state:state().
 setup_slide_with(PredOrSucc, State, SendOrReceive, MoveFullId, MyNode,
-                 TargetNode, TargetId, Tag, MaxTransportBytes, SourcePid) ->
+                 TargetNode, TargetId, Tag, MaxTransportBytes, SourcePid, First) ->
     case get_slide_op(State, MoveFullId) of
         {ok, pred, SlideOp} ->
             % there should not be any previous slide_pred with the given ID!
@@ -475,14 +475,16 @@ setup_slide_with(PredOrSucc, State, SendOrReceive, MoveFullId, MyNode,
             case SendOrReceive =:= slide_op:get_type(SlideOp) andalso
                      node:same_process(TargetNode, slide_op:get_node(SlideOp)) andalso
                      Tag =:= slide_op:get_tag(SlideOp) andalso
-                     TargetId =:= slide_op:get_target_id(SlideOp) of
+                     TargetId =:= slide_op:get_target_id(SlideOp) andalso
+                     First =:= false of
                 true when Phase =:= wait_for_succ_ack ->
                     State1 =
                         case SendOrReceive of
-                            'rcv' -> dht_node_state:add_msg_fwd(
-                                       State, slide_op:get_interval(SlideOp),
-                                       slide_op:get_node(SlideOp));
-                            _ -> State
+                            'rcv'  -> dht_node_state:add_msg_fwd(
+                                        State, slide_op:get_interval(SlideOp),
+                                        slide_op:get_node(SlideOp));
+                            'send' -> dht_node_state:add_db_range(
+                                       State, slide_op:get_interval(SlideOp))
                         end,
                     change_my_id(State1, slide_op:reset_timer(SlideOp), TargetId);
                 true -> State; % ignore already processed message
@@ -491,7 +493,7 @@ setup_slide_with(PredOrSucc, State, SendOrReceive, MoveFullId, MyNode,
         not_found ->
             setup_slide_with2_not_found(
               PredOrSucc, State, SendOrReceive, MoveFullId, MyNode,
-              TargetNode, TargetId, Tag, MaxTransportBytes, SourcePid);
+              TargetNode, TargetId, Tag, MaxTransportBytes, SourcePid, First);
         {wrong_neighbor, Type, SlideOp} -> % wrong pred or succ
             abort_slide(State, SlideOp, Type, wrong_pred_succ_node, true)
     end.
@@ -504,11 +506,11 @@ setup_slide_with(PredOrSucc, State, SendOrReceive, MoveFullId, MyNode,
                        MyNode::node:node_type(), TargetNode::node:node_type(),
                        TargetId::?RT:key(), Tag::any(),
                        MaxTransportBytes::pos_integer(),
-                       SourcePid::comm:erl_local_pid() | null)
+                       SourcePid::comm:erl_local_pid() | null, First::boolean())
         -> dht_node_state:state().
 setup_slide_with2_not_found(PredOrSucc, State, SendOrReceive, MoveFullId,
                             MyNode, TargetNode, TargetId, Tag,
-                            MaxTransportBytes, SourcePid) ->
+                            MaxTransportBytes, SourcePid, First) ->
     CanSlide = case PredOrSucc of
                    pred -> can_slide_pred(State, TargetId);
                    succ -> can_slide_succ(State, TargetId)
@@ -535,7 +537,13 @@ setup_slide_with2_not_found(PredOrSucc, State, SendOrReceive, MoveFullId,
                     SlideOp = slide_op:new_sending_slide(
                                 MoveFullId, succ, TargetId, Tag,
                                 SourcePid, State),
-                    change_my_id(State, SlideOp, TargetId);
+                    case First of
+                        true -> notify_other_slide(succ, SlideOp, State);
+                        _    ->
+                            State1 = dht_node_state:add_db_range(
+                                       State, slide_op:get_interval(SlideOp)),
+                            change_my_id(State1, SlideOp, TargetId)
+                    end;
                 'send' -> % can not send if TargetId is not in my range!
                     abort_slide(State, node:pidX(TargetNode), MoveFullId, SourcePid, Tag,
                                 PredOrSucc, target_id_not_in_range, true);
@@ -553,10 +561,14 @@ setup_slide_with2_not_found(PredOrSucc, State, SendOrReceive, MoveFullId,
                     SlideOp = slide_op:new_receiving_slide(
                                 MoveFullId, succ, TargetId, Tag,
                                 SourcePid, State),
-                    State1 = dht_node_state:add_msg_fwd(
-                               State, slide_op:get_interval(SlideOp),
-                               slide_op:get_node(SlideOp)),
-                    change_my_id(State1, SlideOp, TargetId)
+                    case First of
+                        true -> notify_other_slide(succ, SlideOp, State);
+                        _    ->
+                            State1 = dht_node_state:add_msg_fwd(
+                                       State, slide_op:get_interval(SlideOp),
+                                       slide_op:get_node(SlideOp)),
+                            change_my_id(State1, SlideOp, TargetId)
+                    end
             end;
         _ when not CanSlide ->
             abort_slide(State, node:pidX(TargetNode), MoveFullId, SourcePid, Tag,
