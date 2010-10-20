@@ -21,7 +21,8 @@
 -include("scalaris.hrl").
 
 -export([new_empty/0, new_replica/0,
-        write/4, read/2]).
+         get_version/2,
+         write/4, read/2]).
 
 -type(mode_type() :: is_current | is_filling).
 
@@ -43,11 +44,27 @@ new_replica() ->
 
 -spec write(state(), ?RT:key(), any(), non_neg_integer()) ->
     state().
-write({is_current, DB}, Key, Value, Version) ->
-    {is_current, ?DB:write(DB, Key, Value, Version)}.
+write({Mode, DB}, Key, Value, Version) ->
+    {Mode, ?DB:write(DB, Key, Value, Version)}.
 
 -spec read(state(), ?RT:key()) -> {value, any()} | is_not_current.
 read({is_current, DB}, HashedKey) ->
     {value, ?DB:read(DB, HashedKey)};
 read({is_filling, _DB}, _Hashed_Key) ->
     is_not_current.
+
+-spec get_version(state(), ?RT:key()) -> pos_integer() | unknown | not_ready.
+get_version({is_current, DB}, Key) ->
+    case ?DB:get_entry2(DB, Key) of
+        {true, Entry} ->
+            db_entry:get_version(Entry);
+        {false, _} ->
+            unknown
+    end;
+get_version({is_filling, DB}, Key) ->
+    case ?DB:get_entry2(DB, Key) of
+        {true, Entry} ->
+            db_entry:get_version(Entry);
+        {false, _} ->
+            not_ready
+    end.

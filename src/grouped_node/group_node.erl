@@ -25,12 +25,11 @@
 -include("scalaris.hrl").
 -include("group.hrl").
 
-%% a group_node has two different kinds of state: (a)
-%% group_state() and (b)local_state(). the former is synchronized between the
-%% nodes by the group membership protocol. The latter has to be
-%% synchronized by an external mechanism, like e.g. the transaction
-%% API for the db, or can be lazily synchronized, like e.g. the
-%% successor/predecessor list.
+%% a group_node has two different kinds of state: (a) synchronized
+%% state and (b) lazily synchronized state. changes to the former
+%% state requires a consus among the group participants, read
+%% paxos. changes to the latter can be performed locally (see
+%% group_local_state), e.g. the routing table.
 
 -export([start_link/2]).
 
@@ -40,7 +39,7 @@
 
 -type(message() :: any()).
 
-%% @doc message handler
+%% @doc message handler for join protocol
 -spec on_joining(message(), group_state:state()) -> group_state:state().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -177,8 +176,8 @@ on({paxos_read, Client, HashedKey}, State) ->
 on({paxos_write, Client, HashedKey, Value}, State) ->
     DB = group_state:get_db(State),
     case group_db:read(DB, HashedKey) of
-        {value, {ok, Value, Version}} ->
-            Proposal = {write, HashedKey, Value, Version + 1, Client, comm:this()},
+        {value, {ok, OldValue, OldVersion}} ->
+            Proposal = {write, HashedKey, Value, OldVersion + 1, Client, comm:this()},
             on({ops, Proposal}, State);
         is_not_current ->
             comm:send(Client, {write_response, retry, db_is_not_current}),

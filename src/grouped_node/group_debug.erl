@@ -61,7 +61,7 @@ dbg3() ->
     lists:map(fun (Node) ->
                       State = gen_component:get_state(Node, 100),
                       View = group_state:get_view(State),
-                      case group_mode:get_mode(State) of
+                      case group_state:get_mode(State) of
                           joined ->
                               {Node, length(group_view:get_postponed_decisions(View))};
                           _ ->
