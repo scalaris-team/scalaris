@@ -156,8 +156,6 @@ public class ConnectionFactory {
 	 * <tt>SCALARIS_JAPI_NODE</tt> and <tt>SCALARIS_JAPI_COOKIE</tt>
 	 * environment variables. Their values will be used instead of the values
 	 * defined in the config file!
-	 * 
-	 * @version 2.4
 	 */
 	public ConnectionFactory() {
 		Properties properties = new Properties();
