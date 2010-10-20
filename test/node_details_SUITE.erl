@@ -82,14 +82,23 @@ end_per_suite(Config) ->
                              node_details:rt_size() |
                              node_details:message_log() |
                              node_details:memory() |
-                             unknown) -> true.
-safe_compare(NodeDetails, Tag, ExpValue) ->
-    case ExpValue of
-        unknown -> ?equals_w_note(node_details:contains(NodeDetails, Tag), false, atom_to_list(Tag));
-        _       -> ?equals_w_note(node_details:get(NodeDetails, Tag), ExpValue, atom_to_list(Tag))
+                             unknown,
+                   Unknown::[node_details:node_details_name()],
+                   Known::[node_details:node_details_name()]) -> true.
+safe_compare(NodeDetails, Tag, ExpValue, Unknown, Known) ->
+    ValIsUnknown = (ExpValue =:= unknown) andalso
+                       ((Known =:= [] andalso lists:member(Tag, Unknown)) orelse
+                        (Unknown =:= [] andalso not lists:member(Tag, Known))),
+    case ValIsUnknown of
+        true -> ?equals_w_note(node_details:contains(NodeDetails, Tag), false, atom_to_list(Tag));
+        _    -> ?equals_w_note(node_details:get(NodeDetails, Tag), ExpValue, atom_to_list(Tag))
     end,
     true.
 
+%% @doc Compares NodeDetails with the given values. Either Unknown or Known
+%%      must be non-empty. A value is unknown (and thus not part of the
+%%      NodeDetails object) if its tag is either in Unknown and Known is emty
+%%      or if its tag is not in Known and Unknown is empty.
 -spec node_details_equals(NodeDetails::node_details:node_details(),
                           Pred::node:node_type() | unknown,
                           PredList::nodelist:non_empty_snodelist() | unknown,
@@ -101,19 +110,21 @@ safe_compare(NodeDetails, Tag, ExpValue) ->
                           Hostname::node_details:hostname() | unknown,
                           RTSize::node_details:rt_size() | unknown,
                           MsgLog::node_details:message_log() | unknown,
-                          Memory::node_details:memory() | unknown) -> true.
-node_details_equals(NodeDetails, Pred, PredList, Node, MyRange, Succ, SuccList, Load, Hostname, RTSize, MsgLog, Memory) ->
-    safe_compare(NodeDetails, pred, Pred),
-    safe_compare(NodeDetails, predlist, PredList),
-    safe_compare(NodeDetails, node, Node),
-    safe_compare(NodeDetails, my_range, MyRange),
-    safe_compare(NodeDetails, succ, Succ),
-    safe_compare(NodeDetails, succlist, SuccList),
-    safe_compare(NodeDetails, load, Load),
-    safe_compare(NodeDetails, hostname, Hostname),
-    safe_compare(NodeDetails, rt_size, RTSize),
-    safe_compare(NodeDetails, message_log, MsgLog),
-    safe_compare(NodeDetails, memory, Memory),
+                          Memory::node_details:memory() | unknown,
+                          Unknown::[node_details:node_details_name()],
+                          Known::[node_details:node_details_name()]) -> true.
+node_details_equals(NodeDetails, Pred, PredList, Node, MyRange, Succ, SuccList, Load, Hostname, RTSize, MsgLog, Memory, Unknown, Known) ->
+    safe_compare(NodeDetails, pred, Pred, Unknown, Known),
+    safe_compare(NodeDetails, predlist, PredList, Unknown, Known),
+    safe_compare(NodeDetails, node, Node, Unknown, Known),
+    safe_compare(NodeDetails, my_range, MyRange, Unknown, Known),
+    safe_compare(NodeDetails, succ, Succ, Unknown, Known),
+    safe_compare(NodeDetails, succlist, SuccList, Unknown, Known),
+    safe_compare(NodeDetails, load, Load, Unknown, Known),
+    safe_compare(NodeDetails, hostname, Hostname, Unknown, Known),
+    safe_compare(NodeDetails, rt_size, RTSize, Unknown, Known),
+    safe_compare(NodeDetails, message_log, MsgLog, Unknown, Known),
+    safe_compare(NodeDetails, memory, Memory, Unknown, Known),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -124,7 +135,7 @@ node_details_equals(NodeDetails, Pred, PredList, Node, MyRange, Succ, SuccList, 
 -spec test_new0() -> true.
 test_new0() ->
     NodeDetails = node_details:new(),
-    node_details_equals(NodeDetails, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown).
+    node_details_equals(NodeDetails, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, [], []).
 
 tester_new0(Config) ->
     tester:test(node_details_SUITE, test_new0, 0, 10),
@@ -138,7 +149,7 @@ tester_new0(Config) ->
 -spec test_new7(nodelist:non_empty_snodelist(), node:node_type(), nodelist:non_empty_snodelist(), node_details:load(), node_details:hostname(), node_details:rt_size(), node_details:memory()) -> true.
 test_new7(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     NodeDetails = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
-    node_details_equals(NodeDetails, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
 
 tester_new7(Config) ->
     tester:test(node_details_SUITE, test_new7, 7, 10),
@@ -158,8 +169,8 @@ test_set_get_pred(PredTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, pred, PredTest),
     NodeDetails2_new = node_details:set(NodeDetails2, pred, PredTest),
-    node_details_equals(NodeDetails1_new, PredTest, [PredTest], unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, PredTest, [PredTest], Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, PredTest, [PredTest], unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, [], [pred, predlist]),
+    node_details_equals(NodeDetails2_new, PredTest, [PredTest], Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
 
 -spec test_set_get_predlist(PredList::nodelist:non_empty_snodelist()) -> true.
 test_set_get_predlist(PredListTest) ->
@@ -169,8 +180,8 @@ test_set_get_predlist(PredListTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, predlist, PredListTest),
     NodeDetails2_new = node_details:set(NodeDetails2, predlist, PredListTest),
-    node_details_equals(NodeDetails1_new, hd(PredListTest), PredListTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredListTest), PredListTest, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, hd(PredListTest), PredListTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, [], [pred, predlist]),
+    node_details_equals(NodeDetails2_new, hd(PredListTest), PredListTest, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
 
 -spec test_set_get_node(Node::node:node_type()) -> true.
 test_set_get_node(NodeTest) ->
@@ -180,8 +191,8 @@ test_set_get_node(NodeTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, node, NodeTest),
     NodeDetails2_new = node_details:set(NodeDetails2, node, NodeTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, NodeTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, NodeTest, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, NodeTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, [], [node]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, NodeTest, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
 
 -spec test_set_get_my_range(MyRange::intervals:interval()) -> true.
 test_set_get_my_range(MyRangeTest) ->
@@ -191,8 +202,8 @@ test_set_get_my_range(MyRangeTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, my_range, MyRangeTest),
     NodeDetails2_new = node_details:set(NodeDetails2, my_range, MyRangeTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, MyRangeTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, MyRangeTest, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, MyRangeTest, unknown, unknown, unknown, unknown, unknown, unknown, unknown, [], [my_range]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, MyRangeTest, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory, [message_log], []).
 
 -spec test_set_get_succ(Succ::node:node_type()) -> true.
 test_set_get_succ(SuccTest) ->
@@ -202,8 +213,8 @@ test_set_get_succ(SuccTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, succ, SuccTest),
     NodeDetails2_new = node_details:set(NodeDetails2, succ, SuccTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, SuccTest, [SuccTest], unknown, unknown, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, SuccTest, [SuccTest], Load, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, SuccTest, [SuccTest], unknown, unknown, unknown, unknown, unknown, [], [succ, succlist]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, SuccTest, [SuccTest], Load, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
 
 -spec test_set_get_succlist(SuccList::nodelist:non_empty_snodelist()) -> true.
 test_set_get_succlist(SuccListTest) ->
@@ -213,8 +224,8 @@ test_set_get_succlist(SuccListTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, succlist, SuccListTest),
     NodeDetails2_new = node_details:set(NodeDetails2, succlist, SuccListTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, hd(SuccListTest), SuccListTest, unknown, unknown, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccListTest), SuccListTest, Load, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, hd(SuccListTest), SuccListTest, unknown, unknown, unknown, unknown, unknown, [], [succ, succlist]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccListTest), SuccListTest, Load, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
 
 -spec test_set_get_load(Load::node_details:load()) -> true.
 test_set_get_load(LoadTest) ->
@@ -224,8 +235,8 @@ test_set_get_load(LoadTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, load, LoadTest),
     NodeDetails2_new = node_details:set(NodeDetails2, load, LoadTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, LoadTest, unknown, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, LoadTest, Hostname, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, LoadTest, unknown, unknown, unknown, unknown, [], [load]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, LoadTest, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
                           
 -spec test_set_get_hostname(Hostname::node_details:hostname()) -> true.
 test_set_get_hostname(HostnameTest) ->
@@ -235,8 +246,8 @@ test_set_get_hostname(HostnameTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, hostname, HostnameTest),
     NodeDetails2_new = node_details:set(NodeDetails2, hostname, HostnameTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, HostnameTest, unknown, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, HostnameTest, RTSize, unknown, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, HostnameTest, unknown, unknown, unknown, [], [hostname]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, HostnameTest, RTSize, unknown, Memory, [my_range, message_log], []).
 
 -spec test_set_get_rt_size(RTSize::node_details:rt_size()) -> true.
 test_set_get_rt_size(RTSizeTest) ->
@@ -246,8 +257,8 @@ test_set_get_rt_size(RTSizeTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, rt_size, RTSizeTest),
     NodeDetails2_new = node_details:set(NodeDetails2, rt_size, RTSizeTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, RTSizeTest, unknown, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSizeTest, unknown, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, RTSizeTest, unknown, unknown, [], [rt_size]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSizeTest, unknown, Memory, [my_range, message_log], []).
 
 -spec test_set_get_message_log(MsgLog::node_details:message_log()) -> true.
 test_set_get_message_log(MsgLogTest) ->
@@ -257,8 +268,8 @@ test_set_get_message_log(MsgLogTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, message_log, MsgLogTest),
     NodeDetails2_new = node_details:set(NodeDetails2, message_log, MsgLogTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, MsgLogTest, unknown) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, MsgLogTest, Memory).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, MsgLogTest, unknown, [], [message_log]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, MsgLogTest, Memory, [my_range], []).
 
 -spec test_set_get_memory(Memory::node_details:memory()) -> true.
 test_set_get_memory(MemoryTest) ->
@@ -268,49 +279,49 @@ test_set_get_memory(MemoryTest) ->
     NodeDetails2 = node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory),
     NodeDetails1_new = node_details:set(NodeDetails1, memory, MemoryTest),
     NodeDetails2_new = node_details:set(NodeDetails2, memory, MemoryTest),
-    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, MemoryTest) andalso
-    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, MemoryTest).
+    node_details_equals(NodeDetails1_new, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, MemoryTest, [], [memory]),
+    node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, MemoryTest, [my_range, message_log], []).
 
 tester_set_get_pred(Config) ->
-    tester:test(node_details_SUITE, test_set_get_pred, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_pred, 1, 1000),
     Config.
 
 tester_set_get_predlist(Config) ->
-    tester:test(node_details_SUITE, test_set_get_predlist, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_predlist, 1, 1000),
     Config.
 
 tester_set_get_node(Config) ->
-    tester:test(node_details_SUITE, test_set_get_node, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_node, 1, 1000),
     Config.
 
 tester_set_get_my_range(Config) ->
-    tester:test(node_details_SUITE, test_set_get_my_range, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_my_range, 1, 1000),
     Config.
 
 tester_set_get_succ(Config) ->
-    tester:test(node_details_SUITE, test_set_get_succ, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_succ, 1, 1000),
     Config.
 
 tester_set_get_succlist(Config) ->
-    tester:test(node_details_SUITE, test_set_get_succlist, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_succlist, 1, 1000),
     Config.
 
 tester_set_get_load(Config) ->
-    tester:test(node_details_SUITE, test_set_get_load, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_load, 1, 1000),
     Config.
 
 tester_set_get_hostname(Config) ->
-    tester:test(node_details_SUITE, test_set_get_hostname, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_hostname, 1, 1000),
     Config.
 
 tester_set_get_rt_size(Config) ->
-    tester:test(node_details_SUITE, test_set_get_rt_size, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_rt_size, 1, 1000),
     Config.
 
 tester_set_get_message_log(Config) ->
-    tester:test(node_details_SUITE, test_set_get_message_log, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_message_log, 1, 1000),
     Config.
 
 tester_set_get_memory(Config) ->
-    tester:test(node_details_SUITE, test_set_get_memory, 1, 100),
+    tester:test(node_details_SUITE, test_set_get_memory, 1, 1000),
     Config.
