@@ -23,6 +23,7 @@
 -behaviour(gen_component).
 
 -include("scalaris.hrl").
+-include("group.hrl").
 
 %% a group_node has two different kinds of state: (a)
 %% group_state() and (b)local_state(). the former is synchronized between the
@@ -33,112 +34,117 @@
 
 -export([start_link/2]).
 
--export([on/2, init/1]).
+-export([on/2, on_joining/2, init/1]).
 
 -export([is_alive/1, get_base_interval/0]).
 
 -type(message() :: any()).
 
 %% @doc message handler
--spec on(message(), group_types:state()) -> group_types:state().
+-spec on_joining(message(), group_state:state()) -> group_state:state().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % join protocol
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({get_dht_nodes_response, []}, State) when element(1, State) == joining ->
+on_joining({get_dht_nodes_response, []}, State) ->
     State;
-
-on({get_dht_nodes_response, Nodes},
-   {joining, NodeState, GroupState, TriggerState}) ->
+on_joining({get_dht_nodes_response, Nodes}, State) ->
     Acceptor = comm:make_global(pid_groups:get_my(paxos_acceptor)),
     Learner = comm:make_global(pid_groups:get_my(paxos_learner)),
     comm:send(hd(Nodes), {ops, {group_node_join, comm:this(), Acceptor, Learner}}),
-    {joining_sent_request, NodeState, GroupState, TriggerState};
-on({group_state, NewGroupState, Pred, Succ},
-   {Mode, nil, _GroupState, TriggerState}) when Mode == joining_sent_request orelse Mode == joining->
+    group_state:set_mode(State, joining_sent_request);
+on_joining({group_state, View, Pred, Succ}, State) ->
     % @todo: assert that I am a member of this group
-    NewVersion = group_state:get_version(NewGroupState),
-    fd:subscribe(group_state:get_members(NewGroupState)),
+    NewView = group_view:recalculate_index(View),
+    NewVersion = group_view:get_version(NewView),
+    fd:subscribe(group_view:get_members(NewView)),
     io:format("joined: ~w ~w~n", [NewVersion, self()]),
     % @todo sync databases
-    DB = ?DB:new(group_state:get_group_id(NewGroupState)),
-    NewNodeState = group_local_state:new(Pred, Succ, DB),
-    {joined, NewNodeState, group_paxos_utils:init_paxos(NewGroupState),
-     TriggerState};
-on({group_node_join_response, retry, Reason},
-   {joining_sent_request, nil, GroupState, TriggerState}) ->
+    DB = group_db:new_replica(),
+    NodeState = group_local_state:new(Pred, Succ),
+    NewView2 = group_paxos_utils:init_paxos(NewView),
+    NewState = group_state:set_db(group_state:set_mode(
+                                    group_state:set_node_state(
+                                      group_state:set_view(
+                                        State,
+                                        NewView2),
+                                      NodeState),
+                                    joined),
+                                  DB),
+    gen_component:change_handler(NewState, on);
+on_joining({group_node_join_response, retry, Reason}, State) ->
     % retry
     io:format("retry join: ~p ~p ~n", [Reason, self()]),
     comm:send_local_after(500, self(), {known_nodes_timeout}),
     trigger_known_nodes(),
-    {joining, nil, GroupState, TriggerState};
-on({group_node_join_response,is_already_member},
-   {joining_sent_request, nil, GroupState, TriggerState}) ->
+    group_state:set_mode(State, joining);
+on_joining({group_node_join_response,is_already_member}, State) ->
     io:format("got is_already_member on joining~n", []),
-    {joining_sent_request, nil, GroupState, TriggerState};
-on({known_nodes_timeout}, State) when element(1, State) =:= joining ->
+    State;
+on_joining({known_nodes_timeout}, State) ->
     trigger_known_nodes(),
     comm:send_local_after(500, self(), {known_nodes_timeout}),
     State;
-on({known_nodes_timeout}, State) when element(1, State) =:= joining_send_request ->
-    trigger_known_nodes(),
-    comm:send_local_after(500, self(), {known_nodes_timeout}),
-    State;
+on_joining({trigger}, State) ->
+    group_node_trigger:trigger(State);
+on_joining({route, _, _, _}, State) ->
+    State.
+
+-spec on(message(), group_state:state()) -> group_state:state().
 
 % group protocol (total ordered broadcast)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group_node_join
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({ops, {group_node_join, _Pid, _Acceptor, _Learner} = Proposal},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({ops, {group_node_join, _Pid, _Acceptor, _Learner} = Proposal}, State) ->
     group_ops_join_node:ops_request(State, Proposal);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group_node_remove
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({ops, {group_node_remove, _Pid} = Proposal},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({ops, {group_node_remove, _Pid} = Proposal}, State) ->
     group_ops_remove_node:ops_request(State, Proposal);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group_split
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({ops, {group_split, _Pid, _SplitKey, _LeftGroup, _RightGroup} = Proposal},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+   State) ->
     group_ops_split_group:ops_request(State, Proposal);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % paxos_read
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({ops, {read, _HashedKey, _Value, _Version, _Client, _Proposer} = Proposal},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+   State) ->
     group_ops_db:ops_request(State, Proposal);
 
 on({ops, {write, _HashedKey, _Value, _Version, _Client, _Proposer} = Proposal},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+   State) ->
     group_ops_db:ops_request(State, Proposal);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % deliver
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({learner_decide, _Cookie, PaxosId, Proposal},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+   State) ->
     group_tob:deliver(PaxosId, Proposal, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % retry
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({group_split_response,retry},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({group_split_response,retry}, State) ->
     % @todo: do nothing?
     State;
-on({group_node_join_response,retry},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({group_node_join_response,retry}, State) ->
     % @todo: do nothing? well, we are already in the group.
     State;
-on({group_node_remove_response,retry, Pid},
-   {joined, _NodeState, GroupState, _TriggerState} = State) ->
-    case group_state:is_member(GroupState, Pid) of
+on({group_node_join_response,is_already_member}, State) ->
+    % @todo: do nothing? well, we are already in the group.
+    State;
+on({group_node_remove_response,retry, Pid}, State) ->
+    View = group_state:get_view(State),
+    case group_view:is_member(View, Pid) of
         true ->
             comm:send_local(self(), {ops, {group_node_remove, Pid}}),
             State;
@@ -149,84 +155,65 @@ on({group_node_remove_response,retry, Pid},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % routing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({route, Key, Hops, Message},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({route, Key, Hops, Message}, State) ->
     group_router:route(Key, Hops, Message, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % simple DB
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({quorum_read, Client, HashedKey},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({quorum_read, Client, HashedKey}, State) ->
     % @todo
    State;
-on({paxos_read, Client, HashedKey},
-   {joined, NodeState, _GroupState, _TriggerState} = State) ->
-    DB = group_local_state:get_db(NodeState),
-    {ok, Value, Version} = ?DB:read(DB, HashedKey),
-    Proposal = {read, HashedKey, Value, Version, Client, comm:this()},
-   on({ops, Proposal}, State);
-on({paxos_write, Client, HashedKey, Value},
-   {joined, NodeState, _GroupState, _TriggerState} = State) ->
-    DB = group_local_state:get_db(NodeState),
-    {ok, _Value, Version} = ?DB:read(DB, HashedKey),
-    Proposal = {write, HashedKey, Value, Version + 1, Client, comm:this()},
-   on({ops, Proposal}, State);
-
+on({paxos_read, Client, HashedKey}, State) ->
+    DB = group_state:get_db(State),
+    case group_db:read(DB, HashedKey) of
+        {value, {ok, Value, Version}} ->
+            Proposal = {read, HashedKey, Value, Version, Client, comm:this()},
+            on({ops, Proposal}, State);
+        is_not_current ->
+            comm:send(Client, {read_response, retry, db_is_not_current}),
+            State
+    end;
+on({paxos_write, Client, HashedKey, Value}, State) ->
+    DB = group_state:get_db(State),
+    case group_db:read(DB, HashedKey) of
+        {value, {ok, Value, Version}} ->
+            Proposal = {write, HashedKey, Value, Version + 1, Client, comm:this()},
+            on({ops, Proposal}, State);
+        is_not_current ->
+            comm:send(Client, {write_response, retry, db_is_not_current}),
+            State
+    end;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({crash, Pid},
-   {joined, _NodeState, GroupState, _TriggerState} = State) ->
-    case group_state:is_member(GroupState, Pid) of
+on({crash, Pid}, State) ->
+    View = group_state:get_view(State),
+    case group_view:is_member(View, Pid) of
         true ->
             comm:send_local(self(), {ops, {group_node_remove, Pid}}),
             State;
         false ->
             State
     end;
-on({group_node_join_response, retry, _Reason},
-   {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({group_node_join_response, retry, _Reason}, State) ->
     State;
-on({group_state, NewGroupState, Pred, Succ},
-   {joined, NodeState, GroupState, TriggerState} = State) ->
-    OldVersion = group_state:get_version(GroupState),
-    NewVersion = group_state:get_version(NewGroupState),
-    % @todo has somebody kicked my out?
-    % @todo cannot compare versions like this !!!
-    if
-        NewVersion == OldVersion + 1 ->
-            io:format("accepted newer group_state at ~p~n", [self()]),
-            {joined, group_local_state:update_pred_succ(NodeState, Pred, Succ),
-             group_paxos_utils:init_paxos(NewGroupState), TriggerState};
-        NewVersion =< OldVersion ->
-            State;
-        NewVersion > OldVersion ->
-            %@todo
-            io:format("panic! 7~n", []),
-            State
-    end;
-on({succ_update, Succ},
-   {joined, NodeState, GroupState, TriggerState} = _State) ->
-    {joined, group_local_state:update_succ(NodeState, Succ), GroupState,
-     TriggerState};
-on({pred_update, Pred},
-   {joined, NodeState, GroupState, TriggerState} = _State) ->
-    {joined, group_local_state:update_pred(NodeState, Pred), GroupState,
-     TriggerState};
-
-on({trigger}, {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+on({group_state, NewGroupState, Pred, Succ}, State) ->
+    % @todo ignore for the moment
+    State;
+on({succ_update, Succ}, State) ->
+    NodeState = group_state:get_node_state(State),
+    NewNodeState = group_local_state:update_succ(NodeState, Succ),
+    group_state:set_node_state(State, NewNodeState);
+on({pred_update, Pred}, State) ->
+    NodeState = group_state:get_node_state(State),
+    NewNodeState = group_local_state:update_pred(NodeState, Pred),
+    group_state:set_node_state(State, NewNodeState);
+on({trigger}, State) ->
     group_node_trigger:trigger(State);
-on({trigger}, {Mode, NodeState, GroupState, TriggerState} = _State) ->
-    {Mode, NodeState, GroupState, trigger:next(TriggerState)};
 
 
 % normal protocol
-on({get_node_details, Pid, Which},
-   {_Mode, NodeState, _GroupState, _TriggerState} = State) ->
-    % @todo
-    comm:send(Pid, {get_node_details_response, dht_node_state:details(NodeState)}),
-    State;
 on({known_nodes_timeout}, State) ->
     State;
 on({get_dht_nodes_response, _Nodes}, State) ->
@@ -237,9 +224,7 @@ on({group_split_response,success}, State) ->
     State.
 
 %% @doc joins this node in the ring and calls the main loop
--spec init(list()) -> {joining, nil, nil, trigger:state()} |
-                          {joined, nil, group_state:group_state(),
-                           trigger:state()}.
+-spec init(list()) -> group_state:state().
 init(Options) ->
     % first node in this vm and also vm is marked as first
     % or unit-test
@@ -250,18 +235,20 @@ init(Options) ->
             io:format("first~n", []),
             trigger_known_nodes(),
             Interval = intervals:new('[', 0, 16#100000000000000000000000000000000, ')'),
-            GroupState = group_state:new_group_state(Interval),
-            We = group_state:get_group_node(GroupState),
+            View = group_paxos_utils:init_paxos(group_view:new(Interval)),
+            We = group_view:get_group_node(View),
             TriggerState = trigger:now(trigger:init(Trigger, ?MODULE)),
-            DB = ?DB:new(group_state:get_group_id(GroupState)),
-            {joined, group_local_state:new(We, We, DB),
-             group_paxos_utils:init_paxos(GroupState), TriggerState};
+            DB = group_db:new_empty(),
+            NodeState = group_local_state:new(We, We),
+            % starts with on-handler
+            group_state:new_primary(NodeState, View, DB, TriggerState);
         _ ->
             trigger_known_nodes(),
             io:format("joining~n", []),
             TriggerState = trigger:now(trigger:init(Trigger, ?MODULE)),
             comm:send_local_after(500, self(), {known_nodes_timeout}),
-            {joining, nil, nil, TriggerState}
+            % starts with on-joining-handler
+            gen_component:change_handler(group_state:new_replica(TriggerState), on_joining)
     end.
 
 -spec start_link(pid_groups:groupname(), list()) -> {ok, pid()}.
@@ -289,7 +276,7 @@ trigger_known_nodes() ->
 
 -spec is_alive(pid()) -> boolean().
 is_alive(Pid) ->
-    element(1, gen_component:get_state(Pid)) =:= joined.
+    group_state:get_mode(gen_component:get_state(Pid)) =:= joined.
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->

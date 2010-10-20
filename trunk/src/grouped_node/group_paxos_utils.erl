@@ -23,42 +23,43 @@
 
 -export([propose/2, init_paxos/1, cleanup_paxos_states/1]).
 
--spec propose(group_types:proposal(), group_state:group_state()) ->
-    {success, group_state:group_state()} | failed.
-propose(Proposal, GroupState) ->
-    case is_first_proposal_for_this_instance(GroupState) of
+-spec propose(group_types:proposal(), group_view:view()) ->
+    {success, group_view:view()} | failed.
+propose(Proposal, View) ->
+    InitialRound = group_view:get_index_in_group(View),
+    case is_first_proposal_for_this_instance(View) of
         true ->
-            PaxosId = group_state:get_next_proposal_id(GroupState),
+            PaxosId = group_view:get_next_proposal_id(View),
             Proposer = comm:make_global(pid_groups:get_my(paxos_proposer)),
-            Acceptors = group_state:get_acceptors(GroupState),
-            Majority = length(Acceptors) div 2 + 1,
+            Acceptors = group_view:get_acceptors(View),
+            Majority = quorum:majority_for_accept(length(Acceptors)),
             MaxProposers = length(Acceptors),
             proposer:start_paxosid(Proposer, PaxosId, Acceptors, Proposal, Majority,
-                                   MaxProposers),
-            {success, group_state:made_proposal(GroupState, PaxosId, Proposal)};
+                                   MaxProposers, InitialRound),
+            {success, group_view:made_proposal(View, PaxosId, Proposal)};
         _ ->
             failed
     end.
 
-is_first_proposal_for_this_instance(GroupState) ->
-    NextProposalVersion = group_state:get_next_proposal_id(GroupState),
-    CurrentPaxosVersion = group_state:get_current_paxos_id(GroupState),
+is_first_proposal_for_this_instance(View) ->
+    NextProposalVersion = group_view:get_next_proposal_id(View),
+    CurrentPaxosVersion = group_view:get_current_paxos_id(View),
     NextProposalVersion == CurrentPaxosVersion.
 
--spec init_paxos(group_state:group_state()) ->
-    group_state:group_state().
-init_paxos(GroupState) ->
-    PaxosId = group_state:get_next_paxos_id(GroupState),
-    Learners = group_state:get_learners(GroupState),
+-spec init_paxos(group_view:view()) ->
+    group_view:view().
+init_paxos(View) ->
+    PaxosId = group_view:get_next_paxos_id(View),
+    Learners = group_view:get_learners(View),
     Proposer = pid_groups:get_my(paxos_proposer),
     Acceptor = pid_groups:get_my(paxos_acceptor),
     ?LOG("init_paxos ~p ~p~n", [PaxosId, Learners]),
     acceptor:start_paxosid_local(Acceptor, PaxosId, Learners),
     Learner = pid_groups:get_my(paxos_learner),
-    Majority = group_state:get_size(GroupState) div 2 + 1,
+    Majority = quorum:majority_for_accept(group_view:get_size(View)),
     learner:start_paxosid_local(Learner, PaxosId, Majority, comm:this(), client_cookie),
     %proposer:trigger(comm:make_global(Proposer), PaxosId),
-    group_state:init_paxos(GroupState, PaxosId).
+    group_view:init_paxos(View, PaxosId).
 
 
 -spec cleanup_paxos_states(group_types:paxos_id()) -> ok.

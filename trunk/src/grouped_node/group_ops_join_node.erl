@@ -27,21 +27,21 @@
 
 % @doc we got a request to join a node to from this group, do sanity checks and
 %      propose the join
--spec ops_request(State::group_types:joined_state(),
-                  Proposal::proposal_type()) -> group_types:joined_state().
-ops_request({joined, NodeState, GroupState, TriggerState} = State,
-            {group_node_join, Pid, Acceptor, Learner}) ->
-    case group_state:is_member(GroupState, Pid) of
+-spec ops_request(State::group_state:state(),
+                  Proposal::proposal_type()) -> group_state:state().
+ops_request(State, {group_node_join, Pid, Acceptor, Learner}) ->
+    View = group_state:get_view(State),
+    case group_view:is_member(View, Pid) of
         true ->
             comm:send(Pid, {group_node_join_response, is_already_member}),
             State;
         false ->
             case group_paxos_utils:propose({group_node_join, Pid, Acceptor,
-                                            Learner}, GroupState) of
-                {success, NewGroupState} ->
-                    PaxosId = group_state:get_next_expected_decision_id(NewGroupState),
+                                            Learner}, View) of
+                {success, NewView} ->
+                    PaxosId = group_view:get_next_expected_decision_id(NewView),
                     io:format("proposed join of ~p in ~p~n", [Pid, PaxosId]),
-                    {joined, NodeState, NewGroupState, TriggerState};
+                    group_state:set_view(State, NewView);
                 _ ->
                     comm:send(Pid, {group_node_join_response, retry, propose_rejected}),
                     State
@@ -49,31 +49,31 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
     end.
 
 % @doc it was decided to add a node to our group: execute the join
--spec ops_decision(State::group_types:joined_state(),
+-spec ops_decision(State::group_state:state(),
                    Proposal::proposal_type(),
                    PaxosId::group_types:paxos_id(),
-                   Hint::group_types:decision_hint()) -> group_types:joined_state().
-ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
-             {group_node_join, Pid, Acceptor, Learner} = Proposal,
+                   Hint::group_types:decision_hint()) -> group_state:state().
+ops_decision(State, {group_node_join, Pid, Acceptor, Learner} = Proposal,
              PaxosId, _Hint) ->
     io:format("adding ~p at ~p~n", [Pid, self()]),
-    NewGroupState = group_state:add_node(
-                      group_state:remove_proposal(GroupState,
-                                                  PaxosId),
-                      Pid, Acceptor, Learner),
-    group_utils:notify_neighbors(NodeState, GroupState,
-                                 NewGroupState),
+    View = group_state:get_view(State),
+    NodeState = group_state:get_node_state(State),
+    NewView = group_view:recalculate_index(group_view:add_node(
+                      group_view:remove_proposal(View,
+                                                 PaxosId),
+                      Pid, Acceptor, Learner)),
+    group_utils:notify_neighbors(NodeState, View,
+                                 NewView),
     Pred = group_local_state:get_predecessor(NodeState),
     Succ = group_local_state:get_successor(NodeState),
-    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
+    comm:send(Pid, {group_state, NewView, Pred, Succ}),
     fd:subscribe(Pid),
-    {joined, NodeState, NewGroupState, TriggerState}.
+    group_state:set_view(State, NewView).
 
--spec rejected_proposal(group_types:joined_state(), proposal_type(),
+-spec rejected_proposal(group_state:state(), proposal_type(),
                         group_types:paxos_id()) ->
-    group_types:joined_state().
-rejected_proposal(State,
-                  {group_node_join, Pid, _Acceptor, _Learner},
+    group_state:state().
+rejected_proposal(State, {group_node_join, Pid, _Acceptor, _Learner},
                   _PaxosId) ->
     comm:send(Pid, {group_node_join_response, retry, different_proposal_accepted}),
     State.

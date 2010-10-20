@@ -24,9 +24,12 @@
 
 -export([paxos_read/1, paxos_write/2,
          bench_read/1, bench_write/1,
+         quorum_read/1,
          route/2]).
 
-quorum_read(HashedKey) ->
+-spec quorum_read(binary() | integer()) -> any().
+quorum_read(Key) ->
+    HashedKey = ?RT:hash_key(Key),
     Req = {quorum_read, comm:this(), HashedKey},
     route(Req, HashedKey),
     receive
@@ -34,7 +37,8 @@ quorum_read(HashedKey) ->
             Value
     end.
 
-paxos_read(HashedKey) ->
+paxos_read(Key) ->
+    HashedKey = ?RT:hash_key(Key),
     Req = {paxos_read, comm:this(), HashedKey},
     route(Req, HashedKey),
     Res = receive
@@ -45,8 +49,8 @@ paxos_read(HashedKey) ->
     end,
     Res.
 
-
-paxos_write(HashedKey, Value) ->
+paxos_write(Key, Value) ->
+    HashedKey = ?RT:hash_key(Key),
     Req = {paxos_write, comm:this(), HashedKey, Value},
     route(Req, HashedKey),
     receive
@@ -64,7 +68,6 @@ route(Message, HashedKey) ->
 
 bench_read(N) ->
     Before = erlang:now(),
-    %run(N, fun () -> paxos_read(1) end),
     run_read(N),
     After = erlang:now(),
     Diff = timer:now_diff(After, Before),
@@ -73,7 +76,6 @@ bench_read(N) ->
 
 bench_write(N) ->
     Before = erlang:now(),
-    %run(N, fun () -> paxos_write(1, 2) end),
     run_write(N),
     After = erlang:now(),
     Diff = timer:now_diff(After, Before),

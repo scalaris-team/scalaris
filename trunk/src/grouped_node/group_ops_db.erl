@@ -24,42 +24,41 @@
 -export([ops_request/2, ops_decision/4, rejected_proposal/3]).
 
 -type(proposal_type()::
-      {read, Key::?RT:key(), Value::any(), Client::comm:mypid(),
+      {read, Key::?RT:key(), Value::any(), Version::pos_integer(), Client::comm:mypid(),
        Proposer::comm:mypid()}
       | {write, Key::?RT:key(), Value::any(), Version::pos_integer(), Client::comm:mypid(),
          Proposer::comm:mypid()}).
 
--spec ops_request(State::group_types:joined_state(),
-                  Proposal::proposal_type()) -> group_types:joined_state().
-ops_request({joined, NodeState, GroupState, TriggerState} = State,
-            {read, Key, _Value, _Version, Client, _Proposer} = Proposal) ->
-    case group_paxos_utils:propose(Proposal, GroupState) of
-        {success, NewGroupState} ->
-            PaxosId = group_state:get_next_expected_decision_id(NewGroupState),
-            ?LOG("read ~p in ~p~n", [Key, PaxosId]),
-            {joined, NodeState, NewGroupState, TriggerState};
+-spec ops_request(State::group_state:state(),
+                  Proposal::proposal_type()) -> group_state:state().
+ops_request(State, {read, _Key, _Value, _Version, Client, _Proposer} = Proposal) ->
+    View = group_state:get_view(State),
+    case group_paxos_utils:propose(Proposal, View) of
+        {success, NewView} ->
+            _PaxosId = group_view:get_next_expected_decision_id(View),
+            ?LOG("read ~p in ~p~n", [_Key, _PaxosId]),
+            group_state:set_view(State, NewView);
         _ ->
             comm:send(Client, {read_response, retry, propose_rejected}),
             State
     end;
-ops_request({joined, NodeState, GroupState, TriggerState} = State,
-            {write, Key, _Value, _Version, Client, _Proposer} = Proposal) ->
-    case group_paxos_utils:propose(Proposal, GroupState) of
-        {success, NewGroupState} ->
-            PaxosId = group_state:get_next_expected_decision_id(NewGroupState),
-            ?LOG("write ~p in ~p~n", [Key, PaxosId]),
-            {joined, NodeState, NewGroupState, TriggerState};
+ops_request(State, {write, _Key, _Value, _Version, Client, _Proposer} = Proposal) ->
+    View = group_state:get_view(State),
+    case group_paxos_utils:propose(Proposal, View) of
+        {success, NewView} ->
+            _PaxosId = group_view:get_next_expected_decision_id(NewView),
+            ?LOG("write ~p in ~p~n", [_Key, _PaxosId]),
+            group_state:set_view(State, NewView);
         _ ->
             comm:send(Client, {write_response, retry, propose_rejected}),
             State
     end.
 
--spec ops_decision(State::group_types:joined_state(),
+-spec ops_decision(State::group_state:state(),
                    Proposal::proposal_type(),
                    PaxosId::group_types:paxos_id(),
-                   Hint::group_types:decision_hint()) -> group_types:joined_state().
-ops_decision({joined, _NodeState, _GroupState, _TriggerState} = State,
-             {read, _Key, Value, Version, Client, Proposer} = _Proposal,
+                   Hint::group_types:decision_hint()) -> group_state:state().
+ops_decision(State, {read, _Key, Value, Version, Client, Proposer} = _Proposal,
              _PaxosId, _Hint) ->
     case Proposer == comm:this() of
         true ->
@@ -68,24 +67,28 @@ ops_decision({joined, _NodeState, _GroupState, _TriggerState} = State,
         false ->
             State
     end;
-ops_decision({joined, NodeState, GroupState, TriggerState},
-             {write, Key, Value, Version, Client, Proposer} = _Proposal,
+ops_decision(State, {write, Key, Value, Version, Client, Proposer} = _Proposal,
              _PaxosId, _Hint) ->
-    DB = ?DB:write(group_local_state:get_db(NodeState), Key, Value, Version),
-    NewNodeState = group_local_state:set_db(NodeState, DB),
+    DB = group_state:get_db(State),
+    DB2 = group_db:write(DB, Key, Value, Version),
     case Proposer == comm:this() of
         true ->
             comm:send(Client, {paxos_write_response, {ok, Version}}),
-            {joined, NewNodeState, GroupState, TriggerState};
+            group_state:set_db(State, DB2);
         false ->
-            {joined, NewNodeState, GroupState, TriggerState}
+            group_state:set_db(State, DB2)
     end.
 
--spec rejected_proposal(group_types:joined_state(), proposal_type(),
+-spec rejected_proposal(group_state:state(), proposal_type(),
                         group_types:paxos_id()) ->
-    group_types:joined_state().
+    group_state:state().
 rejected_proposal(State,
-                  {group_node_join, Pid, _Acceptor, _Learner},
+                  {read, _Key, _Value, _Version, Client, _Proposer},
                   _PaxosId) ->
-    comm:send(Pid, {group_node_join_response, retry, different_proposal_accepted}),
+    comm:send(Client, {paxos_read_response, {retry, different_proposal_accepted}}),
+    State;
+rejected_proposal(State,
+                  {write, _Key, _Value, _Version, Client, _Proposer},
+                  _PaxosId) ->
+    comm:send(Client, {paxos_write_response, {retry, different_proposal_accepted}}),
     State.

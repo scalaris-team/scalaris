@@ -27,14 +27,15 @@
 -export([deliver/3]).
 
 -spec deliver(group_types:paxos_id(), group_types:proposal(),
-              group_types:joined_state()) -> group_types:joined_state().
-deliver(PaxosId, paxos_no_value_yet, {joined, _NodeState, _GroupState, _TriggerState} = State) ->
+              group_state:state()) -> group_state:state().
+deliver(PaxosId, paxos_no_value_yet, State) ->
     % @todo
     Proposer = comm:make_global(pid_groups:get_my(paxos_proposer)),
     proposer:trigger(Proposer, PaxosId),
     State;
-deliver(PaxosId, Proposal, {joined, _NodeState, GroupState, _TriggerState} = State) ->
-    NextPaxosId = group_state:get_next_expected_decision_id(GroupState),
+deliver(PaxosId, Proposal, State) ->
+    View = group_state:get_view(State),
+    NextPaxosId = group_view:get_next_expected_decision_id(View),
     IsCurrentDecision = is_current_decision(NextPaxosId, PaxosId),
     IsFutureDecision = is_future_decision(NextPaxosId, PaxosId),
     IsPastDecision = is_past_decision(NextPaxosId, PaxosId),
@@ -60,50 +61,49 @@ deliver(PaxosId, Proposal, {joined, _NodeState, GroupState, _TriggerState} = Sta
 %      cleanup old paxos state
 %      trigger next paxos
 -spec deliver_current_decision(group_types:paxos_id(), group_types:proposal(),
-                               group_types:joined_state()) ->
-    group_types:joined_state().
+                               group_state:state()) ->
+    group_state:state().
 deliver_current_decision(PaxosId, Proposal, OldState) ->
     % deliver this decision
-    {joined, NodeState, GroupState, TriggerState}
-        = group_ops:execute_decision(OldState, PaxosId, Proposal),
+    NewState = group_ops:execute_decision(OldState, PaxosId, Proposal),
     % cleanup old paxos state
     group_paxos_utils:cleanup_paxos_states(PaxosId),
     % check for postponed decisions
     % trigger next paxos
-    deliver_postponed_decisions({joined,
-                                 NodeState,
-                                 group_paxos_utils:init_paxos(GroupState),
-                                 TriggerState}).
+    View = group_state:get_view(NewState),
+    deliver_postponed_decisions(group_state:set_view(NewState, group_paxos_utils:init_paxos(View))).
 
 % @doc postpone a future decision and trigger decision on intermediate paxos'
 -spec postpone_future_decision(group_types:paxos_id(), group_types:proposal(),
-                               group_types:joined_state()) ->
-    group_types:joined_state().
+                               group_state:state()) ->
+    group_state:state().
 postpone_future_decision({GroupId, Version} = PaxosId, Proposal,
-                         {joined, NodeState, GroupState, TriggerState}) ->
-    {GroupId, CurrentVersion} = group_state:get_next_expected_decision_id(GroupState),
+                         State) ->
+    View = group_state:get_view(State),
+    {GroupId, CurrentVersion} = group_view:get_next_expected_decision_id(View),
     % trigger missing decisions
     MissingVersions = lists:seq(CurrentVersion, Version - 1),
     Proposer = comm:make_global(pid_groups:get_my(paxos_proposer)),
     % @todo is this the correct way to trigger the missing paxi?
     [proposer:trigger(Proposer, {GroupId, V}) || V <- MissingVersions],
-    {joined, NodeState,
-     group_state:postpone_decision(GroupState, PaxosId, Proposal),
-     TriggerState}.
+    group_state:set_view(State,
+     group_view:postpone_decision(View, PaxosId, Proposal)).
 
 % @doc check whether any postponed decisions can be delivered now
--spec deliver_postponed_decisions(group_types:joined_state()) -> group_types:joined_state().
-deliver_postponed_decisions({joined, NodeState, GroupState, TriggerState} = OldState) ->
-    NextPaxosId = group_state:get_next_expected_decision_id(GroupState),
-    PostponedDecisions = group_state:get_postponed_decisions(GroupState),
+-spec deliver_postponed_decisions(group_state:state()) -> group_state:state().
+deliver_postponed_decisions(OldState) ->
+    View = group_state:get_view(OldState),
+    NextPaxosId = group_view:get_next_expected_decision_id(View),
+    PostponedDecisions = group_view:get_postponed_decisions(View),
     case lists:keysearch(NextPaxosId, 1, PostponedDecisions) of
         {value, {NextPaxosId, Decision}} ->
-            State = {joined, NodeState,
-                     group_state:remove_postponed_decision(GroupState,
+            NewView = group_view:remove_postponed_decision(View,
                                                            NextPaxosId,
                                                            Decision),
-                     TriggerState},
-            deliver_postponed_decisions(group_ops:execute_decision(State, NextPaxosId,
+            NewState = group_state:set_view(OldState,
+                                            NewView),
+            deliver_postponed_decisions(group_ops:execute_decision(NewState,
+                                                                   NextPaxosId,
                                                                    Decision));
         false ->
             OldState

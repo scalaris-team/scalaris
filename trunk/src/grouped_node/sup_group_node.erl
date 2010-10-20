@@ -46,6 +46,7 @@ start_link() ->
                                 PeriodInSeconds::pos_integer()},
                                [ProcessDescr::any()]}}.
 init([Options]) ->
+    db_ets = ?DB, % assert ?DB is ets
     InstanceId = string:concat("group_node_", randoms:getRandomId()),
     pid_groups:join_as(InstanceId, sup_dht_node),
     boot_server:connect(),

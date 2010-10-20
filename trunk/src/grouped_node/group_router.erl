@@ -26,9 +26,11 @@
 
 -type(message() :: any()).
 
--spec route(?RT:key(), pos_integer(), message(), group_types:joined_state()) -> group_types:joined_state().
-route(Key, Hops, Message, {joined, NodeState, GroupState, _TriggerState} = State) ->
-    Interval = group_state:get_interval(GroupState),
+-spec route(?RT:key(), pos_integer(), message(), group_state:state()) -> group_state:state().
+route(Key, Hops, Message, State) ->
+    View = group_state:get_view(State),
+    NodeState = group_state:get_node_state(State),
+    Interval = group_view:get_interval(View),
     case intervals:in(Key, Interval) of
         true ->
             group_node:on(Message, State);

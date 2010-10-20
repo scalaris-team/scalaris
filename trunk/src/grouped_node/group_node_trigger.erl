@@ -24,20 +24,29 @@
 
 -export([trigger/1]).
 
--spec trigger(group_types:joined_state()) -> group_types:joined_state().
-trigger({joined, NodeState, GroupState, TriggerState} = _State) ->
-    case length(group_state:get_members(GroupState)) > 10 of
-        true ->
-            io:format("we are going to split~n", []),
-            SplitKey = get_split_key(group_state:get_interval(GroupState)),
-            {LeftGroup, RightGroup} = split_group(group_state:get_members(GroupState)),
-            Proposal = {group_split, comm:this(), SplitKey,
-                        LeftGroup, RightGroup},
-            comm:send(comm:this(), {ops, Proposal}),
-            {joined, NodeState, GroupState, trigger:next(TriggerState)};
-        false ->
-            {joined, NodeState, GroupState, trigger:next(TriggerState)}
-    end.
+-spec trigger(group_state:state()) -> group_state:state().
+trigger(State) ->
+    View = group_state:get_view(State),
+    case View of
+        undefined ->
+            ok;
+        _ ->
+            case length(group_view:get_members(View)) > 10 of
+                true ->
+                    io:format("we are going to split~n", []),
+                    SplitKey = get_split_key(group_view:get_interval(View)),
+                    {LeftGroup, RightGroup} = split_group(group_view:get_members(View)),
+                    Proposal = {group_split, comm:this(), SplitKey,
+                                LeftGroup, RightGroup},
+                    comm:send(comm:this(), {ops, Proposal});
+                false ->
+                    ok
+            end
+    end,
+    TriggerState = group_state:get_trigger_state(State),
+    NewTriggerState = trigger:next(TriggerState),
+    group_state:set_trigger_state(State, NewTriggerState).
+
 
 get_split_key(Interval) ->
     {'[', LowerBound, UpperBound, ')'} = intervals:get_bounds(Interval),
