@@ -38,15 +38,27 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc initializes a new database
-new(_NodeId) ->
+%% @doc Initializes a new database.
+new() ->
     RandomName = randoms:getRandomId(),
     CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
     {gb_trees:empty(), intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])}.
 
-%% delete DB (missing function)
-close({_DB, _CKInt, CKDB}) ->
+%% @doc Re-opens a previously existing database (not supported by gb_trees
+%%      -> create new DB).
+open(_FileName) ->
+    log:log(warn, "[ Node ~w:db_gb_trees ] open/1 not supported, executing new/0 instead", [self()]),
+    new().
+
+%% @doc Closes and deletes the DB.
+close({_DB, _CKInt, CKDB}, _Delete) ->
     ?CKETS:delete(CKDB).
+
+%% @doc Returns an empty string.
+%%      Note: should return the name of the DB for open/1 which is not
+%%      supported by gb_trees though).
+get_name(_State) ->
+    "".
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result

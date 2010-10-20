@@ -115,7 +115,7 @@ end_per_suite(Config) ->
         end()).
 
 read(_Config) ->
-    prop_new(1, ?RT:hash_key("Unknown")).
+    prop_new(?RT:hash_key("Unknown")).
 
 write(_Config) ->
     prop_write(?RT:hash_key("Key1"), "Value1", 1, ?RT:hash_key("Key2")).
@@ -138,7 +138,7 @@ delete(_Config) ->
     prop_delete(?RT:hash_key("DeleteKey1"), "Value1", false, 1, 1, ?RT:hash_key("DeleteKey2")).
 
 get_load_and_middle(_Config) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     ?equals(?TEST_DB:get_load(DB), 0),
     DB2 = ?TEST_DB:write(DB, "Key1", "Value1", 1),
     ?equals(?TEST_DB:get_load(DB2), 1),
@@ -253,7 +253,7 @@ update_entries(_Config) ->
                                 db_entry:new(5, "Value5", 2)]).
 
 changed_keys(_Config) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     
     ?equals(?TEST_DB:get_changes(DB), {[], []}),
     
@@ -277,12 +277,12 @@ various_tests(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% ?TEST_DB:new/1, ?TEST_DB getters
+% ?TEST_DB:new/0, ?TEST_DB getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_new(NodeId::?RT:key(), Key::?RT:key()) -> true.
-prop_new(NodeId, Key) ->
-    DB = ?TEST_DB:new(NodeId),
+-spec prop_new(Key::?RT:key()) -> true.
+prop_new(Key) ->
+    DB = ?TEST_DB:new(),
     check_db(DB, {true, []}, 0, [], "check_db_new_1"),
     ?equals(?TEST_DB:read(DB, Key), {ok, empty_val, -1}),
     check_entry(DB, Key, db_entry:new(Key), {ok, empty_val, -1}, false, "check_entry_new_1"),
@@ -290,7 +290,7 @@ prop_new(NodeId, Key) ->
     true.
 
 tester_new(_Config) ->
-    tester:test(?MODULE, prop_new, 2, rw_suite_runs(10)).
+    tester:test(?MODULE, prop_new, 1, rw_suite_runs(10)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -299,7 +299,7 @@ tester_new(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_set_entry(DBEntry::db_entry:entry()) -> true.
 prop_set_entry(DBEntry) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry),
     check_entry(DB2, db_entry:get_key(DBEntry), DBEntry,
                 {ok, db_entry:get_value(DBEntry), db_entry:get_version(DBEntry)},
@@ -325,7 +325,7 @@ tester_set_entry(_Config) ->
                         ReadLock2::0..10, Version2::?DB:version()) -> true.
 prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DBEntry2 = create_db_entry(db_entry:get_key(DBEntry1), Value2, WriteLock2, ReadLock2, Version2),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry1),
     DB3 = ?TEST_DB:update_entry(DB2, DBEntry2),
     check_entry(DB3, db_entry:get_key(DBEntry2), DBEntry2,
@@ -350,7 +350,7 @@ tester_update_entry(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_delete_entry1(DBEntry1::db_entry:entry()) -> true.
 prop_delete_entry1(DBEntry1) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry1),
     DB3 = ?TEST_DB:delete_entry(DB2, DBEntry1),
     check_entry(DB3, db_entry:get_key(DBEntry1), db_entry:new(db_entry:get_key(DBEntry1)),
@@ -361,7 +361,7 @@ prop_delete_entry1(DBEntry1) ->
 
 -spec prop_delete_entry2(DBEntry1::db_entry:entry(), DBEntry2::db_entry:entry()) -> true.
 prop_delete_entry2(DBEntry1, DBEntry2) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry1),
     % note: DBEntry2 may not be the same
     DB3 = ?TEST_DB:delete_entry(DB2, DBEntry2),
@@ -398,7 +398,7 @@ tester_delete_entry2(_Config) ->
 -spec prop_write(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version(), Key2::?RT:key()) -> true.
 prop_write(Key, Value, Version, Key2) ->
     DBEntry = db_entry:new(Key, Value, Version),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:write(DB, Key, Value, Version),
     check_entry(DB2, Key, DBEntry, {ok, Value, Version}, true, "check_entry_write_1"),
     check_db(DB2, {true, []}, 1, [DBEntry], "check_db_write_1"),
@@ -419,7 +419,7 @@ tester_write(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_write_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version(), Key2::?RT:key()) -> true.
 prop_write_lock(Key, Value, Version, Key2) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     
     % unlocking non-existing keys should fail and leave the DB in its previous state:
     DB1 = ?db_equals_pattern(?TEST_DB:unset_write_lock(DB, Key), failed),
@@ -498,7 +498,7 @@ tester_write_lock(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_read_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
 prop_read_lock(Key, Value, Version) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     
     % (un)locking non-existing keys should fail and leave the DB in its previous state:
     DB1 = ?db_equals_pattern(?TEST_DB:unset_read_lock(DB, Key), failed),
@@ -545,7 +545,7 @@ tester_read_lock(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_read_write_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
 prop_read_write_lock(Key, Value, Version) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:write(DB, Key, Value, Version),
     
     % write-(un)lock a read-locked key should fail
@@ -575,7 +575,7 @@ tester_read_write_lock(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_write_read_lock(Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
 prop_write_read_lock(Key, Value, Version) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:write(DB, Key, Value, Version),
     
     % read-(un)lock a write-locked key should fail
@@ -606,7 +606,7 @@ tester_write_read_lock(_Config) ->
 -spec prop_delete(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
                   ReadLock::0..10, Version::?DB:version(), Key2::?RT:key()) -> true.
 prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DBEntry = create_db_entry(Key, Value, WriteLock, ReadLock, Version),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry),
     
@@ -658,7 +658,7 @@ tester_delete(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_add_data(Data::?TEST_DB:db_as_list()) -> true.
 prop_add_data(Data) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -683,7 +683,7 @@ tester_add_data(_Config) ->
 -spec prop_get_entries3_1(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
 prop_get_entries3_1(Data, Range_) ->
     Range = intervals:normalize(Range_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
     UniqueData = lists:usort(fun(A, B) ->
@@ -716,7 +716,7 @@ tester_get_entries3_1(_Config) ->
 -spec prop_get_entries3_2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
 prop_get_entries3_2(Data, Range_) ->
     Range = intervals:normalize(Range_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
     UniqueData = lists:usort(fun(A, B) ->
@@ -751,7 +751,7 @@ tester_get_entries3_2(_Config) ->
 -spec prop_get_entries2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
 prop_get_entries2(Data, Range_) ->
     Range = intervals:normalize(Range_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
     UniqueData = lists:usort(fun(A, B) ->
@@ -781,7 +781,7 @@ tester_get_entries2(_Config) ->
 -spec prop_split_data(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
 prop_split_data(Data, Range_) ->
     Range = intervals:normalize(Range_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
     UniqueData = lists:usort(fun(A, B) ->
@@ -845,7 +845,7 @@ prop_update_entries(Data, ItemsToUpdate) ->
 
 -spec prop_update_entries_helper(UniqueData::?TEST_DB:db_as_list(), UniqueUpdateData::?TEST_DB:db_as_list(), ExpUpdatedData::?TEST_DB:db_as_list()) -> true.
 prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData) ->
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, UniqueData),
     
     UpdatePred = fun(OldEntry, NewEntry) ->
@@ -874,7 +874,7 @@ tester_update_entries(_Config) ->
 prop_delete_entries1(Data, Range_) ->
     % use a range to delete entries
     Range = intervals:normalize(Range_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     
     DB3 = ?TEST_DB:delete_entries(DB2, Range),
@@ -896,7 +896,7 @@ prop_delete_entries2(Data, Range_) ->
     % use a range to delete entries
     Range = intervals:normalize(Range_),
     FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     
     DB3 = ?TEST_DB:delete_entries(DB2, FilterFun),
@@ -929,7 +929,7 @@ tester_delete_entries2(_Config) ->
         Key::?RT:key()) -> true.
 prop_changed_keys_get_entry(Data, ChangesInterval_, Key) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
 
@@ -946,7 +946,7 @@ prop_changed_keys_get_entry(Data, ChangesInterval_, Key) ->
         Entry::db_entry:entry()) -> true.
 prop_changed_keys_set_entry(Data, ChangesInterval_, Entry) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry)),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -966,7 +966,7 @@ prop_changed_keys_set_entry(Data, ChangesInterval_, Entry) ->
         UpdateVal::?TEST_DB:value()) -> true.
 prop_changed_keys_update_entry(Data, ChangesInterval_, UpdateVal) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -992,7 +992,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval_, UpdateVal) ->
         Entry::db_entry:entry()) -> true.
 prop_changed_keys_delete_entry(Data, ChangesInterval_, Entry) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry)),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1011,7 +1011,7 @@ prop_changed_keys_delete_entry(Data, ChangesInterval_, Entry) ->
         Key::?RT:key()) -> true.
 prop_changed_keys_read(Data, ChangesInterval_, Key) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1028,7 +1028,7 @@ prop_changed_keys_read(Data, ChangesInterval_, Key) ->
         Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
 prop_changed_keys_write(Data, ChangesInterval_, Key, Value, Version) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1048,7 +1048,7 @@ prop_changed_keys_write(Data, ChangesInterval_, Key, Value, Version) ->
         Key::?RT:key()) -> true.
 prop_changed_keys_delete(Data, ChangesInterval_, Key) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1067,7 +1067,7 @@ prop_changed_keys_delete(Data, ChangesInterval_, Key) ->
         Key::?RT:key()) -> true.
 prop_changed_keys_set_write_lock(Data, ChangesInterval_, Key) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1087,7 +1087,7 @@ prop_changed_keys_set_write_lock(Data, ChangesInterval_, Key) ->
         Key::?RT:key()) -> true.
 prop_changed_keys_unset_write_lock(Data, ChangesInterval_, Key) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1110,7 +1110,7 @@ prop_changed_keys_unset_write_lock(Data, ChangesInterval_, Key) ->
         Key::?RT:key()) -> true.
 prop_changed_keys_set_read_lock(Data, ChangesInterval_, Key) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1130,7 +1130,7 @@ prop_changed_keys_set_read_lock(Data, ChangesInterval_, Key) ->
         Key::?RT:key()) -> true.
 prop_changed_keys_unset_read_lock(Data, ChangesInterval_, Key) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1151,7 +1151,7 @@ prop_changed_keys_unset_read_lock(Data, ChangesInterval_, Key) ->
 prop_changed_keys_get_entries2(Data, ChangesInterval_, Interval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
     Interval = intervals:normalize(Interval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1169,7 +1169,7 @@ prop_changed_keys_get_entries2(Data, ChangesInterval_, Interval_) ->
 prop_changed_keys_get_entries4(Data, ChangesInterval_, Interval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
     Interval = intervals:normalize(Interval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1191,7 +1191,7 @@ prop_changed_keys_get_entries4(Data, ChangesInterval_, Interval_) ->
         Entry1::db_entry:entry(), Entry2::db_entry:entry()) -> true.
 prop_changed_keys_update_entries(Data, ChangesInterval_, Entry1, Entry2) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old1 = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry1)),
     Old2 = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry2)),
@@ -1221,7 +1221,7 @@ prop_changed_keys_delete_entries1(Data, ChangesInterval_, Range_) ->
     % use a range to delete entries
     ChangesInterval = intervals:normalize(ChangesInterval_),
     Range = intervals:normalize(Range_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1249,7 +1249,7 @@ prop_changed_keys_delete_entries2(Data, ChangesInterval_, Range_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
     Range = intervals:normalize(Range_),
     FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1273,7 +1273,7 @@ prop_changed_keys_delete_entries2(Data, ChangesInterval_, Range_) ->
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_get_load(Data, ChangesInterval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1292,7 +1292,7 @@ prop_changed_keys_get_load(Data, ChangesInterval_) ->
 prop_changed_keys_split_data1(Data, ChangesInterval_, MyNewInterval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
     MyNewInterval = intervals:normalize(MyNewInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
 
@@ -1311,7 +1311,7 @@ prop_changed_keys_split_data1(Data, ChangesInterval_, MyNewInterval_) ->
 prop_changed_keys_split_data2(Data, ChangesInterval_, MyNewInterval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
     MyNewInterval = intervals:normalize(MyNewInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:record_changes(DB, ChangesInterval),
     DB3 = ?TEST_DB:add_data(DB2, Data),
 
@@ -1328,7 +1328,7 @@ prop_changed_keys_split_data2(Data, ChangesInterval_, MyNewInterval_) ->
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_get_data(Data, ChangesInterval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1345,7 +1345,7 @@ prop_changed_keys_get_data(Data, ChangesInterval_) ->
         ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_add_data(Data, ChangesInterval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:record_changes(DB, ChangesInterval),
     
     DB3 = ?TEST_DB:add_data(DB2, Data),
@@ -1368,7 +1368,7 @@ prop_changed_keys_add_data(Data, ChangesInterval_) ->
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval()) -> true.
 prop_changed_keys_check_db(Data, ChangesInterval_) ->
     ChangesInterval = intervals:normalize(ChangesInterval_),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
@@ -1390,7 +1390,7 @@ prop_changed_keys_mult_interval(Data, Entry1, Entry2, Entry3, Entry4) ->
     CI2 = intervals:union(intervals:new(db_entry:get_key(Entry3)),
                           intervals:new(db_entry:get_key(Entry4))),
     CI1_2 = intervals:union(CI1, CI2),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     
     DB3 = ?TEST_DB:record_changes(DB2, CI1),
@@ -1433,7 +1433,7 @@ prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
                           intervals:new(db_entry:get_key(Entry4))),
     CI1_2 = intervals:union(CI1, CI2),
     CI1_wo2 = intervals:minus(CI1, CI2),
-    DB = ?TEST_DB:new(?RT:hash_key(1)),
+    DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     
     DB3 = ?TEST_DB:record_changes(DB2, CI1_2),

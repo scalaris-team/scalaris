@@ -294,7 +294,6 @@ get_base_interval() ->
 % - check if the proposal was for this group instance
 % - add pred and succ list for routing
 % - synchronize db, especially on join/leave/split
-% - ?DB:new() what is the/my Id?
 % - key-space is hard-coded to 0-2^128-1
 % - specify type for group_state messages, it should be a well-defined subset of group_state:state().
 

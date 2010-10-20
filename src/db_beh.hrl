@@ -17,17 +17,19 @@
 %% @end
 %% @version $Id$
 
--type(value() :: any()).
--type(version() :: non_neg_integer()).
--type(kvv_list() :: [{Key::?RT:key(), Value::value(), Version::version()}]).
--type(db_as_list() :: [db_entry:entry()]).
+-type value() :: any().
+-type version() :: non_neg_integer().
+-type kvv_list() :: [{Key::?RT:key(), Value::value(), Version::version()}].
+-type db_as_list() :: [db_entry:entry()].
+-type db_name() :: string().
 
 -ifdef(with_export_type_support).
 -export_type([db/0, value/0, version/0, kvv_list/0,
               db_as_list/0]).
 -endif.
 
--export([new/1, close/1]).
+-export([new/0, open/1, close/1, close/2]).
+-export([get_name/1]).
 -export([get_entry/2, get_entry2/2, set_entry/2, update_entry/2, delete_entry/2]).
 -export([read/2, write/4, delete/2]).
 -export([set_write_lock/2, unset_write_lock/2,
@@ -40,8 +42,12 @@
 -export([record_changes/2, stop_record_changes/1, stop_record_changes/2,
          get_changes/1, get_changes/2]).
 
--spec new(NodeId::?RT:key()) -> db().
+-spec new() -> db().
+-spec open(DBName::db_name()) -> db().
 -spec close(DB::db()) -> any().
+-spec close(DB::db(), Delete::boolean()) -> any().
+
+-spec get_name(DB::db()) -> db_name().
 
 -spec get_entry(DB::db(), Key::?RT:key()) -> db_entry:entry().
 -spec get_entry2(DB::db(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.

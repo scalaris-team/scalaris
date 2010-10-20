@@ -23,7 +23,7 @@
 
 -behaviour(db_beh).
 
--opaque(db() :: {Table::atom(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}).
+-opaque(db() :: {{DB::pid(), FileName::string()}, RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}).
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -37,46 +37,83 @@
 %% public functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Initializes a new database (will launch a process for it); returns the
-%%      a reference to the DB.
-new(Id) ->
-    Dir = lists:flatten(io_lib:format("~s/~s", [config:read(db_directory),
-                                  atom_to_list(node())])),
-    file:make_dir(Dir),
-    FileName = lists:flatten(io_lib:format("~s/db_~p.tch", [Dir, Id])),
-    {ok, DB} = toke_drv:start_link(),
+%% @doc Initializes a new database (will launch a process for it).
+new() ->
+    Dir = util:make_filename(atom_to_list(node())),
+    FullDir = lists:flatten([config:read(db_directory), "/", Dir]),
+    file:make_dir(FullDir),
+    {_Now_Ms, _Now_s, Now_us} = Now = erlang:now(),
+    {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:now_to_local_time(Now),
+    FileBaseName = util:make_filename(
+                     io_lib:format("db_~B~B~B-~B~B~B\.~B.tch",
+                                   [Year, Month, Day, Hour, Minute, Second, Now_us])),
+    FullFileName = lists:flatten([FullDir, "/", FileBaseName]),
+    new_db(FullFileName, [read, write, create, truncate]).
+
+%% @doc Re-opens an existing database (will launch a process for it).
+%%      BEWARE: use with caution in order to preserve consistency!
+open(FileName) ->
+    new_db(FileName, [read, write]).
+
+-spec new_db(FileName::string(),
+             TokeOptions::[read | write | create | truncate | no_lock |
+                           lock_no_block | sync_on_transaction]) -> db().
+new_db(FileName, TokeOptions) ->
+    DB = case toke_drv:start_link() of
+             {ok, Pid} -> Pid;
+             ignore ->
+                 log:log(error, "[ Node ~w:db_toke ] process start returned 'ignore'", [self()]),
+                 erlang:error({toke_failed, drv_start_ignore});
+             {error, Error} ->
+                 log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error]),
+                 erlang:error({toke_failed, Error})
+         end,
     case toke_drv:new(DB) of
         ok ->
             RandomName = randoms:getRandomId(),
             CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
-            case toke_drv:open(DB, FileName, [read,write,create,truncate]) of
-                ok     -> {DB, intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])};
-                Error2 -> log:log(error, "[ TOKE ] ~p", [Error2]),
+            case toke_drv:open(DB, FileName, TokeOptions) of
+                ok     -> {{DB, FileName}, intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])};
+                Error2 -> log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
                           erlang:error({toke_failed, Error2})
             end;
         Error1 ->
-            log:log(error, "[ TOKE ] ~p", [Error1]),
+            log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error1]),
             erlang:error({toke_failed, Error1})
     end.
 
 %% @doc Deletes all contents of the given DB.
-close({DB, _CKInt, CKDB}) ->
+close({{DB, FileName}, _CKInt, CKDB}, Delete) ->
     toke_drv:close(DB),
     toke_drv:delete(DB),
     toke_drv:stop(DB),
+    case Delete of
+        true ->
+            case file:delete(FileName) of
+                ok -> ok;
+                {error, Reason} -> log:log(error, "[ Node ~w:db_toke ] deleting ~.0p failed: ~.0p",
+                                           [self(), FileName, Reason])
+            end;
+        _ -> ok
+    end,
     ?CKETS:delete(CKDB).
+
+%% @doc Returns the name of the DB, i.e. the path to its file, which can be
+%%      used with open/1.
+get_name({{_DB, FileName}, _CKInt, _CKDB}) ->
+    FileName.
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
-get_entry2({DB, _CKInt, _CKDB}, Key) ->
+get_entry2({{DB, _FileName}, _CKInt, _CKDB}, Key) ->
     case toke_drv:get(DB, erlang:term_to_binary(Key)) of
         not_found -> {false, db_entry:new(Key)};
         Entry     -> {true, erlang:binary_to_term(Entry)}
     end.
 
 %% @doc Inserts a complete entry into the DB.
-set_entry(State = {DB, CKInt, CKDB}, Entry) ->
+set_entry(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
     Key = db_entry:get_key(Entry),
     case intervals:in(Key, CKInt) of
         false -> ok;
@@ -91,7 +128,7 @@ update_entry(State, Entry) ->
     set_entry(State, Entry).
 
 %% @doc Removes all values with the given entry's key from the DB.
-delete_entry(State = {DB, CKInt, CKDB}, Entry) ->
+delete_entry(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
     Key = db_entry:get_key(Entry),
     case intervals:in(Key, CKInt) of
         false -> ok;
@@ -101,12 +138,12 @@ delete_entry(State = {DB, CKInt, CKDB}, Entry) ->
     State.
 
 %% @doc Returns the number of stored keys.
-get_load({DB, _CKInt, _CKDB}) ->
+get_load({{DB, _FileName}, _CKInt, _CKDB}) ->
     % TODO: not really efficient (maybe store the load in the DB?)
     toke_drv:fold(fun (_K, _V, Acc) -> Acc + 1 end, 0, DB).
 
 %% @doc Adds all db_entry objects in the Data list.
-add_data(State = {DB, CKInt, CKDB}, Data) ->
+add_data(State = {{DB, _FileName}, CKInt, CKDB}, Data) ->
     % check once for the 'common case'
     case intervals:is_empty(CKInt) of
         true -> ok;
@@ -127,7 +164,7 @@ add_data(State = {DB, CKInt, CKDB}, Data) ->
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
-split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
+split_data(State = {{DB, _FileName}, _CKInt, CKDB}, MyNewInterval) ->
     % first collect all toke keys to remove from my db (can not delete while doing fold!)
     F = fun(_K, DBEntry_, HisList) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
@@ -152,7 +189,7 @@ split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
-get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
+get_entries({{DB, _FileName}, _CKInt, _CKDB}, FilterFun, ValueFun) ->
     F = fun (_Key, DBEntry_, Data) ->
                  DBEntry = erlang:binary_to_term(DBEntry_),
                  case FilterFun(DBEntry) of
@@ -164,7 +201,7 @@ get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
-delete_entries(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+delete_entries(State = {{DB, _FileName}, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
     % first collect all toke keys to delete (can not delete while doing fold!)
     F = fun(KeyToke, DBEntry_, ToDelete) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
@@ -189,7 +226,7 @@ delete_entries(State, Interval) ->
                           end).
 
 %% @doc Returns all DB entries.
-get_data({DB, _CKInt, _CKDB}) ->
+get_data({{DB, _FileName}, _CKInt, _CKDB}) ->
     toke_drv:fold(fun (_K, DBEntry, Acc) ->
                            [erlang:binary_to_term(DBEntry) | Acc]
                   end, [], DB).

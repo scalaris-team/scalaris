@@ -35,12 +35,12 @@
 -spec new_empty() -> {is_current, ?DB:db()}.
 new_empty() ->
     % @todo
-    {is_current, ?DB:new(?RT:hash_key(1))}.
+    {is_current, ?DB:new()}.
 
 -spec new_replica() -> {is_filling, ?DB:db()}.
 new_replica() ->
     % @todo
-    {is_filling, ?DB:new(?RT:hash_key(1))}.
+    {is_filling, ?DB:new()}.
 
 -spec write(state(), ?RT:key(), any(), non_neg_integer()) ->
     state().
