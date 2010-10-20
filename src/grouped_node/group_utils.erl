@@ -25,11 +25,11 @@
 -export([notify_neighbors/3]).
 
 -spec notify_neighbors(NodeState::group_local_state:local_state(),
-                       OldGroupState::group_state:group_state(),
-                       NewGroupState::group_state:group_state()) -> ok.
-notify_neighbors(NodeState, OldGroupState, NewGroupState) ->
-    OldGroupNode = group_state:get_group_node(OldGroupState),
-    NewGroupNode = group_state:get_group_node(NewGroupState),
+                       OldView::group_view:view(),
+                       NewView::group_view:view()) -> ok.
+notify_neighbors(NodeState, OldView, NewView) ->
+    OldGroupNode = group_view:get_group_node(OldView),
+    NewGroupNode = group_view:get_group_node(NewView),
     case OldGroupNode == NewGroupNode of
         true ->
             ok;

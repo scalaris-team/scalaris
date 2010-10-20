@@ -25,19 +25,19 @@
 -type(proposal_type()::{group_node_remove, Pid::comm:mypid()}).
 
 % @doc we got a request to remove a node from this group, do sanity checks and propose the removal
--spec ops_request(State::group_types:joined_state(),
-                  Proposal::proposal_type()) -> group_types:joined_state().
-ops_request({joined, NodeState, GroupState, TriggerState} = State,
-            {group_node_remove, Pid} = _Proposal) ->
-    case group_state:is_member(GroupState, Pid) of
+-spec ops_request(State::group_state:state(),
+                  Proposal::proposal_type()) -> group_state:state().
+ops_request(State, {group_node_remove, Pid} = _Proposal) ->
+    View = group_state:get_view(State),
+    case group_view:is_member(View, Pid) of
         false ->
             comm:send(Pid, {group_node_remove_response,
                             Pid, is_no_member}),
             State;
         true ->
-            case group_paxos_utils:propose({group_node_remove, Pid}, GroupState) of
-                {success, NewGroupState} ->
-                    {joined, NodeState, NewGroupState, TriggerState};
+            case group_paxos_utils:propose({group_node_remove, Pid}, View) of
+                {success, NewView} ->
+                    group_state:set_view(State, NewView);
                 _ ->
                     comm:send(Pid, {group_node_remove_response, retry}),
                     State
@@ -46,31 +46,28 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
 
 
 % @doc it was decided to remove a node from our group: execute the removal
--spec ops_decision(State::group_types:joined_state(),
+-spec ops_decision(State::group_state:state(),
                    Proposal::proposal_type(),
                    PaxosId::group_types:paxos_id(),
-                   Hint::group_types:decision_hint()) -> group_types:joined_state().
-ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
-             {group_node_remove, Pid} = Proposal,
-             PaxosId, _Hint) ->
-    NewGroupState = group_state:remove_node(
-                      group_state:remove_proposal(GroupState,
+                   Hint::group_types:decision_hint()) -> group_state:state().
+ops_decision(State, {group_node_remove, Pid} = _Proposal, PaxosId, _Hint) ->
+    View = group_state:get_view(State),
+    NodeState = group_state:get_node_state(State),
+    NewView = group_view:recalculate_index(group_view:remove_node(
+                      group_view:remove_proposal(View,
                                                   PaxosId),
-                      Pid),
-    group_utils:notify_neighbors(NodeState, GroupState,
-                                 NewGroupState),
+                      Pid)),
+    group_utils:notify_neighbors(NodeState, View, NewView),
     % notify dead node
     Pred = group_local_state:get_predecessor(NodeState),
     Succ = group_local_state:get_successor(NodeState),
-    comm:send(Pid, {group_state, NewGroupState, Pred, Succ}),
+    comm:send(Pid, {group_state, NewView, Pred, Succ}),
     fd:unsubscribe(Pid),
-    {joined, NodeState, NewGroupState, TriggerState}.
+    group_state:set_view(State, View).
 
--spec rejected_proposal(group_types:joined_state(), proposal_type(),
+-spec rejected_proposal(group_state:state(), proposal_type(),
                         group_types:paxos_id()) ->
-    group_types:joined_state().
-rejected_proposal(State,
-                  {group_node_remove, Pid},
-                  _PaxosId) ->
+    group_state:state().
+rejected_proposal(State, {group_node_remove, Pid}, _PaxosId) ->
     comm:send(Pid, {group_node_remove_response, retry, Pid}),
     State.

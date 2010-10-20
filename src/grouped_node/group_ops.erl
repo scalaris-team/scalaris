@@ -22,9 +22,9 @@
 
 -export([execute_decision/3, report_rejection/3]).
 
--spec report_rejection(group_types:joined_state(), group_types:paxos_id(),
+-spec report_rejection(group_state:state(), group_types:paxos_id(),
                        group_types:proposal()) ->
-    group_types:joined_state().
+    group_state:state().
 report_rejection(State, PaxosId, Proposal) ->
     case Proposal of
         {group_split, _Pid, _SplitKey, _LeftGroup, _RightGroup} ->
@@ -40,12 +40,13 @@ report_rejection(State, PaxosId, Proposal) ->
     end.
 
 % @doc execute decision
--spec execute_decision(group_types:joined_state(), group_types:paxos_id(),
+-spec execute_decision(group_state:state(), group_types:paxos_id(),
                        group_types:proposal()) ->
-    group_types:joined_state().
-execute_decision({joined, _, GroupState, _} = State, PaxosId, Proposal) ->
-    PaxosId = group_state:get_next_expected_decision_id(GroupState), %assert
-    case group_state:get_proposal(GroupState, PaxosId) of
+    group_state:state().
+execute_decision(State, PaxosId, Proposal) ->
+    View = group_state:get_view(State),
+    PaxosId = group_view:get_next_expected_decision_id(View), %assert
+    case group_view:get_proposal(View, PaxosId) of
         {value, Proposal} -> % my proposal was accepted
             dispatch_decision(State, PaxosId, Proposal, my_proposal_won);
         none -> % I had no proposal for this paxos instance
@@ -55,9 +56,9 @@ execute_decision({joined, _, GroupState, _} = State, PaxosId, Proposal) ->
             group_ops:report_rejection(NewState, PaxosId, OtherProposal)
     end.
 
--spec dispatch_decision(group_types:joined_state(), group_types:paxos_id(),
+-spec dispatch_decision(group_state:state(), group_types:paxos_id(),
                         group_types:proposal(), group_types:decision_hint()) ->
-    group_types:joined_state().
+    group_state:state().
 dispatch_decision(State, PaxosId, {group_split, _, _, _, _} = Decision, Hint) ->
     group_ops_split_group:ops_decision(State, Decision, PaxosId, Hint);
 dispatch_decision(State, PaxosId, {group_node_remove, _} = Decision, Hint) ->

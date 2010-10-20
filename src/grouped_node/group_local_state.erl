@@ -22,34 +22,23 @@
 
 -include("scalaris.hrl").
 
--export([new/3,
-         set_db/2,
-        get_predecessor/1, get_successor/1, get_db/1,
+-export([new/2,
+        get_predecessor/1, get_successor/1,
         update_pred_succ/3, update_pred/2, update_succ/2]).
 
 -record(local_state, {successor::group_types:group_node(),
                       predecessor::group_types:group_node(),
-                      rt,
-                      db}).
+                      rt}).
 
 -opaque local_state() :: #local_state{}.
 
--spec new(Pred::group_types:group_node(), Succ::group_types:group_node(),
-          DB::?DB:db()) -> local_state().
-new(Pred, Succ, DB) ->
+-spec new(Pred::group_types:group_node(), Succ::group_types:group_node()) ->
+    local_state().
+new(Pred, Succ) ->
     #local_state{
      predecessor = Pred,
      successor = Succ,
-     db = DB,
      rt = none}.
-
--spec get_db(State::local_state()) -> ?DB:db().
-get_db(#local_state{db=DB}) ->
-    DB.
-
--spec set_db(State::local_state(), DB::?DB:db()) -> local_state().
-set_db(LocalState, DB) ->
-    LocalState#local_state{db=DB}.
 
 -spec get_predecessor(State::local_state()) -> group_types:group_node().
 get_predecessor(#local_state{predecessor=Predecessor}) ->

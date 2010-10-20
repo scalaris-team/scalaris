@@ -27,22 +27,22 @@
                           RightGroup::list(comm:mypid())}).
 
 % @doc we got a request to split this group, do sanity checks and propose the split
--spec ops_request(State::group_types:joined_state(),
-                  Proposal::proposal_type()) -> group_types:joined_state().
-ops_request({joined, NodeState, GroupState, TriggerState} = State,
-            {group_split, Pid, SplitKey, LeftGroup, RightGroup} = Proposal) ->
-    CurrentMemberList = group_state:get_members(GroupState),
+-spec ops_request(State::group_state:state(),
+                  Proposal::proposal_type()) -> group_state:state().
+ops_request(State, {group_split, Pid, SplitKey, LeftGroup, RightGroup} = Proposal) ->
+    View = group_state:get_view(State),
+    CurrentMemberList = group_view:get_members(View),
     SplitIsInRange = intervals:in(SplitKey,
-                                  group_state:get_interval(GroupState)),
+                                  group_view:get_interval(View)),
     % is LeftGroup+RightGroup the current member list
     % and the SplitKey is in current range?
     case {lists:sort(LeftGroup ++ RightGroup) == lists:sort(CurrentMemberList),
           SplitIsInRange} of
         {true, true} ->
-            case group_paxos_utils:propose(Proposal, GroupState) of
-                {success, NewGroupState} ->
+            case group_paxos_utils:propose(Proposal, View) of
+                {success, NewView} ->
                     io:format("proposed split~n", []),
-                    {joined, NodeState, NewGroupState, TriggerState};
+                    group_state:set_view(State, NewView);
                 _ ->
                     comm:send(Pid, {group_split_response, retry}),
                     State
@@ -59,11 +59,11 @@ ops_request({joined, NodeState, GroupState, TriggerState} = State,
     end.
 
 % @doc it was decided to split our group: execute the split
--spec ops_decision(State::group_types:joined_state(),
+-spec ops_decision(State::group_state:state(),
                    Proposal::proposal_type(),
                    PaxosId::any(), Hint::group_types:decision_hint()) ->
-    group_types:joined_state().
-ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
+    group_state:state().
+ops_decision(State,
              {group_split, Proposer, SplitKey, LeftGroup, RightGroup} = _Proposal,
              PaxosId, Hint) ->
     case Hint of
@@ -71,32 +71,34 @@ ops_decision({joined, NodeState, GroupState, TriggerState} = _State,
         _ -> ok
     end,
     io:format("decided split~n", []),
-    NewGroupState = group_state:remove_proposal(
-                      split_group(GroupState, SplitKey, LeftGroup, RightGroup),
-                      PaxosId),
-    group_utils:notify_neighbors(NodeState, GroupState, NewGroupState),
+    View = group_state:get_view(State),
+    NewView = group_view:recalculate_index(group_view:remove_proposal(
+                      split_group(View, SplitKey, LeftGroup, RightGroup),
+                      PaxosId)),
+    NodeState = group_state:get_node_state(State),
+    group_utils:notify_neighbors(NodeState, View, NewView),
     update_fd(),
-    {joined, NodeState, NewGroupState, TriggerState}.
+    group_state:set_view(State, NewView).
 
--spec split_group(GroupState::group_state:group_state(),
+-spec split_group(View::group_view:view(),
                   SplitKey::?RT:key(),
                   LeftGroup::list(comm:mypid()),
                   RightGroup::list(comm:mypid())) ->
-    group_state:group_state().
-split_group(GroupState, SplitKey, LeftGroup, RightGroup) ->
-    OldInterval = group_state:get_interval(GroupState),
-    OldGroupId = group_state:get_group_id(GroupState),
+    group_view:view().
+split_group(View, SplitKey, LeftGroup, RightGroup) ->
+    OldInterval = group_view:get_interval(View),
+    OldGroupId = group_view:get_group_id(View),
     {'[', LowerBound, UpperBound, ')'} = intervals:get_bounds(OldInterval),
     case lists:member(comm:this(), LeftGroup) of
         true ->
-            NewGroupId = group_state:get_new_group_id(OldGroupId, left),
+            NewGroupId = group_view:get_new_group_id(OldGroupId, left),
             NewInterval = intervals:new('[', LowerBound, SplitKey, ')'),
-            group_state:split_group(GroupState, NewGroupId, NewInterval,
+            group_view:split_group(View, NewGroupId, NewInterval,
                                          LeftGroup);
         false ->
-            NewGroupId = group_state:get_new_group_id(OldGroupId, right),
+            NewGroupId = group_view:get_new_group_id(OldGroupId, right),
             NewInterval = intervals:new('[', SplitKey, UpperBound, ')'),
-            group_state:split_group(GroupState, NewGroupId, NewInterval,
+            group_view:split_group(View, NewGroupId, NewInterval,
                                          RightGroup)
     end.
 
@@ -104,9 +106,9 @@ update_fd() ->
     %@todo
     ok.
 
--spec rejected_proposal(group_types:joined_state(), proposal_type(),
+-spec rejected_proposal(group_state:state(), proposal_type(),
                         group_types:paxos_id()) ->
-    group_types:joined_state().
+    group_state:state().
 rejected_proposal(State,
                   {group_split, Proposer, _SplitKey, _LeftGroup, _RightGroup},
                   _PaxosId) ->

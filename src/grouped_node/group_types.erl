@@ -34,18 +34,6 @@
                   | {write, Key::?RT:key(), Value::any(), Version::pos_integer(),
                      Client::comm:mypid(), Proposer::comm:mypid()}).
 
--type(mode_type() :: joining | joined).
-
--type(state() :: {Mode::mode_type(),
-                  NodeState::group_local_state:local_state(),
-                  GroupState::group_state:group_state(),
-                  TriggerState::trigger:state()}).
-
--type(joined_state() :: {joined,
-                         NodeState::group_local_state:local_state(),
-                         GroupState::group_state:group_state(),
-                         TriggerState::trigger:state()}).
-
 -type(decision_hint() :: my_proposal_won | had_no_proposal).
 
 -type(group_node() :: {GroupId::group_id(),
@@ -57,6 +45,6 @@
 
 
 -ifdef(with_export_type_support).
--export_type([group_id/0, group_member/0, group_member_list/0, joined_state/0,
-              state/0, proposal/0, paxos_id/0]).
+-export_type([group_id/0, group_member/0, group_member_list/0,
+              proposal/0, paxos_id/0]).
 -endif.
