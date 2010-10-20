@@ -43,7 +43,7 @@
 -endif.
 
 -type paxos_id() :: {paxos_id, util:global_uid()}.
--type tx_item_id() :: util:global_uid().
+-type tx_item_id() :: {tx_item_id, util:global_uid()}.
 -type tx_item_state() ::
  {
    tx_item_id(), %%  1 TxItemId, id of the item
