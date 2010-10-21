@@ -57,7 +57,7 @@
 %%==============================================================================
 
 %% start a manager: it will execute the readphase and commit phase
-start_manager(TransFun, SuccessFun, FailureFun, Owner, TID, InstanceId)->
+start_manager(TransFun, SuccessFun, FailureFun, Owner, TID, _InstanceId)->
     {Res, ResVal} = tmanager:read_phase(TransFun),
     case Res of
         ok ->
@@ -73,7 +73,7 @@ start_manager(TransFun, SuccessFun, FailureFun, Owner, TID, InstanceId)->
     end.
 
 %% start a manager without a read phase
-start_manager_commit(Items, SuccessFun, FailureFun, Owner, TID, InstanceId)->
+start_manager_commit(Items, SuccessFun, FailureFun, Owner, TID, _InstanceId)->
     commit_phase(Items, SuccessFun, empty ,FailureFun, Owner, TID).
 
 %% readphase: execute the transaction function
@@ -217,7 +217,7 @@ start_commit(TMState)->
       || Item <- TMState#tm_state.items ],
     loop(TMState).
 
-start_replicated_manager(Message, InstanceId)->
+start_replicated_manager(Message, _InstanceId)->
     {Leader, Items} = Message#tm_message.message,
     RKey = Message#tm_message.tm_key,
     TransID = Message#tm_message.transaction_id,

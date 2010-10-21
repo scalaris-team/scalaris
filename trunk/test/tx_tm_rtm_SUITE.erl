@@ -111,7 +111,7 @@ abort_prepared_wmc(_) ->
          MC3 <- causes(), MC4 <- causes()],
     ok.
 
-abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
+abort_prepared(_Key, Op, PreOps, ExpectedOutcome) ->
     Keys = ?RT:get_replica_keys(?RT:hash_key(0)),
     DBEntries = get_db_entries(Keys),
     NewDBEntries = [ begin
@@ -209,11 +209,8 @@ calc_rc_outcome(PreOps) ->
     %% DB is static over whole tx.
     %% Read phase and validation phase may operate on different
     %% replica subsets.
-    NumReadlock =   length([ X || X <- PreOps, X =:= readlock ]),
     NumWritelock =  length([ X || X <- PreOps, X =:= writelock ]),
-    NumVersionDec = length([ X || X <- PreOps, X =:= versiondec ]),
     NumVersionInc = length([ X || X <- PreOps, X =:= versioninc ]),
-    NumNone =       length([ X || X <- PreOps, X =:= none ]),
 
     if (0 =:= NumWritelock) -> ok;
        (1 =:= NumWritelock andalso 1 =/= NumVersionInc) -> ok;
