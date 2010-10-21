@@ -254,23 +254,26 @@ on({succ_left, OldSucc, SuccsSucc}, {NeighbTable, RM_State, Subscribers}) ->
 on({update_id, NewId}, {NeighbTable, RM_State, Subscribers} = State) ->
     Neighborhood = get_neighbors(NeighbTable),
     OldMe = nodelist:node(Neighborhood),
-    NewMe = node:update_id(OldMe, NewId),
-    case OldMe =:= NewMe of
+    case node:id(OldMe) =/= NewId of
         true ->
+            NewMe = node:update_id(OldMe, NewId),
             % note: nodelist can't update the base node if the new id is not
             % between pred id and succ id
             try begin
-                    update_neighbors(NeighbTable,
-                                     nodelist:update_node(Neighborhood, NewMe)),
-                    RMFun = fun() -> ?RM:updated_node(RM_State, NeighbTable, OldMe, NewMe) end,
+                    RMFun = fun() ->
+                                    update_neighbors(NeighbTable,
+                                                     nodelist:update_node(Neighborhood, NewMe)),
+                                    ?RM:updated_node(RM_State, NeighbTable, OldMe, NewMe)
+                            end,
                     update_state(NeighbTable, Subscribers, RMFun)
                 end
             catch
-                throw:_ ->
-                    log:log(error, "[ RM ] can't update dht node ~w with id ~w (pred=~w, succ=~w)",
+                throw:Reason ->
+                    log:log(error, "[ RM ] can't update dht node ~w with id ~w (pred=~w, succ=~w): ~.0p",
                             [nodelist:node(Neighborhood), NewId,
                              nodelist:pred(Neighborhood),
-                             nodelist:succ(Neighborhood)]),
+                             nodelist:succ(Neighborhood),
+                             Reason]),
                     State
             end;
         _ -> State
