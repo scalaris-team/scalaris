@@ -90,7 +90,7 @@ new_receiving_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
     case lists:member(Tag, ?special_tags) of
         true ->
             log:log(warn, "Using reserved tag in receiving slide(~.0p, ~.0p, ~.0p, ~.0p, ~.0p, ~.0p)",
-                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid]);
+                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid, State]);
         _ -> ok
     end,
     {IntervalToReceive, TargetNodePid} =
@@ -122,7 +122,7 @@ new_sending_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
     case lists:member(Tag, ?special_tags) of
         true ->
             log:log(warn, "Using reserved tag in sending slide(~.0p, ~.0p, ~.0p, ~.0p, ~.0p, ~.0p)",
-                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid]);
+                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid, State]);
         _ -> ok
     end,
     {IntervalToSend, TargetNodePid} =
