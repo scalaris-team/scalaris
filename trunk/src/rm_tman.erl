@@ -68,10 +68,6 @@ on({trigger}, {RandViewSize, Interval, TriggerState, Cache, Churn} = State,
    NeighbTable) ->
     % Trigger an update of the Random view
     Neighborhood = rm_loop:get_neighbors(NeighbTable),
-    RndView = get_RndView(RandViewSize, Cache),
-    %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-    {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
-    %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
     % Test for being alone:
     case nodelist:has_real_pred(Neighborhood) andalso
              nodelist:has_real_succ(Neighborhood) of
@@ -81,6 +77,10 @@ on({trigger}, {RandViewSize, Interval, TriggerState, Cache, Churn} = State,
             % notify_new_succ and notify_new_pred)
             State;
         _ -> % there is another node in the system
+            RndView = get_RndView(RandViewSize, Cache),
+            %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
+            {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
+            %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
             RequestPredsMinCount =
                 case nodelist:has_real_pred(Neighborhood) of
                     true -> get_pred_list_length() - length(nodelist:preds(Neighborhood));

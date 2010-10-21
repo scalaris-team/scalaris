@@ -176,7 +176,9 @@ nodeid({_Preds, Node, _Succs}) ->
 %% @doc Updates the base node of the neighborhood if its ID is still between
 %%      the ID of the predecessor and successor. Otherwise throws an exception.
 -spec update_node(neighborhood(), NewBaseNode::node:node_type()) -> neighborhood().
-update_node({[Pred, _] = Preds, _Node, [Succ | _] = Succs}, NewBaseNode) ->
+update_node({[Node], Node, [Node]}, NewBaseNode) ->
+    new([NewBaseNode], NewBaseNode, [NewBaseNode]);
+update_node({[Pred | _] = Preds, _Node, [Succ | _] = Succs}, NewBaseNode) ->
     case intervals:in(node:id(NewBaseNode),
                       intervals:new('(', node:id(Pred), node:id(Succ), ')')) of
         true -> new(Preds, NewBaseNode, Succs);
