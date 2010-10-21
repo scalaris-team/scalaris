@@ -50,28 +50,44 @@ init() ->
                   tx_item_state:paxos_id()},
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
-on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId}, DHT_Node_State) ->
+on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% need Acceptors (given via RTMs), Learner,
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),
-    {NewDB, Proposal} = apply(tx_tlog:get_entry_operation(RTLogEntry),
-                              validate,
-                              [DB, RTLogEntry]),
+    Key = tx_tlog:get_entry_key(RTLogEntry),
+    NewDB =
+        %% check only necessary in case of damaged routing
+        case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
+            true ->
+                {TmpDB, Proposal} =
+                    apply(tx_tlog:get_entry_operation(RTLogEntry),
+                          validate,
+                          [DB, RTLogEntry]),
 
-    %% remember own proposal for lock release
-    TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
-    pdb:set({PaxId, Proposal}, TP_DB),
+                %% remember own proposal for lock release
+                TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
+                pdb:set({PaxId, Proposal}, TP_DB),
 
-    %% initiate a paxos proposer round 0 with the proposal
-    Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
-    proposer:start_paxosid_with_proxy(comm:this(), Proposer, PaxId,
-                                     _Acceptors = RTMs, Proposal,
-                                     _Maj = 3, _MaxProposers = 4, 0),
-    %% send registerTP to each RTM (send with it the learner id)
-    _ = [ comm:send(X, {register_TP, {Tid, ItemId, PaxId, comm:this()}})
-      || X <- [TM | RTMs]],
-    %% (optimized: embed the proposer's accept message in registerTP message)
+                %% initiate a paxos proposer round 0 with the proposal
+                Proposer = comm:make_global(dht_node_state:get(DHT_Node_State,
+                                                               proposer)),
+                proposer:start_paxosid_with_proxy(comm:this(), Proposer, PaxId,
+                                                  _Acceptors = RTMs, Proposal,
+                                                  _Maj = 3, _MaxProposers = 5,
+                                                  0),
+                %% send registerTP to each RTM (send with it the learner id)
+                _ = [ comm:send(X, {register_TP, {Tid, ItemId, PaxId,
+                                                  comm:this()}})
+                      || X <- [TM | RTMs]],
+                %% (optimized: embed the proposer's accept message in registerTP message)
+                TmpDB;
+            false ->
+                %% forward commit to now responsible node
+                dht_node_lookup:lookup_aux(
+                  DHT_Node_State, Key, 0, {init_TP, Params}),
+                DB
+        end,
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
 -spec on_tx_commitreply({tx_item_state:paxos_id(), tx_tlog:tlog_entry()},
