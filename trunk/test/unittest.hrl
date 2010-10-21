@@ -44,8 +44,8 @@
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
                                [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~w\" which is "
-                               "not the expected ~s that evaluates to \"~w\"~n",
+                        ?ct_fail("~s evaluated to \"~.0p\" which is "
+                               "not the expected ~s that evaluates to \"~.0p\"~n",
                                [??Actual, Any, ??Expected, ExpectedVal])
                 end
         end()).
@@ -60,8 +60,8 @@
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
                                [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~w\" which is "
-                               "not the expected ~s that evaluates to \"~w\"~n"
+                        ?ct_fail("~s evaluated to \"~.0p\" which is "
+                               "not the expected ~s that evaluates to \"~.0p\"~n"
                                "(~s)~n",
                                [??Actual, Any, ??Expected, ExpectedVal, lists:flatten(Note)])
                 end
@@ -75,7 +75,7 @@
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
                                [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~w\" which is "
+                        ?ct_fail("~s evaluated to \"~.0p\" which is "
                                "not the expected ~s~n",
                                [??Actual, Any, ??ExpectedPattern])
                 end
@@ -89,7 +89,7 @@
                     Any ->
                         ct:pal("Failed: Stacktrace ~p~n",
                                [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~w\" which is "
+                        ?ct_fail("~s evaluated to \"~.0p\" which is "
                                "not the expected ~s~n"
                                "(~s)~n",
                                [??Actual, Any, ??ExpectedPattern, lists:flatten(Note)])
@@ -103,7 +103,7 @@
                     Any -> 
                         ct:pal("Failed: Stacktrace ~p~n",
                                [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~w\"; exception "
+                        ?ct_fail("~s evaluated to \"~.0p\"; exception "
                                "~s:~s was expected~n",
                                [??Cmd, Any, ??ExceptionType, ??ExceptionPattern])
                 catch
@@ -111,7 +111,7 @@
                     OtherType: OtherException ->
                         ct:pal("Failed: Stacktrace ~p~n",
                                [util:get_stacktrace()]),
-                        ?ct_fail("~s threw exception \"~w:~w\" but exception "
+                        ?ct_fail("~s threw exception \"~.0p:~.0p\" but exception "
                                "~s:~s was expected~n",
                                [??Cmd, OtherType, OtherException, ??ExceptionType, ??ExceptionPattern])
                 end
@@ -132,7 +132,7 @@
                             after
                                 0 -> no_message
                             end,
-                        ?ct_fail("expected message ~s but got \"~w\"~n", [??MsgPattern, ActualMessage])
+                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
                 end
         end()).
 -define(expect_message(MsgPattern), ?expect_message_timeout(MsgPattern, 1000)).
@@ -142,7 +142,7 @@
         fun() ->
                 receive
                     ActualMessage ->
-                        ?ct_fail("expected no message but got \"~w\"~n", [ActualMessage])
+                        ?ct_fail("expected no message but got \"~.0p\"~n", [ActualMessage])
                 after
                     Timeout -> ok
                 end
@@ -174,14 +174,14 @@
                 % ignore two ignored messages, then wait for Timeout ignoring all ignored messages and do a final receive with the expected message
                 receive
                     IgnoredMessage ->
-                        ct:pal("ignored \"~w\"~n", [IgnoredMessage]),
+                        ct:pal("ignored \"~.0p\"~n", [IgnoredMessage]),
                         receive
                             IgnoredMessage ->
-                                ct:pal("ignored \"~w\"~n", [IgnoredMessage]),
+                                ct:pal("ignored \"~.0p\"~n", [IgnoredMessage]),
                                 ?consume_message(IgnoredMessage, Timeout),
                                 receive
                                     IgnoredMessage ->
-                                        ct:pal("ignored \"~w\" for the last time~n", [IgnoredMessage]),
+                                        ct:pal("ignored \"~.0p\" for the last time~n", [IgnoredMessage]),
                                     MsgPattern -> ok
                                 after
                                     0 ->
@@ -191,7 +191,7 @@
                                             after
                                                 0 -> no_message
                                             end,
-                                        ?ct_fail("expected message ~s but got \"~w\"~n", [??MsgPattern, ActualMessage])
+                                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
                                 end
                             MsgPattern -> ok
                         after
@@ -202,7 +202,7 @@
                                     after
                                         0 -> no_message
                                     end,
-                                ?ct_fail("expected message ~s but got \"~w\"~n", [??MsgPattern, ActualMessage])
+                                ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
                         end
                     MsgPattern -> ok
                 after
@@ -213,7 +213,7 @@
                             after
                                 0 -> no_message
                             end,
-                        ?ct_fail("expected message ~s but got \"~w\"~n", [??MsgPattern, ActualMessage])
+                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
                 end
         end()).
 -define(expect_message_ignore(MsgPattern, IgnoredMessage), ?expect_message_ignore(MsgPattern, IgnoredMessage, 1000)).
@@ -225,7 +225,7 @@
 %% expect_message_ignore(MsgPattern, IgnoredMessage) ->
 %%     receive
 %%         IgnoredMessage ->
-%%             ct:pal("ignored ~w", [IgnoredMessage]),
+%%             ct:pal("ignored ~.0p", [IgnoredMessage]),
 %%             expect_message_ignore(MsgPattern, IgnoredMessage);
 %%         MsgPattern ->
 %%             ok
@@ -238,5 +238,5 @@
 %%                                 0 ->
 %%                                     unknown
 %%                             end,
-%%             ?ct_fail("expected message ~w but got ~w", [MsgPattern, ActualMessage])
+%%             ?ct_fail("expected message ~.0p but got ~.0p", [MsgPattern, ActualMessage])
 %%     end.
