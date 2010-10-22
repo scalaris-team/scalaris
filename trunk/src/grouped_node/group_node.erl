@@ -225,9 +225,11 @@ on({group_split_response,success}, State) ->
 %% @doc joins this node in the ring and calls the main loop
 -spec init(list()) -> group_state:state().
 init(Options) ->
+    io:format("group_node~n", []),
+    {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
+    erlang:put(my_sup_dht_node_id, MySupDhtNode),
     % first node in this vm and also vm is marked as first
     % or unit-test
-    io:format("group_node~n", []),
     Trigger = config:read(group_node_trigger),
     case dht_node:is_first(Options) of
         true ->

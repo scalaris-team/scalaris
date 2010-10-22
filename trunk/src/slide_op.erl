@@ -22,7 +22,8 @@
 
 -export([new_receiving_slide/6, new_sending_slide/6,
          new_receiving_slide_join/4, new_sending_slide_join/4,
-         is_join/1,
+         new_sending_slide_leave/2,
+         is_join/1, is_leave/1, is_jump/1,
          get_id/1, get_node/1, get_interval/1, get_target_id/1,
          get_source_pid/1, get_tag/1, get_type/1,
          get_timer/1, set_timer/3, reset_timer/1,
@@ -36,7 +37,7 @@
 -export_type([slide_op/0, id/0, slide_phase/0]).
 -endif.
 
--define(special_tags, ['$join$', '$leave$']).
+-define(special_tags, ['$join$', '$leave$', '$jump$']).
 
 -type id() :: util:global_uid().
 
@@ -80,6 +81,12 @@ new_receiving_slide_join(MoveId, Pred, Succ, MyKey) ->
 -spec is_join(SlideOp::slide_op()) -> boolean().
 is_join(SlideOp) -> get_tag(SlideOp) =:= '$join$'.
 
+-spec is_leave(SlideOp::slide_op()) -> boolean().
+is_leave(SlideOp) -> get_tag(SlideOp) =:= '$leave$'.
+
+-spec is_jump(SlideOp::slide_op()) -> boolean().
+is_jump(SlideOp) -> get_tag(SlideOp) =:= '$jump$'.
+
 %% @doc Sets up a slide operation where the current node is receiving data from
 %%      the given target node. One of the nodes will change its ID to TargetId.
 -spec new_receiving_slide(MoveId::util:global_uid(),
@@ -88,7 +95,7 @@ is_join(SlideOp) -> get_tag(SlideOp) =:= '$join$'.
                           State::dht_node_state:state()) -> slide_op().
 new_receiving_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
     case lists:member(Tag, ?special_tags) of
-        true ->
+        true when Tag =/= '$leave$' ->
             log:log(warn, "Using reserved tag in receiving slide(~.0p, ~.0p, ~.0p, ~.0p, ~.0p, ~.0p)",
                     [MoveId, PredOrSucc, TargetId, Tag, SourcePid, State]);
         _ -> ok
@@ -158,6 +165,20 @@ new_sending_slide_join(MoveId, TargetNodePid, TargetId, State) ->
               interval = IntervalToSend,
               target_id = TargetId,
               tag = '$join$',
+              source_pid = null}.
+
+%% @doc Sets up a new slide operation for a node which sends a joining node
+%%      some of its data.
+-spec new_sending_slide_leave(MoveId::id(), State::dht_node_state:state()) -> slide_op().
+new_sending_slide_leave(MoveId, State) ->
+    IntervalToSend = dht_node_state:get(State, my_range),
+    TargetNodePid = dht_node_state:get(State, succ_pid),
+    #slide_op{type = 'send',
+              id = MoveId,
+              node = TargetNodePid,
+              interval = IntervalToSend,
+              target_id = dht_node_state:get(State, pred_id),
+              tag = '$leave$',
               source_pid = null}.
 
 %% @doc Returns the id of a receiving or sending slide operation.

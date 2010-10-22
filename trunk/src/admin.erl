@@ -42,8 +42,10 @@ add_node_at_id(Id) ->
 
 -spec add_node([tuple()]) -> ok.
 add_node(Options) ->
-    Desc = util:sup_supervisor_desc(randoms:getRandomId(),
-                                    config:read(dht_node_sup), start_link, [Options]),
+    DhtNodeId = randoms:getRandomId(),
+    Desc = util:sup_supervisor_desc(
+             DhtNodeId, config:read(dht_node_sup), start_link,
+             [[{my_sup_dht_node_id, DhtNodeId} | Options]]),
     supervisor:start_child(main_sup, Desc),
     ok.
 

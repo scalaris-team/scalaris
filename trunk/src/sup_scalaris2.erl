@@ -102,7 +102,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
               end,
     DHTNodeOptions = DHTNodeFirstId ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNode =
-        util:sup_supervisor_desc(group_node, sup_group_node, start_link, [DHTNodeOptions]),
+        util:sup_supervisor_desc(group_node, sup_group_node, start_link, [[{my_sup_dht_node_id, group_node} | DHTNodeOptions]]),
     FailureDetector =
         util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia =
