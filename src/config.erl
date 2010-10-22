@@ -67,7 +67,7 @@ start_link(Files) ->
                    []         -> Files;
                    ConfigFile -> lists:append(Files, [ConfigFile])
                end,
-    error_logger:info_msg("Config files: ~p~n", [TheFiles]),
+%%     error_logger:info_msg("Config files: ~p~n", [TheFiles]),
     Owner = self(),
     Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
     receive
