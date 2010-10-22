@@ -47,7 +47,7 @@ start_link() ->
                                [ProcessDescr::any()]}}.
 init(Options) ->
     DHTNodeGroup = pid_groups:new("dht_node_"),
-    pid_groups:join_as(DHTNodeGroup, sup_dht_node),
+    pid_groups:join_as(DHTNodeGroup, ?MODULE),
     boot_server:connect(),
     
     Cyclon = util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),

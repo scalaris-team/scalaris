@@ -65,7 +65,7 @@
     {init_check_ring, Token::non_neg_integer()} |
     {notify_new_pred, NewPred::node:node_type()} |
     {notify_new_succ, NewSucc::node:node_type()} |
-%%     {leave, SourcePid::comm:erl_local_pid()} |
+%%     {leave} | % provided seperately in the on-handler spec
     {pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {update_id, NewId::?RT:key()} |
@@ -99,12 +99,12 @@ get_neighbors_table() ->
 
 %% @doc Notifies the successor and predecessor that the current dht_node is
 %%      going to leave / left. Will reset the ring_maintenance state to uninit
-%%      and respond with a {leave_response} message.
+%%      and inform the dht_node process (message handled in dht_node_move).
 %%      Note: only call this method from inside the dht_node process!
 -spec leave() -> ok.
 leave() ->
     Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {leave, self()}).
+    comm:send_local(Pid, {leave}).
 
 %% @doc Sends a message to the remote node's ring_maintenance process notifying
 %%      it of a new successor.
@@ -228,7 +228,7 @@ on_startup(Msg, {uninit, QueuedMessages}) ->
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message() | ?RM:custom_message(), state_init()) -> state_init();
-        ({leave, SourcePid::comm:erl_local_pid()}, state_init())
+        ({leave}, state_init())
             -> {'$gen_component', [{on_handler, Handler::on_startup}],
                 State::state_uninit()}.
 on({get_neighb_tid, SourcePid}, {NeighbTable, _RM_State, _Subscribers} = State) ->
@@ -279,14 +279,14 @@ on({update_id, NewId}, {NeighbTable, RM_State, Subscribers} = State) ->
         _ -> State
     end;
 
-on({leave, SourcePid}, {NeighbTable, RM_State, _Subscribers}) ->
+on({leave}, {NeighbTable, RM_State, _Subscribers}) ->
     Neighborhood = get_neighbors(NeighbTable),
     Me = nodelist:node(Neighborhood),
     Pred = nodelist:pred(Neighborhood),
     Succ = nodelist:succ(Neighborhood),
     comm:send_to_group_member(node:pidX(Succ), ring_maintenance, {pred_left, Me, Pred}),
     comm:send_to_group_member(node:pidX(Pred), ring_maintenance, {succ_left, Me, Succ}),
-    comm:send_local(SourcePid, {leave_response}),
+    comm:send_local(pid_groups:get_my(dht_node), {move, node_leave}),
     ?RM:leave(RM_State, NeighbTable),
     gen_component:change_handler({uninit, msg_queue:new()}, on_startup);
 
