@@ -196,8 +196,8 @@ process_move_msg({move, slide_pred_abort, MoveFullId, Reason}, State) ->
         true ->
             abort_slide(State, SlidePred, pred, Reason, false);
         _ ->
-            log:log(warn, "[ dht_node_move ~w ] slide_pred_abort received with no "
-                          "matching slide operation (ID: ~w, slide_pred: ~w)~n",
+            log:log(warn, "[ dht_node_move ~.0p ] slide_pred_abort received with no "
+                          "matching slide operation (ID: ~.0p, slide_pred: ~.0p)~n",
                     [comm:this(), MoveFullId, dht_node_state:get(State, slide_pred)]),
             State
     end;
@@ -209,8 +209,8 @@ process_move_msg({move, slide_succ_abort, MoveFullId, Reason}, State) ->
         true ->
             abort_slide(State, SlideSucc, succ, Reason, false);
         _ ->
-            log:log(warn, "[ dht_node_move ~w ] slide_succ_abort received with no "
-                          "matching slide operation (ID: ~w, slide_succ: ~w)~n",
+            log:log(warn, "[ dht_node_move ~.0p ] slide_succ_abort received with no "
+                          "matching slide operation (ID: ~.0p, slide_succ: ~.0p)~n",
                     [comm:this(), MoveFullId, dht_node_state:get(State, slide_succ)]),
             State
     end;
@@ -236,17 +236,17 @@ process_move_msg({move, node_update, NewNode}, State) ->
                     end;
                 _ ->
                     % there should not be any other node id change when we are waiting for one!
-                    log:log(fatal, "[ dht_node_move ~w ] received node id update "
+                    log:log(fatal, "[ dht_node_move ~.0p ] received node id update "
                                    "with no matching slide operation "
-                                   "(NewNode: ~w, slide_succ: ~w)~n",
+                                   "(NewNode: ~.0p, slide_succ: ~.0p)~n",
                             [comm:this(), NewNode, SlideOp]),
                     State
             end;
         _ ->
             % we should not receive node update messages unless we are waiting for them
             % (node id updates should only be triggered by this module anyway)
-            log:log(warn, "[ dht_node_move ~w ] received node id update with no "
-                          "matching slide operation (NewNode: ~w, slide_succ: ~w)~n",
+            log:log(warn, "[ dht_node_move ~.0p ] received node id update with no "
+                          "matching slide operation (NewNode: ~.0p, slide_succ: ~.0p)~n",
                     [comm:this(), NewNode, SlideOp]),
             State % ignore unrelated node updates
     end;
@@ -464,7 +464,7 @@ setup_slide_with(PredOrSucc, State, SendOrReceive, MoveFullId, MyNode,
     case get_slide_op(State, MoveFullId) of
         {ok, pred, SlideOp} ->
             % there should not be any previous slide_pred with the given ID!
-            log:log(warn,"[ dht_node_move ~w ] slide_~w received but found previous slide_pred with the same ID (ID: ~w, slide_pred: ~w)~n", [comm:this(), PredOrSucc, MoveFullId, dht_node_state:get(State, slide_pred)]),
+            log:log(warn,"[ dht_node_move ~.0p ] slide_~.0p received but found previous slide_pred with the same ID (ID: ~.0p, slide_pred: ~.0p)~n", [comm:this(), PredOrSucc, MoveFullId, dht_node_state:get(State, slide_pred)]),
             abort_slide(State, SlideOp, pred, changed_parameters, true);
         {ok, succ, SlideOp} ->
             % the predecessor can already have a slide operation if it
@@ -546,7 +546,7 @@ setup_slide_with2_not_found(PredOrSucc, State, SendOrReceive, MoveFullId,
                     end;
                 'send' -> % can not send if TargetId is not in my range!
                     abort_slide(State, node:pidX(TargetNode), MoveFullId, SourcePid, Tag,
-                                PredOrSucc, target_id_not_in_range, true);
+                                PredOrSucc, target_id_not_in_range, not First);
                 'rcv' when PredOrSucc =:= pred ->
                     % slide with pred, receive data
                     SlideOp = slide_op:new_receiving_slide(
@@ -572,12 +572,10 @@ setup_slide_with2_not_found(PredOrSucc, State, SendOrReceive, MoveFullId,
             end;
         _ when not CanSlide ->
             abort_slide(State, node:pidX(TargetNode), MoveFullId, SourcePid, Tag,
-                        PredOrSucc, ongoing_slide, true),
-            State;
+                        PredOrSucc, ongoing_slide, not First);
         _ when not NodesCorrect ->
             abort_slide(State, node:pidX(TargetNode), MoveFullId, SourcePid, Tag,
-                        PredOrSucc, wrong_pred_succ_node, true),
-            State;
+                        PredOrSucc, wrong_pred_succ_node, not First);
         _ -> % MoveDone, i.e. target id already reached (noop)
             notify_source_pid(SourcePid, {move, result, Tag, ok}),
             State
@@ -718,22 +716,22 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
                 _ ->
                     % abort slide but do not notify the other node
                     % (this message should not have been received anyway!)
-                    ErrorMsg = io_lib:format("~w received for a slide with ~s, but only expected for slides with~s~n",
+                    ErrorMsg = io_lib:format("~.0p received for a slide with ~s, but only expected for slides with~s~n",
                                              [MoveMsgTag, PredOrSucc, PredOrSuccExp]),
                     NewState = abort_slide(State, SlideOp, PredOrSucc, {protocol_error, ErrorMsg}, false),
-                    log:log(warn, "[ dht_node_move ~w ] ~w received for a slide with my ~s, but only expected for slides with~s~n"
-                                      "(operation: ~w)~n", [comm:this(), MoveMsgTag, PredOrSucc, PredOrSuccExp, SlideOp]),
+                    log:log(warn, "[ dht_node_move ~.0p ] ~.0p received for a slide with my ~s, but only expected for slides with~s~n"
+                                      "(operation: ~.0p)~n", [comm:this(), MoveMsgTag, PredOrSucc, PredOrSuccExp, SlideOp]),
                     NewState
             end;
         not_found ->
-            log:log(warn,"[ dht_node_move ~w ] ~w received with no matching slide operation (ID: ~w, slide_pred: ~w, slide_succ: ~w)~n",
+            log:log(warn,"[ dht_node_move ~.0p ] ~.0p received with no matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
                     [comm:this(), MoveMsgTag, MoveFullId, dht_node_state:get(State, slide_pred), dht_node_state:get(State, slide_succ)]),
             State;
         {wrong_neighbor, Type, SlideOp} -> % wrong pred or succ
             case lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
                 true ->
                     NewState = abort_slide(State, SlideOp, Type, wrong_pred_succ_node, true),
-                    log:log(warn,"[ dht_node_move ~w ] ~w received but ~s changed during move (ID: ~w, node(slide): ~w, new_~s: ~w)~n",
+                    log:log(warn,"[ dht_node_move ~.0p ] ~.0p received but ~s changed during move (ID: ~.0p, node(slide): ~.0p, new_~s: ~.0p)~n",
                             [comm:this(), MoveMsgTag, Type, MoveFullId, slide_op:get_node(SlideOp), Type, dht_node_state:get(State, Type)]),
                     NewState;
                 _ -> State
@@ -780,7 +778,8 @@ can_slide_pred(State, TargetId) ->
 %% @doc Returns whether a slide operation is possible, i.e. MySlide is null and
 %%      OtherSlide is either null or not overlapping with TargetId.
 %%      Helper for can_slide_succ/2 and can_slide_pred/2.
--spec can_slide(MySlide::slide_op:slide_op(), OtherSlide::slide_op:slide_op(), TargetId::?RT:key()) -> boolean().
+-spec can_slide(MySlide::slide_op:slide_op() | null,
+                OtherSlide::slide_op:slide_op() | null, TargetId::?RT:key()) -> boolean().
 can_slide(MySlide, OtherSlide, TargetId) ->
     MySlide =:= null andalso
         (OtherSlide =:= null orelse
@@ -803,7 +802,7 @@ notify_source_pid(SourcePid, Message) ->
                   NotifyNode::boolean()) -> dht_node_state:state().
 abort_slide(State, SlideOp, Pred_or_Succ, Reason, NotifyNode) ->
     % write to log when aborting an already set-up slide:
-    log:log(warn, "abort_slide(op: ~p, ~p, reason: ~p)~n",
+    log:log(warn, "abort_slide(op: ~.0p, ~.0p, reason: ~.0p)~n",
             [SlideOp, Pred_or_Succ, Reason]),
     slide_op:reset_timer(SlideOp), % reset previous timeouts
     % potentially set up for joining nodes (slide with pred):
