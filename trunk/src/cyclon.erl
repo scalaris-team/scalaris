@@ -33,13 +33,12 @@
 -export([start_link/1]).
 
 % functions gen_component, the trigger and the config module use
--export([init/1, on_startup/2, on/2,
-         activate/0,
-         get_base_interval/0, check_config/0]).
+-export([init/1, on_inactive/2, on_active/2,
+         activate/0, deactivate/0,
+         get_shuffle_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
--export([get_subset_rand/1, get_subset_rand/2,
-         get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
+-export([get_subset_rand/1, get_subset_rand_next_interval/1]).
 
 %% -export([get_ages/0, get_ages/1]).
 
@@ -47,16 +46,16 @@
 %% {Cache, Node, Cycles, TriggerState}
 %% Node: the scalaris node of this cyclon-task
 %% Cycles: the amount of shuffle-cycles
--type(state_init() :: {RandomNodes::cyclon_cache:cache(),
-                       MyNode::node:node_type() | null,
-                       Cycles::integer(), TriggerState::trigger:state()}).
--type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
-                         TriggerState :: trigger:state()}).
-%% -type(state() :: state_init() | state_uninit()).
+-type(state_active() :: {RandomNodes::cyclon_cache:cache(),
+                         MyNode::node:node_type() | null,
+                         Cycles::integer(), TriggerState::trigger:state()}).
+-type(state_inactive() :: {inactive, QueuedMessages::msg_queue:msg_queue(),
+                           TriggerState :: trigger:state()}).
+%% -type(state() :: state_active() | state_inactive()).
 
-% accepted messages of an initialized cyclon process
+% accepted messages of an active cyclon process
 -type(message() ::
-    {trigger} |
+    {cy_shuffle} |
     {rm_changed, OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()} |
     {check_state} |
     {cy_subset, SourcePid::comm:mypid(), PSubset::cyclon_cache:cache()} |
@@ -66,11 +65,18 @@
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
-%% @doc Sends an initialization message to the node's cyclon process.
+%% @doc Activates the cyclon process. If not activated, the cyclon process will
+%%      queue most messages without processing them.
 -spec activate() -> ok.
 activate() ->
     Pid = pid_groups:get_my(cyclon),
-    comm:send_local(Pid, {init_cyclon}).
+    comm:send_local(Pid, {activate_cyclon}).
+
+%% @doc Deactivates the cyclon process.
+-spec deactivate() -> ok.
+deactivate() ->
+    Pid = pid_groups:get_my(cyclon),
+    comm:send_local(Pid, {deactivate_cyclon}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -95,58 +101,23 @@ msg_get_subset_response(Pid, Cache) ->
 
 %% @doc Sends a (local) message to the cyclon process of the requesting
 %%      process' group asking for a random subset of the stored nodes.
-%%      see on({get_subset_rand, N, SourcePid}, State) and
+%%      see on_active({get_subset_rand, N, SourcePid}, State) and
 %%      msg_get_subset_response/2
 -spec get_subset_rand(N::pos_integer()) -> ok.
 get_subset_rand(N) ->
-    get_subset_rand(N, self()).
-
-%% @doc Sends a (local) message to the cyclon process of the requesting
-%%      process' group asking for a random subset of the stored nodes to be
-%%      send to Pid.
-%%      see on({get_subset_rand, N, SourcePid}, State) and
-%%      msg_get_subset_response/2
--spec get_subset_rand(N::pos_integer(), Pid::comm:erl_local_pid()) -> ok.
-get_subset_rand(N, Pid) ->
     CyclonPid = pid_groups:get_my(cyclon),
-    comm:send_local(CyclonPid, {get_subset_rand, N, Pid}).
+    comm:send_local(CyclonPid, {get_subset_rand, N, self()}).
 
 %% @doc Sends a delayed (local) message to the cyclon process of the requesting
 %%      process' group asking for a random subset of the stored nodes with a
 %%      delay equal to the cyclon_interval config parameter.
-%%      see on({get_subset_rand, N, SourcePid}, State) and
+%%      see on_active({get_subset_rand, N, SourcePid}, State) and
 %%      msg_get_subset_response/2
 -spec get_subset_rand_next_interval(N::pos_integer()) -> reference().
 get_subset_rand_next_interval(N) ->
-    get_subset_rand_next_interval(N, self()).
-
-%% @doc Sends a delayed (local) message to the cyclon process of the requesting
-%%      process' group asking for a random subset of the stored nodes to be
-%%      send to Pid with a delay equal to the cyclon_interval config parameter.
-%%      see on({get_subset_rand, N, SourcePid}, State) and
-%%      msg_get_subset_response/2
--spec get_subset_rand_next_interval(N::pos_integer(), Pid::comm:erl_local_pid()) -> reference().
-get_subset_rand_next_interval(N, Pid) ->
     CyclonPid = pid_groups:get_my(cyclon),
-    comm:send_local_after(get_base_interval(), CyclonPid, {get_subset_rand, N, Pid}).
-
-% only used in admin.erl with hard-coded messages -> special case, don't provide getters
-%% %% @doc Sends a (local) message to the cyclon process of the requesting
-%% %%      process' group asking for the age of all stored nodes.
-%% %%      see on({get_ages, SourcePid}, State) and
-%% %%      msg_get_ages_response/2
-%% -spec get_ages() -> ok.
-%% get_ages() ->
-%%     get_ages(, self()).
-%% 
-%% %% @doc Sends a (local) message to the cyclon process of the requesting
-%% %%      process' group asking for the age of all stored nodes to be send to Pid.
-%% %%      see on({get_ages, SourcePid}, State) and
-%% %%      msg_get_ages_response/2
-%% -spec get_ages(Pid::comm:erl_local_pid()) -> ok.
-%% get_ages(Pid) ->
-%%     CyclonPid = pid_groups:get_my(cyclon),
-%%     comm:send_local(CyclonPid, {get_ages, Pid}).
+    comm:send_local_after(get_shuffle_interval(), CyclonPid,
+                          {get_subset_rand, N, self()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -161,35 +132,62 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, cyclon}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, ?MODULE),
-    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
-                                 on_startup).
+    TriggerState = trigger:init(Trigger, fun get_shuffle_interval/0, cy_shuffle),
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+                                 on_inactive).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Message handler during start up phase (will. change to on/2 when a
-%%      'init_cyclon' message is received)
--spec on_startup(message(), state_uninit()) -> state_uninit();
-                ({init_cyclon}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
-on_startup({init_cyclon}, {uninit, QueuedMessages, TriggerState}) ->
+%% @doc Message handler during start up phase (will change to on_active/2 when a
+%%      'activate_cyclon' message is received). Queues getter-messages for
+%%      faster startup of dependent processes. 
+-spec on_inactive(message(), state_inactive()) -> state_inactive();
+                 ({activate_cyclon}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
+    log:log(info, "[ Cyclon ~.0p ] activating...~n"),
     rm_loop:subscribe(self()),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2},
-                                 on);
+                                 on_active);
 
-on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
+on_inactive(Msg = {get_ages, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
+    {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState};
 
-%% @doc Message handler when the module is fully initialized.
--spec on(message(), state_init()) -> state_init().
-on({trigger}, {Cache, Node, Cycles, TriggerState} = State)  ->
+on_inactive(Msg = {get_subset_rand, _N, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
+    {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState};
+
+on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
+    % get a list of up to 50 queued messages to display:
+    MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
+                  || Message <- lists:sublist(QueuedMessages, 50)],
+    MessageList = case length(QueuedMessages) > 50 of
+                      true -> lists:append(MessageListTmp, [{"...", ""}]);
+                      _    -> MessageListTmp
+                  end,
+    KeyValueList = [{"", ""}, {"inactive cyclon process", ""}, {"queued messages:", ""} | MessageList],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State;
+
+on_inactive(_Msg, State) ->
+    State.
+
+%% @doc Message handler when the process is activated.
+-spec on_active(message(), state_active()) -> state_active();
+         ({deactivate_cyclon}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles, TriggerState})  ->
+    log:log(info, "[ Cyclon ~.0p ] deactivating...~n"),
+    rm_loop:unsubscribe(self()),
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+                                 on_inactive);
+
+on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState} = State)  ->
     NewCache =
         case check_state(State) of
             fail -> Cache;
@@ -198,15 +196,15 @@ on({trigger}, {Cache, Node, Cycles, TriggerState} = State)  ->
     TriggerState2 = trigger:next(TriggerState),
     {NewCache, Node, Cycles + 1, TriggerState2};
 
-on({rm_changed, _OldNeighbors, NewNeighbors}, {Cache, _OldNode, Cycles, TriggerState}) ->
+on_active({rm_changed, _OldNeighbors, NewNeighbors}, {Cache, _OldNode, Cycles, TriggerState}) ->
     Node = nodelist:node(NewNeighbors),
     {Cache, Node, Cycles, TriggerState};
 
-on({check_state}, State) ->
+on_active({check_state}, State) ->
     check_state(State),
     State;
 
-on({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
+on_active({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
     %io:format("subset~n", []),
     % this is received at node Q -> integrate results of node P
     ForSend = cyclon_cache:get_random_subset(get_shuffle_length(), Cache),
@@ -214,13 +212,13 @@ on({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
     NewCache = cyclon_cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
     {NewCache, Node, Cycles, TriggerState};
 
-on({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
+on_active({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
     %io:format("subset_response~n", []),
     % this is received at node P -> integrate results of node Q
     NewCache = cyclon_cache:merge(Cache, Node, QSubset, PSubset, get_cache_size()),
     {NewCache, Node, Cycles, TriggerState};
 
-on({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerState}) ->
+on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerState}) ->
     Me = case node_details:contains(NodeDetails, node) of
              true -> node_details:get(NodeDetails, node);
              _    -> Node
@@ -236,22 +234,19 @@ on({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerSta
         end,
     {Cache, Me, Cycles, TriggerState};
 
-on({get_ages, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
+on_active({get_ages, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
     msg_get_ages_response(Pid, cyclon_cache:get_ages(Cache)),
     State;
 
-on({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
+on_active({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
     msg_get_subset_response(Pid, cyclon_cache:get_random_nodes(N, Cache)),
     State;
 
-%% on({flush_cache}, {_Cache, Node, _Cycles, TriggerState}) ->
+%% on_active({flush_cache}, {_Cache, Node, _Cycles, TriggerState}) ->
 %%     request_node_details([pred, succ]),
 %%     {cyclon_cache:new(), Node, 0, TriggerState};
-%% on({start_shuffling}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
-%%     comm:send_local_after(config:read(cyclon_interval), self(), {shuffle}),
-%%     State;
 
-on({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
+on_active({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
     KeyValueList =
         [{"cache_size", cyclon_cache:size(Cache)},
          {"cache (age, node):", ""} | cyclon_cache:debug_format_by_age(Cache)],
@@ -268,14 +263,14 @@ enhanced_shuffle(Cache, Node) ->
     comm:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
     NewCache.
 
-%% @doc simple shuffle without age
-simple_shuffle(Cache, Node) ->
-    {NewCache, NodeQ} = cyclon_cache:pop_random_node(Cache),
-    Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
-    ForSend = cyclon_cache:add_node(Node, 0, Subset),
-    %io:format("~p",[length(ForSend)]),
-    comm:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
-    NewCache.
+%% %% @doc simple shuffle without age
+%% simple_shuffle(Cache, Node) ->
+%%     {NewCache, NodeQ} = cyclon_cache:pop_random_node(Cache),
+%%     Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
+%%     ForSend = cyclon_cache:add_node(Node, 0, Subset),
+%%     %io:format("~p",[length(ForSend)]),
+%%     comm:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
+%%     NewCache.
 
 %% @doc Sends the local node's dht_node a request to tell us some information
 %%      about itself.
@@ -289,7 +284,7 @@ request_node_details(Details) ->
 %% @doc Checks the current state. If the cache is empty or the current node is
 %%      unknown, the local dht_node will be asked for these values and the check
 %%      will be re-scheduled after 1s.
--spec check_state(state_init()) -> ok | fail.
+-spec check_state(state_active()) -> ok | fail.
 check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
     % if the own node is unknown or the cache is empty (it should at least
     % contain the nodes predecessor and successor), request this information
@@ -333,8 +328,8 @@ check_config() ->
     config:is_less_than_equal(cyclon_shuffle_length, config:read(cyclon_cache_size)).
 
 %% @doc Gets the cyclon interval set in scalaris.cfg.
--spec get_base_interval() -> pos_integer().
-get_base_interval() ->
+-spec get_shuffle_interval() -> pos_integer().
+get_shuffle_interval() ->
     config:read(cyclon_interval).
 
 %% @doc Gets the cyclon_shuffle_length parameter that defines how many entries
@@ -348,4 +343,3 @@ get_shuffle_length() ->
 -spec get_cache_size() -> pos_integer().
 get_cache_size() ->
     config:read(cyclon_cache_size).
-    
