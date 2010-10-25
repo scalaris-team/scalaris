@@ -22,7 +22,7 @@
 %%  participate in any state exchanges until this information has been
 %%  received and postpone such messages, i.e. 'get_state', if received. All
 %%  other messages, e.g. requests for estimated values, are either ignored
-%%  (only applies to "trigger") or answered with information from the previous
+%%  (only applies to "gossip_trigger") or answered with information from the previous
 %%  round, e.g. requests for (estimated) system properties.
 %%  
 %%  When these values are successfully integrated into the process state,
@@ -70,13 +70,12 @@
 -export([start_link/1]).
 
 % functions gen_component, the trigger and the config module use
--export([init/1, on_startup/2, on/2,
-         activate/0,
+-export([init/1, on_inactive/2, on_active/2,
+         activate/0, deactivate/0,
          get_base_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
--export([get_values_best/0, get_values_best/1,
-         get_values_all/0, get_values_all/1]).
+-export([get_values_best/0, get_values_all/0]).
 
 -type(state() :: gossip_state:state()).
 
@@ -84,16 +83,17 @@
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
 %% -> previous and current state, queued messages (get_state messages received
 %% before local values are known) and the state of the trigger.
--type(full_state_init() :: {PreviousState::state(), CurrentState::state(),
-                       MessageQueue::msg_queue:msg_queue(),
-                       TriggerState::trigger:state()}).
--type(full_state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
-                         TriggerState :: trigger:state()}).
-%% -type(full_state() :: full_state_init() | full_state_uninit()).
+-type(full_state_active() :: {PreviousState::state(), CurrentState::state(),
+                              MessageQueue::msg_queue:msg_queue(),
+                              TriggerState::trigger:state()}).
+-type(full_state_inactive() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
+                                TriggerState::trigger:state(),
+                                PreviousState::state()}).
+%% -type(full_state() :: full_state_active() | full_state_inactive()).
 
 % accepted messages of gossip processes
 -type(message() ::
-    {trigger} |
+    {gossip_trigger} |
     {{get_node_details_response, node_details:node_details()}, local_info} |
     {{get_node_details_response, node_details:node_details()}, leader_start_new_round} |
     {get_state, comm:mypid(), gossip_state:values_internal()} |
@@ -103,11 +103,18 @@
     {get_values_best, SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
-%% @doc Sends an initialization message to the node's gossip process.
+%% @doc Activates the gossip process. If not activated, the gossip process will
+%%      queue most messages without processing them.
 -spec activate() -> ok.
 activate() ->
     Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {init_gossip}).
+    comm:send_local(Pid, {activate_gossip}).
+
+%% @doc Deactivates the gossip process.
+-spec deactivate() -> ok.
+deactivate() ->
+    Pid = pid_groups:get_my(cyclon),
+    comm:send_local(Pid, {deactivate_cyclon}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -132,38 +139,21 @@ msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
 
 %% @doc Sends a (local) message to the gossip process of the requesting
 %%      process' group asking for the best values of the stored information.
-%%      see on({get_values_best, SourcePid}, FullState) and
+%%      see on_active({get_values_best, SourcePid}, FullState) and
 %%      msg_get_values_best_response/2
 -spec get_values_best() -> ok.
 get_values_best() ->
-    get_values_best(self()).
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for the best values of the stored information to
-%%      be send to Pid.
-%%      see on({get_values_best, SourcePid}, FullState) and
-%%      msg_get_values_best_response/2
--spec get_values_best(comm:erl_local_pid()) -> ok.
-get_values_best(Pid) ->
     GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {get_values_best, Pid}).
+    comm:send_local(GossipPid, {get_values_best, self()}).
 
 %% @doc Sends a (local) message to the gossip process of the requesting
 %%      process' group asking for all stored information.
-%%      see on({get_values_all, SourcePid}, FullState) and
+%%      see on_active({get_values_all, SourcePid}, FullState) and
 %%      msg_get_values_all_response/4
 -spec get_values_all() -> ok.
 get_values_all() ->
-    get_values_all(self()).
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for all stored information to be send to Pid.
-%%      see on({get_values_all, SourcePid}, FullState) and
-%%      msg_get_values_all_response/4
--spec get_values_all(comm:erl_local_pid()) -> ok.
-get_values_all(Pid) ->
     GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {get_values_all, Pid}).
+    comm:send_local(GossipPid, {get_values_all, self()}).
 
 %% @doc Returns the previous state if the current state has not sufficiently
 %%      converged yet otherwise returns the current state.
@@ -190,36 +180,73 @@ start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on}], State::full_state_uninit()}.
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::full_state_inactive()}.
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, ?MODULE),
-    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
-                                 on_startup).
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0, gossip_trigger),
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState, gossip_state:new_state()},
+                                 on_inactive).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Message handler during start up phase (will change to on/2 when a
-%%      'init_gossip' message is received).
--spec on_startup(message(), full_state_uninit()) -> full_state_uninit();
-                ({init_gossip}, full_state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::full_state_init()}.
-on_startup({init_gossip}, {uninit, QueuedMessages, TriggerState}) ->
+%% @doc Message handler during start up phase (will change to on_active/2 when a
+%%      'activate_gossip' message is received). Queues getter-messages for
+%%      faster startup of dependent processes. 
+-spec on_inactive(message(), full_state_inactive()) -> full_state_inactive();
+                 ({activate_gossip}, full_state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::full_state_active()}.
+on_inactive({activate_gossip}, {uninit, QueuedMessages, TriggerState, PreviousState}) ->
     TriggerState2 = trigger:now(TriggerState),
-    PreviousState = gossip_state:new_state(),
     State = gossip_state:new_state(),
     msg_queue:send(QueuedMessages),
-    gen_component:change_handler({PreviousState, State, [], TriggerState2}, on);
+    gen_component:change_handler({PreviousState, State, [], TriggerState2}, on_active);
 
-on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
+on_inactive(Msg = {get_values_all, _SourcePid},
+            {uninit, QueuedMessages, TriggerState, PreviousState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState, PreviousState};
 
-%% @doc Message handler when the module is fully initialized.
--spec on(message(), full_state_init()) -> full_state_init().
-on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
+on_inactive(Msg = {get_values_best, _SourcePid},
+            {uninit, QueuedMessages, TriggerState, PreviousState}) ->
+    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState, PreviousState};
+
+on_inactive({web_debug_info, Requestor}, {uninit, QueuedMessages, _TriggerState, PreviousState} = State) ->
+    % get a list of up to 50 queued messages to display:
+    MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
+                  || Message <- lists:sublist(QueuedMessages, 50)],
+    MessageList = case length(QueuedMessages) > 50 of
+                      true -> lists:append(MessageListTmp, [{"...", ""}]);
+                      _    -> MessageListTmp
+                  end,
+    KeyValueList =
+        [{"", ""}, {"inactive gossip process", ""},
+         {"prev_round",          gossip_state:get(PreviousState, round)},
+         {"prev_triggered",      gossip_state:get(PreviousState, triggered)},
+         {"prev_msg_exch",       gossip_state:get(PreviousState, msg_exch)},
+         {"prev_conv_avg_count", gossip_state:get(PreviousState, converge_avg_count)},
+         {"prev_avg",            gossip_state:get(PreviousState, avgLoad)},
+         {"prev_min",            gossip_state:get(PreviousState, minLoad)},
+         {"prev_max",            gossip_state:get(PreviousState, maxLoad)},
+         {"prev_stddev",         gossip_state:calc_stddev(PreviousState)},
+         {"prev_size_ldr",       gossip_state:calc_size_ldr(PreviousState)},
+         {"prev_size_kr",        gossip_state:calc_size_kr(PreviousState)},
+         {"", ""},
+         {"queued messages:", ""} | MessageList],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State;
+
+on_inactive(_Msg, State) ->
+    State.
+
+%% @doc Message handler when the process is activated.
+-spec on_active(message(), full_state_active()) -> full_state_active();
+               ({deactivate_gossip}, full_state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::full_state_inactive()}.
+on_active({deactivate_gossip}, {PreviousState, _State, _QueuedMessages, TriggerState}) ->
+    gen_component:change_handler({uninit, msg_queue:new(), TriggerState, PreviousState},
+                                 on_inactive);
+
+on_active({gossip_trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
     % this message is received continuously when the Trigger calls
     % see gossip_trigger and gossip_interval in the scalaris.cfg file
-%%     io:format("{trigger_gossip}: ~p~n", [State]),
     NewTriggerState = trigger:next(TriggerState),
     NewState = gossip_state:inc_triggered(State),
     % request a check whether we are the leader and can thus decide whether to
@@ -239,7 +266,7 @@ on({trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
 % Responses to requests for information about the local node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({{get_node_details_response, NodeDetails}, local_info},
+on_active({{get_node_details_response, NodeDetails}, local_info},
    {PreviousState, State, QueuedMessages, TriggerState}) ->
     % this message is received when the (local) node was asked to tell us its
     % load and key range
@@ -264,7 +291,7 @@ on({{get_node_details_response, NodeDetails}, local_info},
 % Leader election
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
    {PreviousState, State, QueuedMessages, TriggerState}) ->
     % this message can only be received after being requested by
     % request_new_round_if_leader/1 which only asks for this if the condition to
@@ -283,7 +310,7 @@ on({{get_node_details_response, NodeDetails}, leader_start_new_round},
 % State exchange
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_state, Source_PID, OtherValues} = Msg,
+on_active({get_state, Source_PID, OtherValues} = Msg,
    {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
     % This message is received when a node asked our node for its state.
     % The piggy-backed other node's state will be used to update our own state
@@ -301,7 +328,7 @@ on({get_state, Source_PID, OtherValues} = Msg,
             end,
     {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState};
 
-on({get_state_response, OtherValues},
+on_active({get_state_response, OtherValues},
    {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
     % This message is received as a response to a get_state message and contains
     % another node's state. We will use it to update our own state
@@ -315,10 +342,10 @@ on({get_state_response, OtherValues},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % ignore empty node list from cyclon
-on({cy_cache, []}, FullState)  ->
+on_active({cy_cache, []}, FullState)  ->
     FullState;
 
-on({cy_cache, [Node] = _Cache},
+on_active({cy_cache, [Node] = _Cache},
     {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
     % This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node. We will then contact this
@@ -338,14 +365,14 @@ on({cy_cache, [Node] = _Cache},
 % Getter messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_values_best, SourcePid},
+on_active({get_values_best, SourcePid},
     {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
     BestState = previous_or_current(PreviousState, State),
     BestValues = gossip_state:conv_state_to_extval(BestState),
     msg_get_values_best_response(SourcePid, BestValues),
     FullState;
 
-on({get_values_all, SourcePid},
+on_active({get_values_all, SourcePid},
     {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
     PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
     CurrentValues = gossip_state:conv_state_to_extval(State),
@@ -358,7 +385,7 @@ on({get_values_all, SourcePid},
 % Web interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({web_debug_info, Requestor},
+on_active({web_debug_info, Requestor},
    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
     BestValues = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
     KeyValueList =
@@ -470,7 +497,7 @@ update(MyState, OtherValues) ->
                 V5 = update_value(avgLoad2, V4, OtherValues),
                 _V6 = update_value(avg_kr, V5, OtherValues);
             false ->
-                % this case should not happen since the on/2 handlers should only
+                % this case should not happen since the on_active/2 handlers should only
                 % call update/2 if the rounds match
                 log:log(error,"[ Node | ~w ] gossip:update rounds not equal (ignoring):~nstacktrace: ~p", [comm:this(),util:get_stacktrace()]),
                 MyValues
@@ -657,7 +684,7 @@ request_local_info() ->
                                [pred, node, load]}).
 
 %% @doc Sends the local node's cyclon process a request for a random node.
-%%      on({cy_cache, Cache},State) will handle the response
+%%      on_active({cy_cache, Cache},State) will handle the response
 -spec request_random_node() -> ok.
 request_random_node() ->
     cyclon:get_subset_rand(1),

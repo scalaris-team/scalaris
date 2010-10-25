@@ -71,9 +71,7 @@ all() ->
      test_on_get_values_all5,
      test_on_get_values_all6,
      test_get_values_best0,
-     test_get_values_best1,
-     test_get_values_all0,
-     test_get_values_all1].
+     test_get_values_all0].
 
 suite() ->
     [
@@ -113,19 +111,19 @@ end_per_testcase(_TestCase, Config) ->
 test_init(Config) ->
     config:write(gossip_interval, 100),
     EmptyMsgQueue = msg_queue:new(),
+    GossipNewState = gossip_state:new_state(),
     FullState1 = gossip:init('trigger_periodic'),
     ?equals_pattern(FullState1,
-                    {'$gen_component', [{on_handler, on_startup}],
-                     {uninit, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}}),
-    {'$gen_component', [{on_handler, on_startup}], InitialState1} = FullState1,
+                    {'$gen_component', [{on_handler, on_inactive}],
+                     {uninit, EmptyMsgQueue, {'trigger_periodic', _TriggerState}, GossipNewState}}),
+    {'$gen_component', [{on_handler, on_inactive}], InitialState1} = FullState1,
     ?expect_no_message(),
     
-    FullState2 = gossip:on_startup({init_gossip}, InitialState1),
-    GossipNewState = gossip_state:new_state(),
+    FullState2 = gossip:on_inactive({activate_gossip}, InitialState1),
     ?equals_pattern(FullState2,
-                    {'$gen_component', [{on_handler, on}],
+                    {'$gen_component', [{on_handler, on_active}],
                      {GossipNewState, GossipNewState, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     ?expect_no_message(),
     Config.
 
@@ -137,29 +135,11 @@ test_get_values_best0(Config) ->
     ?expect_no_message(),
     Config.
 
-test_get_values_best1(Config) ->
-    pid_groups:join_as("gossip_group", gossip),
-
-    SelfPid = self(),
-    gossip:get_values_best(self()),
-    ?expect_message({get_values_best, SelfPid}),
-    ?expect_no_message(),
-    Config.
-
 test_get_values_all0(Config) ->
     pid_groups:join_as("gossip_group", gossip),
 
     gossip:get_values_all(),
     ?expect_message({get_values_all, _Pid}),
-    ?expect_no_message(),
-    Config.
-
-test_get_values_all1(Config) ->
-    pid_groups:join_as("gossip_group", gossip),
-
-    SelfPid = self(),
-    gossip:get_values_all(self()),
-    ?expect_message({get_values_all, SelfPid}),
     ?expect_no_message(),
     Config.
 
@@ -178,7 +158,7 @@ test_on_trigger1(Config) ->
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
+        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
     ?equals(gossip_state:get(NewState, values), GossipNewValues),
@@ -188,7 +168,7 @@ test_on_trigger1(Config) ->
     ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     % round = 0 -> request for new round will be send
     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
@@ -213,7 +193,7 @@ test_on_trigger2(Config) ->
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
+        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
     ?equals(gossip_state:get(NewState, values), GossipNewValues),
@@ -223,7 +203,7 @@ test_on_trigger2(Config) ->
     ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     % round = 0 -> request for new round will be send
     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
@@ -249,7 +229,7 @@ test_on_trigger3(Config) ->
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
+        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
     ?equals(gossip_state:get(NewState, values), Values),
@@ -259,7 +239,7 @@ test_on_trigger3(Config) ->
     ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     % round != 0 and triggers (1) <= min_tpr (2) -> request for new round will not be send
 %%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
@@ -285,7 +265,7 @@ test_on_trigger4(Config) ->
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 1, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
+        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
     ?equals(gossip_state:get(NewState, values), Values),
@@ -295,7 +275,7 @@ test_on_trigger4(Config) ->
     ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     % round != 0 and triggers (2) <= min_tpr (2) -> request for new round will not be send
 %%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
@@ -321,7 +301,7 @@ test_on_trigger5(Config) ->
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 2, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
+        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
     ?equals(gossip_state:get(NewState, values), Values),
@@ -331,7 +311,7 @@ test_on_trigger5(Config) ->
     ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     % round != 0 and triggers (3) > min_tpr (2) and conv_avg_count (0) < conv_avg_count_newround (1) -> request for new round will not be send
 %%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
@@ -357,7 +337,7 @@ test_on_trigger6(Config) ->
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 3, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
+        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
     ?equals(gossip_state:get(NewState, values), Values),
@@ -367,7 +347,7 @@ test_on_trigger6(Config) ->
     ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     % round != 0 and triggers (4) > min_tpr (2) and conv_avg_count (0) < conv_avg_count_newround (1) -> request for new round will not be send
 %%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
 %%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
@@ -393,7 +373,7 @@ test_on_trigger7(Config) ->
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 4, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
+        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
     ?equals(gossip_state:get(NewState, values), Values),
@@ -403,7 +383,7 @@ test_on_trigger7(Config) ->
     ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({trigger}),
+    ?expect_message({gossip_trigger}),
     % round != 0 and triggers (5) > max_tpr (4) -> request for new round will be send
     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
@@ -426,7 +406,7 @@ test_on_get_node_details_response_local_info1(Config) ->
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, local_info},
+        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewState, State),
@@ -450,7 +430,7 @@ test_on_get_node_details_response_local_info2(Config) ->
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
     % non-empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, local_info},
+        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
                   {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
@@ -475,7 +455,7 @@ test_on_get_node_details_response_local_info3(Config) ->
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
     % empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, local_info},
+        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
@@ -506,7 +486,7 @@ test_on_get_node_details_response_local_info4(Config) ->
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
     % non-empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, local_info},
+        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
                   {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
@@ -540,7 +520,7 @@ test_on_get_node_details_response_local_info5(Config) ->
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
     % non-empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, local_info},
+        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
                   {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
@@ -575,7 +555,7 @@ test_on_get_node_details_response_local_info6(Config) ->
     State = create_gossip_state(Values, false, 0, 0, 0),
     % non-empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, local_info},
+        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
                   {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
@@ -610,7 +590,7 @@ test_on_get_node_details_response_local_info7(Config) ->
     State = create_gossip_state(Values, false, 0, 0, 0),
     % non-empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, local_info},
+        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
                   {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
     
     ?equals(NewPreviousState, PreviousState),
@@ -642,7 +622,7 @@ test_on_get_node_details_response_leader_start_new_round1(Config) ->
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, PreviousState),
@@ -666,7 +646,7 @@ test_on_get_node_details_response_leader_start_new_round2(Config) ->
     State = create_gossip_state(Values, true, 0, 0, 0),
     % non-empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
                   {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, PreviousState),
@@ -690,7 +670,7 @@ test_on_get_node_details_response_leader_start_new_round3(Config) ->
     State = create_gossip_state(Values, true, 0, 0, 0),
     % non-empty queued messages list
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
                   {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, PreviousState),
@@ -713,7 +693,7 @@ test_on_get_node_details_response_leader_start_new_round4(Config) ->
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, State),
@@ -745,7 +725,7 @@ test_on_get_node_details_response_leader_start_new_round5(Config) ->
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, false, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, State),
@@ -777,7 +757,7 @@ test_on_get_node_details_response_leader_start_new_round6(Config) ->
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, false, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, State),
@@ -809,7 +789,7 @@ test_on_get_node_details_response_leader_start_new_round7(Config) ->
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({{get_node_details_response, NodeDetails}, leader_start_new_round},
+        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, State),
@@ -847,7 +827,7 @@ test_on_cy_cache1(Config) ->
     % empty node cache
     Cache = [],
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({cy_cache, Cache},
+        gossip:on_active({cy_cache, Cache},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, PreviousState),
@@ -870,7 +850,7 @@ test_on_cy_cache2(Config) ->
     % non-empty node cache
     Cache = [node:new(comm:make_global(self()), 10, 0)],
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({cy_cache, Cache},
+        gossip:on_active({cy_cache, Cache},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, PreviousState),
@@ -895,7 +875,7 @@ test_on_cy_cache3(Config) ->
     % non-empty node cache
     Cache = [node:new(comm:this(), 10, 0)],
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({cy_cache, Cache},
+        gossip:on_active({cy_cache, Cache},
                   {PreviousState, State, [], get_ptrigger_nodelay()}),
 
     ?equals(NewPreviousState, PreviousState),
@@ -922,7 +902,7 @@ test_on_get_values_best1(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_best, self()},
+        gossip:on_active({get_values_best, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -945,7 +925,7 @@ test_on_get_values_best2(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_best, self()},
+        gossip:on_active({get_values_best, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -968,7 +948,7 @@ test_on_get_values_best3(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_best, self()},
+        gossip:on_active({get_values_best, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -991,7 +971,7 @@ test_on_get_values_best4(Config) ->
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, false, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_best, self()},
+        gossip:on_active({get_values_best, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1014,7 +994,7 @@ test_on_get_values_best5(Config) ->
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, false, 20, 20, 2),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_best, self()},
+        gossip:on_active({get_values_best, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1037,7 +1017,7 @@ test_on_get_values_best6(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, true, 20, 20, 2),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_best, self()},
+        gossip:on_active({get_values_best, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1060,7 +1040,7 @@ test_on_get_values_all1(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_all, self()},
+        gossip:on_active({get_values_all, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1085,7 +1065,7 @@ test_on_get_values_all2(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_all, self()},
+        gossip:on_active({get_values_all, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1110,7 +1090,7 @@ test_on_get_values_all3(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_all, self()},
+        gossip:on_active({get_values_all, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1135,7 +1115,7 @@ test_on_get_values_all4(Config) ->
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, false, 20, 20, 20),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_all, self()},
+        gossip:on_active({get_values_all, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1160,7 +1140,7 @@ test_on_get_values_all5(Config) ->
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, false, 20, 20, 2),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_all, self()},
+        gossip:on_active({get_values_all, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1185,7 +1165,7 @@ test_on_get_values_all6(Config) ->
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, true, 20, 20, 2),
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on({get_values_all, self()},
+        gossip:on_active({get_values_all, self()},
                   {PreviousState, State, [], TriggerNoDelay}),
 
     ?equals(NewState, State),
@@ -1242,7 +1222,7 @@ get_ptrigger_nodelay() ->
     get_ptrigger_delay(0).
 
 get_ptrigger_delay(Delay) ->
-    trigger:init('trigger_periodic', fun () -> Delay end, 'trigger').
+    trigger:init('trigger_periodic', fun () -> Delay end, 'gossip_trigger').
 
 fake_dht_node() ->
     unittest_helper:start_subprocess(

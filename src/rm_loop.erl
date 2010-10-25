@@ -85,6 +85,7 @@ activate(Me, Pred, Succ) ->
     Pid = pid_groups:get_my(ring_maintenance),
     comm:send_local(Pid, {init_rm, Me, Pred, Succ}).
 
+%% @doc Returns the current neighborhood structure.
 -spec get_neighbors(Table::tid()) -> nodelist:neighborhood().
 get_neighbors(Table) -> ets:lookup_element(Table, neighbors, 2).
 
