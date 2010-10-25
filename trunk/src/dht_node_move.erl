@@ -626,6 +626,7 @@ change_my_id(State, NewSlideOp, TargetId) ->
             rm_loop:leave(),
             % de-activate processes not needed anymore:
             cyclon:deactivate(),
+            gossip:deactivate(),
             dht_node_state:set_slide(
               State, succ, slide_op:set_phase(NewSlideOp, wait_for_node_update));
         _ ->
