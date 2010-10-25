@@ -47,9 +47,10 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {init, 1},     % initialize component
-     {on, 2}        % handle a single message
-                    % on(Msg, State) -> NewState | unknown_event | kill
+     {init, 1}     % initialize component
+     % note: can use arbitrary on-handler, but by default on/2 is used:
+%%      {on, 2}        % handle a single message
+%%                     % on(Msg, State) -> NewState | unknown_event | kill
     ];
 %% userdevguide-end gen_component:behaviour
 behaviour_info(_Other) ->
