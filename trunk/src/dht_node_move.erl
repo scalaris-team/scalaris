@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 
 -export([process_move_msg/2,
-         can_slide_succ/2, can_slide_pred/2,
+         can_slide_succ/3, can_slide_pred/3,
          rm_pred_changed/2, rm_notify_new_pred/3,
          make_slide_leave/1,
          check_config/0]).
@@ -541,8 +541,8 @@ setup_slide_with2_not_found(PredOrSucc, State, SendOrReceive, MoveFullId,
                             MyNode, TargetNode, TargetId, Tag,
                             MaxTransportBytes, SourcePid, First) ->
     CanSlide = case PredOrSucc of
-                   pred -> can_slide_pred(State, TargetId);
-                   succ -> can_slide_succ(State, TargetId)
+                   pred -> can_slide_pred(State, TargetId, Tag);
+                   succ -> can_slide_succ(State, TargetId, Tag)
                end,
     % correct pred/succ info? did pred/succ know our current ID (compare node info)
     NodesCorrect = MyNode =:= dht_node_state:get(State, node) andalso
@@ -807,23 +807,25 @@ get_slide_op(State, MoveFullId) ->
 %% @doc Returns whether a slide with the successor is possible for the given
 %%      target id.
 %% @see can_slide/3
--spec can_slide_succ(State::dht_node_state:state(), TargetId::?RT:key()) -> boolean().
-can_slide_succ(State, TargetId) ->
-    OtherSlide = dht_node_state:get(State, slide_pred),
+-spec can_slide_succ(State::dht_node_state:state(), TargetId::?RT:key(), Tag::any()) -> boolean().
+can_slide_succ(State, TargetId, Tag) ->
+    SlidePred = dht_node_state:get(State, slide_pred),
     dht_node_state:get(State, slide_succ) =:= null andalso
-        (OtherSlide =:= null orelse
-             not intervals:in(TargetId, slide_op:get_interval(OtherSlide))).
+        (SlidePred =:= null orelse
+             (not intervals:in(TargetId, slide_op:get_interval(SlidePred)) andalso
+                  not (Tag =:= '$leave$' andalso slide_op:is_leave(SlidePred)))
+        ).
 
 %% @doc Returns whether a slide with the predecessor is possible for the given
 %%      target id.
 %% @see can_slide/3
--spec can_slide_pred(State::dht_node_state:state(), TargetId::?RT:key()) -> boolean().
-can_slide_pred(State, TargetId) ->
-    OtherSlide = dht_node_state:get(State, slide_succ),
+-spec can_slide_pred(State::dht_node_state:state(), TargetId::?RT:key(), Tag::any()) -> boolean().
+can_slide_pred(State, TargetId, _Tag) ->
+    SlideSucc = dht_node_state:get(State, slide_succ),
     dht_node_state:get(State, slide_pred) =:= null andalso
-        (OtherSlide =:= null orelse
-             (not intervals:in(TargetId, slide_op:get_interval(OtherSlide)) andalso
-                  not slide_op:is_leave(OtherSlide))
+        (SlideSucc =:= null orelse
+             (not intervals:in(TargetId, slide_op:get_interval(SlideSucc)) andalso
+                  not slide_op:is_leave(SlideSucc))
         ).
 
 %% @doc Sends the source pid the given message if it is not 'null'.

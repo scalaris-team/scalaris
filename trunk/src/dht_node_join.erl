@@ -219,7 +219,7 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
     TargetId = node:id(NewPred),
     % only reply to join request with keys in our range:
     KeyInRange = dht_node_state:is_responsible(node:id(NewPred), State),
-    case KeyInRange andalso dht_node_move:can_slide_pred(State, TargetId) of
+    case KeyInRange andalso dht_node_move:can_slide_pred(State, TargetId, '$join$') of
         true ->
             % TODO: implement step-wise join
             MoveFullId = util:get_global_uid(),
