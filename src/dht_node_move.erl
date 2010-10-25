@@ -149,7 +149,7 @@ process_move_msg({move, jump, TargetId, Tag, SourcePid}, State) ->
 process_move_msg({move, notify_succ_timeout, MoveFullId}, MyState) ->
     WorkerFun =
         fun(SlideOp, succ, State) ->
-                case (slide_op:get_timeouts(SlideOp) =< get_notify_succ_retries()) of
+                case (slide_op:get_timeouts(SlideOp) < get_notify_succ_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
                         notify_other_slide(succ, NewSlideOp, State);
@@ -165,7 +165,7 @@ process_move_msg({move, notify_succ_timeout, MoveFullId}, MyState) ->
 process_move_msg({move, notify_pred_timeout, MoveFullId}, MyState) ->
     WorkerFun =
         fun(SlideOp, pred, State) ->
-                case (slide_op:get_timeouts(SlideOp) =< get_notify_pred_retries()) of
+                case (slide_op:get_timeouts(SlideOp) < get_notify_pred_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
                         notify_other_slide(pred, NewSlideOp, State);
@@ -294,7 +294,7 @@ process_move_msg({move, rm_new_pred, NewPred}, State) ->
 process_move_msg({move, rcv_data_timeout, MoveFullId}, MyState) ->
     WorkerFun =
         fun(SlideOp, succ, State) ->
-                case (slide_op:get_timeouts(SlideOp) =< get_rcv_data_retries()) of
+                case (slide_op:get_timeouts(SlideOp) < get_rcv_data_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
                         request_data(State, succ, NewSlideOp);
@@ -317,7 +317,7 @@ process_move_msg({move, req_data, MoveFullId}, MyState) ->
 process_move_msg({move, send_data_timeout, MoveFullId}, MyState) ->
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                case (slide_op:get_timeouts(SlideOp) =< get_send_data_retries()) of
+                case (slide_op:get_timeouts(SlideOp) < get_send_data_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
                         send_data(State, PredOrSucc, NewSlideOp);
@@ -341,7 +341,7 @@ process_move_msg({move, data, MovingData, MoveFullId}, MyState) ->
 process_move_msg({move, data_ack_timeout, MoveFullId}, MyState) ->
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                case (slide_op:get_timeouts(SlideOp) =< get_data_ack_retries()) of
+                case (slide_op:get_timeouts(SlideOp) < get_data_ack_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
                         send_data_ack(State, PredOrSucc, NewSlideOp);
@@ -365,7 +365,7 @@ process_move_msg({move, data_ack, MoveFullId}, MyState) ->
 process_move_msg({move, send_delta_timeout, MoveFullId, ChangedData, DeletedKeys}, MyState) ->
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                case (slide_op:get_timeouts(SlideOp) =< get_send_delta_retries()) of
+                case (slide_op:get_timeouts(SlideOp) < get_send_delta_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
                         send_delta2(State, PredOrSucc, NewSlideOp, ChangedData, DeletedKeys);
