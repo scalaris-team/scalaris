@@ -20,7 +20,7 @@
 
 -include("scalaris.hrl").
 
--export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0]).
+-export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0, dbg_db/0]).
 
 -spec dbg() -> any().
 dbg() ->
@@ -74,4 +74,11 @@ dbg_mode() ->
     lists:map(fun (Node) ->
                       State = gen_component:get_state(Node, 100),
                       {Node, group_state:get_mode(State)}
+              end, pid_groups:find_all(group_node)).
+
+-spec dbg_db() -> any().
+dbg_db() ->
+    lists:map(fun (Node) ->
+                      State = gen_component:get_state(Node, 100),
+                      {Node, element(1, group_state:get_db(State))}
               end, pid_groups:find_all(group_node)).

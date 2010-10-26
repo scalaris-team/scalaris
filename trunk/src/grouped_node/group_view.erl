@@ -50,6 +50,7 @@
          split_group/4,
          get_group_node/1]).
 
+% view() must be serializable, i.e. don't put ets-tables in here
 -record(view, {group_id :: group_types:group_id(),
                current_paxos_version,
                next_proposal_version,
