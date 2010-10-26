@@ -364,7 +364,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     vivaldi:activate(),
     dc_clustering:activate(),
     gossip:activate(),
-    comm:send_local(pid_groups:get_my(dht_node_reregister), {register}),
+    dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     dht_node_state:new(?RT:empty_ext(Succ), NeighbTable, DB).
 
