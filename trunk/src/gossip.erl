@@ -113,8 +113,8 @@ activate() ->
 %% @doc Deactivates the gossip process.
 -spec deactivate() -> ok.
 deactivate() ->
-    Pid = pid_groups:get_my(cyclon),
-    comm:send_local(Pid, {deactivate_cyclon}).
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local(Pid, {deactivate_gossip}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -243,6 +243,14 @@ on_inactive(_Msg, State) ->
 on_active({deactivate_gossip}, {PreviousState, _State, _QueuedMessages, TriggerState}) ->
     gen_component:change_handler({uninit, msg_queue:new(), TriggerState, PreviousState},
                                  on_inactive);
+
+% ignore activate_gossip messages in active state
+% note: remove this if the gossip process is to be deactivated on leave (see
+% dht_node_move.erl). In the current implementation we can not distinguish
+% between the first join and a re-join but after every join, the process is
+% (re-)activated.
+on_active({activate_gossip}, State) ->
+    State;
 
 on_active({gossip_trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
     % this message is received continuously when the Trigger calls
