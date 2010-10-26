@@ -64,7 +64,7 @@ add_9_remove_4(_Config) ->
     wait_for(check_version({1, 11}, 10)),
     admin:del_nodes(4),
     timer:sleep(500),
-    wait_for(check_version({1, 15}, 6)),
+    wait_for(check_version({1, 16}, 6)),
     ok.
 
 wait_for(F) ->
