@@ -161,7 +161,7 @@ check_config() ->
 
 %% userdevguide-begin rt_simple:handle_custom_message
 %% @doc There are no custom messages here.
--spec handle_custom_message(custom_message() | any(), rt_loop:state_init()) -> unknown_event.
+-spec handle_custom_message(custom_message() | any(), rt_loop:state_active()) -> unknown_event.
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_simple:handle_custom_message
 

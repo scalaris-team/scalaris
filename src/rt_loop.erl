@@ -26,38 +26,49 @@
 
 % for routing table implementation
 -export([start_link/1]).
--export([init/1, on_startup/2, on/2, get_base_interval/0, check_config/0,
-         get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2,
-         activate/3]).
+-export([init/1, on_inactive/2, on_active/2,
+         activate/3, deactivate/0,
+         get_base_interval/0, check_config/0,
+         get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2]).
 
 -ifdef(with_export_type_support).
--export_type([state_init/0]).
+-export_type([state_active/0]).
 -endif.
 
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state
--opaque(state_init() :: {Id           :: ?RT:key(),
-                         Pred         :: node:node_type(),
-                         Succ         :: node:node_type(),
-                         RTState      :: ?RT:rt(),
-                         TriggerState :: trigger:state()}).
--type(state_uninit() :: {uninit, MessageQueue::msg_queue:msg_queue(),
-                         TriggerState::trigger:state()}).
-%% -type(state() :: state_init() | state_uninit()).
+-opaque(state_active() :: {Id           :: ?RT:key(),
+                           Pred         :: node:node_type(),
+                           Succ         :: node:node_type(),
+                           RTState      :: ?RT:rt(),
+                           TriggerState :: trigger:state()}).
+-type(state_inactive() :: {inactive,
+                           MessageQueue::msg_queue:msg_queue(),
+                           TriggerState::trigger:state()}).
+%% -type(state() :: state_active() | state_inactive()).
 %% userdevguide-end rt_loop:state
 
 % accepted messages of rt_loop processes
 -type(message() ::
-    {update, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
-    {stabilize} |
+    {trigger_rt} |
+    {update_rt, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
+    {web_debug_info, Requestor::comm:erl_local_pid()} |
+    {dump, Pid::comm:erl_local_pid()} |
     ?RT:custom_message()).
 
-%% @doc Sends an initialization message to the node's routing table.
+%% @doc Activates the routing table process. If not activated, it will
+%%      queue most messages without processing them.
 -spec activate(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
 activate(Id, Pred, Succ) ->
     Pid = pid_groups:get_my(routing_table),
-    comm:send_local(Pid, {init_rt, Id, Pred, Succ}).
+    comm:send_local(Pid, {activate_rt, Id, Pred, Succ}).
+
+%% @doc Deactivates the re-register process.
+-spec deactivate() -> ok.
+deactivate() ->
+    Pid = pid_groups:get_my(routing_table),
+    comm:send_local(Pid, {deactivate_rt}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -71,37 +82,61 @@ start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, routing_table}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, ?MODULE),
-    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
-                                 on_startup).
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0, trigger_rt),
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+                                 on_inactive).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Message handler during start up phase (will change to on/2 when a
-%%      'init_rt' message is received).
--spec on_startup(message(), state_uninit()) -> state_uninit();
-                ({init_rt, Id::?RT:key(), Pred::node:node_type(),
-                  Succ::node:node_type()}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
-on_startup({init_rt, Id, Pred, Succ}, {uninit, QueuedMessages, TriggerState}) ->
+%% @doc Message handler during start up phase (will change to on_active/2 when a
+%%      'activate_rt' message is received).
+-spec on_inactive(message(), state_inactive()) -> state_inactive();
+                 ({activate_rt, Id::?RT:key(), Pred::node:node_type(),
+                   Succ::node:node_type()}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+on_inactive({activate_rt, Id, Pred, Succ}, {inactive, QueuedMessages, TriggerState}) ->
+    log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:next(TriggerState),
     rm_loop:subscribe(self(), fun rm_loop:subscribe_dneighbor_change_filter/2,
                       fun rm_send_update/3),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
-      {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2}, on);
+      {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2}, on_active);
 
-on_startup(Message, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, msg_queue:add(QueuedMessages, Message), TriggerState}.
+on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
+    % get a list of up to 50 queued messages to display:
+    MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
+                  || Message <- lists:sublist(QueuedMessages, 50)],
+    MessageList = case length(QueuedMessages) > 50 of
+                      true -> lists:append(MessageListTmp, [{"...", ""}]);
+                      _    -> MessageListTmp
+                  end,
+    KeyValueList = [{"", ""}, {"inactive RT process", ""}, {"queued messages:", ""} | MessageList],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State;
+
+on_inactive(_Msg, State) ->
+    State.
 
 %% @doc Message handler when the module is fully initialized.
--spec on(message(), state_init()) -> state_init() | unknown_event.
+-spec on_active(message(), state_active()) -> state_active() | unknown_event;
+               ({deactivate_rt}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+on_active({deactivate_rt}, {_Id, _Pred, Succ, _OldRT, TriggerState})  ->
+    log:log(info, "[ RT ~.0p ] deactivating...~n", [comm:this()]),
+    rm_loop:unsubscribe_all(self()),
+    % send new empty RT to the dht_node so that all routing messages
+    % must be passed to the successor: 
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {rt_update, ?RT:empty_ext(Succ)}),
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+                                 on_inactive);
+
 %% userdevguide-begin rt_loop:update_rt
 % update routing table with changed ID, pred and/or succ
-on({update_rt, NewId, NewPred, NewSucc},
+on_active({update_rt, NewId, NewPred, NewSucc},
    {OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
     case ?RT:update(NewId, NewPred, NewSucc, OldRT, OldId, OldPred, OldSucc) of
         {trigger_rebuild, NewRT} ->
@@ -116,7 +151,7 @@ on({update_rt, NewId, NewPred, NewSucc},
 %% userdevguide-end rt_loop:update_rt
 
 %% userdevguide-begin rt_loop:trigger
-on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
+on_active({trigger_rt}, {Id, Pred, Succ, RTState, TriggerState}) ->
     % start periodic stabilization
     % log:log(debug, "[ RT ] stabilize"),
     NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
@@ -127,13 +162,13 @@ on({trigger}, {Id, Pred, Succ, RTState, TriggerState}) ->
 %% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
-on({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->
+on_active({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->
     NewRT = ?RT:filter_dead_node(OldRT, DeadPid),
     ?RT:check(OldRT, NewRT, Id, Pred, Succ, false),
     new_state(Id, Pred, Succ, NewRT, TriggerState);
 
 % debug_info for web interface
-on({web_debug_info, Requestor},
+on_active({web_debug_info, Requestor},
    {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
     KeyValueList =
         [{"rt_size", ?RT:get_size(RTState)},
@@ -141,39 +176,39 @@ on({web_debug_info, Requestor},
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-on({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
+on_active({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
     comm:send_local(Pid, {dump_response, RTState}),
     State;
 
 % unknown message
-on(Message, State) ->
+on_active(Message, State) ->
     ?RT:handle_custom_message(Message, State).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% rt_loop:state_init() handling
+% rt_loop:state_active() handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % handling rt_loop's (opaque) state - these handlers should at least be used
 % outside this module:
 
 -spec new_state(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type(),
-                 RTState::?RT:rt(), TriggerState::trigger:state()) -> state_init().
+                 RTState::?RT:rt(), TriggerState::trigger:state()) -> state_active().
 new_state(Id, Pred, Succ, RTState, TriggerState) ->
     {Id, Pred, Succ, RTState, TriggerState}.
 
--spec get_id(State::state_init()) -> ?RT:key().
+-spec get_id(State::state_active()) -> ?RT:key().
 get_id(State) -> element(1, State).
 
--spec get_pred(State::state_init()) -> node:node_type().
+-spec get_pred(State::state_active()) -> node:node_type().
 get_pred(State) -> element(2, State).
 
--spec get_succ(State::state_init()) -> node:node_type().
+-spec get_succ(State::state_active()) -> node:node_type().
 get_succ(State) -> element(3, State).
 
--spec get_rt(State::state_init()) -> ?RT:rt().
+-spec get_rt(State::state_active()) -> ?RT:rt().
 get_rt(State) -> element(4, State).
 
--spec set_rt(State::state_init(), RT::?RT:rt()) -> NewState::state_init().
+-spec set_rt(State::state_active(), RT::?RT:rt()) -> NewState::state_active().
 set_rt(State, RT) -> setelement(4, State, RT).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
