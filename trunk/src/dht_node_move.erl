@@ -625,12 +625,12 @@ change_my_id(State, NewSlideOp, TargetId) ->
         true ->
             rm_loop:leave(),
             % de-activate processes not needed anymore:
-            cyclon:deactivate(),
+            dht_node_reregister:deactivate(),
             % note: do not deactivate gossip, vivaldi or dc_clustering - their values are still valid and still count!
 %%             gossip:deactivate(),
-%%             vivaldi:deactivate(),
 %%             dc_clustering:deactivate(),
-            dht_node_reregister:deactivate(),
+%%             vivaldi:deactivate(),
+            cyclon:deactivate(),
             rt_loop:deactivate(),
             dht_node_state:set_slide(
               State, succ, slide_op:set_phase(NewSlideOp, wait_for_node_update));
