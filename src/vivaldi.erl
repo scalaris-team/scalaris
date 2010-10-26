@@ -31,12 +31,12 @@
 -export([start_link/1]).
 
 % functions gen_component, the trigger and the config module use
--export([init/1, on_startup/2, on/2,
-         activate/0,
+-export([init/1, on_inactive/2, on_active/2,
+         activate/0, deactivate/0,
          get_base_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
--export([get_coordinate/0, get_coordinate/1]).
+-export([get_coordinate/0]).
 
 -ifdef(with_export_type_support).
 -export_type([error/0, latency/0, network_coordinate/0]).
@@ -48,25 +48,32 @@
 -type(latency() :: number()).
 
 % state of the vivaldi loop
--type(state_init() :: {network_coordinate(), error(), trigger:state()}).
--type(state_uninit() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
-                         TriggerState :: trigger:state()}).
-%% -type(state() :: state_init() | state_uninit()).
+-type(state_active() :: {network_coordinate(), error(), trigger:state()}).
+-type(state_inactive() :: {inactive, QueuedMessages::msg_queue:msg_queue(),
+                           TriggerState :: trigger:state()}).
+%% -type(state() :: state_active() | state_inactive()).
 
 % accepted messages of vivaldi processes
 -type(message() ::
-    {trigger} |
+    {vivaldi_trigger} |
     {cy_cache, RandomNodes::[node:node_type()]} |
     {vivaldi_shuffle, SourcePid::comm:mypid(), network_coordinate(), error()} |
     {update_vivaldi_coordinate, latency(), {network_coordinate(), error()}} |
     {get_coordinate, comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
-%% @doc Sends an initialization message to the node's vivaldi process.
+%% @doc Activates the vivaldi process. If not activated, the vivaldi process
+%%      will queue most messages without processing them.
 -spec activate() -> ok.
 activate() ->
     Pid = pid_groups:get_my(vivaldi),
-    comm:send_local(Pid, {init_vivaldi}).
+    comm:send_local(Pid, {activate_vivaldi}).
+
+%% @doc Deactivates the cyclon process.
+-spec deactivate() -> ok.
+deactivate() ->
+    Pid = pid_groups:get_my(vivaldi),
+    comm:send_local(Pid, {deactivate_vivaldi}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions that create and send messages to nodes requesting information.
@@ -86,21 +93,12 @@ msg_get_coordinate_response(Pid, Coordinate, Confidence) ->
 
 %% @doc Sends a (local) message to the vivaldi process of the requesting
 %%      process' group asking for the current coordinate and confidence.
-%%      see on({get_coordinate, Pid}, State) and
+%%      see on_active({get_coordinate, Pid}, State) and
 %%      msg_get_coordinate_response/3
 -spec get_coordinate() -> ok.
 get_coordinate() ->
-    get_coordinate(comm:this()).
-
-%% @doc Sends a (local) message to the vivaldi process of the requesting
-%%      process' group asking for the current coordinate and confidence to
-%%      be send to Pid.
-%%      see on({get_coordinate, Pid}, State) and
-%%      msg_get_coordinate_response/3
--spec get_coordinate(comm:mypid()) -> ok.
-get_coordinate(Pid) ->
     VivaldiPid = pid_groups:get_my(vivaldi),
-    comm:send_local(VivaldiPid, {get_coordinate, Pid}).
+    comm:send_local(VivaldiPid, {get_coordinate, comm:this()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -111,32 +109,62 @@ start_link(DHTNodeGroup) ->
     Trigger = config:read(vivaldi_trigger),
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, vivaldi}]).
 
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_startup}], State::state_uninit()}.
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, ?MODULE),
-    gen_component:change_handler({uninit, msg_queue:new(), TriggerState},
-                                 on_startup).
+    TriggerState = trigger:init(Trigger, fun get_base_interval/0, vivaldi_trigger),
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+                                 on_inactive).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Message handler during start up phase (will change to on/2 when a
-%%      'init_vivaldi' message is received).
--spec on_startup(message(), state_uninit()) -> state_uninit();
-                ({init_vivaldi}, state_uninit()) -> {'$gen_component', [{on_handler, Handler::on}], State::state_init()}.
-on_startup({init_vivaldi}, {uninit, QueuedMessages, TriggerState}) ->
+%% @doc Message handler during start up phase (will change to on_active/2 when a
+%%      'activate_vivaldi' message is received).
+-spec on_inactive(message(), state_inactive()) -> state_inactive();
+                ({activate_vivaldi}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+on_inactive({activate_vivaldi}, {inactive, QueuedMessages, TriggerState}) ->
+    log:log(info, "[ Vivaldi ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:now(TriggerState),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler({random_coordinate(), 1.0, TriggerState2},
-                                 on);
+                                 on_active);
 
-on_startup(Msg, {uninit, QueuedMessages, TriggerState}) ->
-    {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState}.
+on_inactive(Msg = {get_coordinate, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
+    {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState};
+
+on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
+    % get a list of up to 50 queued messages to display:
+    MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
+                  || Message <- lists:sublist(QueuedMessages, 50)],
+    MessageList = case length(QueuedMessages) > 50 of
+                      true -> lists:append(MessageListTmp, [{"...", ""}]);
+                      _    -> MessageListTmp
+                  end,
+    KeyValueList = [{"", ""}, {"inactive vivaldi process", ""}, {"queued messages:", ""} | MessageList],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State;
+
+on_inactive(_Msg, State) ->
+    State.
 
 %% @doc Message handler when the module is fully initialized.
--spec on(message(), state_init()) -> state_init().
-on({trigger}, {Coordinate, Confidence, TriggerState} ) ->
+-spec on_active(message(), state_active()) -> state_active();
+         ({deactivate_vivaldi}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+on_active({deactivate_vivaldi}, {_Coordinate, _Confidence, TriggerState} )  ->
+    log:log(info, "[ Vivaldi ~.0p ] deactivating...~n", [comm:this()]),
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+                                 on_inactive);
+
+% ignore activate_vivaldi messages in active state
+% note: remove this if the vivaldi process is to be deactivated on leave (see
+% dht_node_move.erl). In the current implementation we can not distinguish
+% between the first join and a re-join but after every join, the process is
+% (re-)activated.
+on_active({activate_vivaldi}, State) ->
+    State;
+
+on_active({vivaldi_trigger}, {Coordinate, Confidence, TriggerState} ) ->
     % start new vivaldi shuffle
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
     NewTriggerState = trigger:next(TriggerState),
@@ -144,11 +172,11 @@ on({trigger}, {Coordinate, Confidence, TriggerState} ) ->
     {Coordinate, Confidence, NewTriggerState};
 
 % ignore empty node list from cyclon
-on({cy_cache, []}, State)  ->
+on_active({cy_cache, []}, State)  ->
     State;
 
 % got random node from cyclon
-on({cy_cache, [Node] = _Cache},
+on_active({cy_cache, [Node] = _Cache},
    {Coordinate, Confidence, _TriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
     % do not exchange states with itself
@@ -161,12 +189,12 @@ on({cy_cache, [Node] = _Cache},
     end,
     State;
 
-on({vivaldi_shuffle, SourcePid, RemoteCoordinate, RemoteConfidence}, State) ->
+on_active({vivaldi_shuffle, SourcePid, RemoteCoordinate, RemoteConfidence}, State) ->
     %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     vivaldi_latency:measure_latency(SourcePid, RemoteCoordinate, RemoteConfidence),
     State;
 
-on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
+on_active({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
    {Coordinate, Confidence, TriggerState}) ->
     %io:format("latency is ~pus~n", [Latency]),
     {NewCoordinate, NewConfidence} =
@@ -179,7 +207,7 @@ on({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},
         end,
     {NewCoordinate, NewConfidence, TriggerState};
 
-on({get_coordinate, Pid}, {Coordinate, Confidence, _TriggerState} = State) ->
+on_active({get_coordinate, Pid}, {Coordinate, Confidence, _TriggerState} = State) ->
     msg_get_coordinate_response(Pid, Coordinate, Confidence),
     State;
 
@@ -187,7 +215,7 @@ on({get_coordinate, Pid}, {Coordinate, Confidence, _TriggerState} = State) ->
 % Web interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({web_debug_info, Requestor},
+on_active({web_debug_info, Requestor},
    {Coordinate, Confidence, _TriggerState} = State) ->
     KeyValueList =
         [{"coordinate", lists:flatten(io_lib:format("~p", [Coordinate]))},
