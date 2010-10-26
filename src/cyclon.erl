@@ -148,7 +148,7 @@ init(Trigger) ->
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_cyclon}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
-    log:log(info, "[ Cyclon ~.0p ] activating...~n"),
+    log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self()),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
@@ -182,7 +182,7 @@ on_inactive(_Msg, State) ->
 -spec on_active(message(), state_active()) -> state_active();
          ({deactivate_cyclon}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles, TriggerState})  ->
-    log:log(info, "[ Cyclon ~.0p ] deactivating...~n"),
+    log:log(info, "[ Cyclon ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self()),
     gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
                                  on_inactive);
