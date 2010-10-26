@@ -631,6 +631,7 @@ change_my_id(State, NewSlideOp, TargetId) ->
 %%             vivaldi:deactivate(),
 %%             dc_clustering:deactivate(),
             dht_node_reregister:deactivate(),
+            rt_loop:deactivate(),
             dht_node_state:set_slide(
               State, succ, slide_op:set_phase(NewSlideOp, wait_for_node_update));
         _ ->
