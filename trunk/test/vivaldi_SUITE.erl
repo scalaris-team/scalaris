@@ -63,20 +63,17 @@ test_init(Config) ->
     config:write(vivaldi_interval, 100),
     EmptyMsgQueue = msg_queue:new(),
     FullState1 = vivaldi:init('trigger_periodic'),
-    Trigger1 = trigger:init('trigger_periodic', vivaldi),
     ?equals_pattern(FullState1,
-                    {'$gen_component', [{on_handler, on_startup}],
-                     {uninit, EmptyMsgQueue, Trigger1}}),
-    {'$gen_component', [{on_handler, on_startup}], InitialState1} = FullState1,
+                    {'$gen_component', [{on_handler, on_inactive}],
+                     {inactive, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}}),
+    {'$gen_component', [{on_handler, on_inactive}], InitialState1} = FullState1,
     ?expect_no_message(),
     
-    Trigger2 = trigger:now(Trigger1),
-    ?expect_message({trigger}),
-    FullState2 = vivaldi:on_startup({init_vivaldi}, InitialState1),
+    FullState2 = vivaldi:on_inactive({activate_vivaldi}, InitialState1),
     ?equals_pattern(FullState2,
-                    {'$gen_component', [{on_handler, on}],
-                     {[_X, _Y], 1.0, Trigger2}}),
-    ?expect_message({trigger}),
+                    {'$gen_component', [{on_handler, on_active}],
+                     {[_X, _Y], 1.0, {'trigger_periodic', _TriggerState}}}),
+    ?expect_message({vivaldi_trigger}),
     ?expect_no_message(),
     Config.
 
@@ -87,7 +84,7 @@ test_on_trigger(Config) ->
     Trigger1 = get_ptrigger_nodelay(),
     InitialState = {Coordinate, Confidence, Trigger1},
     {NewCoordinate, NewConfidence, NewTriggerState} =
-        vivaldi:on({trigger}, InitialState),
+        vivaldi:on_active({vivaldi_trigger}, InitialState),
 
     Self = self(),
     ?equals(Coordinate, NewCoordinate),
@@ -96,7 +93,7 @@ test_on_trigger(Config) ->
     % since the timer ref will be different
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({get_subset_rand, 1, Self}),
-    ?expect_message({trigger}),
+    ?expect_message({vivaldi_trigger}),
     ?expect_no_message(),
     Config.
 
@@ -106,7 +103,7 @@ test_on_vivaldi_shuffle(Config) ->
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
-    _NewState = vivaldi:on({vivaldi_shuffle, comm:this(), [0.0, 0.0], 1.0},
+    _NewState = vivaldi:on_active({vivaldi_shuffle, comm:this(), [0.0, 0.0], 1.0},
                                  InitialState),
     receive
         {ping, SourcePid} -> comm:send(SourcePid, {pong})
@@ -124,7 +121,7 @@ test_on_cy_cache1(Config) ->
     % empty node cache
     Cache = [],
     NewState =
-        vivaldi:on({cy_cache, Cache}, InitialState),
+        vivaldi:on_active({cy_cache, Cache}, InitialState),
 
     ?equals(NewState, InitialState),
     % no messages should be send if no node given
@@ -140,7 +137,7 @@ test_on_cy_cache2(Config) ->
     % non-empty node cache
     Cache = [node:new(comm:make_global(self()), ?RT:hash_key(10), 0)],
     NewState =
-        vivaldi:on({cy_cache, Cache}, InitialState),
+        vivaldi:on_active({cy_cache, Cache}, InitialState),
 
     ?equals(NewState, InitialState),
     % no messages sent to itself
@@ -158,7 +155,7 @@ test_on_cy_cache3(Config) ->
     % non-empty node cache
     Cache = [node:new(comm:make_global(self()), ?RT:hash_key(10), 0)],
     NewState =
-        vivaldi:on({cy_cache, Cache}, InitialState),
+        vivaldi:on_active({cy_cache, Cache}, InitialState),
 
     ?equals(NewState, InitialState),
     % if pids don't match, a get_state is send to the cached node's dht_node
@@ -183,7 +180,7 @@ get_ptrigger_nodelay() ->
     get_ptrigger_delay(0).
 
 get_ptrigger_delay(Delay) ->
-    trigger:init('trigger_periodic', fun () -> Delay end, 'trigger').
+    trigger:init('trigger_periodic', fun () -> Delay end, 'vivaldi_trigger').
 
 fake_dht_node() ->
     unittest_helper:start_subprocess(
