@@ -173,10 +173,14 @@ get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
 %%      responsible for this key.
 -spec is_responsible(Key::intervals:key(), State::state()) -> boolean().
 is_responsible(Key, #state{neighbors=NeighbTable}) ->
-    Neighbors = rm_loop:get_neighbors(NeighbTable),
-    intervals:in(Key,
-                 node:mk_interval_between_nodes(
-                   nodelist:pred(Neighbors), nodelist:node(Neighbors))).
+    case rm_loop:has_left(NeighbTable) of
+        true -> false;
+        _ ->
+            Neighbors = rm_loop:get_neighbors(NeighbTable),
+            intervals:in(Key,
+                         node:mk_interval_between_nodes(
+                           nodelist:pred(Neighbors), nodelist:node(Neighbors)))
+    end.
 
 %% @doc Checks whether the node is responsible for the given key either by its
 %%      current range or for a range the node is temporarily responsible for

@@ -27,7 +27,7 @@
 -export([start_link/1]).
 -export([init/1, on_startup/2, on/2,
          activate/3, leave/0, update_id/1,
-         get_neighbors/1, get_neighbors_table/0,
+         get_neighbors/1, has_left/1, get_neighbors_table/0,
          notify_new_pred/2, notify_new_succ/2,
          % node change subscriptions:
          subscribe/1, subscribe/3,
@@ -88,6 +88,12 @@ activate(Me, Pred, Succ) ->
 %% @doc Returns the current neighborhood structure.
 -spec get_neighbors(Table::tid()) -> nodelist:neighborhood().
 get_neighbors(Table) -> ets:lookup_element(Table, neighbors, 2).
+
+%% @doc Returns whether the current node has already left the ring
+%%      (intermediate state before the node is killed or jumping to another
+%%      ID).
+-spec has_left(Table::tid()) -> boolean().
+has_left(Table) -> ets:lookup_element(Table, has_left, 2).
 
 %% @doc Gets the tid of the table rm_tman uses to store its neighbors.
 %%      Beware: this is a synchronous call to the rm_tman process!
@@ -217,6 +223,7 @@ on_startup({init_rm, Me, Pred, Succ}, {uninit, QueuedMessages}) ->
     % create the ets table storing the neighborhood
     TableName = list_to_atom(string:concat(pid_groups:my_groupname(), ":rm_tman")),
     NeighbTable = ets:new(TableName, [ordered_set, protected]),
+    ets:insert(NeighbTable, {has_left, false}),
     dn_cache:subscribe(),
     % initialize the rm_* module - assume it sets a neighborhood using update_neighbors/2!
     RM_State = ?RM:init(NeighbTable, Me, Pred, Succ),
@@ -289,6 +296,7 @@ on({leave}, {NeighbTable, RM_State, _Subscribers}) ->
     comm:send_to_group_member(node:pidX(Pred), ring_maintenance, {succ_left, Me, Succ}),
     comm:send_local(pid_groups:get_my(dht_node), {move, node_leave}),
     ?RM:leave(RM_State, NeighbTable),
+    ets:insert(NeighbTable, {has_left, true}),
     gen_component:change_handler({uninit, msg_queue:new()}, on_startup);
 
 % failure detector reported dead node
