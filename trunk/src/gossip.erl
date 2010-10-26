@@ -196,6 +196,7 @@ init(Trigger) ->
 -spec on_inactive(message(), full_state_inactive()) -> full_state_inactive();
                  ({activate_gossip}, full_state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::full_state_active()}.
 on_inactive({activate_gossip}, {uninit, QueuedMessages, TriggerState, PreviousState}) ->
+    log:log(info, "[ Gossip ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:now(TriggerState),
     State = gossip_state:new_state(),
     msg_queue:send(QueuedMessages),
@@ -241,6 +242,7 @@ on_inactive(_Msg, State) ->
 -spec on_active(message(), full_state_active()) -> full_state_active();
                ({deactivate_gossip}, full_state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::full_state_inactive()}.
 on_active({deactivate_gossip}, {PreviousState, _State, _QueuedMessages, TriggerState}) ->
+    log:log(info, "[ Gossip ~.0p ] deactivating...~n", [comm:this()]),
     gen_component:change_handler({uninit, msg_queue:new(), TriggerState, PreviousState},
                                  on_inactive);
 
