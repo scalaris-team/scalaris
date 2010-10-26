@@ -30,6 +30,8 @@
 % to work.
 -include("db_beh.hrl").
 
+-export([get_chunk/3]).
+
 -define(CKETS, ets).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -66,5 +68,27 @@ get_name(_State) ->
 get_data({DB, _CKInt, _CKDB}) ->
     ets:tab2list(DB).
 
+%{DB, _CKInt, _CKDB}
+-spec get_chunk(db(), ?RT:key() | '$end_of_table', pos_integer()) -> {?RT:key() | '$end_of_table', list()}.
+get_chunk(_DB, '$end_of_table', _ChunkSize) ->
+    {'$end_of_table', []};
+get_chunk({ETSDB, _CKInt, _CKDB} = DB, Start, 1) ->
+    case get_entry2(DB, Start) of
+        {true, Entry} ->
+            Next = ets:next(ETSDB, Start),
+            {Next, [Entry]};
+        {false, _} ->
+            {'$end_of_table', []}
+    end;
+get_chunk({ETSDB, _CKInt, _CKDB} = DB, Start, ChunkSize) ->
+    case get_entry2(DB, Start) of
+        {true, Entry} ->
+            {Next, Chunk} = get_chunk(DB, ets:next(ETSDB, Start), ChunkSize - 1),
+            {Next, [Entry | Chunk]};
+        {false, _} ->
+            get_chunk(DB, ets:next(ETSDB, Start), ChunkSize - 1)
+    end.
+
 -define(ETS, ets).
 -include("db_generic_ets.hrl").
+

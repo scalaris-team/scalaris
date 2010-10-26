@@ -45,18 +45,29 @@ ops_request(State, {read, _Key, _Value, _Version, Client, _Proposer} = Proposal)
 ops_request(State, {write, Key, _Value, Version, Client, _Proposer} = Proposal) ->
     View = group_state:get_view(State),
     DB = group_state:get_db(State),
-    CurrentVersion = group_db:get_version(DB, Key),
-    case {Version =< CurrentVersion, group_paxos_utils:propose(Proposal, View)} of
-        {true, _} ->
-            comm:send(Client, {write_response, retry, old_version}),
-            State;
-        {false, {success, NewView}} ->
-            _PaxosId = group_view:get_next_expected_decision_id(NewView),
-            ?LOG("write ~p in ~p~n", [_Key, _PaxosId]),
-            group_state:set_view(State, NewView);
-        _ ->
-            comm:send(Client, {write_response, retry, propose_rejected}),
-            State
+    case group_db:get_version(DB, Key) of
+        unknown ->
+            case group_paxos_utils:propose(Proposal, View) of
+                {success, NewView} ->
+                    _PaxosId = group_view:get_next_expected_decision_id(NewView),
+                    group_state:set_view(State, NewView);
+                _ ->
+                    comm:send(Client, {write_response, retry, propose_rejected}),
+                    State
+            end;
+        CurrentVersion ->
+            case {Version =< CurrentVersion, group_paxos_utils:propose(Proposal, View)} of
+                {true, _} ->
+                    comm:send(Client, {write_response, retry, old_version}),
+                    State;
+                {false, {success, NewView}} ->
+                    _PaxosId = group_view:get_next_expected_decision_id(NewView),
+                    ?LOG("write ~p in ~p~n", [_Key, _PaxosId]),
+                    group_state:set_view(State, NewView);
+                _ ->
+                    comm:send(Client, {write_response, retry, propose_rejected}),
+                    State
+            end
     end.
 
 -spec ops_decision(State::group_state:state(),

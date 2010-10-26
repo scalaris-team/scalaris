@@ -26,11 +26,14 @@
 
 -type(message() :: any()).
 
+-define(IF(P, S), if P -> S; true -> ok end).
+
 -spec route(?RT:key(), pos_integer(), message(), group_state:state()) -> group_state:state().
 route(Key, Hops, Message, State) ->
     View = group_state:get_view(State),
     NodeState = group_state:get_node_state(State),
     Interval = group_view:get_interval(View),
+    ?IF(Hops > 3, io:format("~p~n", [Hops])),
     case intervals:in(Key, Interval) of
         true ->
             group_node:on(Message, State);

@@ -56,10 +56,15 @@ on_joining({group_state, View, Pred, Succ}, State) ->
     % @todo: assert that I am a member of this group
     NewView = group_view:recalculate_index(View),
     NewVersion = group_view:get_version(NewView),
-    fd:subscribe(group_view:get_members(NewView)),
+    Members = group_view:get_members(NewView),
+    fd:subscribe(Members),
     io:format("joined: ~w ~w~n", [NewVersion, self()]),
     % @todo sync databases
-    DB = group_db:new_replica(),
+    Interval = group_view:get_interval(View),
+    {'[', Start, _, ')'} = intervals:get_bounds(Interval),
+    UUID = util:get_global_uid(),
+    RepairJob = {UUID, Interval, Members, group_view:get_version(View)},
+    DB = group_db:start_repair_job(group_db:new_replica(), RepairJob),
     NodeState = group_local_state:new(Pred, Succ),
     NewView2 = group_paxos_utils:init_paxos(NewView),
     NewState = group_state:set_db(group_state:set_mode(
@@ -170,19 +175,42 @@ on({paxos_read, Client, HashedKey}, State) ->
             Proposal = {read, HashedKey, Value, Version, Client, comm:this()},
             on({ops, Proposal}, State);
         is_not_current ->
-            comm:send(Client, {read_response, retry, db_is_not_current}),
+            comm:send(Client, {paxos_read_response, retry, db_is_not_current}),
             State
     end;
 on({paxos_write, Client, HashedKey, Value}, State) ->
     DB = group_state:get_db(State),
     case group_db:read(DB, HashedKey) of
         {value, {ok, OldValue, OldVersion}} ->
+            io:format("paxos_write is current~n", []),
             Proposal = {write, HashedKey, Value, OldVersion + 1, Client, comm:this()},
             on({ops, Proposal}, State);
         is_not_current ->
-            comm:send(Client, {write_response, retry, db_is_not_current}),
+            io:format("paxos_write is not current~n", []),
+            comm:send(Client, {paxos_write_response, retry, db_is_not_current}),
             State
     end;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DB repair
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({db_repair_request, Start, ChunkSize, Version, UUID, Client}, State) ->
+    DB = group_state:get_db(State),
+    % @todo check version
+    case group_db:get_chunk(DB, Start, ChunkSize) of
+        is_not_current ->
+            comm:send(Client, {db_repair_response, not_current, nil, nil, nil,
+                               UUID, comm:this()});
+        {Last, Chunk} ->
+            comm:send(Client, {db_repair_response, ok, Start, Last, Chunk,
+                               UUID, comm:this()})
+    end,
+    State;
+on({db_repair_response, Error, Start, Last, Chunk, UUID, Sender}, State) ->
+    DB = group_state:get_db(State),
+    group_db:repair(Error, Start, Last, Chunk, Sender, UUID, State);
+on({group_repair, timeout, UUID, Start}, State) ->
+    group_db:repair_timeout(State, UUID, Start);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -197,7 +225,7 @@ on({crash, Pid}, State) ->
     end;
 on({group_node_join_response, retry, _Reason}, State) ->
     State;
-on({group_state, NewGroupState, Pred, Succ}, State) ->
+on({group_state, _NewGroupState, _Pred, _Succ}, State) ->
     % @todo ignore for the moment
     State;
 on({succ_update, Succ}, State) ->
@@ -223,7 +251,7 @@ on({group_split_response,success}, State) ->
     State.
 
 %% @doc joins this node in the ring and calls the main loop
--spec init(list()) -> group_state:state().
+-spec init(list()) -> group_state:state() | {'$gen_component', list(), group_state:state()}.
 init(Options) ->
     io:format("group_node~n", []),
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),

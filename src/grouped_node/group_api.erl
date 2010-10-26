@@ -41,13 +41,12 @@ paxos_read(Key) ->
     HashedKey = ?RT:hash_key(Key),
     Req = {paxos_read, comm:this(), HashedKey},
     route(Req, HashedKey),
-    Res = receive
+    receive
         {paxos_read_response, {value, Value, Version}} ->
             {value, Value, Version};
         X ->
             X
-    end,
-    Res.
+    end.
 
 paxos_write(Key, Value) ->
     HashedKey = ?RT:hash_key(Key),

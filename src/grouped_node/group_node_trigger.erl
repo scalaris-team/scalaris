@@ -26,11 +26,9 @@
 
 -spec trigger(group_state:state()) -> group_state:state().
 trigger(State) ->
-    View = group_state:get_view(State),
-    case View of
-        undefined ->
-            ok;
-        _ ->
+    case group_state:get_view(State) of
+        undefined -> State;
+        View ->
             case length(group_view:get_members(View)) > 10 of
                 true ->
                     io:format("we are going to split~n", []),
