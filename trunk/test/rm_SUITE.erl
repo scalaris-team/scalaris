@@ -130,11 +130,11 @@ prop_update_id2(NewId) ->
     change_id_and_check(unknown, NewId).
 
 tester_update_id2(_Config) ->
-    Ring = unittest_helper:make_ring_with_ids([?RT:hash_key(0)]),
+    Ring = unittest_helper:make_ring_with_ids(fun() -> [?RT:hash_key(0)] end),
     tester:test(rm_SUITE, prop_update_id2, 1, 1000),
     unittest_helper:stop_ring(Ring).
 
 tester_update_id2_1(_Config) ->
-    Ring = unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
+    Ring = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
     tester:test(rm_SUITE, prop_update_id2, 1, 100),
     unittest_helper:stop_ring(Ring).

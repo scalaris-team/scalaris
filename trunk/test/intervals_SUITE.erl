@@ -43,12 +43,30 @@ suite() ->
      {timetrap, {seconds, 10}}
     ].
 
+-spec spawn_config_processes() -> pid().
+spawn_config_processes() ->
+    unittest_helper:fix_cwd(),
+    unittest_helper:start_process(
+      fun() ->
+              crypto:start(),
+              config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+              log:start_link()
+      end).
+
 init_per_suite(Config) ->
     ct:pal("Starting unittest ~p", [ct:get_status()]),
-    crypto:start(),
-    Config.
+    Pid = spawn_config_processes(),
+    [{wrapper_pid, Pid} | Config].
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    case lists:keyfind(wrapper_pid, 1, Config) of
+        false ->
+            ok;
+        {wrapper_pid, Pid} ->
+            error_logger:tty(false),
+            log:set_log_level(none),
+            exit(Pid, kill)
+    end,
     ok.
 
 new(_Config) ->
