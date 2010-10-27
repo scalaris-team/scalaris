@@ -266,5 +266,8 @@ index_of(_, []) ->
 index_of(P, [P|_Rest]) ->
     1;
 index_of(P, [_|Rest]) ->
-    1 + index_of(P, Rest).
+    case index_of(P, Rest) of
+        error -> error;
+        Index -> 1 + Index
+    end.
 
