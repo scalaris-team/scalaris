@@ -63,7 +63,7 @@ ops_decision(State, {group_node_remove, Pid} = _Proposal, PaxosId, _Hint) ->
     Succ = group_local_state:get_successor(NodeState),
     comm:send(Pid, {group_state, NewView, Pred, Succ}),
     fd:unsubscribe(Pid),
-    group_state:set_view(State, View).
+    group_state:set_view(State, NewView).
 
 -spec rejected_proposal(group_state:state(), proposal_type(),
                         group_types:paxos_id()) ->

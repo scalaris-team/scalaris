@@ -55,7 +55,7 @@ ops_request(State, {group_node_join, Pid, Acceptor, Learner}) ->
                    Hint::group_types:decision_hint()) -> group_state:state().
 ops_decision(State, {group_node_join, Pid, Acceptor, Learner} = Proposal,
              PaxosId, _Hint) ->
-    io:format("adding ~p at ~p~n", [Pid, self()]),
+    io:format("adding ~p at ~p~n", [Pid, PaxosId]),
     View = group_state:get_view(State),
     NodeState = group_state:get_node_state(State),
     NewView = group_view:recalculate_index(group_view:add_node(
