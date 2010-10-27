@@ -47,10 +47,10 @@ init_per_testcase(TestCase, Config) ->
             {skip, "cannot handle network split yet - see issue 59"};
         transactions_1_failure_4_nodes_networksplit_write ->
 %            {skip, "cannot handle network split yet - see issue 59"},
-            Pid = unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key( 0))),
+            Pid = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key( 0)) end),
             [{wrapper_pid, Pid} | Config];
         _ ->
-            Pid = unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
+            Pid = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
             [{wrapper_pid, Pid} | Config]
 %%             {skip, "temporarily"}
     end.
