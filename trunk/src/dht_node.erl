@@ -220,10 +220,25 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
                                    true -> intervals:get_bounds(DBRange);
                                    _    -> DBRange
                                end,
-                    log:log(warn,
-                            "Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  Key:~p",
-                           [intervals:get_bounds(dht_node_state:get(State, my_range)),
-                            DBRange2, Key]),
+                    % it is possible that we received the message due to a
+                    % forward while sliding and before the other node removed
+                    % the forward -> do not warn then
+                    SlidePred = dht_node_state:get(State, slide_pred),
+                    SlideSucc = dht_node_state:get(State, slide_succ),
+                    case ((SlidePred =/= null andalso
+                               slide_op:get_type(SlidePred) =:= 'send' andalso
+                               intervals:in(Key, slide_op:get_interval(SlidePred)))
+                         orelse
+                              (SlideSucc =/= null andalso
+                                   slide_op:get_type(SlideSucc) =:= 'send' andalso
+                                   intervals:in(Key, slide_op:get_interval(SlideSucc)))) of
+                        true -> ok;
+                        false ->
+                            log:log(warn,
+                                    "Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  Key:~p",
+                                    [intervals:get_bounds(dht_node_state:get(State, my_range)),
+                                     DBRange2, Key])
+                    end,
                     dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
             end;
         [Pid] -> comm:send(Pid, CompleteMsg)
