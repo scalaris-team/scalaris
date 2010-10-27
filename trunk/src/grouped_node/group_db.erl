@@ -110,7 +110,7 @@ repair(ok, _Start, Last, Chunk, _Sender, UUID, State) ->
             % apply chunk
             NewDB = apply_chunk(DB, Chunk),
             {'[', _Lower, Upper, ')'} = intervals:get_bounds(Interval),
-            NewInterval = intervals:new({'[', Last, Upper, ')'}),
+            NewInterval = intervals:new('[', Last, Upper, ')'),
             % do we have to continue?
             case intervals:in(Last, Interval) of
                 false -> %done
