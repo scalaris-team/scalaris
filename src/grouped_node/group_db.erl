@@ -81,7 +81,7 @@ get_chunk({is_filling, _DB, _}, _Start, _ChunkSize) ->
 get_chunk({is_current, DB, none}, Start, ChunkSize) ->
     % @todo
     %?DB:get_chunk(DB, Start, ChunkSize).
-    is_not_current;
+    is_not_current.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repair code
