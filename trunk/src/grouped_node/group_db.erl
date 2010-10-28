@@ -128,7 +128,7 @@ repair(ok, _Start, Last, Chunk, _Sender, UUID, State) ->
     state().
 start_repair_job({Mode, DB, none}, {UUID, Interval, Members, Version} = Job) ->
     {_, Start, _, _} = intervals:get_bounds(Interval),
-    trigger_repair(Members, Start, Version, UUID),
+    %trigger_repair(Members, Start, Version, UUID),
     {Mode, DB, Job}.
 
 % @doc timeout message from last chunk request, maybe we didn't get a chunk in time
@@ -149,7 +149,7 @@ repair_timeout(State, UUID, Start) ->
 trigger_repair(Members, Start, Version, UUID) ->
     Msg = {db_repair_request, Start, config:read(group_repair_chunk_size),
            Version, UUID, comm:this()},
-    comm:send(lists:last(Members), Msg), % hd(Members) would be me
+    comm:send(util:randomelem(Members), Msg), % hd(Members) would be me
     TimeoutMsg = {group_repair, timeout, UUID, Start},
     comm:send_local_after(config:read(group_repair_timeout), self(), TimeoutMsg),
     ok.

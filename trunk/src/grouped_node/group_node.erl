@@ -198,7 +198,7 @@ on({db_repair_request, Start, ChunkSize, Version, UUID, Client}, State) ->
     % @todo check version
     case group_db:get_chunk(DB, Start, ChunkSize) of
         is_not_current ->
-            comm:send(Client, {db_repair_response, not_current, nil, nil, nil,
+            comm:send(Client, {db_repair_response, is_not_current, nil, nil, [],
                                UUID, comm:this()});
         {Last, Chunk} ->
             comm:send(Client, {db_repair_response, ok, Start, Last, Chunk,
@@ -206,7 +206,6 @@ on({db_repair_request, Start, ChunkSize, Version, UUID, Client}, State) ->
     end,
     State;
 on({db_repair_response, Error, Start, Last, Chunk, UUID, Sender}, State) ->
-    DB = group_state:get_db(State),
     group_db:repair(Error, Start, Last, Chunk, Sender, UUID, State);
 on({group_repair, timeout, UUID, Start}, State) ->
     group_db:repair_timeout(State, UUID, Start);
