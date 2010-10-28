@@ -53,7 +53,7 @@
                            Dest::comm:erl_local_pid(),
                            Msg::comm:message()) -> ok.
 send_local_as_client(Seconds, Dest, Msg) ->
-    Delayer = pid_groups:pid_of(clients_group, msg_delay),
+    Delayer = pid_groups:pid_of("clients_group", msg_delay),
     comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
 
 -spec send_local(Seconds::number(), Dest::comm:erl_local_pid(), Msg::comm:message()) -> ok.
