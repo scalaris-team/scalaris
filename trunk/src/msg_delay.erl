@@ -35,6 +35,7 @@
 
 %% public interface for transaction validation using Paxos-Commit.
 -export([send_local/3]).
+-export([send_local_as_client/3]).
 
 %% functions for gen_component module and supervisor callbacks
 -export([start_link/1]).
@@ -47,6 +48,13 @@
 
 % internal state
 -type(state()::{TableName::atom(), Round::non_neg_integer()}).
+
+-spec send_local_as_client(Seconds::number(),
+                           Dest::comm:erl_local_pid(),
+                           Msg::comm:message()) -> ok.
+send_local_as_client(Seconds, Dest, Msg) ->
+    Delayer = pid_groups:pid_of(clients_group, msg_delay),
+    comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
 
 -spec send_local(Seconds::number(), Dest::comm:erl_local_pid(), Msg::comm:message()) -> ok.
 send_local(Seconds, Dest, Msg) ->

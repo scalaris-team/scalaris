@@ -213,7 +213,7 @@ commit(TLog) ->
         TM ->
             tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
     end,
-    msg_delay:send_local(config:read(tx_timeout) / 1000,
+    msg_delay:send_local_as_client(config:read(tx_timeout) / 1000,
                          self(), {tx_timeout, ClientsId}),
     _Result =
         receive
