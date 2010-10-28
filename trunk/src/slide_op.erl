@@ -20,12 +20,14 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--export([new_receiving_slide/6, new_sending_slide/6,
-         new_receiving_slide_join/4, new_sending_slide_join/4,
-         new_sending_slide_leave/2,
-         is_join/1, is_leave/1, is_jump/1,
+-export([new_slide/6,
+         new_receiving_slide_join/5, new_sending_slide_join/4,
+         new_sending_slide_leave/3,
+         other_type_to_my_type/1,
+         is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1,
          get_id/1, get_node/1, get_interval/1, get_target_id/1,
-         get_source_pid/1, get_tag/1, get_type/1,
+         get_source_pid/1, get_tag/1, get_sendORreceive/1, get_type/1,
+         get_predORsucc/1,
          get_timer/1, set_timer/3, reset_timer/1,
          get_timeouts/1, inc_timeouts/1, reset_timeouts/1,
          get_phase/1, set_phase/2]).
@@ -34,14 +36,18 @@
 -include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
--export_type([slide_op/0, id/0, slide_phase/0]).
+-export_type([slide_op/0, id/0, phase/0, type/0]).
 -endif.
-
--define(special_tags, ['$join$', '$leave$', '$jump$']).
 
 -type id() :: util:global_uid().
 
--type slide_phase() ::
+-type type() ::
+        {slide, pred | succ, 'send' | 'rcv'} |
+        {join, 'send' | 'rcv'} |
+        {leave, 'send' | 'rcv'} |
+        {jump, 'send' | 'rcv'}.
+
+-type phase() ::
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
         wait_for_succ_ack | % pred initiated a slide and has notified its succ
         wait_for_node_update | % pred changing its id
@@ -49,7 +55,7 @@
         wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
         wait_for_data | wait_for_delta. % receiving node
 
--record(slide_op, {type       = ?required(slide_op, type)      :: 'send' | 'rcv',
+-record(slide_op, {type       = ?required(slide_op, type)      :: type(),
                    id         = ?required(slide_op, id)        :: id(),
                    node       = ?required(slide_op, node)      :: comm:mypid(), % the node, data is sent to/received from
                    interval   = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
@@ -58,127 +64,93 @@
                    source_pid = null          :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
                    timer      = {null, nomsg} :: {reference(), comm:message()} | {null, nomsg}, % timeout timer
                    timeouts   = 0             :: non_neg_integer(),
-                   phase      = null          :: slide_phase()
+                   phase      = null          :: phase()
                   }).
 -opaque slide_op() :: #slide_op{}.
+
+%% @doc Sets up a slide operation of the given type. One of the nodes will
+%%      change its ID to TargetId.
+-spec new_slide(MoveId::util:global_uid(), Type::type(), TargetId::?RT:key(),
+                Tag::any(), SourcePid::comm:erl_local_pid() | null,
+                State::dht_node_state:state()) -> slide_op().
+new_slide(MoveId, Type, TargetId, Tag, SourcePid, State) ->
+    {PredOrSucc, SendOrReceive} =
+        case Type of
+            {slide, PoS, SoR} -> {PoS, SoR};
+            % do not handle "join" here -> use the specialized new_*_slide_join methods!
+            % creating slides for the leaving/jumping node must be done with new_slide_leave/jump!
+            {leave, 'rcv'} -> {pred, 'rcv'};
+            {jump, 'rcv'} ->  {pred, 'rcv'}
+        end,
+    {Interval, TargetNodePid} =
+        case PredOrSucc of
+            pred ->
+                Pred = dht_node_state:get(State, pred),
+                I = case SendOrReceive of
+                        'rcv'  -> node:mk_interval_between_ids(TargetId, node:id(Pred));
+                        'send' -> node:mk_interval_between_ids(node:id(Pred), TargetId)
+                    end,
+                {I, node:pidX(Pred)};
+            succ ->
+                I = case SendOrReceive of
+                        'rcv'  -> node:mk_interval_between_ids(
+                                    dht_node_state:get(State, node_id), TargetId);
+                        'send' -> node:mk_interval_between_ids(
+                                    TargetId, dht_node_state:get(State, node_id))
+                    end,
+                {I, dht_node_state:get(State, succ_pid)}
+        end,
+    #slide_op{type = Type,
+              id = MoveId,
+              node = TargetNodePid,
+              interval = Interval,
+              target_id = TargetId,
+              tag = Tag,
+              source_pid = SourcePid}.
 
 %% @doc Sets up a new slide operation for a joining node (see
 %%      dht_node_join.erl). MyKey is the joining node's new Id and will be used
 %%      as the target id of the slide operation.
--spec new_receiving_slide_join(MoveId::util:global_uid(), Pred::node:node_type(),
-                               Succ::node:node_type(), MyKey::?RT:key())
-        -> slide_op().
-new_receiving_slide_join(MoveId, Pred, Succ, MyKey) ->
-    IntervalToReceive = node:mk_interval_between_ids(node:id(Pred), MyKey),
-    #slide_op{type = 'rcv',
+-spec new_receiving_slide_join(MoveId::util:global_uid(), NewPred::node:node_type(),
+        NewSucc::node:node_type(), MyNewKey::?RT:key(), Tag::any()) -> slide_op().
+new_receiving_slide_join(MoveId, NewPred, NewSucc, MyNewKey, Tag) ->
+    IntervalToReceive = node:mk_interval_between_ids(node:id(NewPred), MyNewKey),
+    #slide_op{type = {join, 'rcv'},
               id = MoveId,
-              node = node:pidX(Succ),
+              node = node:pidX(NewSucc),
               interval = IntervalToReceive,
-              target_id = MyKey,
-              tag = '$join$',
+              target_id = MyNewKey,
+              tag = Tag,
               source_pid = null}.
-
--spec is_join(SlideOp::slide_op()) -> boolean().
-is_join(SlideOp) -> get_tag(SlideOp) =:= '$join$'.
-
--spec is_leave(SlideOp::slide_op()) -> boolean().
-is_leave(SlideOp) -> get_tag(SlideOp) =:= '$leave$'.
-
--spec is_jump(SlideOp::slide_op()) -> boolean().
-is_jump(SlideOp) -> get_tag(SlideOp) =:= '$jump$'.
-
-%% @doc Sets up a slide operation where the current node is receiving data from
-%%      the given target node. One of the nodes will change its ID to TargetId.
--spec new_receiving_slide(MoveId::util:global_uid(),
-                          PredOrSucc::pred | succ, TargetId::?RT:key(), Tag::any(),
-                          SourcePid::comm:erl_local_pid() | null,
-                          State::dht_node_state:state()) -> slide_op().
-new_receiving_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
-    case lists:member(Tag, ?special_tags) of
-        true when Tag =/= '$leave$' ->
-            log:log(warn, "Using reserved tag in receiving slide(~.0p, ~.0p, ~.0p, ~.0p, ~.0p, ~.0p)",
-                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid, State]);
-        _ -> ok
-    end,
-    {IntervalToReceive, TargetNodePid} =
-        case PredOrSucc of
-            pred ->
-                Pred = dht_node_state:get(State, pred),
-                Interval = node:mk_interval_between_ids(TargetId, node:id(Pred)),
-                {Interval, node:pidX(Pred)};
-            succ ->
-                Interval = node:mk_interval_between_ids(
-                             dht_node_state:get(State, node_id), TargetId),
-                {Interval, dht_node_state:get(State, succ_pid)}
-        end,
-    #slide_op{type = 'rcv',
-              id = MoveId,
-              node = TargetNodePid,
-              interval = IntervalToReceive,
-              target_id = TargetId,
-              tag = Tag,
-              source_pid = SourcePid}.
-
-%% @doc Sets up a slide operation where the current node is sending data to
-%%      the node given by PredOrSucc. One of the nodes will change its ID to TargetId.
--spec new_sending_slide(MoveId::util:global_uid(),
-                        PredOrSucc::pred | succ, TargetId::?RT:key(), Tag::any(),
-                        SourcePid::comm:erl_local_pid() | null,
-                        State::dht_node_state:state()) -> slide_op().
-new_sending_slide(MoveId, PredOrSucc, TargetId, Tag, SourcePid, State) ->
-    case lists:member(Tag, ?special_tags) of
-        true ->
-            log:log(warn, "Using reserved tag in sending slide(~.0p, ~.0p, ~.0p, ~.0p, ~.0p, ~.0p)",
-                    [MoveId, PredOrSucc, TargetId, Tag, SourcePid, State]);
-        _ -> ok
-    end,
-    {IntervalToSend, TargetNodePid} =
-        case PredOrSucc of
-            pred ->
-                Pred = dht_node_state:get(State, pred),
-                Interval = node:mk_interval_between_ids(node:id(Pred), TargetId),
-                {Interval, node:pidX(Pred)};
-            succ ->
-                Interval = node:mk_interval_between_ids(
-                             TargetId, dht_node_state:get(State, node_id)),
-                {Interval, dht_node_state:get(State, succ_pid)}
-        end,
-    #slide_op{type = 'send',
-              id = MoveId,
-              node = TargetNodePid,
-              interval = IntervalToSend,
-              target_id = TargetId,
-              tag = Tag,
-              source_pid = SourcePid}.
 
 %% @doc Sets up a new slide operation for a node which sends a joining node
 %%      some of its data.
--spec new_sending_slide_join(MoveId::util:global_uid(), TargetNodePid::comm:mypid(),
-        TargetId::?RT:key(), State::dht_node_state:state()) -> slide_op().
-new_sending_slide_join(MoveId, TargetNodePid, TargetId, State) ->
+-spec new_sending_slide_join(MoveId::util:global_uid(), JoiningNode::node:node_type(),
+        Tag::any(), State::dht_node_state:state()) -> slide_op().
+new_sending_slide_join(MoveId, JoiningNode, Tag, State) ->
+    JoiningNodeId = node:id(JoiningNode),
     IntervalToSend = node:mk_interval_between_ids(
-                                   dht_node_state:get(State, pred_id),
-                                   TargetId),
-    #slide_op{type = 'send',
+                       dht_node_state:get(State, pred_id), JoiningNodeId),
+    #slide_op{type = {join, 'send'},
               id = MoveId,
-              node = TargetNodePid,
+              node = node:pidX(JoiningNode),
               interval = IntervalToSend,
-              target_id = TargetId,
-              tag = '$join$',
+              target_id = JoiningNodeId,
+              tag = Tag,
               source_pid = null}.
 
 %% @doc Sets up a new slide operation for a node which sends a joining node
 %%      some of its data.
--spec new_sending_slide_leave(MoveId::id(), State::dht_node_state:state()) -> slide_op().
-new_sending_slide_leave(MoveId, State) ->
+-spec new_sending_slide_leave(MoveId::id(), Tag::any(), State::dht_node_state:state()) -> slide_op().
+new_sending_slide_leave(MoveId, Tag, State) ->
     IntervalToSend = dht_node_state:get(State, my_range),
     TargetNodePid = dht_node_state:get(State, succ_pid),
-    #slide_op{type = 'send',
+    #slide_op{type = {leave, 'send'},
               id = MoveId,
               node = TargetNodePid,
               interval = IntervalToSend,
               target_id = dht_node_state:get(State, pred_id),
-              tag = '$leave$',
+              tag = Tag,
               source_pid = null}.
 
 %% @doc Returns the id of a receiving or sending slide operation.
@@ -210,8 +182,74 @@ get_source_pid(#slide_op{source_pid=Pid}) -> Pid.
 get_tag(#slide_op{tag=Tag}) -> Tag.
 
 %% @doc Returns whether the given slide operation sends or receives data.
--spec get_type(SlideOp::slide_op()) -> 'send' | 'rcv'.
+-spec get_sendORreceive(SlideOp::slide_op() | type()) -> 'send' | 'rcv'.
+get_sendORreceive(#slide_op{type=Type}) -> get_sendORreceive(Type);
+get_sendORreceive({slide, _, SendOrReceive}) -> SendOrReceive;
+get_sendORreceive({_TypeTag, SendOrReceive}) -> SendOrReceive.
+
+%% @doc Returns whether the given slide operation works with the successor or
+%%      predecessor.
+-spec get_predORsucc(SlideOp::slide_op() | type()) -> pred | succ.
+get_predORsucc(#slide_op{type=Type}) -> get_predORsucc(Type);
+get_predORsucc({slide, PredOrSucc, _}) -> PredOrSucc;
+get_predORsucc({join, 'send'}) -> pred;
+get_predORsucc({join, 'rcv'}) -> succ;
+get_predORsucc({leave, 'send'}) -> succ;
+get_predORsucc({leave, 'rcv'}) -> pred;
+get_predORsucc({jump, 'send'}) -> succ;
+get_predORsucc({jump, 'rcv'}) -> pred.
+
+%% @doc Returns the given slide operation's (full) type.
+-spec get_type(SlideOp::slide_op()) -> type().
 get_type(#slide_op{type=Type}) -> Type.
+
+%% @doc Converts the given slide type to the type the other participating node
+%%      can use.
+-spec other_type_to_my_type(type()) -> type().
+other_type_to_my_type({slide, pred, SendOrReceive}) ->
+    {slide, succ, switch_sendORreceive2(SendOrReceive)};
+other_type_to_my_type({slide, succ, SendOrReceive}) ->
+    {slide, pred, switch_sendORreceive2(SendOrReceive)};
+other_type_to_my_type({TypeTag, SendOrReceive}) ->
+    {TypeTag, switch_sendORreceive2(SendOrReceive)}.
+
+%% @doc Helper to change 'send' to 'rcv' and the other way around.
+-spec switch_sendORreceive2('send') -> 'rcv';
+                           ('rcv') -> 'send'.
+switch_sendORreceive2('send') -> 'rcv';
+switch_sendORreceive2('rcv') -> 'send'.
+
+%% @doc Returns whether the given slide op or type is a join operation.
+-spec is_join(SlideOp::slide_op() | type()) -> boolean().
+is_join(#slide_op{type=Type}) -> is_join(Type);
+is_join(Type) -> element(1, Type) =:= join.
+
+%% @doc Returns whether the given slide op or type is a join operation sending
+%%      or receiving data as provided.
+-spec is_join(SlideOp::slide_op() | type(), 'send' | 'rcv') -> boolean().
+is_join(#slide_op{type=Type}, SendOrReceive) -> is_join(Type, SendOrReceive);
+is_join({join, SendOrReceive}, SendOrReceive) -> true;
+is_join(_Type, _SendOrReceive) -> false.
+
+%% @doc Returns whether the given slide op or type is a leave operation.
+-spec is_leave(SlideOp::slide_op() | type()) -> boolean().
+is_leave(#slide_op{type=Type}) -> is_leave(Type);
+is_leave({leave, _}) -> true;
+is_leave({jump, _}) -> true;
+is_leave(_Type) -> false.
+
+%% @doc Returns whether the given slide op or type is a leave operation sending
+%%      or receiving data as provided.
+-spec is_leave(SlideOp::slide_op() | type(), 'send' | 'rcv') -> boolean().
+is_leave(#slide_op{type=Type}, SendOrReceive) -> is_leave(Type, SendOrReceive);
+is_leave({leave, SendOrReceive}, SendOrReceive) -> true;
+is_leave({jump, SendOrReceive}, SendOrReceive) -> true;
+is_leave(_Type, _SendOrReceive) -> false.
+
+%% @doc Returns whether the given slide op or type is a jump operation.
+-spec is_jump(SlideOp::slide_op() | type()) -> boolean().
+is_jump(#slide_op{type=Type}) -> is_jump(Type);
+is_jump(Type) -> element(1, Type) =:= jump.
 
 %% @doc Returns the timer of the slide operation or {null, nomsg} if no timer
 %%      is set.
@@ -267,10 +305,10 @@ reset_timeouts(SlideOp) ->
     SlideOp#slide_op{timeouts = 0}.
 
 %% @doc Returns the current phase of the slide operation.
--spec get_phase(SlideOp::slide_op()) -> slide_phase().
+-spec get_phase(SlideOp::slide_op()) -> phase().
 get_phase(#slide_op{phase=Phase}) -> Phase.
 
 %% @doc Sets the slide operation's current phase.
--spec set_phase(SlideOp::slide_op(), NewPhase::slide_phase()) -> slide_op().
+-spec set_phase(SlideOp::slide_op(), NewPhase::phase()) -> slide_op().
 set_phase(SlideOp, NewPhase) ->
     SlideOp#slide_op{phase = NewPhase}.

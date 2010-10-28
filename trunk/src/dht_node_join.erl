@@ -170,7 +170,7 @@ process_join_state({join, join_response, Pred, MoveId},
             rm_loop:notify_new_pred(node:pidX(Succ), Me),
             
             State = finish_join(Me, Pred, Succ, ?DB:new(), QueuedMessages),
-            SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, MyKey),
+            SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, MyKey, join),
             SlideOp1 = slide_op:set_phase(SlideOp, wait_for_node_update),
             State1 = dht_node_state:set_slide(State, succ, SlideOp1),
             State2 = dht_node_state:add_msg_fwd(State1, slide_op:get_interval(SlideOp1),
@@ -219,13 +219,12 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
     TargetId = node:id(NewPred),
     % only reply to join request with keys in our range:
     KeyInRange = dht_node_state:is_responsible(node:id(NewPred), State),
-    case KeyInRange andalso dht_node_move:can_slide_pred(State, TargetId, '$join$') of
+    case KeyInRange andalso dht_node_move:can_slide_pred(State, TargetId, {join, 'rcv'}) of
         true ->
             % TODO: implement step-wise join
             MoveFullId = util:get_global_uid(),
-            SlideOp = slide_op:new_sending_slide_join(MoveFullId,
-                                                      node:pidX(NewPred),
-                                                      TargetId, State),
+            SlideOp = slide_op:new_sending_slide_join(
+                        MoveFullId, NewPred, join, State),
             SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update),
             rm_loop:subscribe(self(), fun dht_node_move:rm_pred_changed/2,
                               fun dht_node_move:rm_notify_new_pred/3),
