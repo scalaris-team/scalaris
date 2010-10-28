@@ -25,7 +25,8 @@
 -export([process_move_msg/2,
          can_slide_succ/3, can_slide_pred/3,
          rm_pred_changed/2, rm_notify_new_pred/3,
-         make_slide_leave/1,
+         make_slide_succ/4, make_slide_pred/4,
+         make_slide_leave/1, make_jump/4,
          check_config/0]).
 
 -ifdef(with_export_type_support).
@@ -83,68 +84,13 @@
 %%      protocol.
 -spec process_move_msg(move_message(), dht_node_state:state()) -> dht_node_state:state().
 process_move_msg({move, slide_succ, TargetId, Tag, SourcePid}, State) ->
-    % slide with successor possible? if so -> receive or send data?
-    {IsSlideSucc, SendOrReceive} =
-        case intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
-            true -> {true, 'rcv'};
-            _ ->
-                TargetIdInMyRange = dht_node_state:is_responsible(TargetId, State),
-                {TargetIdInMyRange, 'send'}
-        end,
-    
-    if
-        IsSlideSucc ->
-            MoveFullId = util:get_global_uid(),
-            MyNode = dht_node_state:get(State, node),
-            TargetNode = dht_node_state:get(State, succ),
-            setup_slide_with(succ, State, SendOrReceive, MoveFullId, MyNode,
-                             TargetNode, TargetId, Tag,
-                             get_max_transport_bytes(), SourcePid, true);
-        true ->
-            notify_source_pid(SourcePid,
-                              {move, result, Tag, wrong_pred_succ_node}),
-            State
-    end;
+    make_slide_succ(State, TargetId, Tag, SourcePid);
 
 process_move_msg({move, slide_pred, TargetId, Tag, SourcePid}, State) ->
-    % Note: we can not check everything whether this is a valid slide_pred
-    % -> our predecessor has to check that
-    SendOrReceive = case dht_node_state:is_responsible(TargetId, State) of
-                        true -> 'rcv';
-                        _    -> 'send'
-                    end,
-    
-    MoveFullId = util:get_global_uid(),
-    MyNode = dht_node_state:get(State, node),
-    TargetNode = dht_node_state:get(State, pred),
-    setup_slide_with(pred, State, SendOrReceive, MoveFullId, MyNode,
-                     TargetNode, TargetId, Tag, get_max_transport_bytes(),
-                     SourcePid, true);
+    make_slide_pred(State, TargetId, Tag, SourcePid);
 
 process_move_msg({move, jump, TargetId, Tag, SourcePid}, State) ->
-    % check whether this is a slide_succ -> if so, do that instead
-    case dht_node_state:is_responsible(TargetId, State) orelse
-             intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
-        true ->
-            process_move_msg({move, slide_succ, TargetId, Tag, SourcePid},
-                             State);
-        _ ->
-            case dht_node_state:get(State, slide_succ) =/= null andalso
-                     dht_node_state:get(State, slide_pred) =/= null of
-                true ->
-                    % leave the ring and join somewhere else
-                    % TODO: send data to successor (andalso predecessor?) and afterwards, leave!
-                    OldIdVersion = node:id_version(dht_node_state:get(State, node)),
-                    idholder:set_id(TargetId, OldIdVersion + 1),
-                    comm:send_local(self(), {kill}),
-                    rm_loop:leave(),
-                    State;
-                _ ->
-                    notify_source_pid(SourcePid,
-                                      {move, result, Tag, ongoing_slide}),
-                    State
-            end
-    end;
+    make_jump(State, TargetId, Tag, SourcePid);
 
 process_move_msg({move, notify_succ_timeout, MoveFullId}, MyState) ->
     WorkerFun =
@@ -902,6 +848,83 @@ abort_slide(State, Node, SlideOpId, Phase, SourcePid, Tag, Pred_or_Succ, Reason,
              lists:member(Phase, [null, wait_for_succ_ack]) of
         true -> make_slide_leave(State2);
         _    -> State2
+    end.
+
+%% @doc Creates a slide with the node's successor. The current node will change
+%%      its ID to TargetId, SourcePid will be notified about the result.
+-spec make_slide_succ(State::dht_node_state:state(), TargetId::?RT:key(),
+                      Tag::any(), SourcePid::comm:erl_local_pid() | null)
+    -> dht_node_state:state().
+make_slide_succ(State, TargetId, Tag, SourcePid) ->
+    % slide with successor possible? if so, receive or send data?
+    {IsSlideSucc, SendOrReceive} =
+        case intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
+            true -> {true, 'rcv'};
+            _ ->
+                TargetIdInMyRange = dht_node_state:is_responsible(TargetId, State),
+                {TargetIdInMyRange, 'send'}
+        end,
+    if
+        IsSlideSucc ->
+            MoveFullId = util:get_global_uid(),
+            MyNode = dht_node_state:get(State, node),
+            TargetNode = dht_node_state:get(State, succ),
+            setup_slide_with(succ, State, SendOrReceive, MoveFullId, MyNode,
+                             TargetNode, TargetId, Tag,
+                             get_max_transport_bytes(), SourcePid, true);
+        true ->
+            notify_source_pid(SourcePid,
+                              {move, result, Tag, wrong_pred_succ_node}),
+            State
+    end.
+
+%% @doc Creates a slide with the node's predecessor. The predecessor will
+%%      change its ID to TargetId, SourcePid will be notified about the result.
+-spec make_slide_pred(State::dht_node_state:state(), TargetId::?RT:key(),
+                      Tag::any(), SourcePid::comm:erl_local_pid() | null)
+    -> dht_node_state:state().
+make_slide_pred(State, TargetId, Tag, SourcePid) ->
+    % Note: we can not fully check whether this is a valid slide_pred
+    % -> our predecessor has to check that
+    SendOrReceive = case dht_node_state:is_responsible(TargetId, State) of
+                        true -> 'rcv';
+                        _    -> 'send'
+                    end,
+    MoveFullId = util:get_global_uid(),
+    MyNode = dht_node_state:get(State, node),
+    TargetNode = dht_node_state:get(State, pred),
+    setup_slide_with(pred, State, SendOrReceive, MoveFullId, MyNode,
+                     TargetNode, TargetId, Tag, get_max_transport_bytes(),
+                     SourcePid, true).
+
+%% @doc Creates a slide with the node's predecessor. The predecessor will
+%%      change its ID to TargetId, SourcePid will be notified about the result.
+-spec make_jump(State::dht_node_state:state(), TargetId::?RT:key(),
+                Tag::any(), SourcePid::comm:erl_local_pid() | null)
+    -> dht_node_state:state().
+make_jump(State, TargetId, Tag, SourcePid) ->
+    % check whether the operation is a slide_succ -> if so, do that instead
+    case dht_node_state:is_responsible(TargetId, State) orelse
+             intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
+        true ->
+            process_move_msg({move, slide_succ, TargetId, Tag, SourcePid},
+                             State);
+        _ ->
+            case dht_node_state:get(State, slide_succ) =/= null andalso
+                     dht_node_state:get(State, slide_pred) =/= null of
+                true ->
+                    % leave the ring and join somewhere else
+                    % TODO: send data to successor (andalso predecessor?) and afterwards, leave!
+                    OldIdVersion = node:id_version(dht_node_state:get(State, node)),
+                    idholder:set_id(TargetId, OldIdVersion + 1),
+                    comm:send_local(self(), {kill}),
+                    rm_loop:leave(),
+                    State;
+                _ ->
+                    notify_source_pid(SourcePid,
+                                      {move, result, Tag, ongoing_slide}),
+                    State
+            end
     end.
 
 %% @doc Creates a slide that will move all data to the successor and leave the
