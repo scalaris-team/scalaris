@@ -237,16 +237,26 @@ start_link() ->
 -spec get_and_init_key() -> string().
 get_and_init_key() ->
     Key = randoms:getRandomId(),
+    case get_and_init_key(Key, _Retries = 10) of
+        fail ->
+            io:format("geT_and_init_key choosing new key and retrying~n"),
+            get_and_init_key();
+        Key -> Key
+    end.
+
+get_and_init_key(_Key, 0) ->
+    fail;
+get_and_init_key(Key, Count) ->
     case cs_api_v2:write(Key, 0) of
         ok ->
             Key;
         {fail, abort} ->
             io:format("geT_and_init_key 1 failed, retrying~n", []),
-            get_and_init_key();
+            get_and_init_key(Key, Count - 1);
         {fail, failed} ->
             io:format("geT_and_init_key 1 failed, retrying~n", []),
-            get_and_init_key();
+            get_and_init_key(Key, Count - 1);
         {fail, timeout} ->
             io:format("geT_and_init_key 2 timeout, retrying~n", []),
-            get_and_init_key()
+            get_and_init_key(Key, Count - 1)
     end.
