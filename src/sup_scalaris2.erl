@@ -96,6 +96,9 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
     Config =
         util:sup_worker_desc(config, config, start_link,
                              [[preconfig:config(), preconfig:local_config()]]),
+    ClientsDelayer =
+        util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
+                             [clients_group]),
     DHTNodeFirstId = case preconfig:get_env(first_id, random) of
                   random -> [];
                   Id     -> [{{idholder, id}, Id}]
@@ -130,7 +133,8 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                      MonitorTiming,
                      CommLayer,
                      FailureDetector,
-                     AdminServer],
+                     AdminServer,
+                     ClientsDelayer],
     %% do we want to run an empty boot-server?
     PostBootServer = case EmptyBootServer of
                          true -> [YAWS, BenchServer, Ganglia];
