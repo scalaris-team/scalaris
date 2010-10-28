@@ -98,7 +98,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                              [[preconfig:config(), preconfig:local_config()]]),
     ClientsDelayer =
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
-                             [clients_group]),
+                             ["clients_group"]),
     DHTNodeFirstId = case preconfig:get_env(first_id, random) of
                          random -> [];
                          Id     -> [{{idholder, id}, Id}]
