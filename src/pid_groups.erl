@@ -198,9 +198,15 @@ groups_with(PidName) ->
 
 -spec find_a(pidname()) -> pid() | failed.
 find_a(PidName) ->
-    case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
-        [[Pid] | _] -> Pid;
-        []          -> failed
+    % try in my own group first
+    case get_my(PidName) of
+        failed ->
+            % search others
+            case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
+                [[Pid] | _] -> Pid;
+                []          -> failed
+            end;
+        Pid -> Pid
     end.
 
 -spec find_all(pidname()) -> [pid()].
