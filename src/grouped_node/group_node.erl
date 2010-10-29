@@ -193,20 +193,21 @@ on({paxos_write, Client, HashedKey, Value}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DB repair
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({db_repair_request, Start, ChunkSize, Version, UUID, Client}, State) ->
+on({db_repair_request, Range, ChunkSize, Version, UUID, Client}, State) ->
     DB = group_state:get_db(State),
     % @todo check version
-    case group_db:get_chunk(DB, Start, ChunkSize) of
+    case group_db:get_chunk(DB, Range, ChunkSize) of
         is_not_current ->
-            comm:send(Client, {db_repair_response, is_not_current, nil, nil, [],
+            comm:send(Client, {db_repair_response, is_not_current, Range, Range, [],
                                UUID, comm:this()});
         {Last, Chunk} ->
-            comm:send(Client, {db_repair_response, ok, Start, Last, Chunk,
+            comm:send(Client, {db_repair_response, ok, Range, Last, Chunk,
                                UUID, comm:this()})
     end,
     State;
-on({db_repair_response, Error, Start, Last, Chunk, UUID, Sender}, State) ->
-    group_db:repair(Error, Start, Last, Chunk, Sender, UUID, State);
+on({db_repair_response, Error, GivenInterval, RemainingInterval, Chunk, UUID, Sender}, State) ->
+    group_db:repair(Error, GivenInterval, RemainingInterval, Chunk, Sender, UUID,
+                    State);
 on({group_repair, timeout, UUID, Start}, State) ->
     group_db:repair_timeout(State, UUID, Start);
 

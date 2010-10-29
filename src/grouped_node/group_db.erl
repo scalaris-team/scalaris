@@ -21,7 +21,7 @@
 -include("scalaris.hrl").
 
 -export([new_empty/0, new_replica/0,
-         get_version/2,
+         get_version/2, get_size/1,
          write/4, read/2,
          get_chunk/3,
          repair/7, start_repair_job/2, repair_timeout/3]).
@@ -29,7 +29,7 @@
 -type(mode_type() :: is_current | is_filling).
 -type(chunk() :: list(db_entry:entry())).
 
--type(repair_job() :: {UUID::any(), Interval::any(), Members::any(), Version::pos_integer()} | none).
+-type(repair_job() :: {UUID::any(), Interval::any(), Members::any(), Version::non_neg_integer()} | none).
 -type(state() :: {Mode::mode_type(), DB::?DB:db(), RepairState::repair_job()}).
 
 -ifdef(with_export_type_support).
@@ -74,51 +74,56 @@ get_version({is_filling, DB, _}, Key) ->
             not_ready
     end.
 
--spec get_chunk(state(), Start::?RT:key(), ChunkSize::non_neg_integer()) ->
-    is_not_current | {?RT:key() | '$end_of_table', chunk()}.
-get_chunk({is_filling, _DB, _}, _Start, _ChunkSize) ->
+-spec get_size(state()) -> non_neg_integer().
+get_size({_, DB, _}) ->
+    ?DB:get_load(DB).
+
+-spec get_chunk(state(), Interval::intervals:interval(), ChunkSize::non_neg_integer()) ->
+    is_not_current | {intervals:interval(), chunk()}.
+get_chunk({is_filling, _DB, _}, _Interval, _ChunkSize) ->
     is_not_current;
-get_chunk({is_current, DB, none}, Start, ChunkSize) ->
+get_chunk({is_current, DB, none}, Interval, ChunkSize) ->
     % @todo
-    %?DB:get_chunk(DB, Start, ChunkSize).
-    is_not_current.
+    ?DB:get_chunk(DB, Interval, ChunkSize).
+    %is_not_current.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repair code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc received chunk from other group member -> repair local db
--spec repair(Error::ok | is_not_current, Start::?RT:key(), Last::?RT:key(),
+-spec repair(Error::ok | is_not_current, GivenInterval::intervals:interval(),
+             RemainingInterval::intervals:interval(),
              Chunk::chunk(), Sender::comm:mypid(), UUID::util:global_uid(),
              State::group_state:state())->
     group_state:state().
-repair(is_not_current, Start, _Last, [], _Sender, UUID, State) ->
+repair(is_not_current, _GivenInterval, RemainingInterval, [], _Sender, UUID, State) ->
     % partner is not current -> retrigger
     case group_state:get_db(State) of
         {is_current, _DB, none} -> % we are already done
             State;
         {_Mode, _DB, {UUID, _Interval, Members, Version} = _Job} ->
             io:format("repair: is_not_current -> retriggering~n", []),
-            trigger_repair(Members, Start, Version, UUID),
+            trigger_repair(Members, RemainingInterval, Version, UUID),
             State
     end;
-repair(ok, _Start, Last, Chunk, _Sender, UUID, State) ->
+repair(ok, _GivenInterval, RemainingInterval, Chunk, _Sender, UUID, State) ->
     case group_state:get_db(State) of
         {is_current, _, none} -> % repair has already finished
             State;
-        {_Mode, DB, {UUID, Interval, Members, Version} = _Job} ->
+        {_Mode, DB, {UUID, _RemainingInterval, Members, Version} = _Job} ->
             % apply chunk
             NewDB = apply_chunk(DB, Chunk),
-            {'[', _Lower, Upper, ')'} = intervals:get_bounds(Interval),
-            NewInterval = intervals:new('[', Last, Upper, ')'),
             % do we have to continue?
-            case intervals:in(Last, Interval) of
-                false -> %done
+            io:format("rest interval ~p~n", [RemainingInterval]),
+            case intervals:is_empty(RemainingInterval) of
+                true -> % done
+                    io:format("done~n", []),
                     DB2 = {is_current, NewDB, none},
                     group_state:set_db(State, DB2);
-                true ->
-                    trigger_repair(Members, Last, Version, UUID),
-                    DB2 = {is_filling, NewDB, {UUID, NewInterval, Members, Version}},
+                false -> % continue
+                    trigger_repair(Members, RemainingInterval, Version, UUID),
+                    DB2 = {is_filling, NewDB, {UUID, RemainingInterval, Members, Version}},
                     group_state:set_db(State, DB2)
             end
     end.
@@ -127,35 +132,51 @@ repair(ok, _Start, Last, Chunk, _Sender, UUID, State) ->
 -spec start_repair_job(DB::{is_filling, ?DB:db(), none}, repair_job()) ->
     state().
 start_repair_job({Mode, DB, none}, {UUID, Interval, Members, Version} = Job) ->
-    {_, Start, _, _} = intervals:get_bounds(Interval),
-    %trigger_repair(Members, Start, Version, UUID),
+    trigger_repair(Members, Interval, Version, UUID),
     {Mode, DB, Job}.
 
-% @doc timeout message from last chunk request, maybe we didn't get a chunk in time
--spec repair_timeout(State::group_state:state(), util:global_uid(), Start::?RT:key()) ->
+% @doc timeout message from last chunk request, maybe we didn't get a
+% chunk in time
+-spec repair_timeout(State::group_state:state(), util:global_uid(),
+                     Interval::intervals:interval()) ->
     group_state:state().
-repair_timeout(State, UUID, Start) ->
+repair_timeout(State, UUID, Interval) ->
     case group_state:get_db(State) of
         {_Mode, _DB, none} ->
             State;
-        {_Mode, _DB, {UUID, Interval, Members, Version} = _Job} ->
-            case intervals:in(Start, Interval) of
+        {_Mode, _DB, {UUID, NextInterval, Members, Version} = _Job} ->
+            case Interval == NextInterval of
                 false -> State;
-                true -> trigger_repair(Members, Start, Version, UUID), State
+                true -> trigger_repair(Members, Interval, Version, UUID), State
             end
     end.
 
--spec trigger_repair(list(), ?RT:key(), any(), util:global_uid()) -> ok.
-trigger_repair(Members, Start, Version, UUID) ->
-    Msg = {db_repair_request, Start, config:read(group_repair_chunk_size),
+-spec trigger_repair(list(), intervals:interval(), any(), util:global_uid()) ->
+    ok.
+trigger_repair(Members, nil, Version, UUID) ->
+    nil = nil2;
+trigger_repair(Members, Interval, Version, UUID) ->
+    Msg = {db_repair_request, Interval, config:read(group_repair_chunk_size),
            Version, UUID, comm:this()},
-    comm:send(util:randomelem(Members), Msg), % hd(Members) would be me
-    TimeoutMsg = {group_repair, timeout, UUID, Start},
+    Candidate = util:randomelem(Members),
+    comm:send(Candidate, Msg), % hd(Members) would be me
+    TimeoutMsg = {group_repair, timeout, UUID, Interval},
     comm:send_local_after(config:read(group_repair_timeout), self(), TimeoutMsg),
     ok.
 
 -spec apply_chunk(?DB:db(), chunk()) -> ?DB:db().
-apply_chunk(DB, Chunk) ->
-    % @todo
-    io:format("apply_chunk(~p)~n", [Chunk]),
-    DB.
+apply_chunk(DB, []) ->
+    DB;
+apply_chunk(DB, [Entry | Rest]) ->
+    Key = db_entry:get_key(Entry),
+    NewVersion = db_entry:get_version(Entry),
+    DB2 = case ?DB:get_entry2(DB, Key) of
+              {true, OldEntry} ->
+                  OldVersion = db_entry:get_version(OldEntry),
+                  case OldVersion < NewVersion of
+                      true -> ?DB:set_entry(DB, Entry);
+                      false  -> DB
+                  end;
+              {false, _} -> ?DB:set_entry(DB, Entry)
+          end,
+    apply_chunk(DB2, Rest).

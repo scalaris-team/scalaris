@@ -20,7 +20,7 @@
 
 -include("scalaris.hrl").
 
--export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0, dbg_db/0]).
+-export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0, dbg_db/0, dbg_db_without_pid/0]).
 
 -spec dbg() -> any().
 dbg() ->
@@ -46,7 +46,8 @@ inc(Stats, Label) ->
 -spec dbg_version() -> any().
 dbg_version() ->
     lists:map(fun (Node) ->
-                      State = gen_component:get_state(Node, 100),
+                      State = gen_component:get_state(Node, 1000),
+                      io:format("~p~n", [State]),
                       View = group_state:get_view(State),
                       case group_state:get_mode(State) of
                           joined ->
@@ -59,7 +60,7 @@ dbg_version() ->
 -spec dbg3() -> any().
 dbg3() ->
     lists:map(fun (Node) ->
-                      State = gen_component:get_state(Node, 100),
+                      State = gen_component:get_state(Node, 1000),
                       View = group_state:get_view(State),
                       case group_state:get_mode(State) of
                           joined ->
@@ -72,13 +73,24 @@ dbg3() ->
 -spec dbg_mode() -> any().
 dbg_mode() ->
     lists:map(fun (Node) ->
-                      State = gen_component:get_state(Node, 100),
+                      State = gen_component:get_state(Node, 1000),
                       {Node, group_state:get_mode(State)}
               end, pid_groups:find_all(group_node)).
 
 -spec dbg_db() -> any().
 dbg_db() ->
     lists:map(fun (Node) ->
-                      State = gen_component:get_state(Node, 100),
-                      {Node, element(1, group_state:get_db(State))}
+                      State = gen_component:get_state(Node, 1000),
+                      DB = group_state:get_db(State),
+                      Size = group_db:get_size(DB),
+                      {Node, element(1, DB), Size}
+              end, pid_groups:find_all(group_node)).
+
+-spec dbg_db_without_pid() -> any().
+dbg_db_without_pid() ->
+    lists:map(fun (Node) ->
+                      State = gen_component:get_state(Node, 1000),
+                      DB = group_state:get_db(State),
+                      Size = group_db:get_size(DB),
+                      {element(1, DB), Size}
               end, pid_groups:find_all(group_node)).

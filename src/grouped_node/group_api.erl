@@ -37,6 +37,7 @@ quorum_read(Key) ->
             Value
     end.
 
+-spec paxos_read(binary() | integer()) -> any().
 paxos_read(Key) ->
     HashedKey = ?RT:hash_key(Key),
     Req = {paxos_read, comm:this(), HashedKey},
@@ -48,6 +49,7 @@ paxos_read(Key) ->
             X
     end.
 
+-spec paxos_write(binary() | integer(), any()) -> any().
 paxos_write(Key, Value) ->
     HashedKey = ?RT:hash_key(Key),
     Req = {paxos_write, comm:this(), HashedKey, Value},
@@ -65,6 +67,7 @@ route(Message, HashedKey) ->
     comm:send_local(Node, {route, HashedKey, 0, Message}),
     ok.
 
+-spec bench_read(pos_integer()) -> ok.
 bench_read(N) ->
     Before = erlang:now(),
     run_read(N),
@@ -73,6 +76,7 @@ bench_read(N) ->
     io:format("~ps ; ~p1/s~n", [Diff / 1000000.0, N / Diff * 1000000.0]),
     ok.
 
+-spec bench_write(pos_integer()) -> ok.
 bench_write(N) ->
     Before = erlang:now(),
     run_write(N),
