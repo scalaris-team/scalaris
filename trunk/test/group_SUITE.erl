@@ -25,7 +25,7 @@
 -include("unittest.hrl").
 
 all() ->
-    [add_9, add_9_remove_4].
+    [add_9, add_9_remove_4, db_repair].
 
 suite() ->
     [
@@ -67,6 +67,23 @@ add_9_remove_4(_Config) ->
     wait_for(check_version({1, 15}, 6)),
     ok.
 
+db_repair(_Config) ->
+    % add one node
+    admin:add_nodes(1),
+    % check group_state
+    wait_for(check_version({1, 3}, 2)),
+    % check db
+    wait_for(check_db({is_current, 0}, 2)),
+    % write one kv-pair
+    group_api:paxos_write(1,2),
+    % add one node
+    admin:add_nodes(1),
+    % check group_state
+    wait_for(check_version({1, 5}, 3)),
+    % check db
+    wait_for(check_db({is_current, 1}, 3)),
+    ok.
+
 wait_for(F) ->
     case F() of
         true ->
@@ -82,4 +99,12 @@ check_version(Version, Length) ->
             ct:pal("~p ~p", [lists:usort(Versions), group_debug:dbg_version()]),
             [Version] ==
                 lists:usort(Versions) andalso length(Versions) == Length
+    end.
+
+check_db(Version, Length) ->
+    fun () ->
+            Versions = group_debug:dbg_db_without_pid(),
+            ct:pal("~p ~p", [lists:usort(Versions), length(Versions)]),
+            lists:usort(Versions) == [Version] andalso
+                length(Versions) == Length
     end.
