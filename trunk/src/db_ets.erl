@@ -32,7 +32,7 @@
 % to work.
 -include("db_beh.hrl").
 
--export([get_chunk/3, delete_larger_equal_than/2, delete_smaller_than/2]).
+-export([get_chunk/3]).
 
 -define(CKETS, ets).
 
@@ -89,7 +89,7 @@ get_chunk(DB, Interval, ChunkSize) ->
                 '$end_of_table' ->
                     {intervals:empty(), Chunk};
                 _ ->
-                    {intervals:new('[', Next, End, ')'), Chunk}
+                    {intervals:new({'[', Begin, End, ')'}), Chunk}
             end
     end.
 
@@ -168,18 +168,6 @@ get_chunk_inner({ETSDB, _CKInt, _CKDB} = DB, Current, RealStart, Interval, Chunk
             Next = ets:next(ETSDB, Current),
             get_chunk_inner(DB, Next, RealStart, Interval, ChunkSize, Chunk)
     end.
-
--spec delete_larger_equal_than(db(), ?RT:key()) ->
-    db().
-delete_larger_equal_than({ETSDB, _CKInt, _CKDB} = DB, Start) ->
-    Deleted = ets:select_delete(ETSDB, [{{'$1', '$2', '$3', '$4', '$5'}, [{'=<', Start, '$1'}], [true]}]),
-    DB.
-
--spec delete_smaller_than(db(), ?RT:key()) ->
-    db().
-delete_smaller_than({ETSDB, _CKInt, _CKDB} = DB, End) ->
-    ets:select_delete(ETSDB, [{{'$1', '$2', '$3', '$4', '$5'}, [{'<', '$1', End}], [true]}]),
-    DB.
 
 -define(ETS, ets).
 -include("db_generic_ets.hrl").
