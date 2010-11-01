@@ -87,6 +87,7 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || openSUSE || Factory || Repository: [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/openSUSE_Factory/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || SLE || 10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_10/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || SLE || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11/scalaris-svn.ymp 1-Click Install (unstable)] ||
+|| SLE || 11 SP1 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_11_SP1/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11_SP1/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11_SP1/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || CentOS || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/] ||
 || RHEL || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/] ||
 || Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Debian_5.0/] ||
@@ -101,10 +102,10 @@ Inside those repositories you will also find erlang packages - you don't need th
 Please note that the openSUSE !BuildService does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list:
 
 {{{
-deb http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.10/ ./
+deb http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_10.04/ ./
 }}}
 
-Refer to http://en.opensuse.org/Build_Service/Deb_builds#Configuring_sources.list if you are having trouble adding .deb-based repositories.
+Refer to http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list if you are having trouble adding .deb-based repositories.
 
 == How to build an rpm? ==
 
