@@ -28,7 +28,7 @@
 -include("db_SUITE.hrl").
 
 %all() -> tests_avail() ++ [get_chunk].
-all() -> [get_chunk].
+all() -> tests_avail() ++ [get_chunk, test_delete_larger_equal_than, test_delete_smaller_than].
 
 %% @doc Specify how often a read/write suite can be executed in order not to
 %%      hit a timeout (depending on the speed of the DB implementation).
@@ -94,3 +94,29 @@ count_keys_in_range(Keys, Interval) ->
     length(lists:filter(fun(Key) ->
                                 intervals:in(Key, Interval)
                         end, Keys)).
+
+-spec prop_delete_larger_equal_than(Keys::list(?RT:key()), Begin::?RT:key()) -> true.
+prop_delete_larger_equal_than(Keys2, Begin) ->
+    Keys = lists:usort(Keys2),
+    StartSize = length(Keys),
+    DB = db_ets:new(),
+    DB2 = fill_db(DB, Keys),
+    ExpectedSize = StartSize - length([X || X <- Keys, X >= Begin]),
+    DB3 = db_ets:delete_larger_equal_than(DB2, Begin),
+    ExpectedSize == db_ets:get_load(DB3).
+
+-spec prop_delete_smaller_than(Keys::list(?RT:key()), Begin::?RT:key()) -> true.
+prop_delete_smaller_than(Keys2, Begin) ->
+    Keys = lists:usort(Keys2),
+    StartSize = length(Keys),
+    DB = db_ets:new(),
+    DB2 = fill_db(DB, Keys),
+    ExpectedSize = StartSize - length([X || X <- Keys, X < Begin]),
+    DB3 = db_ets:delete_smaller_than(DB2, Begin),
+    ExpectedSize == db_ets:get_load(DB3).
+
+test_delete_larger_equal_than(_Config) ->
+    tester:test(?MODULE, prop_delete_larger_equal_than, 2, rw_suite_runs(10)).
+
+test_delete_smaller_than(_Config) ->
+    tester:test(?MODULE, prop_delete_smaller_than, 2, rw_suite_runs(10)).
