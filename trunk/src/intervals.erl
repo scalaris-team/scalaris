@@ -420,7 +420,7 @@ is_continuous(_) -> false.
 %%      brackets. Note that here
 %%      'all' transfers to {'[', minus_infinity, plus_infinity, ']'},
 %%      {element, Key} to {'[', Key, Key, ']'} and
-%%      [{interval,'[',minus_infinity,1,')'},{interval,'(',1,plus_infinity,']'}] to {'(', Key, Key, ')'}.
+%%      [{interval,'[',minus_infinity,Key,')'},{interval,'(',Key,plus_infinity,']'}] to {'(', Key, Key, ')'}.
 %%      Other normalized intervals that wrap around will be returned the same
 %%      way they can be constructed with new/4.
 %%      Note: this method will only work on continuous non-empty intervals

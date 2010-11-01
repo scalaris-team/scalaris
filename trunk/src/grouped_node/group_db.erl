@@ -27,7 +27,6 @@
          repair/7, start_repair_job/2, repair_timeout/3]).
 
 -type(mode_type() :: is_current | is_filling).
--type(chunk() :: list(db_entry:entry())).
 
 -type(repair_job() :: {UUID::any(), Interval::any(), Members::any(), Version::non_neg_integer()} | none).
 -type(state() :: {Mode::mode_type(), DB::?DB:db(), RepairState::repair_job()}).
@@ -79,7 +78,7 @@ get_size({_, DB, _}) ->
     ?DB:get_load(DB).
 
 -spec get_chunk(state(), Interval::intervals:interval(), ChunkSize::non_neg_integer()) ->
-    is_not_current | {intervals:interval(), chunk()}.
+    is_not_current | {intervals:interval(), ?DB:db_as_list()}.
 get_chunk({is_filling, _DB, _}, _Interval, _ChunkSize) ->
     is_not_current;
 get_chunk({is_current, DB, none}, Interval, ChunkSize) ->
@@ -94,7 +93,7 @@ get_chunk({is_current, DB, none}, Interval, ChunkSize) ->
 % @doc received chunk from other group member -> repair local db
 -spec repair(Error::ok | is_not_current, GivenInterval::intervals:interval(),
              RemainingInterval::intervals:interval(),
-             Chunk::chunk(), Sender::comm:mypid(), UUID::util:global_uid(),
+             Chunk::?DB:db_as_list(), Sender::comm:mypid(), UUID::util:global_uid(),
              State::group_state:state())->
     group_state:state().
 repair(is_not_current, _GivenInterval, RemainingInterval, [], _Sender, UUID, State) ->
@@ -164,7 +163,7 @@ trigger_repair(Members, Interval, Version, UUID) ->
     comm:send_local_after(config:read(group_repair_timeout), self(), TimeoutMsg),
     ok.
 
--spec apply_chunk(?DB:db(), chunk()) -> ?DB:db().
+-spec apply_chunk(?DB:db(), ?DB:db_as_list()) -> ?DB:db().
 apply_chunk(DB, []) ->
     DB;
 apply_chunk(DB, [Entry | Rest]) ->

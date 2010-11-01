@@ -27,8 +27,7 @@
 
 -include("db_SUITE.hrl").
 
-%all() -> tests_avail() ++ [get_chunk].
-all() -> [get_chunk].
+all() -> lists:append(tests_avail(), [tester_get_chunk_precond, tester_get_chunk]).
 
 %% @doc Specify how often a read/write suite can be executed in order not to
 %%      hit a timeout (depending on the speed of the DB implementation).
@@ -36,61 +35,67 @@ all() -> [get_chunk].
 max_rw_tests_per_suite() ->
     10000.
 
-
-get_chunk(Config) ->
-    tester_get_chunk(Config).
-
--spec prop_get_chunk(Keys::list(?RT:key()), Begin::?RT:key(), End::?RT:key()) -> true.
-prop_get_chunk(Keys2, Begin, End) ->
-    case Begin /= End of
+-spec prop_get_chunk(Keys::[?RT:key()], BeginBr::intervals:left_bracket(), Begin::?RT:key(),
+                     End::?RT:key(), EndBr::intervals:right_bracket(), ChunkSize::pos_integer()) -> true.
+prop_get_chunk(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
+    Interval = intervals:new(BeginBr, Begin, End, EndBr),
+    case not intervals:is_empty(Interval) of
         true ->
             Keys = lists:usort(Keys2),
             DB = db_ets:new(),
             DB2 = fill_db(DB, Keys),
-            ChunkSize = 5,
-            Interval = intervals:new('[', Begin, End, ')'),
             {Next, Chunk} = db_ets:get_chunk(DB2, Interval, ChunkSize),
             db_ets:close(DB2),
-            case length(Chunk) /= length(lists:usort(Chunk)) of
+            ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
+            ExpectedChunkSize = util:min(count_keys_in_range(Keys, Interval),
+                                         ChunkSize),
+            case ExpectedChunkSize =/= length(Chunk) of
                 true ->
-                    ct:pal("chunk contains duplicates ~p ~p ~p ~p", [Chunk, Keys, Begin, End]),
-                    false;
+                    ?ct_fail("chunk has wrong size ~.0p ~.0p ~.0p, expected size: ~.0p",
+                             [Chunk, Keys, Interval, ExpectedChunkSize]);
                 false ->
-                    ExpectedChunkSize = util:min(count_keys_in_range(Keys, Interval),
-                                            ChunkSize),
-                    case ExpectedChunkSize /= length(Chunk) of
-                        true ->
-                            ct:pal("chunk has wrong size ~p ~p ~p ~p", [Chunk, Keys, Begin, End]),
-                            false;
-                        false ->
-                            case check_chunk_entries_are_in_interval(Chunk, Interval) of
-                                false ->
-                                    ct:pal("check_chunk_entries_are_in_interval failed ~p ~p ~p ~p",
-                                           [Chunk, Keys, Begin, End]),
-                                    false;
-                                true ->
-                                    true
-                            end
-                    end
-            end;
-        false ->
-            true
+                    ?equals([Entry || Entry <- Chunk,
+                                      not intervals:in(db_entry:get_key(Entry), Interval)],
+                            [])
+            end,
+            % Next if subset of Interval, no chunk entry is in Next:
+            ?equals_w_note(intervals:is_subset(Next, Interval), true,
+                           io_lib:format("Next ~.0p is not subset of ~.0p",
+                                         [Next, Interval])),
+            ?equals_w_note([Entry || Entry <- Chunk,
+                                     intervals:in(db_entry:get_key(Entry), Next)],
+                           [], io_lib:format("Next: ~.0p", [Next])),
+            true;
+        _ -> true
     end.
 
 tester_get_chunk(_Config) ->
-    tester:test(?MODULE, prop_get_chunk, 3, rw_suite_runs(10)).
+    prop_get_chunk([0, 4, 31], '[', 0, 4, ']', 2),
+    prop_get_chunk([1, 5, 127, 13], '[', 3, 2, ']', 4), 
+    tester:test(?MODULE, prop_get_chunk, 6, rw_suite_runs(1000)).
 
-fill_db(DB, []) ->
-    DB;
-fill_db(DB, [Key | Rest]) ->
-    fill_db(db_ets:write(DB, Key, "Value", 1), Rest).
+-spec fill_db(DB::db_ets:db(), [?RT:key()]) -> db_ets:db().
+fill_db(DB, []) -> DB;
+fill_db(DB, [Key | Rest]) -> fill_db(db_ets:write(DB, Key, "Value", 1), Rest).
 
-check_chunk_entries_are_in_interval(Entries, Interval) ->
-    lists:all(fun (Entry) ->
-                      intervals:in(db_entry:get_key(Entry), Interval)
-              end, Entries).
-
+-spec count_keys_in_range(Keys::[?RT:key()], Interval::intervals:interval()) -> non_neg_integer().
 count_keys_in_range(Keys, Interval) ->
-    length(lists:filter(fun(Key) ->
-                                intervals:in(Key, Interval)
-                        end, Keys)).
+    lists:foldl(fun(Key, Count) ->
+                        case intervals:in(Key, Interval) of
+                            true -> Count + 1;
+                            _    -> Count
+                        end
+                end, 0, Keys).
+
+tester_get_chunk_precond(_Config) ->
+    Table = ets:new(ets_test_SUITE, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
+    ets:insert(Table, {5}),
+    ets:insert(Table, {6}),
+    ets:insert(Table, {7}),
+    ?equals(ets:next(Table, 7), '$end_of_table'),
+    ?equals(ets:next(Table, 6), 7),
+    ?equals(ets:next(Table, 5), 6),
+    ?equals(ets:next(Table, 4), 5),
+    ?equals(ets:next(Table, 3), 5),
+    ?equals(ets:next(Table, 2), 5),
+    ?equals(ets:first(Table), 5).
