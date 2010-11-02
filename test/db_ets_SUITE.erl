@@ -84,11 +84,11 @@ prop_delete_chunk(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
             DB = db_ets:new(),
             DB2 = fill_db(DB, Keys),
             {Next, Chunk} = db_ets:get_chunk(DB2, Interval, ChunkSize),
-            Next = db_ets:delete_chunk(DB2, Interval, ChunkSize),
-            PostDeleteChunkSize = db_ets:get_load(DB2),
-            lists:foreach(fun (Entry) -> db_ets:delete_entry(DB2, Entry) end, Chunk),
-            PostDeleteSize = db_ets:get_load(DB2),
-            db_ets:close(DB2),
+            {Next, DB3} = db_ets:delete_chunk(DB2, Interval, ChunkSize),
+            PostDeleteChunkSize = db_ets:get_load(DB3),
+            DB5 = lists:foldl(fun (Entry, DB4) -> db_ets:delete_entry(DB4, Entry) end, DB3, Chunk),
+            PostDeleteSize = db_ets:get_load(DB5),
+            db_ets:close(DB5),
             ?equals(PostDeleteChunkSize, PostDeleteSize), % delete should have deleted all items in Chunk
             ?equals(length(Keys) - length(Chunk), PostDeleteSize), % delete should have deleted all items in Chunk
             true;
