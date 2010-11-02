@@ -24,7 +24,10 @@
          get_version/2, get_size/1,
          write/4, read/2,
          get_chunk/3,
-         repair/7, start_repair_job/2, repair_timeout/3]).
+         % repair
+         repair/7, start_repair_job/2, repair_timeout/3,
+         % cleanup after split
+         prune_out_of_range_entries/2, delete_chunk/3]).
 
 -type(mode_type() :: is_current | is_filling).
 
@@ -152,7 +155,7 @@ repair_timeout(State, UUID, Interval) ->
 
 -spec trigger_repair(list(), intervals:interval(), any(), util:global_uid()) ->
     ok.
-trigger_repair(Members, nil, Version, UUID) ->
+trigger_repair(_Members, nil, _Version, _UUID) ->
     nil = nil2;
 trigger_repair(Members, Interval, Version, UUID) ->
     Msg = {db_repair_request, Interval, config:read(group_repair_chunk_size),
@@ -179,3 +182,23 @@ apply_chunk(DB, [Entry | Rest]) ->
               {false, _} -> ?DB:set_entry(DB, Entry)
           end,
     apply_chunk(DB2, Rest).
+
+-spec prune_out_of_range_entries(state(), intervals:interval()) ->
+    state().
+prune_out_of_range_entries(State, Range) ->
+    ChunkSize = config:read(group_delete_chunk_size),
+    Complement = intervals:minus(intervals:all(), Range),
+    comm:send_local(self(), {db_delete_chunked, Complement, ChunkSize}),
+    State.
+
+-spec delete_chunk(state(), intervals:interval(), pos_integer()) ->
+    state().
+delete_chunk({is_current, DB, none} = State, Range, ChunkSize) ->
+    {Next, DB2} = ?DB:delete_chunk(DB, Range, ChunkSize),
+    case intervals:is_empty(Next) of
+        true ->
+            {is_current, DB2, none};
+        false ->
+            comm:send_local(self(), {db_delete_chunked, Next, ChunkSize}),
+            {is_current, DB2, none}
+    end.

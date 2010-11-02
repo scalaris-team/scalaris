@@ -29,9 +29,8 @@ trigger(State) ->
     case group_state:get_view(State) of
         undefined -> State;
         View ->
-            case length(group_view:get_members(View)) > 10 of
+            case length(group_view:get_members(View)) > config:read(group_max_size)  of
                 true ->
-                    io:format("we are going to split~n", []),
                     SplitKey = get_split_key(group_view:get_interval(View)),
                     {LeftGroup, RightGroup} = split_group(group_view:get_members(View)),
                     Proposal = {group_split, comm:this(), SplitKey,

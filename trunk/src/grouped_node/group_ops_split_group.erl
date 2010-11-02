@@ -78,7 +78,10 @@ ops_decision(State,
     NodeState = group_state:get_node_state(State),
     group_utils:notify_neighbors(NodeState, View, NewView),
     update_fd(),
-    group_state:set_view(State, NewView).
+    Range = group_view:get_interval(NewView),
+    DB = group_state:get_db(State),
+    DB2 = group_db:prune_out_of_range_entries(DB, Range),
+    group_state:set_view(group_state:set_db(State, DB2), NewView).
 
 -spec split_group(View::group_view:view(),
                   SplitKey::?RT:key(),
