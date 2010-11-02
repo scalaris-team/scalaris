@@ -211,6 +211,10 @@ on({db_repair_response, Error, GivenInterval, RemainingInterval, Chunk, UUID, Se
 on({group_repair, timeout, UUID, Start}, State) ->
     group_db:repair_timeout(State, UUID, Start);
 
+on({db_delete_chunked, Range, ChunkSize}, State) ->
+    DB = group_state:get_db(State),
+    DB2 = group_db:delete_chunk(DB, Range, ChunkSize),
+    group_state:set_db(State, DB2);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
