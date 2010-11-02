@@ -31,7 +31,7 @@
 % to work.
 -include("db_beh.hrl").
 
--export([get_chunk/3]).
+-export([get_chunk/3, delete_chunk/3]).
 
 -define(CKETS, ets).
 
@@ -171,6 +171,13 @@ get_chunk_inner(DB, Current, RealStart, Interval, ChunkSize, Chunk) ->
         _ ->
             {'$end_of_interval', Chunk}
     end.
+
+-spec delete_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
+    intervals:interval().
+delete_chunk(DB, Interval, ChunkSize) ->
+    {Next, Chunk} = get_chunk(DB, Interval, ChunkSize),
+    lists:foreach(fun (Entry) -> delete_entry(DB, Entry) end, Chunk),
+    Next.
 
 -define(ETS, ets).
 -include("db_generic_ets.hrl").
