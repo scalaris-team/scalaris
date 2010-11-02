@@ -346,7 +346,7 @@ restart_join(OldIdVersion, QueuedMessages) ->
     NewId = ?RT:get_random_node_id(),
     NewIdVersion = OldIdVersion + 1,
     idholder:set_id(NewId, NewIdVersion),
-    comm:send_local(self(), {idholder_get_id_response, NewId, NewIdVersion}),
+    idholder:get_id(),
     {join, {phase1}, QueuedMessages}.
 
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
