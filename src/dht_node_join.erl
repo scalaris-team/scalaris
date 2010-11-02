@@ -357,15 +357,14 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     rm_loop:activate(Me, Pred, Succ),
     % wait for the ring maintenance to initialize and tell us its table ID
     NeighbTable = rm_loop:get_neighbors_table(),
-    Id = node:id(Me),
-    rt_loop:activate(Id, Pred, Succ),
+    rt_loop:activate(NeighbTable),
     cyclon:activate(),
     vivaldi:activate(),
     dc_clustering:activate(),
     gossip:activate(),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
-    dht_node_state:new(?RT:empty_ext(Succ), NeighbTable, DB).
+    dht_node_state:new(?RT:empty_ext(rm_loop:get_neighbors(NeighbTable)), NeighbTable, DB).
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.
