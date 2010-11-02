@@ -173,11 +173,11 @@ get_chunk_inner(DB, Current, RealStart, Interval, ChunkSize, Chunk) ->
     end.
 
 -spec delete_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
-    intervals:interval().
+    {intervals:interval(), db()}.
 delete_chunk(DB, Interval, ChunkSize) ->
     {Next, Chunk} = get_chunk(DB, Interval, ChunkSize),
-    lists:foreach(fun (Entry) -> delete_entry(DB, Entry) end, Chunk),
-    Next.
+    DB2 = lists:foldl(fun (Entry, DB1) -> delete_entry(DB1, Entry) end, DB, Chunk),
+    {Next, DB2}.
 
 -define(ETS, ets).
 -include("db_generic_ets.hrl").
