@@ -71,8 +71,32 @@ prop_get_chunk(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
 
 tester_get_chunk(_Config) ->
     prop_get_chunk([0, 4, 31], '[', 0, 4, ']', 2),
-    prop_get_chunk([1, 5, 127, 13], '[', 3, 2, ']', 4), 
+    prop_get_chunk([1, 5, 127, 13], '[', 3, 2, ']', 4),
     tester:test(?MODULE, prop_get_chunk, 6, rw_suite_runs(1000)).
+
+-spec prop_delete_chunk(Keys::[?RT:key()], BeginBr::intervals:left_bracket(), Begin::?RT:key(),
+                        End::?RT:key(), EndBr::intervals:right_bracket(), ChunkSize::pos_integer()) -> true.
+prop_delete_chunk(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
+    Interval = intervals:new(BeginBr, Begin, End, EndBr),
+    case not intervals:is_empty(Interval) of
+        true ->
+            Keys = lists:usort(Keys2),
+            DB = db_ets:new(),
+            DB2 = fill_db(DB, Keys),
+            {Next, Chunk} = db_ets:get_chunk(DB2, Interval, ChunkSize),
+            Next = db_ets:delete_chunk(DB2, Interval, ChunkSize),
+            PostDeleteChunkSize = db_ets:get_load(DB2),
+            lists:foreach(fun (Entry) -> db_ets:delete_entry(DB2, Entry) end, Chunk),
+            PostDeleteSize = db_ets:get_load(DB2),
+            db_ets:close(DB2),
+            ?equals(PostDeleteChunkSize, PostDeleteSize), % delete should have deleted all items in Chunk
+            ?equals(length(Keys) - length(Chunk), PostDeleteSize), % delete should have deleted all items in Chunk
+            true;
+        _ -> true
+    end.
+
+tester_delete_chunk(_Config) ->
+    tester:test(?MODULE, prop_delete_chunk, 6, rw_suite_runs(1000)).
 
 -spec fill_db(DB::db_ets:db(), [?RT:key()]) -> db_ets:db().
 fill_db(DB, []) -> DB;
