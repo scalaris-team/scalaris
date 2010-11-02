@@ -40,9 +40,9 @@ behaviour_info(callbacks) ->
      % routing
      {next_hop, 2},
      % trigger for new stabilization round
-     {init_stabilize, 3},
-     % adapt RT to changed node ID, pred and/or succ
-     {update, 7},
+     {init_stabilize, 2},
+     % adapt RT to changed neighborhood
+     {update, 3},
      % dead nodes filtering
      {filter_dead_node, 2},
      % statistics
@@ -57,11 +57,11 @@ behaviour_info(callbacks) ->
      % for bulkowner
      {to_list, 1},
      % convert from internal representation to version for dht_node
-     {export_rt_to_dht_node, 4},
+     {export_rt_to_dht_node, 2},
      % handle messages specific to a certain routing-table implementation
      {handle_custom_message, 2},
-     % common methods, e.g. from rt_generic.hrl
-     {check, 5}, {check, 6}, {check, 7},
+     % common methods
+     {check, 4}, {check, 5},
      {check_config, 0}
     ];
 %% userdevguide-end rt_beh:behaviour

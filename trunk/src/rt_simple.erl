@@ -26,11 +26,11 @@
 % routingtable behaviour
 -export([empty/1, empty_ext/1,
          hash_key/1, get_random_node_id/0, next_hop/2,
-         init_stabilize/3, update/7,
+         init_stabilize/2, update/3,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_replica_keys/1,
-         dump/1, to_list/1, export_rt_to_dht_node/4, n/0,
+         dump/1, to_list/1, export_rt_to_dht_node/2, n/0,
          handle_custom_message/2,
-         check/5, check/6, check/7,
+         check/4, check/5,
          check_config/0]).
 
 %% userdevguide-begin rt_simple:types
@@ -48,8 +48,8 @@
 
 %% userdevguide-begin rt_simple:empty
 %% @doc Creates an "empty" routing table containing the successor.
--spec empty(node:node_type()) -> rt().
-empty(Succ) -> Succ.
+-spec empty(nodelist:neighborhood()) -> rt().
+empty(Neighbors) -> nodelist:succ(Neighbors).
 %% userdevguide-end rt_simple:empty
 
 %% userdevguide-begin rt_simple:hash_key
@@ -87,17 +87,16 @@ get_random_node_id() ->
 
 %% userdevguide-begin rt_simple:init_stabilize
 %% @doc Triggered by a new stabilization round, renews the routing table.
--spec init_stabilize(key(), node:node_type(), rt()) -> rt().
-init_stabilize(_Id, Succ, _RT) -> empty(Succ).
+-spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
+init_stabilize(Neighbors, _RT) -> empty(Neighbors).
 %% userdevguide-end rt_simple:init_stabilize
 
 %% userdevguide-begin rt_simple:update
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
--spec update(Id::key(), Pred::node:node_type(), Succ::node:node_type(),
-             OldRT::rt(), OldId::key(), OldPred::node:node_type(),
-             OldSucc::node:node_type()) -> {ok, rt()}.
-update(_Id, _Pred, Succ, _OldRT, _OldId, _OldPred, _OldSucc) ->
-    {ok, Succ}.
+-spec update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
+             NewNeighbors::nodelist:neighborhood()) -> {ok, rt()}.
+update(_OldRT, _OldNeighbors, NewNeighbors) ->
+    {ok, nodelist:succ(NewNeighbors)}.
 %% userdevguide-end rt_simple:update
 
 %% userdevguide-begin rt_simple:filter_dead_node
@@ -157,21 +156,50 @@ check_config() ->
                                 "{int(), int()}")
         end.
 
--include("rt_generic.hrl").
-
 %% userdevguide-begin rt_simple:handle_custom_message
 %% @doc There are no custom messages here.
--spec handle_custom_message(custom_message() | any(), rt_loop:state_active()) -> unknown_event.
+-spec handle_custom_message(custom_message() | any(), rt_loop:state_active())
+        -> unknown_event.
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_simple:handle_custom_message
+
+%% userdevguide-begin rt_simple:check
+%% @doc Notifies the dht_node and failure detector if the routing table changed.
+%%      Provided for convenience (see check/5).
+-spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> ok.
+check(OldRT, NewRT, Neighbors, ReportToFD) ->
+    check(OldRT, NewRT, Neighbors, Neighbors, ReportToFD).
+
+%% @doc Notifies the dht_node if the (external) routing table changed.
+%%      Also updates the failure detector if ReportToFD is set.
+%%      Note: the external routing table only changes the internal RT has
+%%      changed.
+-spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
+            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
+check(OldRT, NewRT, _OldNeighbors, NewNeighbors, ReportToFD) ->
+    case OldRT =:= NewRT of
+        true -> ok;
+        _ ->
+            Pid = pid_groups:get_my(dht_node),
+            comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, NewNeighbors)}),
+            % update failure detector:
+            case ReportToFD of
+                true ->
+                    NewPids = to_pid_list(NewRT), OldPids = to_pid_list(OldRT),
+                    fd:update_subscriptions(OldPids, NewPids);
+                _ -> ok
+            end
+    end.
+%% userdevguide-end rt_simple:check
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Communication with dht_node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_simple:empty_ext
--spec empty_ext(node:node_type()) -> external_rt().
-empty_ext(Succ) -> empty(Succ).
+-spec empty_ext(nodelist:neighborhood()) -> external_rt().
+empty_ext(Neighbors) -> empty(Neighbors).
 %% userdevguide-end rt_simple:empty_ext
 
 %% userdevguide-begin rt_simple:next_hop
@@ -183,9 +211,8 @@ next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, rt)).
 %% userdevguide-begin rt_simple:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node. Both
 %%      are the same here.
--spec export_rt_to_dht_node(rt(), ID::key(), Pred::node:node_type(),
-                            Succ::node:node_type()) -> external_rt().
-export_rt_to_dht_node(RT, _Id, _Pred, _Succ) -> RT.
+-spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
+export_rt_to_dht_node(RT, _Neighbors) -> RT.
 %% userdevguide-end rt_simple:export_rt_to_dht_node
 
 %% userdevguide-begin rt_simple:to_list

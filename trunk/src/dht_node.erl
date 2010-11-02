@@ -54,8 +54,7 @@
       {lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
 
 -type(rt_message() ::
-      {rt_update, RoutingTable::?RT:external_rt()} |
-      {rt_get_node, Source_PID::comm:mypid(), Index::rt_chord:index()}).
+      {rt_update, RoutingTable::?RT:external_rt()}).
 
 % accepted messages of dht_node processes
 -type(message() ::
@@ -104,13 +103,6 @@ on({die}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({rt_update, RoutingTable}, State) ->
     dht_node_state:set_rt(State, RoutingTable);
-
-%% TODO: rt_chord-specific message -> move to rt_chord
-%% userdevguide-begin dht_node:rt_get_node
-on({rt_get_node, Source_PID, Index}, State) ->
-    comm:send(Source_PID, {rt_get_node_response, Index, dht_node_state:get(State, node)}),
-    State;
-%% userdevguide-end dht_node:rt_get_node
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Transactions (see transstore/*.erl, transactions/*.erl)

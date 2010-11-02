@@ -27,9 +27,9 @@
 % for routing table implementation
 -export([start_link/1]).
 -export([init/1, on_inactive/2, on_active/2,
-         activate/3, deactivate/0,
+         activate/1, deactivate/0,
          get_base_interval/0, check_config/0,
-         get_id/1, get_pred/1, get_succ/1, get_rt/1, set_rt/2]).
+         get_id/1, get_pred/1, get_succ/1, get_neighb/1, get_rt/1, set_rt/2]).
 
 -ifdef(with_export_type_support).
 -export_type([state_active/0]).
@@ -37,9 +37,7 @@
 
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state
--opaque(state_active() :: {Id           :: ?RT:key(),
-                           Pred         :: node:node_type(),
-                           Succ         :: node:node_type(),
+-opaque(state_active() :: {NeighbTable  :: tid(),
                            RTState      :: ?RT:rt(),
                            TriggerState :: trigger:state()}).
 -type(state_inactive() :: {inactive,
@@ -51,7 +49,7 @@
 % accepted messages of rt_loop processes
 -type(message() ::
     {trigger_rt} |
-    {update_rt, Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()} |
+    {update_rt, OldNeighbors::nodelist:neighborhood()} |
     {crash, DeadPid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {dump, Pid::comm:erl_local_pid()} |
@@ -59,10 +57,11 @@
 
 %% @doc Activates the routing table process. If not activated, it will
 %%      queue most messages without processing them.
--spec activate(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type()) -> ok.
-activate(Id, Pred, Succ) ->
+%%      Pre: ring_maintenance must be up and running
+-spec activate(NeighbTable::tid()) -> ok.
+activate(NeighbTable) ->
     Pid = pid_groups:get_my(routing_table),
-    comm:send_local(Pid, {activate_rt, Id, Pred, Succ}).
+    comm:send_local(Pid, {activate_rt, NeighbTable}).
 
 %% @doc Deactivates the re-register process.
 -spec deactivate() -> ok.
@@ -95,16 +94,16 @@ init(Trigger) ->
 %% @doc Message handler during start up phase (will change to on_active/2 when a
 %%      'activate_rt' message is received).
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
-                 ({activate_rt, Id::?RT:key(), Pred::node:node_type(),
-                   Succ::node:node_type()}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
-on_inactive({activate_rt, Id, Pred, Succ}, {inactive, QueuedMessages, TriggerState}) ->
+                 ({activate_rt, NeighbTable::tid()}, state_inactive())
+                    -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+on_inactive({activate_rt, NeighbTable}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:next(TriggerState),
     rm_loop:subscribe(self(), fun rm_loop:subscribe_dneighbor_change_filter/2,
                       fun rm_send_update/3),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
-      {Id, Pred, Succ, ?RT:empty(Succ), TriggerState2}, on_active);
+      {NeighbTable, ?RT:empty(rm_loop:get_neighbors(NeighbTable)), TriggerState2}, on_active);
 
 on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
     % get a list of up to 50 queued messages to display:
@@ -124,48 +123,49 @@ on_inactive(_Msg, State) ->
 %% @doc Message handler when the module is fully initialized.
 -spec on_active(message(), state_active()) -> state_active() | unknown_event;
                ({deactivate_rt}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
-on_active({deactivate_rt}, {_Id, _Pred, Succ, _OldRT, TriggerState})  ->
+on_active({deactivate_rt}, {NeighbTable, _OldRT, TriggerState})  ->
     log:log(info, "[ RT ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe_all(self()),
     % send new empty RT to the dht_node so that all routing messages
     % must be passed to the successor: 
     comm:send_local(pid_groups:get_my(dht_node),
-                    {rt_update, ?RT:empty_ext(Succ)}),
+                    {rt_update, ?RT:empty_ext(rm_loop:get_neighbors(NeighbTable))}),
     gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
                                  on_inactive);
 
 %% userdevguide-begin rt_loop:update_rt
 % update routing table with changed ID, pred and/or succ
-on_active({update_rt, NewId, NewPred, NewSucc},
-   {OldId, OldPred, OldSucc, OldRT, TriggerState}) ->
-    case ?RT:update(NewId, NewPred, NewSucc, OldRT, OldId, OldPred, OldSucc) of
+on_active({update_rt, OldNeighbors}, {NeighbTable, OldRT, TriggerState}) ->
+    NewNeighbors = rm_loop:get_neighbors(NeighbTable),
+    case ?RT:update(OldRT, OldNeighbors, NewNeighbors) of
         {trigger_rebuild, NewRT} ->
             % trigger immediate rebuild
             NewTriggerState = trigger:now(TriggerState),
-            ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
-            new_state(NewId, NewPred, NewSucc, NewRT, NewTriggerState);
+            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
+            new_state(NeighbTable, NewRT, NewTriggerState);
         {ok, NewRT} ->
-            ?RT:check(OldRT, NewRT, NewId, OldPred, NewPred, OldSucc, NewSucc),
-            new_state(NewId, NewPred, NewSucc, NewRT, TriggerState)
+            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
+            new_state(NeighbTable, NewRT, TriggerState)
     end;
 %% userdevguide-end rt_loop:update_rt
 
 %% userdevguide-begin rt_loop:trigger
-on_active({trigger_rt}, {Id, Pred, Succ, RTState, TriggerState}) ->
+on_active({trigger_rt}, {NeighbTable, OldRT, TriggerState}) ->
     % start periodic stabilization
     % log:log(debug, "[ RT ] stabilize"),
-    NewRTState = ?RT:init_stabilize(Id, Succ, RTState),
-    ?RT:check(RTState, NewRTState, Id, Pred, Succ),
+    Neighbors = rm_loop:get_neighbors(NeighbTable),
+    NewRT = ?RT:init_stabilize(Neighbors, OldRT),
+    ?RT:check(OldRT, NewRT, Neighbors, true),
     % trigger next stabilization
     NewTriggerState = trigger:next(TriggerState),
-    new_state(Id, Pred, Succ, NewRTState, NewTriggerState);
+    new_state(NeighbTable, NewRT, NewTriggerState);
 %% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
-on_active({crash, DeadPid}, {Id, Pred, Succ, OldRT, TriggerState}) ->
+on_active({crash, DeadPid}, {NeighbTable, OldRT, TriggerState}) ->
     NewRT = ?RT:filter_dead_node(OldRT, DeadPid),
-    ?RT:check(OldRT, NewRT, Id, Pred, Succ, false),
-    new_state(Id, Pred, Succ, NewRT, TriggerState);
+    ?RT:check(OldRT, NewRT, rm_loop:get_neighbors(NeighbTable), false),
+    new_state(NeighbTable, NewRT, TriggerState);
 
 % debug_info for web interface
 on_active({web_debug_info, Requestor},
@@ -176,7 +176,7 @@ on_active({web_debug_info, Requestor},
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-on_active({dump, Pid}, {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
+on_active({dump, Pid}, {_NeighbTable, RTState, _TriggerState} = State) ->
     comm:send_local(Pid, {dump_response, RTState}),
     State;
 
@@ -191,25 +191,33 @@ on_active(Message, State) ->
 % handling rt_loop's (opaque) state - these handlers should at least be used
 % outside this module:
 
--spec new_state(Id::?RT:key(), Pred::node:node_type(), Succ::node:node_type(),
-                 RTState::?RT:rt(), TriggerState::trigger:state()) -> state_active().
-new_state(Id, Pred, Succ, RTState, TriggerState) ->
-    {Id, Pred, Succ, RTState, TriggerState}.
+-spec new_state(NeighbTable::tid(), RTState::?RT:rt(),
+                TriggerState::trigger:state()) -> state_active().
+new_state(NeighbTable, RT, TriggerState) ->
+    {NeighbTable, RT, TriggerState}.
 
 -spec get_id(State::state_active()) -> ?RT:key().
-get_id(State) -> element(1, State).
+get_id({NeighbTable, _RT, _TriggerState}) ->
+    nodelist:nodeid(rm_loop:get_neighbors(NeighbTable)).
 
 -spec get_pred(State::state_active()) -> node:node_type().
-get_pred(State) -> element(2, State).
+get_pred({NeighbTable, _RT, _TriggerState}) ->
+    nodelist:pred(rm_loop:get_neighbors(NeighbTable)).
 
 -spec get_succ(State::state_active()) -> node:node_type().
-get_succ(State) -> element(3, State).
+get_succ({NeighbTable, _RT, _TriggerState}) ->
+    nodelist:succ(rm_loop:get_neighbors(NeighbTable)).
+
+-spec get_neighb(State::state_active()) -> nodelist:neighborhood().
+get_neighb({NeighbTable, _RT, _TriggerState}) ->
+    rm_loop:get_neighbors(NeighbTable).
 
 -spec get_rt(State::state_active()) -> ?RT:rt().
-get_rt(State) -> element(4, State).
+get_rt({_NeighbTable, RT, _TriggerState}) -> RT.
 
 -spec set_rt(State::state_active(), RT::?RT:rt()) -> NewState::state_active().
-set_rt(State, RT) -> setelement(4, State, RT).
+set_rt({NeighbTable, _OldRT, TriggerState}, NewRT) ->
+    {NeighbTable, NewRT, TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc.
@@ -220,11 +228,8 @@ set_rt(State, RT) -> setelement(4, State, RT).
 -spec rm_send_update(Subscriber::comm:erl_local_pid(),
                      OldNeighbors::nodelist:neighborhood(),
                      NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_send_update(Pid, _OldNeighbors, NewNeighbors) ->
-    NewId = nodelist:nodeid(NewNeighbors),
-    NewPred = nodelist:pred(NewNeighbors),
-    NewSucc = nodelist:succ(NewNeighbors),
-    comm:send_local(Pid, {update_rt, NewId, NewPred, NewSucc}).
+rm_send_update(Pid, OldNeighbors, _NewNeighbors) ->
+    comm:send_local(Pid, {update_rt, OldNeighbors}).
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
