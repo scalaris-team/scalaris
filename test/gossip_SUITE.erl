@@ -29,30 +29,12 @@
 -compile(export_all).
 
 -include("unittest.hrl").
+-include("scalaris.hrl").
 
 all() ->
     [test_init,
-     test_on_trigger1,
-     test_on_trigger2,
-     test_on_trigger3,
-     test_on_trigger4,
-     test_on_trigger5,
-     test_on_trigger6,
-     test_on_trigger7,
-     test_on_get_node_details_response_local_info1,
-     test_on_get_node_details_response_local_info2,
-     test_on_get_node_details_response_local_info3,
-     test_on_get_node_details_response_local_info4,
-     test_on_get_node_details_response_local_info5,
-     test_on_get_node_details_response_local_info6,
-     test_on_get_node_details_response_local_info7,
-     test_on_get_node_details_response_leader_start_new_round1,
-     test_on_get_node_details_response_leader_start_new_round2,
-     test_on_get_node_details_response_leader_start_new_round3,
-     test_on_get_node_details_response_leader_start_new_round4,
-     test_on_get_node_details_response_leader_start_new_round5,
-     test_on_get_node_details_response_leader_start_new_round6,
-     test_on_get_node_details_response_leader_start_new_round7,
+     test_on_trigger,
+     test_on_get_node_details_response_local_info,
      test_on_get_state,
      test_on_get_state_response,
      test_on_cy_cache1,
@@ -75,7 +57,7 @@ all() ->
 
 suite() ->
     [
-     {timetrap, {seconds, 10}}
+     {timetrap, {seconds, 20}}
     ].
 
 init_per_suite(Config) ->
@@ -143,671 +125,265 @@ test_get_values_all0(Config) ->
     ?expect_no_message(),
     Config.
 
-test_on_trigger1(Config) ->
+-spec prop_on_trigger(PredId::?RT:key(), NodeId::?RT:key(),
+        MinTpR::pos_integer(), MinToMaxTpR::pos_integer(),
+        ConvAvgCntSNR::pos_integer(),
+        PreviousState::gossip_state:state(), State::gossip_state:state(),
+        MsgQueue::msg_queue:msg_queue()) -> true.
+prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousState, State, MsgQueue) ->
+    MaxTpR = MinTpR + MinToMaxTpR,
+    
+    Self = self(),
+    This = comm:this(),
+    
     pid_groups:join_as("gossip_group", dht_node),
     pid_groups:join_as("gossip_group", cyclon),
+    Pred = node:new(comm:make_global(fake_node("gossip_group_pred", dht_node)), PredId, 1),
+    Node = node:new(This, NodeId, 1),
+    fake_rm_loop(Pred, Node),
     
+    
+    config:write(gossip_min_triggers_per_round, MinTpR),
+    config:write(gossip_max_triggers_per_round, MaxTpR),
+    config:write(gossip_converge_avg_count_start_new_round, ConvAvgCntSNR),
+    
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on_active({gossip_trigger}, {PreviousState, State, MsgQueue, get_ptrigger_nodelay()}),
+
+    IsLeader = intervals:in(?RT:hash_key(0), node:mk_interval_between_nodes(Pred, Node)),
+    StartNewRound = IsLeader andalso
+                        (gossip_state:get(State, round) =:= 0 orelse
+                             (gossip_state:get(State, triggered) + 1 > MinTpR andalso
+                                  (gossip_state:get(State, triggered) + 1 > MaxTpR orelse
+                                       gossip_state:get(State, converge_avg_count) >= ConvAvgCntSNR))),
+    case StartNewRound of
+        true ->
+            % see gossip:calc_initial_avg_kr/2:
+            KrExp = try if
+                            PredId =:= NodeId -> ?RT:n(); % I am the only node
+                            NodeId >= PredId  -> NodeId - PredId;
+                            NodeId < PredId   -> (?RT:n() - PredId - 1) + NodeId
+                        end
+                    catch % keys might not support subtraction or ?RT:n() might throw
+                        throw:not_supported -> unknown;
+                        error:badarith -> unknown
+                    end,
+            NewValuesExp1 = gossip_state:set(gossip_state:new_internal(), size_inv, 1.0),
+            NewValuesExp2 = gossip_state:set(NewValuesExp1, avg_kr, KrExp),
+            NewValuesExp3 = gossip_state:set(NewValuesExp2, round, gossip_state:get(State, round) + 1),
+            NewStateExp = gossip_state:new_state(NewValuesExp3),
+
+            ?equals(gossip_state:get(NewState, values), gossip_state:get(NewStateExp, values)),
+            ?equals(gossip_state:get(NewState, initialized), gossip_state:get(NewStateExp, initialized)),
+            ?equals(gossip_state:get(NewState, triggered), gossip_state:get(NewStateExp, triggered)),
+            ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(NewStateExp, msg_exch)),
+            ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(NewStateExp, converge_avg_count)),
+            ?equals(NewPreviousState, gossip_state:inc_triggered(State)),
+            ?equals(NewMsgQueue, MsgQueue),
+            ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
+            ?expect_message({gossip_trigger}),
+            
+            ?expect_message({get_node_details, This, [load]});
+        false ->
+            ?equals(gossip_state:get(NewState, values), gossip_state:get(State, values)),
+            ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
+            ?equals(gossip_state:get(NewState, triggered), gossip_state:get(State, triggered) + 1),
+            ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
+            ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
+            ?equals(NewPreviousState, PreviousState),
+            ?equals(NewMsgQueue, MsgQueue),
+            ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
+            ?expect_message({gossip_trigger})
+    end,
+    % request for random node?
+    case gossip_state:get(NewState, round) > 0 andalso
+             gossip_state:get(NewState, initialized) of
+        true -> ?expect_message({get_subset_rand, 1, Self});
+        false -> ok
+    end,
+    % no further messages
+    ?expect_no_message(),
+    true.
+
+test_on_trigger1() ->
     GossipNewValues = gossip_state:new_internal(),
-%%     Self = self(),
-    
-    config:write(gossip_min_triggers_per_round, 2),
-    config:write(gossip_max_triggers_per_round, 4),
-    config:write(gossip_converge_avg_count_start_new_round, 1),
-    
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(gossip_state:get(NewState, values), GossipNewValues),
-    ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
-    ?equals(gossip_state:get(NewState, triggered), 1),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({gossip_trigger}),
-    % round = 0 -> request for new round will be send
-    ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
-    ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
-    % neither initialized nor round > 0 -> no request for random node
-%%     ?expect_message({get_subset_rand, 1, Self}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
 
-test_on_trigger2(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    pid_groups:join_as("gossip_group", cyclon),
-    
+test_on_trigger2() ->
     GossipNewValues = gossip_state:new_internal(),
-%%     Self = self(),
-    
-    config:write(gossip_min_triggers_per_round, 2),
-    config:write(gossip_max_triggers_per_round, 4),
-    config:write(gossip_converge_avg_count_start_new_round, 1),
-    
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(gossip_state:get(NewState, values), GossipNewValues),
-    ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
-    ?equals(gossip_state:get(NewState, triggered), 1),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({gossip_trigger}),
-    % round = 0 -> request for new round will be send
-    ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
-    ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
-    % initialized but not round > 0 -> no request for random node
-%%     ?expect_message({get_subset_rand, 1, Self}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
 
-test_on_trigger3(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    pid_groups:join_as("gossip_group", cyclon),
-    
+test_on_trigger3() ->
     GossipNewValues = gossip_state:new_internal(),
-    Self = self(),
-    
-    config:write(gossip_min_triggers_per_round, 2),
-    config:write(gossip_max_triggers_per_round, 4),
-    config:write(gossip_converge_avg_count_start_new_round, 1),
-    
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values but round = 1, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(gossip_state:get(NewState, values), Values),
-    ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
-    ?equals(gossip_state:get(NewState, triggered), 1),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({gossip_trigger}),
-    % round != 0 and triggers (1) <= min_tpr (2) -> request for new round will not be send
-%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
-%%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
-    % initialized and round > 0 -> request for random node will be send
-    ?expect_message({get_subset_rand, 1, Self}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
 
-test_on_trigger4(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    pid_groups:join_as("gossip_group", cyclon),
-    
+test_on_trigger4() ->
     GossipNewValues = gossip_state:new_internal(),
-    Self = self(),
-    
-    config:write(gossip_min_triggers_per_round, 2),
-    config:write(gossip_max_triggers_per_round, 4),
-    config:write(gossip_converge_avg_count_start_new_round, 1),
-    
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values but round = 1, initialized, triggers = 1, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 1, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(gossip_state:get(NewState, values), Values),
-    ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
-    ?equals(gossip_state:get(NewState, triggered), 2),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({gossip_trigger}),
-    % round != 0 and triggers (2) <= min_tpr (2) -> request for new round will not be send
-%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
-%%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
-    % initialized and round > 0 -> request for random node will be send
-    ?expect_message({get_subset_rand, 1, Self}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
 
-test_on_trigger5(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    pid_groups:join_as("gossip_group", cyclon),
-    
+test_on_trigger5() ->
     GossipNewValues = gossip_state:new_internal(),
-    Self = self(),
-    
-    config:write(gossip_min_triggers_per_round, 2),
-    config:write(gossip_max_triggers_per_round, 4),
-    config:write(gossip_converge_avg_count_start_new_round, 1),
-
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values but round = 1, initialized, triggers = 2, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 2, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(gossip_state:get(NewState, values), Values),
-    ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
-    ?equals(gossip_state:get(NewState, triggered), 3),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({gossip_trigger}),
-    % round != 0 and triggers (3) > min_tpr (2) and conv_avg_count (0) < conv_avg_count_newround (1) -> request for new round will not be send
-%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
-%%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
-    % initialized and round > 0 -> request for random node will be send
-    ?expect_message({get_subset_rand, 1, Self}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
 
-test_on_trigger6(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    pid_groups:join_as("gossip_group", cyclon),
-    
+test_on_trigger6() ->
     GossipNewValues = gossip_state:new_internal(),
-    Self = self(),
-    
-    config:write(gossip_min_triggers_per_round, 2),
-    config:write(gossip_max_triggers_per_round, 4),
-    config:write(gossip_converge_avg_count_start_new_round, 1),
-
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values but round = 1, initialized, triggers = 3, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 3, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(gossip_state:get(NewState, values), Values),
-    ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
-    ?equals(gossip_state:get(NewState, triggered), 4),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({gossip_trigger}),
-    % round != 0 and triggers (4) > min_tpr (2) and conv_avg_count (0) < conv_avg_count_newround (1) -> request for new round will not be send
-%%     ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
-%%     ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
-    % initialized and round > 0 -> request for random node will be send
-    ?expect_message({get_subset_rand, 1, Self}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
 
-test_on_trigger7(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    pid_groups:join_as("gossip_group", cyclon),
-    
+test_on_trigger7() ->
     GossipNewValues = gossip_state:new_internal(),
-    Self = self(),
-    
-    config:write(gossip_min_triggers_per_round, 2),
-    config:write(gossip_max_triggers_per_round, 4),
-    config:write(gossip_converge_avg_count_start_new_round, 1),
-
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values but round = 1, initialized, triggers = 4, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 4, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(gossip_state:get(NewState, values), Values),
-    ?equals(gossip_state:get(NewState, initialized), gossip_state:get(State, initialized)),
-    ?equals(gossip_state:get(NewState, triggered), 5),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    ?expect_message({gossip_trigger}),
-    % round != 0 and triggers (5) > max_tpr (4) -> request for new round will be send
-    ThisWithCookie = comm:this_with_cookie(leader_start_new_round),
-    ?expect_message({get_node_details, ThisWithCookie, [my_range]}),
-    % initialized and round > 0 -> request for random node will be send
-    ?expect_message({get_subset_rand, 1, Self}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
 
-test_on_get_node_details_response_local_info1(Config) ->
-    GossipNewValues = gossip_state:new_internal(),
+test_on_trigger(_Config) ->
+    test_on_trigger1(),
+    test_on_trigger2(),
+    test_on_trigger3(),
+    test_on_trigger4(),
+    test_on_trigger5(),
+    test_on_trigger6(),
+    test_on_trigger7(),
+    tester:test(?MODULE, prop_on_trigger, 8, 100).
+
+-spec prop_on_get_node_details_response_local_info(Load::integer(),
+        PreviousState::gossip_state:state(), State::gossip_state:state(),
+        MsgQueue::msg_queue:msg_queue()) -> true.
+prop_on_get_node_details_response_local_info(Load, PreviousState, State, MsgQueue) ->
+    NodeDetails = node_details:set(node_details:new(), load, Load),
+    TriggerState = get_ptrigger_nodelay(),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+        gossip:on_active({get_node_details_response, NodeDetails},
+                  {PreviousState, State, MsgQueue, TriggerState}),
     
-    NodeDetails = node_details:set(
-                    node_details:set(
-                      node_details:set(
-                        node_details:new(), node, node:new(pid, 1, 0)),
-                      pred, node:new(pid, 0, 0)),
-                    load, 0),
+    case gossip_state:get(State, initialized) of
+        true -> 
+            ?equals(NewState, State);
+        false ->
+            OldAvgLoad = gossip_state:get(State, avgLoad),
+            case OldAvgLoad of
+                unknown -> ?equals(float(gossip_state:get(NewState, avgLoad)), float(Load));
+                _       -> ?equals(float(gossip_state:get(NewState, avgLoad)), (Load + OldAvgLoad) / 2.0)
+            end,
+            OldAvg2Load = gossip_state:get(State, avgLoad2),
+            case OldAvg2Load of
+                unknown -> ?equals(float(gossip_state:get(NewState, avgLoad2)), float(Load * Load));
+                _       -> ?equals(float(gossip_state:get(NewState, avgLoad2)), (Load * Load + OldAvg2Load) / 2.0)
+            end,
+            ?equals(gossip_state:get(NewState, size_inv), gossip_state:get(State, size_inv)),
+            ?equals(gossip_state:get(NewState, avg_kr), gossip_state:get(State, avg_kr)),
+            OldMinLoad = gossip_state:get(State, minLoad),
+            case OldMinLoad of
+                unknown -> ?equals(gossip_state:get(NewState, minLoad), Load);
+                _       -> ?equals(gossip_state:get(NewState, minLoad), erlang:min(Load, OldMinLoad))
+            end,
+            OldMaxLoad = gossip_state:get(State, maxLoad),
+            case OldMaxLoad of
+                unknown -> ?equals(gossip_state:get(NewState, maxLoad), Load);
+                _       -> ?equals(gossip_state:get(NewState, maxLoad), erlang:max(Load, OldMaxLoad))
+            end,
+            ?equals(gossip_state:get(NewState, initialized), true),
+            ?equals(gossip_state:get(NewState, triggered), gossip_state:get(State, triggered)),
+            ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
+            ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
+            [?expect_message(Msg) || Msg <- MsgQueue]
+    end,
+    ?equals(NewPreviousState, PreviousState),
+    ?equals(NewMsgQueue, []),
+    ?equals_pattern(NewTriggerState, TriggerState),
+    ?expect_no_message(),
+    true.
+
+test_on_get_node_details_response_local_info1() ->
+    GossipNewValues = gossip_state:new_internal(),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(NewState, State),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % no messages should be send if already initialized
-    ?expect_no_message(),
-    Config.
+    prop_on_get_node_details_response_local_info(0, PreviousState, State, []).
 
-test_on_get_node_details_response_local_info2(Config) ->
+test_on_get_node_details_response_local_info2() ->
     GossipNewValues = gossip_state:new_internal(),
-    
-    NodeDetails = node_details:set(
-                    node_details:set(
-                      node_details:set(
-                        node_details:new(), node, node:new(pid, 1, 0)),
-                      pred, node:new(pid, 0, 0)),
-                    load, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
-    % non-empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
-                  {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(NewState, State),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % no messages should be send if already initialized
-    ?expect_no_message(),
-    Config.
+    prop_on_get_node_details_response_local_info(0, PreviousState, State, [{msg1}, {msg2}]).
 
-test_on_get_node_details_response_local_info3(Config) ->
+test_on_get_node_details_response_local_info3() ->
     GossipNewValues = gossip_state:new_internal(),
-    
-    NodeDetails = node_details:set(
-                    node_details:set(
-                      node_details:set(
-                        node_details:new(), node, node:new(pid, 1, 0)),
-                      pred, node:new(pid, 0, 0)),
-                    load, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
-    % empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    NewValues_exp = gossip_state:new_internal(0, 0, unknown, 1, 0, 0, 0),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), true),
-    ?equals(gossip_state:get(NewState, triggered), gossip_state:get(State, triggered)),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % message queue empty -> no messages should be send
-    ?expect_no_message(),
-    Config.
+    prop_on_get_node_details_response_local_info(0, PreviousState, State, []).
 
-test_on_get_node_details_response_local_info4(Config) ->
+test_on_get_node_details_response_local_info4() ->
     GossipNewValues = gossip_state:new_internal(),
-    
-    NodeDetails = node_details:set(
-                    node_details:set(
-                      node_details:set(
-                        node_details:new(), node, node:new(pid, 1, 0)),
-                      pred, node:new(pid, 0, 0)),
-                    load, 0),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
-    % non-empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
-                  {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    NewValues_exp = gossip_state:new_internal(0, 0, unknown, 1, 0, 0, 0),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), true),
-    ?equals(gossip_state:get(NewState, triggered), gossip_state:get(State, triggered)),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % message queue non-empty -> the following messages should have been send
-    ?expect_message({msg1}),
-    ?expect_message({msg2}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_get_node_details_response_local_info(0, PreviousState, State, [{msg1}, {msg2}]).
 
-test_on_get_node_details_response_local_info5(Config) ->
+test_on_get_node_details_response_local_info5() ->
     GossipNewValues = gossip_state:new_internal(),
-    
-    NodeDetails = node_details:set(
-                    node_details:set(
-                      node_details:set(
-                        node_details:new(), node, node:new(pid, 4, 0)),
-                      pred, node:new(pid, 2, 0)),
-                    load, 4),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
-    % non-empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
-                  {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    NewValues_exp = gossip_state:new_internal(4, 4*4, unknown, 2, 4, 4, 0),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), true),
-    ?equals(gossip_state:get(NewState, triggered), gossip_state:get(State, triggered)),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % message queue non-empty -> the following messages should have been send
-    ?expect_message({msg1}),
-    ?expect_message({msg2}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_get_node_details_response_local_info(4, PreviousState, State, [{msg1}, {msg2}]).
 
-test_on_get_node_details_response_local_info6(Config) ->
+test_on_get_node_details_response_local_info6() ->
     GossipNewValues = gossip_state:new_internal(),
-    
     Values = gossip_state:new_internal(2.0, 2.0*2.0, unknown, 6.0, 2, 2, 0),
-    NodeDetails = node_details:set(
-                    node_details:set(
-                      node_details:set(
-                        node_details:new(), node, node:new(pid, 4, 0)),
-                      pred, node:new(pid, 2, 0)),
-                    load, 4),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, false, 0, 0, 0),
-    % non-empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
-                  {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    NewValues_exp = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 4, 0),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), true),
-    ?equals(gossip_state:get(NewState, triggered), gossip_state:get(State, triggered)),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % message queue non-empty -> the following messages should have been send
-    ?expect_message({msg1}),
-    ?expect_message({msg2}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_get_node_details_response_local_info(4, PreviousState, State, [{msg1}, {msg2}]).
 
-test_on_get_node_details_response_local_info7(Config) ->
+test_on_get_node_details_response_local_info7() ->
     GossipNewValues = gossip_state:new_internal(),
-    
     Values = gossip_state:new_internal(2.0, 2.0*2.0, unknown, 6.0, 6, 6, 0),
-    NodeDetails = node_details:set(
-                    node_details:set(
-                      node_details:set(
-                        node_details:new(), node, node:new(pid, 4, 0)),
-                      pred, node:new(pid, 2, 0)),
-                    load, 4),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, false, 0, 0, 0),
-    % non-empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, local_info},
-                  {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
-    
-    ?equals(NewPreviousState, PreviousState),
-    NewValues_exp = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 4, 6, 0),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), true),
-    ?equals(gossip_state:get(NewState, triggered), gossip_state:get(State, triggered)),
-    ?equals(gossip_state:get(NewState, msg_exch), gossip_state:get(State, msg_exch)),
-    ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
-    
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % message queue non-empty -> the following messages should have been send
-    ?expect_message({msg1}),
-    ?expect_message({msg2}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+    prop_on_get_node_details_response_local_info(4, PreviousState, State, [{msg1}, {msg2}]).
 
-test_on_get_node_details_response_leader_start_new_round1(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    
-    GossipNewValues = gossip_state:new_internal(),
-    
-    % not the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 0, 1, ']')),
-    Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
-    PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
-    % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
-    State = create_gossip_state(Values, true, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
-
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(NewState, State),
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % no messages should be send if not the leader
-    ?expect_no_message(),
-    Config.
-
-test_on_get_node_details_response_leader_start_new_round2(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    
-    GossipNewValues = gossip_state:new_internal(),
-    
-    % not the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 0, 1, ']')),
-    Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
-    PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
-    % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
-    State = create_gossip_state(Values, true, 0, 0, 0),
-    % non-empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
-                  {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
-
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(NewState, State),
-    ?equals(NewMsgQueue, [{msg1}, {msg2}]),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % no messages should be send if not the leader
-    ?expect_no_message(),
-    Config.
-
-test_on_get_node_details_response_leader_start_new_round3(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    
-    GossipNewValues = gossip_state:new_internal(),
-    
-    % not the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 1, 10, ']')),
-    Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
-    PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
-    % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
-    State = create_gossip_state(Values, true, 0, 0, 0),
-    % non-empty queued messages list
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
-                  {PreviousState, State, [{msg1}, {msg2}], get_ptrigger_nodelay()}),
-
-    ?equals(NewPreviousState, PreviousState),
-    ?equals(NewState, State),
-    ?equals(NewMsgQueue, [{msg1}, {msg2}]),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % no messages should be send if not the leader
-    ?expect_no_message(),
-    Config.
-
-test_on_get_node_details_response_leader_start_new_round4(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    
-    GossipNewValues = gossip_state:new_internal(),
-    
-    % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 10, 1, ']')),
-    Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
-    PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
-    % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
-    State = create_gossip_state(Values, true, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
-
-    ?equals(NewPreviousState, State),
-    NewValues_exp = gossip_state:new_internal(unknown, unknown, 1.0, unknown, unknown, unknown, 1),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), false),
-    ?equals(gossip_state:get(NewState, triggered), 0),
-    ?equals(gossip_state:get(NewState, msg_exch), 0),
-    ?equals(gossip_state:get(NewState, converge_avg_count), 0),
-
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = comm:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
-
-test_on_get_node_details_response_leader_start_new_round5(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    
-    GossipNewValues = gossip_state:new_internal(),
-    
-    % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 10, 1, ']')),
-    Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
-    PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
-    % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
-    State = create_gossip_state(Values, false, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
-
-    ?equals(NewPreviousState, State),
-    NewValues_exp = gossip_state:new_internal(unknown, unknown, 1.0, unknown, unknown, unknown, 1),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), false),
-    ?equals(gossip_state:get(NewState, triggered), 0),
-    ?equals(gossip_state:get(NewState, msg_exch), 0),
-    ?equals(gossip_state:get(NewState, converge_avg_count), 0),
-
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = comm:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
-
-test_on_get_node_details_response_leader_start_new_round6(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    
-    GossipNewValues = gossip_state:new_internal(),
-    
-    % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 10, 0, ']')),
-    Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
-    PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
-    % given values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
-    State = create_gossip_state(Values, false, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
-
-    ?equals(NewPreviousState, State),
-    NewValues_exp = gossip_state:new_internal(unknown, unknown, 1.0, unknown, unknown, unknown, 1),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), false),
-    ?equals(gossip_state:get(NewState, triggered), 0),
-    ?equals(gossip_state:get(NewState, msg_exch), 0),
-    ?equals(gossip_state:get(NewState, converge_avg_count), 0),
-
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = comm:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
-
-test_on_get_node_details_response_leader_start_new_round7(Config) ->
-    pid_groups:join_as("gossip_group", dht_node),
-    
-    GossipNewValues = gossip_state:new_internal(),
-    
-    % the node is the leader
-    NodeDetails = node_details:set(node_details:new(), my_range, intervals:new('(', 0, 0, ']')),
-    Values = gossip_state:new_internal(3.0, 10.0, unknown, 4.0, 2, 6, 0),
-    PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
-    % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
-    State = create_gossip_state(Values, true, 0, 0, 0),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({{get_node_details_response, NodeDetails}, leader_start_new_round},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
-
-    ?equals(NewPreviousState, State),
-    NewValues_exp = gossip_state:new_internal(unknown, unknown, 1.0, unknown, unknown, unknown, 1),
-    ?equals(gossip_state:get(NewState, values), NewValues_exp),
-    ?equals(gossip_state:get(NewState, initialized), false),
-    ?equals(gossip_state:get(NewState, triggered), 0),
-    ?equals(gossip_state:get(NewState, msg_exch), 0),
-    ?equals(gossip_state:get(NewState, converge_avg_count), 0),
-
-    ?equals(NewMsgQueue, []),
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-    % if a new round is started, the leader asks for its node's information
-    ThisWithCookie = comm:this_with_cookie(local_info),
-    ?expect_message({get_node_details, ThisWithCookie, [pred, node, load]}),
-    % no further messages
-    ?expect_no_message(),
-    Config.
+test_on_get_node_details_response_local_info(_Config) ->
+    test_on_get_node_details_response_local_info1(),
+    test_on_get_node_details_response_local_info2(),
+    test_on_get_node_details_response_local_info3(),
+    test_on_get_node_details_response_local_info4(),
+    test_on_get_node_details_response_local_info5(),
+    test_on_get_node_details_response_local_info6(),
+    test_on_get_node_details_response_local_info7(),
+    tester:test(?MODULE, prop_on_get_node_details_response_local_info, 4, 100).
 
 test_on_get_state(Config) ->
     % TODO: implement unit test
@@ -863,7 +439,7 @@ test_on_cy_cache2(Config) ->
 
 test_on_cy_cache3(Config) ->
     % register some other process as the dht_node
-    DHT_Node = fake_dht_node(),
+    DHT_Node = fake_node("gossip_group", dht_node),
 %%     ?equals(pid_groups:get_my(dht_node), DHT_Node),
 
     GossipNewValues = gossip_state:new_internal(),
@@ -1224,6 +800,30 @@ get_ptrigger_nodelay() ->
 get_ptrigger_delay(Delay) ->
     trigger:init('trigger_periodic', fun () -> Delay end, 'gossip_trigger').
 
-fake_dht_node() ->
+-spec fake_node(RegisterGroup::pid_groups:groupname(), RegisterName::pid_groups:pidname()) -> pid().
+fake_node(RegisterGroup, RegisterName) ->
     unittest_helper:start_subprocess(
-      fun() -> pid_groups:join_as("gossip_group", dht_node) end).
+      fun() -> pid_groups:join_as(RegisterGroup, RegisterName) end).
+
+-spec fake_rm_loop(Pred::node:node_type(), Node::node:node_type()) -> pid().
+fake_rm_loop(Pred, Node) ->
+    fake_rm_loop(Pred, Node, Pred).
+
+-spec fake_rm_loop(Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()) -> pid().
+fake_rm_loop(Pred, Node, Succ) ->
+    unittest_helper:start_subprocess(
+      fun() -> pid_groups:join_as("gossip_group", ring_maintenance) end,
+      % recursive anonymous function:
+      fun() ->
+              Fun = fun(F) ->
+                            TableName = list_to_atom(string:concat(pid_groups:my_groupname(), ":rm_tman")),
+                            NeighbTable = ets:new(TableName, [ordered_set, protected]),
+                            rm_loop:update_neighbors(NeighbTable, nodelist:new_neighborhood(Pred, Node, Succ)),
+                            receive
+                                {done} -> ok;
+                                {get_neighb_tid, Pid} -> comm:send_local(Pid, {get_neighb_tid_response, NeighbTable})
+                            end,
+                            F(F)
+                    end,
+              Fun(Fun)
+      end).
