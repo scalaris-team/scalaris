@@ -126,7 +126,7 @@ create_value({union, Types}, Size, ParseState) ->
     create_value(lists:nth(crypto:rand_uniform(1, Length + 1), Types),
                  Size, ParseState);
 create_value({record, Module, TypeName}, Size, ParseState) ->
-    case tester_parse_state:lookup_type({type, Module, TypeName}, ParseState) of
+    case tester_parse_state:lookup_type({record, Module, TypeName}, ParseState) of
         {value, RecordType} ->
             create_record_value(TypeName, RecordType, Size, ParseState);
         none ->

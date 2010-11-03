@@ -105,7 +105,7 @@ collect_type_info(Module, Type, ParseState) ->
 -spec parse_chunk/3 :: (any(), module(), tester_parse_state:state()) -> tester_parse_state:state().
 parse_chunk({attribute, _Line, type, {{record, TypeName}, ATypeSpec, _List}}, Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
-    tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec, NewParseState);
+    tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec, NewParseState);
 parse_chunk({attribute, _Line, type, {TypeName, ATypeSpec, _List}}, Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
     tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec, NewParseState);
@@ -117,7 +117,7 @@ parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, [AFunSpec]}}, Modul
     tester_parse_state:add_type_spec({'fun', Module, FunName, FunArity}, TheFunSpec, NewParseState);
 parse_chunk({attribute, _Line, record, {TypeName, TypeList}}, Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(TypeList, Module, ParseState),
-    tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec, NewParseState);
+    tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec, NewParseState);
 parse_chunk({attribute, _Line, _AttributeName, _AttributeValue}, _Module, ParseState) ->
     ParseState;
 parse_chunk({function, _Line, _FunName, _FunArity, FunCode}, _Module, ParseState) ->
