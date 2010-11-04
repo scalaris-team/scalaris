@@ -45,6 +45,9 @@ end_per_suite(_Config) ->
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
+        % note: the craceful leave tests only work if transactions are
+        % transferred to new TMs if the TM dies or the bench_server restarts
+        % the transactions
         add_3_rm_2_load ->
             {skip, "no graceful leave yet"};
         add_3_rm_2_load_v2 ->
@@ -121,7 +124,9 @@ add_3_rm_2_load_test() ->
     admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
-    admin:del_nodes(2),
+    % let 2 nodes gracefully leave
+    [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
+%%     admin:del_nodes(2),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid).
 
@@ -135,7 +140,9 @@ add_3_rm_2_load_v2_test() ->
     admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
-    admin:del_nodes(2),
+    % let 2 nodes gracefully leave
+    [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
+%%     admin:del_nodes(2),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid).
 
