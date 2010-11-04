@@ -22,29 +22,16 @@
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
-
-% routingtable behaviour
--export([empty/1, empty_ext/1,
-         hash_key/1, get_random_node_id/0, next_hop/2,
-         init_stabilize/2, update/3,
-         filter_dead_node/2, to_pid_list/1, get_size/1, get_replica_keys/1,
-         n/0, dump/1, to_list/1, export_rt_to_dht_node/2,
-         handle_custom_message/2,
-         check/4, check/5,
-         check_config/0]).
-
--ifdef(with_export_type_support).
--export_type([key/0, rt/0, custom_message/0, external_rt/0, index/0]).
--endif.
+-include("rt_beh.hrl").
 
 %% userdevguide-begin rt_chord:types
--opaque(key()::non_neg_integer()).
--opaque(rt()::gb_tree()).
--type(external_rt()::gb_tree()).        %% @todo: make opaque
--type(index() :: {pos_integer(), non_neg_integer()}).
--opaque(custom_message() ::
-       {rt_get_node, Source_PID::comm:mypid(), Index::rt_chord:index()} |
-       {rt_get_node_response, Index::index(), Node::node:node_type()}).
+-type key_t() :: non_neg_integer().
+-type rt_t() :: gb_tree().
+-type external_rt_t() :: gb_tree().
+-type index() :: {pos_integer(), non_neg_integer()}.
+-opaque custom_message() ::
+       {rt_get_node, Source_PID::comm:mypid(), Index::index()} |
+       {rt_get_node_response, Index::index(), Node::node:node_type()}.
 %% userdevguide-end rt_chord:types
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -53,18 +40,16 @@
 
 %% userdevguide-begin rt_chord:empty
 %% @doc Creates an empty routing table.
--spec empty(nodelist:neighborhood()) -> rt().
 empty(_Neighbors) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty
 
 %% @doc Hashes the key to the identifier space.
--spec hash_key(iodata() | integer()) -> key().
 hash_key(Key) -> hash_key_(Key).
 
 %% @doc Hashes the key to the identifier space (internal function to allow
 %%      use in e.g. get_random_node_id without dialyzer complaining about the
 %%      opaque key type).
--spec hash_key_(iodata() | integer()) -> integer().
+-spec hash_key_(client_key()) -> key_t().
 hash_key_(Key) when is_integer(Key) ->
     <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
     N;
@@ -74,7 +59,6 @@ hash_key_(Key) ->
 
 %% @doc Generates a random node id, i.e. a random 128-bit number, based on the
 %%      parameters set in the config file (key_creator and key_creator_bitmask).
--spec get_random_node_id() -> key().
 get_random_node_id() ->
     case config:read(key_creator) of
         random -> hash_key_(randoms:getRandomId());
@@ -89,7 +73,6 @@ get_random_node_id() ->
 
 %% userdevguide-begin rt_chord:init_stabilize
 %% @doc Starts the stabilization routine.
--spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 init_stabilize(Neighbors, RT) ->
     % calculate the longest finger
     Id = nodelist:nodeid(Neighbors),
@@ -102,7 +85,6 @@ init_stabilize(Neighbors, RT) ->
 
 %% userdevguide-begin rt_chord:filter_dead_node
 %% @doc Removes dead nodes from the routing table.
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
 filter_dead_node(RT, DeadPid) ->
     DeadIndices = [Index || {Index, Node}  <- gb_trees:to_list(RT),
                             node:same_process(Node, DeadPid)],
@@ -111,27 +93,22 @@ filter_dead_node(RT, DeadPid) ->
 %% userdevguide-end rt_chord:filter_dead_node
 
 %% @doc Returns the pids of the routing table entries.
--spec to_pid_list(rt()) -> [comm:mypid()].
 to_pid_list(RT) ->
     [node:pidX(Node) || Node <- gb_trees:values(RT)].
 
 %% @doc Returns the size of the routing table.
--spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(RT) ->
     gb_trees:size(RT).
 
 %% @doc Keep a key in the address space. See n/0.
--spec normalize(Key::non_neg_integer()) -> key().
+-spec normalize(Key::key_t()) -> key_t().
 normalize(Key) ->
     Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Returns the size of the address space.
--spec n() -> non_neg_integer().
-n() ->
-    16#100000000000000000000000000000000.
+n() -> 16#100000000000000000000000000000000.
 
 %% @doc Returns the replicas of the given key.
--spec get_replica_keys(key()) -> [key()].
 get_replica_keys(Key) ->
     [Key,
      Key bxor 16#40000000000000000000000000000000,
@@ -140,13 +117,13 @@ get_replica_keys(Key) ->
     ].
 
 %% @doc Dumps the RT state for output in the web interface.
--spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 dump(RT) ->
-    [{lists:flatten(io_lib:format("~p", [Index])), lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- gb_trees:to_list(RT)].
+    [{lists:flatten(io_lib:format("~p", [Index])),
+      lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- gb_trees:to_list(RT)].
 
 %% userdevguide-begin rt_chord:stabilize
 %% @doc Updates one entry in the routing table and triggers the next update.
--spec stabilize(MyId::key(), Succ::node:node_type(), OldRT::rt(),
+-spec stabilize(MyId::key() | key_t(), Succ::node:node_type(), OldRT::rt(),
                 Index::index(), Node::node:node_type()) -> NewRT::rt().
 stabilize(Id, Succ, RT, Index, Node) ->
     case (node:id(Succ) =/= node:id(Node))   % reached succ?
@@ -156,8 +133,9 @@ stabilize(Id, Succ, RT, Index, Node) ->
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
-            lookup:unreliable_lookup(Key, {send_to_group_member, routing_table,
-                                           {rt_get_node, comm:this(), next_index(Index)}}),
+            Msg = {rt_get_node, comm:this(), next_index(Index)},
+            lookup:unreliable_lookup(Key,
+                                     {send_to_group_member, routing_table, Msg}),
             NewRT;
         _ -> RT
     end.
@@ -176,7 +154,7 @@ update(_OldRT, _OldNeighbors, NewNeighbors) ->
 %% Finger calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @private
--spec calculateKey(key(), index()) -> key().
+-spec calculateKey(key() | key_t(), index()) -> key_t().
 calculateKey(Id, {I, J}) ->
     % N / K^I * (J + 1)
     Offset = (n() div util:pow(config:read(chord_base), I)) * (J + 1),
@@ -195,7 +173,6 @@ next_index({I, J}) ->
 
 %% @doc Checks whether config parameters of the rt_chord process exist and are
 %%      valid.
--spec check_config() -> boolean().
 check_config() ->
     config:is_integer(chord_base) and
         config:is_greater_than_equal(chord_base, 2) and
@@ -236,8 +213,6 @@ handle_custom_message(_Message, _State) ->
 %% userdevguide-begin rt_chord:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
 check(OldRT, NewRT, Neighbors, ReportToFD) ->
     check(OldRT, NewRT, Neighbors, Neighbors, ReportToFD).
 
@@ -245,8 +220,6 @@ check(OldRT, NewRT, Neighbors, ReportToFD) ->
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table also changes if the Pred or Succ
 %%      change.
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
 check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
     case OldRT =:= NewRT andalso
              nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) andalso
@@ -254,11 +227,13 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
         true -> ok;
         _ ->
             Pid = pid_groups:get_my(dht_node),
-            comm:send_local(Pid, {rt_update, export_rt_to_dht_node(NewRT, NewNeighbors)}),
+            RT_ext = export_rt_to_dht_node(NewRT, NewNeighbors),
+            comm:send_local(Pid, {rt_update, RT_ext}),
             % update failure detector:
             case ReportToFD of
                 true ->
-                    NewPids = to_pid_list(NewRT), OldPids = to_pid_list(OldRT),
+                    NewPids = to_pid_list(NewRT),
+                    OldPids = to_pid_list(OldRT),
                     fd:update_subscriptions(OldPids, NewPids);
                 _ -> ok
             end
@@ -270,7 +245,6 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_chord:empty_ext
--spec empty_ext(nodelist:neighborhood()) -> external_rt().
 empty_ext(_Neighbors) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty_ext
 
@@ -281,13 +255,12 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 %%      proper next hop.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
 next_hop(State, Id) ->
     case intervals:in(Id, dht_node_state:get(State, succ_range)) of
         true -> dht_node_state:get(State, succ_pid);
         _ ->
             % check routing table:
-            RT = dht_node_state:get(State, rt),
+    RT = dht_node_state:get(State, rt),
             RTSize = get_size(RT),
             NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
                          {value, _Key, N} ->
@@ -311,8 +284,6 @@ next_hop(State, Id) ->
 %% userdevguide-end rt_chord:next_hop
 
 %% userdevguide-begin rt_chord:export_rt_to_dht_node
--spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood())
-        -> external_rt().
 export_rt_to_dht_node(RT, Neighbors) ->
     Id = nodelist:nodeid(Neighbors),
     Pred = nodelist:pred(Neighbors),
@@ -331,7 +302,6 @@ export_rt_to_dht_node(RT, Neighbors) ->
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
--spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) ->
     RT = dht_node_state:get(State, rt),
     Succ = dht_node_state:get(State, succ),

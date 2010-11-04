@@ -25,13 +25,14 @@
 
 -behaviour(db_beh).
 % TODO: make db() opaque again once dialyzer doesn't complain about get_db/1 anymore ("matching against tuple breaks opaqueness")
--type(db() :: {Table::tid() | atom(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}).
+-type db_t() :: {Table::tid() | atom(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}.
+
+-export([get_chunk/3, delete_chunk/3]).
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
 -include("db_beh.hrl").
 
--export([get_chunk/3, delete_chunk/3]).
 
 -define(CKETS, ets).
 
@@ -40,7 +41,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initializes a new database.
-new() ->
+new_() ->
     % ets prefix: DB_ + random name
     RandomName = randoms:getRandomId(),
     DBname = list_to_atom(string:concat("db_", RandomName)),
@@ -50,30 +51,24 @@ new() ->
 
 %% @doc Re-opens a previously existing database (not supported by ets
 %%      -> create new DB).
-open(_FileName) ->
+open_(_FileName) ->
     log:log(warn, "[ Node ~w:db_ets ] open/1 not supported, executing new/0 instead", [self()]),
     new().
 
 %% @doc Closes and deletes the DB.
-close({DB, _CKInt, CKDB}, _Delete) ->
+close_({DB, _CKInt, CKDB}, _Delete) ->
     ets:delete(DB),
     ?CKETS:delete(CKDB).
 
 %% @doc Returns an empty string.
 %%      Note: should return the name of the DB for open/1 which is not
 %%      supported by ets though).
-get_name(_State) ->
+get_name_(_State) ->
     "".
 
 %% @doc Returns all DB entries.
-get_data({DB, _CKInt, _CKDB}) ->
+get_data_({DB, _CKInt, _CKDB}) ->
     ets:tab2list(DB).
-
-%% @doc Gets the ets database from the state (seperate function to
-%%      make dialyzer happy with get_chunk/1 using ets' methods and methods
-%%      with an opaque db() state concurrently).
--spec get_db(State::db()) -> tid() | atom().
-get_db({DB, _CKInt, _CKDB}) -> DB.
 
 %% @doc Returns all key-value pairs of the given DB which are in the given
 %%      interval but at most ChunkSize elements.
@@ -86,15 +81,18 @@ get_db({DB, _CKInt, _CKDB}) -> DB.
 %%      particular, continuous
 -spec get_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
     {intervals:interval(), db_as_list()}.
-get_chunk(DB, Interval, ChunkSize) ->
+get_chunk(DB, Interval, ChunkSize) -> get_chunk_(DB, Interval, ChunkSize).
+
+-spec get_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
+    {intervals:interval(), db_as_list()}.
+get_chunk_({ETSDB, _CKInt, _CKDB} = DB, Interval, ChunkSize) ->
     % assert ChunkSize > 0, see ChunkSize type
-    case get_load(DB) of
+    case get_load_(DB) of
         0 -> {intervals:empty(), []};
         _ ->
             %ct:pal("0: ~p ~p", [intervals:get_bounds(Interval), Interval]),
             {_BeginBr, Begin, End, EndBr} = intervals:get_bounds(Interval),
             % get first key which is in the interval and in the ets table:
-            ETSDB = get_db(DB),
             case first_key_in_interval(ETSDB, Begin, Interval) of
                 '$end_of_table' ->
                     {intervals:empty(), []};
@@ -102,7 +100,7 @@ get_chunk(DB, Interval, ChunkSize) ->
                     %ct:pal("first key: ~.0p~n", [FirstKey]),
                     {Next, Chunk} =
                         get_chunk_inner(DB, ets:next(ETSDB, FirstKey), FirstKey,
-                                        Interval, ChunkSize - 1, [get_entry(DB, FirstKey)]),
+                                        Interval, ChunkSize - 1, [get_entry_(DB, FirstKey)]),
                     case Next of
                         '$end_of_table' ->
                             {intervals:empty(), Chunk};
@@ -142,10 +140,9 @@ first_key_in_interval(ETSDB, Current, Interval) ->
 
 %% @doc inner loop for get_chunk
 %% pre: Current is in ets table, ets table is not empty
--spec get_chunk_inner(DB::{tid() | atom(), intervals:interval(), tid() | atom()},
-                      Current::?RT:key() | '$end_of_table', RealStart::?RT:key(),
-                      Interval::intervals:interval(), ChunkSize::pos_integer(),
-                      Chunk::db_as_list())
+-spec get_chunk_inner(DB::db_t(), Current::?RT:key() | '$end_of_table',
+                      RealStart::?RT:key(), Interval::intervals:interval(),
+                      ChunkSize::pos_integer(), Chunk::db_as_list())
         -> {?RT:key() | '$end_of_table' | '$end_of_interval', db_as_list()}.
 get_chunk_inner(_DB, RealStart, RealStart, _Interval, _ChunkSize, Chunk) ->
     %ct:pal("inner: 0: ~p", [RealStart]),
@@ -155,17 +152,15 @@ get_chunk_inner(_DB, Current, _RealStart, _Interval, 0, Chunk) ->
     %ct:pal("inner: 1: ~p", [Current]),
     % we hit the chunk size limit
     {Current, Chunk};
-get_chunk_inner(DB, '$end_of_table', RealStart, Interval, ChunkSize, Chunk) ->
+get_chunk_inner({ETSDB, _CKInt, _CKDB} = DB, '$end_of_table', RealStart, Interval, ChunkSize, Chunk) ->
     %ct:pal("inner: 2: ~p", ['$end_of_table']),
     % reached end of table - start at beginning (may be a wrapping interval)
-    ETSDB = get_db(DB),
     get_chunk_inner(DB, ets:first(ETSDB), RealStart, Interval, ChunkSize, Chunk);
-get_chunk_inner(DB, Current, RealStart, Interval, ChunkSize, Chunk) ->
+get_chunk_inner({ETSDB, _CKInt, _CKDB} = DB, Current, RealStart, Interval, ChunkSize, Chunk) ->
     %ct:pal("inner: 3: ~p", [Current]),
     case intervals:in(Current, Interval) of
         true ->
-            Entry = get_entry(DB, Current),
-            ETSDB = get_db(DB),
+            Entry = get_entry_(DB, Current),
             Next = ets:next(ETSDB, Current),
             get_chunk_inner(DB, Next, RealStart, Interval, ChunkSize - 1, [Entry | Chunk]);
         _ ->
@@ -174,8 +169,12 @@ get_chunk_inner(DB, Current, RealStart, Interval, ChunkSize, Chunk) ->
 
 -spec delete_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
     {intervals:interval(), db()}.
-delete_chunk(DB, Interval, ChunkSize) ->
-    {Next, Chunk} = get_chunk(DB, Interval, ChunkSize),
+delete_chunk(DB, Interval, ChunkSize) -> delete_chunk_(DB, Interval, ChunkSize).
+
+-spec delete_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
+    {intervals:interval(), db_t()}.
+delete_chunk_(DB, Interval, ChunkSize) ->
+    {Next, Chunk} = get_chunk_(DB, Interval, ChunkSize),
     DB2 = lists:foldl(fun (Entry, DB1) -> delete_entry(DB1, Entry) end, DB, Chunk),
     {Next, DB2}.
 

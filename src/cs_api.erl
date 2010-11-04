@@ -31,13 +31,13 @@
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @type key() = term(). Key
--type(key() :: term()).
-%% @type value() = term(). Value
--type(value() :: term()).
+-type request() :: {read, client_key()} | {write, client_key(), client_value()} | {commit}.
+-type result() :: any(). %% TODO: specify result() type
 
+-spec new_tlog() -> tx_tlog:tlog().
 new_tlog() -> txlog:new().
 
+-spec process_request_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), {results, [result()]}}.
 process_request_list(TLog, ReqList) ->
     ?TRACE("cs_api:process_request_list(~p, ~p)~n", [TLog, ReqList]),
     % should just call transaction_api:process_request_list
@@ -90,8 +90,8 @@ process_request(TLog, Request) ->
     end.
 
 %% @doc reads the value of a key
-%% @spec read(key()) -> value() | {fail, term()} 
--spec read(key()) -> value() | {fail, term()}.
+%% @spec read(client_key()) -> client_value() | {fail, term()} 
+-spec read(client_key()) -> client_value() | {fail, term()}.
 read(Key) ->
     ?TRACE("cs_api:read(~p)~n", [Key]),
     case util:tc(transaction_api, quorum_read, [Key]) of
@@ -107,8 +107,8 @@ read(Key) ->
     end.
 
 %% @doc writes the value of a key
-%% @spec write(key(), value()) -> ok | {fail, term()}
--spec write(key(), value()) -> ok | {fail, term()}.
+%% @spec write(client_key(), client_value()) -> ok | {fail, term()}
+-spec write(client_key(), client_value()) -> ok | {fail, term()}.
 write(Key, Value) ->
     ?TRACE("cs_api:write(~p, ~p)~n", [Key, Value]),
     case util:tc(transaction_api, single_write, [Key, Value]) of
@@ -120,13 +120,18 @@ write(Key, Value) ->
             {fail, Reason}
     end.
 
+-spec delete(Key::client_key())
+        -> {ok, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, timeout} |
+           {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, node_not_found}.
 delete(Key) ->
     ?TRACE("cs_api:delete(~p)~n", [Key]),
     transaction_api:delete(Key, 2000).
 
 %% @doc atomic compare and swap
-%% @spec test_and_set(key(), value(), value()) -> ok | {fail, term()}
--spec test_and_set(key(), value(), value()) -> ok | {fail, Reason::term()}.
+%% @spec test_and_set(client_key(), client_value(), client_value()) -> ok | {fail, term()}
+-spec test_and_set(client_key(), client_value(), client_value()) -> ok | {fail, Reason::term()}.
 test_and_set(Key, OldValue, NewValue) ->
     ?TRACE("cs_api:test_and_set(~p, ~p, ~p)~n", [Key, OldValue, NewValue]),
     TFun = fun(TransLog) ->

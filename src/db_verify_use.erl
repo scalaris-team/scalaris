@@ -27,7 +27,7 @@
 
 -define(BASE_DB, db_gb_trees).
 
--opaque(db()::{?BASE_DB:db(), Counter::non_neg_integer()}).
+-type db_t()::{?BASE_DB:db(), Counter::non_neg_integer()}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -62,7 +62,7 @@ update_counter(Counter) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc initializes a new database.
-new() ->
+new_() ->
     ?TRACE0(new),
     case erlang:get(?MODULE) of
         undefined -> ok;
@@ -72,7 +72,7 @@ new() ->
     {?BASE_DB:new(), 0}.
 
 %% @doc Re-opens a previously existing database.
-open(FileName) ->
+open_(FileName) ->
     ?TRACE1(open, FileName),
     case erlang:get(?MODULE) of
         undefined -> ok;
@@ -82,26 +82,26 @@ open(FileName) ->
     {?BASE_DB:open(FileName), 0}.
 
 %% @doc Closes and deletes the DB.
-close({DB, _Counter} = DB_) ->
+close_({DB, _Counter} = DB_) ->
     ?TRACE1(close, DB_),
     erlang:erase(?MODULE),
     ?BASE_DB:close(DB).
 
 %% @doc Closes and (optionally) deletes the DB.
-close({DB, _Counter} = DB_, Delete) ->
+close_({DB, _Counter} = DB_, Delete) ->
     ?TRACE2(close, DB_, Delete),
     erlang:erase(?MODULE),
     ?BASE_DB:close(DB, Delete).
 
 %% @doc Returns the name of the DB which can be used with open/1.
-get_name({DB, Counter} = DB_) ->
+get_name_({DB, Counter} = DB_) ->
     ?TRACE1(get_name, DB_),
     verify_counter(Counter),
     ?BASE_DB:get_name(DB).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned.
-get_entry({DB, Counter} = DB_, Key) ->
+get_entry_({DB, Counter} = DB_, Key) ->
     ?TRACE2(get_entry, DB_, Key),
     verify_counter(Counter),
     ?BASE_DB:get_entry(DB, Key).
@@ -109,99 +109,99 @@ get_entry({DB, Counter} = DB_, Key) ->
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
-get_entry2({DB, Counter} = DB_, Key) ->
+get_entry2_({DB, Counter} = DB_, Key) ->
     ?TRACE2(get_entry2, DB_, Key),
     verify_counter(Counter),
     ?BASE_DB:get_entry2(DB, Key).
 
 %% @doc Inserts a complete entry into the DB.
-set_entry({DB, Counter} = DB_, Entry) ->
+set_entry_({DB, Counter} = DB_, Entry) ->
     ?TRACE2(set_entry, DB_, Entry),
     verify_counter(Counter),
     {?BASE_DB:set_entry(DB, Entry), update_counter(Counter)}.
 
 %% @doc Updates an existing (!) entry in the DB.
-update_entry({DB, Counter} = DB_, Entry) ->
+update_entry_({DB, Counter} = DB_, Entry) ->
     ?TRACE2(update_entry, DB_, Entry),
     verify_counter(Counter),
     {true, _} = ?BASE_DB:get_entry2(DB, db_entry:get_key(Entry)),
     {?BASE_DB:update_entry(DB, Entry), update_counter(Counter)}.
 
 %% @doc Removes all values with the given entry's key from the DB.
-delete_entry({DB, Counter} = DB_, Entry) ->
+delete_entry_({DB, Counter} = DB_, Entry) ->
     ?TRACE2(delete_entry, DB_, Entry),
     verify_counter(Counter),
     {?BASE_DB:delete_entry(DB, Entry), update_counter(Counter)}.
 
 %% @doc Returns the number of stored keys.
-get_load({DB, Counter} = DB_) ->
+get_load_({DB, Counter} = DB_) ->
     ?TRACE1(get_load, DB_),
     verify_counter(Counter),
     ?BASE_DB:get_load(DB).
 
 %% @doc Adds all db_entry objects in the Data list.
-add_data({DB, Counter} = DB_, Data) ->
+add_data_({DB, Counter} = DB_, Data) ->
     ?TRACE2(add_data, DB_, Data),
     verify_counter(Counter),
     {?BASE_DB:add_data(DB, Data), update_counter(Counter)}.
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
-split_data({DB, Counter} = DB_, MyNewInterval) ->
+split_data_({DB, Counter} = DB_, MyNewInterval) ->
     ?TRACE2(split_data, DB_, MyNewInterval),
     verify_counter(Counter),
     {MyNewDB, HisList} = ?BASE_DB:split_data(DB, MyNewInterval),
     {{MyNewDB, update_counter(Counter)}, HisList}.
 
 %% @doc Gets (non-empty) db_entry objects in the given range.
-get_entries({DB, Counter} = DB_, Interval) ->
+get_entries_({DB, Counter} = DB_, Interval) ->
     ?TRACE2(get_entries, DB_, Interval),
     verify_counter(Counter),
     ?BASE_DB:get_entries(DB, Interval).
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
-get_entries({DB, Counter} = DB_, FilterFun, ValueFun) ->
+get_entries_({DB, Counter} = DB_, FilterFun, ValueFun) ->
     ?TRACE3(get_entries, DB_, FilterFun, ValueFun),
     verify_counter(Counter),
     ?BASE_DB:get_entries(DB, FilterFun, ValueFun).
 
 %% @doc Returns all DB entries.
-get_data({DB, Counter} = DB_) ->
+get_data_({DB, Counter} = DB_) ->
     ?TRACE1(get_data, DB_),
     verify_counter(Counter),
     ?BASE_DB:get_data(DB).
 
 %% @doc Adds the new interval to the interval to record changes for.
 %%      Changed entries can then be gathered by get_changes/1.
-record_changes({DB, Counter} = DB_, NewInterval) ->
+record_changes_({DB, Counter} = DB_, NewInterval) ->
     ?TRACE2(record_changes, DB_, NewInterval),
     verify_counter(Counter),
     {?BASE_DB:record_changes(DB, NewInterval), update_counter(Counter)}.
 
 %% @doc Stops recording changes and removes all entries from the table of
 %%      changed keys.
-stop_record_changes({DB, Counter} = DB_) ->
+stop_record_changes_({DB, Counter} = DB_) ->
     ?TRACE1(stop_record_changes, DB_),
     verify_counter(Counter),
     {?BASE_DB:stop_record_changes(DB), update_counter(Counter)}.
 
 %% @doc Stops recording changes in the given interval and removes all such
 %%      entries from the table of changed keys.
-stop_record_changes({DB, Counter} = DB_, Interval) ->
+stop_record_changes_({DB, Counter} = DB_, Interval) ->
     ?TRACE2(stop_record_changes, DB_, Interval),
     verify_counter(Counter),
     {?BASE_DB:stop_record_changes(DB, Interval), update_counter(Counter)}.
 
 %% @doc Gets all db_entry objects which have been changed or deleted.
-get_changes({DB, Counter} = DB_) ->
+get_changes_({DB, Counter} = DB_) ->
     ?TRACE1(get_changes, DB_),
     verify_counter(Counter),
     ?BASE_DB:get_changes(DB).
 
 %% @doc Gets all db_entry objects in the given interval which have been
 %%      changed or deleted.
-get_changes({DB, Counter} = DB_, Interval) ->
+get_changes_({DB, Counter} = DB_, Interval) ->
     ?TRACE2(get_changes, DB_, Interval),
     verify_counter(Counter),
     ?BASE_DB:get_changes(DB, Interval).
@@ -246,14 +246,14 @@ delete({DB, Counter} = DB_, Key) ->
     {NewDB, Status} = ?BASE_DB:delete(DB, Key),
     {{NewDB, update_counter(Counter)}, Status}.
 
-update_entries({DB, Counter} = DB_, NewEntries, Pred, UpdateFun) ->
+update_entries_({DB, Counter} = DB_, NewEntries, Pred, UpdateFun) ->
     ?TRACE4(update_entries, DB_, NewEntries, Pred, UpdateFun),
     verify_counter(Counter),
     {?BASE_DB:update_entries(DB, NewEntries, Pred, UpdateFun), update_counter(Counter)}.
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
-delete_entries({DB, Counter} = DB_, RangeOrFilterFun) ->
+delete_entries_({DB, Counter} = DB_, RangeOrFilterFun) ->
     ?TRACE2(get_entries, DB_, RangeOrFilterFun),
     verify_counter(Counter),
     {?BASE_DB:delete_entries(DB, RangeOrFilterFun), update_counter(Counter)}.

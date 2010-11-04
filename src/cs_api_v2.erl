@@ -27,13 +27,13 @@
 
 % Public Interface
 
-%% @type key() = term(). Key
--type(key() :: term()).
-%% @type value() = term(). Value
--type(value() :: term()).
+-type request() :: {read, client_key()} | {write, client_key(), client_value()} | {commit}.
+-type result() :: any(). %% TODO: specify result() type
 
+-spec new_tlog() -> tx_tlog:tlog().
 new_tlog() -> tx_tlog:empty().
 
+-spec process_request_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), {results, [result()]}}.
 process_request_list([], [{commit}]) ->
     {[], {results, [commit]}};
 process_request_list(TLog, ReqList) ->
@@ -65,8 +65,8 @@ process_request_list(TLog, ReqList) ->
     {TransLogResult, {results, ResultList}}.
 
 %% @doc reads the value of a key
-%% @spec read(key()) -> value() | {fail, term()}
--spec read(key()) -> value() | {fail, term()}.
+%% @spec read(client_key()) -> client_value() | {fail, term()}
+-spec read(client_key()) -> client_value() | {fail, term()}.
 read(Key) ->
     ReqList = [{read, Key}],
     case process_request_list(tx_tlog:empty(), ReqList) of
@@ -75,8 +75,8 @@ read(Key) ->
     end.
 
 %% @doc writes the value of a key
-%% @spec write(key(), value()) -> ok | {fail, term()}
--spec write(key(), value()) -> ok | {fail, term()}.
+%% @spec write(client_key(), client_value()) -> ok | {fail, term()}
+-spec write(client_key(), client_value()) -> ok | {fail, term()}.
 write(Key, Value) ->
     ReqList = [{write, Key, Value}, {commit}],
     case process_request_list(tx_tlog:empty(), ReqList) of
@@ -87,12 +87,17 @@ write(Key, Value) ->
             {fail, Reason}
     end.
 
+-spec delete(Key::client_key())
+        -> {ok, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, timeout} |
+           {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, node_not_found}.
 delete(Key) ->
     transaction_api:delete(Key, 2000).
 
 %% @doc atomic compare and swap
-%% @spec test_and_set(key(), value(), value()) -> ok | {fail, term()}
--spec test_and_set(key(), value(), value()) -> ok | {fail, Reason::term()}.
+%% @spec test_and_set(client_key(), client_value(), client_value()) -> ok | {fail, term()}
+-spec test_and_set(client_key(), client_value(), client_value()) -> ok | {fail, Reason::term()}.
 test_and_set(Key, OldValue, NewValue) ->
     ReadReqList = [{read, Key}],
     WriteReqList = [{write, Key, NewValue}, {commit}],
