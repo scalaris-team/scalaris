@@ -92,7 +92,7 @@ process_move_msg({move, notify_succ_timeout, MoveFullId}, MyState) ->
                 case (slide_op:get_timeouts(SlideOp) < get_notify_succ_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        notify_other_slide(succ, NewSlideOp, State);
+                        notify_other_slide(NewSlideOp, State);
                     _ ->
                         % if the message was received by succ, it will itself run
                         % into a timeout since we do not reply to it anymore
@@ -108,7 +108,7 @@ process_move_msg({move, notify_pred_timeout, MoveFullId}, MyState) ->
                 case (slide_op:get_timeouts(SlideOp) < get_notify_pred_retries()) of
                     true ->
                         NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        notify_other_slide(pred, NewSlideOp, State);
+                        notify_other_slide(NewSlideOp, State);
                     _ ->
                         % if the message was received by pred, it will itself run
                         % into a timeout since we do not reply to it anymore
@@ -334,72 +334,44 @@ process_move_msg({move, delta_ack, MoveFullId}, MyState) ->
 %%      correct, i.e. its target node is still the node's successor. No timer
 %%      should have been set on NewSlideOp. Will also set the appropriate
 %%      slide_phase and update the slide op in the dht_node.
--spec notify_other_slide(PredOrSucc::pred | succ, NewSlideOp::slide_op:slide_op(), State::dht_node_state:state()) -> dht_node_state:state().
-notify_other_slide(succ, NewSlideOp, State) ->
-    OtherNode = dht_node_state:get(State, succ),
+-spec notify_other_slide(NewSlideOp::slide_op:slide_op(), State::dht_node_state:state()) -> dht_node_state:state().
+notify_other_slide(NewSlideOp, State) ->
+    Type = slide_op:get_type(NewSlideOp),
+    PredOrSucc = slide_op:get_predORsucc(Type),
+    OtherNode = dht_node_state:get(State, PredOrSucc),
     SlOpNodePid = slide_op:get_node(NewSlideOp),
     case node:same_process(OtherNode, SlOpNodePid) of
         true ->
-            Timeout_ms = get_notify_succ_timeout(),
-            Timeout_msgtag = notify_succ_timeout,
-            Notify_msgtag = slide_pred,
-            NewPhase = wait_for_succ_ack,
-            notify_other_slide2(succ, NewSlideOp, State, OtherNode,
-                                Timeout_ms, Timeout_msgtag, Notify_msgtag,
-                                NewPhase);
-        _ ->
-            dht_node_state:set_slide(State, succ, null)
-    end;
-notify_other_slide(pred, NewSlideOp, State) ->
-    OtherNode = dht_node_state:get(State, pred),
-    SlOpNodePid = slide_op:get_node(NewSlideOp),
-    case node:same_process(OtherNode, SlOpNodePid) of
-        true ->
-            Timeout_ms = get_notify_pred_timeout(),
-            Timeout_msgtag = notify_pred_timeout,
-            Notify_msgtag = slide_succ,
-            NewPhase =
-                case slide_op:get_sendORreceive(NewSlideOp) of % note: type = my slide_op's type
-                    'rcv'  -> wait_for_data;
-                    'send' -> wait_for_req_data
+            {Timeout_ms, Timeout_msgtag, NewPhase} =
+                case PredOrSucc of
+                    succ -> {get_notify_succ_timeout(),
+                             notify_succ_timeout,
+                             wait_for_succ_ack};
+                    pred ->
+                        SendOrReceive = slide_op:get_sendORreceive(Type),
+                        case SendOrReceive of
+                            'rcv'  -> {get_notify_pred_timeout(),
+                                       notify_pred_timeout,
+                                       wait_for_data};
+                            'send' -> {get_notify_pred_timeout(),
+                                       notify_pred_timeout,
+                                       wait_for_req_data}
+                        end
                 end,
-            notify_other_slide2(pred, NewSlideOp, State, OtherNode,
-                                Timeout_ms, Timeout_msgtag, Notify_msgtag,
-                                NewPhase);
+            SlideOp = slide_op:set_timer(NewSlideOp, Timeout_ms,
+                                         {move, Timeout_msgtag, slide_op:get_id(NewSlideOp)}),
+            comm:send(SlOpNodePid, {move, slide, Type,
+                                    slide_op:get_id(SlideOp),
+                                    dht_node_state:get(State, node),
+                                    OtherNode, slide_op:get_target_id(SlideOp),
+                                    slide_op:get_tag(SlideOp),
+                                    get_max_transport_bytes()}),
+            PredOrSucc = slide_op:get_predORsucc(SlideOp),
+            dht_node_state:set_slide(State, PredOrSucc,
+                                     slide_op:set_phase(SlideOp, NewPhase));
         _ ->
-            dht_node_state:set_slide(State, pred, null)
+            dht_node_state:set_slide(State, PredOrSucc, null)
     end.
-
-%% @doc Helper for notify_other_slide/4. Sets the timer, sends the message and
-%%      finally sets the new slide op in the dht_node state.
--spec notify_other_slide2
-        (succ, NewSlideOp::slide_op:slide_op(),
-         State::dht_node_state:state(), OtherNode::node:node_type(),
-         Timeout_ms::pos_integer(), Timeout_msgtag::notify_succ_timeout,
-         Notify_msgtag::slide_pred, NewPhase::wait_for_succ_ack)
-            -> dht_node_state:state();
-        (pred, NewSlideOp::slide_op:slide_op(),
-         State::dht_node_state:state(), OtherNode::node:node_type(),
-         Timeout_ms::pos_integer(), Timeout_msgtag::notify_pred_timeout,
-         Notify_msgtag::slide_succ, NewPhase::wait_for_req_data | wait_for_data)
-            -> dht_node_state:state().
-notify_other_slide2(PredOrSucc, NewSlideOp, State, OtherNode,
-                    Timeout_ms, Timeout_msgtag, Notify_msgtag, NewPhase) ->
-    SlOpNodePid = node:pidX(OtherNode),
-    SlideOp = slide_op:set_timer(NewSlideOp, Timeout_ms,
-                                {move, Timeout_msgtag, slide_op:get_id(NewSlideOp)}),
-    OtherSlideType = case slide_op:get_sendORreceive(SlideOp) of
-                         'send' -> 'rcv';
-                         'rcv'  -> 'send'
-                     end,
-    comm:send(SlOpNodePid, {move, Notify_msgtag, OtherSlideType,
-                            slide_op:get_id(SlideOp),
-                            dht_node_state:get(State, node),
-                            OtherNode, slide_op:get_target_id(SlideOp),
-                            slide_op:get_tag(SlideOp),
-                            get_max_transport_bytes()}),
-    dht_node_state:set_slide(State, PredOrSucc,
-                             slide_op:set_phase(SlideOp, NewPhase)).
 
 %% @doc Sets up a new slide operation with the node's successor or predecessor
 %%      after a request for a slide has been received.
@@ -482,7 +454,7 @@ setup_slide_with2_not_found(State, Type, MoveFullId,
                     % TODO: integrate jump - send data to successor (andalso predecessor?) and afterwards, leave!
                     SlideOp = slide_op:new_sending_slide_leave(
                                 MoveFullId, leave, State),
-                    notify_other_slide(succ, SlideOp, State);
+                    notify_other_slide(SlideOp, State);
                 _ ->
                     TargetIdInRange = dht_node_state:is_responsible(TargetId, State),
                     SlideOp = slide_op:new_slide(MoveFullId, Type, TargetId, Tag, SourcePid, State),
@@ -492,11 +464,11 @@ setup_slide_with2_not_found(State, Type, MoveFullId,
                             % slide with pred, send data
                             State1 = dht_node_state:add_db_range(
                                        State, slide_op:get_interval(SlideOp)),
-                            notify_other_slide(pred, SlideOp, State1);
+                            notify_other_slide(SlideOp, State1);
                         'send' when TargetIdInRange andalso PredOrSucc =:= succ ->
                             % slide with succ, send data
                             case First of
-                                true -> notify_other_slide(succ, SlideOp, State);
+                                true -> notify_other_slide(SlideOp, State);
                                 _    ->
                                     State1 = dht_node_state:add_db_range(
                                                State, slide_op:get_interval(SlideOp)),
@@ -509,11 +481,11 @@ setup_slide_with2_not_found(State, Type, MoveFullId,
                             State1 = dht_node_state:add_msg_fwd(
                                        State, slide_op:get_interval(SlideOp),
                                        slide_op:get_node(SlideOp)),
-                            notify_other_slide(pred, SlideOp, State1);
+                            notify_other_slide(SlideOp, State1);
                         'rcv' when PredOrSucc =:= succ ->
                             % slide with succ, receive data
                             case First of
-                                true -> notify_other_slide(succ, SlideOp, State);
+                                true -> notify_other_slide(SlideOp, State);
                                 _    ->
                                     State1 = dht_node_state:add_msg_fwd(
                                                State, slide_op:get_interval(SlideOp),
