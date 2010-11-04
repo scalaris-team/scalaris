@@ -22,7 +22,7 @@
 
 -export([new_slide/6,
          new_receiving_slide_join/5, new_sending_slide_join/4,
-         new_sending_slide_leave/3,
+         new_sending_slide_leave/3, new_sending_slide_jump/4,
          other_type_to_my_type/1,
          is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1,
          get_id/1, get_node/1, get_interval/1, get_target_id/1,
@@ -30,7 +30,8 @@
          get_predORsucc/1,
          get_timer/1, set_timer/3, reset_timer/1,
          get_timeouts/1, inc_timeouts/1, reset_timeouts/1,
-         get_phase/1, set_phase/2]).
+         get_phase/1, set_phase/2,
+         get_next_op/1]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -55,6 +56,13 @@
         wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
         wait_for_data | wait_for_delta. % receiving node
 
+-type next_op() ::
+        {join, Id::?RT:key()} |
+        {slide, pred | succ, Id::?RT:key()} |
+        {jump, Id::?RT:key()} |
+        {leave} |
+        {none}.
+
 -record(slide_op, {type       = ?required(slide_op, type)      :: type(),
                    id         = ?required(slide_op, id)        :: id(),
                    node       = ?required(slide_op, node)      :: comm:mypid(), % the node, data is sent to/received from
@@ -64,7 +72,8 @@
                    source_pid = null          :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
                    timer      = {null, nomsg} :: {reference(), comm:message()} | {null, nomsg}, % timeout timer
                    timeouts   = 0             :: non_neg_integer(),
-                   phase      = null          :: phase()
+                   phase      = null          :: phase(),
+                   next_op    = {none}          :: next_op()
                   }).
 -opaque slide_op() :: #slide_op{}.
 
@@ -139,8 +148,8 @@ new_sending_slide_join(MoveId, JoiningNode, Tag, State) ->
               tag = Tag,
               source_pid = null}.
 
-%% @doc Sets up a new slide operation for a node which sends a joining node
-%%      some of its data.
+%% @doc Sets up a new slide operation for a node which is about to leave its
+%%      position in the ring and transfer its data to its successor.
 -spec new_sending_slide_leave(MoveId::id(), Tag::any(), State::dht_node_state:state()) -> slide_op().
 new_sending_slide_leave(MoveId, Tag, State) ->
     IntervalToSend = dht_node_state:get(State, my_range),
@@ -152,6 +161,22 @@ new_sending_slide_leave(MoveId, Tag, State) ->
               target_id = dht_node_state:get(State, pred_id),
               tag = Tag,
               source_pid = null}.
+
+%% @doc Sets up a new slide operation for a node which is about to leave its
+%%      position in the ring, transfer its data to its successor and afterwards
+%%      join somewhere else.
+-spec new_sending_slide_jump(MoveId::id(), TargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
+new_sending_slide_jump(MoveId, TargetId, Tag, State) ->
+    IntervalToSend = dht_node_state:get(State, my_range),
+    TargetNodePid = dht_node_state:get(State, succ_pid),
+    #slide_op{type = {jump, 'send'},
+              id = MoveId,
+              node = TargetNodePid,
+              interval = IntervalToSend,
+              target_id = dht_node_state:get(State, pred_id),
+              tag = Tag,
+              source_pid = null,
+              next_op = {join, TargetId}}.
 
 %% @doc Returns the id of a receiving or sending slide operation.
 -spec get_id(SlideOp::slide_op()) -> id().
@@ -312,3 +337,6 @@ get_phase(#slide_op{phase=Phase}) -> Phase.
 -spec set_phase(SlideOp::slide_op(), NewPhase::phase()) -> slide_op().
 set_phase(SlideOp, NewPhase) ->
     SlideOp#slide_op{phase = NewPhase}.
+
+-spec get_next_op(SlideOp::slide_op()) -> next_op().
+get_next_op(#slide_op{next_op=Op}) -> Op.

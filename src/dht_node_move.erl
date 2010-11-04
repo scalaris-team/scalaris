@@ -58,7 +58,7 @@
 
 -type move_message() ::
     {move, start_slide, pred | succ, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
-    {move, jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
+    {move, start_jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
     {move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportBytes::pos_integer()} |
     {move, slide_abort, pred | succ, MoveFullId::slide_op:id(), Reason::abort_reason()} |
     {move, node_update, NewNode::node:node_type()} |
@@ -83,7 +83,7 @@
 process_move_msg({move, start_slide, PredOrSucc, TargetId, Tag, SourcePid}, State) ->
     make_slide(State, PredOrSucc, TargetId, Tag, SourcePid);
 
-process_move_msg({move, jump, TargetId, Tag, SourcePid}, State) ->
+process_move_msg({move, start_jump, TargetId, Tag, SourcePid}, State) ->
     make_jump(State, TargetId, Tag, SourcePid);
 
 process_move_msg({move, notify_succ_timeout, MoveFullId}, MyState) ->
@@ -118,7 +118,7 @@ process_move_msg({move, notify_pred_timeout, MoveFullId}, MyState) ->
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_req_data, wait_for_data], pred, notify_pred_timeout);
 
-% notification from predecessor that it wants to slide with our node
+% notification from predecessor/successor that it wants to slide with our node
 process_move_msg({move, slide, OtherType, MoveFullId, OtherNode,
                   OtherTargetNode, TargetId, Tag, MaxTransportBytes}, State) ->
     setup_slide_with(State, slide_op:other_type_to_my_type(OtherType), MoveFullId,
@@ -313,17 +313,7 @@ process_move_msg({move, delta_ack, MoveFullId}, MyState) ->
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
                 SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
-                notify_source_pid(slide_op:get_source_pid(SlideOp1),
-                                  {move, result, slide_op:get_tag(SlideOp1), ok}),
-                case slide_op:is_leave(SlideOp1) of
-                    true ->
-                        SupDhtNodeId = erlang:get(my_sup_dht_node_id),
-                        ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
-                        ok = supervisor:delete_child(main_sup, SupDhtNodeId),
-                        kill;
-                    _    ->
-                        dht_node_state:set_slide(State, PredOrSucc, null)
-                end
+                finish_delta_ack(State, PredOrSucc, SlideOp1)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, wait_for_delta_ack, both, delta_ack).
 
@@ -451,10 +441,35 @@ setup_slide_with2_not_found(State, Type, MoveFullId,
                     % graceful leave (slide with succ, send all data)
                     % note: may also be a jump operation!
                     % TODO: check for running slide, abort it if possible, eventually extend it
-                    % TODO: integrate jump - send data to successor (andalso predecessor?) and afterwards, leave!
-                    SlideOp = slide_op:new_sending_slide_leave(
-                                MoveFullId, leave, State),
-                    notify_other_slide(SlideOp, State);
+                    % TODO(jump): notify node jumping to (?)
+                    case slide_op:is_jump(Type) of
+                        true ->
+                            case dht_node_state:is_responsible(TargetId, State) orelse
+                                     intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
+                                true ->
+                                    % note: we could optimize here and not undergo all the checks again,
+                                    % but this should not be a common case!
+                                    % also: already checked in make_jump
+                                    % (this is for the case when a message with the slide request is received which doesn't go through make_jump)
+                                    make_slide(State, succ, TargetId, Tag, SourcePid);
+                                _ ->
+                                    case dht_node_state:get(State, slide_succ) =/= null andalso
+                                             dht_node_state:get(State, slide_pred) =/= null of
+                                        true ->
+                                            SlideOp = slide_op:new_sending_slide_jump(
+                                                        MoveFullId, TargetId, Tag, State),
+                                            notify_other_slide(SlideOp, State);
+                                        _ ->
+                                            notify_source_pid(SourcePid,
+                                                              {move, result, Tag, ongoing_slide}),
+                                            State
+                                    end
+                            end;
+                        _    ->
+                            SlideOp = slide_op:new_sending_slide_leave(
+                                        MoveFullId, leave, State),
+                            notify_other_slide(SlideOp, State)
+                    end;
                 _ ->
                     TargetIdInRange = dht_node_state:is_responsible(TargetId, State),
                     SlideOp = slide_op:new_slide(MoveFullId, Type, TargetId, Tag, SourcePid, State),
@@ -631,6 +646,44 @@ accept_delta(State, PredOrSucc, SlideOp, ChangedData, DeletedKeys) ->
                       {move, result, slide_op:get_tag(SlideOp), ok}),
     dht_node_state:set_slide(State2, PredOrSucc, null).
 
+-spec finish_delta_ack(State::dht_node_state:state(), PredOrSucc::pred | succ,
+                       SlideOp::slide_op:slide_op()) -> dht_node_state:state().
+finish_delta_ack(State, PredOrSucc, SlideOp) ->
+    notify_source_pid(slide_op:get_source_pid(SlideOp),
+                      {move, result, slide_op:get_tag(SlideOp), ok}),
+    case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
+        true ->
+            SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+            ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
+            ok = supervisor:delete_child(main_sup, SupDhtNodeId),
+            kill;
+        _    ->
+            State1 = dht_node_state:set_slide(State, PredOrSucc, null),
+            % continue with the next planned operation:
+            case slide_op:get_next_op(SlideOp) of
+                {none} -> State1;
+                {join, NewTargetId} ->
+                    OldIdVersion = node:id_version(dht_node_state:get(State1, node)),
+                    idholder:set_id(NewTargetId, OldIdVersion + 1),
+                    idholder:get_id(),
+                    {join, {phase1}, msg_queue:new()};
+                {slide, pred, NewTargetId} ->
+                    make_slide(State1, pred, NewTargetId,
+                               slide_op:get_tag(SlideOp),
+                               slide_op:get_source_pid(SlideOp));
+                {slide, succ, NewTargetId} ->
+                    make_slide(State1, succ, NewTargetId,
+                               slide_op:get_tag(SlideOp),
+                               slide_op:get_source_pid(SlideOp));
+                {jump, NewTargetId} ->
+                    make_jump(State1, NewTargetId,
+                              slide_op:get_tag(SlideOp),
+                              slide_op:get_source_pid(SlideOp));
+                {leave} ->
+                    make_slide_leave(State1)
+            end
+    end.
+
 %% @doc Checks if a slide operation with the given MoveFullId exists and
 %%      executes WorkerFun if everything is ok. If the successor/predecessor
 %%      information in the slide operation is incorrect, the slide is aborted
@@ -800,32 +853,25 @@ abort_slide(State, Node, SlideOpId, Phase, SourcePid, Tag, Type, Reason, NotifyN
         Tag::any(), SourcePid::comm:erl_local_pid() | null) -> dht_node_state:state().
 make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
     % slide with PredOrSucc possible? if so, receive or send data?
-    {IsCorrectSlide, SendOrReceive} =
+    SendOrReceive =
         case PredOrSucc of
             succ ->
                 case intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
-                    true -> {true, 'rcv'};
-                    _    -> {dht_node_state:is_responsible(TargetId, State), 'send'}
+                    true -> 'rcv';
+                    _    -> 'send'
                 end;
             pred ->
                 case dht_node_state:is_responsible(TargetId, State) of
-                    true -> {true, 'rcv'};
-                    _    -> {true, 'send'}
+                    true -> 'rcv';
+                    _    -> 'send'
                 end
         end,
-    if
-        IsCorrectSlide ->
-            MoveFullId = util:get_global_uid(),
-            MyNode = dht_node_state:get(State, node),
-            TargetNode = dht_node_state:get(State, PredOrSucc),
-            setup_slide_with(State, {slide, PredOrSucc, SendOrReceive},
-                             MoveFullId, MyNode, TargetNode, TargetId, Tag,
-                             get_max_transport_bytes(), SourcePid, true);
-        true ->
-            notify_source_pid(SourcePid,
-                              {move, result, Tag, wrong_pred_succ_node}),
-            State
-    end.
+    MoveFullId = util:get_global_uid(),
+    MyNode = dht_node_state:get(State, node),
+    TargetNode = dht_node_state:get(State, PredOrSucc),
+    setup_slide_with(State, {slide, PredOrSucc, SendOrReceive},
+                     MoveFullId, MyNode, TargetNode, TargetId, Tag,
+                     get_max_transport_bytes(), SourcePid, true).
 
 %% @doc Creates a slide with the node's predecessor. The predecessor will
 %%      change its ID to TargetId, SourcePid will be notified about the result.
@@ -834,25 +880,22 @@ make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
     -> dht_node_state:state().
 make_jump(State, TargetId, Tag, SourcePid) ->
     % check whether the operation is a slide_succ -> if so, do that instead
+    % (check here, although a check is in setup_slide_with2_not_found - this
+    % avoids going through make_slide from inside setup_slide_with2_not_found
+    % again)
     case dht_node_state:is_responsible(TargetId, State) orelse
              intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
         true ->
             make_slide(State, succ, TargetId, Tag, SourcePid);
         _ ->
-            case dht_node_state:get(State, slide_succ) =/= null andalso
-                     dht_node_state:get(State, slide_pred) =/= null of
-                true ->
-                    MoveFullId = util:get_global_uid(),
-                    MyNode = dht_node_state:get(State, node),
-                    TargetNode = dht_node_state:get(State, succ),
-                    setup_slide_with(State, {jump, 'send'},
-                                     MoveFullId, MyNode, TargetNode, TargetId, Tag,
-                                     get_max_transport_bytes(), SourcePid, true);
-                _ ->
-                    notify_source_pid(SourcePid,
-                                      {move, result, Tag, ongoing_slide}),
-                    State
-            end
+            MoveFullId = util:get_global_uid(),
+            MyNode = dht_node_state:get(State, node),
+            TargetNode = dht_node_state:get(State, succ),
+            log:log(info, "[ Node ~.0p ] starting jump (succ: ~.0p, TargetId: ~.0p)~n",
+                    [MyNode, TargetNode, TargetId]),
+            setup_slide_with(State, {jump, 'send'},
+                             MoveFullId, MyNode, TargetNode, TargetId, Tag,
+                             get_max_transport_bytes(), SourcePid, true)
     end.
 
 %% @doc Creates a slide that will move all data to the successor and leave the
