@@ -33,12 +33,12 @@
 -endif.
 
 -type req_id() :: {rdht_req_id, util:global_uid()}.
--type request() :: {atom(), ?RT:key()} | {atom(), ?RT:key(), any()} | {commit}.
+-type request() :: {rdht_tx_read, client_key()} | {rdht_tx_write, client_key(), client_value()} | {commit}.
 -type result_entry() :: any(). %% TODO: specify more strict.
 -type result() :: [ result_entry() ].
 
 -spec process_request_list(tx_tlog:tlog(), [request()]) ->
-        {tx_tlog:tlog(), any()}.
+        {tx_tlog:tlog(), {results, result()}}.
 %% single request and empty translog, done separately for optimization only
 process_request_list([], [SingleReq]) ->
     RdhtOpWithReqId = initiate_rdht_ops([{1, SingleReq}]),

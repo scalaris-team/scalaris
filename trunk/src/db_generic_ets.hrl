@@ -25,7 +25,7 @@
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
-get_entry2({DB, _CKInt, _CKDB}, Key) ->
+get_entry2_({DB, _CKInt, _CKDB}, Key) ->
 %%    Start = erlang:now(),
     Result = case ?ETS:lookup(DB, Key) of
                  [Entry] -> {true, Entry};
@@ -42,7 +42,7 @@ get_entry2({DB, _CKInt, _CKDB}, Key) ->
     Result.
 
 %% @doc Inserts a complete entry into the DB.
-set_entry(State = {DB, CKInt, CKDB}, Entry) ->
+set_entry_(State = {DB, CKInt, CKDB}, Entry) ->
     Key = db_entry:get_key(Entry),
     case intervals:in(Key, CKInt) of
         false -> ok;
@@ -53,11 +53,11 @@ set_entry(State = {DB, CKInt, CKDB}, Entry) ->
 
 %% @doc Updates an existing (!) entry in the DB.
 %%      TODO: use ets:update_element here?
-update_entry(State, Entry) ->
-    set_entry(State, Entry).
+update_entry_(State, Entry) ->
+    set_entry_(State, Entry).
 
 %% @doc Removes all values with the given entry's key from the DB.
-delete_entry(State = {DB, CKInt, CKDB}, Entry) ->
+delete_entry_(State = {DB, CKInt, CKDB}, Entry) ->
     Key = db_entry:get_key(Entry),
     case intervals:in(Key, CKInt) of
         false -> ok;
@@ -67,11 +67,11 @@ delete_entry(State = {DB, CKInt, CKDB}, Entry) ->
     State.
 
 %% @doc returns the number of stored keys
-get_load({DB, _CKInt, _CKDB}) ->
+get_load_({DB, _CKInt, _CKDB}) ->
     ?ETS:info(DB, size).
 
 %% @doc adds keys
-add_data(State = {DB, CKInt, CKDB}, Data) ->
+add_data_(State = {DB, CKInt, CKDB}, Data) ->
     case intervals:is_empty(CKInt) of
         true -> ok;
         _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
@@ -85,7 +85,7 @@ add_data(State = {DB, CKInt, CKDB}, Data) ->
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
-split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
+split_data_(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
     F = fun (DBEntry, HisList) ->
                 Key = db_entry:get_key(DBEntry),
                 case intervals:in(Key, MyNewInterval) of
@@ -103,7 +103,7 @@ split_data(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
-get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
+get_entries_({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
     F = fun (DBEntry, Data) ->
                  case FilterFun(DBEntry) of
                      true -> [ValueFun(DBEntry) | Data];
@@ -114,7 +114,7 @@ get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
-delete_entries(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+delete_entries_(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
     F = fun(DBEntry, _) ->
                 case FilterFun(DBEntry) of
                     false -> ok;
@@ -129,7 +129,6 @@ delete_entries(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun)
         end,
     ?ETS:foldl(F, ok, DB),
     State;
-delete_entries(State, Interval) ->
-    delete_entries(State, fun(E) ->
-                                  intervals:in(db_entry:get_key(E), Interval)
-                          end).
+delete_entries_(State, Interval) ->
+    delete_entries_(State,
+                    fun(E) -> intervals:in(db_entry:get_key(E), Interval) end).

@@ -54,54 +54,79 @@
           integer()    %% version
         }.
 
--type tlog() :: [tlog_entry()].
+-type tlog_t() :: [tlog_entry()].
+-opaque tlog() :: tlog_t().
+
+%% Public tlog methods:
 
 % @doc create an empty list
--spec empty() -> [].
+-spec empty() -> tlog().
 empty() -> [].
 
 -spec add_entry(tlog(), tlog_entry()) -> tlog().
 add_entry(TransLog, Entry) ->
-    [ Entry | TransLog ].
+    add_entry_(TransLog, Entry).
 
 -spec filter_by_key(tlog(), ?RT:key()) -> tlog().
 filter_by_key(TransLog, Key) ->
-    [ X || X <- TransLog, Key =:= get_entry_key(X) ].
+    filter_by_key_(TransLog, Key).
 
 -spec filter_by_status(tlog(), tx_status()) -> tlog().
 filter_by_status(TransLog, Status) ->
-    [ X || X <- TransLog, Status =:= get_entry_status(X) ].
+    filter_by_status_(TransLog, Status).
 
 -spec update_entry(tlog(), ?RT:key() | tlog_entry(), tx_op(), any()) -> tlog().
-update_entry(TransLog, {read,LogKey,LogSuccess,_,LogVers} = Element,
+update_entry(TransLog, Element, Op, Value) ->
+    update_entry_(TransLog, Element, Op, Value).
+
+%% Private tlog methods / implementations of public tlog methods:
+
+-spec add_entry_(tlog_t(), tlog_entry()) -> tlog_t().
+add_entry_(TransLog, Entry) ->
+    [ Entry | TransLog ].
+
+-spec filter_by_key_(tlog_t(), ?RT:key()) -> tlog_t().
+filter_by_key_(TransLog, Key) ->
+    [ X || X <- TransLog, Key =:= get_entry_key(X) ].
+
+-spec filter_by_status_(tlog_t(), tx_status()) -> tlog_t().
+filter_by_status_(TransLog, Status) ->
+    [ X || X <- TransLog, Status =:= get_entry_status(X) ].
+
+-spec update_entry_(tlog_t(), ?RT:key() | tlog_entry(), tx_op(), any()) -> tlog_t().
+update_entry_(TransLog, {read,LogKey,LogSuccess,_,LogVers} = Element,
              write, Value) ->
     UnchangedPart = lists:delete(Element, TransLog),
-    add_entry(UnchangedPart,
+    add_entry_(UnchangedPart,
               new_entry(write, LogKey, LogSuccess, Value, LogVers + 1));
 
-update_entry(TransLog, {write,LogKey,LogSuccess,_,LogVers} = Element,
+update_entry_(TransLog, {write,LogKey,LogSuccess,_,LogVers} = Element,
              write, Value) ->
     UnchangedPart = lists:delete(Element, TransLog),
-    add_entry(UnchangedPart,
+    add_entry_(UnchangedPart,
               new_entry(write, LogKey, LogSuccess, Value, LogVers));
 
-update_entry(TransLog, Key, write, Value) ->
-    [Element] = filter_by_key(TransLog, Key),
-    update_entry(TransLog, Element, write, Value).
+update_entry_(TransLog, Key, write, Value) ->
+    [Element] = filter_by_key_(TransLog, Key),
+    update_entry_(TransLog, Element, write, Value).
 
 
-%% Operations on Elements of TransLogs
+%% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
 new_entry(Op, Key, Status, Val, Vers) ->
 %    #tlog_entry{op = Op, key = Key, status = Status, val = Val, vers = Vers}.
     {Op, Key, Status, Val, Vers}.
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
+
 -spec get_entry_key(tlog_entry()) -> ?RT:key().
 get_entry_key(Element)       -> element(2, Element).
+
 -spec get_entry_status(tlog_entry()) -> tx_status().
 get_entry_status(Element)    -> element(3, Element).
+
 -spec get_entry_value(tlog_entry()) -> any().
 get_entry_value(Element)     -> element(4, Element).
+
 -spec get_entry_version(tlog_entry()) -> integer().
 get_entry_version(Element)   -> element(5, Element).

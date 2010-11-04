@@ -23,12 +23,15 @@
 -author('moser@zib.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
 -include("trecords.hrl").
 
 -export([write/3, read/2, write2/3, read2/2, parallel_reads/2, abort/0, 
 	 quorum_read/1, parallel_quorum_reads/2, single_write/2, 
 	 do_transaction/3, do_transaction_wo_rp/3, commit/1, jWrite/3, 
      jRead/2, jParallel_reads/2, delete/2]).
+
+-type fail_reason() :: not_found | timeout | fail | abort.
 
 %%===================================================================
 %% HOWTO do a transaction:
@@ -59,13 +62,13 @@
 %%====================================================================
 
 
-%% Use this function to do a quorum read without a commit phase
-%% returns:
-%% {Value, Version} | {fail, not_found} | {fail, timeout} | 
-%% {fail, fail} 
-%% * for {fail, fail} the reason is currently unknown, should 
-%%   not occur 
-quorum_read(Key)->
+%% @doc Performs a quorum read without a commit phase. Returns:
+%% {Value, Version} | {fail, not_found} | {fail, timeout} | {fail, fail} 
+%% -> for {fail, fail} the reason is currently unknown, should not occur 
+-spec quorum_read(Keys::[client_key()])
+        -> {client_value(), client_version()} |
+           {fail, not_found} | {fail, timeout} | {fail, fail}.
+quorum_read(Key) ->
     RTO = config:read(quorum_read_timeout),
     case pid_groups:find_a(dht_node) of
         failed -> {fail, fail};
@@ -90,9 +93,9 @@ quorum_read(Key)->
             end
     end.
 
-%% Use this function to do parallel quorum reads on a list of keys with a commit phase
--spec parallel_quorum_reads(Keys::[iodata() | integer()], Par::any()) -> {fail} | {fail, timeout} | any().
-parallel_quorum_reads(Keys, _Par)->
+%% @doc Performs parallel quorum reads on a list of keys with a commit phase.
+-spec parallel_quorum_reads(Keys::[client_key()], Par::any()) -> {fail} | {fail, timeout} | any().
+parallel_quorum_reads(Keys, _Par) ->
 %    ?TLOGN("starting quorum reads on ~p", [Keys]),
     RTO = config:read(parallel_quorum_read_timeout),
     case pid_groups:find_a(dht_node) of
@@ -108,9 +111,10 @@ parallel_quorum_reads(Keys, _Par)->
 
 %% returns:
 %% commit | userabort | {fail, not_found} | {fail, timeout} | {fail, fail} | {fail, abort}
-%% * for {fail, fail} the reason is currently unknown, should 
-%%   not occur 
-single_write(Key, Value)->
+%% -> for {fail, fail} the reason is currently unknown, should not occur
+-spec single_write(client_key(), client_value())
+        -> commit | userabort | {fail, fail_reason()}.
+single_write(Key, Value) ->
     %% ?TLOGN("starting a single write function on ~p, value ~p", [Key, Value]),
     TFun = fun(TLog)->
                    {Result, TLog2} = write(Key, Value, TLog),
@@ -123,38 +127,39 @@ single_write(Key, Value)->
     FailureFun = fun(Reason) -> {fail, Reason} end,
     do_transaction(TFun, SuccessFun, FailureFun).
 
-%% use this function to do a full transaction including a readphase
+%% @doc Performs a full transaction including a readphase.
+-spec do_transaction(TFun::fun((TLog) -> {Result::any(), TLog}),
+                           SuccessFun::fun(({Result::any(), ReadPhaseResult::any()}) -> OverallResultSucc),
+                           FailureFun::fun((Reason::fail_reason()) -> OverallResultFail))
+        -> OverallResultSucc | OverallResultFail.
 do_transaction(TFun, SuccessFun, FailureFun)->
     LocalDHTNodes = pid_groups:find_all(dht_node),
     LocalDHTNode = lists:nth(random:uniform(length(LocalDHTNodes)), LocalDHTNodes),
     LocalDHTNode ! {do_transaction, TFun, SuccessFun, FailureFun, comm:this()},
     receive
-        {trans, Message}->
-            Message
+        {trans, Message} -> Message
     end.
 
-%% Use this function to do a transaction without a read phase
+%% @doc Performs a transaction without a read phase.
 %% Thus it is necessary to provide a proper list with items for TMItems
+-spec do_transaction_wo_rp(TMItems::[any()],
+                           SuccessFun::fun(({Result::any(), ReadPhaseResult::any()}) -> OverallResultSucc),
+                           FailureFun::fun((Reason::fail_reason()) -> OverallResultFail))
+        -> OverallResultSucc | OverallResultFail.
 do_transaction_wo_rp([], _SuccessFun, _FailureFun)->
     {ok};
 do_transaction_wo_rp(TMItems, SuccessFun, FailureFun)->
     LocalDHTNode = pid_groups:find_a(dht_node),
     LocalDHTNode ! {do_transaction_wo_rp, TMItems, nil, SuccessFun, FailureFun, comm:this()},
     receive
-        {trans, Message}->
-            %% ?TLOGN(" received ~p~n", [Message]),
-            Message
+        {trans, Message} -> Message
     end.
 
-%%--------------------------------------------------------------------
-%% Function: commit(TransLog) -> {ok} | {fail, Reason}
-%% Description: Commits all operations contained in the TransLog.
-%%--------------------------------------------------------------------
-commit(TransLog)->
-    SuccessFun = fun(_) ->
-        {ok} end,
-    FailureFun = fun(X) ->
-        {fail, X} end,
+%% @doc Commits all operations contained in the TransLog.
+-spec commit(TransLog::any()) -> {ok} | {fail, fail_reason()}.
+commit(TransLog) ->
+    SuccessFun = fun(_) -> {ok} end,
+    FailureFun = fun(X) -> {fail, X} end,
     do_transaction_wo_rp(trecords:create_items(TransLog), SuccessFun, FailureFun).
 
 %%====================================================================
@@ -169,6 +174,8 @@ commit(TransLog)->
 %% Description: Needs a TransLog to collect all operations  
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
+-spec write(client_key(), client_value(), TransLog)
+        -> {{fail, not_found | timeout | fail} | ok, TransLog}.
 write(Key, Value, TransLog) ->
     transaction:write(Key, Value, TransLog).
 
@@ -180,6 +187,8 @@ write(Key, Value, TransLog) ->
 %% Description: Needs a TransLog to collect all operations  
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
+-spec read(client_key(), TransLog)
+        -> {{fail, not_found | timeout | fail} | {value, client_value()}, TransLog}.
 read(Key, TransLog)->
     TLog = transaction:read(Key, TransLog),
     case TLog of
@@ -196,22 +205,27 @@ read(Key, TransLog)->
 %% Description: Needs a TransLog to collect all operations  
 %%                  that are part of the transaction
 %%--------------------------------------------------------------------
+-spec parallel_reads([client_key()], TransLog)
+        -> {fail | [{value, client_value()}], TransLog}.
 parallel_reads(Keys, TransLog)->
     transaction:parallel_reads(Keys, TransLog).
 
 
 % @spec read2(translog(), term()) -> {term(), translog()}
 % @throws {abort, {fail, translog()}}
+-spec read2(TransLog, client_key())
+        -> {client_value(), TransLog}.
 read2(TransLog, Key) ->
     case read(Key, TransLog) of
-	{{fail, _Details}, _TransLog1} = Result ->
-	    throw({abort, Result});
-	{{value, Value}, TransLog1} ->
-	    {Value, TransLog1}
+        {{fail, _Details}, _TransLog1} = Result ->
+            throw({abort, Result});
+        {{value, Value}, TransLog1} ->
+            {Value, TransLog1}
     end.
 
 % @spec write2(translog(), term(), term()) -> translog()
 % @throws {abort, {fail, translog()}}
+-spec write2(TransLog, client_key(), client_value()) -> TransLog.
 write2(TransLog, Key, Value) ->
     case write(Key, Value, TransLog) of
 	{{fail, _Reason}, _TransLog1} = Result ->
@@ -225,16 +239,17 @@ write2(TransLog, Key, Value) ->
 %% Description: Signals a user decision to abort a transaction
 %%              PREMATURE
 %%--------------------------------------------------------------------
-abort()->
-    abort.
+-spec abort() -> abort.
+abort() -> abort.
 
 %% @doc tries to delete the given key and returns the number of 
 %%      replicas successfully deleted.
 %%      WARNING: this function can lead to inconsistencies
--spec(delete/2 :: (any(), pos_integer()) -> {ok, pos_integer(), list()} | 
-						{fail, timeout} | 
-						{fail, timeout, pos_integer(), list()} | 
-						{fail, node_not_found}).
+-spec delete(client_key(), Timeout::pos_integer())
+        -> {ok, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, timeout} |
+           {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, node_not_found}.
 delete(Key, Timeout) ->
     case pid_groups:find_a(dht_node) of
         failed ->
@@ -250,38 +265,23 @@ delete(Key, Timeout) ->
 %% transaction API - Wrapper functions to be used from the java transaction api
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% Function: jWrite(Key, Value, TransLog) -> {{fail, not_found}, TransLog} |
-%%                                          {{fail, timeout}, TransLog} |
-%%                                          {{fail, fail}, TransLog} |
-%%                                          {ok, NewTransLog} 
-%% Description: Needs a TransLog to collect all operations  
-%%                  that are part of the transaction
-%%--------------------------------------------------------------------
-jWrite(Key, Value, TransLog)->
+%% @doc Java wrapper to write/3. Needs a TransLog to collect all operations
+%%      that are part of the transaction.
+-spec jWrite(client_key(), client_value(), TransLog)
+        -> {{fail, not_found | timeout | fail} | ok, TransLog}.
+jWrite(Key, Value, TransLog) ->
     write(Key, Value, TransLog).
 
-%%--------------------------------------------------------------------
-%% Function: jRead(Key, TransLog) -> {{fail, not_found}, TransLog} |
-%%                                  {{fail, timeout}, TransLog} |
-%%                                  {{fail, fail}, TransLog} |
-%%                                  {{value, Value}, NewTransLog} 
-%% Description: Needs a TransLog to collect all operations  
-%%                  that are part of the transaction
-%%--------------------------------------------------------------------
+%% @doc Java wrapper to read/2. Needs a TransLog to collect all operations  
+%%      that are part of the transaction.
+-spec jRead(client_key(), TransLog)
+        -> {{fail, not_found | timeout | fail} | {value, client_value()}, TransLog}.
 jRead(Key, TransLog)->
     read(Key, TransLog).
 
-%%--------------------------------------------------------------------
-%% Function: jParallel_reads(Keys, TransLog) -> {fail, NewTransLog},
-%%                                   {[{value, Value}], NewTransLog} 
-%% Args: [Keys] - List with keys
-%%       TransLog
-%% Description: Needs a TransLog to collect all operations  
-%%                  that are part of the transaction
-%%--------------------------------------------------------------------
+%% @doc Java wrapper to parallel_reads/2. Needs a TransLog to collect all  
+%%      operations that are part of the transaction.
+-spec jParallel_reads([client_key()], TransLog)
+        -> {fail | [{value, client_value()}], TransLog}.
 jParallel_reads(Keys, TransLog)->
-%%     io:format("~p~n", [TransLog]),
-    A = parallel_reads(Keys, TransLog),
-%%     io:format("~p~n", [A]),
-    A.
+    parallel_reads(Keys, TransLog).

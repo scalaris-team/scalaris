@@ -415,5 +415,6 @@ is_first(Options) ->
     lists:member({first}, Options) andalso
         (util:is_unittest() orelse preconfig:get_env(first, false) =:= true).
 
+-spec is_alive(Pid::pid()) -> boolean().
 is_alive(Pid) ->
     element(1, gen_component:get_state(Pid)) =:= state.

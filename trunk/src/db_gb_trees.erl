@@ -24,7 +24,7 @@
 
 -behaviour(db_beh).
 
--opaque(db() :: {Table::gb_tree(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}).
+-type db_t() :: {Table::gb_tree(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -39,38 +39,38 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initializes a new database.
-new() ->
+new_() ->
     RandomName = randoms:getRandomId(),
     CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
     {gb_trees:empty(), intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])}.
 
 %% @doc Re-opens a previously existing database (not supported by gb_trees
 %%      -> create new DB).
-open(_FileName) ->
+open_(_FileName) ->
     log:log(warn, "[ Node ~w:db_gb_trees ] open/1 not supported, executing new/0 instead", [self()]),
     new().
 
 %% @doc Closes and deletes the DB.
-close({_DB, _CKInt, CKDB}, _Delete) ->
+close_({_DB, _CKInt, CKDB}, _Delete) ->
     ?CKETS:delete(CKDB).
 
 %% @doc Returns an empty string.
 %%      Note: should return the name of the DB for open/1 which is not
 %%      supported by gb_trees though).
-get_name(_State) ->
+get_name_(_State) ->
     "".
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
-get_entry2({DB, _CKInt, _CKDB}, Key) ->
+get_entry2_({DB, _CKInt, _CKDB}, Key) ->
     case gb_trees:lookup(Key, DB) of
         {value, Entry} -> {true, Entry};
         none           -> {false, db_entry:new(Key)}
     end.
 
 %% @doc Inserts a complete entry into the DB.
-set_entry({DB, CKInt, CKDB}, Entry) ->
+set_entry_({DB, CKInt, CKDB}, Entry) ->
     Key = db_entry:get_key(Entry),
     case intervals:in(Key, CKInt) of
         false -> ok;
@@ -79,7 +79,7 @@ set_entry({DB, CKInt, CKDB}, Entry) ->
     {gb_trees:enter(Key, Entry, DB), CKInt, CKDB}.
 
 %% @doc Updates an existing (!) entry in the DB.
-update_entry({DB, CKInt, CKDB}, Entry) ->
+update_entry_({DB, CKInt, CKDB}, Entry) ->
     Key = db_entry:get_key(Entry),
     case intervals:in(Key, CKInt) of
         false -> ok;
@@ -88,7 +88,7 @@ update_entry({DB, CKInt, CKDB}, Entry) ->
     {gb_trees:update(Key, Entry, DB), CKInt, CKDB}.
 
 %% @doc Removes all values with the given entry's key from the DB.
-delete_entry({DB, CKInt, CKDB}, Entry) ->
+delete_entry_({DB, CKInt, CKDB}, Entry) ->
     Key = db_entry:get_key(Entry),
     case intervals:in(Key, CKInt) of
         false -> ok;
@@ -97,11 +97,11 @@ delete_entry({DB, CKInt, CKDB}, Entry) ->
     {gb_trees:delete_any(Key, DB), CKInt, CKDB}.
 
 %% @doc Returns the number of stored keys.
-get_load({DB, _CKInt, _CKDB}) ->
+get_load_({DB, _CKInt, _CKDB}) ->
     gb_trees:size(DB).
 
 %% @doc Adds all db_entry objects in the Data list.
-add_data({DB, CKInt, CKDB}, Data) ->
+add_data_({DB, CKInt, CKDB}, Data) ->
     % check once for the 'common case'
     case intervals:is_empty(CKInt) of
         true -> ok;
@@ -120,7 +120,7 @@ add_data({DB, CKInt, CKDB}, Data) ->
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
-split_data({DB, CKInt, CKDB}, MyNewInterval) ->
+split_data_({DB, CKInt, CKDB}, MyNewInterval) ->
     % depending on the number of removed entries, a complete re-construction of
     % the tree using gb_trees:from_orddict could be faster than continuously
     % deleting entries - we do not know this beforehand though
@@ -142,7 +142,7 @@ split_data({DB, CKInt, CKDB}, MyNewInterval) ->
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
-get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
+get_entries_({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
     F = fun(_Key, DBEntry, Data) ->
                 case FilterFun(DBEntry) of
                     true -> [ValueFun(DBEntry) | Data];
@@ -153,7 +153,7 @@ get_entries({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
-delete_entries({DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+delete_entries_({DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
     % depending on the number of removed entries, a complete re-construction of
     % the tree using gb_trees:from_orddict could be faster than continuously
     % deleting entries - we do not know this beforehand though
@@ -171,11 +171,12 @@ delete_entries({DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
         end,
     NewDB = lists:foldr(F, DB, gb_trees:values(DB)),
     {NewDB, CKInt, CKDB};
-delete_entries(State, Interval) ->
-    delete_entries(State, fun(E) ->
-                                  intervals:in(db_entry:get_key(E), Interval)
-                          end).
+delete_entries_(State, Interval) ->
+    delete_entries_(State,
+                    fun(E) ->
+                            intervals:in(db_entry:get_key(E), Interval)
+                    end).
 
 %% @doc Returns all DB entries.
-get_data({DB, _CKInt, _CKDB}) ->
+get_data_({DB, _CKInt, _CKDB}) ->
     gb_trees:values(DB).
