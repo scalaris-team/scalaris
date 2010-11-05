@@ -700,8 +700,8 @@ calc_initial_avg_kr(Pred, Me) ->
     % -> try it and if it fails, return unknown
     try
         if
-            PredKey =:= MyKey -> ?RT:n(); % I am the only node
-            MyKey >= PredKey  -> MyKey - PredKey;
+            PredKey == MyKey -> ?RT:n(); % I am the only node
+            MyKey > PredKey  -> MyKey - PredKey;
             MyKey < PredKey   -> (?RT:n() - PredKey - 1) + MyKey
         end
     catch % keys might not support subtraction or ?RT:n() might throw
