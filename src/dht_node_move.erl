@@ -821,10 +821,14 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
                   NotifyNode::boolean()) -> dht_node_state:state().
 abort_slide(State, Node, SlideOpId, Phase, SourcePid, Tag, Type, Reason, NotifyNode) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
+    PredOrSuccOther = case PredOrSucc of
+                          pred -> succ;
+                          succ -> pred
+                      end,
     % abort slide on the (other) node:
     case NotifyNode of
         true ->
-            comm:send(Node, {move, slide_abort, PredOrSucc, SlideOpId, Reason});
+            comm:send(Node, {move, slide_abort, PredOrSuccOther, SlideOpId, Reason});
         _ -> ok
     end,
     notify_source_pid(SourcePid, {move, result, Tag, Reason}),
@@ -862,8 +866,8 @@ make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
                 end;
             pred ->
                 case dht_node_state:is_responsible(TargetId, State) of
-                    true -> 'rcv';
-                    _    -> 'send'
+                    true -> 'send';
+                    _    -> 'rcv'
                 end
         end,
     MoveFullId = util:get_global_uid(),
