@@ -19,7 +19,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([add_node/1, add_node_at_id/1, add_nodes/1, del_nodes/1,
+-export([add_node/1, add_node_at_id/1, add_nodes/1, del_nodes/1, del_nodes/2,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/3, print_ages/0,
          check_routing_tables/1, dd_check_ring/1,dd_check_ring/0,
@@ -60,23 +60,40 @@ add_nodes(Count) ->
 %%      detects them by their random names (which is a list).
 %%      Beware: Other processes in main_sup must not be started with
 %%      a list as their name!
--spec del_nodes(integer()) -> ok.
-del_nodes(0) -> ok;
-del_nodes(Count) ->
-    del_single_node(supervisor:which_children(main_sup)),
-    del_nodes(Count - 1).
+%%      Provided for convenience and backwards-compatibility - kills the node,
+%%      i.e. _no_ graceful leave !
+-spec del_nodes(Count::integer()) -> ok.
+del_nodes(Count) -> del_nodes(Count, false).
+
+%% @doc Deletes nodes started with add_nodes();
+%%      detects them by their random names (which is a list).
+%%      Beware: Other processes in main_sup must not be started with
+%%      a list as their name!
+-spec del_nodes(Count::integer(), Graceful::boolean()) -> ok.
+del_nodes(0, _Graceful) -> ok;
+del_nodes(Count, Graceful) ->
+    del_single_node(supervisor:which_children(main_sup), Graceful),
+    del_nodes(Count - 1, Graceful).
 
 %% @doc Delete a single node if its Id, i.e. name, is a list.
 -spec del_single_node([{Id::term() | undefined, Child::pid() | undefined,
-                        Type::worker | supervisor, Modules::[module()] | dynamic}]) -> ok.
-del_single_node([]) ->
+                        Type::worker | supervisor, Modules::[module()] | dynamic}],
+                      Graceful::boolean()) -> ok.
+del_single_node([], _Graceful) ->
     ok;
-del_single_node([{Key, _, _, _} | T]) ->
+del_single_node([{Key, Pid, _, _} | T], Graceful) ->
     case is_list(Key) of
         true ->
-            supervisor:terminate_child(main_sup, Key),
-            supervisor:delete_child(main_sup, Key);
-        _ -> del_single_node(T)
+            case Graceful of
+                true ->
+                    Group = pid_groups:group_of(Pid),
+                    DhtNode = pid_groups:pid_of(Group, dht_node),
+                    comm:send_local(DhtNode, {leave});
+                false ->
+                    supervisor:terminate_child(main_sup, Key),
+                    supervisor:delete_child(main_sup, Key)
+            end;
+        _ -> del_single_node(T, Graceful)
     end.
 
 %% @doc Contact boot server and check that each node's successor is correct.
