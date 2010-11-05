@@ -27,6 +27,7 @@
 -export([check_config/0]).
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -ifdef(with_export_type_support).
 -export_type([req_id/0, request/0, result_entry/0, result/0]).

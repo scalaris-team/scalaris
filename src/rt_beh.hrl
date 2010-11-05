@@ -22,6 +22,8 @@
 -opaque rt()::rt_t().
 -type external_rt()::external_rt_t(). %% @todo: make opaque
 
+-include("client_types.hrl").
+
 -ifdef(with_export_type_support).
 -export_type([key/0, rt/0, custom_message/0, external_rt/0]).
 -endif.

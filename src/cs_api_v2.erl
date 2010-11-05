@@ -24,6 +24,7 @@
          test_and_set/3, range_read/2]).
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 % Public Interface
 
