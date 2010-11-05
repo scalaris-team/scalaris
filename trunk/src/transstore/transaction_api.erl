@@ -24,6 +24,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 -include("trecords.hrl").
 
 -export([write/3, read/2, write2/3, read2/2, parallel_reads/2, abort/0, 
