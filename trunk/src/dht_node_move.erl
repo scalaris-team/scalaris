@@ -782,9 +782,9 @@ can_slide_pred(State, TargetId, _Type) ->
 %% @doc Sends the source pid the given message if it is not 'null'.
 -spec notify_source_pid(SourcePid::comm:erl_local_pid() | null, Message::result_message()) -> ok.
 notify_source_pid(SourcePid, Message) ->
-    case comm:is_valid(SourcePid) of
-        true -> comm:send_local(SourcePid, Message);
-        _    -> ok
+    case SourcePid of
+        null -> ok;
+        _ -> comm:send_local(SourcePid, Message)
     end.
 
 %% @doc Aborts the given slide operation. Pred_or_Succ determines whether the
