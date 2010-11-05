@@ -22,7 +22,6 @@
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
--include("rt_beh.hrl").
 
 %% userdevguide-begin rt_simple:types
 -type key_t() :: non_neg_integer().
@@ -30,6 +29,10 @@
 -type external_rt_t() :: Succ::node:node_type().
 -type custom_message() :: none().
 %% userdevguide-end rt_simple:types
+
+% Note: must include rt_beh.hrl AFTER the type definitions for erlang < R13B04
+% to work.
+-include("rt_beh.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling

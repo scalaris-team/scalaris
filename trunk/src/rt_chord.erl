@@ -22,7 +22,6 @@
 
 -behaviour(rt_beh).
 -include("scalaris.hrl").
--include("rt_beh.hrl").
 
 %% userdevguide-begin rt_chord:types
 -type key_t() :: non_neg_integer().
@@ -33,6 +32,10 @@
        {rt_get_node, Source_PID::comm:mypid(), Index::index()} |
        {rt_get_node_response, Index::index(), Node::node:node_type()}.
 %% userdevguide-end rt_chord:types
+
+% Note: must include rt_beh.hrl AFTER the type definitions for erlang < R13B04
+% to work.
+-include("rt_beh.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling
