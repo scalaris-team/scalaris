@@ -142,7 +142,10 @@ on({rm_buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
     OtherNodeId = node:id(OtherNode),
     OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
     OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
-    NeighborsToSendTmp = nodelist:mk_neighborhood(MyView, OtherNode,
+    % note: the rm_buffer message, esp. OtherNode, might already be outdated
+    % and our own view may contain a newer version of the node
+    {[OtherNodeUpd], MyViewUpd} = nodelist:lupdate_ids([OtherNode], MyView),
+    NeighborsToSendTmp = nodelist:mk_neighborhood(MyViewUpd, OtherNodeUpd,
                                                   get_pred_list_length(),
                                                   get_succ_list_length()),
     NeighborsToSend =
