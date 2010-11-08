@@ -98,15 +98,31 @@ on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
     %% inform callback on commit/abort to release locks etc.
     % get own proposal for lock release
     TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
-    {PaxosId, Proposal} = pdb:get(PaxosId, TP_DB),
-
-    NewDB = update_db_or_forward(RTLogEntry, Result, Proposal, DHT_Node_State),
-
-    %% delete corresponding proposer state
-    Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
-    proposer:stop_paxosids(Proposer, [PaxosId]),
-    pdb:delete(PaxosId, TP_DB),
-    dht_node_state:set_db(DHT_Node_State, NewDB).
+    case pdb:get(PaxosId, TP_DB) of
+        {PaxosId, Proposal} ->
+            NewDB = update_db_or_forward(RTLogEntry, Result, Proposal, DHT_Node_State),
+            %% delete corresponding proposer state
+            Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
+            proposer:stop_paxosids(Proposer, [PaxosId]),
+            pdb:delete(PaxosId, TP_DB),
+            dht_node_state:set_db(DHT_Node_State, NewDB);
+        undefined ->
+            %% delay or forward commit until corresponding validate seen
+            Key = tx_tlog:get_entry_key(RTLogEntry),
+            case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
+                true ->
+                    %% we are not in a hurry, tx is already commited and we are the slow minority
+                    msg_delay:send_local(
+                      1, self(), {tx_tm_rtm_commit_reply,
+                                  {PaxosId, RTLogEntry}, Result});
+                false ->
+                    % we don't have an own proposal yet (no validate seen), so we forward msg as is.
+                    dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
+                                               {tx_tm_rtm_commit_reply, {PaxosId, RTLogEntry},
+                                                Result})
+            end,
+            DHT_Node_State
+    end.
 
 -spec on_tx_commitreply_fwd(tx_tlog:tlog_entry(),
                             commit | abort, commit | abort,
