@@ -1426,7 +1426,7 @@ calls itself using tail-recursion in each branch. The loop works on a
 
 \section{Starting additional local nodes after boot}
 \label{sec:start-addit-local}
-\svnrev{r1093}
+\svnrev{r1253}
 
 After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
@@ -1571,10 +1571,6 @@ and-supervisor. When the supervisor restarts both processes, they will
 retrieve the new position in the ring from the idholder and join the ring
 there.
 
-\todo{The supervisor was configured to restart a node at most 10 times. Does
-  that mean, that a node can only change its position in the ring 10 times
-  (caused by load-balancing)?}
-
 \subsection{Actually joining the ring}
 
 After retrieving its identifier, the node starts the join protocol
@@ -1631,7 +1627,7 @@ message is received from the old node are to initialize the
 maintenance components for the ring and routing table, the database
 and the state of the \code{dht_node}.
 The \erlfun{cs\_replica\_stabilization}{recreate\_replicas}{/1} function is
-called, which is not yet implemented. It would recreat necessary replicas
+called, which is not yet implemented. It would recreate necessary replicas
 that were lost due to load-balancing, node failures and lost updates during
 the data transfer.
 
