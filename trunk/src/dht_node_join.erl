@@ -35,9 +35,9 @@
     {join, get_node, Source_PID::comm:mypid(), Key::?RT:key()} |
     {join, get_node_response, Key::?RT:key(), Succ::node:node_type()} |
     {join, join_response, Pred::node:node_type(), MoveFullId::slide_op:id()} |
-    {join, join_response, not_responsible} |
+    {join, join_response, not_responsible, Node::node:node_type()} |
     {join, join_response_timeout, NewPred::node:node_type(), MoveFullId::slide_op:id()} |
-    {join, lookup_timeout} |
+    {join, lookup_timeout, Node::node:node_type()} |
     {join, known_hosts_timeout} |
     {join, timeout}).
 
@@ -57,7 +57,8 @@ process_join_state({idholder_get_id_response, Id, IdVersion},
                    {join, {as_first}, QueuedMessages}) ->
     log:log(info, "[ Node ~w ] joining as first: ~p",[self(), Id]),
     Me = node:new(comm:this(), Id, IdVersion),
-    finish_join(Me, Me, Me, ?DB:new(), QueuedMessages);  % join complete, State is the first "State"
+    % join complete, State is the first "State"
+    finish_join(Me, Me, Me, ?DB:new(), QueuedMessages);
 %% userdevguide-end dht_node_join:join_first
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -101,16 +102,17 @@ process_join_state({get_dht_nodes_response, Nodes = [_|_]},
 % 3. lookup my position
 process_join_state({get_dht_nodes_response, Nodes = [_|_]},
                    {join, {phase3, Id, IdVersion, ContactNodes}, QueuedMessages}) ->
-    % although in phase3, collect further nodes to contact (messages have been send anyway):
+    % although in phase3, collect further nodes to contact
+    % (messages have been send anyway):
     FurtherNodes = [Node || Node <- Nodes, Node =/= comm:this()],
-    {join, {phase3, Id, IdVersion, lists:append(ContactNodes, FurtherNodes)}, QueuedMessages};
+    {join, {phase3, Id, IdVersion, lists:append(ContactNodes, FurtherNodes)},
+     QueuedMessages};
 
-process_join_state({join, lookup_timeout},
-                   {join, {phase3, Id, IdVersion, []}, QueuedMessages}) ->
+process_join_state({join, lookup_timeout, Node},
+                   {join, {phase3, Id, IdVersion, ContactNodes}, QueuedMessages}) ->
     %io:format("p3: lookup_timeout~n"),
-    % no more nodes left, go back to step 2
-    get_known_nodes(),
-    {join, {phase2, Id, IdVersion}, QueuedMessages};
+    lookup(Id, IdVersion, QueuedMessages,
+           [N || N <- ContactNodes, not node:same_process(N, Node)]);
 
 process_join_state({join, get_node_response, Id, Succ},
                    {join, {phase3, Id, IdVersion, ContactNodes}, QueuedMessages}) ->
@@ -118,8 +120,8 @@ process_join_state({join, get_node_response, Id, Succ},
     % got my successor
     case Id =:= node:id(Succ) of
         true ->
-            log:log(warn, "[ Node ~w ] chosen ID already exists, trying a new ID (~w retries)",
-                    [self(), IdVersion]),
+            log:log(warn, "[ Node ~w ] chosen ID already exists, trying a "
+                   "new ID (~w retries)", [self(), IdVersion]),
             try_new_id(IdVersion, QueuedMessages, ContactNodes);
         _ ->
             Me = node:new(comm:this(), Id, IdVersion),
@@ -132,7 +134,8 @@ process_join_state({join, get_node_response, Id, Succ},
 % 4. joining my neighbor
 process_join_state({get_dht_nodes_response, Nodes = [_|_]},
                    {join, {phase4, ContactNodes, Succ, Me}, QueuedMessages}) ->
-    % although in phase4, collect further nodes to contact (messages have been send anyway):
+    % although in phase4, collect further nodes to contact
+    % (messages have been send anyway):
     FurtherNodes = [Node || Node <- Nodes, Node =/= comm:this()],
     {join, {phase4, lists:append(ContactNodes, FurtherNodes), Succ, Me}, QueuedMessages};
 
@@ -144,16 +147,18 @@ process_join_state({join, join_request_timeout, Timeouts},
             State;
         _ ->
             % no response from responsible node -> select new Id and try again
-            log:log(warn, "[ Node ~w ] no response on join request for the chosen ID ~w, trying a new ID (~w retries)",
+            log:log(warn, "[ Node ~w ] no response on join request for the "
+                   "chosen ID ~w, trying a new ID (~w retries)",
                     [self(), node:id(Me), node:id_version(Me)]),
             try_new_id(node:id_version(Me), QueuedMessages, ContactNodes)
     end;
 
-process_join_state({join, join_response, not_responsible},
+process_join_state({join, join_response, not_responsible, Node},
                    {join, {phase4, ContactNodes, _Succ, Me}, QueuedMessages}) ->
     % the node we contacted is not responsible for our key (anymore)
     % -> start a new lookup (back to phase 3)
-    lookup(node:id(Me), node:id_version(Me), QueuedMessages, ContactNodes);
+    lookup(node:id(Me), node:id_version(Me), QueuedMessages,
+           [N || N <- ContactNodes, not node:same_process(N, Node)]);
 
 process_join_state({join, join_response, Pred, MoveId},
                    {join, {phase4, ContactNodes, Succ, Me}, QueuedMessages}) ->
@@ -161,8 +166,8 @@ process_join_state({join, join_response, Pred, MoveId},
     MyKey = node:id(Me),
     case MyKey =:= node:id(Succ) orelse MyKey =:= node:id(Pred) of
         true ->
-            log:log(warn, "[ Node ~w ] chosen ID already exists, trying a new ID (~w retries)",
-                    [self(), node:id_version(Me)]),
+            log:log(warn, "[ Node ~w ] chosen ID already exists, trying a "
+                   "new ID (~w retries)", [self(), node:id_version(Me)]),
             try_new_id(node:id_version(Me), QueuedMessages, ContactNodes);
         _ ->
             log:log(info, "[ Node ~w ] joined between ~w and ~w", [self(), Pred, Succ]),
@@ -185,11 +190,11 @@ process_join_state({join, join_response, Pred, MoveId},
 % phase has already been started
 process_join_state({join, known_hosts_timeout}, State) -> State;
 process_join_state({get_dht_nodes_response, _KnownHosts}, State) -> State;
-process_join_state({join, lookup_timeout}, State) -> State;
+process_join_state({join, lookup_timeout, _Node}, State) -> State;
 process_join_state({join, get_node_response, _KnownHosts}, State) -> State;
 process_join_state({join, join_request_timeout, _Timeouts}, State) -> State;
 process_join_state({join, join_response, _Pred, _MoveId}, State) -> State;
-process_join_state({join, join_response, not_responsible}, State) -> State;
+%% process_join_state({join, join_response, not_responsible, _Node}, State) -> State;
 
 % a join timeout message re-starts the complete join
 process_join_state({join, timeout},
@@ -219,7 +224,8 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
     TargetId = node:id(NewPred),
     % only reply to join request with keys in our range:
     KeyInRange = dht_node_state:is_responsible(node:id(NewPred), State),
-    case KeyInRange andalso dht_node_move:can_slide_pred(State, TargetId, {join, 'rcv'}) of
+    case KeyInRange andalso
+             dht_node_move:can_slide_pred(State, TargetId, {join, 'rcv'}) of
         true ->
             % TODO: implement step-wise join
             MoveFullId = util:get_global_uid(),
@@ -232,7 +238,8 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
                        State, slide_op:get_interval(SlideOp1)),
             send_join_response(State1, SlideOp1, NewPred);
         _ when not KeyInRange ->
-            comm:send(node:pidX(NewPred), {join, join_response, not_responsible}),
+            comm:send(node:pidX(NewPred), {join, join_response, not_responsible,
+                                           dht_node_state:get(State, node)}),
             State;
         _ -> State
     end;
@@ -266,11 +273,11 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
 %% userdevguide-end dht_node_join:join_request1
 process_join_msg({join, known_hosts_timeout}, State) -> State;
 process_join_msg({get_dht_nodes_response, _KnownHosts}, State) -> State;
-process_join_msg({join, lookup_timeout}, State) -> State;
+process_join_msg({join, lookup_timeout, _Node}, State) -> State;
 process_join_msg({join, get_node_response, _KnownHosts}, State) -> State;
 process_join_msg({join, join_request_timeout, _Timeouts}, State) -> State;
 process_join_msg({join, join_response, _Pred, _MoveId}, State) -> State;
-process_join_msg({join, join_response, not_responsible}, State) -> State;
+%% process_join_msg({join, join_response, not_responsible, _Node}, State) -> State;
 process_join_msg({join, timeout}, State) -> State.
 
 %% @doc Contacts all nodes set in the known_hosts config parameter and request
@@ -287,6 +294,8 @@ get_known_nodes() ->
 %% @doc Tries to do a lookup for the given key by contacting the first node
 %%      among the ContactNodes, then go to phase 3. If there is no node to
 %%      contact, try to get new nodes to contact and cnotinue in phase 2.
+%%      A node that has been contacted will be put at the end of the
+%%      ContactNodes list.
 -spec lookup(MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), QueuedMessages::msg_queue:msg_queue(), ContactNodes::[node:node_type()])
         -> NewState::{join, {phase2, MyKey::?RT:key(), MyKeyVersion::non_neg_integer()}, QueuedMessages::msg_queue:msg_queue()} |
                      {join, {phase3, MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), IdVersion::non_neg_integer(), ContactNodes::[node:node_type()]}, QueuedMessages::msg_queue:msg_queue()}.
@@ -297,8 +306,8 @@ lookup(Id, IdVersion, QueuedMessages, []) ->
 lookup(Id, IdVersion, QueuedMessages, [First | Rest]) ->
     comm:send(First, {lookup_aux, Id, 0, {join, get_node, comm:this(), Id}}),
     msg_delay:send_local(get_lookup_timeout() div 1000, self(),
-                         {join, lookup_timeout}),
-    {join, {phase3, Id, IdVersion, Rest}, QueuedMessages}.
+                         {join, lookup_timeout, First}),
+    {join, {phase3, Id, IdVersion, lists:append(Rest, [First])}, QueuedMessages}.
 
 %% @doc Select new (random) Id and try again (phase 2 or 3 depending on the
 %%      number of available contact nodes).
