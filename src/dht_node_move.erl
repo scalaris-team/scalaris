@@ -24,7 +24,7 @@
 
 -export([process_move_msg/2,
          can_slide_succ/3, can_slide_pred/3,
-         rm_pred_changed/2, rm_notify_new_pred/3,
+         rm_pred_changed/2, rm_notify_new_pred/3, rm_send_node_change/3,
          make_slide/5,
          make_slide_leave/1, make_jump/4,
          check_config/0]).
@@ -149,7 +149,7 @@ process_move_msg({move, node_update, NewNode}, State) ->
              slide_op:get_phase(SlideOp) =:= wait_for_node_update of
         true ->
             rm_loop:unsubscribe(self(), fun rm_loop:subscribe_node_change_filter/2,
-                                fun send_node_change/3),
+                                fun dht_node_move:rm_send_node_change/3),
             TargetId = slide_op:get_target_id(SlideOp),
             case node:id(NewNode) =:= TargetId of
                 true ->
@@ -540,7 +540,9 @@ change_my_id(State, NewSlideOp, TargetId) ->
             dht_node_state:set_slide(
               State, succ, slide_op:set_phase(NewSlideOp, wait_for_node_update));
         _ ->
-            rm_loop:subscribe(self(), fun rm_loop:subscribe_node_change_filter/2, fun send_node_change/3),
+            % note: subscribe with fully qualified function named, i.e. module:fun/arity, to allow successful unsubscribes
+            rm_loop:subscribe(self(), fun rm_loop:subscribe_node_change_filter/2,
+                              fun dht_node_move:rm_send_node_change/3),
             rm_loop:update_id(TargetId),
             dht_node_state:set_slide(
               State, succ, slide_op:set_phase(NewSlideOp, wait_for_node_update))
@@ -918,10 +920,10 @@ make_slide_leave(State) ->
 %% @doc Send a  node change update message to this module inside the dht_node.
 %%      Will be registered with the dht_node as a node change subscriber.
 %% @see dht_node_state:add_nc_subscr/3
--spec send_node_change(Pid::comm:erl_local_pid(),
+-spec rm_send_node_change(Pid::comm:erl_local_pid(),
                        OldNeighbors::nodelist:neighborhood(),
                        NewNeighbors::nodelist:neighborhood()) -> ok.
-send_node_change(Pid, _OldNeighbors, NewNeighbors) ->
+rm_send_node_change(Pid, _OldNeighbors, NewNeighbors) ->
     NewNode = nodelist:node(NewNeighbors),
     comm:send_local(Pid, {move, node_update, NewNode}).
 
