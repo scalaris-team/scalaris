@@ -66,8 +66,8 @@ symm4_slide_succ1_load(_Config) ->
                       symm4_slide_load_test(4, succ, "slide_succ1", fun succ_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ1_load"),
-    Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 40),
+    check_size2(40),
+%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
 %% symm4_slide_succ2_load(_Config) ->
@@ -81,8 +81,8 @@ symm4_slide_succ1_load(_Config) ->
 %%                       symm4_slide_load_test(4, succ, "slide_succ2", fun succ_id_fun2/2),
 %%                       unittest_helper:wait_for_process_to_die(BenchPid)
 %%               end, "symm4_slide_succ2_load"),
-%%     Ring = statistics:get_ring_details(),
-%%     ?equals(statistics:get_total_load(Ring), 40),
+%%     check_size2(40),
+%% %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
 %%     unittest_helper:stop_ring().
 
 symm4_slide_succ1_load_v2(_Config) ->
@@ -96,8 +96,8 @@ symm4_slide_succ1_load_v2(_Config) ->
                       symm4_slide_load_test(4, succ, "slide_succ1_v2", fun succ_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ1_load_v2"),
-    Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 40),
+    check_size2(40),
+%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
 %% symm4_slide_succ2_load_v2(_Config) ->
@@ -111,8 +111,8 @@ symm4_slide_succ1_load_v2(_Config) ->
 %%                       symm4_slide_load_test(4, succ, "slide_succ2_v2", fun succ_id_fun2/2),
 %%                       unittest_helper:wait_for_process_to_die(BenchPid)
 %%               end, "symm4_slide_succ2_load_v2"),
-%%     Ring = statistics:get_ring_details(),
-%%     ?equals(statistics:get_total_load(Ring), 40),
+%%     check_size2(40),
+%% %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
 %%     unittest_helper:stop_ring().
 
 symm4_slide_pred1_load(_Config) ->
@@ -126,8 +126,8 @@ symm4_slide_pred1_load(_Config) ->
                       symm4_slide_load_test(4, pred, "slide_pred1", fun pred_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred1_load"),
-    Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 40),
+    check_size2(40),
+%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
 %% symm4_slide_pred2_load(_Config) ->
@@ -141,8 +141,8 @@ symm4_slide_pred1_load(_Config) ->
 %%                       symm4_slide_load_test(4, pred, "slide_pred2", fun pred_id_fun2/2),
 %%                       unittest_helper:wait_for_process_to_die(BenchPid)
 %%               end, "symm4_slide_pred2_load"),
-%%     Ring = statistics:get_ring_details(),
-%%     ?equals(statistics:get_total_load(Ring), 40),
+%%     check_size2(40),
+%% %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
 %%     unittest_helper:stop_ring().
 
 symm4_slide_pred1_load_v2(_Config) ->
@@ -156,8 +156,8 @@ symm4_slide_pred1_load_v2(_Config) ->
                       symm4_slide_load_test(4, pred, "slide_pred1_v2", fun pred_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred1_load_v2"),
-    Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 40),
+    check_size2(40),
+%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
 %% symm4_slide_pred2_load_v2(_Config) ->
@@ -171,8 +171,8 @@ symm4_slide_pred1_load_v2(_Config) ->
 %%                       symm4_slide_load_test(4, pred, "slide_pred2_v2", fun pred_id_fun2/2),
 %%                       unittest_helper:wait_for_process_to_die(BenchPid)
 %%               end, "symm4_slide_pred2_load_v2"),
-%%     Ring = statistics:get_ring_details(),
-%%     ?equals(statistics:get_total_load(Ring), 40),
+%%     check_size2(40),
+%% %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
 %%     unittest_helper:stop_ring().
 
 -spec percent_range(IdA::?RT:key(), IdB::?RT:key(), Percent::1..99) -> ?RT:key().
@@ -214,18 +214,7 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun) ->
                  Node = node_details:get(NodeDetails, node),
                  Other = node_details:get(NodeDetails, PredOrSucc),
                  TargetId = TargetIdFun(node:id(Node), node:id(Other)),
-                 comm:send_local(DhtNode, {move, start_slide, PredOrSucc, TargetId, Tag, self()}),
-                 receive
-                     {move, result, Tag, ok} ->
-%%                          ct:pal("~p.~p ~.0p -> ~.0p", [NthNode, N, node:id(Node), TargetId]),
-                         ok;
-                     {move, result, Tag, Result} ->
-                         ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p",
-                                  [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]);
-                     X ->
-                         ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) unexpected message: ~.0p",
-                                  [PredOrSucc, NthNode, N, Node, Other, TargetId, X])
-                 end;
+                 symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
              Y ->
                  ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message "
                           "(waiting for get_node_details_response): ~.0p",
@@ -238,6 +227,49 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun) ->
          end
      end || N <- lists:seq(1, 50)],
     ok.
+
+symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other) ->
+    comm:send_local(DhtNode, {move, start_slide, PredOrSucc, TargetId, Tag, self()}),
+    receive
+        {move, result, Tag, ok} ->
+            %%                          ct:pal("~p.~p ~.0p -> ~.0p", [NthNode, N, node:id(Node), TargetId]),
+            ok;
+        {move, result, Tag, ongoing_slide = Result} ->
+            ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...",
+                   [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]),
+            timer:sleep(100), % wait a bit before trying again
+            symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
+        {move, result, Tag, wrong_pred_succ_node = Result} ->
+            ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...",
+                   [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]),
+            timer:sleep(100), % wait a bit before trying again
+            symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
+        {move, result, Tag, Result} ->
+            ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p",
+                     [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]);
+        X ->
+            ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) unexpected message: ~.0p",
+                     [PredOrSucc, NthNode, N, Node, Other, TargetId, X])
+    end.
+
+check_size2(ExpSize) ->
+    Ring = statistics:get_ring_details(),
+    Load = statistics:get_total_load(Ring),
+    case Load =/= 40 of
+        true ->
+            DHTNodes = pid_groups:find_all(dht_node),
+            [begin
+                 comm:send_local(DhtNode, {bulkowner_deliver, intervals:all(), {bulk_read_entry, comm:this()}})
+             end || DhtNode <- DHTNodes],
+            Data1 = receive {bulk_read_entry_response, _Range1, D1} -> D1 end,
+            Data2 = receive {bulk_read_entry_response, _Range2, D2} -> [D2 | Data1] end,
+            Data3 = receive {bulk_read_entry_response, _Range3, D3} -> [D3 | Data2] end,
+            Data4 = receive {bulk_read_entry_response, _Range4, D4} -> [D4 | Data3] end,
+            Data = lists:flatten(Data4),
+            ct:pal("~.0p", [Data]),
+            ?equals(Load, ExpSize);
+        false -> ok
+    end.
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
