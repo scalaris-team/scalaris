@@ -1,6 +1,6 @@
 @echo off
 :: set path to erlang installation
-set ERLANG="c:\program files\erl5.7.5\bin"
+set ERLANG="C:\Program Files\erl5.8.1.1\bin"
 
 ::replace @EMAKEFILEDEFINES@ from Emakefile.in and write Emakefile
 ::(this is what autoconf on *nix would do)
@@ -13,7 +13,11 @@ set ERLANG="c:\program files\erl5.7.5\bin"
 ::  {d, boolean_not_builtin},
 ::  {d, recursive_types_are_not_allowed,
 ::  {d, type_forward_declarations_are_not_allowed},
-::  {d, forward_or_recursive_types_are_not_allowed}
+::  {d, forward_or_recursive_types_are_not_allowed},
+::  {d, tid_not_builtin}
+:: For older erlang versions that do not have the httpc module but use the (older)
+:: http module, the following line needs to be added to Emakefile:
+:: ["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]
 :: refer to configure.ac for the appropriate checks for necessity
 :: Note: Search & Replace functionality from http://www.dostips.com
 if not exist Emakefile (
@@ -21,7 +25,8 @@ if not exist Emakefile (
 	for /f "tokens=1,* delims=&&&" %%a in (Emakefile.in) do (
 		set "line=%%a"
 		if defined line (
-			call set "line=echo.%%line:  @EMAKEFILEDEFINES@=%%"
+			call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}%%"
+			call set "line=%%line:@EMAKEFILECOMPILECOMPAT@=%%"
 			for /f "delims=" %%X in ('"echo."%%line%%""') do %%~X >> Emakefile
 		) ELSE echo.
 	)
