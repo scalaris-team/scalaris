@@ -39,7 +39,9 @@
          start/4, start/2,
          start/3]).
 -export([kill/1, sleep/2, runnable/1,
-         get_state/1, get_state/2, change_handler/2]).
+         get_state/1, get_state/2,
+         get_component_state/1, get_component_state/2,
+         change_handler/2]).
 -export([bp_set/3, bp_set_cond/3, bp_del/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
@@ -91,11 +93,26 @@ get_state(Pid) ->
         {'$gen_component', get_state_response, State} -> State
     end.
 
--spec get_state(Pid::pid(), Timeout::non_neg_integer()) -> term().
+-spec get_state(Pid::pid(), Timeout::non_neg_integer()) -> term() | failed.
 get_state(Pid, Timeout) ->
     Pid ! {'$gen_component', get_state, self()},
     receive
         {'$gen_component', get_state_response, State} -> State
+    after Timeout -> failed
+    end.
+
+-spec get_component_state(Pid::pid()) -> term().
+get_component_state(Pid) ->
+    Pid ! {'$gen_component', get_component_state, self()},
+    receive
+        {'$gen_component', get_component_state_response, State} -> State
+    end.
+
+-spec get_component_state(Pid::pid(), Timeout::non_neg_integer()) -> {Module::module(), Handler::atom(), ComponentState::term()} | failed.
+get_component_state(Pid, Timeout) ->
+    Pid ! {'$gen_component', get_component_state, self()},
+    receive
+        {'$gen_component', get_component_state_response, State} -> State
     after Timeout -> failed
     end.
 
@@ -249,8 +266,8 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
           when is_tuple(GenComponentMessage),
                '$gen_component' =:= element(1, GenComponentMessage) ->
             NewComponentState =
-                handle_gen_component_message(GenComponentMessage, State,
-                                             ComponentState),
+                handle_gen_component_message(GenComponentMessage, Module, On,
+                                             State, ComponentState),
             loop(Module, On, State, NewComponentState);
         % handle failure detector messages
         {ping, Pid} ->
@@ -314,7 +331,8 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                 end
     end.
 
-handle_gen_component_message(Message, State, ComponentState) ->
+-spec handle_gen_component_message(Message::tuple(), Module::module(), Handler::atom(), State::term(), ComponentState) -> ComponentState.
+handle_gen_component_message(Message, Module, On, State, ComponentState) ->
     {_Options, _Slowest, BPState} = ComponentState,
     case Message of
         {'$gen_component', bp, barrier} ->
@@ -349,6 +367,10 @@ handle_gen_component_message(Message, State, ComponentState) ->
         {'$gen_component', get_state, Pid} ->
             comm:send_local(
               Pid, {'$gen_component', get_state_response, State}),
+            ComponentState;
+        {'$gen_component', get_component_state, Pid} ->
+            comm:send_local(
+              Pid, {'$gen_component', get_component_state_response, {Module, On, ComponentState}}),
             ComponentState
     end.
 
