@@ -64,6 +64,10 @@ on({start_ping}, {Owner, RemotePid, Token, _, Latencies}) ->
 
 on({shutdown}, _State) ->
     log:log(info, "shutdown vivaldi_latency due to timeout", []),
+    kill;
+
+on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Latencies}) ->
+    log:log(info, "shutdown vivaldi_latency due to vivaldi shutting down", []),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -74,6 +78,7 @@ init({Owner, RemotePid, Token}) ->
     %io:format("vivaldi_latency start ~n"),
     comm:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
     comm:send_local(self(), {start_ping}),
+    erlang:monitor(process, Owner),
     {Owner, RemotePid, Token, unknown, []}.
 
 -spec measure_latency(comm:mypid(), vivaldi:network_coordinate(), vivaldi:error()) -> {ok, pid()}.
