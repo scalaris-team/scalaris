@@ -95,8 +95,8 @@ deliver_postponed_decisions(OldState) ->
     View = group_state:get_view(OldState),
     NextPaxosId = group_view:get_next_expected_decision_id(View),
     PostponedDecisions = group_view:get_postponed_decisions(View),
-    case lists:keysearch(NextPaxosId, 1, PostponedDecisions) of
-        {value, {NextPaxosId, Decision}} ->
+    case lists:keyfind(NextPaxosId, 1, PostponedDecisions) of
+        {NextPaxosId, Decision} ->
             NewView = group_view:remove_postponed_decision(View,
                                                            NextPaxosId,
                                                            Decision),

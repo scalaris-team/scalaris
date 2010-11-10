@@ -74,8 +74,8 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
                      true ->
                          [comm:make_global(bench_server)];
                      false ->
-                         case lists:keysearch(copies, 1, Options) of
-                             {value, {copies, Copies}} ->
+                         case lists:keyfind(copies, 1, Options) of
+                             {copies, Copies} ->
                                  lists:sublist(util:get_nodes(), Copies);
                              false ->
                                  util:get_nodes()

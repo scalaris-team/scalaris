@@ -197,16 +197,16 @@ start(Module, Args, Options) ->
 
 -spec start(module(), term(), list(), comm:erl_local_pid()) -> ok.
 start(Module, Args, Options, Supervisor) ->
-    case lists:keysearch(pid_groups_join_as, 1, Options) of
-        {value, {pid_groups_join_as, GroupId, PidName}} ->
+    case lists:keyfind(pid_groups_join_as, 1, Options) of
+        {pid_groups_join_as, GroupId, PidName} ->
             pid_groups:join_as(GroupId, PidName),
             log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
             ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self());
         false ->
             log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module])
     end,
-    case lists:keysearch(erlang_register, 1, Options) of
-        {value, {erlang_register, Name}} ->
+    case lists:keyfind(erlang_register, 1, Options) of
+        {erlang_register, Name} ->
             case whereis(Name) of
                 undefined -> ok;
                 _ -> catch(unregister(Name)) %% unittests may leave garbage
@@ -224,8 +224,8 @@ start(Module, Args, Options, Supervisor) ->
         InitialComponentState = {Options, _Slowest = 0.0, bp_state_new()},
         Handler = case Module:init(Args) of
                       {'$gen_component', Config, InitialState} ->
-                          {value, {on_handler, NewHandler}} =
-                              lists:keysearch(on_handler, 1, Config),
+                          {on_handler, NewHandler} =
+                              lists:keyfind(on_handler, 1, Config),
                           NewHandler;
                       InitialState ->
                           on
@@ -313,8 +313,8 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                     loop(Module, On, NewState, NextComponentState);
                 kill -> ok;
                 {'$gen_component', Config, NewState} ->
-                    {value, {on_handler, NewHandler}} =
-                        lists:keysearch(on_handler, 1, Config),
+                    {on_handler, NewHandler} =
+                        lists:keyfind(on_handler, 1, Config),
                     %% This is not counted as a bp_step
                     loop(Module, NewHandler, NewState, TmpComponentState);
                 NewState ->
