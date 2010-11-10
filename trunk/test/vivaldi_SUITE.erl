@@ -29,7 +29,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
+    Config2 = unittest_helper:init_per_suite(Config),
     unittest_helper:fix_cwd(),
     error_logger:tty(true),
     Pid = unittest_helper:start_process(
@@ -41,16 +41,17 @@ init_per_suite(Config) ->
                     comm_server:start_link(pid_groups:new("comm_layer_")),
                     comm_server:set_local_address({127,0,0,1},14195)
             end),
-    [{wrapper_pid, Pid} | Config].
+    [{wrapper_pid, Pid} | Config2].
 
 end_per_suite(Config) ->
+    {wrapper_pid, Pid} = lists:keyfind(wrapper_pid, 1, Config),
     reset_config(),
-    {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
     error_logger:tty(false),
     log:set_log_level(none),
     exit(Pid, kill),
     unittest_helper:stop_pid_groups(),
-    Config.
+    unittest_helper:end_per_suite(Config),
+    ok.
 
 init_per_testcase(_TestCase, Config) ->
     Config.

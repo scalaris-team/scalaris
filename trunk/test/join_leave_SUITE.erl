@@ -36,11 +36,10 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Config.
+    unittest_helper:init_per_suite(Config).
 
-end_per_suite(_Config) ->
-    unittest_helper:stop_ring(),
+end_per_suite(Config) ->
+    unittest_helper:end_per_suite(Config),
     ok.
 
 init_per_testcase(TestCase, Config) ->

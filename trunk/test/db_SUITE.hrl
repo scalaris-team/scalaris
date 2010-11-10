@@ -83,20 +83,17 @@ rw_suite_runs(Desired) ->
     erlang:min(Desired, max_rw_tests_per_suite()).
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
+    Config2 = unittest_helper:init_per_suite(Config),
     Pid = spawn_config_processes(),
-    [{wrapper_pid, Pid} | Config].
+    [{wrapper_pid, Pid} | Config2].
 
 end_per_suite(Config) ->
-    case lists:keyfind(wrapper_pid, 1, Config) of
-        false ->
-            ok;
-        {wrapper_pid, Pid} ->
-            error_logger:tty(false),
-            log:set_log_level(none),
-            exit(Pid, kill),
-            unittest_helper:stop_pid_groups()
-    end,
+    {wrapper_pid, Pid} = lists:keyfind(wrapper_pid, 1, Config),
+    error_logger:tty(false),
+    log:set_log_level(none),
+    exit(Pid, kill),
+    unittest_helper:stop_pid_groups(),
+    unittest_helper:end_per_suite(Config),
     ok.
 
 -define(db_equals_pattern(Actual, ExpectedPattern),

@@ -33,6 +33,13 @@ suite() ->
      {timetrap, {seconds, 180}}
     ].
 
+init_per_suite(Config) ->
+    unittest_helper:init_per_suite(Config).
+
+end_per_suite(Config) ->
+    unittest_helper:end_per_suite(Config),
+    ok.
+
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         skip_test ->
@@ -41,15 +48,7 @@ init_per_testcase(TestCase, Config) ->
             Config
     end.
 
-init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Config.
-
 end_per_testcase(_TestCase, _Config) ->
-    unittest_helper:stop_ring(),
-    ok.
-
-end_per_suite(_Config) ->
     unittest_helper:stop_ring(),
     ok.
 

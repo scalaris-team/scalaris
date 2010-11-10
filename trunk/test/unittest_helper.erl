@@ -30,7 +30,8 @@
          wait_for_process_to_die/1,
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
-         get_all_children/1]).
+         get_all_children/1,
+         get_processes/0, init_per_suite/1, end_per_suite/1]).
 
 -include("scalaris.hrl").
 
@@ -121,6 +122,8 @@ stop_ring(Pid) ->
             exit(Pid, kill),
             wait_for_process_to_die(Pid),
             stop_pid_groups(),
+            randoms:stop(),
+            inets:stop(),
             catch unregister(ct_test_ring),
             ok
         end
@@ -232,3 +235,69 @@ get_all_children(Supervisor) ->
     WorkerChilds = [Pid ||  {_Id, Pid, worker, _Modules} <- AllChilds],
     SupChilds = [Pid || {_Id, Pid, supervisor, _Modules} <- AllChilds],
     lists:flatten([WorkerChilds | [get_all_children(S) || S <- SupChilds]]).
+
+-spec get_processes() -> [{pid(), InitCall::mfa(), CurFun::mfa(), Info::term | failed | no_further_infos}].
+get_processes() ->
+    _Processes = [begin
+                      InitCall = element(2, lists:keyfind(initial_call, 1, Data)),
+                      CurFun = element(2, lists:keyfind(current_function, 1, Data)),
+                      Info =
+                          case {InitCall, CurFun} of
+                              {{gen_component, _, _}, {gen_component, _, _}} ->
+                                  gen_component:get_component_state(X);
+                              {_, {file_io_server, _, _}} ->
+                                  case file:pid2name(X) of
+                                      undefined -> {file, undefined};
+                                      {ok, FileName} -> {file, FileName};
+                                      FileName -> {file, FileName}
+                                  end;
+                              {_, {gen_server, _, _}} ->
+                                  sys:get_status(X);
+                              _ -> no_further_infos
+                          end,
+                      {X, InitCall, CurFun, Info}
+                  end
+                  || X <- processes(),
+                     Data <- [process_info(X, [current_function, initial_call])],
+                     Data =/= undefined].
+
+%% @doc Generic init_per_suite for all unit tests. Prints current state
+%%      information and stores information about all running processes.
+init_per_suite(Config) ->
+    Processes = get_processes(),
+    ct:pal("Starting unittest ~p", [ct:get_status()]),
+    [{processes, Processes} | Config].
+
+%% @doc Generic end_per_suite for all unit tests. Gets the list of processes
+%%      stored in init_per_suite/1 and kills all but a selected few of
+%%      processes which are now running but haven't been running before.
+%%      Thus allows a clean start of succeeding test suites.
+%%      Prints information about the processes that have been killed.
+end_per_suite(Config) ->
+    ct:pal("Stopping unittest ~p", [ct:get_status()]),
+    %error_logger:tty(false),
+    unittest_helper:stop_ring(),
+    % the following might still be running in case there was no ring:
+    randoms:stop(),
+    inets:stop(),
+    {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
+    NewProcesses = get_processes(),
+    {_OnlyOld, _Both, OnlyNew} = util:split_unique(OldProcesses, NewProcesses,
+                                                 fun(P1, P2) ->
+                                                         element(1, P1) =< element(1, P2)
+                                                 end, fun(_P1, P2) -> P2 end),
+%%     ct:pal("Old: ~.0p~n", [OnlyOld]),
+%%     ct:pal("Both: ~.0p~n", [Both]),
+%%     ct:pal("New: ~.0p~n", [OnlyNew]),
+    Killed = [begin
+                  try erlang:exit(X, kill) of
+                      true -> {ok, Proc}
+                  catch _:_ -> {fail, Proc}
+                  end
+              end || {X, InitCall, CurFun, _Info} = Proc <- OnlyNew,
+                     not (InitCall =:= {test_server_sup,timetrap,3} andalso
+                              CurFun =:= {test_server_sup,timetrap,3}),
+                     X =/= self(),
+                     element(1, CurFun) =/= file_io_server],
+    ct:pal("Killed processes: ~.0p", [Killed]),
+    Config.
