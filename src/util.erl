@@ -181,7 +181,7 @@ dump_extract_from_list(List, Key) ->
 dump() ->
     Info = [element(2, Fun) || X <- processes(),
                                Fun <- [process_info(X, current_function)],
-                               Fun =/= [undefined]],
+                               Fun =/= undefined],
     FunCnt = dict:to_list(lists:foldl(fun(Fun, DictIn) ->
                                               dict:update_counter(Fun, 1, DictIn)
                                       end, dict:new(), Info)),
