@@ -52,7 +52,8 @@
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
         wait_for_succ_ack | % pred initiated a slide and has notified its succ
         wait_for_node_update | % pred changing its id
-        wait_for_pred_update | % wait for the local rm process to know about a joining node (pred)
+        wait_for_pred_update_join | % wait for the local rm process to know about a joining node (pred)
+        wait_for_pred_update_data_ack | % wait for the local rm process to know about the changed pred's ID
         wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
         wait_for_data | wait_for_delta. % receiving node
 
@@ -65,7 +66,7 @@
 
 -record(slide_op, {type       = ?required(slide_op, type)      :: type(),
                    id         = ?required(slide_op, id)        :: id(),
-                   node       = ?required(slide_op, node)      :: comm:mypid(), % the node, data is sent to/received from
+                   node       = ?required(slide_op, node)      :: node:node_type(), % the node, data is sent to/received from
                    interval   = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
                    target_id  = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
                    tag        = ?required(slide_op, tag)       :: any(),
@@ -91,7 +92,7 @@ new_slide(MoveId, Type, TargetId, Tag, SourcePid, State) ->
             {leave, 'rcv'} -> {pred, 'rcv'};
             {jump, 'rcv'} ->  {pred, 'rcv'}
         end,
-    {Interval, TargetNodePid} =
+    {Interval, TargetNode} =
         case PredOrSucc of
             pred ->
                 Pred = dht_node_state:get(State, pred),
@@ -99,7 +100,7 @@ new_slide(MoveId, Type, TargetId, Tag, SourcePid, State) ->
                         'rcv'  -> node:mk_interval_between_ids(TargetId, node:id(Pred));
                         'send' -> node:mk_interval_between_ids(node:id(Pred), TargetId)
                     end,
-                {I, node:pidX(Pred)};
+                {I, Pred};
             succ ->
                 I = case SendOrReceive of
                         'rcv'  -> node:mk_interval_between_ids(
@@ -107,11 +108,11 @@ new_slide(MoveId, Type, TargetId, Tag, SourcePid, State) ->
                         'send' -> node:mk_interval_between_ids(
                                     TargetId, dht_node_state:get(State, node_id))
                     end,
-                {I, dht_node_state:get(State, succ_pid)}
+                {I, dht_node_state:get(State, succ)}
         end,
     #slide_op{type = Type,
               id = MoveId,
-              node = TargetNodePid,
+              node = TargetNode,
               interval = Interval,
               target_id = TargetId,
               tag = Tag,
@@ -126,7 +127,7 @@ new_receiving_slide_join(MoveId, NewPred, NewSucc, MyNewKey, Tag) ->
     IntervalToReceive = node:mk_interval_between_ids(node:id(NewPred), MyNewKey),
     #slide_op{type = {join, 'rcv'},
               id = MoveId,
-              node = node:pidX(NewSucc),
+              node = NewSucc,
               interval = IntervalToReceive,
               target_id = MyNewKey,
               tag = Tag,
@@ -142,7 +143,7 @@ new_sending_slide_join(MoveId, JoiningNode, Tag, State) ->
                        dht_node_state:get(State, pred_id), JoiningNodeId),
     #slide_op{type = {join, 'send'},
               id = MoveId,
-              node = node:pidX(JoiningNode),
+              node = JoiningNode,
               interval = IntervalToSend,
               target_id = JoiningNodeId,
               tag = Tag,
@@ -153,10 +154,10 @@ new_sending_slide_join(MoveId, JoiningNode, Tag, State) ->
 -spec new_sending_slide_leave(MoveId::id(), Tag::any(), State::dht_node_state:state()) -> slide_op().
 new_sending_slide_leave(MoveId, Tag, State) ->
     IntervalToSend = dht_node_state:get(State, my_range),
-    TargetNodePid = dht_node_state:get(State, succ_pid),
+    TargetNode = dht_node_state:get(State, succ),
     #slide_op{type = {leave, 'send'},
               id = MoveId,
-              node = TargetNodePid,
+              node = TargetNode,
               interval = IntervalToSend,
               target_id = dht_node_state:get(State, pred_id),
               tag = Tag,
@@ -168,10 +169,10 @@ new_sending_slide_leave(MoveId, Tag, State) ->
 -spec new_sending_slide_jump(MoveId::id(), TargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
 new_sending_slide_jump(MoveId, TargetId, Tag, State) ->
     IntervalToSend = dht_node_state:get(State, my_range),
-    TargetNodePid = dht_node_state:get(State, succ_pid),
+    TargetNode = dht_node_state:get(State, succ),
     #slide_op{type = {jump, 'send'},
               id = MoveId,
-              node = TargetNodePid,
+              node = TargetNode,
               interval = IntervalToSend,
               target_id = dht_node_state:get(State, pred_id),
               tag = Tag,
@@ -183,7 +184,7 @@ new_sending_slide_jump(MoveId, TargetId, Tag, State) ->
 get_id(#slide_op{id=Id}) -> Id.
 
 %% @doc Returns the pid of the node to exchange data with.
--spec get_node(SlideOp::slide_op()) -> comm:mypid().
+-spec get_node(SlideOp::slide_op()) -> node:node_type().
 get_node(#slide_op{node=Node}) -> Node.
 
 %% @doc Returns the interval of data to receive or send.

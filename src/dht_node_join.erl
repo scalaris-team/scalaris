@@ -178,9 +178,12 @@ process_join_state({join, join_response, Pred, MoveId},
             SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, MyKey, join),
             SlideOp1 = slide_op:set_phase(SlideOp, wait_for_node_update),
             State1 = dht_node_state:set_slide(State, succ, SlideOp1),
-            State2 = dht_node_state:add_msg_fwd(State1, slide_op:get_interval(SlideOp1),
-                                                slide_op:get_node(SlideOp1)),
-            NewMsgQueue = msg_queue:add(QueuedMessages, {move, node_update, Me}),
+            State2 = dht_node_state:add_msg_fwd(
+                       State1, slide_op:get_interval(SlideOp1),
+                       node:pidX(slide_op:get_node(SlideOp1))),
+            RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
+            NewMsgQueue = msg_queue:add(QueuedMessages,
+                                        {move, node_update, RMSubscrTag}),
             msg_queue:send(NewMsgQueue),
             State2
     end;
@@ -231,9 +234,13 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
             MoveFullId = util:get_global_uid(),
             SlideOp = slide_op:new_sending_slide_join(
                         MoveFullId, NewPred, join, State),
-            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update),
-            rm_loop:subscribe(self(), fun dht_node_move:rm_pred_changed/2,
-                              fun dht_node_move:rm_notify_new_pred/3),
+            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_join),
+            RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
+            rm_loop:subscribe(self(), RMSubscrTag,
+                              fun(_OldNeighbors, NewNeighbors) ->
+                                      NewPred =:= nodelist:pred(NewNeighbors)
+                              end,
+                              fun dht_node_move:rm_notify_new_pred/4),
             State1 = dht_node_state:add_db_range(
                        State, slide_op:get_interval(SlideOp1)),
             send_join_response(State1, SlideOp1, NewPred);
@@ -249,7 +256,7 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
         {pred, SlideOp} ->
             ResponseReceived =
                 lists:member(slide_op:get_phase(SlideOp),
-                             [wait_for_req_data, wait_for_pred_update]),
+                             [wait_for_req_data, wait_for_pred_update_join]),
             case (slide_op:get_timeouts(SlideOp) < 3) of
                 _ when ResponseReceived -> State;
                 true ->
@@ -261,9 +268,8 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
                     log:log(warn, "abort_join(op: ~p, reason: timeout)~n",
                             [SlideOp]),
                     slide_op:reset_timer(SlideOp), % reset previous timeouts
-                    rm_loop:unsubscribe(self(),
-                                        fun dht_node_move:rm_pred_changed/2,
-                                        fun dht_node_move:rm_notify_new_pred/3),
+                    RMSubscrTag = {move, slide_op:get_id(SlideOp)},
+                    rm_loop:unsubscribe(self(), RMSubscrTag),
                     State1 = dht_node_state:rm_db_range(
                                State, slide_op:get_interval(SlideOp)),
                     dht_node_state:set_slide(State1, pred, null)
