@@ -77,7 +77,7 @@ symm4_slide_succ1_load(_Config) ->
                       symm4_slide1_load_test(4, succ, "slide_succ1", fun succ_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ1_load"),
-    check_size2(40),
+    check_size2_v1(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -94,7 +94,7 @@ symm4_slide_succ2_load(_Config) ->
                       symm4_slide2_load_test(4, succ, "slide_succ2", fun succ_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ2_load"),
-    check_size2(40),
+    check_size2_v1(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -111,7 +111,7 @@ symm4_slide_succ1_load_v2(_Config) ->
                       symm4_slide1_load_test(4, succ, "slide_succ1_v2", fun succ_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ1_load_v2"),
-    check_size2(40),
+    check_size2_v2(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -128,7 +128,7 @@ symm4_slide_succ2_load_v2(_Config) ->
                       symm4_slide2_load_test(4, succ, "slide_succ2_v2", fun succ_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ2_load_v2"),
-    check_size2(40),
+    check_size2_v2(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -145,7 +145,7 @@ symm4_slide_pred1_load(_Config) ->
                       symm4_slide1_load_test(4, pred, "slide_pred1", fun pred_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred1_load"),
-    check_size2(40),
+    check_size2_v1(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -162,7 +162,7 @@ symm4_slide_pred2_load(_Config) ->
                       symm4_slide2_load_test(4, pred, "slide_pred2", fun pred_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred2_load"),
-    check_size2(40),
+    check_size2_v1(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -179,7 +179,7 @@ symm4_slide_pred1_load_v2(_Config) ->
                       symm4_slide1_load_test(4, pred, "slide_pred1_v2", fun pred_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred1_load_v2"),
-    check_size2(40),
+    check_size2_v2(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -196,7 +196,7 @@ symm4_slide_pred2_load_v2(_Config) ->
                       symm4_slide2_load_test(4, pred, "slide_pred2_v2", fun pred_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred2_load_v2"),
-    check_size2(40),
+    check_size2_v2(40),
 %%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
     unittest_helper:stop_ring().
 
@@ -321,10 +321,32 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
                      [PredOrSucc, NthNode, N, Node, Other, TargetId, X])
     end.
 
-check_size2(ExpSize) ->
+-spec check_size2_v1(ExpSize::pos_integer()) -> ok.
+check_size2_v1(ExpSize) ->
     Ring = statistics:get_ring_details(),
     Load = statistics:get_total_load(Ring),
-    case Load =/= 40 of
+    % note: cs_api (v1) may leave old data items on nodes not responsible for them anymore, tolerate it here:
+    case Load < ExpSize of
+        true ->
+            DHTNodes = pid_groups:find_all(dht_node),
+            [begin
+                 comm:send_local(DhtNode, {bulkowner_deliver, intervals:all(), {bulk_read_entry, comm:this()}})
+             end || DhtNode <- DHTNodes],
+            Data1 = receive {bulk_read_entry_response, _Range1, D1} -> D1 end,
+            Data2 = receive {bulk_read_entry_response, _Range2, D2} -> [D2 | Data1] end,
+            Data3 = receive {bulk_read_entry_response, _Range3, D3} -> [D3 | Data2] end,
+            Data4 = receive {bulk_read_entry_response, _Range4, D4} -> [D4 | Data3] end,
+            Data = lists:flatten(Data4),
+            ct:pal("~.0p", [Data]),
+            ?equals(Load, ExpSize);
+        false -> ok
+    end.
+
+-spec check_size2_v2(ExpSize::pos_integer()) -> ok.
+check_size2_v2(ExpSize) ->
+    Ring = statistics:get_ring_details(),
+    Load = statistics:get_total_load(Ring),
+    case Load =/= ExpSize of
         true ->
             DHTNodes = pid_groups:find_all(dht_node),
             [begin
