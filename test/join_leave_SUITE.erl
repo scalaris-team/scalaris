@@ -88,7 +88,8 @@ add_9_rm_5_test() ->
 add_2x3_load(_Config) ->
     stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
     Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 4).
+    % note: cs_api (v1) may leave old data items on nodes not responsible for them anymore, tolerate it here:
+    ?equals_pattern(statistics:get_total_load(Ring), L when L >= 4).
 
 add_2x3_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 5000) end),
@@ -116,7 +117,8 @@ add_2x3_load_v2_test() ->
 add_3_rm_2_load(_Config) ->
     stop_time(fun add_3_rm_2_load_test/0, "add_2x3_load"),
     Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 4).
+    % note: cs_api (v1) may leave old data items on nodes not responsible for them anymore, tolerate it here:
+    ?equals_pattern(statistics:get_total_load(Ring), L when L >= 4).
 
 add_3_rm_2_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 5000) end),
