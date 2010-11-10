@@ -249,27 +249,26 @@ collect_rv_ack(TMState, Key, RKey, Timestamp, StoredVote) ->
 	    
 check_rv_acks(RVAcksList)->    
     CounterList = [],
-    NewCounterList = lists:foldl(fun({{Value, Timestamp}, AckTimestamp}, CAcc)->
-					CurrCounter = lists:keysearch(AckTimestamp, 1, CAcc),
-					if
-					    false =:= CurrCounter ->
-						NewCounter = {AckTimestamp, {Value, Timestamp}, 1},
-						[NewCounter|CAcc];
-					    true ->
-						%% _AckTS == AckTimestamp, the one we searched for in the list
-						{value, {_AckTS, {Val, Ts}, Count}} = CurrCounter,
-						if
-						    Timestamp > Ts ->
-							NewCounter = {AckTimestamp, {Value, Timestamp}, (Count + 1)},
-							lists:keyreplace(Timestamp, 1, CAcc, NewCounter);
-						    true ->
-							NewCounter = {AckTimestamp, {Val, Ts}, (Count + 1)},
-							lists:keyreplace(Timestamp, 1, CAcc, NewCounter)
-						end
-					end
-				end,
-				CounterList,
-				RVAcksList),
+    NewCounterList =
+        lists:foldl(fun({{Value, Timestamp}, AckTimestamp}, CAcc) ->
+                            case lists:keyfind(AckTimestamp, 1, CAcc) of
+                                false ->
+                                    NewCounter = {AckTimestamp, {Value, Timestamp}, 1},
+                                    [NewCounter|CAcc];
+                                {_AckTS, {Val, Ts}, Count} ->
+                                    %% _AckTS == AckTimestamp, the one we searched for in the list
+                                    if
+                                        Timestamp > Ts ->
+                                            NewCounter = {AckTimestamp, {Value, Timestamp}, (Count + 1)},
+                                            lists:keyreplace(Timestamp, 1, CAcc, NewCounter);
+                                        true ->
+                                            NewCounter = {AckTimestamp, {Val, Ts}, (Count + 1)},
+                                            lists:keyreplace(Timestamp, 1, CAcc, NewCounter)
+                                    end
+                            end
+                    end,
+                    CounterList,
+                    RVAcksList),
     Limit = config:read(quorum_factor),
     check_counter_fh(NewCounterList, Limit).
 
