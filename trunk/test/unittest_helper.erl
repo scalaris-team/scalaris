@@ -290,13 +290,16 @@ end_per_suite(Config) ->
 %%     ct:pal("Both: ~.0p~n", [Both]),
 %%     ct:pal("New: ~.0p~n", [OnlyNew]),
     Killed = [begin
+%%                   ct:pal("killing ~.0p", [Proc]),
                   try erlang:exit(X, kill) of
                       true -> {ok, Proc}
                   catch _:_ -> {fail, Proc}
                   end
               end || {X, InitCall, CurFun, _Info} = Proc <- OnlyNew,
-                     not (InitCall =:= {test_server_sup,timetrap,3} andalso
-                              CurFun =:= {test_server_sup,timetrap,3}),
+                     not (InitCall =:= {test_server_sup, timetrap, 3} andalso
+                              CurFun =:= {test_server_sup, timetrap, 3}),
+                     not (InitCall =:= {test_server_sup, timetrap, 2} andalso
+                              CurFun =:= {test_server_sup, timetrap, 2}),
                      X =/= self(),
                      element(1, CurFun) =/= file_io_server],
     ct:pal("Killed processes: ~.0p", [Killed]),
