@@ -84,9 +84,9 @@ change_id_and_check(OldId, NewId) ->
     end,
 %%     ct:pal("ct: ~p -> ~p~n", [node:id(OldNode), NewId]),
     
-    comm:send(RM, {subscribe, self(), fun rm_loop:subscribe_default_filter/2, fun rm_loop:send_changes_to_subscriber/3}),
+    comm:send(RM, {subscribe, self(), rm_SUITE, fun rm_loop:subscribe_default_filter/2, fun rm_loop:send_changes_to_subscriber/4}),
     comm:send(RM, {update_id, NewId}),
-    comm:send(RM, {unsubscribe, self(), fun rm_loop:subscribe_default_filter/2, fun rm_loop:send_changes_to_subscriber/3}),
+    comm:send(RM, {unsubscribe, self(), rm_SUITE}),
     
     % check that the new ID has been set:
     comm:send_to_group_member(RM, dht_node, {get_node_details, comm:this(), [node, pred, succ]}),
@@ -113,7 +113,7 @@ change_id_and_check(OldId, NewId) ->
 -spec check_subscr_node_update(OldNode::node:node_type(), NewNode::node:node_type()) -> any().
 check_subscr_node_update(OldNode, NewNode) ->
     receive
-        {rm_changed, OldNeighbors, NewNeighbors} ->
+        {rm_changed, rm_SUITE, OldNeighbors, NewNeighbors} ->
             ?equals(nodelist:node(OldNeighbors), OldNode),
             ?equals(nodelist:node(NewNeighbors), NewNode)
     after 1000 ->
@@ -122,7 +122,7 @@ check_subscr_node_update(OldNode, NewNode) ->
                 X -> X
             after 0 -> no_message
             end,
-            ?ct_fail("expected message {rm_changed, OldNeighbors, NewNeighbors} but got \"~.0p\"~n", [ActualMessage])
+            ?ct_fail("expected message {rm_changed, rm_SUITE, OldNeighbors, NewNeighbors} but got \"~.0p\"~n", [ActualMessage])
     end.
 
 -spec prop_update_id2(?RT:key()) -> boolean().

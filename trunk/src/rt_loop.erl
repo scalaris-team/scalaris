@@ -29,7 +29,8 @@
 -export([init/1, on_inactive/2, on_active/2,
          activate/1, deactivate/0,
          get_base_interval/0, check_config/0,
-         get_id/1, get_pred/1, get_succ/1, get_neighb/1, get_rt/1, set_rt/2]).
+         get_id/1, get_pred/1, get_succ/1, get_neighb/1, get_rt/1, set_rt/2,
+         rm_send_update/4]).
 
 -ifdef(with_export_type_support).
 -export_type([state_active/0]).
@@ -99,8 +100,9 @@ init(Trigger) ->
 on_inactive({activate_rt, NeighbTable}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:next(TriggerState),
-    rm_loop:subscribe(self(), fun rm_loop:subscribe_dneighbor_change_filter/2,
-                      fun rm_send_update/3),
+    rm_loop:subscribe(self(), rt_loop,
+                      fun rm_loop:subscribe_dneighbor_change_filter/2,
+                      fun rt_loop:rm_send_update/4),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
       {NeighbTable, ?RT:empty(rm_loop:get_neighbors(NeighbTable)), TriggerState2}, on_active);
@@ -125,7 +127,7 @@ on_inactive(_Msg, State) ->
                ({deactivate_rt}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 on_active({deactivate_rt}, {NeighbTable, _OldRT, TriggerState})  ->
     log:log(info, "[ RT ~.0p ] deactivating...~n", [comm:this()]),
-    rm_loop:unsubscribe_all(self()),
+    rm_loop:unsubscribe(self(), rt_loop),
     % send new empty RT to the dht_node so that all routing messages
     % must be passed to the successor: 
     comm:send_local(pid_groups:get_my(dht_node),
@@ -225,10 +227,10 @@ set_rt({NeighbTable, _OldRT, TriggerState}, NewRT) ->
 
 %% @doc Notifies the node's routing table of a changed node ID, predecessor
 %%      and/or successor. Used to subscribe to the ring maintenance. 
--spec rm_send_update(Subscriber::comm:erl_local_pid(),
+-spec rm_send_update(Subscriber::pid(), Tag::rt_loop,
                      OldNeighbors::nodelist:neighborhood(),
                      NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_send_update(Pid, OldNeighbors, _NewNeighbors) ->
+rm_send_update(Pid, rt_loop, OldNeighbors, _NewNeighbors) ->
     comm:send_local(Pid, {update_rt, OldNeighbors}).
 
 -spec get_base_interval() -> pos_integer().

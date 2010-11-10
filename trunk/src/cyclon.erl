@@ -36,7 +36,7 @@
 -export([init/1, on_inactive/2, on_active/2,
          activate/0, deactivate/0,
          get_shuffle_interval/0,
-         rm_send_changes/3,
+         rm_send_changes/4,
          check_config/0]).
 
 % helpers for creating getter messages:
@@ -151,7 +151,8 @@ init(Trigger) ->
                  ({activate_cyclon}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
-    rm_loop:subscribe(self(), fun rm_loop:subscribe_default_filter/2, fun cyclon:rm_send_changes/3),
+    rm_loop:subscribe(self(), cyclon, fun rm_loop:subscribe_default_filter/2,
+                      fun cyclon:rm_send_changes/4),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),
@@ -185,7 +186,7 @@ on_inactive(_Msg, State) ->
          ({deactivate_cyclon}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles, TriggerState})  ->
     log:log(info, "[ Cyclon ~.0p ] deactivating...~n", [comm:this()]),
-    rm_loop:unsubscribe(self(), fun rm_loop:subscribe_default_filter/2, fun cyclon:rm_send_changes/3),
+    rm_loop:unsubscribe(self(), cyclon),
     gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
                                  on_inactive);
 
@@ -314,9 +315,9 @@ check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
 
 %% @doc Sends changes to a subscribed cyclon process when the neighborhood
 %%      changes.
--spec rm_send_changes(Pid::comm:erl_local_pid(),
+-spec rm_send_changes(Pid::pid(), Tag::cyclon,
         OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_send_changes(Pid, _OldNeighbors, NewNeighbors) ->
+rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors) ->
     comm:send_local(Pid, {rm_changed, nodelist:node(NewNeighbors)}).
 
 %% @doc Checks whether config parameters of the cyclon process exist and are
