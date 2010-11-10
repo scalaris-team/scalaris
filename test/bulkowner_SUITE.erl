@@ -37,15 +37,12 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    error_logger:tty(true),
-    Pid = unittest_helper:make_ring(4),
-    [{wrapper_pid, Pid} | Config].
+    Config2 = unittest_helper:init_per_suite(Config),
+    unittest_helper:make_ring(4),
+    Config2.
 
 end_per_suite(Config) ->
-    error_logger:tty(false),
-    {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    unittest_helper:stop_ring(Pid),
+    unittest_helper:end_per_suite(Config),
     ok.
 
 count(_Config) ->

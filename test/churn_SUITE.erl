@@ -47,26 +47,24 @@ init_per_testcase(TestCase, Config) ->
             {skip, "cannot handle network split yet - see issue 59"};
         transactions_1_failure_4_nodes_networksplit_write ->
 %            {skip, "cannot handle network split yet - see issue 59"},
-            Pid = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key( 0)) end),
-            [{wrapper_pid, Pid} | Config];
+            unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
+            Config;
         _ ->
-            Pid = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
-            [{wrapper_pid, Pid} | Config]
+            unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
+            Config
 %%             {skip, "temporarily"}
     end.
-
-init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Config.
-
-end_per_testcase(_TestCase, Config) ->
+ 
+end_per_testcase(_TestCase, _Config) ->
     %error_logger:tty(false),
-    {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    unittest_helper:stop_ring(Pid),
+    unittest_helper:stop_ring(),
     ok.
 
-end_per_suite(_Config) ->
-    unittest_helper:stop_ring(),
+init_per_suite(Config) ->
+    unittest_helper:init_per_suite(Config).
+
+end_per_suite(Config) ->
+    unittest_helper:end_per_suite(Config),
     ok.
 
 transactions_1_failure_4_nodes_read(_) ->

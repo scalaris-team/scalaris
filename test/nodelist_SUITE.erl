@@ -44,10 +44,10 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Config.
+    unittest_helper:init_per_suite(Config).
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    unittest_helper:end_per_suite(Config),
     ok.
 
 % TODO: add tests for simple node lists (the following tests only test functions with neighborhood structures)

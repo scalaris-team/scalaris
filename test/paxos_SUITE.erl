@@ -36,14 +36,13 @@ suite() ->
     [{timetrap, {seconds, 40}}].
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Pid = unittest_helper:make_ring(2),
+    Config2 = unittest_helper:init_per_suite(Config),
+    unittest_helper:make_ring(2),
     comm_server:set_local_address({127,0,0,1},14195),
-    [{wrapper_pid, Pid} | Config].
+    Config2.
 
 end_per_suite(Config) ->
-    {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    unittest_helper:stop_ring(Pid),
+    unittest_helper:end_per_suite(Config),
     ok.
 
 %% make proposers, acceptors, and learners

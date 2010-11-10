@@ -37,17 +37,15 @@ all() ->
 suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    Pid = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
+    Config2 = unittest_helper:init_per_suite(Config),
+    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
     ?equals(?CS_API:write(0, "initial0"), ok),
     %% make a 2nd write, so versiondec does not result in -1 in the DB
     ?equals(?CS_API:write(0, "initial"), ok),
-    [{wrapper_pid, Pid} | Config].
+    Config2.
 
 end_per_suite(Config) ->
-    %error_logger:tty(false),
-    {value, {wrapper_pid, Pid}} = lists:keysearch(wrapper_pid, 1, Config),
-    unittest_helper:stop_ring(Pid),
+    unittest_helper:end_per_suite(Config),
     ok.
 
 causes() -> [readlock, writelock, versiondec, versioninc, none].

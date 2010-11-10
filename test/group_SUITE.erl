@@ -33,12 +33,11 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
-    ct:pal("~p", [util:is_unittest()]),
-    Config.
+    unittest_helper:init_per_suite(Config).
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
     scalaris2:stop(),
+    unittest_helper:end_per_suite(Config),
     ok.
 
 init_per_testcase(_TestCase, Config) ->

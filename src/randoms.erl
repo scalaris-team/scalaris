@@ -22,7 +22,7 @@
 
 -include("scalaris.hrl").
 
--export([start/0, getRandomId/0, rand_uniform/2]).
+-export([start/0, stop/0, getRandomId/0, rand_uniform/2]).
 
 %% @doc Starts the crypto module's server.
 -spec start() -> ok.
@@ -38,3 +38,7 @@ getRandomId() ->
 -spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
 rand_uniform(Lo, Hi) ->
     crypto:rand_uniform(Lo, Hi).
+
+%% @doc Stops the crypto module's server.
+-spec stop() -> ok.
+stop() -> crypto:stop().

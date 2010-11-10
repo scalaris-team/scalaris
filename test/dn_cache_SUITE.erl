@@ -61,15 +61,14 @@ stop_config_processes(Pid) ->
     ok.
 
 init_per_suite(Config) ->
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
+    Config2 = unittest_helper:init_per_suite(Config),
     Pid = spawn_config_processes(),
-    [{wrapper_pid, Pid} | Config].
+    [{wrapper_pid, Pid} | Config2].
 
 end_per_suite(Config) ->
-    case lists:keyfind(wrapper_pid, 1, Config) of
-        false -> ok;
-        {wrapper_pid, Pid} -> stop_config_processes(Pid)
-    end,
+    {wrapper_pid, Pid} = lists:keyfind(wrapper_pid, 1, Config),
+    stop_config_processes(Pid),
+    unittest_helper:end_per_suite(Config),
     ok.
 
 dn_detection(Config) ->
