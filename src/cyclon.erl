@@ -35,7 +35,9 @@
 % functions gen_component, the trigger and the config module use
 -export([init/1, on_inactive/2, on_active/2,
          activate/0, deactivate/0,
-         get_shuffle_interval/0, check_config/0]).
+         get_shuffle_interval/0,
+         rm_send_changes/3,
+         check_config/0]).
 
 % helpers for creating getter messages:
 -export([get_subset_rand/1, get_subset_rand_next_interval/1]).
@@ -56,7 +58,7 @@
 % accepted messages of an active cyclon process
 -type(message() ::
     {cy_shuffle} |
-    {rm_changed, OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()} |
+    {rm_changed, NewNode::node:node_type()} |
     {check_state} |
     {cy_subset, SourcePid::comm:mypid(), PSubset::cyclon_cache:cache()} |
     {cy_subset_response, QSubset::cyclon_cache:cache(), PSubset::cyclon_cache:cache()} |
@@ -149,7 +151,7 @@ init(Trigger) ->
                  ({activate_cyclon}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
-    rm_loop:subscribe(self()),
+    rm_loop:subscribe(self(), fun rm_loop:subscribe_default_filter/2, fun cyclon:rm_send_changes/3),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),
@@ -183,7 +185,7 @@ on_inactive(_Msg, State) ->
          ({deactivate_cyclon}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles, TriggerState})  ->
     log:log(info, "[ Cyclon ~.0p ] deactivating...~n", [comm:this()]),
-    rm_loop:unsubscribe(self()),
+    rm_loop:unsubscribe(self(), fun rm_loop:subscribe_default_filter/2, fun cyclon:rm_send_changes/3),
     gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
                                  on_inactive);
 
@@ -196,9 +198,8 @@ on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState} = State)  ->
     TriggerState2 = trigger:next(TriggerState),
     {NewCache, Node, Cycles + 1, TriggerState2};
 
-on_active({rm_changed, _OldNeighbors, NewNeighbors}, {Cache, _OldNode, Cycles, TriggerState}) ->
-    Node = nodelist:node(NewNeighbors),
-    {Cache, Node, Cycles, TriggerState};
+on_active({rm_changed, NewNode}, {Cache, _OldNode, Cycles, TriggerState}) ->
+    {Cache, NewNode, Cycles, TriggerState};
 
 on_active({check_state}, State) ->
     check_state(State),
@@ -310,6 +311,13 @@ check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sends changes to a subscribed cyclon process when the neighborhood
+%%      changes.
+-spec rm_send_changes(Pid::comm:erl_local_pid(),
+        OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> ok.
+rm_send_changes(Pid, _OldNeighbors, NewNeighbors) ->
+    comm:send_local(Pid, {rm_changed, nodelist:node(NewNeighbors)}).
 
 %% @doc Checks whether config parameters of the cyclon process exist and are
 %%      valid.
