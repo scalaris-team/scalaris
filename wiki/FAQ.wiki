@@ -90,10 +90,12 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || SLE || 11 SP1 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/SLE_11_SP1/] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11_SP1/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/tschuett/SLE_11_SP1/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || CentOS || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/CentOS_5/] ||
 || RHEL || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/] ||
+|| RHEL || 6 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_6/] ||
 || Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Debian_5.0/] ||
 || Ubuntu || 9.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.04/] ||
 || Ubuntu || 9.10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.10/] ||
 || Ubuntu || 10.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_10.04/] ||
+|| Ubuntu || 10.10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_10.10/] ||
 
 Inside those repositories you will also find erlang packages - you don't need these if you already have a recent enough erlang version - the package dependencies are set accordingly.
 
