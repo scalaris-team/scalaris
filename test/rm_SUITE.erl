@@ -49,7 +49,6 @@ init_per_testcase(TestCase, Config) ->
     end.
 
 end_per_testcase(_TestCase, _Config) ->
-    unittest_helper:stop_ring(),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

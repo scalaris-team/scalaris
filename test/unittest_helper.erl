@@ -122,8 +122,11 @@ stop_ring(Pid) ->
             exit(Pid, kill),
             wait_for_process_to_die(Pid),
             stop_pid_groups(),
-            randoms:stop(),
-            inets:stop(),
+            % do not stop the randoms and inets apps since we do not know
+            % whether we started them in make_ring* and whether other processes
+            % still rely on it
+%%             randoms:stop(),
+%%             inets:stop(),
             catch unregister(ct_test_ring),
             ok
         end
@@ -263,14 +266,19 @@ get_processes() ->
 
 %% @doc Generic init_per_suite for all unit tests. Prints current state
 %%      information and stores information about all running processes.
+%%      Also starts the crypto application needed for unit tests using the
+%%      tester.
 init_per_suite(Config) ->
     Processes = get_processes(),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
+    randoms:start(),
     [{processes, Processes} | Config].
 
-%% @doc Generic end_per_suite for all unit tests. Gets the list of processes
-%%      stored in init_per_suite/1 and kills all but a selected few of
-%%      processes which are now running but haven't been running before.
+%% @doc Generic end_per_suite for all unit tests. Tries to stop a scalaris ring
+%%      started with make_ring* (if there is one) and stops the inets and
+%%      crypto applications needed for some unit tests. Then gets the list of
+%%      processes stored in init_per_suite/1 and kills all but a selected few
+%%      of processes which are now running but haven't been running before.
 %%      Thus allows a clean start of succeeding test suites.
 %%      Prints information about the processes that have been killed.
 end_per_suite(Config) ->
