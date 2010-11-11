@@ -70,7 +70,6 @@ spawn_config_processes() ->
     unittest_helper:fix_cwd(),
     unittest_helper:start_process(
       fun() ->
-              crypto:start(),
               pid_groups:start_link(),
               config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
               log:start_link()

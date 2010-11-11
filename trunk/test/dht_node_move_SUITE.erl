@@ -50,7 +50,6 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_ring(),
     Config.
 
 %% @doc Sets tighter timeouts for slides
