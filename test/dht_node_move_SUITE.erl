@@ -325,19 +325,20 @@ check_size2_v1(ExpSize) ->
     Ring = statistics:get_ring_details(),
     Load = statistics:get_total_load(Ring),
     % note: cs_api (v1) may leave old data items on nodes not responsible for them anymore, tolerate it here:
-    case Load < ExpSize of
+    case Load =/= ExpSize of
         true ->
             DHTNodes = pid_groups:find_all(dht_node),
-            [begin
-                 comm:send_local(DhtNode, {bulkowner_deliver, intervals:all(), {bulk_read_entry, comm:this()}})
-             end || DhtNode <- DHTNodes],
-            Data1 = receive {bulk_read_entry_response, _Range1, D1} -> D1 end,
-            Data2 = receive {bulk_read_entry_response, _Range2, D2} -> [D2 | Data1] end,
-            Data3 = receive {bulk_read_entry_response, _Range3, D3} -> [D3 | Data2] end,
-            Data4 = receive {bulk_read_entry_response, _Range4, D4} -> [D4 | Data3] end,
-            Data = lists:flatten(Data4),
+            DataAll = [begin
+                           comm:send_local(DhtNode,
+                                           {bulkowner_deliver, intervals:all(),
+                                            {bulk_read_entry, comm:this()}}),
+                           receive
+                               {bulk_read_entry_response, _Range1, D} -> D
+                           end
+                       end || DhtNode <- DHTNodes],
+            Data = lists:flatten(DataAll),
             ct:pal("~.0p", [Data]),
-            ?equals(Load, ExpSize);
+            ?equals_pattern(Load, L when L >= ExpSize);
         false -> ok
     end.
 
@@ -348,14 +349,15 @@ check_size2_v2(ExpSize) ->
     case Load =/= ExpSize of
         true ->
             DHTNodes = pid_groups:find_all(dht_node),
-            [begin
-                 comm:send_local(DhtNode, {bulkowner_deliver, intervals:all(), {bulk_read_entry, comm:this()}})
-             end || DhtNode <- DHTNodes],
-            Data1 = receive {bulk_read_entry_response, _Range1, D1} -> D1 end,
-            Data2 = receive {bulk_read_entry_response, _Range2, D2} -> [D2 | Data1] end,
-            Data3 = receive {bulk_read_entry_response, _Range3, D3} -> [D3 | Data2] end,
-            Data4 = receive {bulk_read_entry_response, _Range4, D4} -> [D4 | Data3] end,
-            Data = lists:flatten(Data4),
+            DataAll = [begin
+                           comm:send_local(DhtNode,
+                                           {bulkowner_deliver, intervals:all(),
+                                            {bulk_read_entry, comm:this()}}),
+                           receive
+                               {bulk_read_entry_response, _Range1, D} -> D
+                           end
+                       end || DhtNode <- DHTNodes],
+            Data = lists:flatten(DataAll),
             ct:pal("~.0p", [Data]),
             ?equals(Load, ExpSize);
         false -> ok

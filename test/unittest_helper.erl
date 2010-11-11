@@ -58,7 +58,10 @@ make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
     %       (it might use config or another process)
     fix_cwd(),
     error_logger:tty(true),
-    undefined = ets:info(config_ets),
+    case ets:info(config_ets) of
+        undefined -> ok;
+        _         -> ct:fail("Trying to create a new ring although there is already one.")
+    end,
     Pid = start_process(
             fun() ->
                     ct:pal("Trying to build Scalaris~n"),
@@ -67,24 +70,29 @@ make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
                     pid_groups:start_link(),
                     sup_scalaris:start_link(boot, [{boot_server, empty}]),
                     boot_server:connect(),
-                    Ids = IdsFun(),
+                    Ids = IdsFun(), % config may be needed
                     admin:add_node([{first}, {{idholder, id}, hd(Ids)}]),
                     [admin:add_node_at_id(Id) || Id <- tl(Ids)],
                     ok
             end),
 %%     timer:sleep(1000),
+    % need to call IdsFun again (may require config process or others
+    % -> can not call it before starting the scalaris process)
     Ids = IdsFun(),
     check_ring_size(length(Ids)),
     wait_for_stable_ring(),
     Size = check_ring_size(length(Ids)),
-    ct:pal("Scalaris has booted with ~p nodes...~n", [Size]),
+    ct:pal("Scalaris has booted with ~p node(s)...~n", [Size]),
     Pid.
 
 -spec make_ring(pos_integer()) -> pid().
 make_ring(Size) ->
     fix_cwd(),
     error_logger:tty(true),
-    undefined = ets:info(config_ets),
+    case ets:info(config_ets) of
+        undefined -> ok;
+        _         -> ct:fail("Trying to create a new ring although there is already one.")
+    end,
     Pid = start_process(
             fun() ->
                     ct:pal("Trying to build Scalaris~n"),

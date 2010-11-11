@@ -1426,7 +1426,7 @@ calls itself using tail-recursion in each branch. The loop works on a
 
 \section{Starting additional local nodes after boot}
 \label{sec:start-addit-local}
-\svnrev{r1253}
+\svnrev{r1267}
 
 After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
@@ -1601,49 +1601,45 @@ fails for some reason, it is tried again.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_other_p3}{../src/dht_node_join.erl}
 
-If its (future) successor is found, this new node will send a \code{join_request}
-message including a reference to itself and the chosen \code{Id}.
-This message is received by the old node in \code{dht_node.erl}
+If its (future) successor is found and the \code{Id} is not the same, this
+new node will send a \code{join_request} message including a reference to
+itself and the chosen \code{Id}. 
+If the chosen \code{Id} already exists, i.e. it is the successor's
+\code{Id}, the node will try a new (randomly chosen) \code{Id}. 
+Assuming the \code{join_request} message was send, it will be received by the
+existing node in \code{dht_node.erl}
 
 \codesnippet{dht_node.erl}{dht_node:join_message}{../src/dht_node.erl}
 
-and finally triggers a call to \erlfun{dht\_node\_join}{join\_request}{/2}
-on the old node:
+and trigger a call to \erlfun{dht\_node\_join}{process\_join\_msg}{/2} which
+will set up a slide operation with the new node or deny the request if it is
+not responsible for the key (anymore) any reply with a \code{}:
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_request1}{../src/dht_node_join.erl}
-\codesnippet{dht_node_join.erl}{dht_node_join:join_request}{../src/dht_node_join.erl}
+\codesnippet{dht_node_join.erl}{dht_node_join:join_request2}{../src/dht_node_join.erl}
 
-The \code{dht_node} will update the interval it is responsible for and
-notify the ring maintenance of its new predecessor. It will also remove all
-key-value pairs from its database which are now in the responsibility of
-the joining node and send a \code{join_response} message to the new node
-with its former predecessor and the data the new node has to host.
-
-\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p4}{../src/dht_node_join.erl}
-
-Back on the joining node: it waits for the \code{join_response}
-message in phase 4 of the join protocol. The next steps after the
-message is received from the old node are to initialize the
-maintenance components for the ring and routing table, the database
-and the state of the \code{dht_node}.
-The \erlfun{cs\_replica\_stabilization}{recreate\_replicas}{/1} function is
-called, which is not yet implemented. It would recreate necessary replicas
-that were lost due to load-balancing, node failures and lost updates during
-the data transfer.
-
+The joining node will receive the \code{join_response} message in phase 4 of
+the join protocol. If everything is ok, i.e. \code{MyKey} is unique, it will
+notify its ring maintenance process that it enters the ring, start all required
+processes and join the slide operation in order to receive data from the
+existing node.
 The macro \code{?RT} maps to the configured routing algorithm and
 \code{?RM} to the configured ring maintenance algorithm. It is defined
 in \code{include/scalaris.hrl}. For further details on the routing see
 Chapter~\sieheref{chapter.routing}.
 
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p4}{../src/dht_node_join.erl}
+\codesnippet{dht_node_join.erl}{dht_node_join:finish_join}{../src/dht_node_join.erl}
+
 Note that join-related messages arriving in other phases than those handling
 them will be ignored. Any other messages during a \code{dht_node}'s join will
 be queued and re-send when the join is complete.
 
-\todo{What, if the \code{Id} is exactly the same as that of the existing
-  node? This could lead to lookup and responsibility inconsistency? Can this
-  be triggered by the load-balancing? This is a bug, that should be
-  fixed!!!}
+The \code{join_timeout} parameter in the config files defines an overall
+timeout for the whole join operation. If it takes longer than
+\code{join_timeout} ms, the join will be re-started using
+\erlfun{dht\_node\_join}{restart\_join}{/2}
+\codesnippet{dht_node_join.erl}{dht_node_join:restart_join}{../src/dht_node_join.erl}
 
 
 \chapter{Directory Structure of the Source Code}

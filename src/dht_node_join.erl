@@ -337,7 +337,7 @@ send_join_request(Me, Succ, Timeouts) ->
 
 %% @doc Sends a join response message to the new predecessor and sets the given
 %%      slide operation in the dht_node state (adding a timeout to it as well).
-%% userdevguide-begin dht_node_join:join_request
+%% userdevguide-begin dht_node_join:join_request2
 -spec send_join_response(State::dht_node_state:state(),
                          NewSlideOp::slide_op:slide_op(),
                          NewPred::node:node_type())
@@ -352,18 +352,22 @@ send_join_response(State, SlideOp, NewPred) ->
     % also this is better in case the other node dies during the join
 %%     rm_loop:notify_new_pred(comm:this(), NewPred),
     dht_node_state:set_slide(State, pred, NewSlideOp).
-%% userdevguide-end dht_node_join:join_request
+%% userdevguide-end dht_node_join:join_request2
 
+%% userdevguide-begin dht_node_join:restart_join
 -spec restart_join(OldIdVersion::non_neg_integer(), QueuedMessages::msg_queue:msg_queue())
         -> {join, {phase1}, QueuedMessages::msg_queue:msg_queue()}.
 restart_join(OldIdVersion, QueuedMessages) ->
-    log:log(warn, "[ Node ~w ] join procedure taking longer than ~Bs, re-starting...", [self(), get_join_timeout()]),
+    log:log(warn, "[ Node ~w ] join procedure taking longer than ~Bs, re-starting...",
+            [self(), get_join_timeout()]),
     NewId = ?RT:get_random_node_id(),
     NewIdVersion = OldIdVersion + 1,
     idholder:set_id(NewId, NewIdVersion),
     idholder:get_id(),
     {join, {phase1}, QueuedMessages}.
+%% userdevguide-end dht_node_join:restart_join
 
+%% userdevguide-begin dht_node_join:finish_join
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::?DB:db(),
                   QueuedMessages::msg_queue:msg_queue())
@@ -380,6 +384,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     dht_node_state:new(?RT:empty_ext(rm_loop:get_neighbors(NeighbTable)), NeighbTable, DB).
+%% userdevguide-end dht_node_join:finish_join
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.
