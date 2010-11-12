@@ -26,7 +26,8 @@
 -include("scalaris.hrl").
 
 all() ->
-    [tester_update_id, tester_update_id2, tester_update_id2_1].
+    [tester_update_id, tester_update_id2_1, tester_update_id2_2,
+     tester_update_id2_3, tester_update_id2_4].
 
 suite() ->
     [
@@ -71,7 +72,7 @@ tester_update_id(_Config) ->
 -spec change_id_and_check(OldId::?RT:key() | unknown, NewId::?RT:key()) -> true.
 change_id_and_check(OldId, NewId) ->
     RM = comm:make_global(pid_groups:find_a(ring_maintenance)),
-    comm:send_to_group_member(RM, dht_node, {get_node_details, comm:this(), [node, predlist, succlist]}),
+    comm:send_to_group_member(RM, dht_node, {get_node_details, comm:this(), [node]}),
     OldNode = receive
                   {get_node_details_response, OldNodeDetails} ->
                       node_details:get(OldNodeDetails, node)
@@ -94,9 +95,12 @@ change_id_and_check(OldId, NewId) ->
             Pred = node_details:get(NewNodeDetails, pred),
             Succ = node_details:get(NewNodeDetails, succ),
             case node:id(OldNode) =/= NewId andalso
-                     ((NewNode =:= Pred) andalso (NewNode =:= Succ) orelse
-                     intervals:in(NewId,
-                                  intervals:new('(', node:id(Pred), node:id(Succ), ')'))) of
+                     ((NewNode =:= Pred) andalso (NewNode =:= Succ) % 1-element ring
+                     orelse % two nodes:
+                          Pred =:= Succ
+                     orelse % at least three nodes:
+                          intervals:in(NewId,
+                                       intervals:new('(', node:id(Pred), node:id(Succ), ')'))) of
                 true ->
                     ?equals(node:id(NewNode), NewId),
                     ?equals(node:id_version(NewNode), node:id_version(OldNode) + 1),
@@ -127,12 +131,22 @@ check_subscr_node_update(OldNode, NewNode) ->
 prop_update_id2(NewId) ->
     change_id_and_check(unknown, NewId).
 
-tester_update_id2(_Config) ->
-    Ring = unittest_helper:make_ring_with_ids(fun() -> [?RT:hash_key(0)] end),
+tester_update_id2_1(_Config) ->
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(1, ?RT:get_replica_keys(?RT:hash_key(0))) end),
     tester:test(rm_SUITE, prop_update_id2, 1, 1000),
     unittest_helper:stop_ring(Ring).
 
-tester_update_id2_1(_Config) ->
-    Ring = unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
+tester_update_id2_2(_Config) ->
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end),
+    tester:test(rm_SUITE, prop_update_id2, 1, 100),
+    unittest_helper:stop_ring(Ring).
+
+tester_update_id2_3(_Config) ->
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end),
+    tester:test(rm_SUITE, prop_update_id2, 1, 100),
+    unittest_helper:stop_ring(Ring).
+
+tester_update_id2_4(_Config) ->
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end),
     tester:test(rm_SUITE, prop_update_id2, 1, 100),
     unittest_helper:stop_ring(Ring).

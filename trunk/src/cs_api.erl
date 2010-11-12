@@ -198,14 +198,23 @@ do_transaction_locally(TransFun, SuccessFun, Failure, Timeout) ->
             do_transaction_locally(TransFun, SuccessFun, Failure, Timeout)
     end.
 
-%@doc range a range of key-value pairs
+%% @doc Read a range of key-value pairs between the given two keys (inclusive).
 -spec range_read(intervals:key(), intervals:key()) -> {ok | timeout, [db_entry:entry()]}.
 range_read(From, To) ->
-    ?TRACE("cs_api:range_read(~p, ~p)~n", [From, To]),
-    Interval = intervals:new('[', From, To, ']'),
+    Interval = case From of
+                   To -> intervals:all();
+                   _  -> intervals:new('[', From, To, ']')
+               end,
+    range_read(Interval).
+
+%% @doc Read a range of key-value pairs in the given interval.
+-spec range_read(intervals:interval()) -> {ok | timeout, [db_entry:entry()]}.
+range_read(Interval) ->
+    ?TRACE("cs_api:range_read(~p)~n", [Interval]),
     bulkowner:issue_bulk_owner(Interval,
                                {bulk_read_entry, comm:this()}),
-    TimerRef = comm:send_local_after(config:read(range_read_timeout), self(), {range_read_timeout}),
+    TimerRef = comm:send_local_after(config:read(range_read_timeout), self(),
+                                     {range_read_timeout}),
     range_read_loop(Interval, intervals:empty(), [], TimerRef).
 
 -spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.

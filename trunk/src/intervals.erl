@@ -15,6 +15,7 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
+%% @author Nico Kruber <kruber@zib.de>
 %% @doc Interval data structure and handling functions.
 %%
 %% All intervals created by methods of this module are normalized, i.e. simple
@@ -81,9 +82,11 @@ new(X) -> [{element, X}].
 %%      - half-open interval (A, B], aka ]A, B]
 %%      - half-open interval [A, B), aka [A, B[
 %%      - open interval (A, B), aka ]A, B[
-%%      The new interval may wrap around, i.e. A > B. If A=:=B and not '(A,A)'
-%%      is given, an interval covering the whole space is created.
-%%      Beware: some combinations create empty intervals, e.g. '(A,A)'.
+%%      The new interval may wrap around, e.g. if A > B.
+%%      If '[A,A]' is given, an interval with the element A is created.
+%%      The special cases '(A,A)', '[A,A)', '(A,A]' and
+%%      '(plus_infinity,minus_infinity,)' translate to an empty interval.
+%%      '[minus_infinity,plus_infinity]' translates to 'all'.
 -spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval().
 new(LeftBr, Begin, End, RightBr) ->
     normalize_simple({interval, LeftBr, Begin, End, RightBr}).
@@ -217,7 +220,9 @@ normalize_internal(List) ->
 -spec normalize_simple(simple_interval()) -> [simple_interval()].
 normalize_simple(all) -> [all];
 normalize_simple({element, _A} = I) -> [I];
-normalize_simple({interval, '(', X, X, ')'}) -> [];
+normalize_simple({interval, '(', X, X, _RightBr}) -> [];
+normalize_simple({interval, _LeftBr, X, X, ')'}) -> [];
+normalize_simple({interval, '[', X, X, ']'}) -> [{element, X}];
 normalize_simple({interval, '[', minus_infinity, plus_infinity, ']'}) ->
     [all];
 normalize_simple({interval, LeftBr, minus_infinity, plus_infinity, RightBr}) ->
@@ -230,8 +235,6 @@ normalize_simple({interval, '[', plus_infinity, minus_infinity, ')'}) ->
     [{element, plus_infinity}];
 normalize_simple({interval, '[', plus_infinity, minus_infinity, ']'}) ->
     [{element, minus_infinity}, {element, plus_infinity}];
-normalize_simple({interval, _LeftBr, X, X, _RightBr}) ->
-    [all]; % case '(X,X)' has been handled above
 normalize_simple({interval, '(', plus_infinity, X, RightBr}) ->
     [{interval, '[', minus_infinity, X, RightBr}];
 normalize_simple({interval, '[', plus_infinity, X, RightBr}) ->
@@ -421,8 +424,8 @@ is_continuous(_) -> false.
 %%      'all' transfers to {'[', minus_infinity, plus_infinity, ']'},
 %%      {element, Key} to {'[', Key, Key, ']'} and
 %%      [{interval,'[',minus_infinity,Key,')'},{interval,'(',Key,plus_infinity,']'}] to {'(', Key, Key, ')'}.
-%%      Other normalized intervals that wrap around will be returned the same
-%%      way they can be constructed with new/4.
+%%      Other normalized intervals that wrap around (as well as the first two)
+%%      are returned the same way they can be constructed with new/4.
 %%      Note: this method will only work on continuous non-empty intervals
 %%      and will throw an exception otherwise!
 -spec get_bounds(interval()) -> {left_bracket(), key(), key(), right_bracket()}.

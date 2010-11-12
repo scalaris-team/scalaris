@@ -178,11 +178,16 @@ nodeid({_Preds, Node, _Succs}) ->
 -spec update_node(neighborhood(), NewBaseNode::node:node_type()) -> neighborhood().
 update_node({[Node], Node, [Node]}, NewBaseNode) ->
     new([NewBaseNode], NewBaseNode, [NewBaseNode]);
+update_node({[Pred], _Node, [Pred] = Neighbors}, NewBaseNode) ->
+    case node:id(NewBaseNode) =:= node:id(Pred) of
+        false -> new(Neighbors, NewBaseNode, Neighbors);
+        _     -> throw('cannot update base node - not within (id(Pred), id(Succ))')
+    end;
 update_node({[Pred | _] = Preds, _Node, [Succ | _] = Succs}, NewBaseNode) ->
     case intervals:in(node:id(NewBaseNode),
                       intervals:new('(', node:id(Pred), node:id(Succ), ')')) of
         true -> new(Preds, NewBaseNode, Succs);
-        _ -> throw('cannot update base node - not within (id(Pred), id(Succ))')
+        _    -> throw('cannot update base node - not within (id(Pred), id(Succ))')
     end.
 
 %% @doc Returns the neighborhood's predecessor list.
