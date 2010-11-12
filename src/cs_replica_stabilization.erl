@@ -111,5 +111,5 @@ update_db(Data) ->
 createReplicatedIntervals(From, To) ->
     FromReplicas = ?RT:get_replica_keys(From),
     ToReplicas   = ?RT:get_replica_keys(To),
-    lists:zipwith(fun intervals:new/2, FromReplicas, ToReplicas).
+    lists:zipwith(fun node:mk_interval_between_ids/2, FromReplicas, ToReplicas).
 

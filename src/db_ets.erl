@@ -110,8 +110,6 @@ get_chunk_({ETSDB, _CKInt, _CKDB} = DB, Interval, ChunkSize) ->
                             case intervals:in(Next, Interval) of
                                 false ->
                                     {intervals:empty(), Chunk};
-                                true when Next =:= End ->
-                                    {intervals:new(Next), Chunk};
                                 _ ->
                                     {intervals:new('[', Next, End, EndBr), Chunk}
                             end
