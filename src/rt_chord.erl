@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 %% userdevguide-begin rt_chord:types
--type key_t() :: non_neg_integer().
+-type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
 -type rt_t() :: gb_tree().
 -type external_rt_t() :: gb_tree().
 -type index() :: {pos_integer(), non_neg_integer()}.
