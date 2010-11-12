@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 %% userdevguide-begin rt_simple:types
--type key_t() :: non_neg_integer().
+-type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
 -type rt_t() :: Succ::node:node_type().
 -type external_rt_t() :: Succ::node:node_type().
 -type custom_message() :: none().
