@@ -20,7 +20,8 @@
 
 -include("scalaris.hrl").
 
--export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0, dbg_db/0, dbg_db_without_pid/0]).
+-export([dbg/0, dbg_version/0, dbg3/0, dbg_mode/0, dbg_db/0,
+         dbg_db_without_pid/0, check_ring/0, check_ring_uniq/0]).
 
 -spec dbg() -> any().
 dbg() ->
@@ -94,3 +95,60 @@ dbg_db_without_pid() ->
                       Size = group_db:get_size(DB),
                       {element(1, DB), Size}
               end, pid_groups:find_all(group_node)).
+
+-spec check_ring() ->
+    ok | {failed, string()}.
+check_ring() ->
+    Data = lists:map(fun (Node) ->
+                             comm:send_local(Node, {get_succ_pred, comm:this()}),
+                             receive
+                                 {get_succ_pred_response, Pred, Succ, Interval} ->
+                                     {Interval, Pred, Succ}
+                             end
+                     end, pid_groups:find_all(group_node)),
+    Set = gb_sets:from_list(Data),
+    F = fun ({Interval, Pred, Succ}, Tree) ->
+                case Tree of
+                    {failed, Msg} ->
+                        Tree;
+                    _ ->
+                        case gb_trees:lookup(Interval, Tree) of
+                            none ->
+                                gb_trees:insert(Interval, {Pred, Succ}, Tree);
+                            {value, {Pred, Succ}} ->
+                                Tree;
+                            {value, {Pred, Succ2}} ->
+                                Msg = io_lib:format("succs don't match for ~p: ~w <-> ~p",
+                                                    [Interval, Succ, Succ2]),
+                                {failed, lists:flatten(Msg)};
+                            {value, {Pred2, Succ}} ->
+                                Msg = io_lib:format("preds don't match for ~p: ~w <-> ~p",
+                                                    [Interval, Pred, Pred2]),
+                                {failed, lists:flatten(Msg)};
+                            {value, {Pred2, Succ2}} ->
+                                Msg = io_lib:format("preds and succs don't match for ~w: ~w <-> ~w",
+                                                    [Interval, {Pred, Succ}, {Pred2, Succ2}]),
+                                {failed, lists:flatten(Msg)}
+                        end
+                end
+        end,
+    Result = lists:foldl(F, gb_trees:empty(), Data),
+    case Result of
+        {failed, _} ->
+            Result;
+        _ ->
+            ok
+    end.
+
+-spec check_ring_uniq() ->
+    list().
+check_ring_uniq() ->
+    Data = lists:map(fun (Node) ->
+                             comm:send_local(Node, {get_succ_pred, comm:this()}),
+                             receive
+                                 {get_succ_pred_response, Pred, Succ, Interval} ->
+                                     {Interval, Pred, Succ}
+                             end
+                     end, pid_groups:find_all(group_node)),
+    Set = gb_sets:from_list(Data),
+    gb_sets:to_list(Set).

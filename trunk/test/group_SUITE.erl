@@ -25,7 +25,8 @@
 -include("unittest.hrl").
 
 all() ->
-    [add_9, add_9_remove_4, db_repair, group_split, group_split_with_data].
+    [add_9, add_9_remove_4, db_repair, group_split, group_split_with_data,
+     build_ring]. %, build_ring_with_routing
 
 suite() ->
     [
@@ -113,6 +114,58 @@ group_split_with_data(_Config) ->
     timer:sleep(1000),
     wait_for(check_versions([{2, 2}, {3, 2}], 10)),
     wait_for(check_dbs([{is_current, 1}, {is_current, 3}], 10)),
+    ok.
+
+build_ring(_Config) ->
+    config:write(group_node_base_interval, 60000),
+    config:write(group_max_size, 4),
+    admin:add_nodes(31),
+    % check group_state
+    wait_for(check_versions([{1, 33}], 32)),
+    % check db
+    wait_for(check_dbs([{is_current, 0}], 32)),
+    % trigger split
+    pid_groups:find_a(group_node) ! {trigger},
+    timer:sleep(1000),
+    % wait for the 8 groups
+    wait_for(fun () ->
+                     [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
+                     F = check_versions([{8, 2}, {9, 2}, {10, 2}, {11, 2},
+                                         {12, 2}, {13, 2}, {14, 2}, {15, 2}],
+                                        32),
+                     F()
+             end),
+    % wait for repaired ring I
+    wait_for(fun () ->
+                     length(group_debug:check_ring_uniq()) == 8
+             end),
+    % wait for repaired ring II
+    wait_for(fun () ->
+                     group_debug:check_ring() == ok
+             end),
+    ok.
+
+build_ring_with_routing(_Config) ->
+    % disabled
+    config:write(group_node_base_interval, 60000),
+    config:write(group_max_size, 4),
+    admin:add_nodes(31),
+    % check group_state
+    wait_for(check_versions([{1, 33}], 32)),
+    % check db
+    wait_for(check_dbs([{is_current, 0}], 32)),
+    % trigger split
+    pid_groups:find_a(group_node) ! {trigger},
+    timer:sleep(1000),
+    wait_for(fun () ->
+                     [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
+                     F = check_versions([{8, 2}, {9, 2}, {10, 2}, {11, 2}, {12, 2}, {13, 2}, {14, 2}, {15, 2}], 32),
+                     F()
+             end),
+    %?equals(group_api:paxos_write(1, 1), ok),
+    %?equals(group_api:paxos_write(2, 2), ok),
+    %?equals(group_api:paxos_write(3, 3), ok),
+    %?equals(group_api:paxos_write(4, 4), ok),
     ok.
 
 wait_for(F) ->

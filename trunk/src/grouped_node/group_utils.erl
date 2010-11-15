@@ -30,12 +30,12 @@
 notify_neighbors(NodeState, OldView, NewView) ->
     OldGroupNode = group_view:get_group_node(OldView),
     NewGroupNode = group_view:get_group_node(NewView),
-    case OldGroupNode == NewGroupNode of
+    case OldGroupNode =:= NewGroupNode of
         true ->
             ok;
         false ->
-            {_, _, Preds} = group_local_state:get_predecessor(NodeState),
-            {_, _, Succs} = group_local_state:get_successor(NodeState),
+            {_, _, _, Preds} = group_local_state:get_predecessor(NodeState),
+            {_, _, _, Succs} = group_local_state:get_successor(NodeState),
             [comm:send(P, {succ_update, NewGroupNode}) || P <- Preds],
             [comm:send(P, {pred_update, NewGroupNode}) || P <- Succs],
             ok
