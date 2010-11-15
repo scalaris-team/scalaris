@@ -36,10 +36,12 @@
          % testing / comparing intervals
          is_empty/1, is_subset/2, is_continuous/1,
          is_adjacent/2, in/2,
+         is_left_of/2, is_right_of/2,
          % operations for intervals
          intersection/2, union/2, minus/2,
          % getters for certain intervals
          get_bounds/1, get_elements/1,
+         %
          % for unit testing only
          is_well_formed/1, normalize/1
         ]).
@@ -588,3 +590,22 @@ greater_than(X, Y)              -> X > Y.
 %% @doc A &gt;= B
 -spec greater_equals_than(A::key(), B::key()) -> boolean().
 greater_equals_than(A, B) -> (A =:= B) orelse greater_than(A, B).
+
+%% @doc X and Y are adjacent and Y follows X
+-spec is_left_of(interval(), interval()) -> boolean().
+is_left_of(X, Y) ->
+    case is_adjacent(X, Y) of
+        true ->
+            {_, _A,  B, _} = get_bounds(X),
+            {_,  C, _D, _} = get_bounds(Y),
+            % in(B, X) =/= in(B, Y) implied by is_adjacent
+            (B =:= C orelse {B, C} =:= {plus_infinity, minus_infinity}) andalso (in(B, X) orelse in(B, Y));
+        false ->
+            false
+    end.
+
+%% @doc X and Y are adjacent and X follows Y
+-spec is_right_of(interval(), interval()) -> boolean().
+is_right_of(X, Y) ->
+    is_left_of(Y, X).
+

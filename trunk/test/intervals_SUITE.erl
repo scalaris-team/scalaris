@@ -42,6 +42,7 @@ all() ->
      tester_not_intersection, tester_not_intersection2,
      tester_union_well_formed, tester_union, tester_not_union, tester_union_continuous,
      tester_is_adjacent, tester_is_adjacent_union,
+     tester_is_left_right_of,
      tester_is_subset, tester_is_subset2,
      tester_minus_well_formed, tester_minus, tester_minus2, tester_minus3,
      tester_not_minus, tester_not_minus2,
@@ -509,6 +510,9 @@ prop_is_adjacent(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
              {B, A} =:= {intervals:new(minus_infinity), intervals:new(plus_infinity)}),
     IsAdjacent =:= intervals:is_adjacent(A, B).
 
+tester_is_adjacent_union(_Config) ->
+    tester:test(?MODULE, prop_is_adjacent_union, 8, 5000).
+
 -spec prop_is_adjacent_union(A0Br::intervals:left_bracket(), A0::intervals:key(), A1::intervals:key(), A1Br::intervals:right_bracket(),
                              B0Br::intervals:left_bracket(), B0::intervals:key(), B1::intervals:key(), B1Br::intervals:right_bracket()) -> boolean().
 prop_is_adjacent_union(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
@@ -519,8 +523,20 @@ prop_is_adjacent_union(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
 tester_is_adjacent(_Config) ->
     tester:test(?MODULE, prop_is_adjacent, 8, 5000).
 
-tester_is_adjacent_union(_Config) ->
-    tester:test(?MODULE, prop_is_adjacent_union, 8, 5000).
+-spec(prop_is_left_right_of/8 :: (A0Br::intervals:left_bracket(), A0::intervals:key(),
+                                  A1::intervals:key(), A1Br::intervals:right_bracket(),
+                                  B0Br::intervals:left_bracket(), B0::intervals:key(),
+                                  B1::intervals:key(), B1Br::intervals:right_bracket()) -> true).
+prop_is_left_right_of(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
+    A = intervals:new(A0Br, A0, A1, A1Br),
+    B = intervals:new(B0Br, B0, B1, B1Br),
+    ?equals(?implies(intervals:is_left_of(A, B), intervals:is_empty(intervals:minus(intervals:new(A0Br, A0, B1, B1Br), intervals:union(A, B)))), true),
+    ?equals(?implies(intervals:is_right_of(A, B), intervals:is_empty(intervals:minus(intervals:new(B0Br, B0, A1, A1Br), intervals:union(A, B)))), true),
+    ?equals(intervals:is_adjacent(A, B), intervals:is_left_of(A, B) orelse intervals:is_right_of(A, B)),
+    true.
+
+tester_is_left_right_of(_Config) ->
+    tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
