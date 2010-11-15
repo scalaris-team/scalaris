@@ -257,9 +257,9 @@ split_group(#view{acceptors=OldAcceptors,
                  proposals = gb_trees:empty()}.
 
 -spec get_group_node(View::view()) -> group_types:group_node().
-get_group_node(#view{group_id = GroupId, version = Version,
+get_group_node(#view{group_id = GroupId, interval = Range, version = Version,
                      members = Members}) ->
-    {GroupId, Version, Members}.
+    {GroupId, Range, Version, Members}.
 
 index_of(_, []) ->
     error;

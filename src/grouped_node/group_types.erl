@@ -37,6 +37,7 @@
 -type(decision_hint() :: my_proposal_won | had_no_proposal).
 
 -type(group_node() :: {GroupId::group_id(),
+                       Range::intervals:interval(),
                        Version::non_neg_integer(),
                        Members::list(comm:mypid())}).
 

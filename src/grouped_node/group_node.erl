@@ -92,6 +92,10 @@ on_joining({known_nodes_timeout}, State) ->
 on_joining({trigger}, State) ->
     group_node_trigger:trigger(State);
 on_joining({route, _, _, _}, State) ->
+    State;
+on_joining({pred_update, _Succ}, State) ->
+    State;
+on_joining({succ_update, _Succ}, State) ->
     State.
 
 -spec on(message(), group_state:state()) -> group_state:state().
@@ -137,6 +141,15 @@ on({learner_decide, _Cookie, PaxosId, Proposal},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % retry
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({group_split_response,retry_outdated_member_list}, State) ->
+    % @todo: do nothing?
+    State;
+on({group_split_response,success}, State) ->
+    % @todo: do nothing?
+    State;
+on({group_split_response,member_list_has_changed}, State) ->
+    % @todo: do nothing?
+    State;
 on({group_split_response,retry}, State) ->
     % @todo: do nothing?
     State;
@@ -232,13 +245,22 @@ on({group_node_join_response, retry, _Reason}, State) ->
 on({group_state, _NewGroupState, _Pred, _Succ}, State) ->
     % @todo ignore for the moment
     State;
+on({get_succ_pred, Pid}, State) ->
+    NodeState = group_state:get_node_state(State),
+    Pred = group_local_state:get_predecessor(NodeState),
+    Succ = group_local_state:get_successor(NodeState),
+    Interval = group_view:get_interval(group_state:get_view(State)),
+    comm:send(Pid, {get_succ_pred_response, Pred, Succ, Interval}),
+    State;
 on({succ_update, Succ}, State) ->
     NodeState = group_state:get_node_state(State),
-    NewNodeState = group_local_state:update_succ(NodeState, Succ),
+    Range = group_view:get_interval(group_state:get_view(State)),
+    NewNodeState = group_local_state:update_succ(NodeState, Succ, Range),
     group_state:set_node_state(State, NewNodeState);
 on({pred_update, Pred}, State) ->
     NodeState = group_state:get_node_state(State),
-    NewNodeState = group_local_state:update_pred(NodeState, Pred),
+    Range = group_view:get_interval(group_state:get_view(State)),
+    NewNodeState = group_local_state:update_pred(NodeState, Pred, Range),
     group_state:set_node_state(State, NewNodeState);
 on({trigger}, State) ->
     group_node_trigger:trigger(State);
@@ -249,10 +271,8 @@ on({known_nodes_timeout}, State) ->
     State;
 on({get_dht_nodes_response, _Nodes}, State) ->
     % too late !?!
-    State;
-
-on({group_split_response,success}, State) ->
     State.
+
 
 %% @doc joins this node in the ring and calls the main loop
 -spec init(list()) -> group_state:state() | {'$gen_component', list(), group_state:state()}.

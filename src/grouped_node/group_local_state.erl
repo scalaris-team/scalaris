@@ -24,7 +24,7 @@
 
 -export([new/2,
         get_predecessor/1, get_successor/1,
-        update_pred_succ/3, update_pred/2, update_succ/2]).
+        update_pred_succ/4, update_pred/3, update_succ/3]).
 
 -record(local_state, {successor::group_types:group_node(),
                       predecessor::group_types:group_node(),
@@ -49,16 +49,46 @@ get_successor(#local_state{successor=Successor}) ->
     Successor.
 
 -spec update_pred_succ(local_state(), group_types:group_node(),
-                       group_types:group_node()) -> local_state().
-update_pred_succ(NodeState, Pred, Succ) ->
-    update_pred(update_succ(NodeState, Succ), Pred).
+                       group_types:group_node(), Range::intervals:interval()) -> local_state().
+update_pred_succ(NodeState, Pred, Succ, Range) ->
+    case Pred == Succ of
+        true ->
+            ct:pal("WARNING");
+        false ->
+            ok
+    end,
+    update_pred(update_succ(NodeState, Succ, Range), Pred, Range).
 
--spec update_succ(local_state(), group_types:group_node()) -> local_state().
-update_succ(NodeState, Succ) ->
-    % @todo: check if newer and update
-    NodeState.
+-spec update_succ(local_state(), group_types:group_node(), Range::intervals:interval()) -> local_state().
+update_succ(NodeState, {NewGroupId, NewRange, NewVersion, _NewMembers} = Succ, Range) ->
+    {OldGroupId, OldRange, OldVersion, _OldMembers} = get_successor(NodeState),
+    case
+        (intervals:is_left_of(Range, NewRange) andalso
+        is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion))
+        orelse
+        not intervals:is_right_of(Range, OldRange)
+        of
+        true ->
+            NodeState#local_state{successor=Succ};
+        false ->
+            NodeState
+    end.
 
--spec update_pred(local_state(), group_types:group_node()) -> local_state().
-update_pred(NodeState, Pred) ->
-    % @todo: check if newer and update
-    NodeState.
+-spec update_pred(local_state(), group_types:group_node(), Range::intervals:interval()) -> local_state().
+update_pred(NodeState, {NewGroupId, NewRange, NewVersion, _NewMembers} = Pred, Range) ->
+    {OldGroupId, OldRange, OldVersion, _OldMembers} = get_predecessor(NodeState),
+    case
+        (intervals:is_right_of(Range, NewRange) andalso
+        is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion))
+        orelse
+        not intervals:is_right_of(Range, OldRange)
+        of
+        true ->
+            NodeState#local_state{predecessor=Pred};
+        false ->
+            NodeState
+    end.
+
+is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion) ->
+    (OldGroupId == NewGroupId andalso NewVersion > OldVersion) orelse
+        OldGroupId < NewGroupId.
