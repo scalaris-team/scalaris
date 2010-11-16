@@ -27,7 +27,7 @@
 -include("scalaris.hrl").
 
 all() ->
-    [new, is_empty, intersection, tc1, normalize,
+    [new, is_empty, intersection, tc1, normalize, is_left_right_of,
      tester_empty_well_formed, tester_empty, tester_empty_continuous,
      tester_new1_well_formed, tester_new1, tester_new1_continuous,
      tester_new1_bounds,
@@ -537,6 +537,14 @@ prop_is_left_right_of(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
 
 tester_is_left_right_of(_Config) ->
     tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000).
+
+is_left_right_of(_Config) ->
+    X = [{interval,'[',17, ?PLUS_INFINITY, ')'}],
+    Y = [{interval,'[',?MINUS_INFINITY,17,')'}],
+    ?equals(intervals:is_adjacent(X, Y), true), % @17
+    ?equals(intervals:is_left_of(X, Y), true),
+    ?equals(intervals:is_left_of(Y, X), true),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
