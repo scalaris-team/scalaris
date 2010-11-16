@@ -87,26 +87,26 @@ escape_quotes(String) ->
 escape_quotes_($", Rest) -> [$\\, $" | Rest];
 escape_quotes_(Ch, Rest) -> [Ch | Rest].
 
--spec max(plus_infinity, any()) -> plus_infinity;
-         (any(), plus_infinity) -> plus_infinity;
-         (T | minus_infinity, T | minus_infinity) -> T.
-max(plus_infinity, _) -> plus_infinity;
-max(_, plus_infinity) -> plus_infinity;
-max(minus_infinity, X) -> X;
-max(X, minus_infinity) -> X;
+-spec max(?PLUS_INFINITY, any()) -> ?PLUS_INFINITY;
+         (any(), ?PLUS_INFINITY) -> ?PLUS_INFINITY;
+         (T | ?MINUS_INFINITY, T | ?MINUS_INFINITY) -> T.
+max(?PLUS_INFINITY, _) -> ?PLUS_INFINITY;
+max(_, ?PLUS_INFINITY) -> ?PLUS_INFINITY;
+max(?MINUS_INFINITY, X) -> X;
+max(X, ?MINUS_INFINITY) -> X;
 max(A, B) ->
     case A > B of
         true -> A;
         false -> B
     end.
 
--spec min(minus_infinity, any()) -> minus_infinity;
-         (any(), minus_infinity) -> minus_infinity;
-         (T | plus_infinity, T | plus_infinity) -> T.
-min(minus_infinity, _) -> minus_infinity;
-min(_, minus_infinity) -> minus_infinity;
-min(plus_infinity, X) -> X;
-min(X, plus_infinity) -> X;
+-spec min(?MINUS_INFINITY, any()) -> ?MINUS_INFINITY;
+         (any(), ?MINUS_INFINITY) -> ?MINUS_INFINITY;
+         (T | ?PLUS_INFINITY, T | ?PLUS_INFINITY) -> T.
+min(?MINUS_INFINITY, _) -> ?MINUS_INFINITY;
+min(_, ?MINUS_INFINITY) -> ?MINUS_INFINITY;
+min(?PLUS_INFINITY, X) -> X;
+min(X, ?PLUS_INFINITY) -> X;
 min(A, B) ->
     case A < B of
         true -> A;
