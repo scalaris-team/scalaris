@@ -605,7 +605,10 @@ is_left_of(X, Y) ->
             {_, _A,  B, _} = get_bounds(X),
             {_,  C, _D, _} = get_bounds(Y),
             % in(B, X) =/= in(B, Y) implied by is_adjacent
-            (B =:= C orelse {B, C} =:= {?PLUS_INFINITY, ?MINUS_INFINITY}) andalso (in(B, X) orelse in(B, Y));
+            (B =:= C andalso (in(B, X) orelse in(B, Y)))
+                orelse
+            ({B, C} =:= {?PLUS_INFINITY, ?MINUS_INFINITY} andalso
+             (in(?PLUS_INFINITY, X) orelse in(?MINUS_INFINITY, Y)));
         false ->
             false
     end.
