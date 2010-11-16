@@ -52,7 +52,7 @@
 
 -type left_bracket() :: '(' | '['.
 -type right_bracket() :: ')' | ']'.
--type key() :: ?RT:key() | minus_infinity | plus_infinity.
+-type key() :: ?RT:key() | ?MINUS_INFINITY | ?PLUS_INFINITY.
 -type simple_interval() :: {element, key()} | {interval, left_bracket(), key(), key(), right_bracket()} | all.
 -opaque interval() :: [simple_interval()]. %todo: make opaque (gives wrong dialyzer warnings with erlang =< R14B)
 
@@ -65,7 +65,13 @@
 % {interval, '(', A::term(), B::term(), ']'} -> half-open interval (A, B], aka ]A, B]
 % {interval, '[', A::term(), B::term(), ')'} -> half-open interval [A, B), aka [A, B[
 % {interval, '(', A::term(), B::term(), ')'} -> open interval (A, B), aka ]A, B[
-% all -> minus_infinity to plus_infinity
+% all -> ?MINUS_INFINITY to ?PLUS_INFINITY
+
+% Note: the intervals module uses two special symbols (?MINUS_INFINITY
+% and ?PLUS_INFINITY) to define the smallest and the largest element.
+% In Scalaris these values are dependent on the routing table
+% implementation. Therefore it is not possible e.g. to use intervals
+% over integer ranges and strings at the same time!
 
 %% @doc Creates an empty interval.
 -spec empty() -> interval().
@@ -87,8 +93,8 @@ new(X) -> [{element, X}].
 %%      The new interval may wrap around, e.g. if A > B.
 %%      If '[A,A]' is given, an interval with the element A is created.
 %%      The special cases '(A,A)', '[A,A)', '(A,A]' and
-%%      '(plus_infinity,minus_infinity,)' translate to an empty interval.
-%%      '[minus_infinity,plus_infinity]' translates to 'all'.
+%%      '(?PLUS_INFINITY,?MINUS_INFINITY,)' translate to an empty interval.
+%%      '[?MINUS_INFINITY,?PLUS_INFINITY]' translates to 'all'.
 -spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval().
 new(LeftBr, Begin, End, RightBr) ->
     normalize_simple({interval, LeftBr, Begin, End, RightBr}).
@@ -225,30 +231,30 @@ normalize_simple({element, _A} = I) -> [I];
 normalize_simple({interval, '(', X, X, _RightBr}) -> [];
 normalize_simple({interval, _LeftBr, X, X, ')'}) -> [];
 normalize_simple({interval, '[', X, X, ']'}) -> [{element, X}];
-normalize_simple({interval, '[', minus_infinity, plus_infinity, ']'}) ->
+normalize_simple({interval, '[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'}) ->
     [all];
-normalize_simple({interval, LeftBr, minus_infinity, plus_infinity, RightBr}) ->
-    [{interval, LeftBr, minus_infinity, plus_infinity, RightBr}];
-normalize_simple({interval, '(', plus_infinity, minus_infinity, ')'}) ->
+normalize_simple({interval, LeftBr, ?MINUS_INFINITY, ?PLUS_INFINITY, RightBr}) ->
+    [{interval, LeftBr, ?MINUS_INFINITY, ?PLUS_INFINITY, RightBr}];
+normalize_simple({interval, '(', ?PLUS_INFINITY, ?MINUS_INFINITY, ')'}) ->
     [];
-normalize_simple({interval, '(', plus_infinity, minus_infinity, ']'}) ->
-    [{element, minus_infinity}];
-normalize_simple({interval, '[', plus_infinity, minus_infinity, ')'}) ->
-    [{element, plus_infinity}];
-normalize_simple({interval, '[', plus_infinity, minus_infinity, ']'}) ->
-    [{element, minus_infinity}, {element, plus_infinity}];
-normalize_simple({interval, '(', plus_infinity, X, RightBr}) ->
-    [{interval, '[', minus_infinity, X, RightBr}];
-normalize_simple({interval, '[', plus_infinity, X, RightBr}) ->
-    [{interval, '[', minus_infinity, X, RightBr}, {element, plus_infinity}];
-normalize_simple({interval, LeftBr, X, minus_infinity, ')'}) ->
-    [{interval, LeftBr, X, plus_infinity, ']'}];
-normalize_simple({interval, LeftBr, X, minus_infinity, ']'}) ->
-    [{element, minus_infinity}, {interval, LeftBr, X, plus_infinity, ']'}];
+normalize_simple({interval, '(', ?PLUS_INFINITY, ?MINUS_INFINITY, ']'}) ->
+    [{element, ?MINUS_INFINITY}];
+normalize_simple({interval, '[', ?PLUS_INFINITY, ?MINUS_INFINITY, ')'}) ->
+    [{element, ?PLUS_INFINITY}];
+normalize_simple({interval, '[', ?PLUS_INFINITY, ?MINUS_INFINITY, ']'}) ->
+    [{element, ?MINUS_INFINITY}, {element, ?PLUS_INFINITY}];
+normalize_simple({interval, '(', ?PLUS_INFINITY, X, RightBr}) ->
+    [{interval, '[', ?MINUS_INFINITY, X, RightBr}];
+normalize_simple({interval, '[', ?PLUS_INFINITY, X, RightBr}) ->
+    [{interval, '[', ?MINUS_INFINITY, X, RightBr}, {element, ?PLUS_INFINITY}];
+normalize_simple({interval, LeftBr, X, ?MINUS_INFINITY, ')'}) ->
+    [{interval, LeftBr, X, ?PLUS_INFINITY, ']'}];
+normalize_simple({interval, LeftBr, X, ?MINUS_INFINITY, ']'}) ->
+    [{element, ?MINUS_INFINITY}, {interval, LeftBr, X, ?PLUS_INFINITY, ']'}];
 normalize_simple({interval, LeftBr, Begin, End, RightBr} = I) ->
     case wraps_around(LeftBr, Begin, End, RightBr) of
-        true ->  [{interval, '[', minus_infinity, End, RightBr},
-                  {interval, LeftBr, Begin, plus_infinity, ']'}];
+        true ->  [{interval, '[', ?MINUS_INFINITY, End, RightBr},
+                  {interval, LeftBr, Begin, ?PLUS_INFINITY, ']'}];
         false -> [I]
     end.
 
@@ -270,9 +276,9 @@ is_well_formed([_|_] = List) ->
 %%      or any other value are considered 'not normalized'.
 -spec is_well_formed_simple(simple_interval()) ->  boolean().
 is_well_formed_simple({element, _X}) -> true;
-is_well_formed_simple({interval, '(', plus_infinity, _Y, _RightBr}) ->
+is_well_formed_simple({interval, '(', ?PLUS_INFINITY, _Y, _RightBr}) ->
     false;
-is_well_formed_simple({interval, _LeftBr, _X, minus_infinity, ')'}) ->
+is_well_formed_simple({interval, _LeftBr, _X, ?MINUS_INFINITY, ')'}) ->
     false;
 is_well_formed_simple({interval, _LeftBr, X, Y, _RightBr}) ->
     % same as: X=/=Y andalso not wraps_around(Interval)
@@ -411,36 +417,36 @@ is_continuous([{element, _Key}]) -> true;
 is_continuous([{interval, _LBr, _L, _R, _RBr}]) -> true;
 % complex intervals have adjacent intervals merged except for those wrapping around
 % -> if it contains only two simple intervals which are adjacent, it is continuous!
-is_continuous([{interval, '[', minus_infinity, _B1, _B1Br},
-               {interval, _A0Br, _A0, plus_infinity, ']'}]) -> true;
-is_continuous([{element, minus_infinity},
-               {interval, _A0Br, _A0, plus_infinity, ']'}]) -> true;
-is_continuous([{interval, '[', minus_infinity, _B1, _B1Br},
-               {element, plus_infinity}]) -> true;
-is_continuous([{element, minus_infinity},
-               {element, plus_infinity}]) -> true;
+is_continuous([{interval, '[', ?MINUS_INFINITY, _B1, _B1Br},
+               {interval, _A0Br, _A0, ?PLUS_INFINITY, ']'}]) -> true;
+is_continuous([{element, ?MINUS_INFINITY},
+               {interval, _A0Br, _A0, ?PLUS_INFINITY, ']'}]) -> true;
+is_continuous([{interval, '[', ?MINUS_INFINITY, _B1, _B1Br},
+               {element, ?PLUS_INFINITY}]) -> true;
+is_continuous([{element, ?MINUS_INFINITY},
+               {element, ?PLUS_INFINITY}]) -> true;
 is_continuous(_) -> false.
 
 %% @doc Gets the bounds of a given continuous (!) interval including their
 %%      brackets. Note that here
-%%      'all' transfers to {'[', minus_infinity, plus_infinity, ']'},
+%%      'all' transfers to {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'},
 %%      {element, Key} to {'[', Key, Key, ']'} and
-%%      [{interval,'[',minus_infinity,Key,')'},{interval,'(',Key,plus_infinity,']'}] to {'(', Key, Key, ')'}.
+%%      [{interval,'[',?MINUS_INFINITY,Key,')'},{interval,'(',Key,?PLUS_INFINITY,']'}] to {'(', Key, Key, ')'}.
 %%      Other normalized intervals that wrap around (as well as the first two)
 %%      are returned the same way they can be constructed with new/4.
 %%      Note: this method will only work on continuous non-empty intervals
 %%      and will throw an exception otherwise!
 -spec get_bounds(interval()) -> {left_bracket(), key(), key(), right_bracket()}.
-get_bounds([all]) -> {'[', minus_infinity, plus_infinity, ']'};
+get_bounds([all]) -> {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'};
 get_bounds([{element, Key}]) -> {'[', Key, Key, ']'};
 get_bounds([{interval, LBr, L, R, RBr}]) -> {LBr, L, R, RBr};
-get_bounds([{interval, '[', minus_infinity, B1, B1Br},
-            {interval, A0Br, A0, plus_infinity, ']'}]) -> {A0Br, A0, B1, B1Br};
-get_bounds([{element, minus_infinity},
-            {interval, A0Br, A0, plus_infinity, ']'}]) -> {A0Br, A0, minus_infinity, ']'};
-get_bounds([{interval, '[', minus_infinity, B1, B1Br},
-            {element, plus_infinity}]) -> {'[', plus_infinity, B1, B1Br};
-get_bounds([{element, minus_infinity}, {element, plus_infinity}]) -> {'[', plus_infinity, minus_infinity, ']'};
+get_bounds([{interval, '[', ?MINUS_INFINITY, B1, B1Br},
+            {interval, A0Br, A0, ?PLUS_INFINITY, ']'}]) -> {A0Br, A0, B1, B1Br};
+get_bounds([{element, ?MINUS_INFINITY},
+            {interval, A0Br, A0, ?PLUS_INFINITY, ']'}]) -> {A0Br, A0, ?MINUS_INFINITY, ']'};
+get_bounds([{interval, '[', ?MINUS_INFINITY, B1, B1Br},
+            {element, ?PLUS_INFINITY}]) -> {'[', ?PLUS_INFINITY, B1, B1Br};
+get_bounds([{element, ?MINUS_INFINITY}, {element, ?PLUS_INFINITY}]) -> {'[', ?PLUS_INFINITY, ?MINUS_INFINITY, ']'};
 get_bounds([]) -> erlang:throw('no bounds in empty interval').
 
 %% @doc Gets all elements inside the interval and returnes a "rest"-interval,
@@ -472,12 +478,12 @@ is_adjacent(A, B) ->
 minus_simple(A, A)   -> empty();
 minus_simple(_, all) -> empty();
 minus_simple(all, {element, B0}) ->
-    % hack: use [minus_infinity, plus_infinity] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
-    minus_simple2({interval, '[', minus_infinity, plus_infinity, ']'},
+    % hack: use [?MINUS_INFINITY, ?PLUS_INFINITY] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
+    minus_simple2({interval, '[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'},
                   {interval, '[', B0, B0, ']'});
 minus_simple(all, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
-    % hack: use [minus_infinity, plus_infinity] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
-    minus_simple2({interval, '[', minus_infinity, plus_infinity, ']'}, B);
+    % hack: use [?MINUS_INFINITY, ?PLUS_INFINITY] as 'all' and [B0, B0] as element - minus_simple2 can handle this though
+    minus_simple2({interval, '[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'}, B);
 minus_simple(A = {element, _}, {element, _}) -> [A];
 minus_simple(A = {element, A0}, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
     case in_simple(A0, B) of
@@ -543,23 +549,23 @@ minus2(A, [HB | TB]) ->
 %% @private
 %% @doc Determines whether an interval with the given borders wraps around,
 %%      i.e. the interval would cover the (non-existing) gap between
-%%      plus_infinity and minus_infinity.
+%%      ?PLUS_INFINITY and ?MINUS_INFINITY.
 -spec wraps_around(left_bracket(), key(), key(), right_bracket()) -> boolean().
 wraps_around(_LeftBr, X, X, _RightBr) ->
     false;
-wraps_around(_LeftBr, minus_infinity, _, _RightBr) ->
+wraps_around(_LeftBr, ?MINUS_INFINITY, _, _RightBr) ->
     false;
-wraps_around(_LeftBr, _, plus_infinity, _RightBr) ->
+wraps_around(_LeftBr, _, ?PLUS_INFINITY, _RightBr) ->
     false;
-wraps_around(_LeftBr, _, minus_infinity, ')') ->
-    % same as [A, plus_infinity] or (A, plus_infinity]
+wraps_around(_LeftBr, _, ?MINUS_INFINITY, ')') ->
+    % same as [A, ?PLUS_INFINITY] or (A, ?PLUS_INFINITY]
     false;
-wraps_around(_LeftBr, _, minus_infinity, _RightBr) ->
+wraps_around(_LeftBr, _, ?MINUS_INFINITY, _RightBr) ->
     true;
-wraps_around('(', plus_infinity, _, _RightBr) ->
-    % same as [minus_infinity, A] or [minus_infinity, A)
+wraps_around('(', ?PLUS_INFINITY, _, _RightBr) ->
+    % same as [?MINUS_INFINITY, A] or [?MINUS_INFINITY, A)
     false;
-wraps_around(_LeftBr, plus_infinity, _, _RightBr) ->
+wraps_around(_LeftBr, ?PLUS_INFINITY, _, _RightBr) ->
     true;
 wraps_around(_LeftBr, First, Last, _RightBr) when First > Last ->
     true;
@@ -581,10 +587,10 @@ is_between('(', Begin, X, End, ')') ->
 %% @doc A &gt; B
 -spec greater_than(A::key(), B::key()) -> boolean().
 greater_than(X, X)              -> false;
-greater_than(minus_infinity, _) -> false;
-greater_than(plus_infinity, _)  -> true;
-greater_than(_, plus_infinity)  -> false;
-greater_than(_, minus_infinity) -> true;
+greater_than(?MINUS_INFINITY, _) -> false;
+greater_than(?PLUS_INFINITY, _)  -> true;
+greater_than(_, ?PLUS_INFINITY)  -> false;
+greater_than(_, ?MINUS_INFINITY) -> true;
 greater_than(X, Y)              -> X > Y.
 
 %% @doc A &gt;= B
@@ -599,7 +605,7 @@ is_left_of(X, Y) ->
             {_, _A,  B, _} = get_bounds(X),
             {_,  C, _D, _} = get_bounds(Y),
             % in(B, X) =/= in(B, Y) implied by is_adjacent
-            (B =:= C orelse {B, C} =:= {plus_infinity, minus_infinity}) andalso (in(B, X) orelse in(B, Y));
+            (B =:= C orelse {B, C} =:= {?PLUS_INFINITY, ?MINUS_INFINITY}) andalso (in(B, X) orelse in(B, Y));
         false ->
             false
     end.
