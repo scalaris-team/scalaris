@@ -100,33 +100,47 @@ dbg_db_without_pid() ->
     ok | {failed, string()}.
 check_ring() ->
     Data = lists:map(fun (Node) ->
-                             comm:send_local(Node, {get_succ_pred, comm:this()}),
+                             comm:send_local(Node, {get_pred_succ, comm:this()}),
                              receive
-                                 {get_succ_pred_response, Pred, Succ, Interval} ->
+                                 {get_pred_succ_response, Pred, Succ, Interval} ->
                                      {Interval, Pred, Succ}
                              end
                      end, pid_groups:find_all(group_node)),
-    Set = gb_sets:from_list(Data),
-    F = fun ({Interval, Pred, Succ}, Tree) ->
-                case Tree of
-                    {failed, Msg} ->
-                        Tree;
-                    _ ->
+    F = fun ({Interval, Pred, Succ}, Acc) ->
+                case Acc of
+                    {failed, _Msg} ->
+                        Acc;
+                    Tree ->
                         case gb_trees:lookup(Interval, Tree) of
                             none ->
-                                gb_trees:insert(Interval, {Pred, Succ}, Tree);
+                                {_, PredInterval, _, _} = Pred,
+                                {_, SuccInterval, _, _} = Succ,
+                                case Interval =:= group_types:all() of
+                                    true ->
+                                        SuccessValue = gb_trees:enter(Interval, {Pred, Succ}, Tree),
+                                        check_pred_succ(PredInterval =:= group_types:all(),
+                                                        SuccInterval =:= group_types:all(),
+                                                        SuccessValue,
+                                                        PredInterval, Interval, SuccInterval);
+                                    false ->
+                                        SuccessValue = gb_trees:enter(Interval, {Pred, Succ}, Tree),
+                                        check_pred_succ(intervals:is_left_of(PredInterval, Interval),
+                                                        intervals:is_left_of(Interval, SuccInterval),
+                                                        SuccessValue,
+                                                        PredInterval, Interval, SuccInterval)
+                                    end;
                             {value, {Pred, Succ}} ->
                                 Tree;
                             {value, {Pred, Succ2}} ->
-                                Msg = io_lib:format("succs don't match for ~p: ~w <-> ~p",
+                                Msg = io_lib:format("succs don't match for ~p: ~p <-> ~p",
                                                     [Interval, Succ, Succ2]),
                                 {failed, lists:flatten(Msg)};
                             {value, {Pred2, Succ}} ->
-                                Msg = io_lib:format("preds don't match for ~p: ~w <-> ~p",
+                                Msg = io_lib:format("preds don't match for ~p: ~p <-> ~p",
                                                     [Interval, Pred, Pred2]),
                                 {failed, lists:flatten(Msg)};
                             {value, {Pred2, Succ2}} ->
-                                Msg = io_lib:format("preds and succs don't match for ~w: ~w <-> ~w",
+                                Msg = io_lib:format("preds and succs don't match for ~p: ~p <-> ~p",
                                                     [Interval, {Pred, Succ}, {Pred2, Succ2}]),
                                 {failed, lists:flatten(Msg)}
                         end
@@ -144,11 +158,31 @@ check_ring() ->
     list().
 check_ring_uniq() ->
     Data = lists:map(fun (Node) ->
-                             comm:send_local(Node, {get_succ_pred, comm:this()}),
+                             comm:send_local(Node, {get_pred_succ, comm:this()}),
                              receive
-                                 {get_succ_pred_response, Pred, Succ, Interval} ->
+                                 {get_pred_succ_response, Pred, Succ, Interval} ->
                                      {Interval, Pred, Succ}
                              end
                      end, pid_groups:find_all(group_node)),
     Set = gb_sets:from_list(Data),
     gb_sets:to_list(Set).
+
+% @private
+% @doc create error messages if Succ and/or Pred interval is wrong
+check_pred_succ(PredP, SuccP, SuccessValue, PredInterval, Interval, SuccInterval) ->
+    case {PredP, SuccP} of
+        {true, true} ->
+            SuccessValue;
+        {true, false} ->
+            Msg = io_lib:format("wrong succ interval: ~w -> ~w",
+                                [Interval, SuccInterval]),
+            {failed, lists:flatten(Msg)};
+        {false, true} ->
+            Msg = io_lib:format("wrong pred interval: ~w -> ~w",
+                                [PredInterval, Interval]),
+            {failed, lists:flatten(Msg)};
+        {false, false} ->
+            Msg = io_lib:format("wrong pred and succ interval: ~w -> ~w -> ~w",
+                                [PredInterval, Interval, SuccInterval]),
+            {failed, lists:flatten(Msg)}
+    end.
