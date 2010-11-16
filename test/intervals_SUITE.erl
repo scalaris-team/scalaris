@@ -539,7 +539,7 @@ tester_is_left_right_of(_Config) ->
     tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000).
 
 is_left_right_of(_Config) ->
-    X = [{interval,'[',17, ?PLUS_INFINITY, ')'}],
+    X = [{interval,'[',17, ?PLUS_INFINITY, ']'}],
     Y = [{interval,'[',?MINUS_INFINITY,17,')'}],
     ?equals(intervals:is_adjacent(X, Y), true), % @17
     ?equals(intervals:is_left_of(X, Y), true),
