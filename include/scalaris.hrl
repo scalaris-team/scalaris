@@ -28,6 +28,8 @@
 
 %%Standard Chord routingtable
 -define(RT, rt_chord).
+-define(MINUS_INFINITY, 0).
+-define(PLUS_INFINITY, 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF).
 
 %%Simple routingtable
 %-define(RT, rt_simple).
