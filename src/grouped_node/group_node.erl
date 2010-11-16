@@ -194,11 +194,9 @@ on({paxos_write, Client, HashedKey, Value}, State) ->
     DB = group_state:get_db(State),
     case group_db:read(DB, HashedKey) of
         {value, {ok, OldValue, OldVersion}} ->
-            io:format("paxos_write is current~n", []),
             Proposal = {write, HashedKey, Value, OldVersion + 1, Client, comm:this()},
             on({ops, Proposal}, State);
         is_not_current ->
-            io:format("paxos_write is not current~n", []),
             comm:send(Client, {paxos_write_response, retry, db_is_not_current}),
             State
     end;

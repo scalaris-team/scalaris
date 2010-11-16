@@ -27,7 +27,7 @@
 
 all() ->
     [add_9, add_9_remove_4, db_repair, group_split, group_split_with_data,
-     build_ring]. %, build_ring_with_routing
+     build_ring, build_ring_with_routing].
     %[build_ring].
     %[build_ring_with_routing].
 
@@ -170,20 +170,26 @@ build_ring_with_routing(_Config) ->
                                         32),
                      F()
              end),
-    % wait for repaired ring I
+    %% wait for repaired ring I
     wait_for(fun () ->
                      [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
-                     length(group_debug:check_ring_uniq()) == 8
+                     case group_debug:check_ring() of
+                         ok ->
+                             true;
+                         {failed, Msg} ->
+                             ct:pal("~p", [Msg]),
+                             false
+                     end
              end),
-    % wait for repaired ring II
-    wait_for(fun () ->
-                     [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
-                     group_debug:check_ring() == ok
-             end),
-    ?equals(group_api:paxos_write(1, 1), ok),
-    %?equals(group_api:paxos_write(2, 2), ok),
-    %?equals(group_api:paxos_write(3, 3), ok),
-    %?equals(group_api:paxos_write(4, 4), ok),
+    ?equals(group_api:paxos_write(1, 1), {paxos_write_response,{ok,0}}),
+    ?equals(group_api:paxos_write(2, 2), {paxos_write_response,{ok,0}}),
+    ?equals(group_api:paxos_write(3, 3), {paxos_write_response,{ok,0}}),
+    ?equals(group_api:paxos_write(4, 4), {paxos_write_response,{ok,0}}),
+
+    ?equals(group_api:paxos_read(1), {value,1,0}),
+    ?equals(group_api:paxos_read(2), {value,2,0}),
+    ?equals(group_api:paxos_read(3), {value,3,0}),
+    ?equals(group_api:paxos_read(4), {value,4,0}),
     ok.
 
 wait_for(F) ->

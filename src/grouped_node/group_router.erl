@@ -33,7 +33,7 @@ route(Key, Hops, Message, State) ->
     View = group_state:get_view(State),
     NodeState = group_state:get_node_state(State),
     Interval = group_view:get_interval(View),
-    ?IF(Hops > 3, io:format("~p ~p~n", [Hops, group_view:get_interval(View)])),
+    ?IF(Hops > 8, io:format("~p ~p~n", [Hops, group_view:get_interval(View)])),
     case intervals:in(Key, Interval) of
         true ->
             group_node:on(Message, State);
