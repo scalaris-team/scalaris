@@ -40,13 +40,18 @@ trigger(State) ->
                     ok
             end
     end,
-    TriggerState = group_state:get_trigger_state(State),
+    NewState = case group_state:get_mode(State) of
+                   joined ->
+                       group_rm:trigger(State);
+                   _ ->
+                       State
+               end,
+    TriggerState = group_state:get_trigger_state(NewState),
     NewTriggerState = trigger:next(TriggerState),
-    group_state:set_trigger_state(State, NewTriggerState).
-
+    group_state:set_trigger_state(NewState, NewTriggerState).
 
 get_split_key(Interval) ->
-    {'[', LowerBound, UpperBound, ')'} = intervals:get_bounds(Interval),
+    {'[', LowerBound, UpperBound, _} = intervals:get_bounds(Interval),
     true = is_number(LowerBound) andalso is_number(UpperBound),
     case LowerBound < UpperBound of
         true ->

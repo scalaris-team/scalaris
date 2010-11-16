@@ -61,7 +61,6 @@ on_joining({group_state, View, Pred, Succ}, State) ->
     io:format("joined: ~w ~w~n", [NewVersion, self()]),
     % @todo sync databases
     Interval = group_view:get_interval(View),
-    {'[', Start, _, ')'} = intervals:get_bounds(Interval),
     UUID = util:get_global_uid(),
     RepairJob = {UUID, Interval, Members, group_view:get_version(View)},
     DB = group_db:start_repair_job(group_db:new_replica(), RepairJob),
@@ -229,6 +228,20 @@ on({db_delete_chunked, Range, ChunkSize}, State) ->
     DB2 = group_db:delete_chunk(DB, Range, ChunkSize),
     group_state:set_db(State, DB2);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Ring maintenance
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({rm_get_succ, Node, NodesPred}, State) ->
+    group_rm:handle_get_succ(State, Node, NodesPred);
+
+on({rm_get_succ_response, Node, NodesSucc}, State) ->
+    group_rm:handle_get_succ_response(State, Node, NodesSucc);
+
+on({rm_get_pred, Node, NodesSucc}, State) ->
+    group_rm:handle_get_pred(State, Node, NodesSucc);
+
+on({rm_get_pred_response, Node, NodesPred}, State) ->
+    group_rm:handle_get_pred_response(State, Node, NodesPred);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({crash, Pid}, State) ->
@@ -245,12 +258,12 @@ on({group_node_join_response, retry, _Reason}, State) ->
 on({group_state, _NewGroupState, _Pred, _Succ}, State) ->
     % @todo ignore for the moment
     State;
-on({get_succ_pred, Pid}, State) ->
+on({get_pred_succ, Pid}, State) ->
     NodeState = group_state:get_node_state(State),
     Pred = group_local_state:get_predecessor(NodeState),
     Succ = group_local_state:get_successor(NodeState),
     Interval = group_view:get_interval(group_state:get_view(State)),
-    comm:send(Pid, {get_succ_pred_response, Pred, Succ, Interval}),
+    comm:send(Pid, {get_pred_succ_response, Pred, Succ, Interval}),
     State;
 on({succ_update, Succ}, State) ->
     NodeState = group_state:get_node_state(State),
@@ -287,7 +300,7 @@ init(Options) ->
         true ->
             io:format("first~n", []),
             trigger_known_nodes(),
-            Interval = intervals:new('[', 0, 16#100000000000000000000000000000000, ')'),
+            Interval = group_types:all(),
             View = group_paxos_utils:init_paxos(group_view:new(Interval)),
             We = group_view:get_group_node(View),
             TriggerState = trigger:now(trigger:init(Trigger, ?MODULE)),

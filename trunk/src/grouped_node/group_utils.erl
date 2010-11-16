@@ -22,7 +22,7 @@
 
 -include("scalaris.hrl").
 
--export([notify_neighbors/3]).
+-export([notify_neighbors/1, notify_neighbors/2, notify_neighbors/3]).
 
 -spec notify_neighbors(NodeState::group_local_state:local_state(),
                        OldView::group_view:view(),
@@ -34,9 +34,21 @@ notify_neighbors(NodeState, OldView, NewView) ->
         true ->
             ok;
         false ->
-            {_, _, _, Preds} = group_local_state:get_predecessor(NodeState),
-            {_, _, _, Succs} = group_local_state:get_successor(NodeState),
-            [comm:send(P, {succ_update, NewGroupNode}) || P <- Preds],
-            [comm:send(P, {pred_update, NewGroupNode}) || P <- Succs],
-            ok
+            notify_neighbors(NodeState, NewView)
     end.
+
+-spec notify_neighbors(NodeState::group_local_state:local_state(),
+                       View::group_view:view()) -> ok.
+notify_neighbors(NodeState, View) ->
+    GroupNode = group_view:get_group_node(View),
+    {_, _, _, Preds} = group_local_state:get_predecessor(NodeState),
+    {_, _, _, Succs} = group_local_state:get_successor(NodeState),
+    [comm:send(P, {succ_update, GroupNode}) || P <- Preds],
+    [comm:send(P, {pred_update, GroupNode}) || P <- Succs],
+    ok.
+
+-spec notify_neighbors(State::group_state:state()) -> ok.
+notify_neighbors(State) ->
+    NodeState = group_state:get_node_state(State),
+    View = group_state:get_view(State),
+    notify_neighbors(NodeState, View).

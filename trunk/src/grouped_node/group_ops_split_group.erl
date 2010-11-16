@@ -91,18 +91,14 @@ ops_decision(State,
 split_group(View, SplitKey, LeftGroup, RightGroup) ->
     OldInterval = group_view:get_interval(View),
     OldGroupId = group_view:get_group_id(View),
-    {'[', LowerBound, UpperBound, ')'} = intervals:get_bounds(OldInterval),
+    {Left, Right} = split_at(SplitKey, OldInterval),
     case lists:member(comm:this(), LeftGroup) of
         true ->
             NewGroupId = group_view:get_new_group_id(OldGroupId, left),
-            NewInterval = intervals:new('[', LowerBound, SplitKey, ')'),
-            group_view:split_group(View, NewGroupId, NewInterval,
-                                         LeftGroup);
+            group_view:split_group(View, NewGroupId, Left, LeftGroup);
         false ->
             NewGroupId = group_view:get_new_group_id(OldGroupId, right),
-            NewInterval = intervals:new('[', SplitKey, UpperBound, ')'),
-            group_view:split_group(View, NewGroupId, NewInterval,
-                                         RightGroup)
+            group_view:split_group(View, NewGroupId, Right, RightGroup)
     end.
 
 update_fd() ->
@@ -117,3 +113,10 @@ rejected_proposal(State,
                   _PaxosId) ->
     comm:send(Proposer, {group_split_response, retry}),
     State.
+
+% @doc split given interval at SplitKey, respect previous brackets
+split_at(SplitKey, OldInterval) ->
+    {'[', LowerBound, UpperBound, UpperBr} = intervals:get_bounds(OldInterval),
+     Left = intervals:new('[', LowerBound, SplitKey, ')'),
+     Right = intervals:new('[', SplitKey, UpperBound, UpperBr),
+                           {Left, Right}.

@@ -19,6 +19,7 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-export([all/0]).
 
 -type(group_id() :: non_neg_integer()).
 
@@ -36,6 +37,7 @@
 
 -type(decision_hint() :: my_proposal_won | had_no_proposal).
 
+% for communication with other nodes, e.g. update_pred
 -type(group_node() :: {GroupId::group_id(),
                        Range::intervals:interval(),
                        Version::non_neg_integer(),
@@ -49,3 +51,6 @@
 -export_type([group_id/0, group_member/0, group_member_list/0,
               proposal/0, paxos_id/0]).
 -endif.
+
+all() ->
+    intervals:new('[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']').
