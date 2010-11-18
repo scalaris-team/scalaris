@@ -177,6 +177,11 @@ AC_RUN_IFELSE(
        [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
 AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::{ok, arity()}).], [ok])],
+       [AC_MSG_NOTICE([arity() is available])],
+       [AC_MSG_FAILURE([the type arity() is not available; you are probably using Erlang < R13 which is not supported anymore])])
+
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [httpc:set_option(max_sessions, 1)])],
        [AC_MSG_NOTICE([httpc is available])],
        [AC_MSG_NOTICE([httpc unavailable, using wrapper module]);EMAKEFILECOMPILECOMPAT=["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]])
