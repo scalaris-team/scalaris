@@ -27,7 +27,7 @@
 
 %% a group_node has two different kinds of state: (a) synchronized
 %% state and (b) lazily synchronized state. changes to the former
-%% state requires a consus among the group participants, read
+%% state require a consensus among the group participants, read
 %% paxos. changes to the latter can be performed locally (see
 %% group_local_state), e.g. the routing table.
 
