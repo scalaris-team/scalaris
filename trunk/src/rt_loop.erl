@@ -171,7 +171,7 @@ on_active({crash, DeadPid}, {NeighbTable, OldRT, TriggerState}) ->
 
 % debug_info for web interface
 on_active({web_debug_info, Requestor},
-   {_Id, _Pred, _Succ, RTState, _TriggerState} = State) ->
+   {_NeighbTable, RTState, _TriggerState} = State) ->
     KeyValueList =
         [{"rt_size", ?RT:get_size(RTState)},
          {"rt (index, node):", ""} | ?RT:dump(RTState)],
