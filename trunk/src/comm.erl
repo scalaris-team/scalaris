@@ -46,6 +46,7 @@
 -export([make_global/1, make_local/1]).
 -export([this/0, get/2, this_with_cookie/1, self_with_cookie/1]).
 -export([is_valid/1, is_local/1]).
+%%-export([node/1]).
 %% Message manipulation
 -export([get_msg_tag/1]).
 
@@ -208,6 +209,16 @@ is_local(Pid) -> comm_layer:is_local(Pid).
 %%      current process.
 is_local(Pid) -> erlang:node(Pid) =:= node().
 -endif.
+
+% -spec node(
+% -ifdef(TCP_LAYER).
+% node({Pid, c, _Cookie}) -> node(Pid);
+% node(Pid) -> {element(1, Pid), element(2, Pid)}.
+% -endif.
+% -ifdef(BUILTIN).
+% node({Pid, c, _Cookie}) -> node(Pid);
+% node(Pid) -> erlang:node(Pid).
+% -endif.
 
 %% @doc Gets the tag of a message (the first element of its tuple - should be an
 %%      atom).
