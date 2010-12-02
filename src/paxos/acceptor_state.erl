@@ -28,6 +28,7 @@
 -export([get_value/1]).
 -export([add_prepare_msg/2]).
 -export([add_accept_msg/3]).
+-export([accepted/1]).
 
 -type acceptor_state() ::
         { any(),             %% PaxosID,
@@ -77,3 +78,6 @@ add_accept_msg(State, InRound, InProposal) ->
             {ok, NewState2};
         false -> {dropped, Rack}
     end.
+
+-spec accepted(acceptor_state()) -> boolean().
+accepted(State) -> paxos_no_value_yet =/= get_value(State).
