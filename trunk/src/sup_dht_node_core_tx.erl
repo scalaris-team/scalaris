@@ -51,7 +51,7 @@ init(DHTNodeGroup) ->
                                    [DHTNodeGroup, tx_rtm2]),
     TX_RTM3 = util:sup_worker_desc(tx_rtm3, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm3]),
-    {ok, {{one_for_all, 10, 1},
+    {ok, {{one_for_one, 10, 1},
           [
            RDHT_tx_read, RDHT_tx_write,
            TX_TM, TX_RTM0, TX_RTM1, TX_RTM2, TX_RTM3
