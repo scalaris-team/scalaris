@@ -81,6 +81,10 @@ start_paxosid(Acceptor, PaxosID, Learners) ->
 stop_paxosids(Acceptor, PaxosIds) ->
     comm:send(Acceptor, {acceptor_deleteids, PaxosIds}).
 
+-spec add_learner(comm:mypid(), any(), comm:mypid()) -> ok.
+add_learner(Acceptor, PaxosID, Learner) ->
+    comm:send(Acceptor, {acceptor_add_learner, PaxosID, Learner}).
+
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
@@ -108,9 +112,9 @@ on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
         _ ->
             NewState = acceptor_state:set_learners(StateForID, Learners),
             my_set_entry(NewState, ETSTableName),
-            case acceptor_state:get_value(NewState) of
-                paxos_no_value_yet -> ok;
-                _ -> inform_learners(PaxosID, NewState)
+            case acceptor_state:accepted(NewState) of
+                true  -> inform_learners(PaxosID, NewState);
+                false -> ok
             end
     end,
     State;
@@ -168,8 +172,21 @@ on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->
     end,
     State;
 
-on(_, _State) ->
-    unknown_event.
+on({acceptor_add_learner, PaxosID, Learner}, ETSTableName = State) ->
+    ?TRACE("acceptor:add_learner~n", []),
+    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    case ErrCode of
+        new -> ok; %% do not support adding learners without prior initialize
+        ok ->
+            case acceptor_state:accepted(StateForID) of
+                true -> inform_learner(Learner,  PaxosID, StateForID);
+                false -> ok
+            end,
+            NewLearners = [Learner | acceptor_state:get_learners(StateForID)],
+            NStateForID = acceptor_state:set_learners(StateForID, NewLearners),
+            my_set_entry(PaxosID, NStateForID)
+    end,
+    State.
 
 my_get_entry(Id, TableName) ->
     case pdb:get(Id, TableName) of
@@ -183,10 +200,13 @@ my_set_entry(NewEntry, TableName) ->
 inform_learners(PaxosID, State) ->
     ?TRACE("acceptor:inform_learners: PaxosID ~p Learners ~p Decision ~p~n",
            [PaxosID, acceptor_state:get_learners(State), acceptor_state:get_value(State)]),
-    [ msg_accepted(X, PaxosID,
-                   acceptor_state:get_raccepted(State),
-                   acceptor_state:get_value(State))
+    [ inform_learner(X, PaxosID, State)
       || X <- acceptor_state:get_learners(State) ].
+
+inform_learner(Learner, PaxosID, StateForID) ->
+    msg_accepted(Learner, PaxosID,
+                 acceptor_state:get_raccepted(StateForID),
+                 acceptor_state:get_value(StateForID)).
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
