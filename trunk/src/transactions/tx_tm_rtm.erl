@@ -253,7 +253,10 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
             ok;
         true ->
             %% unsubscribe RTMs from FD
-            my_stop_fds_for_tid(TxId, TxState),
+            case Role of
+                tx_tm -> my_stop_fds_for_tid(TxId, TxState);
+                _ -> ok
+            end,
             %% delete locally
             [ pdb:delete(ItemId, TableName)
               || {_, ItemId} <- tx_state:get_tlog_txitemids(TxState)],
