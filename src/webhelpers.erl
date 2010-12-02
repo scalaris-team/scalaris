@@ -417,12 +417,12 @@ renderRing({failed, Pid}) ->
 getIndexedRingRendered() ->
     RealRing = statistics:get_ring_details(),
     % table with mapping node_id -> index
-    ets:new(webhelpers_indexed_ring, [ordered_set, private, named_table]),
-    [begin
-         Size = ets:info(webhelpers_indexed_ring, size),
-         ets:insert(webhelpers_indexed_ring,
-                    {node:id(node_details:get(NodeDetails, node)), Size})
-     end || {ok, NodeDetails} <- RealRing],
+    _ = ets:new(webhelpers_indexed_ring, [ordered_set, private, named_table]),
+    _ = [begin
+             Size = ets:info(webhelpers_indexed_ring, size),
+             ets:insert(webhelpers_indexed_ring,
+                        {node:id(node_details:get(NodeDetails, node)), Size})
+         end || {ok, NodeDetails} <- RealRing],
     RingSize = ets:info(webhelpers_indexed_ring, size),
     EHtml =
         if
