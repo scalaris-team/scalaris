@@ -16,20 +16,15 @@
 %% @author Florian Schintke <schintke@onscale.de>
 %% @doc DB for a process internal state (lika a gen_component).
 %% This abstraction allows for easy switching between
-%% erlang:put/get/erase and ets:insert/lookup,delete
+%% erlang:put/get/erase and ets:insert/lookup/delete
 %% @end
 %% @version $Id$
 -module(pdb).
 -author('schintke@onscale.de').
 -vsn('$Id$').
 
-%-define(TRACE(X,Y), io:format(X,Y)).
--define(TRACE(X,Y), ok).
-
 -type tableid() :: atom().
-
--export([new/2, get/2, set/2, delete/2]).
-
+-export([new/2, get/2, set/2, delete/2, tab2list/1]).
 -include("scalaris.hrl").
 
 %% put/get variant
@@ -41,35 +36,42 @@
 new(TableName, _Params) ->
     TableName.
 
--spec get(Key::term(), TableName::atom()) -> tuple() | undefined.
+-spec get(term(), atom()) -> tuple() | undefined.
 get(Key, _TableName) ->
     erlang:get(Key).
 
--spec set(Value::tuple(), TableName::atom()) -> ok.
+-spec set(tuple(), atom()) -> ok.
 set(NewTuple, _TableName) ->
     erlang:put(element(1,NewTuple), NewTuple),
     ok.
 
--spec delete(Key::term(), TableName::atom()) -> ok.
+-spec delete(term(), atom()) -> ok.
 delete(Key, _TableName) ->
     erlang:erase(Key),
     ok.
+
+-spec tab2list(atom()) -> [term()].
+tab2list(_TableName) ->
+    [ X || {_,X} <- erlang:get()].
 
 %% %% ets variant (only for debugging! has performance issues with msg_delay)
 %% -type tableid() :: tid() | atom().
 %% new(TableName, Params) ->
 %%     Name = ets:new(TableName, Params).
-%% 
+%%
 %% get(Key, TableName) ->
 %%     case ets:lookup(TableName, Key) of
 %%         [] -> undefined;
 %%         [Entry] -> Entry
 %%     end.
-%% 
+%%
 %% set(NewTuple, TableName) ->
 %%     ets:insert(TableName, NewTuple),
 %%     ok.
-%% 
+%%
 %% delete(Key, TableName) ->
 %%     ets:delete(TableName, Key),
 %%     ok.
+%%
+%% tab2list(TableName) ->
+%%   ets:tab2list(TableName).
