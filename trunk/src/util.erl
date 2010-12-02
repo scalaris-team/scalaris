@@ -24,9 +24,8 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([global_uid/0]).
+-export_type([global_uid/0,time/0]).
 -endif.
-
 -export([escape_quotes/1,
          min/2, max/2, logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
@@ -44,6 +43,10 @@
 -export([get_global_uid/0]).
 
 -opaque global_uid() :: {pos_integer(), comm:mypid()}.
+
+-type time() :: {MegaSecs::non_neg_integer(),
+                 Secs::non_neg_integer(),
+                 MicroSecs::non_neg_integer()}.
 
 %% @doc Applies start_link in the given Module with the given Parameters.
 -spec parameterized_start_link(Module::module(), Parameters::list()) -> term() | none().
