@@ -24,10 +24,6 @@
 
 -export([start_link/0, start/0]).
 
--type time() :: {MegaSecs::non_neg_integer(),
-                 Secs::non_neg_integer(),
-                 MicroSecs::non_neg_integer()}.
-
 -spec start_link() -> {ok, pid()} | ignore.
 start_link() ->
     case config:read(ganglia_enable) of
@@ -37,12 +33,12 @@ start_link() ->
             ignore
     end.
 
--spec start() -> time().
+-spec start() -> util:time().
 start() ->
     Last = erlang:now(),
     ganglia_loop(Last).
 
--spec ganglia_loop(PreviousTime::time()) -> NewTime::time().
+-spec ganglia_loop(PreviousTime::util:time()) -> NewTime::util:time().
 ganglia_loop(Last) ->
     % message statistics
     {Tree, _Time} = comm_logger:dump(),

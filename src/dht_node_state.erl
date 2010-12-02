@@ -47,12 +47,10 @@
 -export_type([state/0]).
 -endif.
 
--type join_time() :: {MegaSecs::non_neg_integer(), Secs::non_neg_integer(), MicroSecs::non_neg_integer()}.
-
 %% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
                 neighbors  = ?required(state, neighbors) :: tid(),
-                join_time  = ?required(state, join_time) :: join_time(),
+                join_time  = ?required(state, join_time) :: util:time(),
                 trans_log  = ?required(state, trans_log) :: #translog{},
                 db         = ?required(state, db)        :: ?DB:db(),
                 tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
@@ -122,7 +120,7 @@ new(RT, NeighbTable, DB) ->
          (state(), my_range) -> intervals:interval();
          (state(), db_range) -> intervals:interval();
          (state(), succ_range) -> intervals:interval();
-         (state(), join_time) -> join_time();
+         (state(), join_time) -> util:time();
          (state(), trans_log) -> #translog{};
          (state(), db) -> ?DB:db();
          (state(), tx_tp_db) -> any();
