@@ -34,7 +34,7 @@
 start_link(DHTNodeGroup) ->
     supervisor:start_link(?MODULE, DHTNodeGroup).
 
--spec init(pid_groups:groupname()) -> {ok, {{one_for_all, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
+-spec init(pid_groups:groupname()) -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init(DHTNodeGroup) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     RDHT_tx_read = util:sup_worker_desc(rdht_tx_read, rdht_tx_read, start_link,
