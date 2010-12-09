@@ -52,7 +52,7 @@
                          QueuedMessages::msg_queue:msg_queue()}).
 %% -type(state() :: state_init() | state_uninit()).
 
-% accepted messages of an initialized rm_tman process
+% accepted messages of an initialized rm_loop process
 -type(message() ::
     {get_neighb_tid, SourcePid::comm:erl_local_pid()} |
     {zombie, Node::node:node_type()} |
@@ -410,9 +410,12 @@ update_failuredetector(OldNeighborhood, NewNeighborhood) ->
                            nodelist:succs(OldNeighborhood)),
     NewView = lists:append(nodelist:preds(NewNeighborhood),
                            nodelist:succs(NewNeighborhood)),
-    OldPids = [node:pidX(Node) || Node <- OldView],
-    NewPids = [node:pidX(Node) || Node <- NewView],
-    fd:update_subscriptions(OldPids, NewPids).
+    OldPids = [node:pidX(Node) || Node <- OldView,
+                                  not node:same_process(Node, nodelist:node(OldNeighborhood))],
+    NewPids = [node:pidX(Node) || Node <- NewView,
+                                  not node:same_process(Node, nodelist:node(NewNeighborhood))],
+    fd:update_subscriptions(OldPids, NewPids),
+    ok.
 
 %% @doc Inform the dht_node of a new neighborhood.
 -spec call_subscribers(OldNeighborhood::nodelist:neighborhood(),
