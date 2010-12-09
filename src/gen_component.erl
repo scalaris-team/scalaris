@@ -269,6 +269,10 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                 handle_gen_component_message(GenComponentMessage, Module, On,
                                              State, ComponentState),
             loop(Module, On, State, NewComponentState);
+        % handle failure detector messages
+        {ping, Pid} ->
+            comm:send(Pid, {pong}),
+            loop(Module, On, State, ComponentState);
         %% forward a message to group member by its process name
         %% initiated via comm:send_to_group_member()
         {send_to_group_member, Processname, Msg} ->

@@ -229,6 +229,20 @@ have to know their individual Pid.
   messages of the form \code{\{send_to_group_member,} \code{_, _\}} as such
   messages are consumed by \erlmodule{gen\_component} itself.}
 
+\subsection{\texorpdfstring{Integration with \erlmodule{fd\_pinger}:
+  Replying to failure detectors}
+  {Integration with fd\_pinger: Replying to failure detectors}}
+
+Each \erlmodule{gen\_component} replies automatically to \code{\{ping,
+  Pid\}} requests with a \code{\{pong\}} send to the given \code{Pid}.  Such
+messages are generated, for example, by \erlmodule{fd\_pinger} which is used
+by our \erlmodule{fd} failure detectors.
+
+\emph{In consequence, no \erlmodule{gen\_component} can individually handle
+messages of the form: \code{\{ping, _\}} as such messages are consumed by
+\erlmodule{gen\_component} itself.}
+
+
 \subsection{\texorpdfstring{The debugging interface of \erlmodule{gen\_component}:
   Breakpoints and step-wise execution}
   {The debugging interface of gen\_component: Breakpoints and step-wise execution}}
