@@ -699,14 +699,9 @@ calc_initial_avg_kr(Pred, Me) ->
     % we don't know whether we can subtract keys of type ?RT:key()
     % -> try it and if it fails, return unknown
     try
-        if
-            PredKey == MyKey -> ?RT:n(); % I am the only node
-            MyKey > PredKey  -> MyKey - PredKey;
-            MyKey < PredKey   -> (?RT:n() - PredKey - 1) + MyKey
-        end
-    catch % keys might not support subtraction or ?RT:n() might throw
-        throw:not_supported -> unknown;
-        error:badarith -> unknown
+        ?RT:get_range(PredKey, MyKey)
+    catch
+        throw:not_supported -> unknown
     end.
 
 %% @doc Checks whether config parameters of the gossip process exist and are
