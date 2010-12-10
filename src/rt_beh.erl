@@ -50,8 +50,9 @@ behaviour_info(callbacks) ->
      % gets all (replicated) keys for a given (hashed) key
      % (for symmetric replication)
      {get_replica_keys, 1},
-     % address space size (throws 'throw:not_supported' if unsupported by the RT)
-     {n, 0},
+     % address space size, range and split key
+     % (may all throw 'throw:not_supported' if unsupported by the RT)
+     {n, 0}, {get_range, 2}, {get_split_key, 2},
      % for debugging and web interface
      {dump, 1},
      % for bulkowner
