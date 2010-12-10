@@ -25,7 +25,7 @@
 -export([log/2, log/3, log/4, set_log_level/1]).
 -export([check_config/0]).
 
--type log_level() :: warn | info | error | fatal | debug.
+-type log_level() :: debug | info | warn | error | fatal.
 
 %% @doc Starts the log4erl process, removes the error_logger and
 %%      error_logger_file_h report handlers and registers itself as the (only)

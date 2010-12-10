@@ -94,9 +94,7 @@ add_9_rm_5_test() ->
 add_2x3_load(_Config) ->
     unittest_helper:make_ring(1),
     stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
-    Ring = statistics:get_ring_details(),
-    % note: cs_api (v1) may leave old data items on nodes not responsible for them anymore, tolerate it here:
-    ?equals_pattern(statistics:get_total_load(Ring), L when L >= 4).
+    dht_node_move_SUITE:check_size2_v1(4).
 
 add_2x3_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 5000) end),
@@ -110,8 +108,7 @@ add_2x3_load_test() ->
 add_2x3_load_v2(_Config) ->
     unittest_helper:make_ring(1),
     stop_time(fun add_2x3_load_v2_test/0, "add_2x3_load_v2"),
-    Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 4).
+    dht_node_move_SUITE:check_size2_v2(4).
 
 add_2x3_load_v2_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(1, 5000) end),
@@ -125,9 +122,7 @@ add_2x3_load_v2_test() ->
 add_3_rm_2_load(_Config) ->
     unittest_helper:make_ring(1),
     stop_time(fun add_3_rm_2_load_test/0, "add_2x3_load"),
-    Ring = statistics:get_ring_details(),
-    % note: cs_api (v1) may leave old data items on nodes not responsible for them anymore, tolerate it here:
-    ?equals_pattern(statistics:get_total_load(Ring), L when L >= 4).
+    dht_node_move_SUITE:check_size2_v1(4).
 
 add_3_rm_2_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 5000) end),
@@ -143,8 +138,7 @@ add_3_rm_2_load_test() ->
 add_3_rm_2_load_v2(_Config) ->
     unittest_helper:make_ring(1),
     stop_time(fun add_3_rm_2_load_v2_test/0, "add_2x3_load_v2"),
-    Ring = statistics:get_ring_details(),
-    ?equals(statistics:get_total_load(Ring), 4).
+    dht_node_move_SUITE:check_size2_v2(4).
 
 add_3_rm_2_load_v2_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(1, 5000) end),
@@ -164,9 +158,7 @@ prop_join_at(FirstId, SecondId, BenchSlaves, BenchRuns) ->
     admin:add_node_at_id(SecondId),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid),
-    Ring = statistics:get_ring_details(),
-    % note: cs_api (v1) may leave old data items on nodes not responsible for them anymore, tolerate it here:
-    ?equals_pattern(statistics:get_total_load(Ring), L when L >= BenchSlaves * 4),
+    dht_node_move_SUITE:check_size2_v1(BenchSlaves * 4),
     unittest_helper:stop_ring(),
     true.
 
@@ -177,9 +169,7 @@ prop_join_at_v2(FirstId, SecondId, BenchSlaves, BenchRuns) ->
     admin:add_node_at_id(SecondId),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid),
-    Ring = statistics:get_ring_details(),
-    ExpLoad = BenchSlaves * 4,
-    ?equals(statistics:get_total_load(Ring), ExpLoad),
+    dht_node_move_SUITE:check_size2_v2(BenchSlaves * 4),
     unittest_helper:stop_ring(),
     true.
 
