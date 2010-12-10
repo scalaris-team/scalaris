@@ -135,12 +135,12 @@ on({crashed, WatchedPid}, State) ->
     Subscriptions = state_get_subscriptions(State, WatchedPid),
     _ = [ case Cookie of
               '$fd_nil' ->
-                  io:format("Sending to ~p/~p~n",
-                            [X, pid_groups:group_and_name_of(X)]),
+                  log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
+                            [comm:this(), X, pid_groups:group_and_name_of(X)]),
                   comm:send_local(X, {crash, WatchedPid});
               _ ->
-                  io:format("Sending to ~p/~p with ~p~n",
-                            [X, pid_groups:group_and_name_of(X), Cookie]),
+                  log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p with ~.0p~n",
+                            [comm:this(), X, pid_groups:group_and_name_of(X), Cookie]),
                   comm:send_local(X, {crash, WatchedPid, Cookie})
           end
           || {X, Cookie} <- Subscriptions ],
@@ -171,7 +171,7 @@ check_config() ->
 %% @private
 -spec report_crash(state()) -> ok.
 report_crash(State) ->
-    log:log(warn,"[ FD ~p ] reports ~.0p as crashed",
+    log:log(warn, "[ FD ~p ] reports ~.0p as crashed",
             [comm:this(), state_get_rem_pids(State)]).
 %%    comm:send_local(FDPid, {crash, RemotePid}).
 
