@@ -39,7 +39,8 @@
        util:time(),    %% local time of last pong arrival
        util:time(),    %% remote is crashed if no pong arrives until this
        atom(),         %% ets table name
-       [reference()]   %% locally monitored pids for a remote hbs
+       %% locally monitored pids for a remote hbs:
+       [{pid(), reference()}]
      }).
 
 %% Akronyms: HBS =:= (local) heartbeat server instance
@@ -179,27 +180,42 @@ report_crash(State) ->
 -spec failureDetectorInterval() -> pos_integer().
 failureDetectorInterval() -> config:read(failure_detector_interval).
 
+-spec time_plus(util:time(), integer()) -> util:time().
 time_plus(Now, Delta) ->
     Seconds = Delta div 1000000,
     MilliSeconds = Delta rem 1000000,
     T1 = setelement(2, Now, element(2, Now) + Seconds),
     setelement(3, T1, element(3, T1) + MilliSeconds).
 
+-spec state_new(comm:mypid(), [{comm:mypid(), pos_integer()}],
+                util:time(), util:time(), atom()) -> state().
 state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter,Table) ->
     {RemoteHBS, RemotePids, LastPong, CrashedAfter, Table, []}.
 
+-spec state_get_rem_hbs(state()) -> comm:mypid().
 state_get_rem_hbs(State)            -> element(1, State).
+-spec state_set_rem_hbs(state(), comm:mypid()) -> state().
 state_set_rem_hbs(State, Val)       -> setelement(1, State, Val).
+-spec state_get_rem_pids(state()) -> [{comm:mypid(), pos_integer()}].
 state_get_rem_pids(State)           -> element(2, State).
+-spec state_set_rem_pids(state(), [{comm:mypid(), pos_integer()}]) -> state().
 state_set_rem_pids(State, Val)      -> setelement(2, State, Val).
+-spec state_get_last_pong(state()) -> util:time().
 state_get_last_pong(State)          -> element(3, State).
+-spec state_set_last_pong(state(), util:time()) -> state().
 state_set_last_pong(State, Val)     -> setelement(3, State, Val).
+-spec state_get_crashed_after(state()) -> util:time().
 state_get_crashed_after(State)      -> element(4, State).
+-spec state_set_crashed_after(state(), util:time()) -> state().
 state_set_crashed_after(State, Val) -> setelement(4, State, Val).
+-spec state_get_table(state()) -> atom().
 state_get_table(State)              -> element(5, State).
+-spec state_get_monitors(state()) -> [{pid(), reference()}].
 state_get_monitors(State)           -> element(6, State).
+-spec state_set_monitors(state(), [{pid(), reference()}]) -> state().
 state_set_monitors(State, Val)      -> setelement(6, State, Val).
 
+-spec state_add_entry(state(), {comm:mypid(), comm:mypid(), any()}) -> state().
 state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     %% implement reference counting on subscriptions:
     %% instead of storing in the state, we silently store in a pdb for
@@ -218,6 +234,7 @@ state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     end,
     State.
 
+-spec state_del_entry(state(), {comm:mypid(), comm:mypid(), any()}) -> state().
 state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     %% implement reference counting on subscriptions:
     %% instead of storing in the state, we silently store in a pdb for
@@ -242,6 +259,7 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
             State
     end.
 
+-spec state_get_subscriptions(state(), comm:mypid()) -> [{pid(), any()}].
 state_get_subscriptions(State, SearchedPid) ->
     Table = state_get_table(State),
     Entries = pdb:tab2list(Table),
@@ -250,6 +268,7 @@ state_get_subscriptions(State, SearchedPid) ->
           SearchedPid =:= WatchedPid],
     lists:flatten(Res).
 
+-spec state_add_watched_pid(state(), comm:mypid()) -> state().
 state_add_watched_pid(State, WatchedPid) ->
     %% add watched pid remotely, if not already watched
     RemPids = state_get_rem_pids(State),
@@ -265,6 +284,7 @@ state_add_watched_pid(State, WatchedPid) ->
               State, lists:keyreplace(WatchedPid, 1, RemPids, NewEntry))
     end.
 
+-spec state_del_watched_pid(state(), comm:mypid()) -> state().
 state_del_watched_pid(State, WatchedPid) ->
     %% del watched pid remotely, if not longer necessary
     RemPids = state_get_rem_pids(State),
@@ -284,17 +304,19 @@ state_del_watched_pid(State, WatchedPid) ->
             state_set_rem_pids(State, NewRemPids)
     end.
 
+-spec state_add_monitor(state(), comm:mypid()) -> state().
 state_add_monitor(State, WatchedPid) ->
     MonRef = erlang:monitor(process, comm:make_local(WatchedPid)),
     state_set_monitors(
       State, [{WatchedPid, MonRef} | state_get_monitors(State)]).
 
+-spec state_del_monitor(state(), pid()) -> state().
 state_del_monitor(State, WatchedPid) ->
     Monitors = state_get_monitors(State),
     case lists:keyfind(WatchedPid, 1, Monitors) of
+        false -> State;
         {WatchedPid, MonRef} ->
             erlang:demonitor(MonRef),
             state_set_monitors(State,
-                               lists:delete({WatchedPid, MonRef}, Monitors));
-        false -> State
+                               lists:delete({WatchedPid, MonRef}, Monitors))
     end.
