@@ -210,9 +210,9 @@ state_get_crashed_after(State)      -> element(4, State).
 state_set_crashed_after(State, Val) -> setelement(4, State, Val).
 -spec state_get_table(state()) -> atom().
 state_get_table(State)              -> element(5, State).
--spec state_get_monitors(state()) -> [{pid(), reference()}].
+-spec state_get_monitors(state()) -> [{comm:mypid(), reference()}].
 state_get_monitors(State)           -> element(6, State).
--spec state_set_monitors(state(), [{pid(), reference()}]) -> state().
+-spec state_set_monitors(state(), [{comm:mypid(), reference()}]) -> state().
 state_set_monitors(State, Val)      -> setelement(6, State, Val).
 
 -spec state_add_entry(state(), {comm:mypid(), comm:mypid(), any()}) -> state().
