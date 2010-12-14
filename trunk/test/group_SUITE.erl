@@ -28,6 +28,7 @@
 all() ->
     [add_9, add_9_remove_4, db_repair, group_split, group_split_with_data,
      build_ring, build_ring_with_routing].
+    %[add_9_remove_4].
     %[build_ring].
     %[build_ring_with_routing].
 
@@ -46,6 +47,7 @@ end_per_suite(Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     unittest_helper:fix_cwd(),
+    scalaris2:stop(), % when end_per_testcase failed
     scalaris2:start(),
     config:write(dht_node_sup, sup_group_node),
     config:write(dht_node, group_node),
@@ -204,7 +206,7 @@ wait_for(F) ->
 check_versions(ExpectedVersions, Length) ->
     fun () ->
             Versions = [V || {_, V} <- group_debug:dbg_version()],
-            ct:pal("~p ~p", [lists:usort(Versions), group_debug:dbg_version()]),
+            %ct:pal("~p ~p", [lists:usort(Versions), group_debug:dbg_version()]),
             ExpectedVersions ==
                 lists:usort(Versions) andalso length(Versions) == Length
     end.
