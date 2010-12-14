@@ -172,6 +172,7 @@ my_fd_pid() ->
         PID -> PID
     end.
 
+-spec get_hbs(comm:mypid()) -> pid().
 get_hbs(Pid) ->
     %% normalize for the table entry (just distinguish nodes)
     FDPid = comm:get(fd, Pid),
@@ -182,8 +183,8 @@ get_hbs(Pid) ->
         [Res] -> element(2, Res)
     end.
 
+-spec start_and_register_hbs(comm:mypid()) -> pid().
 start_and_register_hbs(Pid) ->
     NewHBS = element(2, fd_hbs:start_link(Pid)),
     ets:insert(fd_hbs, {comm:get(fd, Pid), NewHBS}),
     NewHBS.
-
