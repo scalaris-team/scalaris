@@ -30,6 +30,7 @@
 %%% public interface for initiating a paxos acceptor for a new PaxosID
 -export([start_paxosid/2, start_paxosid_local/3, start_paxosid/3]).
 -export([stop_paxosids/2]).
+-export([add_learner/3]).
 -export([msg_accepted/4]).
 %%% functions for gen_component module and supervisor callbacks
 -export([start_link/1]).
@@ -184,7 +185,7 @@ on({acceptor_add_learner, PaxosID, Learner}, ETSTableName = State) ->
             end,
             NewLearners = [Learner | acceptor_state:get_learners(StateForID)],
             NStateForID = acceptor_state:set_learners(StateForID, NewLearners),
-            my_set_entry(PaxosID, NStateForID)
+            my_set_entry(NStateForID, ETSTableName)
     end,
     State.
 
