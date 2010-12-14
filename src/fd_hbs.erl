@@ -40,7 +40,7 @@
        util:time(),    %% remote is crashed if no pong arrives until this
        atom(),         %% ets table name
        %% locally monitored pids for a remote hbs:
-       [{pid(), reference()}]
+       [{comm:mypid(), reference()}]
      }).
 
 %% Akronyms: HBS =:= (local) heartbeat server instance
