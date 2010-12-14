@@ -129,7 +129,7 @@ send_to_group_member(DestNode, Processname, Mesg) ->
 -ifdef(TCP_LAYER).
 %% @doc TCP_LAYER: Converts a local erlang pid to a global pid of type mypid()
 %%      for use in send/2.
-make_global(Pid) -> get(Pid, comm:this()).
+make_global(Pid) -> get(Pid, this()).
 -endif.
 -ifdef(BUILTIN).
 %% @doc BUILTIN: Returns the given pid (with BUILTIN communication, global pids
@@ -151,11 +151,16 @@ make_local(Pid) -> Pid.
 
 %% @doc Returns the pid of the current process.
 -spec this() -> mypid().
+this() -> this_().
+
+%% @doc Returns the pid of the current process.
+%%      Note: use this_/1 in internal functions (needed for dialyzer).
+-spec this_() -> mypid_plain().
 -ifdef(TCP_LAYER).
-this() -> comm_layer:this().
+this_() -> comm_layer:this().
 -endif.
 -ifdef(BUILTIN). %% @hidden
-this() -> self().
+this_() -> self().
 -endif.
 
 %% @doc Creates the PID a process with name Name would have on node _Node.
@@ -177,7 +182,7 @@ get(Name, Pid = _Node) ->
 %% @doc Encapsulates the current process' pid (as returned by this/0)
 %%      and the given cookie for seamless use of cookies with send/2.
 -spec this_with_cookie(any()) -> mypid_with_cookie().
-this_with_cookie(Cookie) -> {this(), c, Cookie}.
+this_with_cookie(Cookie) -> {this_(), c, Cookie}.
 
 %% @doc Encapsulates the current process' pid (as returned by self/0) and the
 %%      given cookie for seamless use of cookies with send_local/2 and
