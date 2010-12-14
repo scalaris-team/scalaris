@@ -48,7 +48,7 @@ inc(Stats, Label) ->
 dbg_version() ->
     lists:map(fun (Node) ->
                       State = gen_component:get_state(Node, 1000),
-                      io:format("~p~n", [State]),
+                      %io:format("~p~n", [State]),
                       View = group_state:get_view(State),
                       case group_state:get_mode(State) of
                           joined ->
