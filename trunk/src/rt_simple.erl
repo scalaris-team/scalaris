@@ -34,8 +34,6 @@
 % to work.
 -include("rt_beh.hrl").
 
--export([normalize/1]).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -106,21 +104,28 @@ get_size(_RT) -> 1.
 
 %% userdevguide-begin rt_simple:n
 %% @doc Returns the size of the address space.
-n() -> 16#100000000000000000000000000000000.
+n() -> n_().
+%% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
+-spec n_() -> key_t().
+n_() -> 16#100000000000000000000000000000000.
 %% userdevguide-end rt_simple:n
 
 %% @doc Keep a key in the address space. See n/0.
 -spec normalize(Key::key_t()) -> key_t().
-normalize(Key) ->
-    Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
+normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
-get_range(Begin, End) ->
+get_range(Begin, End) -> get_range_(Begin, End).
+
+%% @doc Helper for get_range/2 to make dialyzer happy with internal use of
+%%      get_range/2 in the other methods, e.g. get_split_key/2.
+-spec get_range_(Begin::key_t(), End::key_t()) -> key_t().
+get_range_(Begin, End) ->
     if
-        End == Begin -> n(); % I am the only node
+        End == Begin -> n_(); % I am the only node
         End > Begin  -> End - Begin;
-        End < Begin  -> (n() - Begin - 1) + End
+        End < Begin  -> (n_() - Begin - 1) + End
     end.
 
 %% @doc Gets the key that splits the interval (Begin, End] in two equal halves
@@ -128,7 +133,7 @@ get_range(Begin, End) ->
 %%      Begin==End, the whole key range is split in halves.
 %%      Beware: if the key range is smaller than 2 the split key will be Begin!
 get_split_key(Begin, End) ->
-    normalize(Begin + (get_range(Begin, End) div 2)).
+    normalize(Begin + (get_range_(Begin, End) div 2)).
 
 %% userdevguide-begin rt_simple:get_replica_keys
 %% @doc Returns the replicas of the given key.

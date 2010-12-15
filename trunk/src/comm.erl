@@ -181,7 +181,7 @@ get(Name, Pid = _Node) ->
 
 %% @doc Encapsulates the current process' pid (as returned by this/0)
 %%      and the given cookie for seamless use of cookies with send/2.
--spec this_with_cookie(any()) -> mypid_with_cookie().
+-spec this_with_cookie(any()) -> mypid().
 this_with_cookie(Cookie) -> {this_(), c, Cookie}.
 
 %% @doc Encapsulates the current process' pid (as returned by self/0) and the
