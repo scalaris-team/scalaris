@@ -105,20 +105,34 @@ get_size(RT) ->
 
 %% @doc Keep a key in the address space. See n/0.
 -spec normalize(Key::key_t()) -> key_t().
-normalize(Key) -> rt_simple:normalize(Key).
+normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Returns the size of the address space.
-n() -> rt_simple:n().
+n() -> n_().
+%% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
+-spec n_() -> key_t().
+n_() -> 16#100000000000000000000000000000000.
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
-get_range(Begin, End) -> rt_simple:get_range(Begin, End).
+get_range(Begin, End) -> get_range_(Begin, End).
+
+%% @doc Helper for get_range/2 to make dialyzer happy with internal use of
+%%      get_range/2 in the other methods, e.g. get_split_key/2.
+-spec get_range_(Begin::key_t(), End::key_t()) -> key_t().
+get_range_(Begin, End) ->
+    if
+        End == Begin -> n_(); % I am the only node
+        End > Begin  -> End - Begin;
+        End < Begin  -> (n_() - Begin - 1) + End
+    end.
 
 %% @doc Gets the key that splits the interval (Begin, End] in two equal halves
 %%      (their ranges may differ by at most one key). In the special case of
 %%      Begin==End, the whole key range is split in halves.
 %%      Beware: if the key range is smaller than 2 the split key will be Begin!
-get_split_key(Begin, End) -> rt_simple:get_split_key(Begin, End).
+get_split_key(Begin, End) ->
+    normalize(Begin + (get_range_(Begin, End) div 2)).
 
 %% @doc Returns the replicas of the given key.
 get_replica_keys(Key) ->
