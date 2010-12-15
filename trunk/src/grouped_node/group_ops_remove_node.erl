@@ -27,19 +27,19 @@
 % @doc we got a request to remove a node from this group, do sanity checks and propose the removal
 -spec ops_request(State::group_state:state(),
                   Proposal::proposal_type()) -> group_state:state().
-ops_request(State, {group_node_remove, Pid} = _Proposal) ->
+ops_request(State, {group_node_remove, DeadPid, Proposer} = _Proposal) ->
     View = group_state:get_view(State),
-    case group_view:is_member(View, Pid) of
+    case group_view:is_member(View, DeadPid) of
         false ->
-            comm:send(Pid, {group_node_remove_response,
-                            Pid, is_no_member}),
+            comm:send(Proposer, {group_node_remove_response,
+                                 is_no_member, DeadPid}),
             State;
         true ->
-            case group_paxos_utils:propose({group_node_remove, Pid}, View) of
+            case group_paxos_utils:propose({group_node_remove, DeadPid}, View) of
                 {success, NewView} ->
                     group_state:set_view(State, NewView);
                 _ ->
-                    comm:send(Pid, {group_node_remove_response, retry}),
+                    comm:send(Proposer, {group_node_remove_response, retry, DeadPid}),
                     State
             end
     end.

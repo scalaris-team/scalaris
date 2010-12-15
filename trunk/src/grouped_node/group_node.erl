@@ -109,7 +109,7 @@ on({ops, {group_node_join, _Pid, _Acceptor, _Learner} = Proposal}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group_node_remove
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({ops, {group_node_remove, _Pid} = Proposal}, State) ->
+on({ops, {group_node_remove, _DeadPid, _Proposer} = Proposal}, State) ->
     group_ops_remove_node:ops_request(State, Proposal);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -158,11 +158,13 @@ on({group_node_join_response,retry}, State) ->
 on({group_node_join_response,is_already_member}, State) ->
     % @todo: do nothing? well, we are already in the group.
     State;
-on({group_node_remove_response,retry, Pid}, State) ->
+on({group_node_remove_response, is_no_member, _DeadPid}, State) ->
+    State;
+on({group_node_remove_response, retry, DeadPid}, State) ->
     View = group_state:get_view(State),
-    case group_view:is_member(View, Pid) of
+    case group_view:is_member(View, DeadPid) of
         true ->
-            comm:send_local(self(), {ops, {group_node_remove, Pid}}),
+            comm:send_local(self(), {ops, {group_node_remove, DeadPid, comm:this()}}),
             State;
         false ->
             State
@@ -193,7 +195,7 @@ on({paxos_read, Client, HashedKey}, State) ->
 on({paxos_write, Client, HashedKey, Value}, State) ->
     DB = group_state:get_db(State),
     case group_db:read(DB, HashedKey) of
-        {value, {ok, OldValue, OldVersion}} ->
+        {value, {ok, _OldValue, OldVersion}} ->
             Proposal = {write, HashedKey, Value, OldVersion + 1, Client, comm:this()},
             on({ops, Proposal}, State);
         is_not_current ->
@@ -203,7 +205,7 @@ on({paxos_write, Client, HashedKey, Value}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DB repair
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({db_repair_request, Range, ChunkSize, Version, UUID, Client}, State) ->
+on({db_repair_request, Range, ChunkSize, _Version, UUID, Client}, State) ->
     DB = group_state:get_db(State),
     % @todo check version
     case group_db:get_chunk(DB, Range, ChunkSize) of
@@ -242,11 +244,11 @@ on({rm_get_pred_response, Node, NodesPred}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({crash, Pid}, State) ->
+on({crash, DeadPid}, State) ->
     View = group_state:get_view(State),
-    case group_view:is_member(View, Pid) of
+    case group_view:is_member(View, DeadPid) of
         true ->
-            comm:send_local(self(), {ops, {group_node_remove, Pid}}),
+            comm:send_local(self(), {ops, {group_node_remove, DeadPid, comm:this()}}),
             State;
         false ->
             State
