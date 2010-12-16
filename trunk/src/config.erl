@@ -82,7 +82,14 @@ start(Files, Owner) ->
     register(?MODULE, self()),
     ets:new(config_ets, [set, protected, named_table]),
     [ populate_db(File) || File <- Files],
-    check_config() orelse halt(1),
+    case check_config() of
+        true -> ok;
+        _    ->
+            % wait a bit so the error output can be written
+            % TODO: find a better way
+            timer:sleep(100),
+            halt(1)
+    end,
     Owner ! done,
     loop().
 
