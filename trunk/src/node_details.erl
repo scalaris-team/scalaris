@@ -39,7 +39,7 @@
 
 -type(node_details_name() :: predlist | pred | node | my_range | succ |
                              succlist | load | hostname | rt_size |
-                             message_log | memory).
+                             message_log | memory | new_key).
 
 -record(node_details, {predlist = ?required(node_details, predlist) :: nodelist:non_empty_snodelist(),
                        node     = ?required(node_details, node)     :: node:node_type(),
@@ -59,7 +59,8 @@
      {hostname, hostname()} |
      {rt_size, rt_size()} |
      {message_log, message_log()} |
-     {memory, memory()}]).
+     {memory, memory()} |
+     {new_key, ?RT:key()}]).
 
 -opaque(node_details() :: node_details_record() | node_details_list()).
 
@@ -107,7 +108,8 @@ to_list(NodeDetails) when is_list(NodeDetails) ->
           (node_details(), hostname, hostname()) -> node_details();
           (node_details(), rt_size, rt_size()) -> node_details();
           (node_details(), message_log, message_log()) -> node_details();
-          (node_details(), memory, memory()) -> node_details().
+          (node_details(), memory, memory()) -> node_details();
+          (node_details(), new_key, ?RT:key()) -> node_details().
 set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
     case Key of
         % record members:
@@ -122,7 +124,8 @@ set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
         pred -> NodeDetails#node_details{predlist = [Value]};
         % list members:
         my_range -> [{Key, Value} | to_list(NodeDetails)];
-        message_log -> [{Key, Value} | to_list(NodeDetails)]
+        message_log -> [{Key, Value} | to_list(NodeDetails)];
+        new_key -> [{Key, Value} | to_list(NodeDetails)]
     end;
 set(NodeDetails, Key, Value) when is_list(NodeDetails) ->
     case Key of
@@ -152,7 +155,8 @@ contains(NodeDetails, Key) when is_list(NodeDetails) ->
           (node_details(), hostname) -> hostname();
           (node_details(), rt_size) -> rt_size();
           (node_details(), message_log) -> message_log();
-          (node_details(), memory) -> memory().
+          (node_details(), memory) -> memory();
+          (node_details(), new_key) -> ?RT:key().
 get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load,
   hostname=HostName, rt_size=RTSize, memory=Memory} = _NodeDetails, Key) ->
     case Key of
@@ -181,7 +185,8 @@ get(NodeDetails, Key) when is_list(NodeDetails) ->
               (node_details_list(), hostname) -> hostname();
               (node_details_list(), rt_size) -> rt_size();
               (node_details_list(), message_log) -> message_log();
-              (node_details_list(), memory) -> memory().
+              (node_details_list(), memory) -> memory();
+              (node_details_list(), new_key) -> ?RT:key().
 get_list(NodeDetails, Key) ->
     case lists:keyfind(Key, 1, NodeDetails) of
         {Key, Value} -> Value;
