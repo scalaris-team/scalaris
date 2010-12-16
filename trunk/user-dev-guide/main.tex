@@ -306,6 +306,45 @@ in the larger partition. All requests in the smaller partition will
 time out until the two networks merge again. Note, most other
 key-value stores tend to sacrifice consistency.
 
+\section{Scientific Background}
+
+{\bf Basics.} The general structure of Scalaris is modelled after
+Chord. The Chord paper~\cite{chord-sigcomm} describes the ring
+structure, the routing algorithms, and basic ring maintenance.
+
+The main routines of our Chord node are in \url{src/dht\_node.erl} and
+the join protocol is implemented in \url{src/dht\_node\_join.erl} (see
+also Chap.~\cite{chapter.join}). Our implementation of the routing
+algorithms is described in more detail in Sect.~\ref{chapter.routing}
+and the actual implementation is in \url{src/rt\_chord.erl}.
+
+{\bf Transactions.} The most interesting part is probably the
+transaction algorithms. The most current description of the algorithms
+and background is in \cite{enhanced-paxos}.
+
+We have currently two generations of transaction algorithms. The
+older one is in \url{src/transstore}. The newer one is more
+modular. It provides an implementation of the paxos algorithm in
+\url{src/paxos} and the transaction algorithms itself in
+\url{src/transactions} (see also Chap.~\ref{chapter.transactions}).
+
+{\bf Ring Maintenance.} We changed the ring maintenance algorithm in
+Scalaris. It is not the standard Chord one, but a variation of
+T-Man~\cite{t-man}. It is supposed to fix the ring structure
+faster. In some situations, the standard Chord algorithm is not able
+to fix the ring structure while T-Man can still fix it. For node sampling,
+our implementation relies on Cyclon~\cite{cyclon}.
+
+The T-Man implementation can be found in \url{src/rm\_tman.erl} and
+the Cyclon implementation in \url{src/cyclon}.
+
+{\bf Vivaldi Coordinates.} For some experiments, we implemented so
+called Vivaldi coordinates~\cite{vivaldi}. They can be used to
+estimate the network latency between arbitrary nodes.
+
+The implementation can be found in \url{src/vivaldi.erl}.
+
+
 \chapter{Download and Installation}
 
 \section{Requirements}
@@ -1392,6 +1431,7 @@ detector (the failure detector already unsubscribes the node in this case).
 
 
 \chapter{Transactions in \scalaris{}}
+\label{chapter.transactions}
 
 \section{The Paxos Module}
 
@@ -1404,6 +1444,7 @@ Introduces transaction processing on top of a Overlay
 
 
 \chapter{How a node joins the system}
+\label{chapter.join}
 
 \section{General Erlang server loop}
 
@@ -1708,10 +1749,37 @@ Joe Armstrong.
 \newblock \emph{Programming Erlang: Software for a Concurrent World.}
 \newblock Pragmatic Programmers, ISBN: 978-1-9343560-0-5, July 2007
 
+\bibitem{vivaldi}
+Frank Dabek, Russ Cox, Frans Kaahoek, Robert Morris.
+\newblock \emph{Vivaldi: A Decentralized Network Coordinate System.}
+\newblock ACM SIGCOMM 2004.
+
 \bibitem{rachid-book}
 Rachid Guerraoui and Luis Rodrigues.
 \newblock \emph{Introduction to Reliable Distributed Programming.}
 \newblock Springer-Verlag, 2006.
+
+\bibitem{chord-sigcomm}
+Ion Stoica, Robert Morris, David Karger, M. Frans Kaashoek and Hari Balakrishnan.
+\newblock \emph{Chord: A Scalable Peer-to-peer Lookup Service for Internet Applications.}
+\newblock ACM SIGCOMM 2001, San Deigo, CA, August 2001, pp. 149-160.
+\newblock \href{http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf}{http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord\_sigcomm.pdf}
+
+\bibitem{t-man}
+Mark Jelasity, Alberto Montresor, Özalp Babaoglu.
+\newblock \emph{T-Man: Gossip-based fast overlay topology construction.}
+\newblock Computer Networks (CN) 53(13):2321-2339, 2009.
+
+\bibitem{enhanced-paxos}
+F. Schintke, A. Reinefeld, S. Haridi, T. Schütt.
+\newblock \emph{Enhanced Paxos Commit for Transactions on DHTs.}
+\newblock 10th IEEE/ACM Int. Conf. on Cluster, Cloud and Grid Computing, pp. 448-454,
+May 2010.
+
+\bibitem{cyclon}
+Spyros Voulgaris, Daniela Gavidia, Maarten van Steen.
+\newblock \emph{CYCLON: Inexpensive Membership Management for Unstructured P2P Overlays.}
+\newblock J. Network Syst. Manage. 13(2): 2005.
 
 \end{thebibliography}
 
