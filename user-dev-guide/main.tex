@@ -312,21 +312,21 @@ key-value stores tend to sacrifice consistency.
 Chord. The Chord paper~\cite{chord-sigcomm} describes the ring
 structure, the routing algorithms, and basic ring maintenance.
 
-The main routines of our Chord node are in \url{src/dht\_node.erl} and
-the join protocol is implemented in \url{src/dht\_node\_join.erl} (see
+The main routines of our Chord node are in \code{src/dht\_node.erl} and
+the join protocol is implemented in \code{src/dht\_node\_join.erl} (see
 also Chap.~\cite{chapter.join}). Our implementation of the routing
 algorithms is described in more detail in Sect.~\ref{chapter.routing}
-and the actual implementation is in \url{src/rt\_chord.erl}.
+and the actual implementation is in \code{src/rt\_chord.erl}.
 
 {\bf Transactions.} The most interesting part is probably the
 transaction algorithms. The most current description of the algorithms
 and background is in \cite{enhanced-paxos}.
 
 We have currently two generations of transaction algorithms. The
-older one is in \url{src/transstore}. The newer one is more
+older one is in \code{src/transstore}. The newer one is more
 modular. It provides an implementation of the paxos algorithm in
-\url{src/paxos} and the transaction algorithms itself in
-\url{src/transactions} (see also Chap.~\ref{chapter.transactions}).
+\code{src/paxos} and the transaction algorithms itself in
+\code{src/transactions} (see also Chap.~\ref{chapter.transactions}).
 
 {\bf Ring Maintenance.} We changed the ring maintenance algorithm in
 Scalaris. It is not the standard Chord one, but a variation of
@@ -335,14 +335,14 @@ faster. In some situations, the standard Chord algorithm is not able
 to fix the ring structure while T-Man can still fix it. For node sampling,
 our implementation relies on Cyclon~\cite{cyclon}.
 
-The T-Man implementation can be found in \url{src/rm\_tman.erl} and
-the Cyclon implementation in \url{src/cyclon}.
+The T-Man implementation can be found in \code{src/rm\_tman.erl} and
+the Cyclon implementation in \code{src/cyclon}.
 
 {\bf Vivaldi Coordinates.} For some experiments, we implemented so
 called Vivaldi coordinates~\cite{vivaldi}. They can be used to
 estimate the network latency between arbitrary nodes.
 
-The implementation can be found in \url{src/vivaldi.erl}.
+The implementation can be found in \code{src/vivaldi.erl}.
 
 
 \chapter{Download and Installation}
