@@ -100,6 +100,23 @@ delete_entry_({DB, CKInt, CKDB}, Entry) ->
 get_load_({DB, _CKInt, _CKDB}) ->
     gb_trees:size(DB).
 
+%% @doc Returns the number of stored keys in the given interval.
+get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
+    Empty = intervals:empty(),
+    All = intervals:all(),
+    case Interval of
+        Empty -> 0;
+        All   -> get_load_(State);
+        _     ->
+            F = fun(Key, _DBEntry, Load) ->
+                        case intervals:in(Key, Interval) of
+                            true -> Load + 1;
+                            _    -> Load
+                        end
+                end,
+            util:gb_trees_foldl(F, 0, DB)
+    end.
+
 %% @doc Adds all db_entry objects in the Data list.
 add_data_({DB, CKInt, CKDB}, Data) ->
     % check once for the 'common case'

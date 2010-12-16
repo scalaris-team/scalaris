@@ -140,7 +140,24 @@ delete_entry_(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
 %% @doc Returns the number of stored keys.
 get_load_({{DB, _FileName}, _CKInt, _CKDB}) ->
     % TODO: not really efficient (maybe store the load in the DB?)
-    toke_drv:fold(fun (_K, _V, Acc) -> Acc + 1 end, 0, DB).
+    toke_drv:fold(fun (_K, _V, Load) -> Load + 1 end, 0, DB).
+
+%% @doc Returns the number of stored keys in the given interval.
+get_load_(State = {{DB, _FileName}, _CKInt, _CKDB}, Interval) ->
+    Empty = intervals:empty(),
+    All = intervals:all(),
+    case Interval of
+        Empty -> 0;
+        All   -> get_load_(State);
+        _     ->
+            toke_drv:fold(fun(Key_, _V, Load) ->
+                                  Key = erlang:binary_to_term(Key_),
+                                  case intervals:in(Key, Interval) of
+                                      true -> Load + 1;
+                                      _    -> Load
+                                  end
+                          end, 0, DB)
+    end.
 
 %% @doc Adds all db_entry objects in the Data list.
 add_data_(State = {{DB, _FileName}, CKInt, CKDB}, Data) ->
