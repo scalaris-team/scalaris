@@ -124,7 +124,7 @@ get_range_(Begin, End) ->
     if
         End == Begin -> n_(); % I am the only node
         End > Begin  -> End - Begin;
-        End < Begin  -> (n_() - Begin - 1) + End
+        End < Begin  -> (n_() - Begin) + End
     end.
 
 %% @doc Gets the key that splits the interval (Begin, End] in two equal halves

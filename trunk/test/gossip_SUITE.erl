@@ -162,7 +162,7 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
             KrExp = try if
                             PredId =:= NodeId -> ?RT:n(); % I am the only node
                             NodeId >= PredId  -> NodeId - PredId;
-                            NodeId < PredId   -> (?RT:n() - PredId - 1) + NodeId
+                            NodeId < PredId   -> (?RT:n() - PredId) + NodeId
                         end
                     catch % keys might not support subtraction or ?RT:n() might throw
                         throw:not_supported -> unknown;
