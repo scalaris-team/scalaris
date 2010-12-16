@@ -139,6 +139,12 @@ get_load_({DB, Counter} = DB_) ->
     verify_counter(Counter),
     ?BASE_DB:get_load(DB).
 
+%% @doc Returns the number of stored keys in the given Interval.
+get_load_({DB, Counter} = DB_, Interval) ->
+    ?TRACE2(get_load, DB_, Interval),
+    verify_counter(Counter),
+    ?BASE_DB:get_load(DB, Interval).
+
 %% @doc Adds all db_entry objects in the Data list.
 add_data_({DB, Counter} = DB_, Data) ->
     ?TRACE2(add_data, DB_, Data),

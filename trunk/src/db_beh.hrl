@@ -38,7 +38,7 @@
 -export([get_entries/2, get_entries/3]).
 -export([update_entries/4]).
 -export([delete_entries/2]).
--export([get_load/1, split_data/2, get_data/1, add_data/2]).
+-export([get_load/1, get_load/2, split_data/2, get_data/1, add_data/2]).
 -export([check_db/1]).
 -export([record_changes/2, stop_record_changes/1, stop_record_changes/2,
          get_changes/1, get_changes/2]).
@@ -64,6 +64,9 @@ get_name(DB) -> get_name_(DB).
 
 -spec get_load(DB::db()) -> Load::integer().
 get_load(DB) -> get_load_(DB).
+
+-spec get_load(DB::db(), Interval::intervals:interval()) -> Load::integer().
+get_load(DB, Interval) -> get_load_(DB, Interval).
 
 % entry-based methods:
 -spec get_entry(DB::db(), Key::?RT:key()) -> db_entry:entry().
@@ -157,6 +160,7 @@ get_changes(DB, Interval) -> get_changes_(DB, Interval).
 -spec close_(DB::db_t()) -> any().
 -spec close_(DB::db_t(), Delete::boolean()) -> any().
 -spec get_name_(DB::db_t()) -> db_name().
+-spec get_load_(DB::db_t(), Interval::intervals:interval()) -> Load::integer().
 -spec get_load_(DB::db_t()) -> Load::integer().
 
 -spec get_entry_(DB::db_t(), Key::?RT:key()) -> db_entry:entry().

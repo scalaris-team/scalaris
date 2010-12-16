@@ -66,9 +66,26 @@ delete_entry_(State = {DB, CKInt, CKDB}, Entry) ->
     ?ETS:delete(DB, Key),
     State.
 
-%% @doc returns the number of stored keys
+%% @doc Returns the number of stored keys.
 get_load_({DB, _CKInt, _CKDB}) ->
     ?ETS:info(DB, size).
+
+%% @doc Returns the number of stored keys in the given interval.
+get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
+    Empty = intervals:empty(),
+    All = intervals:all(),
+    case Interval of
+        Empty -> 0;
+        All   -> get_load_(State);
+        _     ->
+            F = fun(DBEntry, Load) ->
+                        case intervals:in(db_entry:get_key(DBEntry), Interval) of
+                            true -> Load + 1;
+                            _    -> Load
+                        end
+                end,
+            ?ETS:foldl(F, 0, DB)
+    end.
 
 %% @doc adds keys
 add_data_(State = {DB, CKInt, CKDB}, Data) ->

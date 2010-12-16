@@ -32,6 +32,7 @@ tests_avail() ->
      tester_read_write_lock, tester_write_read_lock,
      tester_delete, tester_add_data,
      tester_get_entries2, tester_get_entries3_1, tester_get_entries3_2,
+     tester_get_load2,
      tester_split_data, tester_update_entries,
      tester_delete_entries1, tester_delete_entries2,
      tester_changed_keys_get_entry,
@@ -51,6 +52,7 @@ tests_avail() ->
      tester_changed_keys_delete_entries1,
      tester_changed_keys_delete_entries2,
      tester_changed_keys_get_load,
+     tester_changed_keys_get_load2,
      tester_changed_keys_split_data1,
      tester_changed_keys_split_data2,
      tester_changed_keys_get_data,
@@ -771,6 +773,38 @@ tester_get_entries2(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
+% ?TEST_DB:get_load/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_get_load2(Data::?TEST_DB:db_as_list(), LoadInterval::intervals:interval()) -> true.
+prop_get_load2(Data, LoadInterval_) ->
+    LoadInterval = intervals:normalize(LoadInterval_),
+    DB = ?TEST_DB:new(),
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    DB2 = ?TEST_DB:add_data(DB, UniqueData),
+    
+    FilterFun = fun(A) -> intervals:in(db_entry:get_key(A), LoadInterval) end,
+    ValueFun = fun(_DBEntry) -> 1 end,
+    
+    ?equals_w_note(?TEST_DB:get_load(DB2, LoadInterval),
+                   length(lists:filter(FilterFun, UniqueData)),
+                   "check_get_load2_1"),
+    ?equals_w_note(?TEST_DB:get_load(DB2, LoadInterval),
+                   length(?TEST_DB:get_entries(DB2, FilterFun, ValueFun)),
+                   "check_get_load2_2"),
+
+    ?TEST_DB:close(DB2),
+    true.
+
+tester_get_load2(_Config) ->
+    tester:test(?MODULE, prop_get_load2, 2, rw_suite_runs(1000)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 % ?TEST_DB:split_data/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1281,6 +1315,24 @@ prop_changed_keys_get_load(Data, ChangesInterval_) ->
     ?TEST_DB:close(DB4),
     true.
 
+-spec prop_changed_keys_get_load2(
+        Data::?TEST_DB:db_as_list(), LoadInterval::intervals:interval(),
+        ChangesInterval::intervals:interval()) -> true.
+prop_changed_keys_get_load2(Data, LoadInterval_, ChangesInterval_) ->
+    ChangesInterval = intervals:normalize(ChangesInterval_),
+    LoadInterval = intervals:normalize(LoadInterval_),
+    DB = ?TEST_DB:new(),
+    DB2 = ?TEST_DB:add_data(DB, Data),
+    DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
+    
+    ?TEST_DB:get_load(DB3, LoadInterval),
+    ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_load2_1"),
+    
+    DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_load2_2"),
+
+    ?TEST_DB:close(DB4),
+    true.
+
 -spec prop_changed_keys_split_data1(
         Data::?TEST_DB:db_as_list(),
         ChangesInterval::intervals:interval(),
@@ -1632,6 +1684,9 @@ tester_changed_keys_delete_entries2(_Config) ->
 
 tester_changed_keys_get_load(_Config) ->
     tester:test(?MODULE, prop_changed_keys_get_load, 2, rw_suite_runs(1000)).
+
+tester_changed_keys_get_load2(_Config) ->
+    tester:test(?MODULE, prop_changed_keys_get_load2, 3, rw_suite_runs(1000)).
 
 tester_changed_keys_split_data1(_Config) ->
     tester:test(?MODULE, prop_changed_keys_split_data1, 3, rw_suite_runs(1000)).
