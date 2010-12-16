@@ -59,6 +59,10 @@
 %-define(RM, rm_tmansharp).
 %% userdevguide-end scalaris:rm
 
+%% Passive load balancing algorithms:
+%-define(LB_PSV, lb_psv_simple).
+-define(LB_PSV, lb_psv_split).
+
 
 -define(TCP_LAYER, true). % TCP communication
 %-define(BUILTIN, true).   % distributed Erlang native communication

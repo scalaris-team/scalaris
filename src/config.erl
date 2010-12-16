@@ -146,7 +146,8 @@ check_config() ->
         ?RM:check_config() and
         fd_hbs:check_config() and
         dht_node_move:check_config() and
-        dht_node_join:check_config().
+        dht_node_join:check_config() and
+        ?LB_PSV:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->
