@@ -29,7 +29,7 @@ report_rejection(State, PaxosId, Proposal) ->
     case Proposal of
         {group_split, _Pid, _SplitKey, _LeftGroup, _RightGroup} ->
             group_ops_split_group:rejected_proposal(State, Proposal, PaxosId);
-        {group_node_remove, _Pid} ->
+        {group_node_remove, _Pid, _Proposer} ->
             group_ops_remove_node:rejected_proposal(State, Proposal, PaxosId);
         {group_node_join, _Pid, _Acceptor, _Learner} ->
             group_ops_join_node:rejected_proposal(State, Proposal, PaxosId);
@@ -61,7 +61,7 @@ execute_decision(State, PaxosId, Proposal) ->
     group_state:state().
 dispatch_decision(State, PaxosId, {group_split, _, _, _, _} = Decision, Hint) ->
     group_ops_split_group:ops_decision(State, Decision, PaxosId, Hint);
-dispatch_decision(State, PaxosId, {group_node_remove, _} = Decision, Hint) ->
+dispatch_decision(State, PaxosId, {group_node_remove, _, _} = Decision, Hint) ->
     group_ops_remove_node:ops_decision(State, Decision, PaxosId, Hint);
 dispatch_decision(State, PaxosId, {group_node_join, _, _, _} = Decision, Hint) ->
     group_ops_join_node:ops_decision(State, Decision, PaxosId, Hint);
