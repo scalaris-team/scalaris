@@ -265,7 +265,7 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_atom(vivaldi_trigger) and
+    config:is_module(vivaldi_trigger) and
 
     config:is_integer(vivaldi_interval) and
     config:is_greater_than(vivaldi_interval, 0) and

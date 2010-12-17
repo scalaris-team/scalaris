@@ -708,7 +708,7 @@ calc_initial_avg_kr(Pred, Me) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_atom(gossip_trigger) and
+    config:is_module(gossip_trigger) and
     
     config:is_integer(gossip_interval) and
     config:is_greater_than(gossip_interval, 0) and

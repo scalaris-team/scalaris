@@ -148,7 +148,7 @@ get_web_debug_info(_State, _NeighbTable) -> [].
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_atom(ringmaintenance_trigger) and
+    config:is_module(ringmaintenance_trigger) and
     
     config:is_integer(stabilization_interval_max) and
     config:is_greater_than(stabilization_interval_max, 0) and
