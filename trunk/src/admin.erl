@@ -38,7 +38,7 @@
 % @doc add new Scalaris nodes on the local node
 -spec add_node_at_id(?RT:key()) -> ok.
 add_node_at_id(Id) ->
-    add_node([{{idholder, id}, Id}]).
+    add_node([{{idholder, id}, Id}, {skip_psv_lb}]).
 
 -spec add_node([tuple()]) -> ok.
 add_node(Options) ->
