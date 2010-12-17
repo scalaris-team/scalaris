@@ -147,7 +147,10 @@ check_config() ->
         fd_hbs:check_config() and
         dht_node_move:check_config() and
         dht_node_join:check_config() and
-        ?LB_PSV:check_config().
+        % note: need to check all passive load balancing algorithm's parameters
+        %       (another node may ask us to provide a candidate for any of them)
+        lb_psv_simple:check_config() and
+        lb_psv_split:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->
