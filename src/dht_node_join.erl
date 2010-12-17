@@ -110,7 +110,7 @@ process_join_state({get_dht_nodes_response, Nodes},
     % note: collect nodes in the other phases, too (messages have been send anyway)
     %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(comm:this(), Nodes)]),
     ContactNodes = [Node || Node <- Nodes, Node =/= comm:this()],
-    {join, get_number_of_samples(JoinState, ContactNodes), QueuedMessages};
+    {join, get_number_of_samples(JoinState, ContactNodes, true), QueuedMessages};
 
 % in all other phases, just add the provided nodes:
 % note: phase1 should never receive this message!
@@ -432,15 +432,19 @@ get_known_nodes() ->
 %% @doc Calls ?LB_PSV:get_number_of_samples/1 if there is a contact node
 %%      in ContactNodes2 and then adds them to the list of contact nodes.
 -spec get_number_of_samples
-        (phase2(), ContactNodes::[node:node_type()]) -> phase2();
-        (phase2b(), ContactNodes::[node:node_type()]) -> phase2b().
-get_number_of_samples(JoinState, []) ->
+        (phase2(), ContactNodes::[node:node_type()], AddNodes::boolean()) -> phase2();
+        (phase2b(), ContactNodes::[node:node_type()], AddNodes::boolean()) -> phase2b().
+get_number_of_samples(JoinState, [], _AddNodes) ->
     JoinState;
-get_number_of_samples(JoinState, ContactNodes2 = [_|_]) ->
-    ?LB_PSV:get_number_of_samples(ContactNodes2),
+get_number_of_samples(JoinState, ContactNodes = [_|_], AddNodes) ->
+    ?LB_PSV:get_number_of_samples(ContactNodes),
     msg_delay:send_local(get_number_of_samples_timeout() div 1000, self(),
                          {join, get_number_of_samples_timeout}),
-    add_contact_nodes_back(ContactNodes2, JoinState).
+    JoinState1 = case AddNodes of
+                     true -> add_contact_nodes_back(ContactNodes, JoinState);
+                     _    -> JoinState
+                 end,
+    set_phase(phase2b, JoinState1).
 
 %% @doc Creates Count new (unique) additional IDs.
 -spec create_join_ids(Count::non_neg_integer(), OldIds::[?RT:key()]) -> {AllKeys::[?RT:key()], OnlyNewKeys::[?RT:key()]}.
@@ -612,8 +616,7 @@ start_over(JoinState) ->
             get_known_nodes(),
             set_phase(phase2, JoinState);
         [_|_] = ContactNodes ->
-            ?LB_PSV:get_number_of_samples(ContactNodes),
-            set_phase(phase2b, JoinState)
+            get_number_of_samples(JoinState, ContactNodes, false)
     end.
 %% userdevguide-end dht_node_join:restart_join
 
