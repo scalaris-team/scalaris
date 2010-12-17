@@ -42,7 +42,7 @@
     {join, join_request_timeout, Timeouts::non_neg_integer()} |
     {join, timeout} |
     % messages at the existing node:
-    {join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key()} |
+    {join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module()} |
     {join, join_request, NewPred::node:node_type()} |
     {join, join_response_timeout, NewPred::node:node_type(), MoveFullId::slide_op:id()}
     ).
@@ -278,8 +278,8 @@ process_join_state({join, join_response, Succ, Pred, MoveId},
                     MyIdVersion = get_id_version(JoinState),
                     case MyId =:= node:id(Succ) orelse MyId =:= node:id(Pred) of
                         true ->
-                            log:log(warn, "[ Node ~w ] chosen ID already exists, trying next "
-                                        "candidate", [self()]),
+                            log:log(warn, "[ Node ~w ] chosen ID already exists, "
+                                        "trying next candidate", [self()]),
                             JoinState1 = remove_candidate_front(JoinState),
                             {join, contact_best_candidate(JoinState1), QueuedMessages};
                         _ ->
@@ -345,8 +345,18 @@ process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
 
 %% @doc Process requests from a joining node at a existing node:.
 -spec process_join_msg(join_message(), dht_node_state:state()) -> dht_node_state:state().
-process_join_msg({join, get_candidate, Source_PID, Key}, State) ->
-    Candidate = ?LB_PSV:create_join(State, Key),
+process_join_msg({join, get_candidate, Source_PID, Key, LbPsv} = Msg, State) ->
+    % if anything goes wrong creating the candidate, do not crash, just report
+    % a no_op operation to the other node
+    Candidate = try LbPsv:create_join(State, Key)
+                catch
+                    Error:Reason ->
+                        log:log(error, "[ Node ~w ] could not create a candidate "
+                               "for another node: ~.0p:~.0p~n"
+                               "  Msg: ~.0p~n  State: ~.0p",
+                                [self(), Error, Reason, Msg, State]),
+                        lb_op:no_op()
+                end,
     comm:send(Source_PID, {join, get_candidate_response, Key, Candidate}),
     State;
 %% userdevguide-begin dht_node_join:join_request1
@@ -429,15 +439,17 @@ get_known_nodes() ->
     msg_delay:send_local(get_known_hosts_timeout() div 1000, self(),
                          {join, known_hosts_timeout}).
 
-%% @doc Calls ?LB_PSV:get_number_of_samples/1 if there is a contact node
-%%      in ContactNodes2 and then adds them to the list of contact nodes.
+%% @doc Calls get_number_of_samples/1 on the configured passive load balancing
+%%      algorithm if there is a contact node in ContactNodes and then adds them
+%%      to the list of contact nodes.
 -spec get_number_of_samples
-        (phase2(), ContactNodes::[node:node_type()], AddNodes::boolean()) -> phase2();
-        (phase2b(), ContactNodes::[node:node_type()], AddNodes::boolean()) -> phase2b().
+        (Phase, ContactNodes::[], AddNodes::boolean()) -> Phase;
+        (phase_2_4(), ContactNodes::[comm:mypid(),...], AddNodes::boolean()) -> phase2b().
 get_number_of_samples(JoinState, [], _AddNodes) ->
     JoinState;
 get_number_of_samples(JoinState, ContactNodes = [_|_], AddNodes) ->
-    ?LB_PSV:get_number_of_samples(ContactNodes),
+    LbPsv = get_lb_psv(),
+    LbPsv:get_number_of_samples(ContactNodes),
     msg_delay:send_local(get_number_of_samples_timeout() div 1000, self(),
                          {join, get_number_of_samples_timeout}),
     JoinState1 = case AddNodes of
@@ -494,7 +506,9 @@ lookup(JoinState, JoinIds = [_|_]) ->
             get_known_nodes(),
             NewJoinState;
         [First | _Rest] ->
-            _ = [comm:send(First, {lookup_aux, Id, 0, {join, get_candidate, comm:this(), Id}})
+            MyLbPsv = get_lb_psv(),
+            _ = [comm:send(First, {lookup_aux, Id, 0,
+                                   {join, get_candidate, comm:this(), Id, MyLbPsv}})
                 || Id <- JoinIds],
             msg_delay:send_local(get_lookup_timeout() div 1000, self(),
                                  {join, lookup_timeout, First}),
@@ -656,7 +670,8 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     gossip:activate(),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
-    dht_node_state:new(?RT:empty_ext(rm_loop:get_neighbors(NeighbTable)), NeighbTable, DB).
+    NewRT_ext = ?RT:empty_ext(rm_loop:get_neighbors(NeighbTable)),
+    dht_node_state:new(NewRT_ext, NeighbTable, DB).
 
 -spec finish_join_and_slide(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::?DB:db(),
@@ -723,7 +738,8 @@ add_candidate_back(Candidate, {Phase, CurId, CurIdVersion, ContactNodes, JoinIds
     {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, lists:append(Candidates, [Candidate])}.
 -spec sort_candidates(phase_2_4()) -> phase_2_4().
 sort_candidates({Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, ?LB_PSV:sort_candidates(Candidates)}.
+    LbPsv = get_lb_psv(),
+    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, LbPsv:sort_candidates(Candidates)}.
 -spec remove_candidate_front(phase_2_4()) -> phase_2_4().
 remove_candidate_front({Phase, CurId, CurIdVersion, ContactNodes, JoinIds, []}) ->
     {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, []};
@@ -756,7 +772,9 @@ check_config() ->
     config:is_greater_than_equal(join_timeout, 1000) and
 
     config:is_integer(join_get_number_of_samples_timeout) and
-    config:is_greater_than_equal(join_get_number_of_samples_timeout, 1000).
+    config:is_greater_than_equal(join_get_number_of_samples_timeout, 1000) and
+
+    config:is_module(join_lb_psv).
 
 %% @doc Gets the max number of ms to wait for a joining node's reply after
 %%      it send a join request (set in the config files).
@@ -799,3 +817,9 @@ get_join_timeout() ->
 -spec get_number_of_samples_timeout() -> pos_integer().
 get_number_of_samples_timeout() ->
     config:read(join_get_number_of_samples_timeout).
+
+%% @doc Gets the passive load balancing algorithm to use
+%%      (set in the config files).
+-spec get_lb_psv() -> module().
+get_lb_psv() ->
+    config:read(join_lb_psv).
