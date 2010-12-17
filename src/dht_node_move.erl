@@ -685,7 +685,7 @@ finish_delta_ack(State, PredOrSucc, SlideOp) ->
                     OldIdVersion = node:id_version(dht_node_state:get(State1, node)),
                     idholder:set_id(NewTargetId, OldIdVersion + 1),
                     idholder:get_id(),
-                    {join, {phase1}, msg_queue:new()};
+                    {join, {phase1, {skip_psv_lb}}, msg_queue:new()};
                 {slide, pred, NewTargetId} ->
                     make_slide(State1, pred, NewTargetId,
                                slide_op:get_tag(SlideOp),

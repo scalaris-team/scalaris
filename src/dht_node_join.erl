@@ -48,19 +48,19 @@
     ).
 
 -type phase0() ::
-    {as_first}.
+    {as_first, Options::[tuple()]}.
 -type phase1() ::
-    {phase1}.
+    {phase1,  Options::[tuple()]}.
 -type phase2() ::
-    {phase2,  MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
+    {phase2,  Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase2b() ::
-    {phase2b, MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
+    {phase2b, Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase3() ::
-    {phase3,  MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
+    {phase3,  Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase3b() ::
-    {phase3b,  MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
+    {phase3b, Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase4() ::
-    {phase4,  MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
+    {phase4,  Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase_2_4() :: phase2() | phase2b() | phase3() | phase3b() | phase4().
 
 -type join_state() ::
@@ -72,7 +72,7 @@
 % first node
 %% userdevguide-begin dht_node_join:join_first
 process_join_state({idholder_get_id_response, Id, IdVersion},
-                   {join, {as_first}, QueuedMessages}) ->
+                   {join, {as_first, _Options}, QueuedMessages}) ->
     log:log(info, "[ Node ~w ] joining as first: ~p",[self(), Id]),
     Me = node:new(comm:this(), Id, IdVersion),
     % join complete, State is the first "State"
@@ -85,12 +85,12 @@ process_join_state({idholder_get_id_response, Id, IdVersion},
 %% userdevguide-begin dht_node_join:join_other_p12
 % 1. get my key
 process_join_state({idholder_get_id_response, Id, IdVersion},
-                   {join, {phase1}, QueuedMessages}) ->
+                   {join, {phase1, Options}, QueuedMessages}) ->
     %io:format("p1: got key~n"),
     log:log(info,"[ Node ~w ] joining",[self()]),
     get_known_nodes(),
     msg_delay:send_local(get_join_timeout() div 1000, self(), {join, timeout}),
-    {join, {phase2, Id, IdVersion, [], [], []}, QueuedMessages};
+    {join, {phase2, Options, Id, IdVersion, [], [Id], []}, QueuedMessages};
 
 % 2. Find known hosts
 process_join_state({join, known_hosts_timeout},
@@ -110,7 +110,17 @@ process_join_state({get_dht_nodes_response, Nodes},
     % note: collect nodes in the other phases, too (messages have been send anyway)
     %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(comm:this(), Nodes)]),
     ContactNodes = [Node || Node <- Nodes, Node =/= comm:this()],
-    {join, get_number_of_samples(JoinState, ContactNodes, true), QueuedMessages};
+    NewJoinState =
+        case skip_psv_lb(JoinState) of
+            true -> % skip phase2b (use only the given ID)
+                JoinState1 = add_contact_nodes_back(ContactNodes, JoinState),
+                % (re-)issue lookups for all existing IDs
+                JoinState2 = lookup(JoinState1),
+                % the Id may have been removed -> select a new one in this case:
+                lookup_new_ids2(1, JoinState2);
+            _    -> get_number_of_samples(JoinState, ContactNodes, true)
+        end,
+    {join, NewJoinState, QueuedMessages};
 
 % in all other phases, just add the provided nodes:
 % note: phase1 should never receive this message!
@@ -128,7 +138,7 @@ process_join_state({join, get_number_of_samples_timeout},
   when element(1, JoinState) =:= phase2b ->
     %io:format("p2b: get number of samples timeout~n"),
     get_known_nodes(),
-    {join, setelement(1, JoinState, phase2), QueuedMessages};
+    {join, set_phase(phase2, JoinState), QueuedMessages};
 
 % ignore message arriving in later phases: 
 process_join_state({join, get_number_of_samples_timeout}, State) ->
@@ -143,7 +153,10 @@ process_join_state({join, get_number_of_samples, Samples, Source},
     %io:format("p2b: got get_number_of_samples ~p~n", [Samples]),
     % prefer node that send get_number_of_samples as first contact node
     JoinState1 = add_contact_nodes_front([Source], JoinState),
-    {join, lookup_new_ids2(Samples, JoinState1), QueuedMessages};
+    % (re-)issue lookups for all existing IDs
+    JoinState2 = lookup(JoinState1),
+    % then create additional samples, if required
+    {join, lookup_new_ids2(Samples, JoinState2), QueuedMessages};
 
 % ignore message arriving in other phases:
 process_join_state({join, get_number_of_samples, _Samples, _Source}, State) ->
@@ -448,7 +461,7 @@ get_known_nodes() ->
 get_number_of_samples(JoinState, [], _AddNodes) ->
     JoinState;
 get_number_of_samples(JoinState, ContactNodes = [_|_], AddNodes) ->
-    LbPsv = get_lb_psv(),
+    LbPsv = get_lb_psv(JoinState),
     LbPsv:get_number_of_samples(ContactNodes),
     msg_delay:send_local(get_number_of_samples_timeout() div 1000, self(),
                          {join, get_number_of_samples_timeout}),
@@ -506,7 +519,7 @@ lookup(JoinState, JoinIds = [_|_]) ->
             get_known_nodes(),
             NewJoinState;
         [First | _Rest] ->
-            MyLbPsv = get_lb_psv(),
+            MyLbPsv = get_lb_psv(JoinState),
             _ = [comm:send(First, {lookup_aux, Id, 0,
                                    {join, get_candidate, comm:this(), Id, MyLbPsv}})
                 || Id <- JoinIds],
@@ -556,7 +569,10 @@ lookup_new_ids2(TotalCount, JoinState) ->
 integrate_candidate(Candidate, JoinState, Position) ->
     % the other node could suggest a no_op -> select a new ID
     case lb_op:is_slide(Candidate) of
-        false -> lookup_new_ids1(1, JoinState);
+        false ->
+            log:log(warn, "[ Node ~w ] got no_op candidate, "
+                        "looking up a new ID...", [self()]),
+            lookup_new_ids1(1, JoinState);
         _ ->
             % note: can not use an existing ID! the other node should not have
             % replied with such an ID though...
@@ -696,58 +712,65 @@ finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
 -spec get_phase(phase_2_4()) -> phase2 | phase2b | phase3 | phase3b | phase4.
 get_phase(JoinState)         -> element(1, JoinState).
 -spec get_id(phase_2_4()) -> ?RT:key().
-get_id(JoinState)            -> element(2, JoinState).
+get_id(JoinState)            -> element(3, JoinState).
 -spec get_id_version(phase_2_4()) -> non_neg_integer().
-get_id_version(JoinState)    -> element(3, JoinState).
+get_id_version(JoinState)    -> element(4, JoinState).
 -spec get_contact_nodes(phase_2_4()) -> [comm:mypid()].
-get_contact_nodes(JoinState) -> element(4, JoinState).
+get_contact_nodes(JoinState) -> element(5, JoinState).
 -spec get_join_ids(phase_2_4()) -> [?RT:key()].
-get_join_ids(JoinState)      -> element(5, JoinState).
+get_join_ids(JoinState)      -> element(6, JoinState).
 -spec get_candidates(phase_2_4()) -> [lb_op:lb_op()].
-get_candidates(JoinState)    -> element(6, JoinState).
+get_candidates(JoinState)    -> element(7, JoinState).
 
 % setter:
--spec set_phase(phase2 | phase2b | phase3 | phase3b | phase4, phase_2_4()) -> phase_2_4().
+-spec set_phase(phase2, phase_2_4()) -> phase2();
+               (phase2b, phase_2_4()) -> phase2b();
+               (phase3, phase_2_4()) -> phase3();
+               (phase3b, phase_2_4()) -> phase3b();
+               (phase4, phase_2_4()) -> phase4().
 set_phase(Phase, JoinState) -> setelement(1, JoinState, Phase).
 -spec add_contact_nodes_back(Nodes::[comm:mypid()], phase_2_4()) -> phase_2_4().
 add_contact_nodes_back([], JoinState) -> JoinState;
-add_contact_nodes_back(Nodes = [_|_], {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, lists:append(ContactNodes, Nodes), JoinIds, Candidates}.
+add_contact_nodes_back(Nodes = [_|_], {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, CurId, CurIdVersion, lists:append(ContactNodes, Nodes), JoinIds, Candidates}.
 -spec add_contact_nodes_front(Nodes::[comm:mypid(),...], phase_2_4()) -> phase_2_4().
 %% add_contact_nodes_front([], JoinState) ->
 %%     JoinState;
-add_contact_nodes_front([CNHead], {Phase, CurId, CurIdVersion, [CNHead, _] = ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates};
-add_contact_nodes_front(Nodes = [_|_], {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, lists:append(Nodes, ContactNodes), JoinIds, Candidates}.
+add_contact_nodes_front([CNHead], {Phase, Options, CurId, CurIdVersion, [CNHead, _] = ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates};
+add_contact_nodes_front(Nodes = [_|_], {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, CurId, CurIdVersion, lists:append(Nodes, ContactNodes), JoinIds, Candidates}.
 -spec remove_contact_node(Node::comm:mypid(), phase_2_4()) -> phase_2_4().
-remove_contact_node(Node, {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, [N || N <- ContactNodes, N =/= Node],
+remove_contact_node(Node, {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, CurId, CurIdVersion, [N || N <- ContactNodes, N =/= Node],
      JoinIds, Candidates}.
 -spec set_join_ids(JoinIds::[?RT:key()], phase_2_4()) -> phase_2_4().
-set_join_ids(JoinIds, JoinState) -> setelement(5, JoinState, JoinIds).
+set_join_ids(JoinIds, JoinState) -> setelement(6, JoinState, JoinIds).
 -spec remove_join_id(JoinId::?RT:key(), phase_2_4()) -> phase_2_4().
-remove_join_id(JoinIdToRemove, {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, ContactNodes,
+remove_join_id(JoinIdToRemove, {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, CurId, CurIdVersion, ContactNodes,
      [Id || Id <- JoinIds, Id =/= JoinIdToRemove], Candidates}.
 -spec add_candidate_front(Candidate::lb_op:lb_op(), phase_2_4()) -> phase_2_4().
-add_candidate_front(Candidate, {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, [Candidate | Candidates]}.
+add_candidate_front(Candidate, {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, [Candidate | Candidates]}.
 -spec add_candidate_back(Candidate::lb_op:lb_op(), phase_2_4()) -> phase_2_4().
-add_candidate_back(Candidate, {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, lists:append(Candidates, [Candidate])}.
+add_candidate_back(Candidate, {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, lists:append(Candidates, [Candidate])}.
 -spec sort_candidates(phase_2_4()) -> phase_2_4().
-sort_candidates({Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    LbPsv = get_lb_psv(),
-    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, LbPsv:sort_candidates(Candidates)}.
+sort_candidates({Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates} = JoinState) ->
+    LbPsv = get_lb_psv(JoinState),
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, LbPsv:sort_candidates(Candidates)}.
 -spec remove_candidate_front(phase_2_4()) -> phase_2_4().
-remove_candidate_front({Phase, CurId, CurIdVersion, ContactNodes, JoinIds, []}) ->
-    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, []};
-remove_candidate_front({Phase, CurId, CurIdVersion, ContactNodes, JoinIds, [_ | Candidates]}) ->
-    {Phase, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}.
+remove_candidate_front({Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, []}) ->
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, []};
+remove_candidate_front({Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, [_ | Candidates]}) ->
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}.
 -spec set_id(Id::?RT:key(), IdVersion::non_neg_integer(), phase_2_4()) -> phase_2_4().
-set_id(Id, IdVersion, {Phase, _CurId, _CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, Id, IdVersion, ContactNodes, JoinIds, Candidates}.
+set_id(Id, IdVersion, {Phase, Options, _CurId, _CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
+    {Phase, Options, Id, IdVersion, ContactNodes, JoinIds, Candidates}.
+-spec skip_psv_lb(phase_2_4()) -> boolean().
+skip_psv_lb({_Phase, Options, _CurId, _CurIdVersion, _ContactNodes, _JoinIds, _Candidates}) ->
+    lists:member({skip_psv_lb}, Options).
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.
@@ -818,8 +841,13 @@ get_join_timeout() ->
 get_number_of_samples_timeout() ->
     config:read(join_get_number_of_samples_timeout).
 
-%% @doc Gets the passive load balancing algorithm to use
-%%      (set in the config files).
--spec get_lb_psv() -> module().
-get_lb_psv() ->
-    config:read(join_lb_psv).
+%% @doc Gets the passive load balancing algorithm to use for the given
+%%      JoinState (set in the config files). If skip_psv_lb is set,
+%%      lb_psv_simple will be used independent from the module set in the
+%%      config.
+-spec get_lb_psv(JoinState::phase_2_4()) -> module().
+get_lb_psv(JoinState) ->
+    case skip_psv_lb(JoinState) of
+        true -> lb_psv_simple;
+        _    -> config:read(join_lb_psv)
+    end.

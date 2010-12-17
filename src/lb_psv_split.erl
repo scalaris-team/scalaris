@@ -60,7 +60,10 @@ create_join(DhtNodeState, SelectedKey) ->
             lb_common:split_my_range(DhtNodeState, SelectedKey)
     end,
     case SplitKey of
-        MyNodeId -> lb_op:no_op();
+        MyNodeId ->
+            log:log(warn, "[ Node ~w ] join requested for my ID, "
+                        "sending no_op...", [self()]),
+            lb_op:no_op();
         _ ->
             MyLoadNew = MyLoad - OtherLoadNew,
             MyNodeDetails1 = node_details:set(node_details:new(), node, MyNode),

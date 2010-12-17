@@ -41,7 +41,10 @@ create_join(DhtNodeState, SelectedKey) ->
     MyNode = dht_node_state:get(DhtNodeState, node),
     MyNodeId = node:id(MyNode),
     case SelectedKey of
-        MyNodeId -> lb_op:no_op();
+        MyNodeId ->
+            log:log(warn, "[ Node ~w ] join requested for my ID, "
+                        "sending no_op...", [self()]),
+            lb_op:no_op();
         _ ->
             MyPredId = dht_node_state:get(DhtNodeState, pred_id),
             MyLoad = dht_node_state:get(DhtNodeState, load),
