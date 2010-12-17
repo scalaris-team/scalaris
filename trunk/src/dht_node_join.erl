@@ -555,7 +555,7 @@ lookup_new_ids1(Count, JoinState) ->
 lookup_new_ids2(TotalCount, JoinState) ->
     OldIds = get_join_ids(JoinState),
     CurCount = length(OldIds) + length(get_candidates(JoinState)),
-    NewIdsCount = max(TotalCount - CurCount, 0),
+    NewIdsCount = erlang:max(TotalCount - CurCount, 0),
     lookup_new_ids1(NewIdsCount, JoinState).
 
 %% @doc Integrates the Candidate into the join state if is is valid, i.e. a
