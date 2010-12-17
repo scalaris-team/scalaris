@@ -324,7 +324,7 @@ rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_atom(cyclon_trigger) and
+    config:is_module(cyclon_trigger) and
     
     config:is_integer(cyclon_interval) and
     config:is_greater_than(cyclon_interval, 0) and

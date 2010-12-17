@@ -29,7 +29,7 @@
          exists/1, is_atom/1, is_bool/1, is_mypid/1, is_ip/1, is_integer/1,
          is_float/1, is_tuple/2, is_tuple/4, is_list/1, is_list/3, is_string/1,
          is_in_range/3, is_greater_than/2, is_greater_than_equal/2,
-         is_less_than/2, is_less_than_equal/2, is_in/2
+         is_less_than/2, is_less_than_equal/2, is_in/2, is_module/1
         ]).
 
 %% public functions
@@ -175,6 +175,15 @@ test_and_error(Key, Pred, Msg) ->
 is_atom(Key) ->
     Pred = fun erlang:is_atom/1,
     Msg = "is not an atom",
+    test_and_error(Key, Pred, Msg).
+
+-spec is_module(Key::atom()) -> boolean().
+is_module(Key) ->
+    Pred = fun(Value) ->
+                   erlang:is_atom(Value) andalso
+                       code:which(Value) =/= non_existing
+           end,
+    Msg = "is not an existing module",
     test_and_error(Key, Pred, Msg).
 
 -spec is_bool(Key::atom()) -> boolean().
