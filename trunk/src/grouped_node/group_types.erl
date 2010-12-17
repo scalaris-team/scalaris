@@ -27,7 +27,7 @@
 
 -type(proposal() :: {group_node_join, Pid::comm:mypid(), Acceptor::comm:mypid(),
                       Learner::comm:mypid()}
-                  | {group_node_remove, Pid::comm:mypid()}
+                  | {group_node_remove, Pid::comm:mypid(), Proposer::comm:mypid()}
                   | {group_split, Proposer::comm:mypid(), SplitKey::?RT:key(),
                      LeftGroup::list(comm:mypid()), RightGroup::list(comm:mypid())}
                   | {read, Key::?RT:key(), Value::any(), Version::pos_integer(),
