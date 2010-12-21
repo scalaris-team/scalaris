@@ -14,7 +14,7 @@
 ::    limitations under the License.
 
 :: set path to erlang installation
-set ERLANG="C:\Program Files\erl5.8.1.1\bin"
+set ERLANG="C:\Program Files\erl5.8.2\bin"
 :: scalaris configuration parameters
 set SCALARIS_COOKIE=chocolate chip cookie
 set SCALARISDIR=%~dp0..
