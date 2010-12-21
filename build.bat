@@ -1,6 +1,6 @@
 @echo off
 :: set path to erlang installation
-set ERLANG="C:\Program Files\erl5.8.1.1\bin"
+set ERLANG="C:\Program Files\erl5.8.2\bin"
 
 ::replace @EMAKEFILEDEFINES@ from Emakefile.in and write Emakefile
 ::(this is what autoconf on *nix would do)
