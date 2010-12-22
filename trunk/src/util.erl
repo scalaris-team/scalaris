@@ -27,7 +27,8 @@
 -export_type([global_uid/0,time/0]).
 -endif.
 -export([escape_quotes/1,
-         min/2, max/2, logged_exec/1,
+         min/2, max/2, log/2, log2/1, ceil/1, floor/1,
+         logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
          wait_for_unregister/1, get_stacktrace/0, dump/0, dump2/0, dump3/0,
          get_nodes/0, minus/2,
@@ -134,6 +135,36 @@ pow(X, Y) ->
         1 ->
             Half = pow(X, Y div 2),
             Half * Half * X
+    end.
+
+%% @doc Logarithm of X to the base of Base.
+-spec log(X::number(), Base::number()) -> float().
+log(X, B) -> math:log10(X) / math:log10(B).
+
+%% @doc Logarithm of X to the base of 2.
+-spec log2(X::number()) -> float().
+log2(X) -> log(X, 2).
+
+%% @doc Returns the largest integer not larger than X. 
+-spec floor(X::number()) -> integer().
+floor(X) when X >= 0 ->
+    erlang:trunc(X);
+floor(X) ->
+    T = erlang:trunc(X),
+    case T == X of
+        true -> T;
+        _    -> T - 1
+    end.
+
+%% @doc Returns the smallest integer not smaller than X. 
+-spec ceil(X::number()) -> integer().
+ceil(X) when X < 0 ->
+    erlang:trunc(X);
+ceil(X) ->
+    T = erlang:trunc(X),
+    case T == X of
+        true -> T;
+        _    -> T + 1
     end.
 
 -spec logged_exec(Cmd::string() | atom()) -> ok.
