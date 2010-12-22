@@ -74,11 +74,15 @@ on(Msg, State) when element(1, State) =:= join ->
     dht_node_join:process_join_state(Msg, State);
 on(Msg, State) when element(1, Msg) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
+% message with cookie for dht_node_join?
+on({Msg, Cookie} = FullMsg, State) when
+  (is_tuple(Msg) andalso element(1, Msg) =:= join) orelse
+      (is_tuple(Cookie) andalso element(1, Cookie) =:= join) ->
+    dht_node_join:process_join_msg(FullMsg, State);
 %% userdevguide-end dht_node:join_message
 
 % Move messages (see dht_node_move.erl)
-on(Msg, State) when element(1, Msg) =:= move orelse
-     (is_tuple(Msg) andalso erlang:element(1, Msg) =:= move)->
+on(Msg, State) when element(1, Msg) =:= move ->
     dht_node_move:process_move_msg(Msg, State);
 
 %% Kill Messages

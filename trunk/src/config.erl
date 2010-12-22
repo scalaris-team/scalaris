@@ -150,7 +150,8 @@ check_config() ->
         % note: need to check all passive load balancing algorithm's parameters
         %       (another node may ask us to provide a candidate for any of them)
         lb_psv_simple:check_config() and
-        lb_psv_split:check_config().
+        lb_psv_split:check_config() and
+        lb_psv_gossip:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->

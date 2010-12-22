@@ -42,9 +42,13 @@
     {join, join_request_timeout, Timeouts::non_neg_integer()} |
     {join, timeout} |
     % messages at the existing node:
+    {join, number_of_samples_request, SourcePid::comm:mypid(), LbPsv::module()} |
     {join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module()} |
     {join, join_request, NewPred::node:node_type()} |
-    {join, join_response_timeout, NewPred::node:node_type(), MoveFullId::slide_op:id()}
+    {join, join_response_timeout, NewPred::node:node_type(), MoveFullId::slide_op:id()} |
+    {Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() | 
+          lb_psv_gossip:custom_message(),
+     {join, LbPsv::module(), LbPsvState::term()}}
     ).
 
 -type phase0() ::
@@ -358,20 +362,10 @@ process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
 
 %% @doc Process requests from a joining node at a existing node:.
 -spec process_join_msg(join_message(), dht_node_state:state()) -> dht_node_state:state().
-process_join_msg({join, get_candidate, Source_PID, Key, LbPsv} = Msg, State) ->
+process_join_msg({join, get_candidate, Source_PID, Key, LbPsv}, State) ->
     % if anything goes wrong creating the candidate, do not crash, just report
     % a no_op operation to the other node
-    Candidate = try LbPsv:create_join(State, Key)
-                catch
-                    Error:Reason ->
-                        log:log(error, "[ Node ~w ] could not create a candidate "
-                               "for another node: ~.0p:~.0p~n"
-                               "  Msg: ~.0p~n  State: ~.0p",
-                                [self(), Error, Reason, Msg, State]),
-                        lb_op:no_op()
-                end,
-    comm:send(Source_PID, {join, get_candidate_response, Key, Candidate}),
-    State;
+    LbPsv:create_join(State, Key, Source_PID);
 %% userdevguide-begin dht_node_join:join_request1
 process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred)) ->
     TargetId = node:id(NewPred),
@@ -432,6 +426,9 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
 process_join_msg({idholder_get_id_response, _Id, _IdVersion}, State) -> State;
 process_join_msg({get_dht_nodes_response, _Nodes}, State) -> State;
 process_join_msg({join, get_number_of_samples, _Samples, _Source}, State) -> State;
+process_join_msg({join, number_of_samples_request, SourcePid, LbPsv}, State) ->
+    LbPsv:get_number_of_samples_remote(SourcePid),
+    State;
 process_join_msg({join, get_candidate_response, _OrigJoinId, _Candidate}, State) -> State;
 process_join_msg({join, join_response, _Succ, _Pred, _MoveFullId}, State) -> State;
 process_join_msg({join, join_response, not_responsible, _Node}, State) -> State;
@@ -439,7 +436,9 @@ process_join_msg({join, lookup_timeout, _Node}, State) -> State;
 process_join_msg({join, known_hosts_timeout}, State) -> State;
 process_join_msg({join, get_number_of_samples_timeout}, State) -> State;
 process_join_msg({join, join_request_timeout, _Timeouts}, State) -> State;
-process_join_msg({join, timeout}, State) -> State.
+process_join_msg({join, timeout}, State) -> State;
+process_join_msg({Msg, {join, LbPsv, LbPsvState}}, State) ->
+    LbPsv:process_join_msg(Msg, LbPsvState, State).
 
 %% @doc Contacts all nodes set in the known_hosts config parameter and request
 %%      a list of dht_node instances in their VMs.

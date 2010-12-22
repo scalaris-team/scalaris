@@ -86,17 +86,13 @@ calc_sum2Change(Op) ->
         -> {SplitKey::?RT:key(), TargetLoadNew::non_neg_integer()}.
 split_by_load(DhtNodeState, TargetLoad) ->
     DB = dht_node_state:get(DhtNodeState, db),
-    % TODO: maybe implement a more specific and thus (memory) efficient variant than using ?DB:get_chunk/3
-    {RestInterval, Chunks} =
-        ?DB:get_chunk(DB, dht_node_state:get(DhtNodeState, my_range), TargetLoad),
-    SplitKey =
-        case intervals:is_empty(RestInterval) of
-            true when Chunks =:= [] -> erlang:throw('no key in range');
-            true -> db_entry:get_key(lists:last(Chunks));
-            _    -> {_, SplitKeyTmp, _, _} = intervals:get_bounds(RestInterval),
-                    SplitKeyTmp
+    {SplitKey, TargetLoadNew} =
+        ?DB:get_split_key(DB, dht_node_state:get(DhtNodeState, pred_id), TargetLoad),
+    _ = case intervals:in(SplitKey, dht_node_state:get(DhtNodeState, my_range)) of
+            false -> erlang:throw('no key in range');
+            _  -> ok
         end,
-    TargetLoadNew = length(Chunks),
+%%     io:format(" TN: ~.0p, SK: ~.0p~n", [TargetLoadNew, SplitKey]),
     {SplitKey, TargetLoadNew}.
 
 %% @doc Returns the SplitKey that splits the current node's address range in
