@@ -34,4 +34,4 @@ run_1() ->
     admin:add_nodes(Size-1),
     receive {halt} -> ok
     end.
-    %halt(1).
+    %init:stop(1), receive nothing -> ok end.

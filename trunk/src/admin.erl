@@ -227,8 +227,9 @@ start() ->
 
 loop() ->
     receive
-        {halt,N} ->
-            halt(N);
+        {halt, N} ->
+            init:stop(N),
+            receive nothing -> ok end;
         {get_comm_layer_dump, Sender} ->
             comm:send(Sender, {get_comm_layer_dump_response,
                                   comm_logger:dump()}),
