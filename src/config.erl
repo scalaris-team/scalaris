@@ -84,11 +84,9 @@ start(Files, Owner) ->
     [ populate_db(File) || File <- Files],
     case check_config() of
         true -> ok;
-        _    ->
-            % wait a bit so the error output can be written
-            % TODO: find a better way
-            timer:sleep(100),
-            halt(1)
+        _    -> % wait so the error output can be written:
+            init:stop(1),
+            receive nothing -> ok end
     end,
     Owner ! done,
     loop().
@@ -116,8 +114,9 @@ populate_db(File) ->
         {error, Reason} ->
             %% note: log4erl may not be available
             error_logger:error_msg("Can't load config file ~p: ~p. Exiting.\n", [File, Reason]),
-            erlang:halt(1),
-            fail
+            init:stop(1),
+            receive nothing -> ok end
+            %fail
     end.
 
 -spec process_term({Key::atom(), Value::term()}) -> any().

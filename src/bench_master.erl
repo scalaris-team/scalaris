@@ -48,7 +48,8 @@ run_1() ->
     bench_server:run_read(Worker, Iterations),
     io:format("~p~n",[util:get_proc_in_vms(admin_server)]),
     [comm:send(Pid,{halt,1}) || Pid <- util:get_proc_in_vms(admin_server)],
-    halt(1).
+    init:stop(1),
+    receive nothing -> ok end.
 
 %%
 %% Local Functions

@@ -24,19 +24,22 @@
 -spec start() -> no_return().
 start() ->
     case init:get_plain_arguments() of
-	[NodeName | Args] ->
-	    Node = list_to_atom(NodeName),
-	    io:format("~p~n", [Node]),
-	    case rpc:call(Node, ?MODULE, process, [Args]) of
-		{badrpc, Reason} ->
-		    io:format("badrpc to ~p: ~p~n", [Node, Reason]),
-		    halt(1);
-		_ ->
-		    halt(0)
-	    end;
-	_ ->
-	    print_usage(),
-	    halt(1)
+        [NodeName | Args] ->
+            Node = list_to_atom(NodeName),
+            io:format("~p~n", [Node]),
+            case rpc:call(Node, ?MODULE, process, [Args]) of
+                {badrpc, Reason} ->
+                    io:format("badrpc to ~p: ~p~n", [Node, Reason]),
+                    init:stop(1),
+                    receive nothing -> ok end;
+                _ ->
+                    init:stop(0),
+                    receive nothing -> ok end
+            end;
+        _ ->
+            print_usage(),
+            init:stop(1),
+            receive nothing -> ok end
     end.
 
 -spec print_usage() -> ok.
