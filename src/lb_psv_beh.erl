@@ -33,10 +33,16 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
+     % at the joining node, get the number of IDs to sample
+     {get_number_of_samples, 1},
+     % at an existing node, send the number of IDs to sample to a joining node
+     {get_number_of_samples_remote, 1},
      % at an existing node, simulate a join operation
-     {create_join, 2},
+     {create_join, 3},
      % sort a list of candidates so that the best ones are at the front of the list 
      {sort_candidates, 1},
+     % process join messages with signature {Msg, {join, LbPsv, LbPsvState}}
+     {process_join_msg, 3},
      % common methods
      {check_config, 0}
     ];

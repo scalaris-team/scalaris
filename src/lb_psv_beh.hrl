@@ -20,11 +20,14 @@
 
 -include("scalaris.hrl").
 
--export([create_join/2, sort_candidates/1,
+-export([get_number_of_samples/1, get_number_of_samples_remote/1,
+         create_join/3, sort_candidates/1,
+         process_join_msg/3,
          check_config/0]).
 
 -spec get_number_of_samples(ContactNodes::[comm:mypid()]) -> ok.
--spec create_join(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key()) -> lb_op:lb_op().
+-spec get_number_of_samples_remote(SourcePid::comm:mypid()) -> ok.
+-spec create_join(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(), SourcePid::comm:mypid()) -> dht_node_state:state().
 -spec sort_candidates(Ops::[lb_op:lb_op()]) -> [lb_op:lb_op()].
 
 -spec check_config() -> boolean().

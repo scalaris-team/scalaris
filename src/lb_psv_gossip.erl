@@ -18,7 +18,7 @@
 %%         Splits loads in half, otherwise (no load) address ranges.
 %% @end
 %% @version $Id$
--module(lb_psv_split).
+-module(lb_psv_gossip).
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
@@ -29,25 +29,32 @@
 -export_type([custom_message/0]).
 -endif.
 
--type custom_message() :: none().
+-type custom_message() :: {gossip_get_values_best_response, gossip_state:values()}.
 
 %% @doc Gets the number of IDs to sample during join.
 %%      Note: this is executed at the joining node.
 get_number_of_samples([First | _Rest] = _ContactNodes) ->
-    comm:send_local(self(), {join, get_number_of_samples,
-                             conf_get_number_of_samples(), First}).
+    comm:send(First, {join, number_of_samples_request, comm:this(), ?MODULE}).
 
 %% @doc Sends the number of IDs to sample during join to the joining node.
 %%      Note: this is executed at the existing node.
 get_number_of_samples_remote(SourcePid) ->
-    comm:send(SourcePid, {join, get_number_of_samples,
-                          conf_get_number_of_samples(), comm:this()}).
+    MyPidWithCookie = comm:self_with_cookie({join, ?MODULE, {get_samples, SourcePid}}),
+    GossipPid = pid_groups:get_my(gossip),
+    comm:send_local(GossipPid, {get_values_best, MyPidWithCookie}).
 
 %% @doc Creates a join operation if a node would join at my node with the
 %%      given key. This will simulate the join operation and return a lb_op()
 %%      with all the data needed in sort_candidates/1.
 %%      Note: this is executed at an existing node.
 create_join(DhtNodeState, SelectedKey, SourcePid) ->
+    MyPidWithCookie = comm:self_with_cookie({join, ?MODULE, {create_join, SelectedKey, SourcePid}}),
+    GossipPid = pid_groups:get_my(gossip),
+    comm:send_local(GossipPid, {get_values_best, MyPidWithCookie}),
+    DhtNodeState.
+
+-spec create_join2(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(), SourcePid::comm:mypid(), BestValues::gossip_state:values()) -> dht_node_state:state().
+create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues) ->
     Candidate =
         try
             MyNode = dht_node_state:get(DhtNodeState, node),
@@ -56,8 +63,14 @@ create_join(DhtNodeState, SelectedKey, SourcePid) ->
             {SplitKey, OtherLoadNew} =
                 case MyLoad >= 2 of
                     true ->
-                        TargetLoad = util:floor(MyLoad / 2),
-%%                         io:format("T: ~.0p, My: ~.0p~n", [TargetLoad, MyLoad]),
+                        TargetLoad =
+                            case gossip_state:get(BestValues, avgLoad) of
+                                unknown -> util:floor(MyLoad / 2);
+                                AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
+                                    util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
+                                _       -> util:floor(MyLoad / 2)
+                            end,
+                        io:format("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
                         try lb_common:split_by_load(DhtNodeState, TargetLoad)
                         catch
                             throw:'no key in range' ->
@@ -79,7 +92,6 @@ create_join(DhtNodeState, SelectedKey, SourcePid) ->
                                 "sending no_op...", [self()]),
                     lb_op:no_op();
                 _ ->
-%%                     io:format("MK: ~.0p, SK: ~.0p~n", [MyNodeId, SplitKey]),
                     MyLoadNew = MyLoad - OtherLoadNew,
                     MyNodeDetails1 = node_details:set(node_details:new(), node, MyNode),
                     MyNodeDetails = node_details:set(MyNodeDetails1, load, MyLoad),
@@ -137,18 +149,31 @@ my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
 sort_candidates(Ops) ->
     lb_common:bestStddev(Ops, plus_infinity, fun my_sort_fun/2).
 
--spec process_join_msg(custom_message(), SourcePid::comm:mypid(),
-        DhtNodeState::dht_node_state:state()) -> unknown_event.
-process_join_msg(_Msg, _SourcePid, _DhtNodeState) ->
-    unknown_event.
+-spec process_join_msg(custom_message(),
+        {get_samples, SourcePid::comm:mypid()} |
+            {create_join, SelectedKey::?RT:key(), SourcePid::comm:mypid()},
+        DhtNodeState::dht_node_state:state()) -> dht_node_state:state().
+process_join_msg({gossip_get_values_best_response, BestValues},
+                 {get_samples, SourcePid}, DhtNodeState) ->
+    MinSamples = conf_get_min_number_of_samples(),
+    Samples = case gossip_state:get(BestValues, size) of
+                  unknown -> MinSamples;
+                  % always round up:
+                  Size    -> erlang:max(util:ceil((util:log2(Size))), MinSamples)
+              end, 
+    comm:send(SourcePid, {join, get_number_of_samples, Samples, comm:this()}),
+    DhtNodeState;
+process_join_msg({gossip_get_values_best_response, BestValues},
+                 {create_join, SelectedKey, SourcePid}, DhtNodeState) ->
+    create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues).
 
 %% @doc Checks whether config parameters of the passive load balancing
 %%      algorithm exist and are valid.
 check_config() ->
-    config:is_integer(lb_psv_split_samples) and
-    config:is_greater_than_equal(lb_psv_split_samples, 1).
+    config:is_integer(lb_psv_gossip_min_samples) and
+    config:is_greater_than_equal(lb_psv_gossip_min_samples, 1).
 
-%% @doc Gets the number of nodes to sample (set in the config files).
--spec conf_get_number_of_samples() -> pos_integer().
-conf_get_number_of_samples() ->
-    config:read(lb_psv_split_samples).
+%% @doc Gets the minnimum number of nodes to sample (set in the config files).
+-spec conf_get_min_number_of_samples() -> pos_integer().
+conf_get_min_number_of_samples() ->
+    config:read(lb_psv_gossip_min_samples).
