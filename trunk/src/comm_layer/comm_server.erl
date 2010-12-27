@@ -42,7 +42,7 @@ start_link(CommLayerGroup) ->
 %% @doc initialize: return initial state.
 -spec init([]) -> any().
 init([]) ->
-    ets:new(?MODULE, [set, protected, named_table]),
+    _ = ets:new(?MODULE, [set, protected, named_table]),
     _State = null.
 
 -spec tcp_options() -> [{term(), term()}].

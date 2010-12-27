@@ -89,12 +89,12 @@ get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
 
 %% @doc adds keys
 add_data_(State = {DB, CKInt, CKDB}, Data) ->
-    case intervals:is_empty(CKInt) of
-        true -> ok;
-        _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
-                   Entry <- Data,
-                   intervals:in(db_entry:get_key(Entry), CKInt)]
-    end,
+    _ = case intervals:is_empty(CKInt) of
+            true -> ok;
+            _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
+                       Entry <- Data,
+                       intervals:in(db_entry:get_key(Entry), CKInt)]
+        end,
     ?ETS:insert(DB, Data),
     State.
 

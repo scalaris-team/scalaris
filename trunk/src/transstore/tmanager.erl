@@ -142,14 +142,14 @@ init_phase(TMState) ->
                                          {comm:this(),
                                           TMState#tm_state.items})
                 },
-    tsend:send_to_rtms_with_lookup(TMState#tm_state.transID, TMMessage),
+    _ = tsend:send_to_rtms_with_lookup(TMState#tm_state.transID, TMMessage),
 
     TPMessage = {lookup_tp,
                  #tp_message{item_key = unknown,
                              message={comm:this()}
                             }
                 },
-    tsend:send_to_participants_with_lookup(TMState, TPMessage),
+    _ = tsend:send_to_participants_with_lookup(TMState, TPMessage),
     erlang:send_after(config:read(transaction_lookup_timeout), self(),
                       {rtm_lookup_timeout}),
     receive_lookup_rtms_tps_repl(TMState).
@@ -189,7 +189,7 @@ receive_lookup_rtms_tps_repl(TMState)->
                -> {ok, TMState};
                true ->
                     ?TLOGN("Found not enough RTMs and TPs~n", []),
-                    tsend:send_to_rtms(TMState, {kill}),
+                    _ = tsend:send_to_rtms(TMState, {kill}),
                     {timeout, TMState}
             end
     end.
@@ -212,9 +212,9 @@ add_tp(TMState, ItemKey, OriginalKey, Address, Limit) ->
                      tps_found = NewTPsReady}.
 
 start_commit(TMState)->
-    tsend:tell_rtms(TMState),
-    [ tsend:send_prepare_item(TMState, Item)
-      || Item <- TMState#tm_state.items ],
+    _ = tsend:tell_rtms(TMState),
+    _ = [ tsend:send_prepare_item(TMState, Item)
+            || Item <- TMState#tm_state.items ],
     loop(TMState).
 
 start_replicated_manager(Message, _InstanceId)->
@@ -256,16 +256,15 @@ loop(TMState)->
             %% ?TLOGN("received rtms ~p", [RTMs]),
             TMState2 = TMState#tm_state{rtms = RTMs, myBallot = MyBallot},
             %% simple leader election
-            if MyBallot > 2 % not the leader
-               ->
-                    erlang:send_after(time_become_leader(MyBallot), self(), {become_leader});
-               true -> ok
-            end,
+            _ = if MyBallot > 2 % not the leader
+                     -> erlang:send_after(time_become_leader(MyBallot), self(), {become_leader});
+                   true -> ok
+                end,
             loop(TMState2);
         {check_failed_tps} ->
             %% ?TLOGN("received check_failed_tps", []),
             %% io:format("checking failed tps ~n", []),
-            check_failed_tps(TMState),
+            _ = check_failed_tps(TMState),
             %%loop(TMState),
             abort;
         {decision, Decision} ->

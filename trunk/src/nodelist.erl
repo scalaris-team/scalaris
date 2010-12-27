@@ -333,7 +333,7 @@ filter({Preds, Node, Succs}, FilterFun) ->
 -spec lfilter(snodelist(), FilterFun::fun((node:node_type()) -> boolean()), EvalFun::fun((node:node_type()) -> any())) -> snodelist().
 lfilter(NodeList, FilterFun, EvalFun) ->
     {Satisfying, NonSatisfying} = lists:partition(FilterFun, NodeList),
-    lists:map(EvalFun, NonSatisfying),
+    _ = lists:map(EvalFun, NonSatisfying),
     Satisfying.
 
 %% @doc Keeps any node for which FilterFun returns true in a neighborhood
@@ -568,7 +568,7 @@ update_ids(Neighbors, []) ->
 update_ids({Preds, BaseNode, Succs}, NodeList) ->
     {PredsUpd, _} = lupdate_ids(Preds, NodeList),
     {SuccsUpd, _} = lupdate_ids(Succs, NodeList),
-    [throw_if_newer(N, BaseNode) || N <- NodeList, node:same_process(BaseNode, N)],
+    _ = [throw_if_newer(N, BaseNode) || N <- NodeList, node:same_process(BaseNode, N)],
     % due to updated IDs, the lists might not be sorted anymore...
     SuccOrd = fun(N1, N2) -> succ_ord_node(N1, N2, BaseNode) end,
     PredOrd = fun(N1, N2) -> succ_ord_node(N2, N1, BaseNode) end,
@@ -650,7 +650,7 @@ lremove_outdated(NodeList, Node) ->
     Tab = ets:new(nodelist_helper_lremove_outdated, [set, private]),
     % make a unique table of updated pids:
     EtsInsertNewerNodeFun = fun(N) -> ets_insert_newer_node(Tab, N) end,
-    lists:map(EtsInsertNewerNodeFun, NodeList),
+    _ = lists:map(EtsInsertNewerNodeFun, NodeList),
     % now remove all out-dated nodes:
     NodeIsUpToDate = fun(N) ->
                              NInTab = ets:lookup_element(Tab, node:pidX(N), 2),
@@ -678,8 +678,8 @@ lupdate_ids(L1, L2) ->
     L1L2Tab = ets:new(nodelist_helper_lupdate_ids, [set, private]),
     % make a unique table of updated pids:
     EtsInsertNewerNodeFun = fun(N) -> ets_insert_newer_node(L1L2Tab, N) end,
-    lists:map(EtsInsertNewerNodeFun, L1),
-    lists:map(EtsInsertNewerNodeFun, L2),
+    _ = lists:map(EtsInsertNewerNodeFun, L1),
+    _ = lists:map(EtsInsertNewerNodeFun, L2),
     
     GetNewNode = fun(Node) -> ets:lookup_element(L1L2Tab, node:pidX(Node), 2) end,
     L1Upd = lists:map(GetNewNode, L1),

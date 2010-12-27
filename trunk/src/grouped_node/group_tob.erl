@@ -86,7 +86,7 @@ postpone_future_decision({GroupId, Version} = PaxosId, Proposal,
     MissingVersions = lists:seq(CurrentVersion, Version - 1),
     Proposer = comm:make_global(pid_groups:get_my(paxos_proposer)),
     % @todo is this the correct way to trigger the missing paxi?
-    [proposer:trigger(Proposer, {GroupId, V}) || V <- MissingVersions],
+    _ = [proposer:trigger(Proposer, {GroupId, V}) || V <- MissingVersions],
     group_state:set_view(State,
      group_view:postpone_decision(View, PaxosId, Proposal)).
 

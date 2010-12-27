@@ -205,21 +205,21 @@ start(Module, Args, Options, Supervisor) ->
         false ->
             log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module])
     end,
-    case lists:keyfind(erlang_register, 1, Options) of
-        {erlang_register, Name} ->
-            case whereis(Name) of
-                undefined -> ok;
-                _ -> catch(unregister(Name)) %% unittests may leave garbage
-            end,
-            catch(register(Name, self()));
-        false ->
-            ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
-            ok
-    end,
-    case lists:member(wait_for_init, Options) of
-        true -> ok;
-        false -> Supervisor ! {started, self()}
-    end,
+    _ = case lists:keyfind(erlang_register, 1, Options) of
+            {erlang_register, Name} ->
+                _ = case whereis(Name) of
+                        undefined -> ok;
+                        _ -> catch(unregister(Name)) %% unittests may leave garbage
+                    end,
+                catch(register(Name, self()));
+            false ->
+                ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+                ok
+        end,
+    _ = case lists:member(wait_for_init, Options) of
+            true -> ok;
+            false -> Supervisor ! {started, self()}
+        end,
     try
         InitialComponentState = {Options, _Slowest = 0.0, bp_state_new()},
         Handler = case Module:init(Args) of

@@ -24,14 +24,14 @@
 
 -spec start() -> pid().
 start() ->
-    application:start(scalaris),
-	erlang:spawn(?MODULE,run_1,[]).
+    ok = application:start(scalaris),
+	erlang:spawn(?MODULE, run_1, []).
 
 -spec run_1() -> ok.
 run_1() ->
     Size = list_to_integer(os:getenv("NODES_VM")),
-    io:format("Do ~p~n",[Size]),
-    admin:add_nodes(Size-1),
+    io:format("Do ~p~n", [Size]),
+    _ = admin:add_nodes(Size - 1),
     receive {halt} -> ok
     end.
     %init:stop(1), receive nothing -> ok end.

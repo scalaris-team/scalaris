@@ -43,8 +43,8 @@ notify_neighbors(NodeState, View) ->
     GroupNode = group_view:get_group_node(View),
     {_, _, _, Preds} = group_local_state:get_predecessor(NodeState),
     {_, _, _, Succs} = group_local_state:get_successor(NodeState),
-    [comm:send(P, {succ_update, GroupNode}) || P <- Preds],
-    [comm:send(P, {pred_update, GroupNode}) || P <- Succs],
+    _ = [comm:send(P, {succ_update, GroupNode}) || P <- Preds],
+    _ = [comm:send(P, {pred_update, GroupNode}) || P <- Succs],
     ok.
 
 -spec notify_neighbors(State::group_state:state()) -> ok.

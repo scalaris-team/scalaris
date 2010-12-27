@@ -50,7 +50,7 @@ tp_validate(State, Tid, Item)->
     Decision = decision(LockRes),
     NewState = update_transaction_participant_log(dht_node_state:set_db(State, DB), Tid, Item, Decision),
     NewVote = trecords:new_vote(Tid, Item#item.key, Item#item.rkey, Decision, 1),   
-    tsend:send_vote_to_rtms(Item#item.tms, NewVote),
+    _ = tsend:send_vote_to_rtms(Item#item.tms, NewVote),
     NewState.
 
 -spec set_lock(?DB:db(), success | fail, #item{}) -> {?DB:db(), ok | failed}.

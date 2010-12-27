@@ -95,10 +95,10 @@ on_active({deactivate_reregister}, TriggerState)  ->
 
 on_active({register}, TriggerState) ->
     RegisterMessage = {register, get_dht_node_this()},
-    case config:read(register_hosts) of
-        failed -> comm:send(bootPid(), RegisterMessage);
-        Hosts  -> [comm:send(Host, RegisterMessage) || Host <- Hosts]
-    end,
+    _ = case config:read(register_hosts) of
+            failed -> comm:send(bootPid(), RegisterMessage);
+            Hosts  -> [comm:send(Host, RegisterMessage) || Host <- Hosts]
+        end,
     NewTriggerState = trigger:next(TriggerState),
     NewTriggerState;
 

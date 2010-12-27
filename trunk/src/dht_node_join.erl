@@ -411,7 +411,7 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
                     % (similar to dht_node_move:abort_slide/*)
                     log:log(warn, "abort_join(op: ~p, reason: timeout)~n",
                             [SlideOp]),
-                    slide_op:reset_timer(SlideOp), % reset previous timeouts
+                    _ = slide_op:reset_timer(SlideOp), % reset previous timeouts
                     RMSubscrTag = {move, slide_op:get_id(SlideOp)},
                     rm_loop:unsubscribe(self(), RMSubscrTag),
                     State1 = dht_node_state:rm_db_range(
@@ -446,7 +446,7 @@ process_join_msg({Msg, {join, LbPsv, LbPsvState}}, State) ->
 get_known_nodes() ->
     KnownHosts = config:read(known_hosts),
     % contact all known VMs
-    [comm:send(Host, {get_dht_nodes, comm:this()}) || Host <- KnownHosts],
+    _ = [comm:send(Host, {get_dht_nodes, comm:this()}) || Host <- KnownHosts],
     % timeout just in case
     msg_delay:send_local(get_known_hosts_timeout() div 1000, self(),
                          {join, known_hosts_timeout}).

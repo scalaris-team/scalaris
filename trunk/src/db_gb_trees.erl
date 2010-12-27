@@ -120,12 +120,12 @@ get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
 %% @doc Adds all db_entry objects in the Data list.
 add_data_({DB, CKInt, CKDB}, Data) ->
     % check once for the 'common case'
-    case intervals:is_empty(CKInt) of
-        true -> ok;
-        _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
-                   Entry <- Data,
-                   intervals:in(db_entry:get_key(Entry), CKInt)]
-    end,
+    _ = case intervals:is_empty(CKInt) of
+            true -> ok;
+            _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
+                       Entry <- Data,
+                       intervals:in(db_entry:get_key(Entry), CKInt)]
+        end,
     % -> do not use set_entry (no further checks for changed keys necessary)
     NewDB = lists:foldl(
               fun(DBEntry, Tree) ->

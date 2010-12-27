@@ -86,15 +86,17 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
     Before = erlang:now(),
     Times = case lists:member(profile, Options) of
                 false ->
-                    [comm:send(Server, Message) || Server <- ServerList],
+                    _ = [comm:send(Server, Message) || Server <- ServerList],
                     io:format("Collecting results... ~n"),
                     [receive {done, X, Time} -> io:format("BS: ~p @ ~p~n",[Time, X]),Time end || _Server <- ServerList];
                 true ->
-                    Result = fprof:apply(fun () ->
-                                                 [comm:send(Server, Message) || Server <- ServerList],
-                                                 [receive {done, _X, Time} -> Time end || _Server <- ServerList]
-                                         end,
-                                         [], [{procs, pid_groups:processes()}]),
+                    Result =
+                        fprof:apply(
+                          fun () ->
+                                   _ = [comm:send(Server, Message) || Server <- ServerList],
+                                   [receive {done, _X, Time} -> Time end || _Server <- ServerList]
+                          end,
+                          [], [{procs, pid_groups:processes()}]),
                     fprof:profile(),
                     %fprof:analyse(),
                     fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]),
