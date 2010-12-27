@@ -27,11 +27,12 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([send/2, this/0, is_valid/1, is_local/1, make_local/1]).
+-export([send/2, this/0, is_valid/1, is_local/1, make_local/1,
+         get_ip/1, get_port/1]).
 
 -include("scalaris.hrl").
 
--type(process_id() :: {inet:ip_address(), integer(), comm:erl_pid_plain()}).
+-type(process_id() :: {inet:ip_address(), non_neg_integer(), comm:erl_pid_plain()}).
 
 %% @doc send message via tcp, if target is not in same Erlang VM.
 -spec send(process_id(), term()) -> ok.
@@ -68,3 +69,11 @@ is_local({IP, Port, _Pid}) ->
 -spec make_local(process_id()) -> comm:erl_pid_plain().
 make_local({_IP, _Port, Pid}) ->
     Pid.
+
+%% @doc Gets the IP address of the given process id.
+-spec get_ip(process_id()) -> inet:ip_address().
+get_ip({IP, _Port, _Pid}) -> IP.
+
+%% @doc Gets the port of the given process id.
+-spec get_port(process_id()) -> non_neg_integer().
+get_port({_IP, Port, _Pid}) -> Port.

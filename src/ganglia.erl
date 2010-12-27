@@ -33,12 +33,12 @@ start_link() ->
             ignore
     end.
 
--spec start() -> util:time().
+-spec start() -> no_return().
 start() ->
     Last = erlang:now(),
     ganglia_loop(Last).
 
--spec ganglia_loop(PreviousTime::util:time()) -> NewTime::util:time().
+-spec ganglia_loop(PreviousTime::util:time()) -> no_return().
 ganglia_loop(Last) ->
     % message statistics
     {Tree, _Time} = comm_logger:dump(),

@@ -27,7 +27,7 @@
 
 
 % Avg2 = average of load ^2
--spec calculateStddev(Avg::number(), Avg2::number()) -> number().
+-spec calculateStddev(Avg::number(), Avg2::number()) -> float().
 calculateStddev(Avg, Avg2) ->
     math:sqrt(Avg2 - Avg * Avg).
 

@@ -89,7 +89,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid) ->
 %%      Note: this is executed at the joining node.
 sort_candidates(Ops) -> lb_common:bestStddev(Ops, plus_infinity).
 
--spec process_join_msg(custom_message(), SourcePid::comm:mypid(),
+-spec process_join_msg(custom_message() | any(), SourcePid::comm:mypid(),
         DhtNodeState::dht_node_state:state()) -> unknown_event.
 process_join_msg(_Msg, _SourcePid, _DhtNodeState) ->
     unknown_event.

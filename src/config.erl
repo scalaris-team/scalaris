@@ -77,11 +77,11 @@ start_link(Files) ->
     {ok, Link}.
 
 %@private
--spec start(Files::[file:name()], Owner::pid()) -> none().
+-spec start(Files::[file:name()], Owner::pid()) -> no_return().
 start(Files, Owner) ->
     register(?MODULE, self()),
     ets:new(config_ets, [set, protected, named_table]),
-    [ populate_db(File) || File <- Files],
+    _ = [ populate_db(File) || File <- Files],
     case check_config() of
         true -> ok;
         _    -> % wait so the error output can be written:

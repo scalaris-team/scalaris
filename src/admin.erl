@@ -220,7 +220,7 @@ diff([Tag | Rest], Before, After) ->
 start_link() ->
     {ok, spawn_link(?MODULE, start, [])}.
 
--spec start() -> none().
+-spec start() -> ok.
 start() ->
     register(admin_server, self()),
     loop().
