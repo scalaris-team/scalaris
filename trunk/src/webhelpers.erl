@@ -218,17 +218,18 @@ floor(X) ->
 gen_Nodes([],_,_) ->
     "";
 gen_Nodes([H|T],[HN|TN],R) ->
-    Hi=255,
-    Lo=0,
+    Hi = 255,
+    Lo = 0,
     
-    S1 =  pid(HN),
-
+    S1 = pid_to_integer(HN),
+    
     random:seed(S1,S1,S1),
     C1 = random:uniform(Hi-Lo)+Lo-1,
     C2 = random:uniform(Hi-Lo)+Lo-1,
     C3 = random:uniform(Hi-Lo)+Lo-1,
-    io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" style=\"fill:rgb( ~p, ~p ,~p) ;\" />~n",[lists:nth(1, H),lists:nth(2, H),R,C1,C2,C3])
-    ++gen_Nodes(T,TN,R).
+    io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" style=\"fill:rgb( ~p, ~p ,~p) ;\" />~n",
+                  [lists:nth(1, H),lists:nth(2, H),R,C1,C2,C3])
+        ++ gen_Nodes(T,TN,R).
 
 %% @doc Gets the smallest and largest coordinates in each dimension of all
 %%      vectors in the given list.
@@ -261,14 +262,17 @@ max_list(L1, L2) ->
                           end
                   end, L1, L2).
 
--spec pid(comm:mypid()) -> integer().
+-spec pid_to_integer(comm:mypid()) -> integer().
 -ifdef(TCP_LAYER).
-pid({{A,B,C,D},I,_}) ->
+pid_to_integer(Pid) ->
+    {A,B,C,D} = comm:get_ip(Pid),
+    I = comm:get_port(Pid),
     A+B+C+D+I.
 -endif.
 
 -ifdef(BUILTIN).
-pid(X) ->
+pid_to_integer(Pid) ->
+    X = comm:make_local(Pid),
     list_to_integer(lists:nth(1, string:tokens(erlang:pid_to_list(X),"<>."))).
 -endif.
 
@@ -317,10 +321,7 @@ renderRingChart(Ring) ->
                       Me_tmp = node:id(node_details:get(Node, node)),
                       Pred_tmp = node:id(node_details:get(Node, pred)),
                       MaxKey = ?RT:n() - 1,
-                      Diff = case (Me_tmp - Pred_tmp) of
-                                 X when X < 0 -> X + MaxKey;
-                                 Y            -> Y
-                             end * 100 / MaxKey,
+                      Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / MaxKey,
                       io_lib:format("~f", [Diff])
                   end || Node <- Ring ],
         Hostinfos = [ node_details:get(Node, hostname) ++ " (" ++

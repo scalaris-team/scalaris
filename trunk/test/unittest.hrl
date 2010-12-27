@@ -24,7 +24,7 @@
 
 %% @doc Fails the currently run unit test with a reason that is made of the
 %%      given Date formatted using the Format string (see io_lib:format/2).
-% -spec ct_fail(Format::atom() | string() | binary(), Data::[term()]) -> none().
+%% -spec ct_fail(Format::atom() | string() | binary(), Data::[term()]) -> no_return().
 -define(ct_fail(Format, Data),
     ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 

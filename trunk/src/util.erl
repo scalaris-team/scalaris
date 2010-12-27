@@ -33,7 +33,7 @@
          wait_for_unregister/1, get_stacktrace/0, dump/0, dump2/0, dump3/0,
          get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
-         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2, parameterized_start_link/2,
+         gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5,
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
@@ -48,11 +48,6 @@
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
                  MicroSecs::non_neg_integer()}.
-
-%% @doc Applies start_link in the given Module with the given Parameters.
--spec parameterized_start_link(Module::module(), Parameters::list()) -> term() | none().
-parameterized_start_link(Module, Parameters) ->
-    apply(Module, start_link, Parameters).
 
 %% @doc Creates a worker description for a supervisor.
 -spec sup_worker_desc(Name::atom() | string(), Module::module(), Function::atom())

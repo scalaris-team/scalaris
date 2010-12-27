@@ -86,8 +86,7 @@
 -export([hide/1, unhide/1]).
 
 -ifdef(with_export_type_support).
--export_type([pidname/0]).
--export_type([groupname/0]).
+-export_type([pidname/0, groupname/0]).
 -endif.
 
 -type(pidname() :: atom() | nonempty_string()).

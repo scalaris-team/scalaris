@@ -52,11 +52,11 @@
          calc_stddev/1]).
 
 %% Gossip types
--type(avg() :: number() | unknown).
--type(avg2() :: number() | unknown).
+-type(avg() :: float() | unknown).
+-type(avg2() :: float() | unknown).
 -type(stddev() :: float() | unknown).
 -type(size_inv() :: float() | unknown).
--type(size() :: number() | unknown).
+-type(size() :: float() | unknown).
 -type(avg_kr() :: number() | unknown).
 -type(min() :: non_neg_integer() | unknown).
 -type(max() :: non_neg_integer() | unknown).
@@ -149,21 +149,21 @@ new_state(Values) when is_record(Values, values_internal) ->
 %%      </ul>
 %%      See type spec for details on which keys are allowed on which records.
 -spec get(values() | values_internal() | state(), avgLoad) -> avg();
-          (values()                              , stddev) -> stddev();
-          (values()                              , size_ldr) -> size();
-          (values()                              , size_kr) -> size();
-          (values()                              , size) -> size();
-          (values() | values_internal() | state(), minLoad) -> min();
-          (values() | values_internal() | state(), maxLoad) -> max();
-          (values() | state()                    , triggered) -> triggered();
-          (values() | state()                    , msg_exch) -> msg_exch();
-          (values_internal() | state()           , avgLoad2) -> avg2();
-          (values_internal() | state()           , size_inv) -> size_inv();
-          (values_internal() | state()           , avg_kr) -> avg_kr();
-          (values_internal() | state()           , round) -> round();
-          (state()                               , values) -> values_internal();
-          (state()                               , initialized) -> boolean();
-          (state()                               , converge_avg_count) -> converge_avg_count().
+         (values()                              , stddev) -> stddev();
+         (values()                              , size_ldr) -> size();
+         (values()                              , size_kr) -> size();
+         (values()                              , size) -> size();
+         (values() | values_internal() | state(), minLoad) -> min();
+         (values() | values_internal() | state(), maxLoad) -> max();
+         (values() | state()                    , triggered) -> triggered();
+         (values() | state()                    , msg_exch) -> msg_exch();
+         (values_internal() | state()           , avgLoad2) -> avg2();
+         (values_internal() | state()           , size_inv) -> size_inv();
+         (values_internal() | state()           , avg_kr) -> avg_kr();
+         (values_internal() | state()           , round) -> round();
+         (state()                               , values) -> values_internal();
+         (state()                               , initialized) -> boolean();
+         (state()                               , converge_avg_count) -> converge_avg_count().
 get(#values{avg=Avg, stddev=Stddev, size_ldr=Size_ldr, size_kr=Size_kr, min=Min,
             max=Max, triggered=Triggered, msg_exch=MessageExchanges}, Key) ->
     case Key of
@@ -228,12 +228,12 @@ get(#state{values=InternalValues, initialized=Initialized, triggered=Triggered,
 %%        <li>round = gossip round the node is in,</li>
 %%      </ul>
 -spec set(values_internal() | state(), avgLoad, avg()) -> values_internal();
-          (values_internal() | state(), minLoad, min()) -> values_internal();
-          (values_internal() | state(), maxLoad, max()) -> values_internal();
-          (values_internal() | state(), avgLoad2, avg2()) -> values_internal();
-          (values_internal() | state(), size_inv, size_inv()) -> values_internal();
-          (values_internal() | state(), avg_kr, avg_kr()) -> values_internal();
-          (values_internal() | state(), round, round()) -> values_internal().
+         (values_internal() | state(), minLoad, min()) -> values_internal();
+         (values_internal() | state(), maxLoad, max()) -> values_internal();
+         (values_internal() | state(), avgLoad2, avg2()) -> values_internal();
+         (values_internal() | state(), size_inv, size_inv()) -> values_internal();
+         (values_internal() | state(), avg_kr, avg_kr()) -> values_internal();
+         (values_internal() | state(), round, round()) -> values_internal().
 set(InternalValues, Key, Value) when is_record(InternalValues, values_internal) ->
     case Key of
         avgLoad -> InternalValues#values_internal{avg = Value};
@@ -325,7 +325,7 @@ calc_size_kr(State) when is_record(State, state) ->
 
 %% @doc Extracts and calculates the standard deviation from the internal record
 %%      of values.
--spec calc_stddev(values_internal() | state()) -> avg().
+-spec calc_stddev(values_internal() | state()) -> stddev().
 calc_stddev(State) when is_record(State, values_internal) ->
     Avg = get(State, avgLoad),
     Avg2 = get(State, avgLoad2),

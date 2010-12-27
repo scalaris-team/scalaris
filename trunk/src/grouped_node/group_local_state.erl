@@ -27,6 +27,10 @@
         get_predecessor/1, get_successor/1,
         update_pred_succ/4, update_pred/3, update_succ/3]).
 
+-ifdef(with_export_type_support).
+-export_type([local_state/0]).
+-endif.
+
 -record(local_state, {successor::group_types:group_node(),
                       predecessor::group_types:group_node(),
                       rt}).

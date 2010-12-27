@@ -50,6 +50,10 @@
          split_group/4,
          get_group_node/1]).
 
+-ifdef(with_export_type_support).
+-export_type([view/0]).
+-endif.
+
 % view() must be serializable, i.e. don't put ets-tables in here
 -record(view, {group_id :: group_types:group_id(),
                current_paxos_version,

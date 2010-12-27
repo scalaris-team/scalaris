@@ -137,7 +137,7 @@ my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
 sort_candidates(Ops) ->
     lb_common:bestStddev(Ops, plus_infinity, fun my_sort_fun/2).
 
--spec process_join_msg(custom_message(), SourcePid::comm:mypid(),
+-spec process_join_msg(custom_message() | any(), SourcePid::comm:mypid(),
         DhtNodeState::dht_node_state:state()) -> unknown_event.
 process_join_msg(_Msg, _SourcePid, _DhtNodeState) ->
     unknown_event.

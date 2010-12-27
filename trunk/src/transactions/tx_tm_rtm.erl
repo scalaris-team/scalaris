@@ -60,14 +60,14 @@ start_link(DHTNodeGroup, Role) ->
                              [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
 -type state() ::
-        {{?RT:key(), comm:mypid(), pos_integer()},  %% RTMs
-         any(),  %% TableName
-         atom(), %% Role
+        {[{?RT:key(), comm:mypid(), non_neg_integer()}],  %% RTMs
+         pdb:tableid(),  %% TableName
+         pid_groups:pidname(), %% Role
          pid(),  %% LocalAcceptor
          pid()}. %% LocalLearner
 
 %% initialize: return initial state.
--spec init([]) -> state() | {'$gen_component', [tuple()], state()}.
+-spec init([]) -> state() | {'$gen_component', [{on_handler, on_init},...], state()}.
 init([]) ->
     Role = pid_groups:my_pidname(),
     ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n",

@@ -23,11 +23,15 @@
 -author('schintke@onscale.de').
 -vsn('$Id$').
 
--type tableid() :: atom().
+-ifdef(with_export_type_support).
+-export_type([tableid/0]).
+-endif.
+
 -export([new/2, get/2, set/2, delete/2, tab2list/1]).
 -include("scalaris.hrl").
 
 %% put/get variant
+-type tableid() :: atom().
 -spec new(TableName::atom(), [set | ordered_set | bag | duplicate_bag |
                               public | protected | private |
                               named_table | {keypos, integer()} |

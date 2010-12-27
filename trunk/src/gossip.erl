@@ -527,7 +527,11 @@ update_value(Key, MyValues, OtherValues) ->
 %% @doc Calculates a node's new value of the given key using its old value and
 %%      another node's value.
 %% @see update_value/3
--spec calc_new_value(Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2, MyValue::T, OtherValue::T) -> MyNewValue::T.
+-spec calc_new_value
+        (Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2, MyValue::T, OtherValue::T) -> MyNewValue::T when is_subtype(T, number());
+        (Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2, MyValue::T, OtherValue::unknown) -> MyNewValue::T when is_subtype(T, number());
+        (Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2, MyValue::unknown, OtherValue::T) -> MyNewValue::T when is_subtype(T, number());
+        (Key::minLoad | maxLoad | avgLoad | size_inv | avg_kr | avgLoad2, MyValue::unknown, OtherValue::unknown) -> MyNewValue::unknown.
 calc_new_value(minLoad, unknown, OtherMinLoad) ->
     OtherMinLoad;
 calc_new_value(minLoad, MyMinLoad, unknown) ->
@@ -557,7 +561,10 @@ calc_new_value(avgLoad2, MyAvg2, OtherAvg2) ->
 
 %% @doc Calculates the average of the two given values. If MyValue is unknown,
 %%      OtherValue will be returned and vice versa.
--spec calc_avg(number() | unknown, number() | unknown) -> number() | unknown.
+-spec calc_avg(number(), number()) -> float();
+              (T, unknown) -> T when is_subtype(T, number());
+              (unknown, T) -> T when is_subtype(T, number());
+              (unknown, unknown) -> unknown.
 calc_avg(MyValue, OtherValue) -> 
     _MyNewValue =
         case MyValue of
@@ -578,8 +585,8 @@ calc_avg(MyValue, OtherValue) ->
 integrate_local_info(MyState, Load) ->
     MyValues = gossip_state:get(MyState, values),
     ValuesWithNewInfo =
-        gossip_state:new_internal(Load, % Avg
-                                  Load*Load, % Avg2
+        gossip_state:new_internal(float(Load), % Avg
+                                  float(Load * Load), % Avg2
                                   unknown, % 1/size (will be set when entering/creating a round)
                                   unknown, % average key range
                                   Load, % Min
@@ -692,14 +699,13 @@ request_random_node() ->
 %%      predecessor. If the second is larger than the first it wraps around and
 %%      thus the difference is the number of keys from the predecessor to the
 %%      end (of the ring) and from the start to the current node.
--spec calc_initial_avg_kr(Pred::node:node_type(), Me::node:node_type()) -> gossip_state:avg_kr().
+-spec calc_initial_avg_kr(Pred::node:node_type(), Me::node:node_type()) -> integer() | unknown.
 calc_initial_avg_kr(Pred, Me) ->
     PredKey = node:id(Pred),
     MyKey = node:id(Me),
     % we don't know whether we can subtract keys of type ?RT:key()
     % -> try it and if it fails, return unknown
-    try
-        ?RT:get_range(PredKey, MyKey)
+    try ?RT:get_range(PredKey, MyKey)
     catch
         throw:not_supported -> unknown
     end.

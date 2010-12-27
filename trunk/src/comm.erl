@@ -46,6 +46,9 @@
 -export([make_global/1, make_local/1]).
 -export([this/0, get/2, this_with_cookie/1, self_with_cookie/1]).
 -export([is_valid/1, is_local/1]).
+-ifdef(TCP_LAYER).
+-export([get_ip/1, get_port/1]).
+-endif.
 %%-export([node/1]).
 %% Message manipulation
 -export([get_msg_tag/1]).
@@ -240,3 +243,13 @@ get_msg_tag(Message)
 
 unpack_cookie({Pid, c, Cookie}, Message) -> {Pid, {Message, Cookie}};
 unpack_cookie(Pid, Message) -> {Pid, Message}.
+
+-ifdef(TCP_LAYER).
+-spec get_ip(mypid()) -> inet:ip_address().
+%% @doc TCP_LAYER: Gets the IP address of the given (global) mypid().
+get_ip(Pid) -> comm_layer:get_ip(Pid).
+
+-spec get_port(mypid()) -> non_neg_integer().
+%% @doc TCP_LAYER: Gets the port of the given (global) mypid().
+get_port(Pid) -> comm_layer:get_port(Pid).
+-endif.
