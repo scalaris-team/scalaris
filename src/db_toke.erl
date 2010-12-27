@@ -41,7 +41,11 @@
 new_() ->
     Dir = util:make_filename(atom_to_list(node())),
     FullDir = lists:flatten([config:read(db_directory), "/", Dir]),
-    file:make_dir(FullDir),
+    _ = case file:make_dir(FullDir) of
+            ok -> ok;
+            {error, eexist} -> ok;
+            {error, Error} -> exit({db_toke, 'cannot create dir', FullDir, Error})
+        end,
     {_Now_Ms, _Now_s, Now_us} = Now = erlang:now(),
     {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:now_to_local_time(Now),
     FileBaseName = util:make_filename(
@@ -162,12 +166,12 @@ get_load_(State = {{DB, _FileName}, _CKInt, _CKDB}, Interval) ->
 %% @doc Adds all db_entry objects in the Data list.
 add_data_(State = {{DB, _FileName}, CKInt, CKDB}, Data) ->
     % check once for the 'common case'
-    case intervals:is_empty(CKInt) of
-        true -> ok;
-        _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
-                   Entry <- Data,
-                   intervals:in(db_entry:get_key(Entry), CKInt)]
-    end,
+    _ = case intervals:is_empty(CKInt) of
+            true -> ok;
+            _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
+                       Entry <- Data,
+                       intervals:in(db_entry:get_key(Entry), CKInt)]
+        end,
     % -> do not use set_entry (no further checks for changed keys necessary)
     lists:foldl(
       fun(DBEntry, _) ->
@@ -229,13 +233,13 @@ delete_entries_(State = {{DB, _FileName}, CKInt, CKDB}, FilterFun) when is_funct
         end,
     KeysToDelete = toke_drv:fold(F, [], DB),
     % delete all entries with these keys
-    [begin
-         toke_drv:delete(DB, KeyToke),
-         case intervals:in(Key, CKInt) of
-             true -> ?CKETS:insert(CKDB, {Key});
-             _    -> ok
-         end
-     end || {KeyToke, Key} <- KeysToDelete],
+    _ = [begin
+             toke_drv:delete(DB, KeyToke),
+             case intervals:in(Key, CKInt) of
+                 true -> ?CKETS:insert(CKDB, {Key});
+                 _    -> ok
+             end
+         end || {KeyToke, Key} <- KeysToDelete],
     State;
 delete_entries_(State, Interval) ->
     delete_entries_(State,

@@ -130,11 +130,11 @@ on({tcp, Socket, Data}, State) ->
             {deliver, unpack_msg_bundle, Message} ->
                 lists:foldr(fun({DestPid, Msg}, _) -> DestPid ! Msg, ok end,
                             ok, Message),
-                inet:setopts(Socket, [{active, once}]),
+                ok = inet:setopts(Socket, [{active, once}]),
                 inc_r_msg_count(State);
             {deliver, Process, Message} ->
                 Process ! Message,
-                inet:setopts(Socket, [{active, once}]),
+                ok = inet:setopts(Socket, [{active, once}]),
                 inc_r_msg_count(State);
             {user_close} ->
                 log:log(warn,"[ CC ] tcp user_close request", []),
@@ -142,11 +142,11 @@ on({tcp, Socket, Data}, State) ->
                 set_socket(State, notconnected);
             {youare, _Address, _Port} ->
                 %% @TODO what info do we get from this message?
-                inet:setopts(Socket, [{active, once}]),
+                ok = inet:setopts(Socket, [{active, once}]),
                 State;
             Unknown ->
                 log:log(warn,"[ CC ] unknown message ~.0p", [Unknown]),
-                inet:setopts(Socket, [{active, once}]),
+                ok = inet:setopts(Socket, [{active, once}]),
                 State
     end,
     NewState;
@@ -221,11 +221,11 @@ new_connection(Address, Port, MyPort) ->
                         _ -> ok
                     end,
                     Message = term_to_binary({endpoint, MyAddress, MyPort}),
-                    gen_tcp:send(Socket, Message),
+                    _ = gen_tcp:send(Socket, Message),
                     case inet:peername(Socket) of
                         {ok, {RemoteIP, RemotePort}} ->
                             YouAre = term_to_binary({youare, RemoteIP, RemotePort}),
-                            gen_tcp:send(Socket, YouAre),
+                            _ = gen_tcp:send(Socket, YouAre),
                             Socket;
                         {error, Reason} ->
                             log:log(error,"[ CC ] reconnect to ~.0p because socket is ~.0p",

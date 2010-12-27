@@ -320,8 +320,8 @@ start_link() ->
 init(_Args) ->
 %%  ets:new(call_counter, [set, public, named_table]),
 %%  ets:insert(call_counter, {lookup_pointer, 0}),
-    ets:new(?MODULE, [set, protected, named_table]),
-    ets:new(pid_groups_hidden, [set, protected, named_table]),
+    _ = ets:new(?MODULE, [set, protected, named_table]),
+    _ = ets:new(pid_groups_hidden, [set, protected, named_table]),
     %% required to gracefully eliminate dead, but registered processes
     %% from the ets-table
     process_flag(trap_exit, true),
@@ -345,7 +345,7 @@ on({pid_groups_add, GrpName, PidName, Pid, ReplyTo}, State) ->
 on({drop_state}, State) ->
     % only for unit tests
     Links = ets:match(?MODULE, {'_', '$1'}),
-    [unlink(Pid) || [Pid] <- Links],
+    _ = [unlink(Pid) || [Pid] <- Links],
     ets:delete_all_objects(?MODULE),
     State;
 
@@ -356,25 +356,25 @@ on({group_and_name_of, Pid, Source}, State) ->
     State;
 
 on({pid_groups_hide, GrpName, Source}, State) ->
-    [ begin
-          ets:delete_object(?MODULE, X),
-          ets:insert(pid_groups_hidden, X)
-      end || X <- tab2list(), GrpName =:= element(1, element(1, X)) ],
+    _ = [ begin
+              ets:delete_object(?MODULE, X),
+              ets:insert(pid_groups_hidden, X)
+          end || X <- tab2list(), GrpName =:= element(1, element(1, X)) ],
     comm:send_local(Source, {pid_groups_hide_done, GrpName}),
     State;
 
 on({pid_groups_unhide, GrpName, Source}, State) ->
-    [ begin
-          ets:delete_object(pid_groups_hidden, X),
-          ets:insert(?MODULE, X)
-      end || X <- ets:tab2list(pid_groups_hidden), GrpName =:= element(1, element(1, X)) ],
+    _ = [ begin
+              ets:delete_object(pid_groups_hidden, X),
+              ets:insert(?MODULE, X)
+          end || X <- ets:tab2list(pid_groups_hidden), GrpName =:= element(1, element(1, X)) ],
     ets:delete(pid_groups_hidden, GrpName),
     comm:send_local(Source, {pid_groups_unhide_done, GrpName}),
     State;
 
 on({'EXIT', FromPid, _Reason}, State) ->
     Processes = ets:match(?MODULE, {'$1', FromPid}),
-    [ets:delete(?MODULE, {InstanceId, Name}) || [{InstanceId, Name}] <- Processes],
+    _ = [ets:delete(?MODULE, {InstanceId, Name}) || [{InstanceId, Name}] <- Processes],
     State.
 
 

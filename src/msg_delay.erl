@@ -100,7 +100,7 @@ on({msg_delay_periodic} = Trigger, {TableName, Counter} = _State) ->
     case pdb:get(Counter, TableName) of
         undefined -> ok;
         {_, Queue} ->
-            [ comm:send_local(Dest, Msg) || {Dest, Msg} <- Queue ],
+            _ = [ comm:send_local(Dest, Msg) || {Dest, Msg} <- Queue ],
             pdb:delete(Counter, TableName)
     end,
     comm:send_local_after(1000, self(), Trigger),

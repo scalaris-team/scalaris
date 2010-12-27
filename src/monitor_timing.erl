@@ -83,7 +83,7 @@ on({get_timers, From}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec init(any()) -> state().
 init(_) ->
-    ets:new(?MODULE, [set, protected, named_table]),
+    _ = ets:new(?MODULE, [set, protected, named_table]),
     {}.
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.

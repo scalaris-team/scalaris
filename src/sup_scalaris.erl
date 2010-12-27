@@ -69,8 +69,12 @@ start_link(SupervisorType, Options) ->
 init({SupervisorType, Options}) ->
     randoms:start(),
     ServiceGroup = pid_groups:new("basic_services_"),
-    error_logger:logfile({open, preconfig:cs_log_file()}),
-    inets:start(),
+    case error_logger:logfile({open, preconfig:cs_log_file()}) of
+        ok -> ok;
+        {error, Reason} -> error_logger:error_msg("can not open logfile ~.0p: ~.0p",
+                                                  [preconfig:cs_log_file(), Reason])
+    end,
+    _ = inets:start(),
     {ok, {{one_for_one, 10, 1}, my_process_list(SupervisorType, ServiceGroup, Options)}}.
 
 -spec my_process_list/3 :: (supervisor_type(), pid_groups:groupname(), list(tuple())) -> [any()].
@@ -150,5 +154,5 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
 
 -spec scan_environment() -> ok.
 scan_environment() ->
-    admin:add_nodes(preconfig:cs_instances() - 1),
+    _ = admin:add_nodes(preconfig:cs_instances() - 1),
     ok.

@@ -431,9 +431,9 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
 on({crash, Pid},
    {RTMs, _TableName, _Role, _LAcceptor, _LLearner} = State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
-    [ lookup:unreliable_lookup(
-        Key, {get_process_in_group, comm:this(), Key, ?MODULE})
-      || {Key, RTM} <- RTMs, RTM =:= Pid ],
+    _ = [ lookup:unreliable_lookup(
+            Key, {get_process_in_group, comm:this(), Key, ?MODULE})
+            || {Key, RTM} <- RTMs, RTM =:= Pid ],
     State;
 
 on({crash, _Pid, _Cookie},

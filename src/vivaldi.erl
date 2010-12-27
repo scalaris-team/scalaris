@@ -191,7 +191,7 @@ on_active({cy_cache, [Node] = _Cache},
 
 on_active({vivaldi_shuffle, SourcePid, RemoteCoordinate, RemoteConfidence}, State) ->
     %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    vivaldi_latency:measure_latency(SourcePid, RemoteCoordinate, RemoteConfidence),
+    _ = vivaldi_latency:measure_latency(SourcePid, RemoteCoordinate, RemoteConfidence),
     State;
 
 on_active({update_vivaldi_coordinate, Latency, {RemoteCoordinate, RemoteConfidence}},

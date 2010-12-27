@@ -125,12 +125,12 @@ on({parallel_reads, SourcePID, Keys, TLog}, State) ->
 
 %%  initiate a read phase
 on({do_transaction, TransFun, SuccessFun, FailureFun, Owner}, State) ->
-    transaction:do_transaction(State, TransFun, SuccessFun, FailureFun, Owner),
+    _ = transaction:do_transaction(State, TransFun, SuccessFun, FailureFun, Owner),
     State;
 
 %% do a transaction without a read phase
 on({do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner}, State) ->
-    transaction:do_transaction_wo_readphase(State, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner),
+    _ = transaction:do_transaction_wo_readphase(State, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner),
     State;
 
 %% answer - lookup for transaction participant
@@ -404,8 +404,8 @@ start_link(DHTNodeGroup, Options) ->
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
     % note, comm:this() may be invalid at this moment
-    [comm:send(KnownHost, {get_dht_nodes, comm:this()})
-     || KnownHost <- KnownHosts],
+    _ = [comm:send(KnownHost, {get_dht_nodes, comm:this()})
+        || KnownHost <- KnownHosts],
     timer:sleep(100),
     case comm:is_valid(comm:this()) of
         true ->

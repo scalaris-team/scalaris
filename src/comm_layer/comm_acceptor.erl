@@ -78,7 +78,7 @@ server(LS) ->
                                      pid_groups:my_groupname(),
                                      NewAddress, Port, S),
                     gen_tcp:controlling_process(S, NewPid),
-                    inet:setopts(S, comm_server:tcp_options()),
+                    ok = inet:setopts(S, comm_server:tcp_options()),
                     comm_server:register_connection(NewAddress, Port,
                                                     NewPid, S)
             end,

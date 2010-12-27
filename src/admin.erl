@@ -36,24 +36,29 @@
 
 %% userdevguide-begin admin:add_nodes
 % @doc add new Scalaris nodes on the local node
--spec add_node_at_id(?RT:key()) -> ok.
+-spec add_node_at_id(?RT:key()) ->
+        ok | {error, already_present | {already_started, pid() | undefined} | term()}.
 add_node_at_id(Id) ->
     add_node([{{idholder, id}, Id}, {skip_psv_lb}]).
 
--spec add_node([tuple()]) -> ok.
+-spec add_node([tuple()]) ->
+        ok | {error, already_present | {already_started, pid() | undefined} | term()}.
 add_node(Options) ->
     DhtNodeId = randoms:getRandomId(),
     Desc = util:sup_supervisor_desc(
              DhtNodeId, config:read(dht_node_sup), start_link,
              [[{my_sup_dht_node_id, DhtNodeId} | Options]]),
-    supervisor:start_child(main_sup, Desc),
-    ok.
+    case supervisor:start_child(main_sup, Desc) of
+        {ok, _Child}        -> ok;
+        {ok, _Child, _Info} -> ok;
+        {error, _Error} = X -> X
+    end.
 
--spec add_nodes(non_neg_integer()) -> ok.
-add_nodes(0) -> ok;
+-spec add_nodes(non_neg_integer()) ->
+        nothing_to_do | [ok | {error, already_present | {already_started, pid() | undefined} | term()},...].
+add_nodes(0) -> nothing_to_do;
 add_nodes(Count) ->
-    add_node([]),
-    add_nodes(Count - 1).
+    [add_node([]) || _X <- lists:seq(1, Count)].
 %% userdevguide-end admin:add_nodes
 
 %% @doc Deletes nodes started with add_nodes();
@@ -62,23 +67,26 @@ add_nodes(Count) ->
 %%      a list as their name!
 %%      Provided for convenience and backwards-compatibility - kills the node,
 %%      i.e. _no_ graceful leave !
--spec del_nodes(Count::integer()) -> ok.
+-spec del_nodes(Count::integer())
+        -> nothing_to_do | [ok | {error, running | not_found | simple_one_for_one},...].
 del_nodes(Count) -> del_nodes(Count, false).
 
 %% @doc Deletes nodes started with add_nodes();
 %%      detects them by their random names (which is a list).
 %%      Beware: Other processes in main_sup must not be started with
 %%      a list as their name!
--spec del_nodes(Count::integer(), Graceful::boolean()) -> ok.
-del_nodes(0, _Graceful) -> ok;
+-spec del_nodes(Count::integer(), Graceful::boolean())
+        -> nothing_to_do | [ok | {error, running | not_found | simple_one_for_one},...].
+del_nodes(0, _Graceful) -> nothing_to_do;
 del_nodes(Count, Graceful) ->
-    del_single_node(supervisor:which_children(main_sup), Graceful),
-    del_nodes(Count - 1, Graceful).
+    [del_single_node(supervisor:which_children(main_sup), Graceful)
+    || _X <- lists:seq(1, Count)].
 
 %% @doc Delete a single node if its Id, i.e. name, is a list.
 -spec del_single_node([{Id::term() | undefined, Child::pid() | undefined,
                         Type::worker | supervisor, Modules::[module()] | dynamic}],
-                      Graceful::boolean()) -> ok.
+                      Graceful::boolean())
+        -> ok | {error, running | not_found | simple_one_for_one}.
 del_single_node([], _Graceful) ->
     ok;
 del_single_node([{Key, Pid, _, _} | T], Graceful) ->
@@ -90,7 +98,7 @@ del_single_node([{Key, Pid, _, _} | T], Graceful) ->
                     DhtNode = pid_groups:pid_of(Group, dht_node),
                     comm:send_local(DhtNode, {leave});
                 false ->
-                    supervisor:terminate_child(main_sup, Key),
+                    _ = supervisor:terminate_child(main_sup, Key),
                     supervisor:delete_child(main_sup, Key)
             end;
         _ -> del_single_node(T, Graceful)
@@ -168,8 +176,8 @@ number_of_nodes() ->
 %% comm_logger functions
 %%===============================================================================
 get_dump() ->
-    [comm:send(comm:get(admin_server, Server), {get_comm_layer_dump, comm:this()})
-     || Server <- util:get_nodes()],
+    _ = [comm:send(comm:get(admin_server, Server), {get_comm_layer_dump, comm:this()})
+        || Server <- util:get_nodes()],
     %% list({Map, StartTime})
     Dumps = [receive
                  {get_comm_layer_dump_response, Dump} ->
@@ -250,32 +258,33 @@ nodes() ->
 %% Debug functions
 %%=============================================================================
 
--spec(print_ages/0 :: () -> ok).
+-spec print_ages() -> ok.
 print_ages() ->
     boot_server:node_list(),
-    receive
-        {get_list_response, List} ->
-            [ comm:send_to_group_member(Node,cyclon,{get_ages,self()}) || Node <- List ]
-    end,
-    worker_loop(),
-    ok.
+    _ = receive
+            {get_list_response, List} ->
+                [ comm:send_to_group_member(Node, cyclon, {get_ages, self()}) || Node <- List ]
+        end,
+    worker_loop().
 
+-spec worker_loop() -> ok.
 worker_loop() ->
     receive
         {cy_ages, Ages} ->
-            io:format("~p~n",[Ages]),
+            io:format("~p~n", [Ages]),
             worker_loop()
-    after 400 ->
+        after 400 ->
             ok
     end.
 
--spec(check_routing_tables/1 :: (any()) -> ok).
+%% TODO: the message this method sends is not received anywhere - either delete or update it! 
+-spec check_routing_tables(any()) -> ok.
 check_routing_tables(Port) ->
     boot_server:node_list(),
-    receive
-        {get_list_response, List} ->
-            [ comm:send_to_group_member(Node,routing_table,{check,Port}) || Node <- List ]
-    end,
+    _ = receive
+            {get_list_response, List} ->
+                [ comm:send_to_group_member(Node, routing_table, {check, Port}) || Node <- List ]
+        end,
     ok.
 
 -spec dd_check_ring() -> {token_on_the_way}.
@@ -285,5 +294,5 @@ dd_check_ring() ->
 -spec dd_check_ring(non_neg_integer()) -> {token_on_the_way}.
 dd_check_ring(Token) ->
     One = pid_groups:find_a(dht_node),
-    comm:send_local(One, {send_to_group_member, ring_maintenance, {init_check_ring, Token}}),
+    _ = comm:send_local(One, {send_to_group_member, ring_maintenance, {init_check_ring, Token}}),
     {token_on_the_way}.

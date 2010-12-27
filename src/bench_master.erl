@@ -27,9 +27,9 @@
 %%
 -spec start() -> pid().
 start() ->
-    application:start(boot_cs),
+    ok = application:start(boot_cs),
     timer:sleep(1000),
-    erlang:spawn(?MODULE,run_1,[]).
+    erlang:spawn(?MODULE, run_1, []).
 
 -spec run_1() -> no_return().
 run_1() ->
@@ -38,7 +38,7 @@ run_1() ->
     Iterations = list_to_integer(os:getenv("ITERATIONS")),
     RingSize = list_to_integer(os:getenv("RING_SIZE")),
     io:format("Start ~p Nodes with ~p Clients per VMs and ~p Iterations~n",[Size,Worker,Iterations]),
-    admin:add_nodes(Size-1),
+    _ = admin:add_nodes(Size-1),
     timer:sleep(1000),
     check_ring_size(RingSize),
     wait_for_stable_ring(),
@@ -47,7 +47,7 @@ run_1() ->
     timer:sleep(3000),
     bench_server:run_read(Worker, Iterations),
     io:format("~p~n",[util:get_proc_in_vms(admin_server)]),
-    [comm:send(Pid,{halt,1}) || Pid <- util:get_proc_in_vms(admin_server)],
+    _ = [comm:send(Pid, {halt, 1}) || Pid <- util:get_proc_in_vms(admin_server)],
     init:stop(1),
     receive nothing -> ok end.
 

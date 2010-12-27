@@ -54,7 +54,7 @@ now({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}) ->
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef};
 now({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}) ->
     % timer still running
-    erlang:cancel_timer(TimerRef),
+    _ = erlang:cancel_timer(TimerRef),
     NewTimerRef = comm:send_local(self(), {MsgTag}),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef}.
 
@@ -68,7 +68,7 @@ next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, IntervalTag)
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef};
 next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, IntervalTag) ->
     % timer still running?
-    erlang:cancel_timer(TimerRef),
+    _ = erlang:cancel_timer(TimerRef),
     NewTimerRef = send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef}.
 
@@ -95,5 +95,5 @@ stop({_BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, _MsgTag, ok} = State) 
     State;
 stop({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}) ->
     % timer still running?
-    erlang:cancel_timer(TimerRef),
+    _ = erlang:cancel_timer(TimerRef),
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}.

@@ -117,14 +117,14 @@ read_or_write(Key, Value, TransLog, Operation) ->
             %% information from remote
             ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
             Cookie = util:get_pids_uid(),
-            [ lookup:unreliable_lookup(
-                X, {get_key, comm:this_with_cookie(Cookie), X})
-              || X <- ReplicaKeys ],
+            _ = [ lookup:unreliable_lookup(
+                    X, {get_key, comm:this_with_cookie(Cookie), X})
+                    || X <- ReplicaKeys ],
             TRef = erlang:send_after(config:read(transaction_lookup_timeout),
                                      self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
             {Flag, Result} = write_read_receive(ReplicaKeys, Operation, Cookie),
-            erlang:cancel_timer(TRef),
+            _ = erlang:cancel_timer(TRef),
             if Flag =:= fail ->
                     NewTransLog =
                         txlog:add_entry(TransLog,
@@ -163,13 +163,13 @@ quorum_read(Key, SourcePID)->
 do_quorum_read(Key, SourcePID, InstanceId)->
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     Cookie = util:get_pids_uid(),
-            [ lookup:unreliable_lookup(
-                X, {get_key, comm:this_with_cookie(Cookie), X})
-              || X <- ReplicaKeys ],
+    _ = [ lookup:unreliable_lookup(
+            X, {get_key, comm:this_with_cookie(Cookie), X})
+            || X <- ReplicaKeys ],
     TRef = erlang:send_after(config:read(transaction_lookup_timeout), self(),
                       {write_read_receive_timeout, hd(ReplicaKeys)}),
     {Flag, Result} = write_read_receive(ReplicaKeys, read, Cookie),
-    erlang:cancel_timer(TRef),
+    _ = erlang:cancel_timer(TRef),
     if
         Flag =:= fail ->
             comm:send(SourcePID, {single_read_return, {fail, Result}});
@@ -273,11 +273,11 @@ parallel_reads(Keys, TransLog) ->
                 [ ?RT:get_replica_keys(?RT:hash_key(Elem)) ||
                     Elem <- ToLookup ],
 
-            lists:map(fun(ReplicaKeys)->
-                              [ lookup:unreliable_get_key(ReplicaKey) ||
-                                  ReplicaKey <- ReplicaKeys ]
-                      end,
-                      ReplicaKeysAll),
+            _ = lists:map(fun(ReplicaKeys)->
+                                  [ lookup:unreliable_get_key(ReplicaKey) ||
+                                      ReplicaKey <- ReplicaKeys ]
+                          end,
+                          ReplicaKeysAll),
 
             ResultsInit = [ {Key, [], undecided} ||
                               [Key | _RKeys] <- ReplicaKeysAll ],
@@ -489,8 +489,8 @@ delete(SourcePID, Key) ->
 -spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::pid_groups:groupname()) -> ok.
 do_delete(Key, SourcePID, InstanceId)->
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    [ lookup:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
-        Replica <- ReplicaKeys],
+    _ = [ lookup:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
+            Replica <- ReplicaKeys],
     erlang:send_after(config:read(transaction_lookup_timeout), self(), {timeout}),
     delete_collect_results(ReplicaKeys, SourcePID, []).
 

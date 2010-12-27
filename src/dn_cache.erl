@@ -80,13 +80,13 @@ init(Trigger) ->
 
 -spec on(message(), state()) -> state().
 on({trigger}, {Queue, Subscriber, TriggerState}) ->
-    fix_queue:map(fun(X) ->
-                          Pid = case node:is_valid(X) of
-                                    true -> node:pidX(X);
-                                    _    -> X
-                                end,
-                          comm:send(Pid, {ping, comm:this_with_cookie(X)})
-                  end, Queue),
+    _ = fix_queue:map(fun(X) ->
+                              Pid = case node:is_valid(X) of
+                                        true -> node:pidX(X);
+                                        _    -> X
+                                    end,
+                              comm:send(Pid, {ping, comm:this_with_cookie(X)})
+                      end, Queue),
     NewTriggerState = trigger:next(TriggerState),
     {Queue, Subscriber, NewTriggerState};
 

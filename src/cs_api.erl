@@ -229,7 +229,7 @@ range_read_loop(Interval, Done, Data, TimerRef) ->
                     range_read_loop(Interval, Done2, [NewData | Data], TimerRef);
                 true ->
                     % cancel timeout
-                    erlang:cancel_timer(TimerRef),
+                    _ = erlang:cancel_timer(TimerRef),
                     % consume potential timeout message
                     receive
                         {range_read_timeout} -> ok

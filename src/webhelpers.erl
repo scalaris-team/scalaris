@@ -134,11 +134,11 @@ getVivaldiMap() ->
             throw('boot_server_timeout')
         end,
     This = self(),
-    [erlang:spawn(
-       fun() ->
-               SourcePid = comm:get(This, comm:this_with_cookie(Pid)),
-               comm:send_to_group_member(Pid, vivaldi, {get_coordinate, SourcePid})
-       end) || Pid <- Nodes],
+    _ = [erlang:spawn(
+           fun() ->
+                   SourcePid = comm:get(This, comm:this_with_cookie(Pid)),
+                   comm:send_to_group_member(Pid, vivaldi, {get_coordinate, SourcePid})
+           end) || Pid <- Nodes],
     CC_list = get_vivaldi(Nodes, [], 0),
     renderVivaldiMap(CC_list, Nodes).
 
@@ -223,7 +223,7 @@ gen_Nodes([H|T],[HN|TN],R) ->
     
     S1 = pid_to_integer(HN),
     
-    random:seed(S1,S1,S1),
+    _ = random:seed(S1,S1,S1),
     C1 = random:uniform(Hi-Lo)+Lo-1,
     C2 = random:uniform(Hi-Lo)+Lo-1,
     C3 = random:uniform(Hi-Lo)+Lo-1,

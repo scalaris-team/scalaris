@@ -303,7 +303,7 @@ reset_timer(SlideOp) ->
     {TimerRef, Msg} = get_timer(SlideOp),
     SlOp1 = case (TimerRef =/= null) of
                 true ->
-                    erlang:cancel_timer(TimerRef),
+                    _ = erlang:cancel_timer(TimerRef),
                     % consume potential timeout message
                     receive Msg -> ok
                     after 0 -> ok

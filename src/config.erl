@@ -80,7 +80,7 @@ start_link(Files) ->
 -spec start(Files::[file:name()], Owner::pid()) -> no_return().
 start(Files, Owner) ->
     register(?MODULE, self()),
-    ets:new(config_ets, [set, protected, named_table]),
+    _ = ets:new(config_ets, [set, protected, named_table]),
     _ = [ populate_db(File) || File <- Files],
     case check_config() of
         true -> ok;

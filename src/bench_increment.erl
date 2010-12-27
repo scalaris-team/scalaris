@@ -120,7 +120,7 @@ bench_raw() ->
     spawn(fun () -> process(Self, Key, Count) end),
     spawn(fun () -> process(Self, Key, Count) end),
     spawn(fun () -> process(Self, Key, Count) end),
-    wait_for_done(6),
+    _ = wait_for_done(6),
     Count.
 
 -spec bench_cprof() -> pos_integer().
@@ -130,7 +130,7 @@ bench_cprof() ->
     Key = "i",
     cprof:start(),
     spawn(fun () -> process(Self, Key, Count) end),
-    wait_for_done(1),
+    _ = wait_for_done(1),
     cprof:pause(),
     io:format("~p~n", [cprof:analyse()]),
     Count.

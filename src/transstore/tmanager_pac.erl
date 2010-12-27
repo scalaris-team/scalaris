@@ -77,8 +77,8 @@ process_vote_ack(#tm_state{decision = undecided} = TMState, Key, RKey, Dec, TS) 
 			 message = {comm:this(),TMState2#tm_state.transID, Decision}
 			}
 			      },
-	    tsend:send_to_participants(TMState2, Message),
-	    tsend:send_to_rtms(TMState2, {decision, Decision}),
+	    _ = tsend:send_to_participants(TMState2, Message),
+	    _ = tsend:send_to_rtms(TMState2, {decision, Decision}),
 	    TMState2#tm_state{decision = Decision}
     end;
 process_vote_ack(TMState, Key, RKey, Dec, TS) ->
@@ -236,15 +236,15 @@ collect_rv_ack(TMState, Key, RKey, Timestamp, StoredVote) ->
     RVAcks = trecords:get_read_vote_acks(TMState2, Key, RKey),
     WriteVote = check_rv_acks(RVAcks),
     if
-	WriteVote =:= not_enough ->
-	    TMState2;
-	true ->
-	    {VoteToAdopt, TSForWriteVote} = WriteVote,
-	    NewVote = trecords:new_vote(TMState2#tm_state.transID, Key, RKey, VoteToAdopt, TSForWriteVote),
-	    lists:map(fun({_RKey, Address}) ->
-			      tsend:send(Address, {vote, comm:this(), NewVote}) end, 
-		      TMState2#tm_state.rtms),
-	    TMState2
+        WriteVote =:= not_enough ->
+            TMState2;
+        true ->
+            {VoteToAdopt, TSForWriteVote} = WriteVote,
+            NewVote = trecords:new_vote(TMState2#tm_state.transID, Key, RKey, VoteToAdopt, TSForWriteVote),
+            _ = lists:map(fun({_RKey, Address}) ->
+                                  tsend:send(Address, {vote, comm:this(), NewVote}) end, 
+                          TMState2#tm_state.rtms),
+            TMState2
     end.
 	    
 check_rv_acks(RVAcksList)->    

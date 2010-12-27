@@ -47,7 +47,7 @@ ganglia_loop(Last) ->
     SinceLast = timer:now_diff(Now, Last),
     % transaction statistics
     Timers = monitor_timing:get_timers(),
-    [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
+    _ = [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
     % vivaldi statistics
     monitor_per_dht_node(fun monitor_vivaldi_errors/2, pid_groups:groups_with(dht_node)),
     timer:sleep(config:read(ganglia_interval)),
@@ -55,23 +55,23 @@ ganglia_loop(Last) ->
 
 -spec update(Tree::gb_tree()) -> ok.
 update(Tree) ->
-    gmetric(both, "Erlang Processes", "int32", erlang:system_info(process_count), "Total Number"),
-    gmetric(both, "Memory used by Erlang processes", "int32", erlang:memory(processes_used), "Bytes"),
-    gmetric(both, "Memory used by ETS tables", "int32", erlang:memory(ets), "Bytes"),
-    gmetric(both, "Memory used by atoms", "int32", erlang:memory(atom), "Bytes"),
-    gmetric(both, "Memory used by binaries", "int32", erlang:memory(binary), "Bytes"),
-    gmetric(both, "Memory used by system", "int32", erlang:memory(system), "Bytes"),
+    _ = gmetric(both, "Erlang Processes", "int32", erlang:system_info(process_count), "Total Number"),
+    _ = gmetric(both, "Memory used by Erlang processes", "int32", erlang:memory(processes_used), "Bytes"),
+    _ = gmetric(both, "Memory used by ETS tables", "int32", erlang:memory(ets), "Bytes"),
+    _ = gmetric(both, "Memory used by atoms", "int32", erlang:memory(atom), "Bytes"),
+    _ = gmetric(both, "Memory used by binaries", "int32", erlang:memory(binary), "Bytes"),
+    _ = gmetric(both, "Memory used by system", "int32", erlang:memory(system), "Bytes"),
     DHTNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
                                     || P <- pid_groups:find_all(dht_node)]),
-    gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
+    _ = gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
     traverse(gb_trees:iterator(Tree)).
 
 -spec update_timer(monitor_timing:timer(), SinceLast::number()) -> ok.
 update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
-    gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "min"])), "float", Min, "ms"),
-    gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "avg"])), "float", Avg, "ms"),
-    gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "max"])), "float", Max, "ms"),
-    gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "tp"])), "float", Count / SinceLast, "1/s"),
+    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "min"])), "float", Min, "ms"),
+    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "avg"])), "float", Avg, "ms"),
+    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "max"])), "float", Max, "ms"),
+    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "tp"])), "float", Count / SinceLast, "1/s"),
     ok.
 
 -spec traverse(Iter1::term()) -> ok.
@@ -79,7 +79,7 @@ traverse(Iter1) ->
   case gb_trees:next(Iter1) of
     none -> ok;
     {Key, {Bytes, _Count}, Iter2} ->
-      gmetric(positive, Key, "int32", Bytes, "Bytes"),
+      _ = gmetric(positive, Key, "int32", Bytes, "Bytes"),
       traverse(Iter2)
   end.
 
@@ -101,11 +101,11 @@ monitor_vivaldi_errors(Group, Idx) ->
             end
     end.
 
--spec monitor_per_dht_node(fun((pid_groups:groupname(), Idx::non_neg_integer()) -> any()), [pid_groups:groupname(),...] | failed) -> non_neg_integer().
+-spec monitor_per_dht_node(fun((pid_groups:groupname(), Idx::non_neg_integer()) -> any()),
+                           [pid_groups:groupname(),...] | failed) -> non_neg_integer().
 monitor_per_dht_node(F, Nodes) ->
     DHTNodes = lists:sort(Nodes),
     lists:foldl(fun (Group, Idx) ->
-                        F(Group, Idx),
+                        _ = F(Group, Idx),
                         Idx + 1
                 end, 0, DHTNodes).
-

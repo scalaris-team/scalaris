@@ -289,8 +289,8 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
     
     % TODO: add a local cache of contacted nodes in order not to contact them again
-    [comm:send(node:pidX(Node), {get_node_details, comm:this(), [node]})
-        || Node <- NewNodes],
+    _ = [comm:send(node:pidX(Node), {get_node_details, comm:this(), [node]})
+           || Node <- NewNodes],
     % update node ids with information from the other node's neighborhood
     nodelist:update_ids(OldNeighborhood, nodelist:to_list(OtherNeighborhood)).
 

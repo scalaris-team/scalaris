@@ -328,8 +328,8 @@ start_link(DHTNodeGroup, Options) ->
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
     % note, comm:this() may be invalid at this moment
-    [comm:send(KnownHost, {get_dht_nodes, comm:this()})
-     || KnownHost <- KnownHosts],
+    _ = [comm:send(KnownHost, {get_dht_nodes, comm:this()})
+           || KnownHost <- KnownHosts],
     comm:send_local(pid_groups:find_a(service_per_vm),
                     {get_dht_nodes, comm:this()}),
     timer:sleep(100),

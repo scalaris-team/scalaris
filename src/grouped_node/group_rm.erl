@@ -37,8 +37,8 @@ trigger(State) ->
     Succ = group_local_state:get_successor(NodeState),
     {_, _, _, Preds} = Pred,
     {_, _, _, Succs} = Succ,
-    [comm:send(P, {rm_get_succ, GroupNode, Pred}) || P <- Preds],
-    [comm:send(P, {rm_get_pred, GroupNode, Succ}) || P <- Succs],
+    _ = [comm:send(P, {rm_get_succ, GroupNode, Pred}) || P <- Preds],
+    _ = [comm:send(P, {rm_get_pred, GroupNode, Succ}) || P <- Succs],
     State.
 
 
@@ -54,7 +54,7 @@ handle_get_succ(State, Node, NodesPred) ->
     MyRange = group_view:get_interval(View),
     {_, _, _, Nodes} = Node,
     NewNodeState = check_potential_succs(NodeState, MyRange, Node, NodesPred),
-    [comm:send(P, {rm_get_succ_response, Me, MySucc}) || P <- Nodes],
+    _ = [comm:send(P, {rm_get_succ_response, Me, MySucc}) || P <- Nodes],
     group_state:set_node_state(State, NewNodeState).
 
 % @doc this message was sent by a potential predecessor; however his
@@ -69,7 +69,7 @@ handle_get_pred(State, Node, NodesSucc) ->
     MyRange = group_view:get_interval(View),
     {_, _, _, Nodes} = Node,
     NewNodeState = check_potential_preds(NodeState, MyRange, Node, NodesSucc),
-    [comm:send(P, {rm_get_pred_response, Me, MyPred}) || P <- Nodes],
+    _ = [comm:send(P, {rm_get_pred_response, Me, MyPred}) || P <- Nodes],
     group_state:set_node_state(State, NewNodeState).
 
 -spec handle_get_pred_response(group_state:state(), group_types:group_node(),
