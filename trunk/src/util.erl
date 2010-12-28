@@ -40,8 +40,7 @@
          smerge2/2, smerge2/3, smerge2/4,
          is_unittest/0, make_filename/1]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
--export([get_pids_uid/0]).
--export([get_global_uid/0]).
+-export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 
 -opaque global_uid() :: {pos_integer(), comm:mypid()}.
 
@@ -384,6 +383,21 @@ get_global_uid() ->
     _Result = {get_pids_uid(), comm:this()}
     %% , term_to_binary(_Result)
     .
+
+-spec is_my_old_uid(pos_integer() | global_uid()) -> boolean().
+is_my_old_uid({LocalUid, Pid}) ->
+    case comm:this() of
+        Pid -> is_my_old_uid(LocalUid);
+        _   -> false
+    end;
+is_my_old_uid(Id) when is_integer(Id) ->
+    LastUid = case erlang:get(pids_uid_counter) of
+                  undefined -> 0;
+                  Any -> Any
+              end,
+    Id =< LastUid;
+is_my_old_uid(_Id) ->
+    false.
 
 -spec zipfoldl(ZipFun::fun((X, Y) -> Z), FoldFun::fun((Z, Acc) -> Acc), L1::[X], L2::[Y], Acc) -> Acc.
 zipfoldl(ZipFun, FoldFun, [L1H | L1R], [L2H | L2R], AccIn) ->

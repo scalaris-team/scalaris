@@ -732,16 +732,39 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
                                       "(operation: ~.0p)~n", [comm:this(), MoveMsgTag, PredOrSucc, PredOrSuccExp, SlideOp]),
                     NewState
             end;
+        not_found when MoveMsgTag =:= rm_new_pred ->
+            % ignore (local) rm_new_pred messages arriving too late
+            case util:is_my_old_uid(MoveFullId) of
+                true ->
+                    log:log(info,"[ dht_node_move ~.0p ] ~.0p received with old "
+                           "slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
+                            [comm:this(), MoveMsgTag, MoveFullId,
+                             dht_node_state:get(State, slide_pred),
+                             dht_node_state:get(State, slide_succ)]);
+                _ ->
+                    log:log(warn,"[ dht_node_move ~.0p ] ~.0p received with no "
+                           "matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
+                            [comm:this(), MoveMsgTag, MoveFullId,
+                             dht_node_state:get(State, slide_pred),
+                             dht_node_state:get(State, slide_succ)])
+            end,
+            State;
         not_found ->
-            log:log(warn,"[ dht_node_move ~.0p ] ~.0p received with no matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
-                    [comm:this(), MoveMsgTag, MoveFullId, dht_node_state:get(State, slide_pred), dht_node_state:get(State, slide_succ)]),
+            log:log(warn,"[ dht_node_move ~.0p ] ~.0p received with no matching "
+                   "slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
+                    [comm:this(), MoveMsgTag, MoveFullId,
+                     dht_node_state:get(State, slide_pred),
+                     dht_node_state:get(State, slide_succ)]),
             State;
         {wrong_neighbor, PredOrSucc, SlideOp} -> % wrong pred or succ
             case lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
                 true ->
                     NewState = abort_slide(State, SlideOp, wrong_pred_succ_node, true),
-                    log:log(warn,"[ dht_node_move ~.0p ] ~.0p received but ~s changed during move (ID: ~.0p, node(slide): ~.0p, new_~s: ~.0p)~n",
-                            [comm:this(), MoveMsgTag, PredOrSucc, MoveFullId, slide_op:get_node(SlideOp), PredOrSucc, dht_node_state:get(State, PredOrSucc)]),
+                    log:log(warn,"[ dht_node_move ~.0p ] ~.0p received but ~s "
+                           "changed during move (ID: ~.0p, node(slide): ~.0p, new_~s: ~.0p)~n",
+                            [comm:this(), MoveMsgTag, PredOrSucc, MoveFullId,
+                             slide_op:get_node(SlideOp),
+                             PredOrSucc, dht_node_state:get(State, PredOrSucc)]),
                     NewState;
                 _ -> State
             end
