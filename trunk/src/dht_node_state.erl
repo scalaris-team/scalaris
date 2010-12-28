@@ -47,7 +47,7 @@
 -export_type([state/0]).
 -endif.
 
-%% @type state() = {state, gb_trees:gb_tree(), list(), pid()}. the state of a chord# node
+%% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
                 neighbors  = ?required(state, neighbors) :: tid(),
                 join_time  = ?required(state, join_time) :: util:time(),
@@ -55,14 +55,17 @@
                 db         = ?required(state, db)        :: ?DB:db(),
                 tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
                 proposer   = ?required(state, proposer)  :: pid(),
-                slide_pred = null :: slide_op:slide_op() | null, % slide with pred (must not overlap with 'slide with succ'!)
-                slide_succ = null :: slide_op:slide_op() | null, % slide with succ (must not overlap with 'slide with pred'!)
+                % slide with pred (must not overlap with 'slide with succ'!):
+                slide_pred = null :: slide_op:slide_op() | null,
+                % slide with succ (must not overlap with 'slide with pred'!):
+                slide_succ = null :: slide_op:slide_op() | null,
                 msg_fwd    = []   :: [{intervals:interval(), comm:mypid()}],
-                db_range   = intervals:empty() :: intervals:interval() % additional range to respond to during a move
+                % additional range to respond to during a move:
+                db_range   = intervals:empty() :: intervals:interval()
                }).
 -opaque state() :: #state{}.
+%% userdevguide-end dht_node_state:state
 
-%% userdevguide-begin dht_node_state:state
 -spec new(?RT:external_rt(), Neighbors::tid(), ?DB:db()) -> state().
 new(RT, NeighbTable, DB) ->
     #state{rt = RT,
@@ -76,7 +79,6 @@ new(RT, NeighbTable, DB) ->
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer)
           }.
-%% userdevguide-end dht_node_state:state
 
 %% @doc Gets the given property from the dht_node state.
 %%      Allowed keys include:

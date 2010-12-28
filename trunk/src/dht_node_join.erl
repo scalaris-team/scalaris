@@ -58,7 +58,7 @@
 -type phase2() ::
     {phase2,  Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase2b() ::
-    {phase2b, Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
+    {phase2b, Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid(),...], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase3() ::
     {phase3,  Options::[tuple()], MyKey::?RT:key(), MyKeyVersion::non_neg_integer(), ContactNodes::[comm:mypid()], JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase3b() ::
@@ -86,7 +86,7 @@ process_join_state({idholder_get_id_response, Id, IdVersion},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % !first node
-%% userdevguide-begin dht_node_join:join_other_p12
+%% userdevguide-begin dht_node_join:join_other_p1
 % 1. get my key
 process_join_state({idholder_get_id_response, Id, IdVersion},
                    {join, {phase1, Options}, QueuedMessages}) ->
@@ -95,6 +95,7 @@ process_join_state({idholder_get_id_response, Id, IdVersion},
     get_known_nodes(),
     msg_delay:send_local(get_join_timeout() div 1000, self(), {join, timeout}),
     {join, {phase2, Options, Id, IdVersion, [], [Id], []}, QueuedMessages};
+%% userdevguide-end dht_node_join:join_other_p1
 
 % 2. Find known hosts
 process_join_state({join, known_hosts_timeout},
@@ -107,11 +108,12 @@ process_join_state({join, known_hosts_timeout},
 % ignore message arriving in later phases: 
 process_join_state({join, known_hosts_timeout}, State) -> State;
 
+%% userdevguide-begin dht_node_join:join_other_p2
+% in phase 2, 2b add the nodes and do lookups with them / get number of samples
 process_join_state({get_dht_nodes_response, Nodes},
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase2 orelse
            element(1, JoinState) =:= phase2b ->
-    % note: collect nodes in the other phases, too (messages have been send anyway)
     %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(comm:this(), Nodes)]),
     ContactNodes = [Node || Node <- Nodes, Node =/= comm:this()],
     NewJoinState =
@@ -135,6 +137,7 @@ process_join_state({get_dht_nodes_response, Nodes},
            element(1, JoinState) =:= phase4 ->
     FurtherNodes = [Node || Node <- Nodes, Node =/= comm:this()],
     {join, add_contact_nodes_back(FurtherNodes, JoinState), QueuedMessages};
+%% userdevguide-end dht_node_join:join_other_p2
 
 % 2b. get the number of nodes/ids to sample
 process_join_state({join, get_number_of_samples_timeout},
@@ -148,6 +151,7 @@ process_join_state({join, get_number_of_samples_timeout},
 process_join_state({join, get_number_of_samples_timeout}, State) ->
     State;
 
+%% userdevguide-begin dht_node_join:join_other_p2b
 % note: although this message was send in phase2, also accept message in
 % phase2, e.g. messages arriving from previous calls
 process_join_state({join, get_number_of_samples, Samples, Source},
@@ -165,9 +169,8 @@ process_join_state({join, get_number_of_samples, Samples, Source},
 % ignore message arriving in other phases:
 process_join_state({join, get_number_of_samples, _Samples, _Source}, State) ->
     State;
-%% userdevguide-end dht_node_join:join_other_p12
+%% userdevguide-end dht_node_join:join_other_p2b
 
-%% userdevguide-begin dht_node_join:join_other_p3
 % 3. lookup all positions
 process_join_state({join, lookup_timeout, Node},
                    {join, JoinState, QueuedMessages})
@@ -180,6 +183,7 @@ process_join_state({join, lookup_timeout, Node},
 % ignore message arriving in other phases:
 process_join_state({join, lookup_timeout, _Node}, State) -> State;
 
+%% userdevguide-begin dht_node_join:join_other_p3
 process_join_state({join, get_candidate_response, OrigJoinId, Candidate},
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase3 ->
@@ -214,16 +218,17 @@ process_join_state({join, get_candidate_response, OrigJoinId, Candidate},
     JoinState1 = remove_join_id(OrigJoinId, JoinState),
     JoinState2 = integrate_candidate(Candidate, JoinState1, back),
     {join, JoinState2, QueuedMessages};
+%% userdevguide-end dht_node_join:join_other_p3
 
+%% userdevguide-begin dht_node_join:join_other_p3b
 process_join_state({idholder_get_id_response, Id, IdVersion},
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase3b->
     %io:format("p3b: got key~n"),
     JoinState1 = set_id(Id, IdVersion, JoinState),
     {join, send_join_request(JoinState1, 0), QueuedMessages};
-%% userdevguide-end dht_node_join:join_other_p3
+%% userdevguide-end dht_node_join:join_other_p3b
 
-%% userdevguide-begin dht_node_join:join_other_p4
 % 4. joining my neighbor
 process_join_state({join, join_request_timeout, Timeouts},
                    {join, JoinState, QueuedMessages})
@@ -245,6 +250,7 @@ process_join_state({join, join_request_timeout, Timeouts},
 % ignore message arriving in other phases:
 process_join_state({join, join_request_timeout, _Timeouts}, State) -> State;
 
+%% userdevguide-begin dht_node_join:join_other_p4
 process_join_state({join, join_response, not_responsible, Node},
                    {join, JoinState, QueuedMessages} = State)
   when element(1, JoinState) =:= phase4 ->
@@ -360,12 +366,14 @@ process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
     %log:log(info("[dhtnode] [~p] postponed delivery of ~p", [self(), Msg]),
     {join, JoinState, msg_queue:add(QueuedMessages, Msg)}.
 
-%% @doc Process requests from a joining node at a existing node:.
+%% @doc Process requests from a joining node at a existing node:
 -spec process_join_msg(join_message(), dht_node_state:state()) -> dht_node_state:state().
+%% userdevguide-begin dht_node_join:get_candidate
 process_join_msg({join, get_candidate, Source_PID, Key, LbPsv}, State) ->
     % if anything goes wrong creating the candidate, do not crash, just report
     % a no_op operation to the other node
     LbPsv:create_join(State, Key, Source_PID);
+%% userdevguide-end dht_node_join:get_candidate
 %% userdevguide-begin dht_node_join:join_request1
 process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred)) ->
     TargetId = node:id(NewPred),
@@ -394,6 +402,7 @@ process_join_msg({join, join_request, NewPred}, State) when (not is_atom(NewPred
             State;
         _ -> State
     end;
+%% userdevguide-end dht_node_join:join_request1
 process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
     % almost the same as dht_node_move:safe_operation/5 but we tolerate wrong pred:
     case dht_node_state:get_slide_op(State, MoveFullId) of
@@ -420,7 +429,6 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
             end;
         not_found -> State
     end;
-%% userdevguide-end dht_node_join:join_request1
 % only messages with the first element being "join" are processed here
 % -> see dht_node.erl
 process_join_msg({idholder_get_id_response, _Id, _IdVersion}, State) -> State;
@@ -507,16 +515,22 @@ lookup(JoinState, JoinIds = [_|_]) ->
     Phase = get_phase(JoinState),
     case get_contact_nodes(JoinState) of
         [] ->
-            NewJoinState =
-                case Phase of
-                    phase4 -> JoinState;
-                    _      ->
-                        log:log(warn, "[ Node ~w ] no further nodes to contact, "
-                               "trying to get new nodes...", [self()]),
-                        set_phase(phase2, JoinState)
-                end,
-            get_known_nodes(),
-            NewJoinState;
+            case Phase of
+                phase4 ->
+                    get_known_nodes(),
+                    JoinState;
+                phase2 ->
+                    % do not immediately re-issue a request for known nodes
+                    % -> wait for further replies until the known_hosts_timeout hits
+                    log:log(warn, "[ Node ~w ] empty list of contact nodes, "
+                                "waiting...", [self()]),
+                    JoinState;
+                _      ->
+                    log:log(warn, "[ Node ~w ] no further nodes to contact, "
+                                "trying to get new nodes...", [self()]),
+                    get_known_nodes(),
+                    set_phase(phase2, JoinState)
+            end;
         [First | _Rest] ->
             MyLbPsv = get_lb_psv(JoinState),
             _ = [comm:send(First, {lookup_aux, Id, 0,
@@ -589,15 +603,18 @@ integrate_candidate(Candidate, JoinState, Position) ->
             end
     end.
 
+%% userdevguide-begin dht_node_join:contact_best_candidate
 %% @doc Contacts the best candidate among all stored candidates and sends a
 %%      join_request (Timeouts = 0).
--spec contact_best_candidate(JoinState::phase_2_4()) -> phase2() | phase2b() | phase3b() | phase4().
+-spec contact_best_candidate(JoinState::phase_2_4())
+        -> phase2() | phase2b() | phase3b() | phase4().
 contact_best_candidate(JoinState) ->
     contact_best_candidate(JoinState, 0).
 %% @doc Contacts the best candidate among all stored candidates and sends a
 %%      join_request. Timeouts is the number of join_request_timeout messages
 %%      previously received.
--spec contact_best_candidate(JoinState::phase_2_4(), Timeouts::non_neg_integer()) -> phase2() | phase2b() | phase3b() | phase4().
+-spec contact_best_candidate(JoinState::phase_2_4(), Timeouts::non_neg_integer())
+        -> phase2() | phase2b() | phase3b() | phase4().
 contact_best_candidate(JoinState, Timeouts) ->
     JoinState1 = sort_candidates(JoinState),
     case get_candidates(JoinState1) of
@@ -614,12 +631,15 @@ contact_best_candidate(JoinState, Timeouts) ->
                       set_phase(phase3b, JoinState1)
             end
     end.
+%% userdevguide-end dht_node_join:contact_best_candidate
 
+%% userdevguide-begin dht_node_join:send_join_request
 %% @doc Sends a join request to the first candidate. Timeouts is the number of
 %%      join_request_timeout messages previously received.
 %%      PreCond: the id has been set to the ID to join at and has been updated
 %%               in JoinState.
--spec send_join_request(JoinState::phase_2_4(), Timeouts::non_neg_integer()) -> phase2() | phase2b() | phase4().
+-spec send_join_request(JoinState::phase_2_4(), Timeouts::non_neg_integer())
+        -> phase2() | phase2b() | phase4().
 send_join_request(JoinState, Timeouts) ->
     case get_candidates(JoinState) of
         [] -> % no candidates -> start over (should not happen):
@@ -634,8 +654,9 @@ send_join_request(JoinState, Timeouts) ->
                                  self(), {join, join_request_timeout, Timeouts}),
             set_phase(phase4, JoinState)
     end.
+%% userdevguide-end dht_node_join:send_join_request
 
-%% userdevguide-begin dht_node_join:restart_join
+%% userdevguide-begin dht_node_join:start_over
 %% @doc Goes back to phase 2 or 2b depending on whether contact nodes are
 %%      available or not.
 -spec start_over(JoinState::phase_2_4()) -> phase2() | phase2b().
@@ -647,7 +668,7 @@ start_over(JoinState) ->
         [_|_] = ContactNodes ->
             get_number_of_samples(JoinState, ContactNodes, false)
     end.
-%% userdevguide-end dht_node_join:restart_join
+%% userdevguide-end dht_node_join:start_over
 
 %% @doc Sends a join response message to the new predecessor and sets the given
 %%      slide operation in the dht_node state (adding a timeout to it as well).

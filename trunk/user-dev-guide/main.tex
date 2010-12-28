@@ -344,6 +344,13 @@ estimate the network latency between arbitrary nodes.
 
 The implementation can be found in \code{src/vivaldi.erl}.
 
+{\bf Gossipping.} For some algorithms, we use estimates of global
+information. These estimates are aggregated with the help of
+gossipping techniques~\cite{gossip}.
+
+The implementation can be found in \code{src/gossip.erl}.
+
+
 
 \chapter{Download and Installation}
 
@@ -636,7 +643,7 @@ logged.
 \end{lstlisting}
 
 In some cases, it might be necessary to get more complete logging
-information, e.g. for debugging. In \sieheref{sec:start-addit-local},
+information, e.g. for debugging. In \sieheref{chapter.join},
 we are explaining the startup process of \scalaris{} nodes in more
 detail, here the {\tt info} level provides more detailed information.
 
@@ -1019,6 +1026,25 @@ firewalls.
 \item use \code{boot_server:number_of_nodes(). flush().}
 \item use \code{admin_checkring(). flush().}
 \end{itemize}
+
+\section{General Erlang server loop}
+
+Servers in Erlang often use the following structure to maintain a state
+while processing received messages:
+
+\lstset{language=erlang}
+\begin{lstlisting}
+loop(State) ->
+  receive
+    Message ->
+      State1 = f(State),
+      loop(State1)
+  end.
+\end{lstlisting}
+
+The server runs an endless loop, that waits for a message, processes it and
+calls itself using tail-recursion in each branch. The loop works on a
+\code{State}, which can be modified when a message is handled.
 
 \chapter{System Infrastructure}
 
@@ -1445,29 +1471,7 @@ Introduces transaction processing on top of a Overlay
 
 \chapter{How a node joins the system}
 \label{chapter.join}
-
-\section{General Erlang server loop}
-
-Servers in Erlang often use the following structure to maintain a state
-while processing received messages:
-
-\lstset{language=erlang}
-\begin{lstlisting}
-loop(State) ->
-  receive
-    Message ->
-      State1 = f(State),
-      loop(State1)
-  end.
-\end{lstlisting}
-
-The server runs an endless loop, that waits for a message, processes it and
-calls itself using tail-recursion in each branch. The loop works on a
-\code{State}, which can be modified when a message is handled.
-
-\section{Starting additional local nodes after boot}
-\label{sec:start-addit-local}
-\svnrev{r1267}
+\svnrev{r1327}
 
 After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
@@ -1491,14 +1495,16 @@ The function \code{admin:add_nodes(int)} is defined as follows.
 
 It calls \erlfun{admin}{add\_node}{[]} Count times. This function starts a new
 child with the given options for the main supervisor \code{main_sup}.
-As defined by the parameters, to actually perform the start, the
+In particular, it sets a random ID that is passed to the new node as its
+suggested ID to join at.
+To actually perform the start, the
 function \erlfun{sup\_dht\_node}{start\_link}{/1} is called by the Erlang
-supervisor mechanism.  For more details on the OTP supervisor
+supervisor mechanism. For more details on the OTP supervisor
 mechanism see Chapter~18 of the Erlang book~\cite{erlang-book} or the
 online documentation at
 \url{http://www.erlang.org/doc/man/supervisor.html}.
 
-\subsection{Supervisor-tree of a \scalaris{} node}
+\section{Supervisor-tree of a \scalaris{} node}
 
 When a new Erlang VM with a Scalaris node is started, a
 \erlmodule{sup\_scalaris} supervisor is started that creates further
@@ -1511,10 +1517,10 @@ workers and supervisors according to the following scheme
 When new nodes are started using \erlfun{admin}{add\_node}{/1}, only new
 \code{sup_dht_node} supervisors are started.
 
-\subsection{Starting the sup\_dht\_node supervisor and general processes of a node}
+\section{Starting the sup\_dht\_node supervisor and general processes of a node}
 
 Starting supervisors is a two step process: a call to
-\erlfun{supervisor}{start\_link}{/2,3}, e.g. from a supervisor's own
+\erlfun{supervisor}{start\_link}{/2,3}, e.g. from a custom supervisor's own
 \code{start_link} method, will start the supervisor process. It will then
 call \erlfun[]{Module}{init}{/1} to find out about the restart strategy,
 maximum restart frequency and child processes.
@@ -1523,7 +1529,7 @@ Note that \erlfun{supervisor}{start\_link}{/2,3} will not return until
 started.
 
 Let's have a look at \erlfun{sup\_dht\_node}{init}{/1}, the 'DHT node
- supervisor'.
+supervisor'.
 
 \codesnippet{sup_dht_node.erl}{sup_dht_node:init}{../src/sup_dht_node.erl}
 
@@ -1550,7 +1556,7 @@ up. \code{one_for_one} supervision means, that if a single process
 stops, only that process is restarted. The other processes run
 independently.
 
-The \erlfun{sup\_dht\_node}{init}{/1} is finished and the supervisor module,
+When the \erlfun{sup\_dht\_node}{init}{/1} is finished the supervisor module
 starts all the defined processes by calling the functions that were
 defined in the returned list.
 
@@ -1558,27 +1564,33 @@ For a join of a new node, we are only interested in the starting of
 the \code{SupDHTNodeCore_AND} process here. At that point in time, all
 other defined processes are already started and running.
 
-\subsection{Starting the sup\_dht\_node\_core supervisor with a peer and some paxos processes}
+\section{Starting the sup\_dht\_node\_core supervisor with a peer and some paxos processes}
 
-Similarly, the supervisor will call the
-\erlfun[]{sup\_dht\_node\_core}{init}{/1} function:
+Like any other supervisor the \erlmodule{sup\_dht\_node\_core} supervisor
+calls its \erlfun[]{sup\_dht\_node\_core}{init}{/1} function:
 
 \codesnippet{sup_dht_node_core.erl}{sup_dht_node_core:init}{../src/sup_dht_node_core.erl}
 
-It defines five processes, that have to be observed using an
+It defines five processes, that have to be observed using a
 \code{one_for_all}-supervisor, which means, that if one fails, all have to
-be restarted. Passed to the \code{init} function is the processes' group
-that is used with the \erlmodule{pid\_groups} module and a list of options for
+be restarted. The \erlmodule{dht\_node} module implements the main
+component of a full Scalaris node which glues together all the other
+processes. Its
+\erlfun[]{dht\_node}{start\_link}{/2} function will get
+the following parameters: (a) the processes' group that is used with the \erlmodule{pid\_groups}
+module and (b) a list of options for
 the \erlmodule{dht\_node}. The process group name was calculated
-a bit earlier in the code. Exercise: Try to find where.
+a bit earlier in the code. \emph{Exercise: Try to find where.}
 
 
 \codesnippet{dht_node.erl}{dht_node:start_link}{../src/dht_node.erl}
 
-\erlmodule{dht\_node} implements the \code{gen_component} behaviour. This
-component was developed by us to enable us to write code which is
+Like many other modules, the \erlmodule{dht\_node} module implements the
+\code{gen_component}
+behaviour. This behaviour was developed by us to enable us to write code which is
 similar in syntax and semantics to the examples in~\cite{rachid-book}.
-Similar to the \code{supervisor} behaviour, the component has to
+Similar to the \code{supervisor} behaviour, a module implementing this
+behaviour has to
 provide an \code{init/1} function, but here it is used to initialize the
 state of the component. This function is described in the next
 section.
@@ -1586,7 +1598,7 @@ section.
 Note: \code{?MODULE} is a predefined Erlang macro, which expands to the
 module name, the code belongs to (here: \code{dht_node}).
 
-\subsection{\texorpdfstring{Initializing a \code{dht_node}-process}
+\section{\texorpdfstring{Initializing a \code{dht_node}-process}
              {Initializing a dht\_node-process}}
 
 \codesnippet{dht_node.erl}{dht_node:start}{../src/dht_node.erl}
@@ -1597,91 +1609,209 @@ we moved this code into the behaviour. If the \code{dht_node} is the
 first node, it will start immediately by triggering all known nodes
 (to initialize the comm layer) and entering the join process
 accordingly. The node also retrieves its \code{Id} from the idholder:
-\erlfun{idholder}{get\_id}{}. In the first call, a random identifier is
-returned, otherwise the latest set value. If the \code{dht_node}-process
-failed and is restarted by its supervisor, this call to the idholder
-ensures, that the node still keeps its \code{Id}, assuming that the
-idholder process is not failing. This is important for the load-balancing
-and for consistent responsibility of nodes to ensure consistent lookup in
-the structured overlay.
+\erlfun{idholder}{get\_id}{}.
+In case of a re-started node, this will be the last known ID. Otherwhise,
+the \erlmodule{idholder} will return the ID (first) set by the
+\code{\{\{idholder, id\}, KEY\}} option passed to \erlfun{idholder}{init}{/1}
+or a random key. If the \code{dht_node}-process
+fails and is re-started by its supervisor, this call to the idholder
+ensures that the node still keeps its \code{Id}, assuming that the
+idholder process is not failing and no passive load balancing takes place.
+This is important in order not to destroy an existing load balance if a
+node somehow fails.
+%This is important for the
+%load-balancing and for consistent responsibility of nodes to ensure consistent lookup in
+%the structured overlay.
 
-If a node changes its position in the ring for load-balancing, the
-idholder will be informed and the \code{dht_node} finishes itself. This
-triggers a restart of the corresponding database process via the
-and-supervisor. When the supervisor restarts both processes, they will
-retrieve the new position in the ring from the idholder and join the ring
-there.
-
-\subsection{Actually joining the ring}
+\section{Actually joining the ring}
 
 After retrieving its identifier, the node starts the join protocol
 which processes the appropriate messages calling
 \erlfun{dht\_node\_join}{process\_join\_msg}{Message, State}.
 
+\subsection{A single node joining an empty ring}
+
 \codesnippet{dht_node_join.erl}{dht_node_join:join_first}{../src/dht_node_join.erl}
 
-If the ring is empty, the joining node is the only node in the ring
-and will be responsible for the whole key space. \code{join_first}
-just creates a new state for a \scalaris{} node consisting of an empty
-routing table, a successorlist containing itself, itself as its
-predecessor, a reference to itself, its responsibility area from
-\code{Id} to \code{Id} (the full ring), and a load balancing schema.
+If the ring is empty, the joining node will be the only node in the ring
+and will thus be responsible for the whole key space.
+\erlfun{dht\_node\_join}{finish\_join}{/5}
+just creates a new state for a \scalaris{} node consisting of the given
+parameters (the node as itself, its predecessor and successor,
+an empty database and the queued messages that arrived during the join).
+It then activates all dependent processes and creates a routing table from
+this information.
 
-The state is defined in
+The \erlfun{dht\_node\_state}{state}{} type is defined in
 
 \codesnippet{dht_node_state.erl}{dht_node_state:state}{../src/dht_node_state.erl}
 
-If a node joins an existing ring, it will at first try to contact all
-\code{dht_node} processes in any VM configured in \code{known_hosts}.
+\subsection{A single node joining an existing (non-empty) ring}
 
-\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p12}{../src/dht_node_join.erl}
+If a node joins an existing ring, its join protocol will step through
+the following 6 phases:
+\begin{itemize}
+  \item \makebox[4em][l]{\textbf{phase1}}
+    getting the Id from the \erlmodule{idholder}
+  \item \makebox[4em][l]{\textbf{phase2}}
+    finding nodes to contact with the help of the configured \code{known_hosts}
+  \item \makebox[4em][l]{\textbf{phase2b}}
+    getting the number of Ids to sample (may be skipped)
+  \item \makebox[4em][l]{\textbf{phase3}}
+    lookup nodes responsible for all sampled Ids
+  \item \makebox[4em][l]{\textbf{phase3b}}
+    waiting for the \erlmodule{idholder} to acknowledge an Id change
+    (if applicable)
+  \item \makebox[4em][l]{\textbf{phase4}}
+    joining a selected node and setting up item movements
+\end{itemize}
 
-These nodes will be send a lookup request for the node currently responsible
-for the new node's id -- the successor for the joining node. If this lookup
-fails for some reason, it is tried again.
+The following figure shows a (non-exhaustive) overview of the transitions
+between the phases in the normal case. We will go through these step by step
+and discuss what happens if errors occur.
+
+\medskip
+{\centering\includegraphics{dht_node_join_phases2}}
+
+\subsubsection{Phase 1}
+
+Phase~1 is entered during the initialization of the \erlmodule{dht\_node}
+process after requesting the ID from the \erlmodule{idholder}.
+It receives its \code{idholder_get_id_response} message and contacts all
+nodes set in the \code{known_hosts} configuration parameter. Their responses
+are handled in phase~2.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p1}{../src/dht_node_join.erl}
+
+\subsubsection{Phase 2 and 2b}
+
+Phase~2 collects all \erlmodule{dht\_node} processes inside the contacted
+VMs. It therefor mainly processes \code{get_dht_nodes_response} messages and
+integrates all received nodes into the list of \code{ContactNodes}.
+The next step depends on whether the \code{\{skip_psv_lb\}} option for
+skipping any passive load balancing algorithm has been
+given to the \erlmodule{dht\_node} or not. If it is present, the node will
+use the ID from the \erlmodule{idholder}, issue a lookup for the responsible
+node and move to phase~3. Otherwise, the passive load balancing's
+\erlfun{lb\_psv\_*}{get\_number\_of\_samples}{/1} method will be called
+asking for the number of IDs to sample. Its answer will be processed in
+phase~2b.
+
+\code{get_dht_nodes_response} messages arriving in phase~2b will be processed
+the same way since no response for the request for the number of nodes to
+sample has been processed yet.
+For better efficiency, \code{get_dht_nodes_response} messages arriving in
+any later phase will be processed anyway and the send \erlmodule{dht\_node}
+processes will be integrated into the \code{ContactNodes}. These phases'
+operations will however not be interrupted and nothing else is changed.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p2}{../src/dht_node_join.erl}
+
+Phase~2b will handle \code{get_number_of_samples} messages from the passive
+load balance algorithm. Once received, new (unique) IDs will be sampled
+randomly so that the total number of join candidates (selected IDs together
+with fully processed candidates from further phases) is at least as high as
+the given number of samples. Afterwards, lookups will be created for all
+previous IDs as well as the new ones and the node will move to phase~3.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p2b}{../src/dht_node_join.erl}
+
+Lookups will make \scalaris{} find the node currently responsible for a given ID
+and send a request to simulate a join to this node, i.e. a
+\code{get_candidate} message. Note that during such an operation, the joining
+node will become the existing node's predecessor. The simulation will be
+delegated to the passive load balance algorithm the joining node requested, as
+set by the \code{join_lb_psv} configuration parameter. 
+
+\codesnippet{dht_node_join.erl}{dht_node_join:get_candidate}{../src/dht_node_join.erl}
+
+\subsubsection{Phase 3}
+
+The result of the simulation will be send in a \code{get_candidate_response}
+message and will be processed in phase~3 of the joining node. It will be
+integrated into the list of processed candidates. If there are no more IDs
+left to process, the best among them will be contacted. Otherwise further
+\code{get_candidate_response} messages will be awaited.
+Such messages will also be processed in the other phases where the candidate
+will be simply added to the list.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_other_p3}{../src/dht_node_join.erl}
 
-If its (future) successor is found and the \code{Id} is not the same, this
-new node will send a \code{join_request} message including a reference to
-itself and the chosen \code{Id}. 
-If the chosen \code{Id} already exists, i.e. it is the successor's
-\code{Id}, the node will try a new (randomly chosen) \code{Id}. 
-Assuming the \code{join_request} message was send, it will be received by the
-existing node in \code{dht_node.erl}
+If \erlfun{dht\_node\_join}{contact\_best\_candidate}{/1} is called and
+candidates are available (there should be at this stage!), it will sort the
+candidates by using the passive load balance algorithm and get the ID from
+the best candidate. Note that during simulation at the existing node, this
+ID may be different from the initial ID send during the lookup. If this ID
+is the same as the one set at the \erlmodule{idholder}, we can continue
+directly by sending a \code{join_request} message and going to phase~4. 
 
-\codesnippet{dht_node.erl}{dht_node:join_message}{../src/dht_node.erl}
+\erlfunindex{dht\_node\_join}{contact\_best\_candidate}
+\codesnippet{dht_node_join.erl}{dht_node_join:contact_best_candidate}{../src/dht_node_join.erl}
+\erlfunindex{dht\_node\_join}{send\_join\_request}
+\codesnippet{dht_node_join.erl}{dht_node_join:send_join_request}{../src/dht_node_join.erl}
 
-and trigger a call to \erlfun{dht\_node\_join}{process\_join\_msg}{/2} which
+Otherwise we need to set the ID at the \erlmodule{idholder} first and wait
+for its acknowledgement in phase~3b. A \code{join_request} is send once the
+\code{idholder_get_id_response} message arrives.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p3b}{../src/dht_node_join.erl}
+
+The \code{join_request} message will be received by the existing node which
 will set up a slide operation with the new node or deny the request if it is
-not responsible for the key (anymore) any reply with a \code{}:
+not responsible for the key (anymore) and reply with a
+\code{\{join, join_response, not_responsible, Node\}} message.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_request1}{../src/dht_node_join.erl}
+
+If it is responsible for the ID and is not participating in a slide with its
+current predecessor, it will set up a slide with the joining node:
+
+\erlfunindex{dht\_node\_join}{send\_join\_response}
 \codesnippet{dht_node_join.erl}{dht_node_join:join_request2}{../src/dht_node_join.erl}
 
-The joining node will receive the \code{join_response} message in phase 4 of
-the join protocol. If everything is ok, i.e. \code{MyKey} is unique, it will
+\subsubsection{Phase 4}
+
+The joining node will receive the \code{join_response} message in phase~4 of
+the join protocol. If everything is ok, it will
 notify its ring maintenance process that it enters the ring, start all required
-processes and join the slide operation in order to receive data from the
-existing node.
-The macro \code{?RT} maps to the configured routing algorithm and
-\code{?RM} to the configured ring maintenance algorithm. It is defined
+processes and join the slide operation set up by the existing node in order to
+receive some of its data.
+
+If the join candidate's node is not responsible for the candidate's ID anymore
+or the candidate's ID already exists, the next candidate is contacted until
+no further candidates are available and the join protocol starts over using
+\erlfun{dht\_node\_join}{start\_over}{/1}.
+
+Note that the \code{join_response} message will actually be processed in
+any phase. Therefore, if messages arrive late, the join can be processed
+immediately and the rest of the join protocol does not need to be executed
+again.
+
+\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p4}{../src/dht_node_join.erl}
+\erlfunindex{dht\_node\_join}{finish\_join}
+\erlfunindex{dht\_node\_join}{finish\_join\_and\_slide}
+\codesnippet{dht_node_join.erl}{dht_node_join:finish_join}{../src/dht_node_join.erl}
+
+The macro \code{?RT} maps to the configured routing algorithm. It is defined
 in \code{include/scalaris.hrl}. For further details on the routing see
 Chapter~\sieheref{chapter.routing}.
 
-\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p4}{../src/dht_node_join.erl}
-\codesnippet{dht_node_join.erl}{dht_node_join:finish_join}{../src/dht_node_join.erl}
+\subsubsection{Timeouts and other errors}
+
+The \code{join_timeout} parameter in the config files defines an overall
+timeout for the whole join operation. If it takes longer than
+\code{join_timeout} ms, the join will be re-started:
+
+\erlfunindex{dht\_node\_join}{start\_over}
+\codesnippet{dht_node_join.erl}{dht_node_join:start_over}{../src/dht_node_join.erl}
+
+% TODO: write about all the other timeouts
+
+\subsubsection{Misc. (all phases)}
 
 Note that join-related messages arriving in other phases than those handling
 them will be ignored. Any other messages during a \code{dht_node}'s join will
 be queued and re-send when the join is complete.
-
-The \code{join_timeout} parameter in the config files defines an overall
-timeout for the whole join operation. If it takes longer than
-\code{join_timeout} ms, the join will be re-started using
-\erlfun{dht\_node\_join}{restart\_join}{/2}
-\codesnippet{dht_node_join.erl}{dht_node_join:restart_join}{../src/dht_node_join.erl}
-
 
 \chapter{Directory Structure of the Source Code}
 
@@ -1780,6 +1910,11 @@ May 2010.
 Spyros Voulgaris, Daniela Gavidia, Maarten van Steen.
 \newblock \emph{CYCLON: Inexpensive Membership Management for Unstructured P2P Overlays.}
 \newblock J. Network Syst. Manage. 13(2): 2005.
+
+\bibitem{gossip}
+M{\'a}rk Jelasity, Alberto Montresor, Ozalp Babaoglu.
+\newblock \emph{Gossip-based aggregation in large dynamic networks.}
+\newblock ACM Trans. Comput. Syst. 23(3), 219-252 (2005).
 
 \end{thebibliography}
 

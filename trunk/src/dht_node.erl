@@ -374,7 +374,8 @@ on({acceptor_naccepted, _PaxosId, _NewerRound} = Msg, State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec init(Options::[tuple()]) -> {join, {as_first | phase1, Options::[tuple()]}, msg_queue:msg_queue()}.
+-spec init(Options::[tuple()]) -> {join, {as_first | phase1, Options::[tuple()]},
+                                   msg_queue:msg_queue()}.
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),

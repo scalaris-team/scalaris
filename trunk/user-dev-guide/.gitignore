@@ -1,10 +1,10 @@
-/main.aux
-/main.log
-/main.idx
-/main.toc
-/main.out
-/main.ilg
-/main.ind
+/*.aux
+/*.log
+/*.idx
+/*.toc
+/*.out
+/*.ilg
+/*.ind
 .project
 .settings
 .texlipse
