@@ -55,7 +55,8 @@ add_node(Options) ->
     end.
 
 -spec add_nodes(non_neg_integer()) ->
-        nothing_to_do | [ok | {error, already_present | {already_started, pid() | undefined} | term()},...].
+        nothing_to_do | [ok | {error, already_present |
+                         {already_started, pid() | undefined} | term()},...].
 add_nodes(0) -> nothing_to_do;
 add_nodes(Count) ->
     [add_node([]) || _X <- lists:seq(1, Count)].
