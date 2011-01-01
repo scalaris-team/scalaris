@@ -1,4 +1,4 @@
-% @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+% @copyright 2010-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -121,14 +121,14 @@ on({periodic_alive_check}, State) ->
     comm:send(state_get_rem_hbs(State), {pong, comm:this()}),
     Now = erlang:now(),
     CrashedAfter = state_get_crashed_after(State),
-    case 0 < timer:now_diff(Now, CrashedAfter) of
-        true -> report_crash(State);
-        false -> ok
+    NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
+                   true -> report_crash(State);
+                   false -> State
     end,
     %% trigger next timeout
     comm:send_local_after(failureDetectorInterval(),
                           self(), {periodic_alive_check}),
-    State;
+    NewState;
 
 on({crashed, WatchedPid}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
@@ -173,8 +173,13 @@ check_config() ->
 -spec report_crash(state()) -> ok.
 report_crash(State) ->
     log:log(warn, "[ FD ~p ] reports ~.0p as crashed",
-            [comm:this(), state_get_rem_pids(State)]).
-%%    comm:send_local(FDPid, {crash, RemotePid}).
+            [comm:this(), state_get_rem_pids(State)]),
+    FD = pid_groups:find_a(fd),
+    comm:send_local(FD, {hbs_finished, state_get_rem_hbs(State)}),
+    erlang:unlink(pid_groups:find_a(fd)),
+    lists:foldl(fun(X, S) -> on({crashed, X}, S) end,
+                State, [RemPid || {RemPid, _} <- state_get_rem_pids(State)]),
+    kill.
 
 %% @doc The interval between two failure detection runs.
 -spec failureDetectorInterval() -> pos_integer().

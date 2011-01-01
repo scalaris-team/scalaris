@@ -1,4 +1,4 @@
-% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+% @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %            2009 onScale solutions GmbH
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
@@ -100,6 +100,10 @@ init([]) ->
 on({create_hbs, Pid, ReplyTo}, State) ->
     NewHBS = start_and_register_hbs(Pid),
     comm:send_local(ReplyTo, {create_hbs_reply, NewHBS}),
+    State;
+
+on({hbs_finished, RemoteWatchedPid}, State) ->
+    ets:delete(fd_hbs, comm:get(fd, RemoteWatchedPid)),
     State;
 
 on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
