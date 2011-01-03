@@ -179,7 +179,7 @@ check_config() ->
 %% @private
 -spec report_crash(state()) -> kill.
 report_crash(State) ->
-    log:log(warn, "###################[ FD ~p ] reports ~.0p as crashed",
+    log:log(warn, "[ FD ~p ] reports ~.0p as crashed",
             [comm:this(), state_get_rem_pids(State)]),
     FD = pid_groups:find_a(fd),
     comm:send_local(FD, {hbs_finished, state_get_rem_hbs(State)}),
