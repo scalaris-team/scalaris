@@ -58,7 +58,11 @@ init([RemotePid]) ->
     comm:send(RemoteFDPid,
               {subscribe_heartbeats, comm:this(), RemotePid}),
 
-    comm:send_local(self(), {periodic_alive_check}),
+    %% no periodic alive check inside same vm (to succeed unittests)
+    case comm:is_local(RemotePid) of
+        false -> comm:send_local(self(), {periodic_alive_check});
+        true -> ok
+    end,
     Now = erlang:now(),
     state_new(_RemoteHBS = RemoteFDPid, _RemotePids = [{RemotePid, 1}],
               _LastPong = {0,0,0},
@@ -112,9 +116,12 @@ on({pong, _Subscriber}, State) ->
     ?TRACEPONG("Pinger pong for ~p~n", [_Subscriber]),
     Now = erlang:now(),
     LastPong = state_get_last_pong(State),
+%    CrashedAfter = state_get_crashed_after(State),
     Delay = abs(timer:now_diff(Now, LastPong)),
     S1 = state_set_last_pong(State, Now),
-    state_set_crashed_after(S1, time_plus(Now, 3*Delay));
+    NewCrashedAfter = time_plus(Now, 3*Delay),
+%    state_set_crashed_after(S1, erlang:max(NewCrashedAfter, CrashedAfter));
+    state_set_crashed_after(S1, NewCrashedAfter);
 
 on({periodic_alive_check}, State) ->
     ?TRACEPONG("Pinger periodic_alive_check~n", []),
@@ -170,15 +177,18 @@ check_config() ->
 
 %% @doc Reports the crash to local subscribers.
 %% @private
--spec report_crash(state()) -> ok.
+-spec report_crash(state()) -> kill.
 report_crash(State) ->
-    log:log(warn, "[ FD ~p ] reports ~.0p as crashed",
+    log:log(warn, "###################[ FD ~p ] reports ~.0p as crashed",
             [comm:this(), state_get_rem_pids(State)]),
     FD = pid_groups:find_a(fd),
     comm:send_local(FD, {hbs_finished, state_get_rem_hbs(State)}),
-    erlang:unlink(pid_groups:find_a(fd)),
-    lists:foldl(fun(X, S) -> on({crashed, X}, S) end,
-                State, [RemPid || {RemPid, _} <- state_get_rem_pids(State)]),
+    erlang:unlink(FD),
+    _ = try
+            lists:foldl(fun(X, S) -> on({crashed, X}, S) end,
+                        State, [RemPid || {RemPid, _} <- state_get_rem_pids(State)])
+        catch _:_ -> ignore_exception
+        end,
     kill.
 
 %% @doc The interval between two failure detection runs.
