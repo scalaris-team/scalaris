@@ -11,7 +11,7 @@
 % WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 % See the License for the specific language governing permissions and
 % limitations under the License.
-\documentclass[a4]{scrreprt}
+\documentclass[a4paper]{scrreprt}
 \usepackage{typearea}
 \areaset[1cm]{165mm}{240mm}
 
@@ -22,7 +22,11 @@
 \usepackage{graphicx}
 %\usepackage{color}
 %\usepackage{colortbl}
+\usepackage{pifont} % for carriage return symbol
 \usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{multirow}
 \usepackage{makeidx}
 \usepackage{ifthen}
 \usepackage{fancyhdr}
@@ -80,6 +84,8 @@
 %% \renewcommand{\rmdefault}{pzc} % ZapfChancery (slanted)
 %\renewcommand{\rmdefault}{put} % Utopia
 \renewcommand{\rmdefault}{bch} % CharterBT
+
+\newcommand{\carriagereturn}{\scriptsize\Pisymbol{psy}{191}}
 
 
 %%% colors %%%%%%%%%%%%%%%%%%%%%%%%
@@ -201,6 +207,15 @@
 {\catcode`\#=13\catcode`\$=13\catcode`\_=11\catcode`\==13
 }{\catcode`\#=6\catcode`\$=3\catcode`\_=8}
 
+% new left-justified column types
+\newcolumntype{P}[1]{>{\raggedright}p{#1}}
+\newcolumntype{M}[1]{>{\raggedright}m{#1}}
+\newcolumntype{B}[1]{>{\raggedright}m{#1}}
+\newcommand{\tn}{\tabularnewline} % need to use this instead of \\ in these columns
+
+% allow footnotes in tables:
+\usepackage{footnote}
+\makesavenoteenv{tabular}
 
 \makeindex
 
@@ -314,7 +329,7 @@ structure, the routing algorithms, and basic ring maintenance.
 
 The main routines of our Chord node are in \code{src/dht\_node.erl} and
 the join protocol is implemented in \code{src/dht\_node\_join.erl} (see
-also Chap.~\cite{chapter.join}). Our implementation of the routing
+also Chap.~\ref{chapter.join}). Our implementation of the routing
 algorithms is described in more detail in Sect.~\ref{chapter.routing}
 and the actual implementation is in \code{src/rt\_chord.erl}.
 
@@ -643,7 +658,7 @@ logged.
 \end{lstlisting}
 
 In some cases, it might be necessary to get more complete logging
-information, e.g. for debugging. In \sieheref{chapter.join},
+information, e.g. for debugging. In Chapter~\sieheref{chapter.join},
 we are explaining the startup process of \scalaris{} nodes in more
 detail, here the {\tt info} level provides more detailed information.
 
@@ -1471,7 +1486,7 @@ Introduces transaction processing on top of a Overlay
 
 \chapter{How a node joins the system}
 \label{chapter.join}
-\svnrev{r1327}
+\svnrev{r1329}
 
 After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
@@ -1697,13 +1712,10 @@ node and move to phase~3. Otherwise, the passive load balancing's
 asking for the number of IDs to sample. Its answer will be processed in
 phase~2b.
 
-\code{get_dht_nodes_response} messages arriving in phase~2b will be processed
-the same way since no response for the request for the number of nodes to
-sample has been processed yet.
-For better efficiency, \code{get_dht_nodes_response} messages arriving in
-any later phase will be processed anyway and the send \erlmodule{dht\_node}
+\code{get_dht_nodes_response} messages arriving in phase~2b or later will be
+processed anyway and received \erlmodule{dht\_node}
 processes will be integrated into the \code{ContactNodes}. These phases'
-operations will however not be interrupted and nothing else is changed.
+operations will not be interrupted and nothing else is changed.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_other_p2}{../src/dht_node_join.erl}
 
@@ -1798,14 +1810,94 @@ Chapter~\sieheref{chapter.routing}.
 
 \subsubsection{Timeouts and other errors}
 
-The \code{join_timeout} parameter in the config files defines an overall
+The following table summarizes the timeout messages send during the join
+protocol on the joining node. It shows in which of the phases each of the
+messages is processed and describes (in short) what actions are taken.
+All of these messages are influenced by their respective config parameters,
+e.g. \code{join_timeout} parameter in the config files defines an overall
 timeout for the whole join operation. If it takes longer than
-\code{join_timeout} ms, the join will be re-started:
+\code{join_timeout} ms, a \code{\{join, timeout\}} will be send and processed
+as given in this table.
 
-\erlfunindex{dht\_node\_join}{start\_over}
-\codesnippet{dht_node_join.erl}{dht_node_join:start_over}{../src/dht_node_join.erl}
+\medskip
+{\small
+\begin{tabular}{lP{2.4cm}P{2.75cm}P{2.35cm}P{3.15cm}M{1.85cm}}
+  \toprule
+  & \code{known_hosts}\carriagereturn\newline\code{_timeout}
+  & \code{get_number_of}\carriagereturn\newline\code{_samples}\carriagereturn\newline\code{_timeout}
+  & \code{lookup}\carriagereturn\newline\code{ _timeout}
+  & \code{join_request}\carriagereturn\newline\code{_timeout}
+  & \code{timeout} \tn
+  \midrule
+  %
+  phase1
+  & ignore
+  & ignore
+  & ignore
+  & ignore
+  & get ID from \code{idholder} \tn
+  \midrule
+  %
+  phase2
+  & get known nodes from configured VMs
+  & ignore
+  & ignore
+  & ignore
+  & \multirow{21}{1.85cm}
+        {re-start join\newline$\rightarrow$ phase~2 or 2b} \tn
+  \cmidrule(r){1-5}
+  %
+  phase2b
+  & ignore
+  & remove contact node, re-start join\newline
+    $\rightarrow$ phase~2 or 2b
+  & ignore
+  & ignore
+  & \tn
+  \cmidrule(r){1-5}
+  %
+  phase3
+  & ignore
+  & ignore
+  & remove contact node, lookup remaining IDs\newline
+    $\rightarrow$ phase~2 or 3 
+  & ignore
+  & \tn
+  \cmidrule(r){1-5}
+  %
+  phase3b
+  & ignore
+  & ignore
+  & ignore
+  & ignore
+  & \tn
+  \cmidrule(r){1-5}
+  %
+  phase4
+  & ignore
+  & ignore
+  & ignore
+  & timeouts $< 3$?\footnote{set by the \code{join_request_timeouts} config parameter}\newline
+    $\rightarrow$ contact candidate\newline
+    otherwise:\newline
+    remove candidate\newline
+    no candidates left?\newline
+    $\rightarrow$ phase~2 or 2b\newline
+    otherwise:\newline
+    $\rightarrow$ contact next one\newline
+    $\rightarrow$ phase~3b or 4
+  & \tn
+  \bottomrule
+\end{tabular}
+}
+\medskip
 
-% TODO: write about all the other timeouts
+On the existing node, there is only one timeout message which is part of the
+join protocol: the \code{join_response_timeout}. It will be send when a slide
+operation is set up and if the timeout hits before the next message exchange,
+it will increase the slide operation's number of timeouts. The slide will be
+aborted if at least \code{join_response_timeouts} timeouts have been received.
+This parameter is set in the config file.
 
 \subsubsection{Misc. (all phases)}
 

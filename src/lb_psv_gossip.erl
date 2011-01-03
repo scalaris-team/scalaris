@@ -33,8 +33,8 @@
 
 %% @doc Gets the number of IDs to sample during join.
 %%      Note: this is executed at the joining node.
-get_number_of_samples([First | _Rest] = _ContactNodes) ->
-    comm:send(First, {join, number_of_samples_request, comm:this(), ?MODULE}).
+get_number_of_samples(ContactNode) ->
+    comm:send(ContactNode, {join, number_of_samples_request, comm:this(), ?MODULE}).
 
 %% @doc Sends the number of IDs to sample during join to the joining node.
 %%      Note: this is executed at the existing node.

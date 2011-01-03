@@ -25,7 +25,7 @@
          process_join_msg/3,
          check_config/0]).
 
--spec get_number_of_samples(ContactNodes::[comm:mypid()]) -> ok.
+-spec get_number_of_samples(ContactNode::comm:mypid()) -> ok.
 -spec get_number_of_samples_remote(SourcePid::comm:mypid()) -> ok.
 -spec create_join(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(), SourcePid::comm:mypid()) -> dht_node_state:state().
 -spec sort_candidates(Ops::[lb_op:lb_op()]) -> [lb_op:lb_op()].
