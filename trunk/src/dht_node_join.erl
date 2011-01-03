@@ -38,7 +38,7 @@
     {join, join_response, not_responsible, Node::node:node_type()} |
     {join, lookup_timeout, Node::comm:mypid()} |
     {join, known_hosts_timeout} |
-    {join, get_number_of_samples_timeout} |
+    {join, get_number_of_samples_timeout, Node::comm:mypid()} |
     {join, join_request_timeout, Timeouts::non_neg_integer()} |
     {join, timeout} |
     % messages at the existing node:
@@ -109,11 +109,10 @@ process_join_state({join, known_hosts_timeout},
 process_join_state({join, known_hosts_timeout}, State) -> State;
 
 %% userdevguide-begin dht_node_join:join_other_p2
-% in phase 2, 2b add the nodes and do lookups with them / get number of samples
+% in phase 2 add the nodes and do lookups with them / get number of samples
 process_join_state({get_dht_nodes_response, Nodes},
                    {join, JoinState, QueuedMessages})
-  when element(1, JoinState) =:= phase2 orelse
-           element(1, JoinState) =:= phase2b ->
+  when element(1, JoinState) =:= phase2 ->
     %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(comm:this(), Nodes)]),
     ContactNodes = [Node || Node <- Nodes, Node =/= comm:this()],
     NewJoinState =
@@ -132,7 +131,8 @@ process_join_state({get_dht_nodes_response, Nodes},
 % note: phase1 should never receive this message!
 process_join_state({get_dht_nodes_response, Nodes},
                    {join, JoinState, QueuedMessages})
-  when element(1, JoinState) =:= phase3 orelse
+  when element(1, JoinState) =:= phase2b orelse
+           element(1, JoinState) =:= phase3 orelse
            element(1, JoinState) =:= phase3b orelse
            element(1, JoinState) =:= phase4 ->
     FurtherNodes = [Node || Node <- Nodes, Node =/= comm:this()],
@@ -140,15 +140,14 @@ process_join_state({get_dht_nodes_response, Nodes},
 %% userdevguide-end dht_node_join:join_other_p2
 
 % 2b. get the number of nodes/ids to sample
-process_join_state({join, get_number_of_samples_timeout},
+process_join_state({join, get_number_of_samples_timeout, Node},
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase2b ->
     %io:format("p2b: get number of samples timeout~n"),
-    get_known_nodes(),
-    {join, set_phase(phase2, JoinState), QueuedMessages};
+    {join, start_over(remove_contact_node(Node, JoinState)), QueuedMessages};
 
 % ignore message arriving in later phases: 
-process_join_state({join, get_number_of_samples_timeout}, State) ->
+process_join_state({join, get_number_of_samples_timeout, _Node}, State) ->
     State;
 
 %% userdevguide-begin dht_node_join:join_other_p2b
@@ -410,7 +409,7 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId}, State) ->
             ResponseReceived =
                 lists:member(slide_op:get_phase(SlideOp),
                              [wait_for_req_data, wait_for_pred_update_join]),
-            case (slide_op:get_timeouts(SlideOp) < 3) of
+            case (slide_op:get_timeouts(SlideOp) < get_join_response_timeouts()) of
                 _ when ResponseReceived -> State;
                 true ->
                     NewSlideOp = slide_op:inc_timeouts(SlideOp),
@@ -442,7 +441,7 @@ process_join_msg({join, join_response, _Succ, _Pred, _MoveFullId}, State) -> Sta
 process_join_msg({join, join_response, not_responsible, _Node}, State) -> State;
 process_join_msg({join, lookup_timeout, _Node}, State) -> State;
 process_join_msg({join, known_hosts_timeout}, State) -> State;
-process_join_msg({join, get_number_of_samples_timeout}, State) -> State;
+process_join_msg({join, get_number_of_samples_timeout, _Node}, State) -> State;
 process_join_msg({join, join_request_timeout, _Timeouts}, State) -> State;
 process_join_msg({join, timeout}, State) -> State;
 process_join_msg({Msg, {join, LbPsv, LbPsvState}}, State) ->
@@ -467,11 +466,11 @@ get_known_nodes() ->
         (phase_2_4(), ContactNodes::[comm:mypid(),...], AddNodes::boolean()) -> phase2b().
 get_number_of_samples(JoinState, [], _AddNodes) ->
     JoinState;
-get_number_of_samples(JoinState, ContactNodes = [_|_], AddNodes) ->
+get_number_of_samples(JoinState, ContactNodes = [First|_], AddNodes) ->
     LbPsv = get_lb_psv(JoinState),
-    LbPsv:get_number_of_samples(ContactNodes),
-    msg_delay:send_local(get_number_of_samples_timeout() div 1000, self(),
-                         {join, get_number_of_samples_timeout}),
+    LbPsv:get_number_of_samples(First),
+    msg_delay:send_local(get_number_of_samples_timeout() div 1000,
+                         self(), {join, get_number_of_samples_timeout, First}),
     JoinState1 = case AddNodes of
                      true -> add_contact_nodes_back(ContactNodes, JoinState);
                      _    -> JoinState
@@ -799,6 +798,9 @@ check_config() ->
     config:is_integer(join_response_timeout) and
     config:is_greater_than_equal(join_response_timeout, 1000) and
 
+    config:is_integer(join_response_timeouts) and
+    config:is_greater_than_equal(join_response_timeouts, 1) and
+
     config:is_integer(join_request_timeout) and
     config:is_greater_than_equal(join_request_timeout, 1000) and
 
@@ -824,6 +826,12 @@ check_config() ->
 -spec get_join_response_timeout() -> pos_integer().
 get_join_response_timeout() ->
     config:read(join_response_timeout).
+
+%% @doc Gets the max number of join_response_timeouts before the slide is
+%%      aborted (set in the config files).
+-spec get_join_response_timeouts() -> pos_integer().
+get_join_response_timeouts() ->
+    config:read(join_response_timeouts).
 
 %% @doc Gets the max number of ms to wait for a scalaris node to reply on a
 %%      join request (set in the config files).
