@@ -99,7 +99,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
         util:sup_supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
     Config =
         util:sup_worker_desc(config, config, start_link,
-                             [[preconfig:config(), preconfig:local_config()]]),
+                             [[preconfig:config(), preconfig:local_config()], Options]),
     ClientsDelayer =
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
