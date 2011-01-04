@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+# Copyright 2007-2011 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -20,25 +20,23 @@ ERL=@ERL@
 EPMD=@EPMD@
 
 # /bin
-BINDIR=$DESTDIR@bindir@
+BINDIR=@bindir@
 # /etc/scalaris/
-ETCDIR=$DESTDIR@sysconfdir@/scalaris
+ETCDIR=@sysconfdir@/scalaris
 # /lib/scalaris/
-SCALARISDIR=$DESTDIR@libdir@/scalaris
+SCALARISDIR=@libdir@/scalaris
 # /lib/scalaris/ebin
-BEAMDIR=$DESTDIR@libdir@/scalaris/ebin
+BEAMDIR=@libdir@/scalaris/ebin
 # /lib/scalaris/docroot
 DOCROOTDIR=$SCALARISDIR/docroot
 # /share/doc/scalaris
-DOCDIR=$DESTDIR@docdir@
+DOCDIR=@docdir@
 # /share/java
-JAVADIR=$DESTDIR@datarootdir@/java
+JAVADIR=@datarootdir@/java
 # /var/log/scalaris
-LOGDIR=$DESTDIR@localstatedir@/log/scalaris
+LOGDIR=@localstatedir@/log/scalaris
 # /usr/bin/scalaris
-SCALARISCLIENT=$DESTDIR${exec_prefix}/bin/scalaris
-
-SCALARIS_COOKIE="chocolate chip cookie"
+SCALARISCLIENT=${exec_prefix}/bin/scalaris
 
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
@@ -77,8 +75,8 @@ usage(){
 fix_paths() {
     ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
     DIRNAME=`dirname $ABSPATH`
-    # is this a svn checkout or an rpm installation?
-    if [ $DIRNAME != $BINDIR ]; then
+    # is this a svn checkout or an (rpm/deb/manual) installation?
+    if [ "$DIRNAME" != "$BINDIR" ]; then
         # scalaris
         SCALARISDIR=`dirname $DIRNAME`
         # /etc/scalaris/
@@ -92,6 +90,22 @@ fix_paths() {
         # /usr/bin/scalaris
         SCALARISCLIENT="$SCALARISDIR/java-api/scalaris --noconfig"
     fi
+}
+
+# only get cookie from scalarisctl.conf if installed!
+get_cookie() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    if [ "$DIRNAME" = "$BINDIR" ]; then
+      # system config
+      . ${ETCDIR}/scalarisctl.conf
+
+      # load user scalaris configuration (overrides system config)
+      if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
+        . $HOME/.scalaris/scalarisctl.conf
+      fi
+    fi
+    echo -n ${cookie:-"chocolate chip cookie"}
 }
 
 checkinstallation() {
@@ -362,6 +376,7 @@ list_erlang_processes(){
 }
 
 fix_paths
+SCALARIS_COOKIE="`get_cookie`"
 
 while getopts "dhifen:p:y:k:" optionName; do
     case "$optionName" in

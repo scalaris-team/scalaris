@@ -36,15 +36,18 @@ AC_ARG_ENABLE([toke],
 #
 ###########################################################
 
+BROWSER=
 AC_ARG_WITH([browser],
             [AS_HELP_STRING([--with-browser=BROWSER],
-               [use the given browser for 'make test-vts' (default is xdg-open)])],
-            [with_browser=$withval],
-            [with_browser=xdg-open])
+               [absolute path of the browser to use for 'make test-vts'])],
+            [if test -n "$withval"; then
+               BROWSER="$withval"
+             fi],
+            [AC_PATH_PROG([BROWSER], [xdg-open])])
+AC_SUBST(BROWSER)
 
-AC_PATH_PROG([BROWSER], [$with_browser], [$with_browser])
-AS_IF([test "x$BROWSER" = x],
-      [AC_MSG_WARN([--with-browser was given, but "$with_browser" was not found ('make test-vts' will likely fail)])])
+AS_IF([test ! -x "$BROWSER"],
+      [AC_MSG_WARN(["$BROWSER" was not found or is not executable ('make test-vts' will likely fail)])])
 
 ###########################################################
 #
@@ -192,6 +195,38 @@ DIALYZER_FLAGS="$HAVETOKE_DIALYZER $GBTREESISBUILTIN_DIALYZER $TERMISBUILTIN_DIA
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(EMAKEFILECOMPILECOMPAT)
 AC_SUBST(DIALYZER_FLAGS)
+
+###########################################################
+#
+# check java-functions, build-classpath availability for java-api/scalaris
+#
+###########################################################
+
+JAVAFUNCTIONS=
+AC_ARG_WITH([java-functions],
+            [AS_HELP_STRING([--with-java-functions=JAVAFUNCTIONS],
+               [use the given java-functions script for java-api/scalaris (default is /usr/share/java-utils/java-functions)])],
+            [with_java_functions=$withval],
+            [with_java_functions=/usr/share/java-utils/java-functions])
+
+AC_CHECK_FILE($with_java_functions, [JAVAFUNCTIONS=$with_java_functions],
+              [JAVAFUNCTIONS=$with_java_functions
+               AC_MSG_WARN(["$with_java_functions" was not found (java-api/scalaris will likely fail)])])
+AC_SUBST(JAVAFUNCTIONS)
+
+BUILDCLASSPATH=
+AC_ARG_WITH([build-classpath],
+            [AS_HELP_STRING([--with-build-classpath=BUILDCLASSPATH],
+               [absolute path of the build-classpath script to use for java-api/scalaris])],
+            [if test -n "$withval"; then
+               BUILDCLASSPATH="$withval"
+             fi],
+            [AC_PATH_PROG([BUILDCLASSPATH], [build-classpath])])
+AC_SUBST(BUILDCLASSPATH)
+
+AS_IF([test ! -x "$BUILDCLASSPATH"],
+      [AC_MSG_WARN(["$BUILDCLASSPATH" was not found or is not executable (java-api/scalaris will likely fail)])])
+
 ###########################################################
 #
 # check MACOSX vs. Linux for flexbisonparse driver
@@ -217,7 +252,7 @@ AC_SUBST(DRIVER_OS)
 
 mkdir -p ~/.yaws 2> /dev/null
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf])
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl

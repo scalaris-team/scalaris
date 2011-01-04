@@ -9,5 +9,9 @@ set -e
 #     cp /etc/scalaris/scalaris.cfg.example /etc/scalaris/scalaris.cfg
 #   fi
 
+if grep -e '^cookie=\w\+' /etc/scalaris/scalarisctl.conf > /dev/null 2>&1; then
+  echo $RANDOM"-"$RANDOM"-"$RANDOM"-"$RANDOM >> /etc/scalaris/scalarisctl.conf
+fi
+
 #DEBHELPER#
 
