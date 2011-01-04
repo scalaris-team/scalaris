@@ -31,7 +31,8 @@
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
          get_all_children/1,
-         get_processes/0, init_per_suite/1, end_per_suite/1]).
+         get_processes/0, init_per_suite/1, end_per_suite/1,
+         get_ring_data/0, print_ring_data/0]).
 
 -include("scalaris.hrl").
 
@@ -276,6 +277,7 @@ get_processes() ->
 %%      information and stores information about all running processes.
 %%      Also starts the crypto application needed for unit tests using the
 %%      tester.
+-spec init_per_suite([tuple()]) -> [tuple()].
 init_per_suite(Config) ->
     Processes = get_processes(),
     ct:pal("Starting unittest ~p", [ct:get_status()]),
@@ -289,6 +291,7 @@ init_per_suite(Config) ->
 %%      of processes which are now running but haven't been running before.
 %%      Thus allows a clean start of succeeding test suites.
 %%      Prints information about the processes that have been killed.
+-spec end_per_suite([tuple()]) -> [tuple()].
 end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p", [ct:get_status()]),
     %error_logger:tty(false),
@@ -320,3 +323,29 @@ end_per_suite(Config) ->
                      element(1, CurFun) =/= file_io_server],
     ct:pal("Killed processes: ~.0p", [Killed]),
     Config.
+
+-spec get_ring_data() -> [{{intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, ?DB:db_as_list(), ok | timeout}].
+get_ring_data() ->
+    DHTNodes = pid_groups:find_all(dht_node),
+    lists:sort(
+      [begin
+           comm:send_local(DhtNode,
+                           {get_node_details, comm:this(), [my_range]}),
+           comm:send_local(DhtNode,
+                           {bulkowner_deliver, intervals:all(),
+                            {bulk_read_entry, comm:this()}}),
+           receive
+               {get_node_details_response, NodeDetails} ->
+                   receive
+                       {bulk_read_entry_response, _R, Data} ->
+                           {intervals:get_bounds(node_details:get(NodeDetails, my_range)), Data, ok}
+                       after 500 -> {intervals:get_bounds(node_details:get(NodeDetails, my_range)), [], timeout}
+                   end
+           after 500 -> {intervals:empty(), [], timeout}
+           end
+       end || DhtNode <- DHTNodes]).
+
+-spec print_ring_data() -> ok.
+print_ring_data() ->
+    DataAll = unittest_helper:get_ring_data(),
+    ct:pal("~.0p", [DataAll]).
