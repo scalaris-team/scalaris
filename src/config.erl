@@ -22,7 +22,7 @@
 -include("scalaris.hrl").
 
 -export([
-         start_link/1, start/2,
+         start_link/1, start_link/2, start/2,
          read/1, write/2,
          check_config/0,
 
@@ -63,6 +63,13 @@ write(Key, Value) ->
 
 -spec start_link(Files::[file:name()]) -> {ok, pid()}.
 start_link(Files) ->
+    start_link(Files, []).
+
+%% @doc Starts the config process. If Options contains a
+%%      {config, [{Key1, Value1},...]} tuple, each Key is set to its Value in
+%%      the config.
+-spec start_link(Files::[file:name()], Options::[tuple()]) -> {ok, pid()}.
+start_link(Files, Options) ->
     TheFiles = case preconfig:get_env(add_config, []) of
                    []         -> Files;
                    ConfigFile -> lists:append(Files, [ConfigFile])
@@ -74,6 +81,11 @@ start_link(Files) ->
         done -> ok;
         X    -> error_logger:error_msg("unknown config message  ~p", [X])
     end,
+    ConfigParameters = case lists:keyfind(config, 1, Options) of
+                           {config, ConfPars} -> ConfPars;
+                           _ -> []
+                       end,
+    _ = [ets:insert(config_ets, X) || X = {_K, _V} <- ConfigParameters],
     {ok, Link}.
 
 %@private

@@ -23,7 +23,8 @@
 -vsn('$Id$').
 
 -export([fix_cwd/0,
-         make_ring_with_ids/1, make_ring/1, stop_ring/0, stop_ring/1,
+         make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2,
+         stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
          check_ring_size/1,
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
@@ -51,10 +52,18 @@ fix_cwd() ->
         Error -> Error
     end.
 
+%% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 -spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()])) -> pid().
-make_ring_with_ids(Ids) when is_list(Ids) ->
-    make_ring_with_ids(fun () -> Ids end);
-make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
+make_ring_with_ids(Ids) ->
+    make_ring_with_ids(Ids, []).
+
+%% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
+%%      Passes Options to the supervisor, e.g. to set config variables, specify
+%%      a {config, [{Key, Value},...]} option.
+-spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()]), Options::[tuple()]) -> pid().
+make_ring_with_ids(Ids, Options) when is_list(Ids) ->
+    make_ring_with_ids(fun () -> Ids end, Options);
+make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     % note: do not call IdsFun before the initial setup
     %       (it might use config or another process)
     fix_cwd(),
@@ -69,7 +78,7 @@ make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     pid_groups:start_link(),
-                    sup_scalaris:start_link(boot, [{boot_server, empty}]),
+                    sup_scalaris:start_link(boot, [{boot_server, empty} | Options]),
                     boot_server:connect(),
                     Ids = IdsFun(), % config may be needed
                     admin:add_node([{first}, {{idholder, id}, hd(Ids)}]),
@@ -86,8 +95,16 @@ make_ring_with_ids(IdsFun) when is_function(IdsFun, 0) ->
     ct:pal("Scalaris has booted with ~p node(s)...~n", [Size]),
     Pid.
 
--spec make_ring(pos_integer()) -> pid().
+%% @doc Creates a ring with Size random IDs.
+-spec make_ring(Size::pos_integer()) -> pid().
 make_ring(Size) ->
+    make_ring(Size, []).
+
+%% @doc Creates a ring with Size rangom IDs.
+%%      Passes Options to the supervisor, e.g. to set config variables, specify
+%%      a {config, [{Key, Value},...]} option.
+-spec make_ring(Size::pos_integer(), Options::[tuple()]) -> pid().
+make_ring(Size, Options) ->
     fix_cwd(),
     error_logger:tty(true),
     case ets:info(config_ets) of
@@ -100,7 +117,7 @@ make_ring(Size) ->
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     pid_groups:start_link(),
-                    sup_scalaris:start_link(boot),
+                    sup_scalaris:start_link(boot, Options),
                     boot_server:connect(),
                     admin:add_nodes(Size - 1),
                     ok
