@@ -1821,7 +1821,7 @@ as given in this table.
 
 \medskip
 {\small
-\begin{tabular}{lP{2.4cm}P{2.75cm}P{2.35cm}P{3.15cm}M{1.85cm}}
+\begin{tabular}{lP{2.4cm}P{2.75cm}P{2.35cm}P{3.25cm}M{1.70cm}}
   \toprule
   & \code{known_hosts}\carriagereturn\newline\code{_timeout}
   & \code{get_number_of}\carriagereturn\newline\code{_samples}\carriagereturn\newline\code{_timeout}
@@ -1830,7 +1830,7 @@ as given in this table.
   & \code{timeout} \tn
   \midrule
   %
-  phase1
+  \bfseries phase1
   & ignore
   & ignore
   & ignore
@@ -1838,16 +1838,16 @@ as given in this table.
   & get ID from \code{idholder} \tn
   \midrule
   %
-  phase2
+  \bfseries phase2
   & get known nodes from configured VMs
   & ignore
   & ignore
   & ignore
-  & \multirow{21}{1.85cm}
+  & \multirow{21}{1.70cm}
         {re-start join\newline$\rightarrow$ phase~2 or 2b} \tn
   \cmidrule(r){1-5}
   %
-  phase2b
+  \bfseries phase2b
   & ignore
   & remove contact node, re-start join\newline
     $\rightarrow$ phase~2 or 2b
@@ -1856,7 +1856,7 @@ as given in this table.
   & \tn
   \cmidrule(r){1-5}
   %
-  phase3
+  \bfseries phase3
   & ignore
   & ignore
   & remove contact node, lookup remaining IDs\newline
@@ -1865,7 +1865,7 @@ as given in this table.
   & \tn
   \cmidrule(r){1-5}
   %
-  phase3b
+  \bfseries phase3b
   & ignore
   & ignore
   & ignore
@@ -1873,19 +1873,19 @@ as given in this table.
   & \tn
   \cmidrule(r){1-5}
   %
-  phase4
+  \bfseries phase4
   & ignore
   & ignore
   & ignore
   & timeouts $< 3$?\footnote{set by the \code{join_request_timeouts} config parameter}\newline
-    $\rightarrow$ contact candidate\newline
+    \mbox{}~$\rightarrow$ contact candidate\newline
     otherwise:\newline
-    remove candidate\newline
-    no candidates left?\newline
-    $\rightarrow$ phase~2 or 2b\newline
-    otherwise:\newline
-    $\rightarrow$ contact next one\newline
-    $\rightarrow$ phase~3b or 4
+    \mbox{}~remove candidate\newline
+    \mbox{}~no candidates left?\newline
+    \mbox{}~~$\rightarrow$ phase~2 or 2b\newline
+    \mbox{}~otherwise:\newline
+    \mbox{}~~$\rightarrow$ contact next one\newline
+    \mbox{}~~$\rightarrow$ phase~3b or 4
   & \tn
   \bottomrule
 \end{tabular}
