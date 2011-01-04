@@ -209,7 +209,7 @@ install-java: java
 	           java-api/scalaris.jar
 	install -m 644 -t $(JAVADIR)/scalaris/lib \
 	           java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar
-	install -m 644 java-api/scalaris-java.conf.sample \
+	install -m 644 java-api/scalaris-java.conf \
 	           $(ETCDIR)/scalaris-java.conf
 	install -m 644 -t $(ETCDIR) \
 	           java-api/scalaris-java.conf.sample
@@ -226,6 +226,7 @@ install-erlang: compile
 	           ebin/*.beam
 	install -d $(ETCDIR)
 	install -m 644 -t $(ETCDIR) \
+	           bin/scalarisctl.conf \
 	           bin/scalaris.cfg \
 	           bin/scalaris.local.cfg.example
 	install -d $(DOCROOTDIR) \

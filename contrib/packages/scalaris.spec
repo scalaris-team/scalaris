@@ -111,6 +111,11 @@ export NO_BRP_CHECK_BYTECODE_VERSION=true
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
 
+%post
+if grep -e '^cookie=\w\+' %{_sysconfdir}/scalaris/scalarisctl.conf > /dev/null 2>&1; then
+  echo $RANDOM"-"$RANDOM"-"$RANDOM"-"$RANDOM >> %{_sysconfdir}/scalaris/scalarisctl.conf
+fi
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -123,6 +128,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_sysconfdir}/scalaris
 %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
 %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
+%config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
 
 %files doc
 %defattr(-,root,root)

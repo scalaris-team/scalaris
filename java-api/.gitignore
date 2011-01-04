@@ -25,3 +25,4 @@
 /.settings
 /junit*.properties
 /junitvmwatcher*.properties
+/scalaris-java.conf
