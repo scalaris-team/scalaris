@@ -351,6 +351,13 @@ on({web_debug_info, Requestor}, State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
+on({unittest_get_bounds_and_data, SourcePid}, State) ->
+    MyRange = dht_node_state:get(State, my_range),
+    MyBounds = intervals:get_bounds(MyRange),
+    Data = ?DB:get_data(dht_node_state:get(State, db)),
+    comm:send(SourcePid, {unittest_get_bounds_and_data_response, MyBounds, Data}),
+    State;
+
 on({get_dht_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
     State;
