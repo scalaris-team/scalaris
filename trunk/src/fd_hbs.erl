@@ -161,7 +161,7 @@ on({crashed, WatchedPid}, State) ->
                 S1, Subscriptions);
 
 on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
-    ?TRACE("fd_hbs DOWN reported~n", []),
+    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
     %% send crash report to remote end.
     comm:send(state_get_rem_hbs(State),
               {crashed, comm:make_global(WatchedPid)}),

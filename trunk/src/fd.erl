@@ -139,6 +139,16 @@ on({update_remote_hbs_to, Pid}, State) ->
     end,
     State;
 
+on({unittest_report_down, Pid}, State) ->
+    ?TRACE("FD: unittest_report_down p~n", [Pid]),
+    case ets:lookup(fd_hbs, comm:get(fd,Pid)) of
+        [] -> thats_crazy;
+        [Entry] ->
+            HBSPid = element(2, Entry),
+            comm:send_local(HBSPid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down})
+    end,
+    State;
+
 on({web_debug_info, _Requestor}, State) ->
     ?TRACE("FD: web_debug_info~n", []),
 %% TODO: reimplement for new fd.

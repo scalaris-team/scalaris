@@ -45,10 +45,6 @@ init_per_testcase(TestCase, Config) ->
             {skip, "cannot handle network split yet - see issue 59"};
         transactions_3_failures_4_nodes_networksplit_write ->
             {skip, "cannot handle network split yet - see issue 59"};
-        transactions_1_failure_4_nodes_networksplit_write ->
-            {skip, "network split simulation currently broken with new fd."};
-%             unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
-%             Config;
         _ ->
             % stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
@@ -103,30 +99,17 @@ transactions_more_failures_4_nodes_read(FailedNodes) ->
 transactions_1_failure_4_nodes_networksplit_write(_) ->
     % pause some dht_node:
     Node = pid_groups:find_a(sup_dht_node),
-    GroupName = pid_groups:group_of(Node),
-    DhtNodeSupChilds = unittest_helper:get_all_children(Node),
-
-    [begin
-         gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
-         gen_component:bp_barrier(Pid)
-     end || Pid <- DhtNodeSupChilds],
-    pid_groups:hide(GroupName),
-
-%%     unittest_helper:check_ring_size(3),
+    PauseSpec = pause_node(Node),
+    unittest_helper:check_ring_size(3),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
+    
     ct:pal("attempting write_0_a~n"),
     ?equals_w_note(cs_api_v2:write(0, 1), ok, "write_0_a"),
     ct:pal("attempting read_0_a~n"),
     ?equals_w_note(cs_api_v2:read(0), 1, "read_0_a"),
 
-    ct:pal("restarting node~n"),
-    pid_groups:unhide(GroupName),
-    % restart the node again:
-    [begin
-         gen_component:bp_del(Pid, sleep),
-         gen_component:bp_cont(Pid)
-     end || Pid <- DhtNodeSupChilds],
+    unpause_node(PauseSpec),
 
     ct:pal("attempting read_0_b~n"),
     ?equals_w_note(cs_api_v2:read(0), 1, "read_0_b"),
@@ -140,10 +123,47 @@ transactions_3_failures_4_nodes_networksplit_write(_) ->
 
 -spec transactions_more_failures_4_nodes_networksplit_write(FailedNodes::2 | 3) -> ok.
 transactions_more_failures_4_nodes_networksplit_write(FailedNodes) ->
-    admin:del_nodes(FailedNodes),
+    PauseSpecs = [pause_node(DhtNodeSupPid) || DhtNodeSupPid <- util:random_subset(FailedNodes, pid_groups:find_all(sup_dht_node))],
     unittest_helper:check_ring_size(4 - FailedNodes),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
-    ?equals_w_note(cs_api_v2:write(0, 2), {fail, abort}, "write_0_a"),
-    ?equals_w_note(cs_api_v2:read(0), {fail, abort}, "read_0_b"),
+    
+    ct:pal("attempting write_0_a~n"),
+    ?equals_w_note(cs_api_v2:write(0, 1), {fail, abort}, "write_0_a"),
+    ct:pal("attempting read_0_a~n"),
+    ?equals_w_note(cs_api_v2:read(0), {fail, abort}, "read_0_a"),
+    
+    _ = [unpause_node(PauseSpec) || PauseSpec <- PauseSpecs],
+
+    ct:pal("attempting write_0_b~n"),
+    ?equals_w_note(cs_api_v2:write(0, 2), ok, "write_0_b"),
+    ?equals_w_note(cs_api_v2:read(0), 2, "read_0_b"),
+    
+    ok.
+
+-type pause_spec() :: {pid_groups:groupname(), comm:erl_local_pid()}.
+
+-spec pause_node(DhtNodeSupPid::pid()) -> pause_spec().
+pause_node(DhtNodeSupPid) ->
+    GroupName = pid_groups:group_of(DhtNodeSupPid),
+    DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
+    DhtNodeSupChilds = unittest_helper:get_all_children(DhtNodeSupPid),
+    [begin
+         gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
+         gen_component:bp_barrier(Pid)
+     end || Pid <- DhtNodeSupChilds],
+    comm:send_local(fd, {unittest_report_down, comm:make_global(DhtNodePid)}),
+    
+    pid_groups:hide(GroupName),
+    {GroupName, DhtNodeSupChilds}.
+
+-spec unpause_node(pause_spec()) -> ok.
+unpause_node({GroupName, DhtNodeSupChilds}) ->
+    ct:pal("restarting node~n"),
+    pid_groups:unhide(GroupName),
+    % restart the node again:
+    [begin
+         gen_component:bp_del(Pid, sleep),
+         gen_component:bp_cont(Pid)
+     end || Pid <- DhtNodeSupChilds],
     ok.
