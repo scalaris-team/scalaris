@@ -350,18 +350,12 @@ get_ring_data() ->
     lists:sort(
       [begin
            comm:send_local(DhtNode,
-                           {get_node_details, comm:this(), [my_range]}),
-           comm:send_local(DhtNode,
-                           {bulkowner_deliver, intervals:all(),
-                            {bulk_read_entry, comm:this()}}),
+                           {unittest_get_bounds_and_data, comm:this()}),
+           % note: no timeout possible - can not leave messages in queue!
            receive
-               {get_node_details_response, NodeDetails} ->
-                   receive
-                       {bulk_read_entry_response, _R, Data} ->
-                           {intervals:get_bounds(node_details:get(NodeDetails, my_range)), Data, ok}
-                       after 500 -> {intervals:get_bounds(node_details:get(NodeDetails, my_range)), [], timeout}
-                   end
-           after 500 -> {intervals:empty(), [], timeout}
+               {unittest_get_bounds_and_data_response, Bounds, Data} ->
+                   {Bounds, Data, ok}
+%%            after 500 -> {empty, [], timeout}
            end
        end || DhtNode <- DHTNodes]).
 
