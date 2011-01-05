@@ -115,16 +115,7 @@ process_join_state({get_dht_nodes_response, Nodes},
   when element(1, JoinState) =:= phase2 ->
     %io:format("p2: got dht_nodes_response ~p~n", [lists:delete(comm:this(), Nodes)]),
     ContactNodes = [Node || Node <- Nodes, Node =/= comm:this()],
-    NewJoinState =
-        case skip_psv_lb(JoinState) of
-            true -> % skip phase2b (use only the given ID)
-                JoinState1 = add_contact_nodes_back(ContactNodes, JoinState),
-                % (re-)issue lookups for all existing IDs
-                JoinState2 = lookup(JoinState1),
-                % the Id may have been removed -> select a new one in this case:
-                lookup_new_ids2(1, JoinState2);
-            _    -> get_number_of_samples(JoinState, ContactNodes, true)
-        end,
+    NewJoinState = phase2_next_step(JoinState, ContactNodes, true),
     {join, NewJoinState, QueuedMessages};
 
 % in all other phases, just add the provided nodes:
@@ -186,7 +177,7 @@ process_join_state({join, lookup_timeout, _Node}, State) -> State;
 process_join_state({join, get_candidate_response, OrigJoinId, Candidate},
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase3 ->
-    %io:format("p3: lookup success~n"),
+    %io:format("p3: got candidate ~.0p", [Candidate]),
     JoinState1 = remove_join_id(OrigJoinId, JoinState),
     JoinState2 = integrate_candidate(Candidate, JoinState1, front),
     NewJoinState =
@@ -203,6 +194,7 @@ process_join_state({join, get_candidate_response, OrigJoinId, Candidate},
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase2 orelse
            element(1, JoinState) =:= phase2b ->
+    %io:format("p2(b): got candidate ~.0p", [Candidate]),
     JoinState1 = remove_join_id(OrigJoinId, JoinState),
     JoinState2 = integrate_candidate(Candidate, JoinState1, front),
     {join, JoinState2, QueuedMessages};
@@ -214,6 +206,7 @@ process_join_state({join, get_candidate_response, OrigJoinId, Candidate},
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase3b orelse
            element(1, JoinState) =:= phase4 ->
+    %io:format("p3b/4: got candidate ~.0p", [Candidate]),
     JoinState1 = remove_join_id(OrigJoinId, JoinState),
     JoinState2 = integrate_candidate(Candidate, JoinState1, back),
     {join, JoinState2, QueuedMessages};
@@ -241,7 +234,10 @@ process_join_state({join, join_request_timeout, Timeouts},
                 log:log(warn, "[ Node ~w ] no response on join request for the "
                             "chosen ID ~w, trying next candidate",
                         [self(), get_id(JoinState)]),
-                JoinState1 = remove_candidate_front(JoinState),
+                JoinState1 = case skip_psv_lb(JoinState) of
+                                 true -> remove_candidate_front_keep_id(JoinState);
+                                 _    -> remove_candidate_front(JoinState)
+                             end,
                 contact_best_candidate(JoinState1)
         end,
     {join, NewJoinState, QueuedMessages};
@@ -269,7 +265,10 @@ process_join_state({join, join_response, not_responsible, Node},
                             "[ Node ~w ] node contacted for join is not responsible for "
                             "the selected ID (anymore) ~w, trying next candidate",
                             [self(), get_id(JoinState)]),
-                    JoinState1 = remove_candidate_front(JoinState),
+                    JoinState1 = case skip_psv_lb(JoinState) of
+                                     true -> remove_candidate_front_keep_id(JoinState);
+                                     _    -> remove_candidate_front(JoinState)
+                                 end,
                     {join, contact_best_candidate(JoinState1), QueuedMessages}
             end
     end;
@@ -494,6 +493,19 @@ create_join_ids_helper(Count, Ids) ->
         _     -> create_join_ids_helper(Count, gb_sets:add(?RT:get_random_node_id(), Ids))
     end.
 
+-spec phase2_next_step(JoinState::phase_2_4(), ContactNodes::[comm:mypid()],
+                       AddNodes::boolean()) -> phase2() | phase2b() | phase3().
+phase2_next_step(JoinState, ContactNodes, AddNodes) ->
+    case skip_psv_lb(JoinState) of
+        true -> % skip phase2b (use only the given ID)
+            JoinState1 = add_contact_nodes_back(ContactNodes, JoinState),
+            % (re-)issue lookups for all existing IDs
+            JoinState2 = lookup(JoinState1),
+            % the Id may have been removed -> select a new one in this case:
+            lookup_new_ids2(1, JoinState2);
+        _    -> get_number_of_samples(JoinState, ContactNodes, AddNodes)
+    end.
+
 %% @doc Tries to do a lookup for all join IDs in JoinState by contacting the
 %%      first node among the ContactNodes, then go to phase 3. If there is no
 %%      node to contact, try to get new contact nodes and continue in phase 2.
@@ -665,7 +677,7 @@ start_over(JoinState) ->
             get_known_nodes(),
             set_phase(phase2, JoinState);
         [_|_] = ContactNodes ->
-            get_number_of_samples(JoinState, ContactNodes, false)
+            phase2_next_step(JoinState, ContactNodes, false)
     end.
 %% userdevguide-end dht_node_join:start_over
 
@@ -784,6 +796,12 @@ remove_candidate_front({Phase, Options, CurId, CurIdVersion, ContactNodes, JoinI
     {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, []};
 remove_candidate_front({Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, [_ | Candidates]}) ->
     {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, Candidates}.
+-spec remove_candidate_front_keep_id(phase_2_4()) -> phase_2_4().
+remove_candidate_front_keep_id({Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, []}) ->
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, []};
+remove_candidate_front_keep_id({Phase, Options, CurId, CurIdVersion, ContactNodes, JoinIds, [Front | Candidates]}) ->
+    IdFront = node_details:get(lb_op:get(Front, n1_new), new_key),
+    {Phase, Options, CurId, CurIdVersion, ContactNodes, [IdFront | JoinIds], Candidates}.
 -spec set_id(Id::?RT:key(), IdVersion::non_neg_integer(), phase_2_4()) -> phase_2_4().
 set_id(Id, IdVersion, {Phase, Options, _CurId, _CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
     {Phase, Options, Id, IdVersion, ContactNodes, JoinIds, Candidates}.
