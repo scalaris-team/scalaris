@@ -132,7 +132,7 @@ add_3_rm_2_load_test() ->
     check_size(4),
     timer:sleep(500),
     % let 2 nodes gracefully leave
-    [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
+    _ = [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
 %%     admin:del_nodes(2),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid).
@@ -148,7 +148,7 @@ add_3_rm_2_load_v2_test() ->
     check_size(4),
     timer:sleep(500),
     % let 2 nodes gracefully leave
-    [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
+    _ = [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
 %%     admin:del_nodes(2),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid).
