@@ -93,6 +93,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     wait_for_stable_ring(),
     Size = check_ring_size(length(Ids)),
     ct:pal("Scalaris has booted with ~p node(s)...~n", [Size]),
+    print_ring_data(),
     Pid.
 
 %% @doc Creates a ring with Size random IDs.
@@ -127,6 +128,7 @@ make_ring(Size, Options) ->
     wait_for_stable_ring(),
     check_ring_size(Size),
     ct:pal("Scalaris has booted with ~p node(s)...~n", [Size]),
+    print_ring_data(),
     Pid.
 
 %% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1.
