@@ -384,11 +384,13 @@ get_global_uid() ->
     %% , term_to_binary(_Result)
     .
 
--spec is_my_old_uid(pos_integer() | global_uid()) -> boolean().
+%% @doc Checks whether the given GUID is an old incarnation of a GUID from
+%%      my node.
+-spec is_my_old_uid(pos_integer() | global_uid()) -> boolean() | remote.
 is_my_old_uid({LocalUid, Pid}) ->
     case comm:this() of
         Pid -> is_my_old_uid(LocalUid);
-        _   -> false
+        _   -> remote
     end;
 is_my_old_uid(Id) when is_integer(Id) ->
     LastUid = case erlang:get(pids_uid_counter) of
