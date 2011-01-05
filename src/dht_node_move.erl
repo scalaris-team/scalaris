@@ -179,20 +179,19 @@ process_move_msg({move, node_leave}, State) ->
 % wait for the joining node to appear in the rm-process -> got ack from rm:
 % (see dht_node_join.erl) or
 % wait for the rm to update its pred to the expected pred in the data_ack phase
-% precond: all conditions to change into the next phase (wait_for_req_data, 
-%          during join) or to send the delta must be met
+% precond(wait_for_pred_update_join - during join):
+%   all conditions to change into the next phase must be met
+% precond(wait_for_pred_update_data_ack): none (conditions will be checked here) 
 process_move_msg({move, rm_new_pred, {move, MoveFullId} = RMSubscrTag}, MyState) ->
     WorkerFun =
         fun(SlideOp, pred, State) ->
+                rm_loop:unsubscribe(self(), RMSubscrTag),
                 case slide_op:get_phase(SlideOp) of
                     wait_for_pred_update_join ->
-                        rm_loop:unsubscribe(self(), RMSubscrTag),
                         NewSlideOp = slide_op:set_phase(SlideOp, wait_for_req_data),
                         dht_node_state:set_slide(State, pred, NewSlideOp);
                     wait_for_pred_update_data_ack ->
-                        rm_loop:unsubscribe(self(), RMSubscrTag),
-                        send_delta(State, pred, SlideOp);
-                    _ -> State
+                        try_send_delta_to_pred(State, SlideOp)
                 end
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_pred_update_join, wait_for_pred_update_data_ack], pred, rm_new_pred);
@@ -261,37 +260,13 @@ process_move_msg({move, data_ack_timeout, MoveFullId}, MyState) ->
 process_move_msg({move, data_ack, MoveFullId}, MyState) ->
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
+                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
                 % if sending data to the predecessor, check if we have already
                 % received the new predecessor info, otherwise wait for it
                 case PredOrSucc =:= pred andalso
-                         slide_op:get_sendORreceive(SlideOp) =:= send of
-                    true ->
-                        ExpPredId = slide_op:get_target_id(SlideOp),
-                        Pred = dht_node_state:get(State, pred),
-                        case node:id(Pred) of
-                            ExpPredId ->
-                                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
-                                send_delta(State, PredOrSucc, SlideOp1);
-                            _ ->
-                                SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_data_ack),
-                                RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
-                                rm_loop:subscribe(
-                                  self(), RMSubscrTag,
-                                  fun(_OldNeighbors, NewNeighbors) ->
-                                          % note: at the beginning of the slide
-                                          % we assured that both, id and id_version
-                                          % of the other node are correct
-                                          ExpPred = node:new(node:pidX(Pred),
-                                                             ExpPredId,
-                                                             node:id_version(Pred) + 1),
-                                          ExpPred =:= nodelist:pred(NewNeighbors)
-                                  end,
-                                  fun dht_node_move:rm_notify_new_pred/4),
-                                dht_node_state:set_slide(State, pred, SlideOp1)
-                        end;
-                    _ ->
-                        SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
-                        send_delta(State, PredOrSucc, SlideOp1)
+                         slide_op:get_sendORreceive(SlideOp1) =:= send of
+                    true -> try_send_delta_to_pred(State, SlideOp1);
+                    _    -> send_delta(State, PredOrSucc, SlideOp1)
                 end
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data_ack], both, data_ack);
@@ -616,6 +591,23 @@ send_data_ack(State, PredOrSucc, SlideOp) ->
               {move, data_ack, slide_op:get_id(NewSlideOp)}),
     dht_node_state:set_slide(State, PredOrSucc, NewSlideOp).
 
+%% @doc Tries to send the delta to the predecessor. If a slide is sending
+%%      data to its predecessor, we need to take care that the delta is not
+%%      send before the predecessor has changed its ID and our node knows
+%%      about it.
+-spec try_send_delta_to_pred(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
+try_send_delta_to_pred(State, SlideOp) ->
+    ExpPredId = slide_op:get_target_id(SlideOp),
+    Pred = dht_node_state:get(State, pred),
+    case node:id(Pred) of
+        ExpPredId ->
+            send_delta(State, pred, SlideOp);
+        _ ->
+            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_data_ack),
+            rm_subscribe_to_pred_change(SlideOp1),
+            dht_node_state:set_slide(State, pred, SlideOp1)
+    end.
+
 %% @doc Gets changed data in the slide operation's interval from the DB and
 %%      sends as a delta to the target node. Also sets the DB to stop recording
 %%      changes in this interval and delete any such entries. Changes the slide
@@ -735,9 +727,10 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
         not_found when MoveMsgTag =:= rm_new_pred ->
             % ignore (local) rm_new_pred messages arriving too late
             case util:is_my_old_uid(MoveFullId) of
-                true ->
-                    log:log(info,"[ dht_node_move ~.0p ] ~.0p received with old "
-                           "slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
+                true -> ok;
+                remote ->
+                    log:log(info,"[ dht_node_move ~.0p ] ~.0p received with no "
+                           "matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
                             [comm:this(), MoveMsgTag, MoveFullId,
                              dht_node_state:get(State, slide_pred),
                              dht_node_state:get(State, slide_succ)]);
@@ -968,6 +961,21 @@ rm_send_node_change(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
         OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> ok.
 rm_notify_new_pred(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
     comm:send_local(Pid, {move, rm_new_pred, Tag}).
+
+%% @doc Subscribes the node to a change of the predecessor and calls
+%%      dht_node_move:rm_notify_new_pred/4 when the predecessor changes or
+%%      the predecessor gets the target ID of the slide operation.
+-spec rm_subscribe_to_pred_change(SlideOp::slide_op:slide_op()) -> ok.
+rm_subscribe_to_pred_change(SlideOp) ->
+    ExpPredId = slide_op:get_target_id(SlideOp),
+    RMSubscrTag = {move, slide_op:get_id(SlideOp)},
+    rm_loop:subscribe(
+      self(), RMSubscrTag,
+      fun(OldNeighbors, NewNeighbors) ->
+              nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors) orelse
+                  node:id(nodelist:pred(NewNeighbors)) =:= ExpPredId
+      end,
+      fun dht_node_move:rm_notify_new_pred/4).
 
 %% @doc Checks whether config parameters regarding dht_node moves exist and are
 %%      valid.
