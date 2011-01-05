@@ -60,7 +60,7 @@ make_ring_with_ids(Ids) ->
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 %%      Passes Options to the supervisor, e.g. to set config variables, specify
 %%      a {config, [{Key, Value},...]} option.
--spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()]), Options::[tuple()]) -> pid().
+-spec make_ring_with_ids([?RT:key(),...] | fun(() -> [?RT:key(),...]), Options::[tuple()]) -> pid().
 make_ring_with_ids(Ids, Options) when is_list(Ids) ->
     make_ring_with_ids(fun () -> Ids end, Options);
 make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
