@@ -56,6 +56,8 @@ init_per_testcase(TestCase, Config) ->
         add_3_rm_2_load_v2 ->
             {skip, "no graceful leave yet"};
         _ ->
+            % stop ring from previous test case (it may have run into a timeout)
+            unittest_helper:stop_ring(),
             Config
     end.
 

@@ -47,10 +47,17 @@ end_per_suite(Config) ->
     ok.
 
 init_per_testcase(_TestCase, Config) ->
+    % stop ring from previous test case (it may have run into a timeout)
+    unittest_helper:stop_ring(),
+    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
+    set_move_config_parameters(),
+    timer:sleep(500), % wait a bit for the rm-processes to settle
     Config.
-
-end_per_testcase(_TestCase, Config) ->
-    Config.
+ 
+end_per_testcase(_TestCase, _Config) ->
+    %error_logger:tty(false),
+    unittest_helper:stop_ring(),
+    ok.
 
 %% @doc Sets tighter timeouts for slides
 -spec set_move_config_parameters() -> ok.
@@ -65,9 +72,6 @@ set_move_config_parameters() ->
 
 %% @doc Test slide with successor, receiving data from it (using cs_api in the bench server).
 symm4_slide_succ1_load(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
                       symm4_slide1_load_test(1, succ, "slide_succ1", fun succ_id_fun1/2),
@@ -76,15 +80,10 @@ symm4_slide_succ1_load(_Config) ->
                       symm4_slide1_load_test(4, succ, "slide_succ1", fun succ_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ1_load"),
-    check_size2_v1(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v1(40).
 
 %% @doc Test slide with successor, sending data to it (using cs_api in the bench server).
 symm4_slide_succ2_load(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
                       symm4_slide2_load_test(1, succ, "slide_succ2", fun succ_id_fun2/2),
@@ -93,15 +92,10 @@ symm4_slide_succ2_load(_Config) ->
                       symm4_slide2_load_test(4, succ, "slide_succ2", fun succ_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ2_load"),
-    check_size2_v1(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v1(40).
 
 %% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server).
 symm4_slide_succ1_load_v2(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
                       symm4_slide1_load_test(1, succ, "slide_succ1_v2", fun succ_id_fun1/2),
@@ -110,15 +104,10 @@ symm4_slide_succ1_load_v2(_Config) ->
                       symm4_slide1_load_test(4, succ, "slide_succ1_v2", fun succ_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ1_load_v2"),
-    check_size2_v2(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v2(40).
 
 %% @doc Test slide with successor, sending data to it (using cs_api_v2 in the bench server).
 symm4_slide_succ2_load_v2(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
                       symm4_slide2_load_test(1, succ, "slide_succ2_v2", fun succ_id_fun2/2),
@@ -127,15 +116,10 @@ symm4_slide_succ2_load_v2(_Config) ->
                       symm4_slide2_load_test(4, succ, "slide_succ2_v2", fun succ_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ2_load_v2"),
-    check_size2_v2(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v2(40).
 
 %% @doc Test slide with predecessor, sending data to it (using cs_api in the bench server).
 symm4_slide_pred1_load(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
                       symm4_slide1_load_test(1, pred, "slide_pred1", fun pred_id_fun1/2),
@@ -144,15 +128,10 @@ symm4_slide_pred1_load(_Config) ->
                       symm4_slide1_load_test(4, pred, "slide_pred1", fun pred_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred1_load"),
-    check_size2_v1(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v1(40).
 
 %% @doc Test slide with predecessor, receiving data from it (using cs_api in the bench server).
 symm4_slide_pred2_load(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
                       symm4_slide2_load_test(1, pred, "slide_pred2", fun pred_id_fun2/2),
@@ -161,15 +140,10 @@ symm4_slide_pred2_load(_Config) ->
                       symm4_slide2_load_test(4, pred, "slide_pred2", fun pred_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred2_load"),
-    check_size2_v1(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v1(40).
 
 %% @doc Test slide with predecessor, sending data to it (using cs_api_v2 in the bench server).
 symm4_slide_pred1_load_v2(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
                       symm4_slide1_load_test(1, pred, "slide_pred1_v2", fun pred_id_fun1/2),
@@ -178,15 +152,10 @@ symm4_slide_pred1_load_v2(_Config) ->
                       symm4_slide1_load_test(4, pred, "slide_pred1_v2", fun pred_id_fun1/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred1_load_v2"),
-    check_size2_v2(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v2(40).
 
 %% @doc Test slide with predecessor, receiving data from it (using cs_api_v2 in the bench server).
 symm4_slide_pred2_load_v2(_Config) ->
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?RT:hash_key(0))),
-    set_move_config_parameters(),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
                       symm4_slide2_load_test(1, pred, "slide_pred2_v2", fun pred_id_fun2/2),
@@ -195,9 +164,7 @@ symm4_slide_pred2_load_v2(_Config) ->
                       symm4_slide2_load_test(4, pred, "slide_pred2_v2", fun pred_id_fun2/2),
                       unittest_helper:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred2_load_v2"),
-    check_size2_v2(40),
-%%     ?equals(statistics:get_total_load(statistics:get_ring_details()), 40),
-    unittest_helper:stop_ring().
+    check_size2_v2(40).
 
 -spec percent_range(IdA::?RT:key(), IdB::?RT:key(), Percent::1..99) -> ?RT:key().
 percent_range(IdA, IdB, Percent) ->
