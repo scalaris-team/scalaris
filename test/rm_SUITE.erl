@@ -41,13 +41,10 @@ end_per_suite(Config) ->
     unittest_helper:end_per_suite(Config),
     ok.
 
-init_per_testcase(TestCase, Config) ->
-    case TestCase of
-        skip_test ->
-            {skip, "skip this test"};
-        _ ->
-            Config
-    end.
+init_per_testcase(_TestCase, Config) ->
+    % stop ring from previous test case (it may have run into a timeout)
+    unittest_helper:stop_ring(),
+    Config.
 
 end_per_testcase(_TestCase, _Config) ->
     ok.

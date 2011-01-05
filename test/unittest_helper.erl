@@ -330,7 +330,8 @@ end_per_suite(Config) ->
     Killed = [begin
 %%                   ct:pal("killing ~.0p", [Proc]),
                   try erlang:exit(X, kill) of
-                      true -> {ok, Proc}
+                      true -> wait_for_process_to_die(X),
+                              {ok, Proc}
                   catch _:_ -> {fail, Proc}
                   end
               end || {X, InitCall, CurFun, _Info} = Proc <- OnlyNew,

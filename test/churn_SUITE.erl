@@ -50,6 +50,8 @@ init_per_testcase(TestCase, Config) ->
 %             unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
 %             Config;
         _ ->
+            % stop ring from previous test case (it may have run into a timeout)
+            unittest_helper:stop_ring(),
             unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
             Config
 %%             {skip, "temporarily"}
