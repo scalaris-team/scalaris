@@ -108,9 +108,8 @@ on({hbs_finished, RemoteWatchedPid}, State) ->
 
 on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
     ?TRACE("FD: subscribe_heartbeats~n", []),
-    FDPid = comm:get(fd, Subscriber),
     HBPid =
-        case ets:lookup(fd_hbs, FDPid) of
+        case ets:lookup(fd_hbs, comm:get(fd, Subscriber)) of
             [] -> % synchronously create new hb process
                 start_and_register_hbs(Subscriber);
             [Res] -> element(2, Res)
@@ -121,32 +120,18 @@ on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
 
 on({pong, Subscriber}, State) ->
     ?TRACE("FD: pong, ~p~n", [Subscriber]),
-    case ets:lookup(fd_hbs, comm:get(fd,Subscriber)) of
-        [] -> thats_crazy;
-        [Entry] ->
-            Pid = element(2, Entry),
-            comm:send_local(Pid, {pong_via_fd, Subscriber})
-    end,
+    forward_to_hbs(Subscriber, {pong_via_fd, Subscriber}),
     State;
 
 on({update_remote_hbs_to, Pid}, State) ->
     ?TRACE("FD: update_remote_hbs_to p~n", [Pid]),
-    case ets:lookup(fd_hbs, comm:get(fd,Pid)) of
-        [] -> thats_crazy;
-        [Entry] ->
-            HBSPid = element(2, Entry),
-            comm:send_local(HBSPid, {update_remote_hbs_to, Pid})
-    end,
+    forward_to_hbs(Pid, {update_remote_hbs_to, Pid}),
     State;
 
 on({unittest_report_down, Pid}, State) ->
     ?TRACE("FD: unittest_report_down p~n", [Pid]),
-    case ets:lookup(fd_hbs, comm:get(fd,Pid)) of
-        [] -> thats_crazy;
-        [Entry] ->
-            HBSPid = element(2, Entry),
-            comm:send_local(HBSPid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down})
-    end,
+    forward_to_hbs(
+      Pid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down}),
     State;
 
 on({web_debug_info, _Requestor}, State) ->
@@ -202,3 +187,12 @@ start_and_register_hbs(Pid) ->
     NewHBS = element(2, fd_hbs:start_link(Pid)),
     ets:insert(fd_hbs, {comm:get(fd, Pid), NewHBS}),
     NewHBS.
+
+-spec forward_to_hbs(comm:mypid(), comm:message()) -> ok.
+forward_to_hbs(Pid, Msg) ->
+    case ets:lookup(fd_hbs, comm:get(fd,Pid)) of
+        %% [] -> thats_crazy; %% let gen_component report it
+        [Entry] ->
+            HBSPid = element(2, Entry),
+            comm:send_local(HBSPid, Msg)
+    end, ok.
