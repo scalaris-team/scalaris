@@ -153,7 +153,7 @@ on({crashed, WatchedPid}, State) ->
           end
           || {X, Cookie} <- Subscriptions ],
     %% delete from remote_pids
-    NewRemPids = [ X || X <- state_get_rem_pids(State), X =/= WatchedPid ],
+    NewRemPids = lists:delete(WatchedPid, state_get_rem_pids(State)),
     S1 = state_set_rem_pids(State, NewRemPids),
     %% delete subscription entries with this pid
     lists:foldl(fun({Sub, Cook}, StAgg) ->
