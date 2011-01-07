@@ -32,7 +32,7 @@
          hash_key/1, get_random_node_id/0, next_hop/2,
          init_stabilize/2, update/3,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_replica_keys/1,
-         n/0, get_range/2, get_split_key/2,
+         n/0, get_range/2, get_split_key/3,
          dump/1, to_list/1, export_rt_to_dht_node/2,
          handle_custom_message/2,
          check/4, check/5,
@@ -57,9 +57,9 @@
 -spec get_size(rt() | external_rt()) -> non_neg_integer().
 -spec get_replica_keys(key()) -> [key()].
 
--spec n() -> pos_integer().
--spec get_range(Begin::key(), End::key()) -> pos_integer().
--spec get_split_key(Begin::key(), End::key()) -> key().
+-spec n() -> number().
+-spec get_range(Begin::key(), End::key()) -> number().
+-spec get_split_key(Begin::key(), End::key(), SplitFraction::{Num::0..100, Denom::0..100}) -> key().
 
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 

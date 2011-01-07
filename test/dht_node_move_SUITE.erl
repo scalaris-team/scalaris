@@ -166,32 +166,17 @@ symm4_slide_pred2_load_v2(_Config) ->
               end, "symm4_slide_pred2_load_v2"),
     check_size2_v2(40).
 
--spec percent_range(IdA::?RT:key(), IdB::?RT:key(), Percent::1..99) -> ?RT:key().
-percent_range(IdA, IdB, Percent) ->
-    % note: this only works with numeric keys:
-    (if
-         IdB > IdA  -> IdB - IdA;
-         IdB < IdA   -> (?RT:n() - IdA - 1) + IdB
-     end * Percent) div 100.
-
--spec normalize(Id::?RT:key()) -> ?RT:key().
-normalize(Id) ->
-    case Id >= ?RT:n() of
-        true -> Id - ?RT:n();
-        _    -> Id
-    end.
-
 succ_id_fun1(MyId, SuccId) ->
-    normalize(MyId + percent_range(MyId, SuccId, 1)).
+    ?RT:get_split_key(MyId, SuccId, {1, 100}).
 
 succ_id_fun2(MyId, PredId) ->
-    normalize(MyId - percent_range(PredId, MyId, 1)).
+    ?RT:get_split_key(PredId, MyId, {99, 100}).
 
 pred_id_fun1(MyId, PredId) ->
-    normalize(PredId + percent_range(PredId, MyId, 1)).
+    ?RT:get_split_key(PredId, MyId, {1, 100}).
 
 pred_id_fun2(PredId, PredsPredId) ->
-    normalize(PredId - percent_range(PredsPredId, PredId, 1)).
+    ?RT:get_split_key(PredsPredId, PredId, {99, 100}).
 
 -spec symm4_slide1_load_test(NthNode::1..4, PredOrSucc::pred | succ, Tag::any(),
         TargetIdFun::fun((MyId::?RT:key(), OtherId::?RT:key()) -> TargetId::?RT:key())) -> ok.

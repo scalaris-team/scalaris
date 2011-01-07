@@ -102,7 +102,7 @@ split_by_load(DhtNodeState, TargetLoad) ->
 split_my_range(DhtNodeState, SelectedKey) ->
     MyNodeId = dht_node_state:get(DhtNodeState, node_id),
     MyPredId = dht_node_state:get(DhtNodeState, pred_id),
-    SplitKey = try ?RT:get_split_key(MyPredId, MyNodeId)
+    SplitKey = try ?RT:get_split_key(MyPredId, MyNodeId, {1, 2})
                catch throw:not_supported -> SelectedKey
                end,
     Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
