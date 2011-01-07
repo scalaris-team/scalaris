@@ -115,15 +115,33 @@ my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
         true -> true;
         _ when Op1Change =:= Op2Change ->
             Op1NewInterval = node_details:get(lb_op:get(Op1, n1_new), my_range),
-            {_, Op1NewPredId, Op1NewMyId, _} = intervals:get_bounds(Op1NewInterval),
-            Op1NewRange = try ?RT:get_range(Op1NewPredId, Op1NewMyId)
-                          catch throw:not_supported -> 0
-                          end,
+            Op1NewRange =
+                case intervals:all() =:= Op1NewInterval of
+                    true ->
+                        try ?RT:n()
+                        catch throw:not_supported -> 0
+                        end;
+                    _ ->
+                        {_, Op1NewPredId, Op1NewMyId, _} =
+                            intervals:get_bounds(Op1NewInterval),
+                        try ?RT:get_range(Op1NewPredId, Op1NewMyId)
+                        catch throw:not_supported -> 0
+                        end
+                end,
             Op2NewInterval = node_details:get(lb_op:get(Op2, n1_new), my_range),
-            {_, Op2NewPredId, Op2NewMyId, _} = intervals:get_bounds(Op2NewInterval),
-            Op2NewRange = try ?RT:get_range(Op2NewPredId, Op2NewMyId)
-                          catch throw:not_supported -> 0
-                          end,
+            Op2NewRange =
+                case intervals:all() =:= Op2NewInterval of
+                    true ->
+                        try ?RT:n()
+                        catch throw:not_supported -> 0
+                        end;
+                    _ ->
+                        {_, Op2NewPredId, Op2NewMyId, _} =
+                            intervals:get_bounds(Op2NewInterval),
+                        try ?RT:get_range(Op2NewPredId, Op2NewMyId)
+                        catch throw:not_supported -> 0
+                        end
+                end,
             Op2NewRange =< Op1NewRange orelse
                 ((Op1NewRange =:= Op2NewRange) andalso Op1 =< Op2);
         _ -> false

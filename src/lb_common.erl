@@ -105,6 +105,8 @@ split_my_range(DhtNodeState, SelectedKey) ->
     SplitKey = try ?RT:get_split_key(MyPredId, MyNodeId, {1, 2})
                catch throw:not_supported -> SelectedKey
                end,
+%%     io:format("Pred: ~.0p, My: ~.0p,~nSplit: ~.0p, Selected: ~.0p~n",
+%%               [MyPredId, MyNodeId, SplitKey, SelectedKey]),
     Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
     DB = dht_node_state:get(DhtNodeState, db),
     TargetLoadNew = ?DB:get_load(DB, Interval),
