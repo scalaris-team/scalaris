@@ -320,8 +320,7 @@ renderRingChart(Ring) ->
         Sizes = [ begin
                       Me_tmp = node:id(node_details:get(Node, node)),
                       Pred_tmp = node:id(node_details:get(Node, pred)),
-                      MaxKey = ?RT:n() - 1,
-                      Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / MaxKey,
+                      Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / ?RT:n(),
                       io_lib:format("~f", [Diff])
                   end || Node <- Ring ],
         Hostinfos = [ node_details:get(Node, hostname) ++ " (" ++
@@ -331,9 +330,8 @@ renderRingChart(Ring) ->
         CHS = "chs=600x350",
         CHL = "chl=" ++ string:join(Hostinfos, "|"),
         URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL
-    catch % keys might not support subtraction or ?RT:n() might throw
-        throw:not_supported -> "";
-        error:badarith -> ""
+    catch % ?RT methods might throw
+        throw:not_supported -> ""
     end.
 
 -spec getRingRendered() -> html_type().

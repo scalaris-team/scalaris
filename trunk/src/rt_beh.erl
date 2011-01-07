@@ -52,7 +52,7 @@ behaviour_info(callbacks) ->
      {get_replica_keys, 1},
      % address space size, range and split key
      % (may all throw 'throw:not_supported' if unsupported by the RT)
-     {n, 0}, {get_range, 2}, {get_split_key, 2},
+     {n, 0}, {get_range, 2}, {get_split_key, 3},
      % for debugging and web interface
      {dump, 1},
      % for bulkowner

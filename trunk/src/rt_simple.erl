@@ -106,8 +106,8 @@ get_size(_RT) -> 1.
 %% @doc Returns the size of the address space.
 n() -> n_().
 %% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
--spec n_() -> key_t().
-n_() -> 16#100000000000000000000000000000000.
+-spec n_() -> 16#100000000000000000000000000000000.
+n_() -> 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF + 1.
 %% userdevguide-end rt_simple:n
 
 %% @doc Keep a key in the address space. See n/0.
@@ -119,8 +119,8 @@ normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 get_range(Begin, End) -> get_range_(Begin, End).
 
 %% @doc Helper for get_range/2 to make dialyzer happy with internal use of
-%%      get_range/2 in the other methods, e.g. get_split_key/2.
--spec get_range_(Begin::key_t(), End::key_t()) -> key_t().
+%%      get_range/2 in the other methods, e.g. get_split_key/3.
+-spec get_range_(Begin::key_t(), End::key_t()) -> number().
 get_range_(Begin, End) ->
     if
         End == Begin -> n_(); % I am the only node
@@ -128,12 +128,15 @@ get_range_(Begin, End) ->
         End < Begin  -> (n_() - Begin - 1) + End
     end.
 
-%% @doc Gets the key that splits the interval (Begin, End] in two equal halves
-%%      (their ranges may differ by at most one key). In the special case of
+%% @doc Gets the key that splits the interval (Begin, End] so that the first
+%%      interval will be (Num/Denom) * range(Begin, End). In the special case of
 %%      Begin==End, the whole key range is split in halves.
-%%      Beware: if the key range is smaller than 2 the split key will be Begin!
-get_split_key(Begin, End) ->
-    normalize(Begin + (get_range_(Begin, End) div 2)).
+%%      Beware: SplitFactor must be in [0, 1]; the final key will be rounded
+%%      down and may thus be Begin.
+get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
+get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
+get_split_key(Begin, End, {Num, Denom}) ->
+    normalize(Begin + (get_range_(Begin, End) * Num) div Denom).
 
 %% userdevguide-begin rt_simple:get_replica_keys
 %% @doc Returns the replicas of the given key.

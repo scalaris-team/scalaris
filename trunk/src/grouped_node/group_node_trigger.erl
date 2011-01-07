@@ -52,7 +52,7 @@ trigger(State) ->
 
 get_split_key(Interval) ->
     {'[', LowerBound, UpperBound, _} = intervals:get_bounds(Interval),
-    ?RT:get_split_key(LowerBound, UpperBound).
+    ?RT:get_split_key(LowerBound, UpperBound, {1, 2}).
 
 -spec split_group(list(comm:mypid())) -> {list(comm:mypid()), list(comm:mypid())}.
 split_group([]) ->
