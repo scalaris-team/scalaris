@@ -29,6 +29,7 @@
 all() ->
     [new, is_empty, intersection, tc1, normalize, is_left_right_of,
      tester_empty_well_formed, tester_empty, tester_empty_continuous,
+     tester_all_well_formed, tester_all_continuous, tester_all,
      tester_new1_well_formed, tester_new1, tester_new1_continuous,
      tester_new1_bounds,
      tester_new2_well_formed, tester_new2, tester_new2_continuous,
@@ -142,7 +143,7 @@ normalize(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% intervals:empty/0, intervals:in/2 and intervals:is_continuous/1
+% intervals:empty/0, intervals:is_empty/1, intervals:in/2 and intervals:is_continuous/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_empty_well_formed() -> boolean().
@@ -166,7 +167,35 @@ tester_empty_continuous(_Config) ->
     tester:test(?MODULE, prop_empty_continuous, 0, 1).
 
 tester_empty(_Config) ->
-    tester:test(?MODULE, prop_empty, 1, 1).
+    tester:test(?MODULE, prop_empty, 1, 5000).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:all/0, intervals:is_all/1, intervals:in/2 and intervals:is_continuous/1
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_all_well_formed() -> boolean().
+prop_all_well_formed() ->
+    intervals:is_well_formed(intervals:all()).
+
+-spec prop_all_continuous() -> boolean().
+prop_all_continuous() ->
+    intervals:is_continuous(intervals:all()).
+
+-spec prop_all(intervals:key()) -> true.
+prop_all(X) ->
+    ?assert(intervals:is_all(intervals:all())),
+    ?assert(intervals:in(X, intervals:all())),
+    true.
+
+tester_all_well_formed(_Config) ->
+    tester:test(?MODULE, prop_all_well_formed, 0, 1).
+
+tester_all_continuous(_Config) ->
+    tester:test(?MODULE, prop_all_continuous, 0, 1).
+
+tester_all(_Config) ->
+    tester:test(?MODULE, prop_all, 1, 5000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -221,7 +250,7 @@ prop_new2_continuous(X, Y) ->
 -spec prop_new2_bounds(intervals:key(), intervals:key()) -> true.
 prop_new2_bounds(X, Y) ->
     I = intervals:new('[', X, Y, ']'),
-    case I =:= intervals:all() of
+    case intervals:is_all(I) of
         false -> ?equals(intervals:get_bounds(I), {'[', X, Y, ']'});
         true  -> ?equals(intervals:get_bounds(I), {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'})
     end,
@@ -280,7 +309,7 @@ prop_new4_bounds(XBr, X, Y, YBr) ->
     case intervals:is_empty(I) of
         true -> true;
         false ->
-            case I =:= intervals:all() of
+            case intervals:is_all(I) of
                 false -> ?equals(intervals:get_bounds(I), {XBre, Xe, Ye, YBre});
                 true  -> ?equals(intervals:get_bounds(I), {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'})
             end,
@@ -700,7 +729,7 @@ prop_mk_from_node_ids(X, Y) ->
     ?assert(intervals:is_continuous(I)),
     case X =:= Y of
         true  ->
-            ?assert(intervals:all() =:= I andalso
+            ?assert(intervals:is_all(I) andalso
                         intervals:in(X, I));
         false ->
             ?assert(intervals:new('(', X, Y, ']') =:= I andalso

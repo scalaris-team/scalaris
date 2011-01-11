@@ -15,7 +15,7 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Simple passive load balancing sampling k nodes and choosing the
 %%         one that reduces the standard deviation the most.
-%%         Splits loads in half, otherwise (no load) address ranges.
+%%         Splits loads in half, if there is no load address ranges are split.
 %% @end
 %% @version $Id$
 -module(lb_psv_split).
@@ -28,6 +28,8 @@
 -ifdef(with_export_type_support).
 -export_type([custom_message/0]).
 -endif.
+
+-export([my_sort_fun/2]).
 
 -type custom_message() :: none().
 
@@ -115,33 +117,17 @@ my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
         true -> true;
         _ when Op1Change =:= Op2Change ->
             Op1NewInterval = node_details:get(lb_op:get(Op1, n1_new), my_range),
-            Op1NewRange =
-                case intervals:all() =:= Op1NewInterval of
-                    true ->
-                        try ?RT:n()
-                        catch throw:not_supported -> 0
-                        end;
-                    _ ->
-                        {_, Op1NewPredId, Op1NewMyId, _} =
-                            intervals:get_bounds(Op1NewInterval),
-                        try ?RT:get_range(Op1NewPredId, Op1NewMyId)
-                        catch throw:not_supported -> 0
-                        end
-                end,
+            {_, Op1NewPredId, Op1NewMyId, _} =
+                intervals:get_bounds(Op1NewInterval),
+            Op1NewRange = try ?RT:get_range(Op1NewPredId, Op1NewMyId)
+                          catch throw:not_supported -> 0
+                          end,
             Op2NewInterval = node_details:get(lb_op:get(Op2, n1_new), my_range),
-            Op2NewRange =
-                case intervals:all() =:= Op2NewInterval of
-                    true ->
-                        try ?RT:n()
-                        catch throw:not_supported -> 0
-                        end;
-                    _ ->
-                        {_, Op2NewPredId, Op2NewMyId, _} =
-                            intervals:get_bounds(Op2NewInterval),
-                        try ?RT:get_range(Op2NewPredId, Op2NewMyId)
-                        catch throw:not_supported -> 0
-                        end
-                end,
+            {_, Op2NewPredId, Op2NewMyId, _} =
+                intervals:get_bounds(Op2NewInterval),
+            Op2NewRange = try ?RT:get_range(Op2NewPredId, Op2NewMyId)
+                          catch throw:not_supported -> 0
+                          end,
             Op2NewRange =< Op1NewRange orelse
                 ((Op1NewRange =:= Op2NewRange) andalso Op1 =< Op2);
         _ -> false

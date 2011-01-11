@@ -300,7 +300,7 @@ init(Options) ->
         true ->
             io:format("first~n", []),
             trigger_known_nodes(),
-            Interval = group_types:all(),
+            Interval = intervals:all(),
             View = group_paxos_utils:init_paxos(group_view:new(Interval)),
             We = group_view:get_group_node(View),
             TriggerState = trigger:now(trigger:init(Trigger, ?MODULE)),
