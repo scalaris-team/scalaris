@@ -115,11 +115,11 @@ check_ring() ->
                             none ->
                                 {_, PredInterval, _, _} = Pred,
                                 {_, SuccInterval, _, _} = Succ,
-                                case Interval =:= group_types:all() of
+                                case intervals:is_all(Interval) of
                                     true ->
                                         SuccessValue = gb_trees:enter(Interval, {Pred, Succ}, Tree),
-                                        check_pred_succ(PredInterval =:= group_types:all(),
-                                                        SuccInterval =:= group_types:all(),
+                                        check_pred_succ(intervals:is_all(PredInterval),
+                                                        intervals:is_all(SuccInterval),
                                                         SuccessValue,
                                                         PredInterval, Interval, SuccInterval);
                                     false ->

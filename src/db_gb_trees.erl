@@ -102,12 +102,12 @@ get_load_({DB, _CKInt, _CKDB}) ->
 
 %% @doc Returns the number of stored keys in the given interval.
 get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
-    Empty = intervals:empty(),
-    All = intervals:all(),
-    case Interval of
-        Empty -> 0;
-        All   -> get_load_(State);
-        _     ->
+    IsEmpty = intervals:is_empty(Interval),
+    IsAll = intervals:is_all(Interval),
+    if
+        IsEmpty -> 0;
+        IsAll   -> get_load_(State);
+        true    ->
             F = fun(Key, _DBEntry, Load) ->
                         case intervals:in(Key, Interval) of
                             true -> Load + 1;

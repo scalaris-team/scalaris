@@ -148,12 +148,12 @@ get_load_({{DB, _FileName}, _CKInt, _CKDB}) ->
 
 %% @doc Returns the number of stored keys in the given interval.
 get_load_(State = {{DB, _FileName}, _CKInt, _CKDB}, Interval) ->
-    Empty = intervals:empty(),
-    All = intervals:all(),
-    case Interval of
-        Empty -> 0;
-        All   -> get_load_(State);
-        _     ->
+    IsEmpty = intervals:is_empty(Interval),
+    IsAll = intervals:is_all(Interval),
+    if
+        IsEmpty -> 0;
+        IsAll   -> get_load_(State);
+        true    ->
             toke_drv:fold(fun(Key_, _V, Load) ->
                                   Key = erlang:binary_to_term(Key_),
                                   case intervals:in(Key, Interval) of

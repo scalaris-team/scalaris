@@ -67,7 +67,7 @@ update_pred_succ(NodeState, Pred, Succ, Range) ->
 update_succ(NodeState, Succ, MyRange) ->
     {NewGroupId, SuccRange, NewVersion, _NewMembers} = Succ,
     {OldGroupId, OldSuccRange, OldVersion, _OldMembers} = get_successor(NodeState),
-    case MyRange =:= group_types:all() of
+    case intervals:is_all(MyRange) of
         true ->
             % special case when we cover everything
             case is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion) andalso
@@ -110,7 +110,7 @@ update_succ(NodeState, Succ, MyRange) ->
 update_pred(NodeState, Pred, MyRange) ->
     {NewGroupId, PredRange, NewVersion, _NewMembers} = Pred,
     {OldGroupId, OldPredRange, OldVersion, _OldMembers} = get_predecessor(NodeState),
-    case MyRange =:= group_types:all() of
+    case intervals:is_all(MyRange) of
         true ->
             % special case when we cover everything
             case is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion) andalso

@@ -121,12 +121,10 @@ get_range(Begin, End) -> get_range_(Begin, End).
 %% @doc Helper for get_range/2 to make dialyzer happy with internal use of
 %%      get_range/2 in the other methods, e.g. get_split_key/3.
 -spec get_range_(Begin::key_t(), End::key_t()) -> number().
-get_range_(Begin, End) ->
-    if
-        End == Begin -> n_(); % I am the only node
-        End > Begin  -> End - Begin;
-        End < Begin  -> (n_() - Begin - 1) + End
-    end.
+get_range_(Begin, Begin) -> n_(); % I am the only node
+get_range_(?MINUS_INFINITY, ?PLUS_INFINITY) -> n_(); % special case, only node
+get_range_(Begin, End) when End > Begin -> End - Begin;
+get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
 
 %% @doc Gets the key that splits the interval (Begin, End] so that the first
 %%      interval will be (Num/Denom) * range(Begin, End). In the special case of

@@ -34,7 +34,7 @@
 
 -export([empty/0, new/1, new/4, all/0, from_elements/1,
          % testing / comparing intervals
-         is_empty/1, is_subset/2, is_continuous/1,
+         is_empty/1, is_all/1, is_subset/2, is_continuous/1,
          is_adjacent/2, in/2,
          is_left_of/2, is_right_of/2,
          % operations for intervals
@@ -108,6 +108,11 @@ from_elements(Elements) ->
 -spec is_empty(interval()) -> boolean().
 is_empty([]) -> true;
 is_empty(_) ->  false.
+
+%% @doc Checks whether the given interval is covering everything.
+-spec is_all(interval()) -> boolean().
+is_all([all]) -> true;
+is_all(_) ->  false.
 
 %% @doc Creates the intersection of two intervals.
 %%      Precondition: is_well_formed(A) andalso is_well_formed(B).

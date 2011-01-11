@@ -13,9 +13,12 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc    Simple passive load balancing sampling k nodes and choosing the
+%% @doc    Passive load balancing using gossip to sample O(log(N)) nodes (at
+%%         least lb_psv_gossip_min_samples samples) and choose the
 %%         one that reduces the standard deviation the most.
-%%         Splits loads in half, otherwise (no load) address ranges.
+%%         If there is no load address ranges are split in halves, otherwise
+%%         no more load is moved than is needed to have the average load on one
+%%         of the two nodes.
 %% @end
 %% @version $Id$
 -module(lb_psv_gossip).
@@ -116,56 +119,13 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues) ->
     comm:send(SourcePid, {join, get_candidate_response, SelectedKey, Candidate}),
     DhtNodeState.
 
-%% @doc Sort function for two operations and their Sum2Change.
-%%      Op1 will be preferred over Op2, i.e. Op1 is smaller than Op2, if its
-%%      Sum2Change is smaller or if it is equal and its new node's address
-%%      space is larger.
--spec my_sort_fun(Op1::{lb_op:lb_op(), integer()},
-                  Op2::{lb_op:lb_op(), integer()}) -> boolean().
-my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
-    case Op1Change < Op2Change of
-        true -> true;
-        _ when Op1Change =:= Op2Change ->
-            Op1NewInterval = node_details:get(lb_op:get(Op1, n1_new), my_range),
-            Op1NewRange =
-                case intervals:all() =:= Op1NewInterval of
-                    true ->
-                        try ?RT:n()
-                        catch throw:not_supported -> 0
-                        end;
-                    _ ->
-                        {_, Op1NewPredId, Op1NewMyId, _} =
-                            intervals:get_bounds(Op1NewInterval),
-                        try ?RT:get_range(Op1NewPredId, Op1NewMyId)
-                        catch throw:not_supported -> 0
-                        end
-                end,
-            Op2NewInterval = node_details:get(lb_op:get(Op2, n1_new), my_range),
-            Op2NewRange =
-                case intervals:all() =:= Op2NewInterval of
-                    true ->
-                        try ?RT:n()
-                        catch throw:not_supported -> 0
-                        end;
-                    _ ->
-                        {_, Op2NewPredId, Op2NewMyId, _} =
-                            intervals:get_bounds(Op2NewInterval),
-                        try ?RT:get_range(Op2NewPredId, Op2NewMyId)
-                        catch throw:not_supported -> 0
-                        end
-                end,
-            Op2NewRange =< Op1NewRange orelse
-                ((Op1NewRange =:= Op2NewRange) andalso Op1 =< Op2);
-        _ -> false
-    end.
-
 %% @doc Sorts all provided operations so that the one with the biggest change
 %%      of the standard deviation is at the front. In case of no load changes,
 %%      the operation with the largest address range at the joining node will
 %%      be at the front.
 %%      Note: this is executed at the joining node.
 sort_candidates(Ops) ->
-    lb_common:bestStddev(Ops, plus_infinity, fun my_sort_fun/2).
+    lb_common:bestStddev(Ops, plus_infinity, fun lb_psv_split:my_sort_fun/2).
 
 -spec process_join_msg(custom_message(),
         {get_samples, SourcePid::comm:mypid()} |

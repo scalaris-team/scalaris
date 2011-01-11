@@ -19,7 +19,6 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
--export([all/0]).
 
 -type(group_id() :: non_neg_integer()).
 
@@ -51,6 +50,3 @@
 -export_type([group_id/0, paxos_id/0, proposal/0, decision_hint/0,
               group_node/0, group_member/0, group_member_list/0]).
 -endif.
-
-all() ->
-    intervals:new('[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']').
