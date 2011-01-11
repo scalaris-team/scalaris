@@ -81,7 +81,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     sup_scalaris:start_link(boot, [{boot_server, empty} | Options]),
                     boot_server:connect(),
                     Ids = IdsFun(), % config may be needed
-                    admin:add_node([{first}, {{idholder, id}, hd(Ids)}]),
+                    admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
                     [admin:add_node_at_id(Id) || Id <- tl(Ids)],
                     ok
             end),
