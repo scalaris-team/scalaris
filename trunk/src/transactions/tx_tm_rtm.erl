@@ -83,14 +83,21 @@ init([]) ->
     %% TableName = pdb:new(?MODULE, [set, private]),
     LAcceptor = pid_groups:get_my(paxos_acceptor),
     LLearner = pid_groups:get_my(paxos_learner),
-    State = {_RTMs = [], TableName, Role, LAcceptor, LLearner},
 
     %% start getting rtms and maintain them.
     case Role of
         tx_tm ->
-            idholder:get_id(),
+            IdSelf = nodelist:nodeid(
+                       rm_loop:get_neighbors(rm_loop:get_neighbors_table())),
+            RTM_ids = my_get_RTM_ids(IdSelf),
+            NewRTMs =
+                lists:zip3(RTM_ids,
+                           [ unknown || _X <- lists:seq(1, length(RTM_ids))],
+                           lists:seq(0, length(RTM_ids) - 1)),
+            my_RTM_update(NewRTMs),
+            State = {NewRTMs, TableName, Role, LAcceptor, LLearner},
             gen_component:change_handler(State, on_init);
-        _ -> State
+        _ -> {_RTMs = [], TableName, Role, LAcceptor, LLearner}
     end.
 
 -spec on(comm:message(), state()) -> state().
@@ -459,16 +466,6 @@ on({get_rtm_reply, InKey, InPid},
 
 -spec on_init(comm:message(), state()) -> state().
 %% While initializing
-on_init({idholder_get_id_response, IdSelf, _IdSelfVersion},
-   {_RTMs, TableName, Role, LAcceptor, LLearner} = _State) ->
-    ?TRACE("tx_tm_rtm:on_init:idholder_get_id_response State; ~p~n", [_State]),
-    RTM_ids = my_get_RTM_ids(IdSelf),
-    NewRTMs = lists:zip3(RTM_ids,
-                         [ unknown || _X <- lists:seq(1, length(RTM_ids))],
-                         lists:seq(0, length(RTM_ids) - 1)),
-    my_RTM_update(NewRTMs),
-    {NewRTMs, TableName, Role, LAcceptor, LLearner};
-
 on_init({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
     on({update_RTMs}, State);

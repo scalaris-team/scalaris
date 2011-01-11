@@ -93,7 +93,6 @@ on({leave}, State) ->
     dht_node_move:make_slide_leave(State);
 
 on({churn}, _State) ->
-    idholder:reinit(),
     kill;
 
 on({halt}, _State) ->
@@ -381,21 +380,18 @@ on({acceptor_naccepted, _PaxosId, _NewerRound} = Msg, State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec init(Options::[tuple()]) -> {join, {as_first | phase1, Options::[tuple()]},
-                                   msg_queue:msg_queue()}.
+-spec init(Options::[tuple()]) -> dht_node_state:state().
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
-    % first node in this vm and also vm is marked as first
-    % or unit-test
+    % get my ID (if set, otherwise chose a random ID):
+    Id = case lists:keyfind({dht_node, id}, 1, Options) of
+             {{dht_node, id}, IdX} -> IdX;
+             _ -> ?RT:get_random_node_id()
+         end,
     case is_first(Options) of
-        true ->
-            trigger_known_nodes(),
-            idholder:get_id(),
-            {join, {as_first, Options}, msg_queue:new()};
-        _ ->
-            idholder:get_id(),
-            {join, {phase1, Options}, msg_queue:new()}
+        true -> dht_node_join:join_as_first(Id, 0, Options);
+        _    -> dht_node_join:join_as_other(Id, 0, Options)
     end.
 %% userdevguide-end dht_node:start
 
@@ -422,6 +418,8 @@ trigger_known_nodes() ->
             trigger_known_nodes()
     end.
 
+%% @doc Checks whether this VM is marked as first, e.g. in a unit test, and
+%%      this is the first node in this VM.
 -spec is_first([tuple()]) -> boolean().
 is_first(Options) ->
     lists:member({first}, Options) andalso

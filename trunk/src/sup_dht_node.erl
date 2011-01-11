@@ -62,9 +62,6 @@ init(Options) ->
                              [DHTNodeGroup]),
     Gossip =
         util:sup_worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
-    IdHolder =
-        util:sup_worker_desc(idholder, idholder, start_link,
-                             [DHTNodeGroup, Options]),
     Reregister =
         util:sup_worker_desc(dht_node_reregister, dht_node_reregister,
                              start_link, [DHTNodeGroup]),
@@ -85,7 +82,6 @@ init(Options) ->
            Delayer,
            Reregister,
            DeadNodeCache,
-           IdHolder,
            RingMaintenance,
            RoutingTable,
            Cyclon,

@@ -105,7 +105,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                              ["clients_group"]),
     DHTNodeFirstId = case preconfig:get_env(first_id, random) of
                          random -> [];
-                         Id     -> [{{idholder, id}, Id}]
+                         Id     -> [{{dht_node, id}, Id}]
                      end,
     DHTNodeOptions = DHTNodeFirstId ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNode =

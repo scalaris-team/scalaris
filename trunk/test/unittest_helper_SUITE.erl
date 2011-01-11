@@ -70,6 +70,8 @@ prop_make_ring_with_ids(IDs) ->
     ?equals(lists:sort(ActualIds), lists:sort(UniqueIDs)),
     
     unittest_helper:stop_ring(),
+    % wait a bit for all processes to stop
+    timer:sleep(100),
     true.
 
 tester_make_ring_with_ids(_Config) ->

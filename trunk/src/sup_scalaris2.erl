@@ -104,9 +104,9 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
     DHTNodeFirstId = case preconfig:get_env(first_id, random) of
-                  random -> [];
-                  Id     -> [{{idholder, id}, Id}]
-              end,
+                         random -> [];
+                         Id     -> [{{dht_node, id}, Id}]
+                     end,
     DHTNodeOptions = DHTNodeFirstId ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNode =
         util:sup_supervisor_desc(group_node, sup_group_node, start_link, [[{my_sup_dht_node_id, group_node} | DHTNodeOptions]]),

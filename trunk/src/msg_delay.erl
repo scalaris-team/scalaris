@@ -68,6 +68,7 @@ start_link(DHTNodeGroup) ->
                              [], % parameters passed to init
                              [{pid_groups_join_as, DHTNodeGroup, msg_delay}]).
 
+%% userdevguide-begin gen_component:sample
 %% initialize: return initial state.
 -spec init([]) -> state().
 init([]) ->
@@ -120,3 +121,4 @@ on({web_debug_info, Requestor}, {TableName, Counter} = State) ->
           end || Seconds <- lists:seq(0, 10)]],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
+%% userdevguide-end gen_component:sample

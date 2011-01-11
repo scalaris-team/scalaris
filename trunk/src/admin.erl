@@ -39,7 +39,7 @@
 -spec add_node_at_id(?RT:key()) ->
         ok | {error, already_present | {already_started, pid() | undefined} | term()}.
 add_node_at_id(Id) ->
-    add_node([{{idholder, id}, Id}, {skip_psv_lb}]).
+    add_node([{{dht_node, id}, Id}, {skip_psv_lb}]).
 
 -spec add_node([tuple()]) ->
         ok | {error, already_present | {already_started, pid() | undefined} | term()}.

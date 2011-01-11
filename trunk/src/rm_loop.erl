@@ -206,13 +206,6 @@ init(_) ->
 on_startup({init_rm, Me, Pred, Succ}, {uninit, NeighbTable, SubscrTable, QueuedMessages}) ->
     % create the ets table storing the neighborhood
     ets:insert(NeighbTable, {has_left, false}),
-    ets:insert(SubscrTable, {{null, idholder},
-                             fun rm_loop:subscribe_node_change_filter/2,
-                             fun(null, idholder, _OldNeighbors, NewNeighbors) ->
-                                     NewNode = nodelist:node(NewNeighbors),
-                                     idholder:set_id(node:id(NewNode),
-                                                     node:id_version(NewNode))
-                             end}),
     dn_cache:subscribe(),
     % initialize the rm_* module - assume it sets a neighborhood using update_neighbors/2!
     RM_State = ?RM:init(NeighbTable, Me, Pred, Succ),
