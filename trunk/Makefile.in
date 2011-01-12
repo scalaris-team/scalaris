@@ -154,7 +154,7 @@ dialyzer: compile
 	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ --no_native | sed -f contrib/dialyzer-col.sed
 
 %_SUITE-dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/$*_SUITE.erl --no_native | sed -f contrib/dialyzer-col.sed
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wno_return -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/$*_SUITE.erl --no_native | sed -f contrib/dialyzer-col.sed
 
 plt: compile
 	$(DIALYZER) --plt_info > /dev/null ; \

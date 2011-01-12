@@ -159,14 +159,9 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
     case StartNewRound of
         true ->
             % see gossip:calc_initial_avg_kr/2:
-            KrExp = try if
-                            PredId =:= NodeId -> ?RT:n(); % I am the only node
-                            NodeId >= PredId  -> NodeId - PredId;
-                            NodeId < PredId   -> (?RT:n() - PredId) + NodeId
-                        end
-                    catch % keys might not support subtraction or ?RT:n() might throw
-                        throw:not_supported -> unknown;
-                        error:badarith -> unknown
+            KrExp = try ?RT:get_range(PredId, NodeId)
+                    catch % ?RT:get_range() may throw
+                        throw:not_supported -> unknown
                     end,
             NewValuesExp1 = gossip_state:set(gossip_state:new_internal(), size_inv, 1.0),
             NewValuesExp2 = gossip_state:set(NewValuesExp1, avg_kr, KrExp),
@@ -210,16 +205,16 @@ test_on_trigger1() ->
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, not initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, false, 0, 0, 0),
-    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
-    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
+    prop_on_trigger(?RT:hash_key(1), ?RT:hash_key(10), 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(?RT:hash_key(10), ?RT:hash_key(1), 2, 4, 1, PreviousState, State, []).
 
 test_on_trigger2() ->
     GossipNewValues = gossip_state:new_internal(),
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % empty values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(GossipNewValues, true, 0, 0, 0),
-    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
-    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
+    prop_on_trigger(?RT:hash_key(1), ?RT:hash_key(10), 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(?RT:hash_key(10), ?RT:hash_key(1), 2, 4, 1, PreviousState, State, []).
 
 test_on_trigger3() ->
     GossipNewValues = gossip_state:new_internal(),
@@ -227,8 +222,8 @@ test_on_trigger3() ->
     % empty values but round = 1, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 0, 0, 0),
-    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
-    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
+    prop_on_trigger(?RT:hash_key(1), ?RT:hash_key(10), 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(?RT:hash_key(10), ?RT:hash_key(1), 2, 4, 1, PreviousState, State, []).
 
 test_on_trigger4() ->
     GossipNewValues = gossip_state:new_internal(),
@@ -236,8 +231,8 @@ test_on_trigger4() ->
     % empty values but round = 1, initialized, triggers = 1, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 1, 0, 0),
-    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
-    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
+    prop_on_trigger(?RT:hash_key(1), ?RT:hash_key(10), 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(?RT:hash_key(10), ?RT:hash_key(1), 2, 4, 1, PreviousState, State, []).
 
 test_on_trigger5() ->
     GossipNewValues = gossip_state:new_internal(),
@@ -245,8 +240,8 @@ test_on_trigger5() ->
     % empty values but round = 1, initialized, triggers = 2, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 2, 0, 0),
-    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
-    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
+    prop_on_trigger(?RT:hash_key(1), ?RT:hash_key(10), 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(?RT:hash_key(10), ?RT:hash_key(1), 2, 4, 1, PreviousState, State, []).
 
 test_on_trigger6() ->
     GossipNewValues = gossip_state:new_internal(),
@@ -254,8 +249,8 @@ test_on_trigger6() ->
     % empty values but round = 1, initialized, triggers = 3, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 3, 0, 0),
-    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
-    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
+    prop_on_trigger(?RT:hash_key(1), ?RT:hash_key(10), 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(?RT:hash_key(10), ?RT:hash_key(1), 2, 4, 1, PreviousState, State, []).
 
 test_on_trigger7() ->
     GossipNewValues = gossip_state:new_internal(),
@@ -263,8 +258,8 @@ test_on_trigger7() ->
     % empty values but round = 1, initialized, triggers = 4, msg_exchg = 0, conv_avg_count = 0
     Values = gossip_state:set(GossipNewValues, round, 1),
     State = create_gossip_state(Values, true, 4, 0, 0),
-    prop_on_trigger(1, 10, 2, 4, 1, PreviousState, State, []),
-    prop_on_trigger(10, 1, 2, 4, 1, PreviousState, State, []).
+    prop_on_trigger(?RT:hash_key(1), ?RT:hash_key(10), 2, 4, 1, PreviousState, State, []),
+    prop_on_trigger(?RT:hash_key(10), ?RT:hash_key(1), 2, 4, 1, PreviousState, State, []).
 
 test_on_trigger(_Config) ->
     test_on_trigger1(),

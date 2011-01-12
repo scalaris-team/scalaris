@@ -19,7 +19,7 @@
 %%      of a connection where messages are received and send from/to the
 %%      network.
 %% @end
-%% @version $Id $
+%% @version $Id$
 -module(comm_connection).
 -author('schuett@zib.de').
 -author('schintke@zib.de').

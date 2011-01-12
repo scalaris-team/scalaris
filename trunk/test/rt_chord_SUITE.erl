@@ -140,28 +140,29 @@ next_hop2(_Config) ->
     ?DB:close(DB),
     ok.
 
--spec prop_get_split_key_half(Begin::?RT:key(), End::?RT:key()) -> true.
+-spec prop_get_split_key_half(Begin::rt_chord:key(), End::rt_chord:key()) -> true.
 prop_get_split_key_half(Begin, End) ->
     SplitKey = rt_chord:get_split_key(Begin, End, {1, 2}),
     
-    ?equals_w_note(intervals:in(SplitKey, intervals:new('[', Begin, End, ']')), true,
-                   io_lib:format("SplitKey: ~.0p", [SplitKey])),
-    case (Begin =:= End) of
-        true -> ?equals(SplitKey, Begin);
+    case Begin =:= End of
+        true -> ok; % full range, no need to check interval
         _ ->
-            BeginToSplitKey = rt_chord:get_range(Begin, SplitKey),
-            SplitKeyToEnd = rt_chord:get_range(SplitKey, End),
-            ?equals_pattern_w_note(
-                BeginToSplitKey,
-                Result when Result == SplitKeyToEnd orelse Result == (SplitKeyToEnd - 1),
-                io_lib:format("SplitKey: ~.0p", [SplitKey]))
+            ?equals_w_note(intervals:in(SplitKey, intervals:new('[', Begin, End, ']')), true,
+                           io_lib:format("SplitKey: ~.0p", [SplitKey]))
     end,
+
+    BeginToSplitKey = rt_chord:get_range(Begin, SplitKey),
+    SplitKeyToEnd = rt_chord:get_range(SplitKey, End),
+    ?equals_pattern_w_note(
+        BeginToSplitKey,
+        Result when Result == SplitKeyToEnd orelse Result == (SplitKeyToEnd - 1),
+        io_lib:format("SplitKey: ~.0p", [SplitKey])),
     true.
 
 tester_get_split_key_half(_Config) ->
     tester:test(?MODULE, prop_get_split_key_half, 2, 10000).
 
--spec prop_get_split_key(Begin::?RT:key(), End::?RT:key(), SplitFracA::1..100, SplitFracB::0..100) -> true.
+-spec prop_get_split_key(Begin::rt_chord:key(), End::rt_chord:key(), SplitFracA::1..100, SplitFracB::0..100) -> true.
 prop_get_split_key(Begin, End, SplitFracA, SplitFracB) ->
     FullRange = rt_chord:get_range(Begin, End),
 %%     ct:pal("FullRange: ~.0p", [FullRange]),
@@ -174,11 +175,15 @@ prop_get_split_key(Begin, End, SplitFracA, SplitFracB) ->
 %%     ct:pal("Begin: ~.0p, End: ~.0p, SplitFactor: ~.0p", [Begin, End, SplitFraction]),
     SplitKey = rt_chord:get_split_key(Begin, End, SplitFraction),
     
-    ?equals_w_note(intervals:in(SplitKey, intervals:new('[', Begin, End, ']')), true,
-                   io_lib:format("SplitKey: ~.0p", [SplitKey])),
-    case (Begin =:= End) of
+    case erlang:element(1, SplitFraction) =:= 0 of
         true -> ?equals(SplitKey, Begin);
         _ ->
+            case Begin =:= End of
+                true -> ok; % full range, no need to check interval
+                _ ->
+                    ?equals_w_note(intervals:in(SplitKey, intervals:new('[', Begin, End, ']')), true,
+                                   io_lib:format("SplitKey: ~.0p", [SplitKey]))
+            end,
             BeginToSplitKey = case Begin of
                                   SplitKey -> 0;
                                   _ -> rt_chord:get_range(Begin, SplitKey)

@@ -15,7 +15,7 @@
 %% @doc: CommLayer: Management of comm_connection processes.
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
-%% @version $Id $
+%% @version $Id$
 -module(comm_server).
 -author('schuett@zib.de').
 -author('schintke@zib.de').

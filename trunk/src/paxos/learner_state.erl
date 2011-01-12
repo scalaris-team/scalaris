@@ -17,6 +17,7 @@
 %% @doc Part of generic Paxos-Consensus implementation
 %%      The state needed for a single learner instance.
 %% @end
+%% @version $Id$
 -module(learner_state).
 -author('schintke@onscale.de').
 -vsn('$Id$').
