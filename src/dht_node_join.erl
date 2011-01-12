@@ -64,8 +64,9 @@
 -type join_state() ::
     {join, phase_2_4(), QueuedMessages::msg_queue:msg_queue()}.
 
-%% userdevguide-begin dht_node_join:join_first
--spec join_as_first(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()]) -> dht_node_state:state().
+%% userdevguide-begin dht_node_join:join_as_first
+-spec join_as_first(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()])
+        -> dht_node_state:state().
 join_as_first(Id, IdVersion, _Options) ->
     % ugly hack to get a valid ip-address into the comm-layer
     dht_node:trigger_known_nodes(), 
@@ -74,17 +75,18 @@ join_as_first(Id, IdVersion, _Options) ->
     Me = node:new(comm:this(), Id, IdVersion),
     % join complete, State is the first "State"
     finish_join(Me, Me, Me, ?DB:new(), msg_queue:new()).
-%% userdevguide-end dht_node_join:join_first
+%% userdevguide-end dht_node_join:join_as_first
 
-%% userdevguide-begin dht_node_join:join_other_p1
--spec join_as_other(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()]) -> {join, phase2(), msg_queue:msg_queue()}.
+%% userdevguide-begin dht_node_join:join_as_other
+-spec join_as_other(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()])
+        -> {join, phase2(), msg_queue:msg_queue()}.
 join_as_other(Id, IdVersion, Options) ->
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
     get_known_nodes(),
     msg_delay:send_local(get_join_timeout() div 1000, self(), {join, timeout}),
     {join, {phase2, Options, IdVersion, [], [Id], []}, msg_queue:new()}.
-%% userdevguide-end dht_node_join:join_other_p1
+%% userdevguide-end dht_node_join:join_as_other
 
 % join protocol
 %% @doc Process a DHT node's join messages during the join phase.

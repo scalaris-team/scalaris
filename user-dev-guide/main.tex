@@ -1556,7 +1556,6 @@ supervisor. The processes are:
 \code{Delayer},
 \code{Reregister},
 \code{DeadNodeCache},
-\code{IdHolder},
 \code{RoutingTable},
 \code{SupDHTNodeCore_AND},
 \code{Cyclon},
@@ -1620,36 +1619,29 @@ module name, the code belongs to (here: \code{dht_node}).
 
 The \code{gen_component} behaviour registers the \code{dht_node} in the
 process dictionary. Formerly, the process had to do this itself, but
-we moved this code into the behaviour. If the \code{dht_node} is the
-first node, it will start immediately by triggering all known nodes
-(to initialize the comm layer) and entering the join process
-accordingly. The node also retrieves its \code{Id} from the idholder:
-\erlfun{idholder}{get\_id}{}.
-In case of a re-started node, this will be the last known ID. Otherwhise,
-the \erlmodule{idholder} will return the ID (first) set by the
-\code{\{\{idholder, id\}, KEY\}} option passed to \erlfun{idholder}{init}{/1}
-or a random key. If the \code{dht_node}-process
-fails and is re-started by its supervisor, this call to the idholder
-ensures that the node still keeps its \code{Id}, assuming that the
-idholder process is not failing and no passive load balancing takes place.
-This is important in order not to destroy an existing load balance if a
-node somehow fails.
-%This is important for the
-%load-balancing and for consistent responsibility of nodes to ensure consistent lookup in
-%the structured overlay.
+we moved this code into the behaviour. If an ID was given to
+\erlfun{dht\_node}{init}{/1} function as a \code{\{\{dht_node, id\}, KEY\}}
+tuple, the given Id will be used. Otherwise a random key is generated.
+Depending on whether the node is the first inside a VM marked as first or not,
+the according function in \erlmodule{dht\_node\_join} is called.
+Also the pid of the node's supervisor is kept for future reference.
 
 \section{Actually joining the ring}
 
 After retrieving its identifier, the node starts the join protocol
 which processes the appropriate messages calling
+\erlfun{dht\_node\_join}{process\_join\_state}{Message, State}. On the
+existing node, join messages will be processed by
 \erlfun{dht\_node\_join}{process\_join\_msg}{Message, State}.
 
 \subsection{A single node joining an empty ring}
 
-\codesnippet{dht_node_join.erl}{dht_node_join:join_first}{../src/dht_node_join.erl}
+\codesnippet{dht_node_join.erl}{dht_node_join:join_as_first}{../src/dht_node_join.erl}
 
 If the ring is empty, the joining node will be the only node in the ring
 and will thus be responsible for the whole key space.
+It will trigger all known nodes to initialize the comm layer and then finish
+the join.
 \erlfun{dht\_node\_join}{finish\_join}{/5}
 just creates a new state for a \scalaris{} node consisting of the given
 parameters (the node as itself, its predecessor and successor,
@@ -1664,19 +1656,14 @@ The \erlfun{dht\_node\_state}{state}{} type is defined in
 \subsection{A single node joining an existing (non-empty) ring}
 
 If a node joins an existing ring, its join protocol will step through
-the following 6 phases:
+the following four phases:
 \begin{itemize}
-  \item \makebox[4em][l]{\textbf{phase1}}
-    getting the Id from the \erlmodule{idholder}
   \item \makebox[4em][l]{\textbf{phase2}}
     finding nodes to contact with the help of the configured \code{known_hosts}
   \item \makebox[4em][l]{\textbf{phase2b}}
     getting the number of Ids to sample (may be skipped)
   \item \makebox[4em][l]{\textbf{phase3}}
     lookup nodes responsible for all sampled Ids
-  \item \makebox[4em][l]{\textbf{phase3b}}
-    waiting for the \erlmodule{idholder} to acknowledge an Id change
-    (if applicable)
   \item \makebox[4em][l]{\textbf{phase4}}
     joining a selected node and setting up item movements
 \end{itemize}
@@ -1685,18 +1672,14 @@ The following figure shows a (non-exhaustive) overview of the transitions
 between the phases in the normal case. We will go through these step by step
 and discuss what happens if errors occur.
 
-\medskip
-{\centering\includegraphics{dht_node_join_phases2}}
+\begin{center}
+\includegraphics{dht_node_join_phases2}
+\end{center}
 
-\subsubsection{Phase 1}
+At first all nodes set in the \code{known_hosts} configuration parameter are
+contacted. Their responses are then handled in phase~2.
 
-Phase~1 is entered during the initialization of the \erlmodule{dht\_node}
-process after requesting the ID from the \erlmodule{idholder}.
-It receives its \code{idholder_get_id_response} message and contacts all
-nodes set in the \code{known_hosts} configuration parameter. Their responses
-are handled in phase~2.
-
-\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p1}{../src/dht_node_join.erl}
+\codesnippet{dht_node_join.erl}{dht_node_join:join_as_other}{../src/dht_node_join.erl}
 
 \subsubsection{Phase 2 and 2b}
 
@@ -1706,7 +1689,9 @@ integrates all received nodes into the list of \code{ContactNodes}.
 The next step depends on whether the \code{\{skip_psv_lb\}} option for
 skipping any passive load balancing algorithm has been
 given to the \erlmodule{dht\_node} or not. If it is present, the node will
-use the ID from the \erlmodule{idholder}, issue a lookup for the responsible
+only use the ID that has been initially passed to
+\erlfun{dht\_node\_join}{join\_as\_other}{/3}, issue a lookup for the
+responsible
 node and move to phase~3. Otherwise, the passive load balancing's
 \erlfun{lb\_psv\_*}{get\_number\_of\_samples}{/1} method will be called
 asking for the number of IDs to sample. Its answer will be processed in
@@ -1751,22 +1736,13 @@ will be simply added to the list.
 
 If \erlfun{dht\_node\_join}{contact\_best\_candidate}{/1} is called and
 candidates are available (there should be at this stage!), it will sort the
-candidates by using the passive load balance algorithm and get the ID from
-the best candidate. Note that during simulation at the existing node, this
-ID may be different from the initial ID send during the lookup. If this ID
-is the same as the one set at the \erlmodule{idholder}, we can continue
-directly by sending a \code{join_request} message and going to phase~4. 
+candidates by using the passive load balance algorithm and send a 
+\code{join_request} message continuing in phase~4. 
 
 \erlfunindex{dht\_node\_join}{contact\_best\_candidate}
 \codesnippet{dht_node_join.erl}{dht_node_join:contact_best_candidate}{../src/dht_node_join.erl}
 \erlfunindex{dht\_node\_join}{send\_join\_request}
 \codesnippet{dht_node_join.erl}{dht_node_join:send_join_request}{../src/dht_node_join.erl}
-
-Otherwise we need to set the ID at the \erlmodule{idholder} first and wait
-for its acknowledgement in phase~3b. A \code{join_request} is send once the
-\code{idholder_get_id_response} message arrives.
-
-\codesnippet{dht_node_join.erl}{dht_node_join:join_other_p3b}{../src/dht_node_join.erl}
 
 The \code{join_request} message will be received by the existing node which
 will set up a slide operation with the new node or deny the request if it is
@@ -1828,14 +1804,6 @@ as given in this table.
   & \code{lookup}\carriagereturn\newline\code{ _timeout}
   & \code{join_request}\carriagereturn\newline\code{_timeout}
   & \code{timeout} \tn
-  \midrule
-  %
-  \bfseries phase1
-  & ignore
-  & ignore
-  & ignore
-  & ignore
-  & get ID from \code{idholder} \tn
   \midrule
   %
   \bfseries phase2
