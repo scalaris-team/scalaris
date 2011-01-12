@@ -1,4 +1,4 @@
-% @copyright 2009, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+% @copyright 2009, 2010, 2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
 %                 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,8 +23,9 @@
 -vsn('$Id$').
 
 %%-define(TRACE_RTM_MGMT(X,Y), io:format(X,Y)).
+%%-define(TRACE_RTM_MGMT(X,Y), ct:pal(X,Y)).
 -define(TRACE_RTM_MGMT(X,Y), ok).
-%-define(TRACE(X,Y), io:format(X,Y)).
+%-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(_X,_Y), ok).
 -behaviour(gen_component).
 -include("scalaris.hrl").
@@ -61,7 +62,7 @@ start_link(DHTNodeGroup, Role) ->
                              [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
 -type state() ::
-        {[{?RT:key(), comm:mypid(), non_neg_integer()}],  %% RTMs
+        {[{?RT:key(), comm:mypid() | unknown, non_neg_integer()}],  %% RTMs
          pdb:tableid(),  %% TableName
          pid_groups:pidname(), %% Role
          pid(),  %% LocalAcceptor
@@ -112,7 +113,7 @@ on({proposer_accept, Proposer, PaxosID, Round, Value} = _Msg,
 %% forward from acceptor to local learner (take 'Role' away from PaxosId)
 on({acceptor_accepted, {PaxosID, _InRole}, Round, Value} = _Msg,
    {_RTMs, _TableName, _MyRole, _LAcceptor, LLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on(~p)~n", [_Msg]),
+    ?TRACE("tx_tm_rtm:on(~p) in ~p~n", [_Msg, _MyRole]),
     comm:send_local(LLearner, {acceptor_accepted, PaxosID, Round, Value}),
     State;
 
@@ -209,7 +210,7 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog},
 %% this tx is finished and enough TPs were informed, delete the state
 on({tx_tm_rtm_delete, TxId, Decision} = Msg,
    {_RTMs, TableName, Role, LAcceptor, LLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on({delete, ...}) ~n", []),
+    ?TRACE("tx_tm_rtm:on({delete, ~p, ~p}) in ~p ~n", [TxId, Decision, Role]),
     %% TODO: use ok as error code?!
     %% {ok, TxState} = my_get_tx_entry(TxId, State),
     {ErrCode, TxState} = my_get_tx_entry(TxId, State),
@@ -328,7 +329,7 @@ on({tx_tm_rtm_delete_itemid, TxItemId},
     State;
 
 %% sent by my_init_RTMs
-on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg,
+on({tx_tm_rtm_init_RTM, TxState, ItemStates, InRole} = _Msg,
    {_RTMs, _TableName, Role, LAcceptor, _LLearner} = State) ->
    ?TRACE("tx_tm_rtm:on({init_RTM, ...}) ~n", []),
 
@@ -383,9 +384,10 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg,
       || Item <- NewItemStates],
     %% io:format("Stopping hold back queue processing~n"),
 
-    %% @TODO set timeout and remember timerid to cancel, if finished earlier?
-    %% @TODO after timeout take over and initiate new paxos round as proposer
-
+    %% set timeout and remember timerid to cancel, if finished earlier?
+    msg_delay:send_local(1 + InRole, self(), {tx_tm_rtm_propose_yourself, Tid}),
+    %% after timeout take over and initiate new paxos round as proposer
+    %% done in on({tx_tm_rtm_propose_yourself...}) handler
     State;
 
 % received by RTMs
@@ -424,7 +426,7 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
                         lists:keyfind(PaxosID, 1,
                           tx_item_state:get_paxosids_rtlogs_tps(ItemState)),
                     msg_commit_reply(TP, {PaxosID, RTLogEntry}, Decision),
-                    %% @TODO record in txstate and try to delete entry?
+                    %% record in txstate and try to delete entry?
                     NewTxState = tx_state:inc_numinformed(TxState),
                     my_trigger_delete_if_done(NewTxState),
                     my_set_entry(NewTxState, State);
@@ -435,19 +437,82 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
     end,
     State;
 
+% timeout on Tid maybe a proposer crashed? Force proposals with abort.
+on({tx_tm_rtm_propose_yourself, Tid},
+   {_RTMs, _TableName, _Role, _LAcceptor, LLearner} = State) ->
+    ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, _Role]),
+    %% after timeout take over and initiate new paxos round as proposer
+    {ErrCodeTx, TxState} = my_get_tx_entry(Tid, State),
+    _ =
+    case ErrCodeTx of
+        new -> ok; %% takeover is not necessary. Was finished successfully.
+        _Any ->
+            log:log(warn, "Takeover by RTM was necessary."),
+            %% ct:pal("Propose yourself / takeover. status is ~p in ~p~n", [_Any, _Role]),
+            %% ct:pal("TxState is ~.0p~n", [TxState]),
+
+            GLLearner = comm:make_global(LLearner),
+            MySelf = comm:this(),
+            Maj = config:read(quorum_factor),
+
+            %% add ourselves as learner and
+            %% trigger paxos proposers for new round with own proposal 'abort'
+            {_, TxItemIDs} = lists:unzip(tx_state:get_tlog_txitemids(TxState)),
+            [ begin
+                  {_, ItemState} = my_get_item_entry(ItemId, State),
+                  case tx_item_state:get_decided(ItemState) of
+                      false ->
+                          [ begin
+                                learner:start_paxosid(GLLearner, PaxId, Maj,
+                                                      MySelf, ItemId),
+                                %% add learner to running paxos acceptors via RTMs
+                                _ = [ begin
+                                      RTMizedPaxId = {PaxId, get_nth_rtm_name(Nth)},
+                                      comm:send_to_group_member(RTMPid, paxos_acceptor,
+                                                                {acceptor_add_learner, RTMizedPaxId, MySelf}) %% we are proxy for the acceptor to remove Role from ID
+                                  end
+                                  || {_Key, RTMPid, Nth} <- tx_state:get_rtms(TxState)],
+                                %% ct:pal("start proposer for Id ~.0p~n", [PaxId]),
+                                %% proposer:start_paxosid(
+                                %% Proposer, PaxId, Acceptors, abort,
+                                %% Majority, MaxProposers, InitialRound) ->
+                                %% proposer:start_paxosid(GLLearner, PaxId, Maj,
+                                %% MySelf, ItemId)
+                                ok
+                            end
+                            || {PaxId, _RTLog, _TP}
+                                   <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ];
+                      _Decision -> % already decided to prepared / abort
+                          ok
+                  end
+              end || ItemId <- TxItemIDs ]
+        end,
+    State;
+
 %% failure detector events
 on({crash, Pid},
    {RTMs, _TableName, _Role, _LAcceptor, _LLearner} = State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
-    _ = [ lookup:unreliable_lookup(
-            Key, {get_process_in_group, comm:this(), Key, ?MODULE})
-            || {Key, RTM} <- RTMs, RTM =:= Pid ],
+    ct:pal("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
+    _ = [ begin
+              Name = get_nth_rtm_name(Nth),
+              lookup:unreliable_lookup(
+                Key, {get_rtm, comm:this(), Key, Name})
+          end
+      || {Key, RTM, Nth} <- RTMs, RTM =:= Pid ],
     State;
 
 on({crash, _Pid, _Cookie},
    {_RTMs, _TableName, _Role, _LAcceptor, _LLearner} = State) ->
     ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
     %% @todo should we take over, if the TM failed?
+    %% Takeover done by timeout (propose yourself). Doing it here could
+    %% improve speed, but really necessary!?
+    %%
+    %% for all Tids make a fold with
+    %% NewState = lists:foldr(fun(X, XState) ->
+    %%   on({tx_tm_rtm_propose_yourself, Tid}, XState)
+    %%                        end, State, listwithalltids),
     State;
 
 %% periodic RTM update
@@ -497,9 +562,10 @@ my_get_RTM_ids(IdSelf) ->
     %% @todo sort Ids by latency or do the sorting after RTMs are determined
     ?RT:get_replica_keys(IdSelf).
 
+-spec my_RTM_update([{?RT:key(), comm:mypid() | unknown, non_neg_integer()}]) -> ok.
 my_RTM_update(RTMs) ->
     _ = [ begin
-          Name = list_to_atom(lists:flatten(io_lib:format("tx_rtm~p", [Nth]))),
+          Name = get_nth_rtm_name(Nth),
           lookup:unreliable_lookup(Key, {get_rtm, comm:this(), Key, Name})
       end
       || {Key, _Pid, Nth} <- RTMs],
@@ -507,6 +573,9 @@ my_RTM_update(RTMs) ->
                              self(), {update_RTMs}),
     ok.
 
+-spec my_update_rtm_entry([{?RT:key(), comm:mypid() | unknown, non_neg_integer()}],
+                   ?RT:key(), comm:mypid()) ->
+                           [{?RT:key(), comm:mypid() | unknown, non_neg_integer()}].
 my_update_rtm_entry(RTMs, InKey, InPid) ->
     [ case InKey =:= Key of
           true -> case InPid =/= RTM of
@@ -522,18 +591,23 @@ my_update_rtm_entry(RTMs, InKey, InPid) ->
       end || {Key, RTM, Nth} = Entry <- RTMs ].
 
 %% functions for tx processing
+-spec my_start_fds_for_tid(tx_state:tx_id(), tx_state:tx_state()) -> ok.
 my_start_fds_for_tid(Tid, TxEntry) ->
     ?TRACE("tx_tm_rtm:my_start_fds_for_tid~n", []),
+%%    ok.
     RTMs = tx_state:get_rtms(TxEntry),
     RTMGPids = [ X || {_Key, X, _Nth} <- RTMs ],
     fd:subscribe(RTMGPids, Tid).
 
+-spec my_stop_fds_for_tid(tx_state:tx_id(), tx_state:tx_state()) -> ok.
 my_stop_fds_for_tid(Tid, TxEntry) ->
     ?TRACE("tx_tm_rtm:my_stop_fds_for_tid~n", []),
+%%    ok.
     RTMs = tx_state:get_rtms(TxEntry),
     RTMGPids = [ X || {_Key, X, _Nth} <- RTMs ],
     fd:unsubscribe(RTMGPids, Tid).
 
+-spec my_init_RTMs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
 my_init_RTMs(TxState, ItemStates) ->
     ?TRACE("tx_tm_rtm:my_init_RTMs~n", []),
     RTMs = tx_state:get_rtms(TxState),
@@ -541,6 +615,7 @@ my_init_RTMs(TxState, ItemStates) ->
       || {_, X, Nth} <- RTMs ],
     ok.
 
+-spec my_init_TPs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
 my_init_TPs(TxState, ItemStates) ->
     ?TRACE("tx_tm_rtm:my_init_TPs~n", []),
     %% send to each TP its own record / request including the RTMs to
@@ -573,16 +648,22 @@ my_get_tx_entry(Id,
         Entry -> {tx_state:get_status(Entry), Entry}
     end.
 
+-spec my_get_item_entry(tx_item_state:tx_item_id(), state()) ->
+                               {new | uninitialized | ok,
+                                tx_item_state:tx_item_state()}.
 my_get_item_entry(Id, {_RTMS, TableName, _Role, _LAcceptor, _LLearner} = _State) ->
     case pdb:get(Id, TableName) of
         undefined -> {new, tx_item_state:new(Id)};
         Entry -> {tx_item_state:get_status(Entry), Entry}
     end.
 
+-spec my_set_entry(tx_state:tx_state() | tx_item_state:tx_item_state(),
+                   state()) -> state().
 my_set_entry(NewEntry, {_RTMS, TableName, _Role, _LAcceptor, _LLearner} = State) ->
     pdb:set(NewEntry, TableName),
     State.
 
+-spec my_inform_client(tx_state:tx_id(), state(), commit | abort) -> ok.
 my_inform_client(TxId, State, Result) ->
     ?TRACE("tx_tm_rtm:inform client~n", []),
     {ok, TxState} = my_get_tx_entry(TxId, State),
@@ -594,6 +675,8 @@ my_inform_client(TxId, State, Result) ->
     end,
     ok.
 
+-spec my_inform_tps(tx_state:tx_state(), state(), commit | abort) ->
+                           tx_state:tx_state().
 my_inform_tps(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform tps~n", []),
     %% inform TPs
@@ -611,6 +694,7 @@ my_inform_tps(TxState, State, Result) ->
 %%    my_trigger_delete_if_done(NewTxState),
     NewTxState.
 
+-spec my_inform_rtms(tx_state:tx_id(), state(), commit | abort) -> ok.
 my_inform_rtms(_TxId, _State, _Result) ->
     ?TRACE("tx_tm_rtm:inform rtms~n", []),
     %%{ok, TxState} = my_get_tx_entry(_TxId, _State),
@@ -618,6 +702,7 @@ my_inform_rtms(_TxId, _State, _Result) ->
     %% msg_commit_reply(Client, ClientsId, Result)
     ok.
 
+-spec my_trigger_delete_if_done(tx_state:tx_state()) -> ok.
 my_trigger_delete_if_done(TxState) ->
     ?TRACE("tx_tm_rtm:trigger delete?~n", []),
     case (tx_state:is_decided(TxState)) of
@@ -636,9 +721,11 @@ my_trigger_delete_if_done(TxState) ->
             end
     end, ok.
 
+-spec rtms_of_same_dht_node([{?RT:key(), comm:mypid() | unknown, non_neg_integer()}]) ->
+                                   boolean().
 rtms_of_same_dht_node(InRTMs) ->
     {_Keys, RTMPids, _Nth}  = lists:unzip3(InRTMs),
-    Groups = lists:usort([catch(pid_groups:group_of(element(3, X)))
+    Groups = lists:usort([catch(pid_groups:group_of(comm:make_local(X)))
                           || X <- RTMPids]),
     case length(Groups) of
         4 -> false;
@@ -646,6 +733,10 @@ rtms_of_same_dht_node(InRTMs) ->
             log:log(info, "RTMs of same DHT node are used. Please start more Scalaris nodes.~n"),
             true
     end.
+
+-spec get_nth_rtm_name(pos_integer()) -> atom().
+get_nth_rtm_name(Nth) ->
+    list_to_atom(lists:flatten(io_lib:format("tx_rtm~p", [Nth]))).
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.

@@ -1,4 +1,4 @@
-% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+% @copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -32,7 +32,9 @@ all() ->
      abort_prepared_w,
      abort_prepared_rc,
      abort_prepared_rmc,
-     abort_prepared_wmc].
+     abort_prepared_wmc,%,
+     tm_crash
+    ].
 
 suite() -> [{timetrap, {seconds, 120}}].
 
@@ -263,3 +265,32 @@ get_db_entries(Keys) ->
           end
       end
       || X <- Keys ].
+
+
+tm_crash(_) ->
+    ct:pal("Starting tm_crash~n"),
+    cs_api_v2:write("a", "Hello world!"),
+    %% ct:pal("written initial value and setting breakpoints now~n"),
+    TMs = pid_groups:find_all(tx_tm),
+    %% all TMs break at next commit request:
+    [ gen_component:bp_set(X, tx_tm_rtm_commit, tm_crash) || X <- TMs ],
+    %% ct:pal("Breakpoints set~n"),
+    [ gen_component:bp_barrier(X) || X <- TMs ],
+    %% ct:pal("Barriers set~n"),
+
+    %% TM only performs the tx_tm_rtm_commit that lead to the BP
+    %% bp_step blocks. Do it asynchronously. (We don't know which TM
+    %% got the request.
+    Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- TMs ],
+
+    %% ct:pal("Starting read commit~n"),
+    Res = cs_api_v2:process_request_list(cs_api:new_tlog(), [{read, "a"}, {commit}]),
+
+    ct:pal("Res: ~p~n", [Res]),
+
+    [ erlang:exit(Pid, kill) || Pid <- Pids ],
+
+    [ gen_component:bp_del(X, tm_crash) || X <- TMs ],
+
+    [ gen_component:bp_cont(X) || X <- TMs ].
+%%ok.
