@@ -5,54 +5,47 @@
   pre/.style={<-,shorten <=1pt,>=stealth,semithick},
   post/.style={->,shorten >=1pt,>=stealth,semithick},
   timeout/.style={draw=black!50, dashed},
-  phase/.style={rectangle,draw=black!50,top color=black!20,bottom color=white,very thick},
+  phase/.style={rectangle,top color=black!10,bottom color=black!5},
   bend angle=60]
- \node[phase] (phase1)                    {phase1};
- \node[phase] (phase2) [right=3.5 of phase1]  {phase2}
-        edge [pre] node[auto, swap] {get\_known\_nodes()} (phase1);
- \node[phase] (phase2b) [below=3 of phase2] {phase2b}
-        edge [pre] node[auto, align=right]
-         {
-          get\_number\_of\_samples()\\
-          \footnotesize{\textcolor{red}{passive load balancing,}}\\
-          \footnotesize{\textcolor{red}{non-empty ContactNodes}}
-         } (phase2);
- \node[phase] (phase3) [right=3.5 of phase2] {phase3}
-        edge [pre] node[auto, swap, align=left, pos=0.6]
-         {
-          lookup\_new\_ids2()\\
-          ~\footnotesize{$\hookrightarrow$lookup\_new\_ids1()}\\
-          ~~\scriptsize{$\hookrightarrow$lookup()}
-         } node[auto, align=left]
-         {
-          \footnotesize{\textcolor{red}{skip\_psv\_lb set,}}\\
-          \footnotesize{\textcolor{red}{non-empty ContactNodes}}
-         } (phase2)
-        edge [pre, bend right=-35] node[auto, pos=0.98, align=left]
-         {
-          lookup\_new\_ids2()\\
-          ~\footnotesize{$\hookrightarrow$lookup\_new\_ids1()}\\
-          ~~\scriptsize{$\hookrightarrow$lookup()}\\
-         } (phase2b);
- \node[phase] (phase3b) [below=3 of phase3] {phase3b}
-        edge [pre] node[auto, align=left, swap]
-         {
-          contact\_best\_candidate()\\
-          \footnotesize{\textcolor{red}{Id != idholder.Id}}
-         } (phase3);
- \node[phase] (phase4) [right=3.5 of phase3] {phase4}
-        edge [pre] node[auto, swap, align=left]
-         {
-          contact\_best\_candidate()\\
-          ~\footnotesize{$\hookrightarrow$ send\_join\_request()}
-         }
-         node[auto, align=left]
-         {
-          \footnotesize{\textcolor{red}{Id == idholder.Id}}
-         } (phase3)
-        edge [pre, bend right=-35] node[auto, pos=0.98]
-         {
-          send\_join\_request()
-         } (phase3b); 
+ \node[phase] (phase1)                         {init};
+ \node[phase] (phase2)  [right=3.5 of phase1]  {phase2};
+ \node[phase] (phase2b) [below=3 of phase2]    {phase2b};
+ \node[phase] (phase3)  [right=3.5 of phase2]  {phase3};
+ \node[phase] (phase4)  [right=3.5 of phase3]  {phase4};
+
+
+ \path[->] (phase2)
+             edge [pre]  node[auto, swap] {get\_known\_nodes()} (phase1)
+             edge [post] node[auto, swap, align=right]
+                          {
+                           get\_number\_of\_samples()\\
+                           \footnotesize{\textcolor{red}{skip\_psv\_lb not set,}}\\
+                           \footnotesize{\textcolor{red}{non-empty ContactNodes}}
+                          } (phase2b)
+             edge [post] node[auto, align=left, pos=0.475]
+                          {
+                           lookup\_new\_ids2()\\
+                           ~\footnotesize{$\hookrightarrow$lookup\_new\_ids1()}\\
+                           ~~\scriptsize{$\hookrightarrow$lookup()}
+                          }
+                         node[auto, swap, align=left, pos=0.525]
+                          {
+                           \footnotesize{\textcolor{red}{skip\_psv\_lb set,}}\\
+                           \footnotesize{\textcolor{red}{non-empty ContactNodes}}
+                          } (phase3)
+           (phase2b)
+             edge [post, bend left=-35]
+                         node[auto, swap, pos=0.6, align=left]
+                          {
+                           lookup\_new\_ids2()\\
+                           ~\footnotesize{$\hookrightarrow$lookup\_new\_ids1()}\\
+                           ~~\scriptsize{$\hookrightarrow$lookup()}\\
+                          } (phase3)
+           (phase3)
+             edge [post] node[auto, align=center, pos=0.5]
+                          {
+                           contact\_best\_candidate()\\
+                           \footnotesize{$\hookrightarrow$ send\_join\_request()}
+                          } (phase4);
 \end{tikzpicture}
 \input{tikz_footer}
