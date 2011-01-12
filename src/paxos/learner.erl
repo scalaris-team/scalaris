@@ -17,6 +17,7 @@
 %% @doc Part of a generic Paxos-Consensus implementation
 %%           The role of a learner.
 %% @end
+%% @version $Id$
 -module(learner).
 -author('schintke@onscale.de').
 -vsn('$Id$').

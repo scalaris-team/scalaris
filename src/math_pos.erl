@@ -56,7 +56,7 @@ minus_rev([], [], _Carry, Diff, _Base) -> Diff;
 minus_rev([A1 | A_rev_Rest], [B1 | B_rev_Rest], Carry, Diff, Base) ->
     {CurChar, NewCarry} = case (A1 - Carry - B1) of
                               X when X >= 0 -> {X, 0};
-                              X when X =< (-Base) -> {X + 2 * Base, 2};
+                              X when X < (-Base) -> {X + 2 * Base, 2};
                               X -> {X + Base, 1}
                           end,
     minus_rev(A_rev_Rest, B_rev_Rest, NewCarry, [CurChar | Diff], Base).

@@ -17,6 +17,7 @@
 %% @doc Description : Part of generic Paxos-Consensus implementation
 %%           The role of a proposer.
 %% @end
+%% @version $Id$
 -module(proposer).
 -author('schintke@onscale.de').
 -vsn('$Id$').

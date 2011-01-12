@@ -17,6 +17,7 @@
 %% @doc Part of a generic implementation of transactions using Paxos Commit -
 %%      the roles of the (replicated) transaction manager TM and RTM.
 %% @end
+%% @version $Id$
 -module(tx_tm_rtm).
 -author('schintke@onscale.de').
 -vsn('$Id$').

@@ -75,9 +75,14 @@ create_join(DhtNodeState, SelectedKey, SourcePid) ->
                     _ -> % split address range (fall-back):
                         lb_common:split_my_range(DhtNodeState, SelectedKey)
                 end,
+            MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),
             case SplitKey of
                 MyNodeId ->
                     log:log(warn, "[ Node ~w ] join requested for my ID, "
+                                "sending no_op...", [self()]),
+                    lb_op:no_op();
+                MyPredId ->
+                    log:log(warn, "[ Node ~w ] join requested for my pred's ID, "
                                 "sending no_op...", [self()]),
                     lb_op:no_op();
                 _ ->

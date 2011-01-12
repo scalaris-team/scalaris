@@ -17,6 +17,7 @@
 %% @doc Part of generic Paxos-Consensus implementation
 %%           The state needed for a single acceptor instance.
 %% @end
+%% @version $Id$
 -module(acceptor_state).
 -author('schintke@onscale.de').
 -vsn('$Id$').

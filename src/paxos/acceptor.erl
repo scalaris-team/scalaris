@@ -17,6 +17,7 @@
 %% @doc Part of a generic Paxos-Consensus implementation
 %%      The role of a acceptor.
 %% @end
+%% @version $Id$
 -module(acceptor).
 -author('schintke@onscale.de').
 -vsn('$Id$').
