@@ -576,7 +576,6 @@ app_get_env(Var, Default) ->
 -spec app_check_known() -> ok.
 app_check_known() ->
     case application:get_application() of
-        {ok, boot_cs } -> ok; % TODO: remove
         {ok, scalaris } -> ok;
         {ok, scalaris2 } -> ok;
         undefined ->

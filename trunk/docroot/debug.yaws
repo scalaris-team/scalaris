@@ -34,8 +34,9 @@
       
 <erl>
 out(Arg) ->
-    case application:get_application() of
-        {ok, boot_cs} ->
+    case whereis(boot) of
+        undefined -> {html, ""};
+        _ ->
             {html,
 "      <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"ring.yaws\">Ring</a>
@@ -46,8 +47,7 @@ out(Arg) ->
       <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
       </div>
-"};
-        _ -> {html, ""}
+"}
     end.
 </erl>
 

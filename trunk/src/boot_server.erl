@@ -116,13 +116,12 @@ on({web_debug_info, Requestor}, Nodes) ->
     Nodes.
 
 -spec init(Options::[tuple()]) -> state().
-init(Options) ->
-    case lists:member({empty}, Options) of
+init(_Options) ->
+    case config:read(empty_node) of
         true ->
             % ugly hack to get a valid ip-address into the comm-layer
             dht_node:trigger_known_nodes();
-        _ ->
-            ok
+        _ -> ok
     end,
     dn_cache:subscribe(),
     gb_sets:empty().

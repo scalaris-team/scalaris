@@ -23,12 +23,12 @@
 
 -export([start/2, stop/1]).
 
--spec start(normal, NodeType::sup_scalaris:supervisor_type())
+-spec start(StartType::normal, StartArgs::[])
         -> {ok, Pid::pid()} | ignore |
            {error, Error::{already_started, Pid::pid()} | term()}.
-start(normal, NodeType) ->
+start(normal, []) ->
     _ = pid_groups:start_link(),
-    sup_scalaris2:start_link(NodeType).
+    sup_scalaris2:start_link().
 
 -spec stop(any()) -> ok.
 stop(_State) ->
