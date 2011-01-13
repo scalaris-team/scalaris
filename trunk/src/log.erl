@@ -25,6 +25,10 @@
 -export([log/2, log/3, log/4, set_log_level/1]).
 -export([check_config/0]).
 
+-ifdef(with_export_type_support).
+-export_type([log_level/0]).
+-endif.
+
 -type log_level() :: debug | info | warn | error | fatal.
 
 %% @doc Starts the log4erl process, removes the error_logger and
@@ -37,7 +41,17 @@ start_link() ->
     Link = log4erl:start(log4erl, []),
     case Link of
         {ok, _} ->
-            log4erl:add_console_appender(stdout, {config:read(log_level), config:read(log_format)}),
+            case util:is_unittest() of
+                true ->
+                    log4erl:add_appender(?DEFAULT_LOGGER,
+                                         {log4erl_ctpal_appender, ctpal},
+                                         {config:read(log_level),
+                                          config:read(log_format)});
+                _ ->
+                    log4erl:add_console_appender(stdout,
+                                                 {config:read(log_level),
+                                                  config:read(log_format)})
+            end,
             log4erl:add_file_appender(file, {config:read(log_path),
                                              config:read(log_file_name_log4erl),
                                              {size, config:read(log_file_size)},
