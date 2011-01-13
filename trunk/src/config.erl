@@ -22,33 +22,38 @@
 -include("scalaris.hrl").
 
 -export([
-         start_link/1, start_link/2, start/2,
+         start_link2/1, start_link2/0, start_link/1, start_link/2, start/2,
          read/1, write/2,
          check_config/0,
 
-         exists/1, is_atom/1, is_bool/1, is_mypid/1, is_ip/1, is_integer/1,
-         is_float/1, is_tuple/2, is_tuple/4, is_list/1, is_list/3, is_string/1,
+         exists/1, is_atom/1, is_bool/1, is_mypid/1,
+         is_ip/1, is_port/1,
+         is_integer/1, is_float/1,
+         is_tuple/2, is_tuple/4, is_list/1, is_list/3, is_string/1,
          is_in_range/3, is_greater_than/2, is_greater_than_equal/2,
-         is_less_than/2, is_less_than_equal/2, is_in/2, is_module/1
+         is_less_than/2, is_less_than_equal/2, is_in/2, is_module/1,
+         test_and_error/3
         ]).
 
 %% public functions
 
-%% @doc Reads config parameter.
--spec(read/1 :: (atom()) -> any() | failed).
+%% @doc Reads a config parameter. If it is not found, the application's
+%%      environment is checked or failed is returned. The result will be
+%%      cached in the config.
+-spec read(Key::atom()) -> any() | failed.
 read(Key) ->
+    % If an environment variable sets a config parameter that is present in the
+    % config, it will override the config (see populate_db/1, process_term/1).
+    % We can thus first check the ets table and fall back to the environment
+    % check afterwards.
     case ets:lookup(config_ets, Key) of
-        [{Key, Value}] ->
-            %% allow values defined as application environments to override
-            Value;
-        [] ->
-            case preconfig:get_env(Key, failed) of
-                failed ->
-                    failed;
-                X ->
-                    ets:insert(config_ets, {Key, X}),
-                    X
-            end
+        [{Key, Value}] -> Value;
+        [] -> Value = util:app_get_env(Key, failed),
+              case self() =:= erlang:whereis(config) of
+                  true -> ets:insert(config_ets, {Key, Value});
+                  _    -> write(Key, Value)
+              end,
+              Value
     end.
 
 %% @doc Writes a config parameter.
@@ -61,6 +66,7 @@ write(Key, Value) ->
 
 %% gen_server setup
 
+%% @doc Short for start_link/2 with no options and the given files.
 -spec start_link(Files::[file:name()]) -> {ok, pid()}.
 start_link(Files) ->
     start_link(Files, []).
@@ -70,23 +76,43 @@ start_link(Files) ->
 %%      the config.
 -spec start_link(Files::[file:name()], Options::[tuple()]) -> {ok, pid()}.
 start_link(Files, Options) ->
-    TheFiles = case preconfig:get_env(add_config, []) of
-                   []         -> Files;
-                   ConfigFile -> lists:append(Files, [ConfigFile])
-               end,
-%%     error_logger:info_msg("Config files: ~p~n", [TheFiles]),
-    Owner = self(),
-    Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
-    receive
-        done -> ok;
-        X    -> error_logger:error_msg("unknown config message  ~p", [X])
-    end,
-    ConfigParameters = case lists:keyfind(config, 1, Options) of
-                           {config, ConfPars} -> ConfPars;
-                           _ -> []
+    case whereis(config) of
+        Pid when is_pid(Pid) -> {ok, Pid};
+        _ ->
+            TheFiles = case util:app_get_env(add_config, []) of
+                           []         -> Files;
+                           ConfigFile -> lists:append(Files, [ConfigFile])
                        end,
-    _ = [ets:insert(config_ets, X) || X = {_K, _V} <- ConfigParameters],
-    {ok, Link}.
+%%             error_logger:info_msg("Config files: ~p~n", [TheFiles]),
+            Owner = self(),
+            Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
+            receive
+                done -> ok;
+                X    -> error_logger:error_msg("unknown config message  ~p", [X])
+            end,
+            ConfigParameters = case lists:keyfind(config, 1, Options) of
+                                   {config, ConfPars} -> ConfPars;
+                                   _ -> []
+                               end,
+            _ = [write(K, V) || {K, V} <- ConfigParameters],
+            {ok, Link}
+    end.
+
+%% @doc Short for start_link2/1 with no options.
+-spec start_link2() -> {ok, pid()}.
+start_link2() ->
+    start_link2([]).
+
+%% @doc Starts the config process and determines the config files from the
+%%      application's environment. If there is no application, "scalaris.cfg"
+%%      and "scalaris.local.cfg" are used. If Options contains a
+%%      {config, [{Key1, Value1},...]} tuple, each Key is set to its Value in
+%%      the config.
+-spec start_link2(Options::[tuple()]) -> {ok, pid()}.
+start_link2(Options) ->
+    Files = [util:app_get_env(config, "scalaris.cfg"),
+             util:app_get_env(local_config, "scalaris.local.cfg")],
+    start_link(Files, Options).
 
 %@private
 -spec start(Files::[file:name()], Owner::pid()) -> no_return().
@@ -114,27 +140,29 @@ loop() ->
     end.
 
 %@private
--spec populate_db(File::file:name()) -> any().
+-spec populate_db(File::file:name()) -> ok | fail.
+populate_db([]) -> ok;
 populate_db(File) ->
+    %% note: log4erl may not be available -> use error_logger instead of log
     case file:consult(File) of
         {ok, Terms} ->
-            lists:map(fun process_term/1, Terms);
+            _ = lists:map(fun process_term/1, Terms),
+            ok;
         {error, enoent} ->
-            %% note: log4erl may not be available
-            error_logger:info_msg("Can't load config file ~p: File does not exist. Ignoring.\n", [File]),
+            error_logger:info_msg("Can't load config file ~p: File does not exist. "
+                                  " Ignoring.\n", [File]),
             fail;
         {error, Reason} ->
-            %% note: log4erl may not be available
-            error_logger:error_msg("Can't load config file ~p: ~p. Exiting.\n", [File, Reason]),
+            error_logger:error_msg("Can't load config file ~p: ~p. Exiting.\n",
+                                   [File, Reason]),
             init:stop(1),
             receive nothing -> ok end
             %fail
     end.
 
--spec process_term({Key::atom(), Value::term()}) -> any().
+-spec process_term({Key::atom(), Value::term()}) -> true.
 process_term({Key, Value}) ->
-    ets:insert(config_ets, {Key, preconfig:get_env(Key, Value)}).
-
+    ets:insert(config_ets, {Key, util:app_get_env(Key, Value)}).
 
 %% check config methods
 
@@ -142,6 +170,8 @@ process_term({Key, Value}) ->
 -spec check_config() -> boolean().
 check_config() ->
     log:check_config() and
+        sup_scalaris:check_config() and
+        sup_scalaris2:check_config() and
         cyclon:check_config() and
         acceptor:check_config() and
         gossip:check_config() and
@@ -162,7 +192,8 @@ check_config() ->
         %       (another node may ask us to provide a candidate for any of them)
         lb_psv_simple:check_config() and
         lb_psv_split:check_config() and
-        lb_psv_gossip:check_config().
+        lb_psv_gossip:check_config() and
+        comm_acceptor:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->
@@ -227,6 +258,23 @@ is_ip(Key) ->
            end,
     Msg = "is not a valid IPv4 address",
     test_and_error(Key, IsIp, Msg).
+
+-spec is_port(Key::atom()) -> boolean().
+is_port(Key) ->
+    IsPort = fun(Value) ->
+                     case Value of
+                         X when erlang:is_integer(X) ->
+                             true;
+                         X when erlang:is_list(X) ->
+                             lists:all(fun erlang:is_integer/1, X);
+                         {From, To} ->
+                             erlang:is_integer(From) andalso
+                                 erlang:is_integer(To);
+                         _ -> false
+                     end
+             end,
+    Msg = "is not a valid Port address",
+    test_and_error(Key, IsPort, Msg).
 
 -spec is_integer(Key::atom()) -> boolean().
 is_integer(Key) ->

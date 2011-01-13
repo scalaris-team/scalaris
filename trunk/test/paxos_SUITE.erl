@@ -37,7 +37,8 @@ suite() ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:make_ring(2),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
+    unittest_helper:make_ring(2, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
     comm_server:set_local_address({127,0,0,1},14195),
     Config2.
 
@@ -220,8 +221,8 @@ test_two_proposers(_Config) ->
     ok.
 
 %% userdevguide-begin paxos_SUITE:random_interleaving_test
--spec(prop_rnd_interleave/3 :: (1..4, 4..16, {pos_integer(), pos_integer(), pos_integer()})
- -> boolean()).
+-spec prop_rnd_interleave(1..4, 4..16, {pos_integer(), pos_integer(), pos_integer()})
+        -> boolean().
 prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
     ct:pal("Called with: paxos_SUITE:prop_rnd_interleave(~p, ~p, ~p).~n",
            [NumProposers, NumAcceptors, Seed]),

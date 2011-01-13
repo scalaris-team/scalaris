@@ -131,9 +131,9 @@ init(Options) ->
 %% @see sup_scalaris
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(ServiceGroup, Options) ->
-     gen_component:start_link(?MODULE, Options,
-                              [{erlang_register, boot},
-                               {pid_groups_join_as, ServiceGroup, ?MODULE}]).
+    gen_component:start_link(?MODULE, Options,
+                             [{erlang_register, boot},
+                              {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
 %% @doc pid of the boot daemon
 -spec bootPid() -> comm:mypid().

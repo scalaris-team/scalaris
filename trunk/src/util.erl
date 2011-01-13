@@ -38,7 +38,8 @@
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
          smerge2/2, smerge2/3, smerge2/4,
-         is_unittest/0, make_filename/1]).
+         is_unittest/0, make_filename/1,
+         app_get_env/2]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 
@@ -561,3 +562,31 @@ is_unittest() ->
 -spec make_filename(string()) -> string().
 make_filename(Name) ->
     re:replace(Name, "[^a-zA-Z0-9\-_@\.]", "_", [{return, list}, global]).
+
+%% @doc Get an application environment variable. If it is undefined, Default is
+%%      returned.
+-spec app_get_env(Var::atom(), Default::T) -> T.
+app_get_env(Var, Default) ->
+    case application:get_env(Var) of
+        {ok, Val} -> Val;
+        _         -> app_check_known(),
+                     Default
+    end.
+
+-spec app_check_known() -> ok.
+app_check_known() ->
+    case application:get_application() of
+        {ok, boot_cs } -> ok; % TODO: remove
+        {ok, scalaris } -> ok;
+        {ok, scalaris2 } -> ok;
+        undefined ->
+            case is_unittest() of
+                true -> ok;
+                _    -> 
+                    error_logger:error_msg("undefined application but no unittest~n"),
+                    erlang:exit(unknown_application)
+            end;
+        {ok, App} ->
+            error_logger:error_msg("unknown application: ~.0p~n", [App]),
+            erlang:exit(unknown_application)
+    end.

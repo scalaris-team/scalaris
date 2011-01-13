@@ -67,7 +67,7 @@ groups() ->
 init_per_group(GroupName, Config) ->
     case GroupName of
         with_config ->
-            Pid = spawn_config_processes(),
+            Pid = spawn_config_processes(Config),
             [{config_pid, Pid} | Config];
         _ -> Config
     end.
@@ -82,13 +82,14 @@ end_per_group(GroupName, Config) ->
         _ -> ok
     end.
 
--spec spawn_config_processes() -> pid().
-spawn_config_processes() ->
+-spec spawn_config_processes(Config::[tuple()]) -> pid().
+spawn_config_processes(Config) ->
     unittest_helper:fix_cwd(),
     unittest_helper:start_process(
       fun() ->
               pid_groups:start_link(),
-              config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+              {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+              config:start_link2([{config, [{log_path, PrivDir}]}]),
               log:start_link()
       end).
 

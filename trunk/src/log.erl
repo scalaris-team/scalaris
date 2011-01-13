@@ -38,8 +38,8 @@ start_link() ->
     case Link of
         {ok, _} ->
             log4erl:add_console_appender(stdout, {config:read(log_level), config:read(log_format)}),
-            log4erl:add_file_appender(file, {preconfig:log_path(),
-                                             config:read(log_file_name),
+            log4erl:add_file_appender(file, {config:read(log_path),
+                                             config:read(log_file_name_log4erl),
                                              {size, config:read(log_file_size)},
                                              config:read(log_file_rotations),
                                              "txt",
@@ -83,7 +83,8 @@ check_config() ->
     config:is_in(log_level, [warn, info, error, fatal, debug, none]) and
     config:is_in(log_level_file, [warn, info, error, fatal, debug, none]) and
     
-    config:is_string(log_file_name) and
+    config:is_string(log_path) and
+    config:is_string(log_file_name_log4erl) and
     
     config:is_integer(log_file_size) and
     config:is_greater_than(log_file_size, 0) and

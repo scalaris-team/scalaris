@@ -23,21 +23,12 @@
 
 -export([start/2, stop/1]).
 
--spec start(normal, NodeType::sup_scalaris:supervisor_type()) ->
-                 {ok, Pid::pid()}
-               | ignore
-               | {error, Error::{already_started, Pid::pid()}
-               | term()};
-           (any(), any()) -> {error, badarg}.
+-spec start(normal, NodeType::sup_scalaris:supervisor_type())
+        -> {ok, Pid::pid()} | ignore |
+           {error, Error::{already_started, Pid::pid()} | term()}.
 start(normal, NodeType) ->
     _ = pid_groups:start_link(),
-    Sup = sup_scalaris:start_link(NodeType),
-    Size = config:read(nodes_per_vm),
-    log:log(info, "Starting ~B nodes", [Size]),
-    _ = admin:add_nodes(Size-1),
-    Sup;
-start(_, _) ->
-    {error, badarg}.
+    sup_scalaris:start_link(NodeType).
 
 -spec stop(any()) -> ok.
 stop(_State) ->
