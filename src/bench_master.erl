@@ -27,7 +27,8 @@
 %%
 -spec start() -> pid().
 start() ->
-    ok = application:start(boot_cs),
+    application:set_env(scalaris, mode, boot),
+    ok = application:start(scalaris),
     timer:sleep(1000),
     erlang:spawn(?MODULE, run_1, []).
 

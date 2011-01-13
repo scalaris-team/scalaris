@@ -26,7 +26,8 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% 1. put tracer:start() and/or tracer:start_perf() into boot.erl before application:start(boot_cs)
+% 1. put tracer:start() and/or tracer:start_perf() into scalaris_app.erl
+%    before application:start(scalaris)
 % 2. run benchmark
 % 3. call tracer:dump() or tracer:dump_perf()
 %

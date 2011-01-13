@@ -53,7 +53,7 @@ usage(){
     echo "    -h                   help"
     echo "    -d                   daemonize"
     echo "    -f                   marks this node as the first"
-    echo "    -e                   start boot server with no scalaris nodes (empty)"
+    echo "    -e                   start node without any dht nodes (empty)"
     echo "    -n <name>            name for the Erlang VM"
     echo "    -p <port>            TCP port for the Scalaris node"
     echo "    -y <port>            TCP port for the built-in webserver"
@@ -223,43 +223,9 @@ checkinstallation() {
 
 bootstart(){
     NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
-    if [ $daemonize -ne 0 ]; then
-        BACKGROUND="-detached"
-    fi
-    if [ $empty -eq 1 ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs empty true"
-    fi
-    if [ "$port" != "" ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs cs_port $port"
-    fi
-    if [ "$yaws_port" != "" ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs yaws_port $yaws_port"
-    fi
-    if [ "$first_id" != "" ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs first_id $first_id"
-    fi
-    mkdir -p "$LOGDIR/$NODE_NAME"
-    pushd $BEAMDIR > /dev/null
-    $ERL -setcookie "$SCALARIS_COOKIE" \
-        -pa $SCALARISDIR/contrib/yaws/ebin \
-        -pa $SCALARISDIR/contrib/log4erl/ebin \
-        -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
-        -yaws embedded true \
-        -boot_cs log_path "\"$LOGDIR/$NODE_NAME\"" \
-        -boot_cs docroot "\"$DOCROOTDIR\"" \
-        -boot_cs config "\"$ETCDIR/scalaris.cfg\"" \
-        -boot_cs local_config "\"$ETCDIR/scalaris.local.cfg\"" \
-        -boot_cs first true \
-        -connect_all false -hidden -name $NODE_NAME \
-        $SCALARIS_ADDITIONAL_PARAMETERS \
-        -s boot $*;
-    FAILED=$?
-    if [ $FAILED -ne 0 ]; then
-        echo "ERROR: could not start scalaris"
-        echo "  consider running scalarisctl checkinstallation"
-        exit 1
-    fi
-    popd > /dev/null
+    first=1
+    mode=boot
+    scalarisstart
 }
 
 debug(){
@@ -269,19 +235,27 @@ debug(){
 
 bootstop(){
     NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
-    pushd $BEAMDIR > /dev/null
-    $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name ctl \
-        -pa $BEAMDIR \
-        -noinput \
-        -s scalaris_ctl -extra $NODE_NAME@`hostname -f` stop
-    popd > /dev/null
+    scalarisstop
 }
 
 nodestart(){
     NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
+    mode=node
+    scalarisstart
+}
+
+nodestop(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
+    scalarisstop
+}
+
+# pre: set NODE_NAME, mode
+scalarisstart(){
     if [ $daemonize -ne 0 ]; then
         BACKGROUND="-detached"
+    fi
+    if [ $empty -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris empty_node true"
     fi
     if [ $first -eq 1 ]; then
         SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris first true"
@@ -302,6 +276,7 @@ nodestart(){
         -pa $SCALARISDIR/contrib/log4erl/ebin \
         -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
         -yaws embedded true \
+        -scalaris mode $mode \
         -scalaris log_path "\"$LOGDIR/$NODE_NAME\"" \
         -scalaris docroot "\"$DOCROOTDIR\"" \
         -scalaris config "\"$ETCDIR/scalaris.cfg\"" \
@@ -319,8 +294,8 @@ nodestart(){
 }
 
 
-nodestop(){
-    NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
+# pre: set NODE_NAME
+scalarisstop(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -name ctl \
@@ -335,17 +310,17 @@ groupstart(){
     if [ $daemonize -ne 0 ]; then
         BACKGROUND="-detached"
     fi
-    if [ $empty -eq 1 ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs empty true"
+    if [ $first -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 first true"
     fi
     if [ "$port" != "" ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs cs_port $port"
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 cs_port $port"
     fi
     if [ "$yaws_port" != "" ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs yaws_port $yaws_port"
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 yaws_port $yaws_port"
     fi
     if [ "$first_id" != "" ]; then
-        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -boot_cs first_id $first_id"
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 first_id $first_id"
     fi
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null

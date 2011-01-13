@@ -28,19 +28,19 @@
 
 -behaviour(supervisor).
 
--export([start_link/1, start_link/2, init/1, check_config/0]).
+-export([start_link/0, start_link/2, init/1, check_config/0]).
 
 -ifdef(with_export_type_support).
 -export_type([supervisor_type/0]).
 -endif.
 
--type supervisor_type() :: boot | node.
+-type supervisor_type() :: boot | node | undefined.
 
--spec start_link(supervisor_type())
+-spec start_link()
         -> {ok, Pid::pid()} | ignore |
            {error, Error::{already_started, Pid::pid()} | term()}.
-start_link(SupervisorType) ->
-    start_link(SupervisorType, []).
+start_link() ->
+    start_link(undefined, []).
 
 -spec start_link(supervisor_type(), list(tuple()))
         -> {ok, Pid::pid()} | ignore |
@@ -78,18 +78,21 @@ init({SupervisorType, Options}) ->
     {ok, {{one_for_one, 10, 1}, my_process_list(SupervisorType, ServiceGroup, Options)}}.
 
 -spec my_process_list/3 :: (supervisor_type(), pid_groups:groupname(), list(tuple())) -> [any()].
-my_process_list(SupervisorType, ServiceGroup, Options) ->
-    EmptyBootServer = util:app_get_env(empty, false) orelse
-                          lists:member({boot_server, empty}, Options),
+my_process_list(SupervisorType_, ServiceGroup, Options) ->
+    SupervisorType = case SupervisorType_ of
+                         undefined -> util:app_get_env(mode, node);
+                         Mode -> Mode
+                     end,
+    EmptyNode = case config:read(empty_node) of
+                    failed -> config:write(empty_node, false),
+                              false;
+                    X -> X
+                end,
     
     AdminServer = util:sup_worker_desc(admin_server, admin, start_link),
     BenchServer = util:sup_worker_desc(bench_server, bench_server, start_link),
-    BootServerOptions = case EmptyBootServer of
-                            false -> [];
-                            _     -> [{empty}]
-                        end,
     BootServer = util:sup_worker_desc(boot_server, boot_server, start_link,
-                                      [ServiceGroup, BootServerOptions]),
+                                      [ServiceGroup, []]),
     BootServerDNCache =
         util:sup_worker_desc(deadnodecache, dn_cache, start_link,
                              [ServiceGroup]),
@@ -136,7 +139,7 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
                      AdminServer,
                      ClientsDelayer],
     %% do we want to run an empty boot-server?
-    PostBootServer = case EmptyBootServer of
+    PostBootServer = case EmptyNode of
                          true -> [YAWS, BenchServer, Ganglia];
                          _    -> [YAWS, BenchServer, Ganglia, DHTNode]
                      end,

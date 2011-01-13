@@ -78,7 +78,16 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     pid_groups:start_link(),
-                    sup_scalaris:start_link(boot, [{boot_server, empty} | Options]),
+                    NewOptions =
+                        [begin
+                             case Option of
+                                 {config, KVList} ->
+                                     {config,
+                                      lists:append(KVList, [{empty_node, true}])};
+                                 X -> X
+                             end
+                         end || Option <- Options],
+                    sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
                     Ids = IdsFun(), % config may be needed
                     admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),

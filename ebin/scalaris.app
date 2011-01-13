@@ -17,7 +17,7 @@
 {application, scalaris,
               [{description, "scalaris"},
                {vsn, "0.2"},
-               {mod, {scalaris_app, node}},
+               {mod, {scalaris_app, []}},
                {registered, []},
                {applications, [kernel, stdlib]},
                {env, []}
