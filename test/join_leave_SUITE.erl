@@ -67,7 +67,7 @@ end_per_testcase(_TestCase, Config) ->
 
 add_9(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     stop_time(fun add_9_test/0, "add_9").
 
 add_9_test() ->
@@ -76,7 +76,7 @@ add_9_test() ->
 
 rm_5(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     admin:add_nodes(9),
     check_size(10),
     stop_time(fun rm_5_test/0, "rm_5").
@@ -87,7 +87,7 @@ rm_5_test() ->
 
 add_9_rm_5(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     stop_time(fun add_9_rm_5_test/0, "add_9_rm_5").
 
 add_9_rm_5_test() ->
@@ -98,7 +98,7 @@ add_9_rm_5_test() ->
 
 add_2x3_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
     dht_node_move_SUITE:check_size2_v1(4).
 
@@ -113,7 +113,7 @@ add_2x3_load_test() ->
 
 add_2x3_load_v2(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     stop_time(fun add_2x3_load_v2_test/0, "add_2x3_load_v2"),
     dht_node_move_SUITE:check_size2_v2(4).
 
@@ -128,7 +128,7 @@ add_2x3_load_v2_test() ->
 
 add_3_rm_2_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     stop_time(fun add_3_rm_2_load_test/0, "add_2x3_load"),
     dht_node_move_SUITE:check_size2_v1(4).
 
@@ -145,7 +145,7 @@ add_3_rm_2_load_test() ->
 
 add_3_rm_2_load_v2(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     stop_time(fun add_3_rm_2_load_v2_test/0, "add_2x3_load_v2"),
     dht_node_move_SUITE:check_size2_v2(4).
 
@@ -162,7 +162,7 @@ add_3_rm_2_load_v2_test() ->
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key(), BenchSlaves::1..3, BenchRuns::100..500) -> true.
 prop_join_at(FirstId, SecondId, BenchSlaves, BenchRuns) ->
-    unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE), {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE)]}]),
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(BenchSlaves, BenchRuns) end),
     admin:add_node_at_id(SecondId),
     check_size(2),
@@ -173,7 +173,7 @@ prop_join_at(FirstId, SecondId, BenchSlaves, BenchRuns) ->
 
 -spec prop_join_at_v2(FirstId::?RT:key(), SecondId::?RT:key(), BenchSlaves::1..3, BenchRuns::100..500) -> true.
 prop_join_at_v2(FirstId, SecondId, BenchSlaves, BenchRuns) ->
-    unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE), {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE)]}]),
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(BenchSlaves, BenchRuns) end),
     admin:add_node_at_id(SecondId),
     check_size(2),
