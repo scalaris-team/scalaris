@@ -28,7 +28,7 @@
 
 -behaviour(supervisor).
 
--export([start_link/1, start_link/2, init/1]).
+-export([start_link/1, start_link/2, init/1, check_config/0]).
 
 -ifdef(with_export_type_support).
 -export_type([supervisor_type/0]).
@@ -36,14 +36,11 @@
 
 -type supervisor_type() :: boot | node.
 
--spec start_link(supervisor_type()) -> {ok, Pid::pid()}
-                                     | ignore
-                                     | {error, Error::{already_started,
-                                                       Pid::pid()}
-                                     | term()}.
+-spec start_link(supervisor_type())
+        -> {ok, Pid::pid()} | ignore |
+           {error, Error::{already_started, Pid::pid()} | term()}.
 start_link(SupervisorType) ->
     start_link(SupervisorType, []).
-
 
 -spec start_link(supervisor_type(), list(tuple()))
         -> {ok, Pid::pid()} | ignore |
@@ -60,74 +57,73 @@ start_link(SupervisorType, Options) ->
             error_logger:error_msg("error in starting scalaris ~p supervisor: ~p~n",
                       [SupervisorType, Error])
     end,
-    scan_environment(),
+    add_additional_nodes(),
     Link.
 
--spec init({supervisor_type(), list(tuple())}) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
-                                                         PeriodInSeconds::pos_integer()},
-                                                        [ProcessDescr::any()]}}.
+-spec init({supervisor_type(), [tuple()]})
+        -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                  PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
 init({SupervisorType, Options}) ->
     randoms:start(),
+    _ = config:start_link2(Options),
     ServiceGroup = pid_groups:new("basic_services_"),
-    case error_logger:logfile({open, preconfig:cs_log_file()}) of
+    ErrorLoggerFile = filename:join(config:read(log_path),
+                                    config:read(log_file_name_errorlogger)),
+    case error_logger:logfile({open, ErrorLoggerFile}) of
         ok -> ok;
         {error, Reason} -> error_logger:error_msg("can not open logfile ~.0p: ~.0p",
-                                                  [preconfig:cs_log_file(), Reason])
+                                                  [ErrorLoggerFile, Reason])
     end,
     _ = inets:start(),
     {ok, {{one_for_one, 10, 1}, my_process_list(SupervisorType, ServiceGroup, Options)}}.
 
 -spec my_process_list/3 :: (supervisor_type(), pid_groups:groupname(), list(tuple())) -> [any()].
 my_process_list(SupervisorType, ServiceGroup, Options) ->
-    EmptyBootServer = preconfig:get_env(empty, false) orelse
+    EmptyBootServer = util:app_get_env(empty, false) orelse
                           lists:member({boot_server, empty}, Options),
     
-    AdminServer =
-        util:sup_worker_desc(admin_server, admin, start_link),
-    BenchServer =
-        util:sup_worker_desc(bench_server, bench_server, start_link),
+    AdminServer = util:sup_worker_desc(admin_server, admin, start_link),
+    BenchServer = util:sup_worker_desc(bench_server, bench_server, start_link),
     BootServerOptions = case EmptyBootServer of
                             false -> [];
                             _     -> [{empty}]
                         end,
-    BootServer =
-        util:sup_worker_desc(boot_server, boot_server, start_link, [ServiceGroup, BootServerOptions]),
+    BootServer = util:sup_worker_desc(boot_server, boot_server, start_link,
+                                      [ServiceGroup, BootServerOptions]),
     BootServerDNCache =
         util:sup_worker_desc(deadnodecache, dn_cache, start_link,
                              [ServiceGroup]),
     CommLayer =
         util:sup_supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
-    Config =
-        util:sup_worker_desc(config, config, start_link,
-                             [[preconfig:config(), preconfig:local_config()], Options]),
+    Config = util:sup_worker_desc(config, config, start_link2, [Options]),
     ClientsDelayer =
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
-    DHTNodeFirstId = case preconfig:get_env(first_id, random) of
+    DHTNodeFirstId = case util:app_get_env(first_id, random) of
                          random -> [];
                          Id     -> [{{dht_node, id}, Id}]
                      end,
     DHTNodeOptions = DHTNodeFirstId ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNode =
-        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link, [[{my_sup_dht_node_id, dht_node} | DHTNodeOptions]]),
-    FailureDetector =
-        util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
-    Ganglia =
-        util:sup_worker_desc(ganglia_server, ganglia, start_link),
-    Logger =
-        util:sup_supervisor_desc(logger, log, start_link),
+        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link,
+                                 [[{my_sup_dht_node_id, dht_node} | DHTNodeOptions]]),
+    FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
+    Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),
+    Logger = util:sup_supervisor_desc(logger, log, start_link),
     MonitorTiming =
-        util:sup_worker_desc(monitor_timing, monitor_timing, start_link, [ServiceGroup]),
+        util:sup_worker_desc(monitor_timing, monitor_timing, start_link,
+                             [ServiceGroup]),
     Service =
-        util:sup_worker_desc(service_per_vm, service_per_vm, start_link, [ServiceGroup]),
+        util:sup_worker_desc(service_per_vm, service_per_vm, start_link,
+                             [ServiceGroup]),
     YAWS =
         util:sup_worker_desc(yaws, yaws_wrapper, start_link,
-                             [ preconfig:docroot(),
-                               [{port, preconfig:yaws_port()},
+                             [ config:read(docroot),
+                               [{port, config:read(yaws_port)},
                                 {listen, {0,0,0,0}}],
                                [{max_open_conns, 800},
                                 {access_log, false},
-                                {logdir, preconfig:log_path()}]
+                                {logdir, config:read(log_path)}]
                               ]),
 
     %% order in the following list is the start order
@@ -152,7 +148,21 @@ my_process_list(SupervisorType, ServiceGroup, Options) ->
             lists:flatten([PreBootServer, PostBootServer])
     end.
 
--spec scan_environment() -> ok.
-scan_environment() ->
-    _ = admin:add_nodes(preconfig:cs_instances() - 1),
+-spec add_additional_nodes() -> ok.
+add_additional_nodes() ->
+    Size = config:read(nodes_per_vm),
+    log:log(info, "Starting ~B nodes", [Size]),
+    _ = admin:add_nodes(Size - 1),
     ok.
+
+%% @doc Checks whether config parameters of the cyclon process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_string(log_path) and
+    config:is_string(log_file_name_errorlogger) and
+    config:test_and_error(log_path, fun(X) -> X =/= config:read(log_file_name_errorlogger) end,
+                          "is not different from log_file_name_errorlogger") and
+    config:is_integer(nodes_per_vm) and
+    config:is_port(yaws_port) and
+    config:is_string(docroot).

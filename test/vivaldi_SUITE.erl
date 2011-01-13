@@ -35,7 +35,8 @@ init_per_suite(Config) ->
     Pid = unittest_helper:start_process(
             fun() ->
                     pid_groups:start_link(),
-                    config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+                    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+                    config:start_link2([{config, [{log_path, PrivDir}]}]),
                     log:start_link(),
                     comm_server:start_link(pid_groups:new("comm_layer_")),
                     comm_server:set_local_address({127,0,0,1},14195)

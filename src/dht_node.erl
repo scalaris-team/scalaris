@@ -423,7 +423,7 @@ trigger_known_nodes() ->
 -spec is_first([tuple()]) -> boolean().
 is_first(Options) ->
     lists:member({first}, Options) andalso
-        (util:is_unittest() orelse preconfig:get_env(first, false) =:= true).
+        (util:is_unittest() orelse util:app_get_env(first, false) =:= true).
 
 -spec is_alive(Pid::pid()) -> boolean().
 is_alive(Pid) ->

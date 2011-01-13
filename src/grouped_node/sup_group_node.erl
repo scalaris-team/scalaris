@@ -29,23 +29,23 @@
 
 -export([start_link/1, start_link/0, init/1]).
 
--spec start_link([any()]) -> {ok, Pid::pid()} | ignore |
+-spec start_link([tuple()]) -> {ok, Pid::pid()} | ignore |
                              {error, Error::{already_started, Pid::pid()} |
                                              shutdown | term()}.
 start_link(Options) ->
-    supervisor:start_link(?MODULE, [Options]).
+    supervisor:start_link(?MODULE, Options).
 
 -spec start_link() -> {ok, Pid::pid()} | ignore |
                           {error, Error::{already_started, Pid::pid()} |
                            shutdown | term()}.
 start_link() ->
-    supervisor:start_link(?MODULE, [[]]).
+    supervisor:start_link(?MODULE, []).
 
 %% userdevguide-begin sup_dht_node:init
--spec init([[any()]]) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+-spec init([tuple()]) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
                                 PeriodInSeconds::pos_integer()},
                                [ProcessDescr::any()]}}.
-init([Options]) ->
+init(Options) ->
     db_ets = ?DB, % assert ?DB is ets
     InstanceId = string:concat("group_node_", randoms:getRandomId()),
     pid_groups:join_as(InstanceId, sup_dht_node),

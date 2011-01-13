@@ -67,13 +67,14 @@ suite() ->
      {timetrap, {seconds, 10}}
     ].
 
--spec spawn_config_processes() -> pid().
-spawn_config_processes() ->
+-spec spawn_config_processes(Config::[tuple()]) -> pid().
+spawn_config_processes(Config) ->
     unittest_helper:fix_cwd(),
     unittest_helper:start_process(
       fun() ->
               pid_groups:start_link(),
-              config:start_link(["scalaris.cfg", "scalaris.local.cfg"]),
+              {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+              config:start_link2([{config, [{log_path, PrivDir}]}]),
               log:start_link()
       end).
 
@@ -85,7 +86,7 @@ rw_suite_runs(Desired) ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    Pid = spawn_config_processes(),
+    Pid = spawn_config_processes(Config2),
     [{wrapper_pid, Pid} | Config2].
 
 end_per_suite(Config) ->

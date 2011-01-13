@@ -51,7 +51,7 @@ end_per_suite(Config) ->
 -spec prop_make_ring_with_ids(IDs::[?RT:key(),...]) -> true.
 prop_make_ring_with_ids(IDs) ->
     UniqueIDs = lists:usort(IDs),
-    unittest_helper:make_ring_with_ids(UniqueIDs),
+    unittest_helper:make_ring_with_ids(UniqueIDs, [{config, [pdb:get(log_path, ?MODULE), {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
     
     DHTNodes = pid_groups:find_all(dht_node),
     ?equals(length(DHTNodes), length(UniqueIDs)),
@@ -74,5 +74,7 @@ prop_make_ring_with_ids(IDs) ->
     timer:sleep(100),
     true.
 
-tester_make_ring_with_ids(_Config) ->
+tester_make_ring_with_ids(Config) ->
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    pdb:set({log_path, PrivDir}, ?MODULE),
     tester:test(?MODULE, prop_make_ring_with_ids, 1, 10).

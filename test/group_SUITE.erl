@@ -47,7 +47,7 @@ end_per_suite(Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     unittest_helper:fix_cwd(),
-    scalaris2:stop(), % when end_per_testcase failed
+    scalaris2:stop(), % if end_per_testcase failed
     scalaris2:start(),
     config:write(dht_node_sup, sup_group_node),
     config:write(dht_node, group_node),

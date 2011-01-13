@@ -40,7 +40,8 @@ suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
+    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
     ?equals(?CS_API:write(0, "initial0"), ok),
     %% make a 2nd write, so versiondec does not result in -1 in the DB
     ?equals(?CS_API:write(0, "initial"), ok),

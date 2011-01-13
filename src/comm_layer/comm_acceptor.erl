@@ -22,7 +22,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([start_link/1, init/2]).
+-export([start_link/1, init/2, check_config/0]).
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(GroupName) ->
@@ -37,12 +37,12 @@ init(Supervisor, GroupName) ->
     erlang:register(comm_layer_acceptor, self()),
     pid_groups:join_as(GroupName, comm_acceptor),
 
-    log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), preconfig:cs_port()]),
+    log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), config:read(cs_port)]),
     LS = case config:read(listen_ip) of
              undefined ->
-                 open_listen_port(preconfig:cs_port(), first_ip());
+                 open_listen_port(config:read(cs_port), first_ip());
              _ ->
-                 open_listen_port(preconfig:cs_port(), config:read(listen_ip))
+                 open_listen_port(config:read(cs_port), config:read(listen_ip))
          end,
     {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
     comm_server:set_local_address(undefined, LocalPort),
@@ -110,3 +110,9 @@ first_ip() ->
     {ok, Hostname} = inet:gethostname(),
     {ok, HostEntry} = inet:gethostbyname(Hostname),
     erlang:hd(HostEntry#hostent.h_addr_list).
+
+%% @doc Checks whether config parameters of the cyclon process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_port(cs_port).
