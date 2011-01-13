@@ -25,7 +25,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([test/4]).
+-export([test/4, test_log/4]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -42,6 +42,22 @@ test(Module, Func, Arity, Iterations) ->
         exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n", [Module, Func, {exception, Reason2}]);
         error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n", [Module, Func, {exception, {Reason2, erlang:get_stacktrace()}}])
     end,
+    run(Module, Func, Arity, Iterations, ParseState),
+    ok.
+
+-spec test_log/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
+test_log(Module, Func, Arity, Iterations) ->
+    EmptyParseState = tester_parse_state:new_parse_state(),
+    ParseState = try collect_fun_info(Module, Func, Arity,
+                                      EmptyParseState)
+    catch
+        throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(): ~p~n", [Module, Func, {exception, Term2}]);
+        % special handling for exits that come from a ct:fail() call:
+        exit:{test_case_failed, Reason2} -> ?ct_fail("error ~p:~p() failed with ~p~n", [Module, Func, Reason2]);
+        exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n", [Module, Func, {exception, Reason2}]);
+        error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n", [Module, Func, {exception, {Reason2, erlang:get_stacktrace()}}])
+    end,
+    io:format(""),
     run(Module, Func, Arity, Iterations, ParseState),
     ok.
 
@@ -273,6 +289,16 @@ parse_type(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
     end;
 parse_type({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
     {{tuple, {typedef, tester, test_any}}, ParseState};
+parse_type({type, _Line, constraint, _Constraint}, _Module, ParseState) ->
+    {{constraint, nyi}, ParseState};
+parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState) ->
+    {InternalFunType, ParseState2} = parse_type(FunType, Module, ParseState),
+    Foldl = fun (Constraint, {PartialConstraintList, ParseState2a}) ->
+                    {InternalConstraint, ParseState2c} = parse_type(Constraint, Module, ParseState2a),
+                    {[InternalConstraint | PartialConstraintList], ParseState2c}
+            end,
+    {Constraints, ParseState3} = lists:foldl(Foldl, {[], ParseState2}, ConstraintList),
+    {{bounded_fun, InternalFunType, Constraints}, ParseState3};
 parse_type(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p", [TypeSpec, Module]),
     {unkown, ParseState}.
