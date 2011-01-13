@@ -1,4 +1,4 @@
-%% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -133,7 +133,17 @@ on({tcp, Socket, Data}, State) ->
                 ok = inet:setopts(Socket, [{active, once}]),
                 inc_r_msg_count(State);
             {deliver, Process, Message} ->
-                Process ! Message,
+                PID = case is_pid(Process) of
+                          true -> Process;
+                          false -> whereis(Process)
+                      end,
+                case PID of
+                    undefined ->
+                        log:log(warn,
+                                "[ CC ] Cannot accept msg for unknown named"
+                                " process ~p: ~.0p~n", [Process, Message]);
+                    _ -> PID ! Message
+                end,
                 ok = inet:setopts(Socket, [{active, once}]),
                 inc_r_msg_count(State);
             {user_close} ->
