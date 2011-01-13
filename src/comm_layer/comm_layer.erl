@@ -41,7 +41,18 @@ send(Target, Message) ->
     case is_valid(Target) of
         true when IsLocal ->
             ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
-            make_local(Target) ! Message,
+            LocalTarget = make_local(Target),
+            PID = case is_pid(LocalTarget) of
+                      true -> LocalTarget;
+                      false -> whereis(LocalTarget)
+                  end,
+            case PID of
+                undefined ->
+                    log:log(warn,
+                            "[ CC ] Cannot locally send msg to unknown named"
+                                " process ~p: ~.0p~n", [LocalTarget, Message]);
+                _ -> PID ! Message
+            end,
             ok;
         true ->
             comm_server:send(Target, Message);
