@@ -56,7 +56,7 @@ end_per_testcase(_TestCase, _Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_update_id(?RT:key(), ?RT:key()) -> boolean().
 prop_update_id(OldId, NewId) ->
-    Ring = unittest_helper:make_ring_with_ids([OldId], [{config, [pdb:get(log_path, ?MODULE), {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    Ring = unittest_helper:make_ring_with_ids([OldId], [{config, [pdb:get(log_path, ?MODULE)]}]),
     change_id_and_check(OldId, NewId),
     unittest_helper:stop_ring(Ring),
     true.
@@ -132,24 +132,24 @@ prop_update_id2(NewId) ->
 
 tester_update_id2_1(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(1, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(1, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}]}]),
     tester:test(rm_SUITE, prop_update_id2, 1, 1000),
     unittest_helper:stop_ring(Ring).
 
 tester_update_id2_2(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}]}]),
     tester:test(rm_SUITE, prop_update_id2, 1, 100),
     unittest_helper:stop_ring(Ring).
 
 tester_update_id2_3(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}]}]),
     tester:test(rm_SUITE, prop_update_id2, 1, 100),
     unittest_helper:stop_ring(Ring).
 
 tester_update_id2_4(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    Ring = unittest_helper:make_ring_with_ids(fun() -> util:random_subset(2, ?RT:get_replica_keys(?RT:hash_key(0))) end, [{config, [{log_path, PrivDir}]}]),
     tester:test(rm_SUITE, prop_update_id2, 1, 100),
     unittest_helper:stop_ring(Ring).

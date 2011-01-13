@@ -39,7 +39,7 @@ suite() ->
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
-    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}, {known_hosts, [{{127,0,0,1},14195, service_per_vm}]}]}]),
+    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
     Config2.
 
 end_per_suite(Config) ->

@@ -79,13 +79,17 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     randoms:start(),
                     pid_groups:start_link(),
                     NewOptions =
-                        [begin
-                             case Option of
-                                 {config, KVList} ->
-                                     {config,
-                                      lists:append(KVList, [{empty_node, true}])};
-                                 X -> X
-                             end
+                        [case Option of
+                             {config, KVList} ->
+                                 % add empty_node to the end (so it is not overwritten)
+                                 % but add known_hosts to the beginning so it
+                                 % can be overwritten by the Options
+                                 KVList1 = [{known_hosts,
+                                             [{{127,0,0,1},14195, service_per_vm}]}
+                                           | KVList],
+                                 {config,
+                                  lists:append(KVList1, [{empty_node, true}])};
+                             X -> X
                          end || Option <- Options],
                     sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
@@ -127,7 +131,18 @@ make_ring(Size, Options) ->
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     pid_groups:start_link(),
-                    sup_scalaris:start_link(boot, Options),
+                    NewOptions =
+                        [case Option of
+                             {config, KVList} ->
+                                 % but add known_hosts to the beginning so it
+                                 % can be overwritten by the Options
+                                 KVList1 = [{known_hosts,
+                                             [{{127,0,0,1},14195, service_per_vm}]}
+                                           | KVList],
+                                 {config, KVList1};
+                             X -> X
+                         end || Option <- Options],
+                    sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
                     admin:add_nodes(Size - 1),
                     ok
