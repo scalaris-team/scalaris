@@ -34,6 +34,8 @@
 
 -include("scalaris.hrl").
 
+-type connection() :: {null | pos_integer(), comm:mypid()}.
+
 -type(join_message() ::
     % messages at the joining node:
     {get_dht_nodes_response, Nodes::[node:node_type()]} |
@@ -55,8 +57,6 @@
           lb_psv_gossip:custom_message(),
      {join, LbPsv::module(), LbPsvState::term()}}
     ).
-
--type connection() :: {null | pos_integer(), comm:mypid()}.
 
 -type phase2() ::
     {phase2,  Options::[tuple()], MyKeyVersion::non_neg_integer(),
