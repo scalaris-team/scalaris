@@ -1,4 +1,4 @@
-% Copyright 2007-2010 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+% Copyright 2007-2011 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 
 % Licensed under the Apache License, Version 2.0 (the "License");
 % you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@
 \usepackage{fancyhdr}
 \usepackage{fancyvrb}
 \usepackage{lastpage}
+\usepackage{relsize}
 \usepackage{xcolor}
 \usepackage[pdftex,
         colorlinks=true,
@@ -42,6 +43,9 @@
         pdfborder={0 0 0}]{hyperref}
 \usepackage{listings}
 \usepackage{etextools}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shadows}
 
 \renewcommand{\headrulewidth}{0pt}    % Width of head rule
 \renewcommand{\footrulewidth}{0.3pt}  % Width of head rule
@@ -162,7 +166,7 @@
 }
 \newcommand{\bfref}[1]{\textbf{\hyperpage{#1}}}
 \newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
-\newcommand{\code}[1]{\lstinline[basicstyle=\small\ttfamily]!#1!}
+\newcommand{\code}[1]{\lstinline[basicstyle=\smaller\ttfamily]!#1!}
 \newcommand{\filetitle}[1]{\hbox to \linewidth{~~File \code{#1:}\hfill}}
 \newcommand{\scalaris}{Scalaris}
 \newcommand{\todo}[1]{{\color{red}{\em TODO: #1}}}
@@ -1672,9 +1676,8 @@ The following figure shows a (non-exhaustive) overview of the transitions
 between the phases in the normal case. We will go through these step by step
 and discuss what happens if errors occur.
 
-\begin{center}
-\includegraphics{dht_node_join_phases2}
-\end{center}
+\medskip
+{\centering\input{dht_node_join_phases2.tikz}}
 
 At first all nodes set in the \code{known_hosts} configuration parameter are
 contacted. Their responses are then handled in phase~2.
