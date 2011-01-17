@@ -1,11 +1,10 @@
-\input{tikz_header}
 % TODO: extend this picture and provide all paths between phases
 \begin{tikzpicture}
  [rounded corners,
   pre/.style={<-,shorten <=1pt,>=stealth,semithick},
   post/.style={->,shorten >=1pt,>=stealth,semithick},
   timeout/.style={draw=black!50, dashed},
-  phase/.style={rectangle,top color=black!10,bottom color=black!5},
+  phase/.style={rectangle,fill=codebackground,drop shadow},
   bend angle=60]
  \node[phase] (phase1)                         {init};
  \node[phase] (phase2)  [right=3.5 of phase1]  {phase2};
@@ -15,37 +14,36 @@
 
 
  \path[->] (phase2)
-             edge [pre]  node[auto, swap] {get\_known\_nodes()} (phase1)
-             edge [post] node[auto, swap, align=right]
+             edge [pre]  node[auto, swap] {\code{get_known_nodes()}} (phase1)
+             edge [post] node[auto, anchor=east, text width=4cm]
                           {
-                           get\_number\_of\_samples()\\
+                           \code{get_number_of_samples()}\\
                            \footnotesize{\textcolor{red}{skip\_psv\_lb not set,}}\\
                            \footnotesize{\textcolor{red}{non-empty ContactNodes}}
                           } (phase2b)
-             edge [post] node[auto, align=left, pos=0.475]
+             edge [post] node[auto, anchor=south, pos=0.6, text width=4cm]
                           {
-                           lookup\_new\_ids2()\\
-                           ~\footnotesize{$\hookrightarrow$lookup\_new\_ids1()}\\
-                           ~~\scriptsize{$\hookrightarrow$lookup()}
+                           \code{lookup_new_ids2()}\\
+                           ~\footnotesize{$\hookrightarrow$\code{lookup_new_ids1()}}\\
+                           ~~\scriptsize{$\hookrightarrow$\code{lookup()}}
                           }
-                         node[auto, swap, align=left, pos=0.525]
+                         node[auto, swap, anchor=north, pos=0.64, text width=4cm]
                           {
                            \footnotesize{\textcolor{red}{skip\_psv\_lb set,}}\\
                            \footnotesize{\textcolor{red}{non-empty ContactNodes}}
                           } (phase3)
            (phase2b)
              edge [post, bend left=-35]
-                         node[auto, swap, pos=0.6, align=left]
+                         node[auto, swap, pos=0.7, anchor=north west, text width=3cm]
                           {
-                           lookup\_new\_ids2()\\
-                           ~\footnotesize{$\hookrightarrow$lookup\_new\_ids1()}\\
-                           ~~\scriptsize{$\hookrightarrow$lookup()}\\
+                           \code{lookup_new_ids2()}\\
+                           ~\footnotesize{$\hookrightarrow$\code{lookup_new_ids1()}}\\
+                           ~~\scriptsize{$\hookrightarrow$\code{lookup()}}\\
                           } (phase3)
            (phase3)
-             edge [post] node[auto, align=center, pos=0.5]
+             edge [post] node[auto, anchor=south, text width=3cm]
                           {
-                           contact\_best\_candidate()\\
-                           \footnotesize{$\hookrightarrow$ send\_join\_request()}
+                           \code{contact_best_candidate()}\\
+                           \footnotesize{$\hookrightarrow$\code{send_join_request()}}
                           } (phase4);
 \end{tikzpicture}
-\input{tikz_footer}
