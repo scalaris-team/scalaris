@@ -166,7 +166,7 @@
 }
 \newcommand{\bfref}[1]{\textbf{\hyperpage{#1}}}
 \newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
-\newcommand{\code}[1]{\lstinline[basicstyle=\smaller\ttfamily]!#1!}
+\newcommand{\code}[1]{\lstinline[basicstyle=\ttfamily]!#1!}
 \newcommand{\filetitle}[1]{\hbox to \linewidth{~~File \code{#1:}\hfill}}
 \newcommand{\scalaris}{Scalaris}
 \newcommand{\todo}[1]{{\color{red}{\em TODO: #1}}}
@@ -1530,8 +1530,9 @@ When a new Erlang VM with a Scalaris node is started, a
 workers and supervisors according to the following scheme
 (processes starting order: left to right, top to bottom):
 
-\medskip
-{\centering\includegraphics[width=\linewidth]{supervision}}
+\begin{center}
+\includegraphics[width=\linewidth]{supervision}
+\end{center}
 
 When new nodes are started using \erlfun{admin}{add\_node}{/1}, only new
 \code{sup_dht_node} supervisors are started.
