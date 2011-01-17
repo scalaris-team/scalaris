@@ -36,13 +36,15 @@
 
 %% @doc Gets the number of IDs to sample during join.
 %%      Note: this is executed at the joining node.
-get_number_of_samples(ContactNode) ->
-    comm:send(ContactNode, {join, number_of_samples_request, comm:this(), ?MODULE}).
+get_number_of_samples({_, ContactNode} = Connection) ->
+    comm:send(ContactNode, {join, number_of_samples_request, comm:this(),
+                            ?MODULE, Connection}).
 
 %% @doc Sends the number of IDs to sample during join to the joining node.
 %%      Note: this is executed at the existing node.
-get_number_of_samples_remote(SourcePid) ->
-    MyPidWithCookie = comm:self_with_cookie({join, ?MODULE, {get_samples, SourcePid}}),
+get_number_of_samples_remote(SourcePid, Connection) ->
+    MyPidWithCookie =
+        comm:self_with_cookie({join, ?MODULE, {get_samples, SourcePid, Connection}}),
     GossipPid = pid_groups:get_my(gossip),
     comm:send_local(GossipPid, {get_values_best, MyPidWithCookie}).
 
@@ -50,14 +52,18 @@ get_number_of_samples_remote(SourcePid) ->
 %%      given key. This will simulate the join operation and return a lb_op()
 %%      with all the data needed in sort_candidates/1.
 %%      Note: this is executed at an existing node.
-create_join(DhtNodeState, SelectedKey, SourcePid) ->
-    MyPidWithCookie = comm:self_with_cookie({join, ?MODULE, {create_join, SelectedKey, SourcePid}}),
+create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
+    MyPidWithCookie =
+        comm:self_with_cookie({join, ?MODULE,
+                               {create_join, SelectedKey, SourcePid, Conn}}),
     GossipPid = pid_groups:get_my(gossip),
     comm:send_local(GossipPid, {get_values_best, MyPidWithCookie}),
     DhtNodeState.
 
--spec create_join2(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(), SourcePid::comm:mypid(), BestValues::gossip_state:values()) -> dht_node_state:state().
-create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues) ->
+-spec create_join2(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(),
+                   SourcePid::comm:mypid(), BestValues::gossip_state:values(),
+                   Conn::dht_node_join:connection()) -> dht_node_state:state().
+create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
     Candidate =
         try
             MyNode = dht_node_state:get(DhtNodeState, node),
@@ -121,7 +127,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues) ->
                         [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
                 lb_op:no_op()
         end,
-    comm:send(SourcePid, {join, get_candidate_response, SelectedKey, Candidate}),
+    comm:send(SourcePid, {join, get_candidate_response, SelectedKey, Candidate, Conn}),
     DhtNodeState.
 
 %% @doc Sorts all provided operations so that the one with the biggest change
@@ -133,22 +139,22 @@ sort_candidates(Ops) ->
     lb_common:bestStddev(Ops, plus_infinity, fun lb_psv_split:my_sort_fun/2).
 
 -spec process_join_msg(custom_message(),
-        {get_samples, SourcePid::comm:mypid()} |
-            {create_join, SelectedKey::?RT:key(), SourcePid::comm:mypid()},
+        {get_samples, SourcePid::comm:mypid(), Conn::dht_node_join:connection()} |
+            {create_join, SelectedKey::?RT:key(), SourcePid::comm:mypid(), Conn::dht_node_join:connection()},
         DhtNodeState::dht_node_state:state()) -> dht_node_state:state().
 process_join_msg({gossip_get_values_best_response, BestValues},
-                 {get_samples, SourcePid}, DhtNodeState) ->
+                 {get_samples, SourcePid, Conn}, DhtNodeState) ->
     MinSamples = conf_get_min_number_of_samples(),
     Samples = case gossip_state:get(BestValues, size) of
                   unknown -> MinSamples;
                   % always round up:
                   Size    -> erlang:max(util:ceil((util:log2(Size))), MinSamples)
               end, 
-    comm:send(SourcePid, {join, get_number_of_samples, Samples, comm:this()}),
+    comm:send(SourcePid, {join, get_number_of_samples, Samples, Conn}),
     DhtNodeState;
 process_join_msg({gossip_get_values_best_response, BestValues},
-                 {create_join, SelectedKey, SourcePid}, DhtNodeState) ->
-    create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues).
+                 {create_join, SelectedKey, SourcePid, Conn}, DhtNodeState) ->
+    create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn).
 
 %% @doc Checks whether config parameters of the passive load balancing
 %%      algorithm exist and are valid.

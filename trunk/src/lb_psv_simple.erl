@@ -22,6 +22,11 @@
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
+%-define(TRACE(X,Y), ct:pal(X,Y)).
+-define(TRACE(X,Y), ok).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p)~n", [self(), Pid, Msg])).
+-define(TRACE1(Msg, State), ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
+
 -behaviour(lb_psv_beh).
 -include("lb_psv_beh.hrl").
 
@@ -33,21 +38,25 @@
 
 %% @doc Gets the number of IDs to sample during join.
 %%      Note: this is executed at the joining node.
-get_number_of_samples(ContactNode) ->
+get_number_of_samples(Connection) ->
+    ?TRACE_SEND(self(), {join, get_number_of_samples,
+                             conf_get_number_of_samples(), Connection}),
     comm:send_local(self(), {join, get_number_of_samples,
-                             conf_get_number_of_samples(), ContactNode}).
+                             conf_get_number_of_samples(), Connection}).
 
 %% @doc Sends the number of IDs to sample during join to the joining node.
 %%      Note: this is executed at the existing node.
-get_number_of_samples_remote(SourcePid) ->
+get_number_of_samples_remote(SourcePid, Connection) ->
+    ?TRACE_SEND(SourcePid, {join, get_number_of_samples,
+                          conf_get_number_of_samples(), Connection}),
     comm:send(SourcePid, {join, get_number_of_samples,
-                          conf_get_number_of_samples(), comm:this()}).
+                          conf_get_number_of_samples(), Connection}).
 
 %% @doc Creates a join operation if a node would join at my node with the
 %%      given key. This will simulate the join operation and return a lb_op()
 %%      with all the data needed in sort_candidates/1.
 %%      Note: this is executed at an existing node.
-create_join(DhtNodeState, SelectedKey, SourcePid) ->
+create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
     Candidate =
         try
             MyNode = dht_node_state:get(DhtNodeState, node),
@@ -81,7 +90,8 @@ create_join(DhtNodeState, SelectedKey, SourcePid) ->
                         [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
                 lb_op:no_op()
         end,
-    comm:send(SourcePid, {join, get_candidate_response, SelectedKey, Candidate}),
+    ?TRACE_SEND(SourcePid, {join, get_candidate_response, SelectedKey, Candidate, Conn}),
+    comm:send(SourcePid, {join, get_candidate_response, SelectedKey, Candidate, Conn}),
     DhtNodeState.
 
 %% @doc Sorts all provided operations so that the one with the biggest change

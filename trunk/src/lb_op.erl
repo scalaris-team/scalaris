@@ -23,17 +23,20 @@
 -export([no_op/0, slide_op/4, jump_op/6,
         is_no_op/1, is_slide/1, is_jump/1, get/2]).
 
--ifdef(with_export_type_support).
--export_type([lb_op/0]).
--endif.
-
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
+
+-ifdef(with_export_type_support).
+-export_type([lb_op/0, id/0]).
+-endif.
+
+-type id() :: util:global_uid().
 
 -type type() :: slide | jump.
 
 -record(lb_op,
         {type       = ?required(lb_op, type)       :: type(),
+         id         = ?required(lb_op, id)         :: id(),
          % first node involved (node that slides or moves)
          n1         = ?required(lb_op, n1)         :: node_details:node_details(),
          % successor of node1
@@ -46,44 +49,56 @@
         }).
 -opaque lb_op() :: #lb_op{} | no_op.
 
+%% @doc Creates a no_op operation.
 -spec no_op() -> lb_op().
 no_op() -> no_op.
 
+%% @doc Creates a new slide operation with the given nodes and their details
+%%      after the slide.
 -spec slide_op(
     Node::node_details:node_details(), Successor::node_details:node_details(),
     NodeNew::node_details:node_details(), SuccessorNew::node_details:node_details())
         -> lb_op().
 slide_op(Node, Successor, NodeNew, SuccessorNew) ->
-    #lb_op{type = slide,
+    #lb_op{type = slide, id = util:get_global_uid(),
            n1 = Node, n1succ = Successor,
            n1_new = NodeNew, n1succ_new = SuccessorNew}.
 
+%% @doc Creates a new jump operation with the given nodes and their details
+%%      after the jump.
 -spec jump_op(
     NodeToMove::node_details:node_details(), NodeToMove_succ::node_details:node_details(), NodePosition::node_details:node_details(),
     NodeToMoveNew::node_details:node_details(), NodeToMove_succNew::node_details:node_details(), NodePositionNew::node_details:node_details())
         -> lb_op().
 jump_op(NodeToMove, NodeToMove_succ, NodePosition,
         NodeToMoveNew, NodeToMove_succNew, NodePositionNew) ->
-    #lb_op{type = jump,
+    #lb_op{type = jump, id = util:get_global_uid(),
            n1 = NodeToMove, n1succ = NodeToMove_succ, n3 = NodePosition,
            n1_new = NodeToMoveNew, n1succ_new = NodeToMove_succNew, n3_new = NodePositionNew}.
 
+%% @doc Determines whether the operation is a no_op, i.e. no operation.
 -spec is_no_op(Op::lb_op()) -> boolean().
 is_no_op(no_op) -> true;
 is_no_op(#lb_op{}) -> false.
 
+%% @doc Determines whether the operation is a slide.
 -spec is_slide(Op::lb_op()) -> boolean().
 is_slide(no_op) -> false;
 is_slide(Op) -> Op#lb_op.type =:= slide.
 
+%% @doc Determines whether the operation is a jump.
 -spec is_jump(Op::lb_op()) -> boolean().
 is_jump(no_op) -> false;
 is_jump(Op) -> Op#lb_op.type =:= jump.
 
+%% @doc Gets the selected property from the load balancing operation.
 -spec get(lb_op(), n1 | n1succ| n1_new | n1succ_new) -> node_details:node_details();
-         (lb_op(), n3 | n3_new) -> node_details:node_details() | null.
-get(#lb_op{n1=N1, n1succ=N1Succ, n3=N3, n1_new=N1New, n1succ_new=N1SuccNew, n3_new=N3New}, Key) ->
+         (lb_op(), n3 | n3_new) -> node_details:node_details() | null;
+         (lb_op(), id) -> id().
+get(#lb_op{id=Id, n1=N1, n1succ=N1Succ, n3=N3,
+           n1_new=N1New, n1succ_new=N1SuccNew, n3_new=N3New}, Key) ->
     case Key of
+        id -> Id;
         n1 -> N1;
         n1succ -> N1Succ;
         n3 -> N3;
@@ -91,4 +106,3 @@ get(#lb_op{n1=N1, n1succ=N1Succ, n3=N3, n1_new=N1New, n1succ_new=N1SuccNew, n3_n
         n1succ_new -> N1SuccNew;
         n3_new -> N3New
     end.
-
