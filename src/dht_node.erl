@@ -25,7 +25,7 @@
 
 -behaviour(gen_component).
 
--export([start_link/2, on/2, init/1,
+-export([start_link/2, on/2, on_join/2, init/1,
          trigger_known_nodes/0]).
 
 -export([is_first/1, is_alive/1]).
@@ -33,9 +33,6 @@
 -ifdef(with_export_type_support).
 -export_type([message/0]).
 -endif.
-
-% state of the dht_node loop
--type(state() :: dht_node_join:join_state() | dht_node_state:state() | kill).
 
 -type(bulkowner_message() ::
       {bulk_owner, I::intervals:interval(), Msg::comm:message()} |
@@ -66,12 +63,15 @@
       dht_node_move:move_message()).
 
 %% @doc message handler
--spec on(message(), state()) -> state().
+-spec on_join(message(), dht_node_join:join_state())
+        -> dht_node_join:join_state() |
+           {'$gen_component', [{on_handler, Handler::on}], dht_node_state:state()}.
+on_join(Msg, State) ->
+    dht_node_join:process_join_state(Msg, State).
 
+-spec on(message(), dht_node_state:state()) -> dht_node_state:state() | kill.
 %% Join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
-on(Msg, State) when element(1, State) =:= join ->
-    dht_node_join:process_join_state(Msg, State);
 on(Msg, State) when element(1, Msg) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 % message with cookie for dht_node_join?

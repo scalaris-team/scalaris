@@ -148,7 +148,8 @@ init(Trigger) ->
 %%      'activate_cyclon' message is received). Queues getter-messages for
 %%      faster startup of dependent processes. 
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
-                 ({activate_cyclon}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+                 ({activate_cyclon}, state_inactive())
+        -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self(), cyclon, fun rm_loop:subscribe_default_filter/2,

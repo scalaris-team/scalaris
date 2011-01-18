@@ -94,18 +94,23 @@ join_as_first(Id, IdVersion, _Options) ->
 
 %% userdevguide-begin dht_node_join:join_as_other
 -spec join_as_other(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()])
-        -> {join, phase2(), msg_queue:msg_queue()}.
+        -> {'$gen_component', [{on_handler, Handler::on}],
+            State::{join, phase2(), msg_queue:msg_queue()}}.
 join_as_other(Id, IdVersion, Options) ->
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
     get_known_nodes(),
     msg_delay:send_local(get_join_timeout() div 1000, self(), {join, timeout}),
-    {join, {phase2, Options, IdVersion, [], [Id], []}, msg_queue:new()}.
+    gen_component:change_handler(
+      {join, {phase2, Options, IdVersion, [], [Id], []}, msg_queue:new()},
+      on_join).
 %% userdevguide-end dht_node_join:join_as_other
 
 % join protocol
 %% @doc Process a DHT node's join messages during the join phase.
--spec process_join_state(dht_node:message(), join_state()) -> dht_node_state:state().
+-spec process_join_state(dht_node:message(), join_state())
+        -> join_state() |
+           {'$gen_component', [{on_handler, Handler::on}], dht_node_state:state()}.
 % !first node
 % 2. Find known hosts
 % no matter which phase, if there are no contact nodes (yet), try to get some
@@ -800,7 +805,8 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
 -spec finish_join_and_slide(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::?DB:db(),
                   QueuedMessages::msg_queue:msg_queue(), MoveId::slide_op:id())
-        -> dht_node_state:state().
+        -> {'$gen_component', [{on_handler, Handler::on}],
+            State::dht_node_state:state()}.
 finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
     State = finish_join(Me, Pred, Succ, DB, QueuedMessages),
     SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, node:id(Me), join),
@@ -813,7 +819,7 @@ finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
     NewMsgQueue = msg_queue:add(QueuedMessages,
                                 {move, node_update, RMSubscrTag}),
     msg_queue:send(NewMsgQueue),
-    State2.
+    gen_component:change_handler(State2, on).
 %% userdevguide-end dht_node_join:finish_join
 
 % getter:
