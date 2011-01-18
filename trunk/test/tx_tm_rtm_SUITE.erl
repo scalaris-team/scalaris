@@ -42,9 +42,6 @@ init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
     unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}]}]),
-    ?equals(?CS_API:write(0, "initial0"), ok),
-    %% make a 2nd write, so versiondec does not result in -1 in the DB
-    ?equals(?CS_API:write(0, "initial"), ok),
     Config2.
 
 end_per_suite(Config) ->
@@ -58,7 +55,10 @@ abort_prepared_r(_) ->
     %% tx decisions
     %% modify DB and then do operations on the changed DB
     %% quorum reads should alway succeed
-    [abort_prepared(0, read, [MC1, MC2, MC3, MC4], ok)
+    [ begin
+          Key = init_new_db_key("abort_prepared_r"),
+          abort_prepared(Key, read, [MC1, MC2, MC3, MC4], ok)
+      end
      || MC1 <- causes(), MC2 <- causes(),
         MC3 <- causes(), MC4 <- causes()],
     ok.
@@ -67,8 +67,11 @@ abort_prepared_w(_) ->
     %% check all combinations of abort / prepared and the corresponding
     %% tx decisions
     %% modify DB and then do operations on the changed DB
-    [abort_prepared(0, write, [MC1, MC2, MC3, MC4],
-                    calc_w_outcome([MC1, MC2, MC3, MC4]))
+    [ begin
+          Key = init_new_db_key("abort_prepared_w"),
+          abort_prepared(Key, write, [MC1, MC2, MC3, MC4],
+                         calc_w_outcome([MC1, MC2, MC3, MC4]))
+      end
       || MC1 <- causes(), MC2 <- causes(),
          MC3 <- causes(), MC4 <- causes()],
     ok.
@@ -77,8 +80,11 @@ abort_prepared_rc(_) ->
     %% check all combinations of abort / prepared and the corresponding
     %% tx decisions
     %% modify DB and then do operations on the changed DB
-    [abort_prepared(0, read_commit, [MC1, MC2, MC3, MC4],
-                    calc_rc_outcome([MC1, MC2, MC3, MC4]))
+    [ begin
+          Key = init_new_db_key("abort_prepared_rc"),
+          abort_prepared(Key, read_commit, [MC1, MC2, MC3, MC4],
+                         calc_rc_outcome([MC1, MC2, MC3, MC4]))
+      end
      || MC1 <- causes(), MC2 <- causes(),
         MC3 <- causes(), MC4 <- causes()],
     ok.
@@ -87,10 +93,11 @@ abort_prepared_rmc(_) ->
      %% modify DB after work_phase, before validation
      %% read - modify - commit (rmc)
      [begin
+          Key = init_new_db_key("abort_prepared_rmc"),
           {TLog, _} =
               ?CS_API:process_request_list(?CS_API:new_tlog(),
-                                           [{read, 0}]),
-          abort_prepared(0, {commit_tlog, TLog}, [MC1, MC2, MC3, MC4],
+                                           [{read, Key}]),
+          abort_prepared(Key, {commit_tlog, TLog}, [MC1, MC2, MC3, MC4],
                          calc_rmc_outcome([MC1, MC2, MC3, MC4]))
       end
       || MC1 <- causes(), MC2 <- causes(),
@@ -101,19 +108,20 @@ abort_prepared_wmc(_) ->
      %% modify DB after work_phase, before validation
      %% write - modify - commit (rmc)
      [begin
+          Key = init_new_db_key("abort_prepared_wmc"),
           {TLog, _} =
               ?CS_API:process_request_list(?CS_API:new_tlog(),
-                                           [{write, 0, "wmc"}]),
+                                           [{write, Key, "wmc"}]),
           Pattern = [MC1, MC2, MC3, MC4],
-          abort_prepared(0, {commit_tlog, TLog}, Pattern,
+          abort_prepared(Key, {commit_tlog, TLog}, Pattern,
                          calc_wmc_outcome(Pattern))
       end
       || MC1 <- causes(), MC2 <- causes(),
          MC3 <- causes(), MC4 <- causes()],
     ok.
 
-abort_prepared(_Key, Op, PreOps, ExpectedOutcome) ->
-    Keys = ?RT:get_replica_keys(?RT:hash_key(0)),
+abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
+    Keys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     DBEntries = get_db_entries(Keys),
     NewDBEntries = [ begin
           NewDBEntry =
@@ -133,16 +141,16 @@ abort_prepared(_Key, Op, PreOps, ExpectedOutcome) ->
 
     Outcome =
         case Op of
-            write -> ?CS_API:write(0,
+            write -> ?CS_API:write(Key,
                                      io_lib:format("~p with ~p", [Op, PreOps]));
             read ->
-                case ?CS_API:read(0) of
+                case ?CS_API:read(Key) of
                     {fail, Reason} -> {fail, Reason};
                     _ -> ok
                 end;
             read_commit ->
                 case ?CS_API:process_request_list(?CS_API:new_tlog(),
-                                                  [{read, 0}, {commit}]) of
+                                                  [{read, Key}, {commit}]) of
                     %% cs_api
                     {_TLog, {results, [_, {commit, fail, {fail, abort}}]}} -> {fail, abort};
                     {_TLog, {results, [_, {commit, ok, _}]}} -> ok;
@@ -169,14 +177,6 @@ abort_prepared(_Key, Op, PreOps, ExpectedOutcome) ->
                            io_lib:format("~p with ~p and~nDB entries initial: ~p~nafter preops ~p~n and after operation ~p~n",
                                          [Op, PreOps, DBEntries, NewDBEntries, get_db_entries(Keys)]))
     end,
-
-    %% restore original entries
-    [ begin
-          lookup:unreliable_lookup(db_entry:get_key(X),
-                                   {set_key_entry, comm:this(), X}),
-          receive {set_key_entry_reply, X} -> ok end
-      end
-      || X <- DBEntries ],
    ok.
 
 calc_w_outcome(PreOps) ->
@@ -257,6 +257,23 @@ calc_wmc_outcome(PreOps) ->
 
        true -> {fail, abort}
     end.
+
+init_new_db_key(Value) ->
+    UID = util:get_global_uid(),
+    NewKey = lists:flatten(io_lib:format("~p", [UID])),
+    Keys = ?RT:get_replica_keys(?RT:hash_key(NewKey)),
+    [ begin
+          E1 = db_entry:new(Key),
+          %% inc twice, so decversion is ok
+          E2 = db_entry:inc_version(E1),
+          E3 = db_entry:inc_version(E2),
+          %% set a value
+          E4 = db_entry:set_value(E3, Value),
+          lookup:unreliable_lookup(db_entry:get_key(E4),
+                                   {set_key_entry, comm:this(), E4}),
+          receive {set_key_entry_reply, E4} -> ok end
+      end || Key <- Keys ],
+    NewKey.
 
 get_db_entries(Keys) ->
     [ begin
