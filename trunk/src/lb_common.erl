@@ -87,7 +87,7 @@ calc_sum2Change(Op) ->
 split_by_load(DhtNodeState, TargetLoad) ->
     DB = dht_node_state:get(DhtNodeState, db),
     {SplitKey, TargetLoadNew} =
-        ?DB:get_split_key(DB, dht_node_state:get(DhtNodeState, pred_id), TargetLoad),
+        ?DB:get_split_key(DB, dht_node_state:get(DhtNodeState, pred_id), TargetLoad, forward),
     _ = case intervals:in(SplitKey, dht_node_state:get(DhtNodeState, my_range)) of
             false -> erlang:throw('no key in range');
             _  -> ok
