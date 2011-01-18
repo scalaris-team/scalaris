@@ -79,7 +79,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                                     util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
                                 _       -> util:floor(MyLoad / 2)
                             end,
-                        io:format("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
+%%                         io:format("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
                         try lb_common:split_by_load(DhtNodeState, TargetLoad)
                         catch
                             throw:'no key in range' ->
