@@ -121,9 +121,9 @@ process_move_msg({move, notify_pred_timeout, MoveFullId}, MyState) ->
 % notification from predecessor/successor that it wants to slide with our node
 process_move_msg({move, slide, OtherType, MoveFullId, OtherNode,
                   OtherTargetNode, TargetId, Tag, MaxTransportBytes}, State) ->
-    setup_slide_with(State, slide_op:other_type_to_my_type(OtherType), MoveFullId,
-                     OtherTargetNode, OtherNode, TargetId, Tag, MaxTransportBytes,
-                     null, false);
+    setup_slide(State, slide_op:other_type_to_my_type(OtherType), MoveFullId,
+                OtherTargetNode, OtherNode, TargetId, Tag, MaxTransportBytes,
+                null, false);
 
 % notification from pred/succ that he could not aggree on a slide with us
 process_move_msg({move, slide_abort, PredOrSucc, MoveFullId, Reason}, State) ->
@@ -351,15 +351,14 @@ notify_other_slide(NewSlideOp, State) ->
 
 %% @doc Sets up a new slide operation with the node's successor or predecessor
 %%      after a request for a slide has been received.
--spec setup_slide_with(State::dht_node_state:state(), Type::slide_op:type(),
-                       MoveFullId::slide_op:id(),
-                       MyNode::node:node_type(), TargetNode::node:node_type(),
-                       TargetId::?RT:key(), Tag::any(),
-                       MaxTransportBytes::pos_integer(),
-                       SourcePid::comm:erl_local_pid() | null, First::boolean())
+-spec setup_slide(State::dht_node_state:state(), Type::slide_op:type(),
+                  MoveFullId::slide_op:id(), MyNode::node:node_type(),
+                  TargetNode::node:node_type(), TargetId::?RT:key(),
+                  Tag::any(), MaxTransportBytes::pos_integer(),
+                  SourcePid::comm:erl_local_pid() | null, First::boolean())
         -> dht_node_state:state().
-setup_slide_with(State, Type, MoveFullId, MyNode,
-                 TargetNode, TargetId, Tag, MaxTransportBytes, SourcePid, First) ->
+setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
+            MaxTransportBytes, SourcePid, First) ->
     case get_slide_op(State, MoveFullId) of
         % If there already is a slide operation which was previously set up or
         % due to a second message after a timeout hit on the other node,
@@ -391,35 +390,38 @@ setup_slide_with(State, Type, MoveFullId, MyNode,
                     abort_slide(State, SlideOp, changed_parameters, true)
             end;
         not_found ->
-            setup_slide_with2_not_found(
-              State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
+            Command = check_setup_slide_not_found(
+                        State, Type, MyNode, TargetNode, TargetId),
+            exec_setup_slide_not_found(
+              Command, State, Type, MoveFullId, TargetNode, TargetId, Tag,
               MaxTransportBytes, SourcePid, First);
         {wrong_neighbor, _PredOrSucc, SlideOp} -> % wrong pred or succ
             abort_slide(State, SlideOp, wrong_pred_succ_node, true)
     end.
-    
-%% @doc Sets up a new slide operation with the node's successor or predecessor
-%%      after a request for a slide has been received and setup_slide_with/9
-%%      checked that the slide to create did not exist yet.
--spec setup_slide_with2_not_found(State::dht_node_state:state(),
-        Type::slide_op:type(), MoveFullId::slide_op:id(),
-        MyNode::node:node_type(), TargetNode::node:node_type(),
-        TargetId::?RT:key(), Tag::any(), MaxTransportBytes::pos_integer(),
-        SourcePid::comm:erl_local_pid() | null, First::boolean())
-            -> dht_node_state:state().
-setup_slide_with2_not_found(State, Type, MoveFullId,
-                            MyNode, TargetNode, TargetId, Tag,
-                            MaxTransportBytes, SourcePid, First) ->
+
+-type command() :: {abort, abort_reason()} |
+                   {ok, slide, pred | succ, 'send' | 'rcv'} |
+                   {ok, jump, 'send'} |
+                   {ok, leave, 'send'} |
+                   {ok, move_done}.
+
+%% @doc Checks whether a new slide operation with the node's successor or
+%%      predecessor and the given parameters can be set up.
+%%      Note: this does not check whether such a slide already exists.
+-spec check_setup_slide_not_found(State::dht_node_state:state(),
+        Type::slide_op:type(), MyNode::node:node_type(),
+        TargetNode::node:node_type(), TargetId::?RT:key()) -> command().
+check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
     CanSlide = case PredOrSucc of
-                   pred -> can_slide_pred(State, TargetId, Type);
-                   succ -> can_slide_succ(State, TargetId, Type)
+                   pred -> can_slide_pred(State, TId, Type);
+                   succ -> can_slide_succ(State, TId, Type)
                end,
     % correct pred/succ info? did pred/succ know our current ID (compare node info)
     NodesCorrect = MyNode =:= dht_node_state:get(State, node) andalso
-                       TargetNode =:= dht_node_state:get(State, PredOrSucc),
-    MoveDone = (PredOrSucc =:= pred andalso node:id(TargetNode) =:= TargetId) orelse
-               (PredOrSucc =:= succ andalso node:id(MyNode) =:= TargetId),
+                       TNode =:= dht_node_state:get(State, PredOrSucc),
+    MoveDone = (PredOrSucc =:= pred andalso node:id(TNode) =:= TId) orelse
+               (PredOrSucc =:= succ andalso node:id(MyNode) =:= TId),
     case CanSlide andalso NodesCorrect andalso not MoveDone of
         true ->
             case slide_op:is_leave(Type, 'send') of
@@ -427,81 +429,98 @@ setup_slide_with2_not_found(State, Type, MoveFullId,
                     % graceful leave (slide with succ, send all data)
                     % note: may also be a jump operation!
                     % TODO: check for running slide, abort it if possible, eventually extend it
-                    % TODO(jump): notify node jumping to (?)
                     case slide_op:is_jump(Type) of
                         true ->
-                            case dht_node_state:is_responsible(TargetId, State) orelse
-                                     intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
+                            TIdInRange = dht_node_state:is_responsible(
+                                                TId, State),
+                            TIdInSuccRange =
+                                intervals:in(TId,
+                                             dht_node_state:get(State, succ_range)),
+                            if % convert jump to slide?
+                                TIdInRange     -> {ok, slide, succ, 'send'};
+                                TIdInSuccRange -> {ok, slide, succ, 'rcv'};
                                 true ->
-                                    % note: we could optimize here and not undergo all the checks again,
-                                    % but this should not be a common case!
-                                    % also: already checked in make_jump
-                                    % (this is for the case when a message with the slide request is received which doesn't go through make_jump)
-                                    make_slide(State, succ, TargetId, Tag, SourcePid);
-                                _ ->
-                                    case dht_node_state:get(State, slide_succ) =/= null andalso
-                                             dht_node_state:get(State, slide_pred) =/= null of
-                                        true ->
-                                            SlideOp = slide_op:new_sending_slide_jump(
-                                                        MoveFullId, TargetId, Tag, State),
-                                            notify_other_slide(SlideOp, State);
-                                        _ ->
-                                            notify_source_pid(SourcePid,
-                                                              {move, result, Tag, ongoing_slide}),
-                                            State
+                                    SlideSucc =
+                                        dht_node_state:get(State, slide_succ),
+                                    SlidePred =
+                                        dht_node_state:get(State, slide_pred),
+                                    case SlideSucc =/= null andalso
+                                             SlidePred =/= null of
+                                        true -> {ok, jump, 'send'};
+                                        _    -> {abort, ongoing_slide}
                                     end
                             end;
-                        _    ->
-                            SlideOp = slide_op:new_sending_slide_leave(
-                                        MoveFullId, leave, State),
-                            notify_other_slide(SlideOp, State)
+                        _ -> {ok, leave, 'send'}
                     end;
                 _ ->
-                    TargetIdInRange = dht_node_state:is_responsible(TargetId, State),
-                    SlideOp = slide_op:new_slide(MoveFullId, Type, TargetId, Tag, SourcePid, State),
+                    TIdInRange = dht_node_state:is_responsible(TId, State),
                     SendOrReceive = slide_op:get_sendORreceive(Type),
-                    case SendOrReceive of
-                        'send' when TargetIdInRange andalso PredOrSucc =:= pred ->
-                            % slide with pred, send data
-                            State1 = dht_node_state:add_db_range(
-                                       State, slide_op:get_interval(SlideOp)),
-                            notify_other_slide(SlideOp, State1);
-                        'send' when TargetIdInRange andalso PredOrSucc =:= succ ->
-                            % slide with succ, send data
-                            case First of
-                                true -> notify_other_slide(SlideOp, State);
-                                _    ->
-                                    State1 = dht_node_state:add_db_range(
-                                               State, slide_op:get_interval(SlideOp)),
-                                    change_my_id(State1, SlideOp, TargetId)
-                            end;
-                        'send' -> % can not send if TargetId is not in my range!
-                            abort_slide(State, SlideOp, target_id_not_in_range, not First);
-                        'rcv' when PredOrSucc =:= pred ->
-                            % slide with pred, receive data
-                            State1 = dht_node_state:add_msg_fwd(
-                                       State, slide_op:get_interval(SlideOp),
-                                       node:pidX(slide_op:get_node(SlideOp))),
-                            notify_other_slide(SlideOp, State1);
-                        'rcv' when PredOrSucc =:= succ ->
-                            % slide with succ, receive data
-                            case First of
-                                true -> notify_other_slide(SlideOp, State);
-                                _    ->
-                                    State1 = dht_node_state:add_msg_fwd(
-                                               State, slide_op:get_interval(SlideOp),
-                                               node:pidX(slide_op:get_node(SlideOp))),
-                                    change_my_id(State1, SlideOp, TargetId)
-                            end
+                    case SendOrReceive =:= 'send' andalso not TIdInRange of
+                        true -> {abort, target_id_not_in_range};
+                        _    -> {ok, slide, PredOrSucc, SendOrReceive}
                     end
             end;
-        _ when not CanSlide ->
+        _ when not CanSlide -> {abort, ongoing_slide};
+        _ when not NodesCorrect -> {abort, wrong_pred_succ_node};
+        _ -> {ok, move_done} % MoveDone, i.e. target id already reached (noop)
+    end.
+
+%% @doc Creates a new slide operation with the node's successor or
+%%      predecessor and the given parameters according to the command created
+%%      by check_setup_slide_not_found/5.
+%%      Note: assumes that such a slide does not already exist.
+-spec exec_setup_slide_not_found(
+        Command::command(), State::dht_node_state:state(),
+        Type::slide_op:type(), MoveFullId::slide_op:id(),
+        TargetNode::node:node_type(),
+        TargetId::?RT:key(), Tag::any(), MaxTransportBytes::pos_integer(),
+        SourcePid::comm:erl_local_pid() | null, First::boolean())
+            -> dht_node_state:state().
+exec_setup_slide_not_found(Command, State, Type, MoveFullId, TargetNode,
+                           TargetId, Tag, MaxTransportBytes, SourcePid, First) ->
+    case Command of
+        {abort, Reason} ->
             abort_slide(State, TargetNode, MoveFullId, null, SourcePid, Tag,
-                        Type, ongoing_slide, not First);
-        _ when not NodesCorrect ->
-            abort_slide(State, TargetNode, MoveFullId, null, SourcePid, Tag,
-                        Type, wrong_pred_succ_node, not First);
-        _ -> % MoveDone, i.e. target id already reached (noop)
+                        Type, Reason, not First);
+        {ok, jump, 'send'} ->
+            SlideOp = slide_op:new_sending_slide_jump(MoveFullId, TargetId, Tag, State),
+            notify_other_slide(SlideOp, State);
+        {ok, leave, 'send'} ->
+            SlideOp = slide_op:new_sending_slide_leave(MoveFullId, leave, State),
+            notify_other_slide(SlideOp, State);
+        {ok, slide, pred, 'send'} ->
+            % slide with pred, send data
+            SlideOp = slide_op:new_slide(MoveFullId, Type, TargetId, Tag, SourcePid, State),
+            State1 = dht_node_state:add_db_range(State, slide_op:get_interval(SlideOp)),
+            notify_other_slide(SlideOp, State1);
+        {ok, slide, succ, 'send'} ->
+            % slide with succ, send data
+            SlideOp = slide_op:new_slide(MoveFullId, Type, TargetId, Tag, SourcePid, State),
+            case First of
+                true -> notify_other_slide(SlideOp, State);
+                _    -> State1 = dht_node_state:add_db_range(
+                                   State, slide_op:get_interval(SlideOp)),
+                        change_my_id(State1, SlideOp, TargetId)
+            end;
+        {ok, slide, pred, 'rcv'} ->
+            % slide with pred, receive data
+            SlideOp = slide_op:new_slide(MoveFullId, Type, TargetId, Tag, SourcePid, State),
+            State1 = dht_node_state:add_msg_fwd(
+                       State, slide_op:get_interval(SlideOp),
+                       node:pidX(slide_op:get_node(SlideOp))),
+            notify_other_slide(SlideOp, State1);
+        {ok, slide, succ, 'rcv'} ->
+            % slide with succ, receive data
+            SlideOp = slide_op:new_slide(MoveFullId, Type, TargetId, Tag, SourcePid, State),
+            case First of
+                true -> notify_other_slide(SlideOp, State);
+                _    -> State1 = dht_node_state:add_msg_fwd(
+                                   State, slide_op:get_interval(SlideOp),
+                                   node:pidX(slide_op:get_node(SlideOp))),
+                        change_my_id(State1, SlideOp, TargetId)
+            end;
+        {ok, move_done} ->
+            % TODO: notify other node if not first
             notify_source_pid(SourcePid, {move, result, Tag, ok}),
             State
     end.
@@ -817,9 +836,9 @@ notify_source_pid(SourcePid, Message) ->
         _ -> comm:send_local(SourcePid, Message)
     end.
 
-%% @doc Aborts the given slide operation. Pred_or_Succ determines whether the
-%%      SlideOp is a slide with the predecessor or successor of our node. We
-%%      can thus notify the proper node of the abort.
+%% @doc Aborts the given slide operation. Assume the SlideOp has already been
+%%      set in the dht_node and resets the according slide in its state to
+%%      null.
 %% @see abort_slide/8
 -spec abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
         Reason::abort_reason(), NotifyNode::boolean()) -> dht_node_state:state().
@@ -833,10 +852,17 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
     rm_loop:unsubscribe(self(), RMSubscrTag),
     State1 = dht_node_state:rm_db_range(State, slide_op:get_interval(SlideOp1)),
     State2 = dht_node_state:rm_msg_fwd(State1, slide_op:get_interval(SlideOp1)),
-    abort_slide(State2, slide_op:get_node(SlideOp1), slide_op:get_id(SlideOp1),
+    % set a 'null' slide_op if there was an old one with the given ID
+    Type = slide_op:get_type(SlideOp1),
+    PredOrSucc = slide_op:get_predORsucc(Type),
+    State3 = dht_node_state:set_slide(State2, PredOrSucc, null),
+    NewDB = ?DB:stop_record_changes(dht_node_state:get(State3, db),
+                                    slide_op:get_interval(SlideOp)),
+    State4 = dht_node_state:set_db(State3, NewDB),
+    abort_slide(State4, slide_op:get_node(SlideOp1), slide_op:get_id(SlideOp1),
                 slide_op:get_phase(SlideOp1),
                 slide_op:get_source_pid(SlideOp1), slide_op:get_tag(SlideOp1),
-                slide_op:get_type(SlideOp1), Reason, NotifyNode).
+                Type, Reason, NotifyNode).
 
 %% @doc Like abort_slide/5 but does not need a slide operation in order to
 %%      work. Note: prefer using abort_slide/5 when a slide operation is
@@ -848,33 +874,24 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
                   NotifyNode::boolean()) -> dht_node_state:state().
 abort_slide(State, Node, SlideOpId, Phase, SourcePid, Tag, Type, Reason, NotifyNode) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
-    PredOrSuccOther = case PredOrSucc of
-                          pred -> succ;
-                          succ -> pred
-                      end,
     % abort slide on the (other) node:
     case NotifyNode of
         true ->
+            PredOrSuccOther = case PredOrSucc of
+                                  pred -> succ;
+                                  succ -> pred
+                              end,
             comm:send(node:pidX(Node),
                       {move, slide_abort, PredOrSuccOther, SlideOpId, Reason});
         _ -> ok
     end,
     notify_source_pid(SourcePid, {move, result, Tag, Reason}),
-    % set a 'null' slide_op if there was an old one with the given ID
-    State2 =
-        case dht_node_state:get_slide_op(State, SlideOpId) of
-            not_found -> State;
-            {PredOrSucc, _} ->
-                State1 = dht_node_state:set_slide(State, PredOrSucc, null),
-                dht_node_state:set_db(State1, ?DB:stop_record_changes(
-                                        dht_node_state:get(State1, db)))
-        end,
     % re-start a leaving slide on the leaving node if it hasn't left the ring yet:
     case slide_op:is_leave(Type, 'send') andalso
              not slide_op:is_jump(Type) andalso
              lists:member(Phase, [null, wait_for_succ_ack]) of
-        true -> make_slide_leave(State2);
-        _    -> State2
+        true -> make_slide_leave(State);
+        _    -> State
     end.
 
 %% @doc Creates a slide with the node's successor or predecessor. TargetId will
@@ -901,9 +918,9 @@ make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
     MoveFullId = util:get_global_uid(),
     MyNode = dht_node_state:get(State, node),
     TargetNode = dht_node_state:get(State, PredOrSucc),
-    setup_slide_with(State, {slide, PredOrSucc, SendOrReceive},
-                     MoveFullId, MyNode, TargetNode, TargetId, Tag,
-                     get_max_transport_bytes(), SourcePid, true).
+    setup_slide(State, {slide, PredOrSucc, SendOrReceive},
+                MoveFullId, MyNode, TargetNode, TargetId, Tag,
+                get_max_transport_bytes(), SourcePid, true).
 
 %% @doc Creates a slide with the node's predecessor. The predecessor will
 %%      change its ID to TargetId, SourcePid will be notified about the result.
@@ -911,24 +928,14 @@ make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
                 Tag::any(), SourcePid::comm:erl_local_pid() | null)
     -> dht_node_state:state().
 make_jump(State, TargetId, Tag, SourcePid) ->
-    % check whether the operation is a slide_succ -> if so, do that instead
-    % (check here, although a check is in setup_slide_with2_not_found - this
-    % avoids going through make_slide from inside setup_slide_with2_not_found
-    % again)
-    case dht_node_state:is_responsible(TargetId, State) orelse
-             intervals:in(TargetId, dht_node_state:get(State, succ_range)) of
-        true ->
-            make_slide(State, succ, TargetId, Tag, SourcePid);
-        _ ->
-            MoveFullId = util:get_global_uid(),
-            MyNode = dht_node_state:get(State, node),
-            TargetNode = dht_node_state:get(State, succ),
-            log:log(info, "[ Node ~.0p ] starting jump (succ: ~.0p, TargetId: ~.0p)~n",
-                    [MyNode, TargetNode, TargetId]),
-            setup_slide_with(State, {jump, 'send'},
-                             MoveFullId, MyNode, TargetNode, TargetId, Tag,
-                             get_max_transport_bytes(), SourcePid, true)
-    end.
+    MoveFullId = util:get_global_uid(),
+    MyNode = dht_node_state:get(State, node),
+    TargetNode = dht_node_state:get(State, succ),
+    log:log(info, "[ Node ~.0p ] starting jump (succ: ~.0p, TargetId: ~.0p)~n",
+            [MyNode, TargetNode, TargetId]),
+    setup_slide(State, {jump, 'send'},
+                MoveFullId, MyNode, TargetNode, TargetId, Tag,
+                get_max_transport_bytes(), SourcePid, true).
 
 %% @doc Creates a slide that will move all data to the successor and leave the
 %%      ring. Note: Will re-try (forever) to successfully start a leaving slide
@@ -939,9 +946,9 @@ make_slide_leave(State) ->
     InitNode = dht_node_state:get(State, node),
     OtherNode = dht_node_state:get(State, succ),
     log:log(info, "[ Node ~.0p ] starting leave (succ: ~.0p)~n", [InitNode, OtherNode]),
-    setup_slide_with(State, {leave, 'send'}, MoveFullId, InitNode,
-                     OtherNode, node:id(OtherNode), leave,
-                     get_max_transport_bytes(), null, true).
+    setup_slide(State, {leave, 'send'}, MoveFullId, InitNode,
+                OtherNode, node:id(OtherNode), leave,
+                get_max_transport_bytes(), null, true).
 
 %% @doc Send a  node change update message to this module inside the dht_node.
 %%      Will be registered with the dht_node as a node change subscriber.
