@@ -193,7 +193,8 @@ check_config() ->
         lb_psv_simple:check_config() and
         lb_psv_split:check_config() and
         lb_psv_gossip:check_config() and
-        comm_acceptor:check_config().
+        comm_acceptor:check_config() and
+        monitor:check_config().
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->

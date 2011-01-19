@@ -75,10 +75,13 @@ init(Options) ->
                                  start_link, [DHTNodeGroup, Options]),
     Vivaldi =
         util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
+    Monitor =
+        util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
     
     %% order in the following list is the start order
     {ok, {{one_for_one, 10, 1},
           [
+           Monitor,
            Delayer,
            Reregister,
            DeadNodeCache,

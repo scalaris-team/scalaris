@@ -50,9 +50,11 @@
 %% Cycles: the amount of shuffle-cycles
 -type(state_active() :: {RandomNodes::cyclon_cache:cache(),
                          MyNode::node:node_type() | null,
-                         Cycles::integer(), TriggerState::trigger:state()}).
+                         Cycles::integer(), TriggerState::trigger:state(),
+                         MonitorTable::pdb:tableid()}).
 -type(state_inactive() :: {inactive, QueuedMessages::msg_queue:msg_queue(),
-                           TriggerState :: trigger:state()}).
+                           TriggerState :: trigger:state(),
+                           MonitorTable::pdb:tableid()}).
 %% -type(state() :: state_active() | state_inactive()).
 
 % accepted messages of an active cyclon process
@@ -137,7 +139,8 @@ start_link(DHTNodeGroup) ->
 -spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, fun get_shuffle_interval/0, cy_shuffle),
-    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState,
+                                  monitor:proc_init(?MODULE)},
                                  on_inactive).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -150,7 +153,7 @@ init(Trigger) ->
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_cyclon}, state_inactive())
         -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
-on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
+on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState, MonitorTable}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self(), cyclon, fun rm_loop:subscribe_default_filter/2,
                       fun cyclon:rm_send_changes/4),
@@ -158,16 +161,17 @@ on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),
     msg_queue:send(QueuedMessages),
-    gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2},
+    msg_delay:send_local(monitor:proc_get_report_interval(), self(), {report_to_monitor}),
+    gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2, MonitorTable},
                                  on_active);
 
-on_inactive(Msg = {get_ages, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
-    {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState};
+on_inactive(Msg = {get_ages, _Pid}, {inactive, QueuedMessages, TriggerState, MonitorTable}) ->
+    {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState, MonitorTable};
 
-on_inactive(Msg = {get_subset_rand, _N, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
-    {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState};
+on_inactive(Msg = {get_subset_rand, _N, _Pid}, {inactive, QueuedMessages, TriggerState, MonitorTable}) ->
+    {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState, MonitorTable};
 
-on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
+on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState, _MonitorTable} = State) ->
     % get a list of up to 50 queued messages to display:
     MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
                   || Message <- lists:sublist(QueuedMessages, 50)],
@@ -185,43 +189,44 @@ on_inactive(_Msg, State) ->
 %% @doc Message handler when the process is activated.
 -spec on_active(message(), state_active()) -> state_active();
          ({deactivate_cyclon}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
-on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles, TriggerState})  ->
+on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles, TriggerState, MonitorTable})  ->
     log:log(info, "[ Cyclon ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self(), cyclon),
-    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+    gen_component:change_handler({inactive, msg_queue:new(), TriggerState, MonitorTable},
                                  on_inactive);
 
-on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState} = State)  ->
+on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState, MonitorTable} = State)  ->
     NewCache =
         case check_state(State) of
             fail -> Cache;
-            _    -> enhanced_shuffle(Cache, Node)
+            _    -> monitor:proc_inc_value(MonitorTable, "shuffle"),
+                    enhanced_shuffle(Cache, Node)
         end,
     TriggerState2 = trigger:next(TriggerState),
-    {NewCache, Node, Cycles + 1, TriggerState2};
+    {NewCache, Node, Cycles + 1, TriggerState2, MonitorTable};
 
-on_active({rm_changed, NewNode}, {Cache, _OldNode, Cycles, TriggerState}) ->
-    {Cache, NewNode, Cycles, TriggerState};
+on_active({rm_changed, NewNode}, {Cache, _OldNode, Cycles, TriggerState, MonitorTable}) ->
+    {Cache, NewNode, Cycles, TriggerState, MonitorTable};
 
 on_active({check_state}, State) ->
     check_state(State),
     State;
 
-on_active({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
+on_active({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState, MonitorTable}) ->
     %io:format("subset~n", []),
     % this is received at node Q -> integrate results of node P
     ForSend = cyclon_cache:get_random_subset(get_shuffle_length(), Cache),
     comm:send(SourcePid, {cy_subset_response, ForSend, PSubset}),
     NewCache = cyclon_cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
-    {NewCache, Node, Cycles, TriggerState};
+    {NewCache, Node, Cycles, TriggerState, MonitorTable};
 
-on_active({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
+on_active({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState, MonitorTable}) ->
     %io:format("subset_response~n", []),
     % this is received at node P -> integrate results of node Q
     NewCache = cyclon_cache:merge(Cache, Node, QSubset, PSubset, get_cache_size()),
-    {NewCache, Node, Cycles, TriggerState};
+    {NewCache, Node, Cycles, TriggerState, MonitorTable};
 
-on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerState}) ->
+on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, TriggerState, MonitorTable}) ->
     Me = case node_details:contains(NodeDetails, node) of
              true -> node_details:get(NodeDetails, node);
              _    -> Node
@@ -235,13 +240,13 @@ on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, Tri
                                      node_details:get(NodeDetails, succ));
             _ -> OldCache
         end,
-    {Cache, Me, Cycles, TriggerState};
+    {Cache, Me, Cycles, TriggerState, MonitorTable};
 
-on_active({get_ages, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
+on_active({get_ages, Pid}, {Cache, _Node, _Cycles, _TriggerState, _MonitorTable} = State) ->
     msg_get_ages_response(Pid, cyclon_cache:get_ages(Cache)),
     State;
 
-on_active({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
+on_active({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState, _MonitorTable} = State) ->
     msg_get_subset_response(Pid, cyclon_cache:get_random_nodes(N, Cache)),
     State;
 
@@ -249,7 +254,12 @@ on_active({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState} = St
 %%     request_node_details([pred, succ]),
 %%     {cyclon_cache:new(), Node, 0, TriggerState};
 
-on_active({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
+on_active({report_to_monitor}, {_Cache, _Node, _Cycles, _TriggerState, MonitorTable} = State) ->
+    monitor:proc_report_to_my_monitor(MonitorTable),
+    msg_delay:send_local(monitor:proc_get_report_interval(), self(), {report_to_monitor}),
+    State;
+
+on_active({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState, _MonitorTable} = State) ->
     KeyValueList =
         [{"cache_size", cyclon_cache:size(Cache)},
          {"cache (age, node):", ""} | cyclon_cache:debug_format_by_age(Cache)],
@@ -257,6 +267,8 @@ on_active({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState} = 
     State.
 
 %% @doc enhanced shuffle with age
+-spec enhanced_shuffle(Cache::cyclon_cache:cache(), Node::node:node_type())
+        -> cyclon_cache:cache().
 enhanced_shuffle(Cache, Node) ->
     Cache_1 = cyclon_cache:inc_age(Cache),
     {NewCache, NodeQ} = cyclon_cache:pop_oldest_node(Cache_1),
@@ -267,6 +279,8 @@ enhanced_shuffle(Cache, Node) ->
     NewCache.
 
 %% %% @doc simple shuffle without age
+%% -spec simple_shuffle(Cache::cyclon_cache:cache(), Node::node:node_type())
+%%         -> cyclon_cache:cache().
 %% simple_shuffle(Cache, Node) ->
 %%     {NewCache, NodeQ} = cyclon_cache:pop_random_node(Cache),
 %%     Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
@@ -288,7 +302,7 @@ request_node_details(Details) ->
 %%      unknown, the local dht_node will be asked for these values and the check
 %%      will be re-scheduled after 1s.
 -spec check_state(state_active()) -> ok | fail.
-check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
+check_state({Cache, Node, _Cycles, _TriggerState, _MonitorTable} = _State) ->
     % if the own node is unknown or the cache is empty (it should at least
     % contain the nodes predecessor and successor), request this information
     % from the local dht_node
