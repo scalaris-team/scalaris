@@ -7,9 +7,9 @@
   * switch web-interface to cs_api_v2
   * updated JSON API
   * tx_tm_rtm handle more failure scenarios
-  * make APIs interoperable (Erlang, Java, JSON) for some datatypes
+  * make APIs interoperable (Erlang, Java, JSON) for some datatypes issue 43
   * remove transstore, cs_api_v1
   * graceful join/leave protocol with data handover
-  * passive loadbalancing
+  * passive load balancing
   * updated client examples (ruby, java)
   * updated user-dev-guide
