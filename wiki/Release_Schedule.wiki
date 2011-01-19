@@ -1,4 +1,4 @@
-#summary One-sentence summary of this page.
+#summary Features for releases.
 
 = 0.3.0 Rhinechis Scalaris (planned) =
 
