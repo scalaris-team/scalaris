@@ -5,6 +5,7 @@
   * clarify cs_api_v2 (return types) issue 64
   * switch Java API to new cs_api_v2
   * switch web-interface to cs_api_v2
+  * updated JSON API
   * tx_tm_rtm handle more failure scenarios
   * make APIs interoperable (Erlang, Java, JSON) for some datatypes
   * remove transstore, cs_api_v1
