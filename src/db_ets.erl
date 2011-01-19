@@ -173,51 +173,43 @@ get_chunk_inner({ETSDB, _CKInt, _CKDB} = DB, Current, RealStart, Interval, Chunk
 -spec get_split_key(DB::db(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key(DB, Begin, TargetLoad, forward) ->
-    get_split_key_(DB, Begin, TargetLoad, fun first_key_larger_than/2, first, next);
+    get_split_key_(DB, Begin, TargetLoad, fun ets:first/1, fun ets:next/2);
 get_split_key(DB, Begin, TargetLoad, backward) ->
-    get_split_key_(DB, Begin, TargetLoad, fun first_key_smaller_than/2, last, prev).
+    get_split_key_(DB, Begin, TargetLoad, fun ets:last/1, fun ets:prev/2).
 
 -spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(),
-        FindStart::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'),
-        ETS_first::first | last, ETS_next::next | prev)
+        ETS_first::fun((DB::tid() | atom()) -> ?RT:key() | '$end_of_table'),
+        ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'))
         -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key_({ETSDB, _CKInt, _CKDB} = DB, Begin, TargetLoad,
-               FindStart, ETS_first, ETS_next) ->
+               ETS_first, ETS_next) ->
     % assert ChunkSize > 0, see ChunkSize type
     case get_load_(DB) of
         0 -> throw('empty_db');
         _ ->
             % get first key in the ets table which is larger than Begin:
-            case FindStart(ETSDB, Begin) of
+            case first_key(ETSDB, Begin, ETS_first, ETS_next) of
                 '$end_of_table' ->
                     throw('empty_db');
                 FirstKey ->
                     %ct:pal("first key: ~.0p~n", [FirstKey]),
                     {SplitKey, RestLoad} =
-                        get_split_key_inner(DB, ets:ETS_next(ETSDB, FirstKey),
+                        get_split_key_inner(DB, ETS_next(ETSDB, FirstKey),
                                             FirstKey, TargetLoad - 1, FirstKey,
                                             ETS_first, ETS_next),
                     {SplitKey, TargetLoad - RestLoad}
             end
     end.
 
-%% @doc Find the first key in the DB which is larger than Key.
+%% @doc Find the first key in the DB which is larger/smaller than Key.
 %%      Note: Key does not have to exist in the table.
--spec first_key_larger_than(DB::tid() | atom(), Key::?RT:key())
-        -> ?RT:key() | '$end_of_table'.
-first_key_larger_than(ETSDB, Key) ->
-    case ets:next(ETSDB, Key) of
-        '$end_of_table' -> ets:first(ETSDB);
-        X               -> X
-    end.
-
-%% @doc Find the first key in the DB which is smaller than Key.
-%%      Note: Key does not have to exist in the table.
--spec first_key_smaller_than(DB::tid() | atom(), Key::?RT:key())
-        -> ?RT:key() | '$end_of_table'.
-first_key_smaller_than(ETSDB, Key) ->
-    case ets:prev(ETSDB, Key) of
-        '$end_of_table' -> ets:last(ETSDB);
+-spec first_key(DB::tid() | atom(), Key::?RT:key(),
+        ETS_first::fun((DB::tid() | atom()) -> ?RT:key() | '$end_of_table'),
+        ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'))
+            -> ?RT:key() | '$end_of_table'.
+first_key(ETSDB, Key, ETS_first, ETS_next) ->
+    case ETS_next(ETSDB, Key) of
+        '$end_of_table' -> ETS_first(ETSDB);
         X               -> X
     end.
 
@@ -226,7 +218,8 @@ first_key_smaller_than(ETSDB, Key) ->
 -spec get_split_key_inner(
         DB::db_t(), Current::?RT:key() | '$end_of_table',
         RealStart::?RT:key(), TargetLoad::pos_integer(), SplitKey::?RT:key(),
-        ETS_first::first | last, ETS_next::next | prev)
+        ETS_first::fun((DB::tid() | atom()) -> ?RT:key() | '$end_of_table'),
+        ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'))
             -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key_inner(_DB, RealStart, RealStart, TargetLoad, SplitKey, _ETS_first, _ETS_next) ->
     % we hit the start element, i.e. our whole data set has been traversed
@@ -236,9 +229,9 @@ get_split_key_inner(_DB, _Current, _RealStart, 0, SplitKey, _ETS_first, _ETS_nex
     {SplitKey, 0};
 get_split_key_inner({ETSDB, _CKInt, _CKDB} = DB, '$end_of_table', RealStart, TargetLoad, SplitKey, ETS_first, ETS_next) ->
     % reached end of table - start at beginning (may be a wrapping interval)
-    get_split_key_inner(DB, ets:ETS_first(ETSDB), RealStart, TargetLoad, SplitKey, ETS_first, ETS_next);
+    get_split_key_inner(DB, ETS_first(ETSDB), RealStart, TargetLoad, SplitKey, ETS_first, ETS_next);
 get_split_key_inner({ETSDB, _CKInt, _CKDB} = DB, Current, RealStart, TargetLoad, _SplitKey, ETS_first, ETS_next) ->
-    Next = ets:ETS_next(ETSDB, Current),
+    Next = ETS_next(ETSDB, Current),
     get_split_key_inner(DB, Next, RealStart, TargetLoad - 1, Current, ETS_first, ETS_next).
 
 -spec delete_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
