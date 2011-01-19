@@ -31,6 +31,10 @@
          proc_report_to_my_monitor/1,
          proc_get_report_interval/0]).
 
+-type key() :: string().
+-type internal_key() :: {'$monitor$', Key::string()}.
+-type table_index() :: {ProcTable::atom(), Key::key()}.
+
 -type state() :: Table::tid() | atom().
 -type message() ::
     {proc_report, ProcTable::pdb:tableid(), LastReport::util:time(),
@@ -38,8 +42,6 @@
     {purge_old_data} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
--type key() :: string().
--type internal_key() :: {'$monitor$', Key::string()}.
 
 %% @doc Initialises a process' monitor DB. Needs to be called prior to the
 %%      other proc_* methods! 
@@ -173,8 +175,6 @@ get_all_keys(Table) ->
                                      [],     % guard
                                      ['$1']} % result
                                   ])).
-
--type table_index() :: {ProcTable::atom(), Key::key()}.
 
 -spec get_last_n(Table::tid() | atom(), table_index(), N::pos_integer())
         -> [{table_index(), LastReport::util:time(), CurrentReport::util:time(), Value::term()}].
