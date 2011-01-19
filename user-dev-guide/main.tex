@@ -1490,7 +1490,7 @@ Introduces transaction processing on top of a Overlay
 
 \chapter{How a node joins the system}
 \label{chapter.join}
-\svnrev{r1329}
+\svnrev{r1370}
 
 After booting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
@@ -1508,7 +1508,7 @@ scalaris> ./bin/boot.sh
 
 In the following we will trace what this function does in order to add
 additional nodes to the system.
-The function \code{admin:add_nodes(int)} is defined as follows.
+The function \code{admin:add_nodes(pos_integer())} is defined as follows.
 
 \codesnippet{admin.erl}{admin:add_nodes}{../src/admin.erl}
 
@@ -1558,16 +1558,17 @@ The return value of the \code{init/1} function specifies the child
 processes of the supervisor and how to start them. Here, we define a
 list of processes to be observed by a \code{one_for_one}
 supervisor. The processes are:
+\code{Monitor},
 \code{Delayer},
 \code{Reregister},
 \code{DeadNodeCache},
-\code{RoutingTable},
-\code{SupDHTNodeCore_AND},
-\code{Cyclon},
 \code{RingMaintenance},
+\code{RoutingTable},
+\code{Cyclon},
 \code{Vivaldi},
-\code{DC_Clustering} and a
-\code{Gossip} process in this order.
+\code{DC_Clustering},
+\code{Gossip} and a
+\code{SupDHTNodeCore_AND} process in this order.
 
 The term \code{\{one_for_one, 10, 1\}} specifies that the supervisor
 should try 10 times to restart each process before giving
@@ -1681,15 +1682,19 @@ and discuss what happens if errors occur.
 {\centering\input{dht_node_join_phases2.tikz}}
 
 At first all nodes set in the \code{known_hosts} configuration parameter are
-contacted. Their responses are then handled in phase~2.
+contacted. Their responses are then handled in phase~2. In order to separate
+the join state from the ordinary \code{dht_node} state, the
+\code{gen_component} is instructed to use the \erlfun{dht\_node}{on\_join}{/2}
+message handler which delegates every message to
+\erlfun{dht\_node\_join}{process\_join\_state}{/2}.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_as_other}{../src/dht_node_join.erl}
 
 \subsubsection{Phase 2 and 2b}
 
 Phase~2 collects all \erlmodule{dht\_node} processes inside the contacted
-VMs. It therefor mainly processes \code{get_dht_nodes_response} messages and
-integrates all received nodes into the list of \code{ContactNodes}.
+VMs. It therefore mainly processes \code{get_dht_nodes_response} messages and
+integrates all received nodes into the list of available connections.
 The next step depends on whether the \code{\{skip_psv_lb\}} option for
 skipping any passive load balancing algorithm has been
 given to the \erlmodule{dht\_node} or not. If it is present, the node will
@@ -1703,8 +1708,8 @@ phase~2b.
 
 \code{get_dht_nodes_response} messages arriving in phase~2b or later will be
 processed anyway and received \erlmodule{dht\_node}
-processes will be integrated into the \code{ContactNodes}. These phases'
-operations will not be interrupted and nothing else is changed.
+processes will be integrated into the connections. These phases'
+operations will not be interrupted and nothing else is changed though.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_other_p2}{../src/dht_node_join.erl}
 
@@ -1720,7 +1725,7 @@ previous IDs as well as the new ones and the node will move to phase~3.
 Lookups will make \scalaris{} find the node currently responsible for a given ID
 and send a request to simulate a join to this node, i.e. a
 \code{get_candidate} message. Note that during such an operation, the joining
-node will become the existing node's predecessor. The simulation will be
+node would become the existing node's predecessor. The simulation will be
 delegated to the passive load balance algorithm the joining node requested, as
 set by the \code{join_lb_psv} configuration parameter. 
 
@@ -1740,8 +1745,8 @@ will be simply added to the list.
 
 If \erlfun{dht\_node\_join}{contact\_best\_candidate}{/1} is called and
 candidates are available (there should be at this stage!), it will sort the
-candidates by using the passive load balance algorithm and send a 
-\code{join_request} message continuing in phase~4. 
+candidates by using the passive load balance algorithm, send a 
+\code{join_request} message and continue with phase~4. 
 
 \erlfunindex{dht\_node\_join}{contact\_best\_candidate}
 \codesnippet{dht_node_join.erl}{dht_node_join:contact_best_candidate}{../src/dht_node_join.erl}
@@ -1749,8 +1754,8 @@ candidates by using the passive load balance algorithm and send a
 \codesnippet{dht_node_join.erl}{dht_node_join:send_join_request}{../src/dht_node_join.erl}
 
 The \code{join_request} message will be received by the existing node which
-will set up a slide operation with the new node or deny the request if it is
-not responsible for the key (anymore) and reply with a
+will set up a slide operation with the new node. If it is not responsible for
+the key (anymore), it will deny the request and reply with a
 \code{\{join, join_response, not_responsible, Node\}} message.
 
 \codesnippet{dht_node_join.erl}{dht_node_join:join_request1}{../src/dht_node_join.erl}
