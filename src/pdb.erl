@@ -46,7 +46,7 @@ get(Key, _TableName) ->
 
 -spec set(tuple(), atom()) -> ok.
 set(NewTuple, _TableName) ->
-    erlang:put(element(1,NewTuple), NewTuple),
+    erlang:put(element(1, NewTuple), NewTuple),
     ok.
 
 -spec delete(term(), atom()) -> ok.
