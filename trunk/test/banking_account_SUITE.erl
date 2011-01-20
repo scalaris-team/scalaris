@@ -1,4 +1,4 @@
-%  Copyright 2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -11,31 +11,16 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : banking_account_SUITE.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Unit tests for src/transstore/*.erl
-%%%
-%%% Created :  18 Aug 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
 -module(banking_account_SUITE).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
-
 -compile(export_all).
-
--import(transaction_api, [read2/2, write2/3]).
 
 -include("unittest.hrl").
 
-all() ->
-    [banking_account].
-
-suite() ->
-    [
-     {timetrap, {seconds, 120}}
-    ].
+all()   -> [banking_account].
+suite() -> [ {timetrap, {seconds, 120}} ].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
@@ -47,68 +32,57 @@ end_per_suite(Config) ->
     unittest_helper:end_per_suite(Config),
     ok.
 
-make_tfun(MyAccount, OtherAccount) ->
-    fun (TransLog)->
-	    {MyBalance, TransLog1}    = read2(TransLog,  MyAccount),
-            %ct:pal("~p ~p~n", [MyAccount, MyBalance]),
-	    {OtherBalance, TransLog2} = read2(TransLog1, OtherAccount),
-            %ct:pal("~p ~p~n", [OtherAccount, OtherBalance]),
-	    if
-		OtherBalance > 500 ->
-		    TransLog3 = write2(TransLog2, MyAccount,    MyBalance + 400),
-		    TransLog4 = write2(TransLog3, OtherAccount, OtherBalance - 400),
-		    {{ok, ok}, TransLog4};
-		OtherBalance > 100 ->
-		    TransLog3 = write2(TransLog2, MyAccount,    MyBalance + 100),
-		    TransLog4 = write2(TransLog3, OtherAccount, OtherBalance - 100),
-		    {{ok, ok}, TransLog4};
-		true ->
-		    {{ok, ok}, TransLog2}
-	    end
-    end.
+money_transfer(A, B) ->
+    TLog0 = cs_api_v2:new_tlog(),
+    Req1 = [{read, A}, {read, B}],
+    {TLog1, {results, Res1}} = cs_api_v2:process_request_list(TLog0, Req1),
+    [{read,A,{value, ABalance}},{read,B,{value, BBalance}}] = Res1,
+    {DeltaA, DeltaB} = case ABalance > BBalance of
+                           true -> {-1, 1};
+                           false -> {1, -1}
+                       end,
+    Req2 = [{write, A, ABalance + DeltaA},
+            {write, B, BBalance + DeltaB},
+            {commit}],
+    {TLog2, {results, [_Res2, _Res3, CommitAbort]}} =
+        cs_api_v2:process_request_list(TLog1, Req2),
+    CommitAbort.
 
-process(Parent, MyAccount, OtherAccount, Count) ->
-    SuccessFun = fun(X) ->
-                         {success, X}
-                 end,
-    FailureFun = fun(Reason)->
-                         {failure, Reason}
-                 end,
-    process_iter(Parent, make_tfun(MyAccount, OtherAccount), Count, SuccessFun, FailureFun, 0).
+process(Parent, A, B, Count) ->
+    process_iter(Parent, A, B, Count, 0).
 
-process_iter(Parent, _Key, 0, _SuccessFun, _FailureFun, AbortCount) ->
+process_iter(Parent, _A, _B, 0, AbortCount) ->
     Parent ! {done, AbortCount};
-process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
-    case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
-	{success, {commit, _Y}} ->
-	    process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
-	{failure, abort} ->
-	    process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-	X ->
-	    ct:pal("do_transaction failed: ~p~n", [X])
+process_iter(Parent, A, B, Count, AbortCount) ->
+    case money_transfer(A, B) of
+        commit -> process_iter(Parent, A, B, Count - 1, AbortCount);
+        abort -> process_iter(Parent, A, B, Count, AbortCount + 1)
     end.
 
 banking_account(_Config) ->
-    ?equals(transaction_api:single_write("a", 1000), commit),
-    ?equals(transaction_api:single_write("b", 0), commit),
-    ?equals(transaction_api:single_write("c", 0), commit),
+    Total = 1000,
+    ?equals(cs_api_v2:write("a", Total), ok),
+    ?equals(cs_api_v2:write("b", 0), ok),
+    ?equals(cs_api_v2:write("c", 0), ok),
     Self = self(),
-    Count = 100,
-    spawn(banking_account_SUITE, process, [Self, "a", "c", Count]),
-    spawn(banking_account_SUITE, process, [Self, "b", "a", Count]),
-    spawn(banking_account_SUITE, process, [Self, "c", "b", Count]),
-    _Aborts = wait_for_done(3),
-    {A, _} = transaction_api:quorum_read("a"),
-    {B, _} = transaction_api:quorum_read("b"),
-    {C, _} = transaction_api:quorum_read("c"),
+    Count = 1000,
+    spawn(banking_account_SUITE, process, [Self, "a", "b", Count]),
+    spawn(banking_account_SUITE, process, [Self, "b", "c", Count]),
+    spawn(banking_account_SUITE, process, [Self, "c", "a", Count]),
+    Aborts = wait_for_done(3),
+    ct:pal("Committed Tx: ~p~n", [3 * Count]),
+    ct:pal("Aborted and restarted Tx due to concurrent conflicting Txs: ~p~n",
+           [lists:sum(Aborts)]),
+    A = cs_api_v2:read("a"),
+    B = cs_api_v2:read("b"),
+    C = cs_api_v2:read("c"),
     ct:pal("balance: ~p ~p ~p~n", [A, B, C]),
-    ?equals(A + B + C, 1000),
+    ?equals(A + B + C, Total),
     ok.
 
 wait_for_done(0) ->
     [];
 wait_for_done(Count) ->
     receive
-	{done, Aborts} ->
-	    [Aborts |wait_for_done(Count - 1)]
+        {done, Aborts} -> [Aborts | wait_for_done(Count - 1)]
     end.
