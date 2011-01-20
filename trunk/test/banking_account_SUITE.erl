@@ -44,7 +44,7 @@ money_transfer(A, B) ->
     Req2 = [{write, A, ABalance + DeltaA},
             {write, B, BBalance + DeltaB},
             {commit}],
-    {TLog2, {results, [_Res2, _Res3, CommitAbort]}} =
+    {_TLog2, {results, [_Res2, _Res3, CommitAbort]}} =
         cs_api_v2:process_request_list(TLog1, Req2),
     CommitAbort.
 
