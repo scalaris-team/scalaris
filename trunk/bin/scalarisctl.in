@@ -171,7 +171,7 @@ checkinstallation() {
         fi
     fi
 
-    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(dht_node)} of {{module,boot},{module,dht_node}} -> halt(0); X -> halt(1) end.'
+    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot_server), code:ensure_loaded(dht_node)} of {{module,boot_server},{module,dht_node}} -> halt(0); X -> halt(1) end.'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: could not find Scalaris' beam files"
