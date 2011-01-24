@@ -156,7 +156,7 @@ init(Trigger) ->
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState, MonitorTable}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self(), cyclon, fun rm_loop:subscribe_default_filter/2,
-                      fun cyclon:rm_send_changes/4),
+                      fun cyclon:rm_send_changes/4, inf),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),

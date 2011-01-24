@@ -58,6 +58,7 @@ end_per_testcase(_TestCase, _Config) ->
 prop_update_id(OldId, NewId) ->
     Ring = unittest_helper:make_ring_with_ids([OldId], [{config, [pdb:get(log_path, ?MODULE)]}]),
     change_id_and_check(OldId, NewId),
+    change_id_and_check(NewId, OldId),
     unittest_helper:stop_ring(Ring),
     true.
 
@@ -82,7 +83,7 @@ change_id_and_check(OldId, NewId) ->
     end,
 %%     ct:pal("ct: ~p -> ~p~n", [node:id(OldNode), NewId]),
     
-    comm:send(RM, {subscribe, self(), rm_SUITE, fun rm_loop:subscribe_default_filter/2, fun rm_loop:send_changes_to_subscriber/4}),
+    comm:send(RM, {subscribe, self(), rm_SUITE, fun rm_loop:subscribe_default_filter/2, fun rm_loop:send_changes_to_subscriber/4, inf}),
     comm:send(RM, {update_id, NewId}),
     comm:send(RM, {unsubscribe, self(), rm_SUITE}),
     
