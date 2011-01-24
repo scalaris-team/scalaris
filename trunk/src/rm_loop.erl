@@ -338,7 +338,7 @@ on({web_debug_info, Requestor}, {NeighbTable, RM_State, SubscrTable} = State) ->
     Subscribers = [begin
                        case Pid of
                            null -> {"null", Tag};
-                           _    -> {webhelpers:pid_to_name(Pid), Tag}
+                           _    -> {pid_groups:pid_to_name(Pid), Tag}
                        end
                    end
                    || {{Pid, Tag}, _FilterFun, _ExecFun} <- ets:tab2list(SubscrTable)],

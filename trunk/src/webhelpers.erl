@@ -25,7 +25,7 @@
 
 -export([getLoadRendered/0, getRingChart/0, getRingRendered/0,
          getIndexedRingRendered/0, lookup/1, set_key/2, delete_key/2, isPost/1,
-         getVivaldiMap/0, pid_to_name/1, pid_to_name2/1]).
+         getVivaldiMap/0]).
 
 -opaque attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
@@ -275,17 +275,6 @@ pid_to_integer(Pid) ->
     X = comm:make_local(Pid),
     list_to_integer(lists:nth(1, string:tokens(erlang:pid_to_list(X),"<>."))).
 -endif.
-
--spec pid_to_name(Pid::pid()) -> string().
-pid_to_name(Pid) ->
-    case pid_groups:group_and_name_of(Pid) of
-        failed -> erlang:pid_to_list(Pid);
-        X      -> pid_to_name2(X)
-    end.
-
--spec pid_to_name2({pid_groups:groupname(), pid_groups:pidname()}) -> string().
-pid_to_name2({GrpName, PidName}) ->
-    lists:flatten(io_lib:format("~s:~w", [GrpName, PidName])).
 
 %%%-----------------------------Ring----------------------------------
 

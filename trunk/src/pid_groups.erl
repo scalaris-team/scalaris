@@ -70,7 +70,10 @@
          find_all/1,          %% (PidName) -> [Pid]
 
          members/1,           %% (GrpName) -> [Pids]
-         members_by_name/1]). %% (GrpName) -> [pidname()]
+         members_by_name/1,   %% (GrpName) -> [pidname()]
+         
+         pid_to_name/1,       %% translation of pids to strings for debugging
+         pids_to_names/2]).
 
 %% global information
 -export([processes/0,     %% () -> [Pid]    %% for fprof
@@ -238,6 +241,42 @@ groups() ->
 -spec tab2list() -> [{{groupname(), pidname()}, pid()}].
 tab2list() -> ets:tab2list(?MODULE).
 
+-spec pid_to_name(pid() | {groupname(), pidname()}) -> string().
+pid_to_name(Pid) when is_pid(Pid) ->
+    case pid_groups:group_and_name_of(Pid) of
+        failed -> erlang:pid_to_list(Pid);
+        X      -> pid_to_name(X)
+    end;
+pid_to_name({GrpName, PidName}) ->
+    lists:flatten(io_lib:format("~s:~w", [GrpName, PidName])).
+
+%% @doc Resolve (local and remote) pids to names.
+-spec pids_to_names(Pids::[comm:mypid()], Timeout::pos_integer()) -> [string()].
+pids_to_names(Pids, Timeout) ->
+    Refs = [begin
+                case comm:is_local(Pid) of
+                    true -> comm:make_local(Pid);
+                    _    -> comm:send(comm:get(pid_groups, Pid),
+                                      {group_and_name_of, Pid, comm:this_with_cookie(Pid)}),
+                            comm:send_local_after(Timeout, self(), {timeout, Pid})
+                end
+            end || Pid <- Pids],
+    [begin
+         case erlang:is_reference(Ref) of
+             false -> pid_to_name(Ref);
+             _     -> receive
+                          {{group_and_name_of_response, Name}, Pid} ->
+                              _ = erlang:cancel_timer(Ref),
+                              receive {timeout, Pid} -> ok
+                                  after 0 -> ok
+                              end,
+                              pid_to_name(Name);
+                          {timeout, Pid} ->
+                              lists:flatten(
+                                io_lib:format("~.0p (timeout)", [Pid]))
+                      end
+         end
+     end || Ref <- Refs].
 
 %% for the monitoring in the web interface
 %% @doc get info about a process
@@ -257,7 +296,7 @@ get_web_debug_info(GrpName, PidNameString) ->
                 GenCompInfo =
                     receive
                         {web_debug_info_reply, LocalKVs} -> LocalKVs
-                    after 1000 -> []
+                    after 2000 -> []
                     end,
 
                 [{_, Memory}, {_, Reductions}, {_, QueueLen}] =
