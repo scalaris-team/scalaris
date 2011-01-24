@@ -437,7 +437,7 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
                               fun(_OldNeighbors, NewNeighbors) ->
                                       NewPred =:= nodelist:pred(NewNeighbors)
                               end,
-                              fun dht_node_move:rm_notify_new_pred/4),
+                              fun dht_node_move:rm_notify_new_pred/4, 1),
             State1 = dht_node_state:add_db_range(
                        State, slide_op:get_interval(SlideOp1)),
             send_join_response(State1, SlideOp1, NewPred, CandId);

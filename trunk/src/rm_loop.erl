@@ -30,7 +30,7 @@
          get_neighbors/1, has_left/1, get_neighbors_table/0,
          notify_new_pred/2, notify_new_succ/2,
          % node/neighborhood change subscriptions:
-         subscribe/4, unsubscribe/2,
+         subscribe/5, unsubscribe/2,
          send_changes_to_subscriber/4,
          subscribe_default_filter/2, subscribe_node_change_filter/2,
          subscribe_dneighbor_change_filter/2]).
@@ -66,7 +66,7 @@
     {succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {update_id, NewId::?RT:key()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
-    {subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun()} |
+    {subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf} |
     {unsubscribe, Pid::pid(), Tag::any()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -162,10 +162,10 @@ subscribe_dneighbor_change_filter(OldNeighbors, NewNeighbors) ->
 
 %% @doc Registers the given function to be called when the dht_node changes its
 %%      id. It will get the given Pid and the new node as its parameters.
--spec subscribe(Pid::pid() | null, Tag::any(), subscriber_filter_fun(), subscriber_exec_fun()) -> ok.
-subscribe(RegPid, Tag, FilterFun, ExecFun) ->
+-spec subscribe(Pid::pid() | null, Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf) -> ok.
+subscribe(RegPid, Tag, FilterFun, ExecFun, MaxCalls) ->
     Pid = pid_groups:get_my(ring_maintenance),
-    comm:send_local(Pid, {subscribe, RegPid, Tag, FilterFun, ExecFun}).
+    comm:send_local(Pid, {subscribe, RegPid, Tag, FilterFun, ExecFun, MaxCalls}).
 
 %% @doc Un-registers the given process with the given tag from node change
 %%      updates.
@@ -292,14 +292,12 @@ on({zombie, Node}, {NeighbTable, RM_State, SubscrTable}) ->
     update_state(NeighbTable, SubscrTable, RMFun);
 
 %% add Pid to the node change subscriber list
-on({subscribe, Pid, Tag, FilterFun, ExecFun}, {NeighbTable, _RM_State, SubscrTable} = State) ->
-    ets:insert(SubscrTable, {{Pid, Tag}, FilterFun, ExecFun}),
+on({subscribe, Pid, Tag, FilterFun, ExecFun, MaxCalls}, {NeighbTable, _RM_State, SubscrTable} = State) ->
+    SubscrTuple = {{Pid, Tag}, FilterFun, ExecFun, MaxCalls},
+    ets:insert(SubscrTable, SubscrTuple),
     % check if the condition is already met:
     Neighborhood = get_neighbors(NeighbTable),
-    case FilterFun(Neighborhood, Neighborhood) of
-        true -> ExecFun(Pid, Tag, Neighborhood, Neighborhood);
-        _    -> ok
-    end,
+    call_subscribers_check(Neighborhood, Neighborhood, SubscrTuple, SubscrTable),
     State;
 
 on({unsubscribe, Pid, Tag}, {_NeighbTable, _RM_State, SubscrTable} = State) ->
@@ -411,28 +409,44 @@ update_failuredetector(OldNeighborhood, NewNeighborhood) ->
     ok.
 
 %% @doc Inform the dht_node of a new neighborhood.
--spec call_subscribers(OldNeighborhood::nodelist:neighborhood(),
-                       NewNeighborhood::nodelist:neighborhood(),
-                       SubscrTable::tid()) -> ok.
+-spec call_subscribers(OldNeighbors::nodelist:neighborhood(),
+        NewNeighbors::nodelist:neighborhood(), SubscrTable::tid()) -> ok.
 call_subscribers(OldNeighborhood, NewNeighborhood, SubscrTable) ->
     call_subscribers_iter(OldNeighborhood, NewNeighborhood, SubscrTable, ets:first(SubscrTable)).
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
--spec call_subscribers_iter(OldNeighborhood::nodelist:neighborhood(),
-                            NewNeighborhood::nodelist:neighborhood(),
-                            SubscrTable::tid(),
-                            CurrentKey::{pid() | null, any()} | '$end_of_table') -> ok.
+-spec call_subscribers_iter(OldNeighbors::nodelist:neighborhood(),
+        NewNeighbors::nodelist:neighborhood(), SubscrTable::tid(),
+        CurrentKey::{Pid::pid() | null, Tag::any()} | '$end_of_table') -> ok.
 call_subscribers_iter(_OldNeighborhood, _NewNeighborhood, _SubscrTable, '$end_of_table') ->
     ok;
 call_subscribers_iter(OldNeighborhood, NewNeighborhood, SubscrTable, CurrentKey) ->
     % assume the key exists (it should since we are iterating over the table!)
-    [{{Pid, Tag}, FilterFun, ExecFun}] = ets:lookup(SubscrTable, CurrentKey),
-    case FilterFun(OldNeighborhood, NewNeighborhood) of
-        true -> ExecFun(Pid, Tag, OldNeighborhood, NewNeighborhood);
-        _    -> ok
-    end,
+    [SubscrTuple] = ets:lookup(SubscrTable, CurrentKey),
+    call_subscribers_check(OldNeighborhood, NewNeighborhood, SubscrTuple, SubscrTable),
     call_subscribers_iter(OldNeighborhood, NewNeighborhood, SubscrTable,
                           ets:next(SubscrTable, CurrentKey)).
+
+%% @doc Checks whether FilterFun for the current subscription tuple is true
+%%      and executes ExecFun. Unsubscribes the tuple, if ExecFun has been
+%%      called MaxCalls times.
+-spec call_subscribers_check(OldNeighbors::nodelist:neighborhood(),
+        NewNeighbors::nodelist:neighborhood(),
+        {{Pid::pid() | null, Tag::any()}, FilterFun::subscriber_filter_fun(),
+         ExecFun::subscriber_exec_fun(), MaxCalls::pos_integer() | inf},
+        SubscrTable::tid()) -> ok.
+call_subscribers_check(OldNeighborhood, NewNeighborhood,
+        {{Pid, Tag}, FilterFun, ExecFun, MaxCalls}, SubscrTable) ->
+    case FilterFun(OldNeighborhood, NewNeighborhood) of
+        true -> ExecFun(Pid, Tag, OldNeighborhood, NewNeighborhood),
+                case MaxCalls of
+                    inf -> ok;
+                    1   -> ets:delete(SubscrTable, {Pid, Tag}); % unsubscribe
+                    _   -> % subscribe with new max
+                           ets:insert(SubscrTable, {{Pid, Tag}, FilterFun, ExecFun, MaxCalls - 1})
+                end;
+        _    -> ok
+    end.
 
 %% @doc Helper for the web_debug_info handler. Converts the given node list to
 %%      an indexed node list containing string representations of the nodes.

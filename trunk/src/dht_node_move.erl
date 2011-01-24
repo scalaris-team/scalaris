@@ -553,7 +553,7 @@ change_my_id(State, NewSlideOp, TargetId) ->
                                       nodelist:nodeid(NewNeighbors) =:= TargetId
                                       % note: no need to check the id version
                               end,
-                              fun dht_node_move:rm_send_node_change/4),
+                              fun dht_node_move:rm_send_node_change/4, 1),
             rm_loop:update_id(TargetId),
             dht_node_state:set_slide(
               State, succ, slide_op:set_phase(NewSlideOp, wait_for_node_update))
@@ -980,7 +980,7 @@ rm_subscribe_to_pred_change(SlideOp) ->
               nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors) orelse
                   node:id(nodelist:pred(NewNeighbors)) =:= ExpPredId
       end,
-      fun dht_node_move:rm_notify_new_pred/4).
+      fun dht_node_move:rm_notify_new_pred/4, 1).
 
 %% @doc Checks whether config parameters regarding dht_node moves exist and are
 %%      valid.

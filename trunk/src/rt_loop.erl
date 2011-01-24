@@ -102,7 +102,7 @@ on_inactive({activate_rt, NeighbTable}, {inactive, QueuedMessages, TriggerState}
     TriggerState2 = trigger:next(TriggerState),
     rm_loop:subscribe(self(), rt_loop,
                       fun rm_loop:subscribe_dneighbor_change_filter/2,
-                      fun rt_loop:rm_send_update/4),
+                      fun rt_loop:rm_send_update/4, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
       {NeighbTable, ?RT:empty(rm_loop:get_neighbors(NeighbTable)), TriggerState2}, on_active);
