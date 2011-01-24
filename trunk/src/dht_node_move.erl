@@ -281,7 +281,7 @@ process_move_msg({move, send_delta_timeout, MoveFullId, ChangedData, DeletedKeys
                         send_delta2(State, PredOrSucc, NewSlideOp, ChangedData, DeletedKeys);
                     _ ->
                         % abort slide but no need to tell the other node here
-                        abort_slide(State, SlideOp, data_ack_timeout, false)
+                        abort_slide(State, SlideOp, send_delta_timeout, false)
                 end
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, send_delta_timeout);
