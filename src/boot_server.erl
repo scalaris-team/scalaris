@@ -93,25 +93,13 @@ on({zombie_pid, Ping_PID}, Nodes) ->
     NewNodes;
 
 on({web_debug_info, Requestor}, Nodes) ->
-    RegisteredNodes = gb_sets:to_list(Nodes),
+    RegisteredPids = gb_sets:to_list(Nodes),
     % resolve (local and remote) pids to names:
-    S2 = [begin
-              case comm:is_local(Node) of
-                  true -> webhelpers:pid_to_name(comm:make_local(Node));
-                  _ ->
-                      comm:send(comm:get(pid_groups, Node),
-                                {group_and_name_of, Node, comm:this()}),
-                      receive
-                          {group_and_name_of_response, Name} ->
-                              webhelpers:pid_to_name2(Name)
-                      after 2000 -> Node
-                      end
-              end
-          end || Node <- RegisteredNodes],
+    PidNames = pid_groups:pids_to_names(RegisteredPids, 1000),
     KeyValueList =
-        [{"registered nodes", length(RegisteredNodes)},
+        [{"registered nodes", length(RegisteredPids)},
          {"registered nodes (node):", ""} |
-         [{"", Pid} || Pid <- S2]],
+         [{"", Pid} || Pid <- PidNames]],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     Nodes.
 

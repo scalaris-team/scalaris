@@ -132,7 +132,7 @@ on({web_debug_info, Requestor}, {Queue, Subscriber, _TriggerState} = State) ->
            [{"", lists:flatten(io_lib:format("~p", [Node]))} || Node <- queue:to_list(fix_queue:queue(Queue))],
            {"subscribers", gb_sets:size(Subscriber)},
            {"subscribers (pid):", ""},
-           [{"", webhelpers:pid_to_name(Pid)} || Pid <- gb_sets:to_list(Subscriber)]]),
+           [{"", pid_groups:pid_to_name(Pid)} || Pid <- gb_sets:to_list(Subscriber)]]),
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
