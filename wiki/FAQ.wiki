@@ -75,6 +75,7 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || Fedora || 11 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_11/] ||
 || Fedora || 12 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_12/] ||
 || Fedora || 13 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_13/] ||
+|| Fedora || 14 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Fedora_14/] ||
 || Mandriva || 2008 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2008/] ||
 || Mandriva || 2009 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009/] ||
 || Mandriva || 2009.1 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Mandriva_2009.1/] ||
