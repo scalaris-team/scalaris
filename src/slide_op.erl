@@ -20,24 +20,28 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--export([new_slide/6,
+-export([new_slide/8, new_slide_i/8,
          new_receiving_slide_join/5, new_sending_slide_join/4,
-         new_sending_slide_leave/3, new_sending_slide_jump/4,
+         new_sending_slide_leave/3, new_sending_slide_leave/4,
+         new_sending_slide_jump/4, new_sending_slide_jump/5,
          other_type_to_my_type/1,
          is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1,
+         is_incremental/1,
          get_id/1, get_node/1, get_interval/1, get_target_id/1,
          get_source_pid/1, get_tag/1, get_sendORreceive/1, get_type/1,
          get_predORsucc/1,
          get_timer/1, set_timer/3, reset_timer/1,
          get_timeouts/1, inc_timeouts/1, reset_timeouts/1,
          get_phase/1, set_phase/2,
-         get_next_op/1]).
+         is_setup_at_other/1, set_setup_at_other/1,
+         get_next_op/1, set_next_op/2,
+         get_other_max_entries/1, set_other_max_entries/2]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
--export_type([slide_op/0, id/0, phase/0, type/0]).
+-export_type([slide_op/0, id/0, phase/0, type/0, next_op/0]).
 -endif.
 
 -type id() :: util:global_uid().
@@ -50,40 +54,48 @@
 
 -type phase() ::
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
-        wait_for_succ_ack | % pred initiated a slide and has notified its succ
+        wait_for_other_mte | % a node initiated a slide but needs more info from its partner
         wait_for_node_update | % pred changing its id
         wait_for_pred_update_join | % wait for the local rm process to know about a joining node (pred)
         wait_for_pred_update_data_ack | % wait for the local rm process to know about the changed pred's ID
-        wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
-        wait_for_data | wait_for_delta. % receiving node
+        wait_for_change_id | wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
+        wait_for_change_op | wait_for_data | wait_for_delta. % receiving node
 
 -type next_op() ::
+        {slide, continue, Id::?RT:key()} |
+        {jump, continue, Id::?RT:key()} |
+        {leave, continue} |
         {join, Id::?RT:key()} |
-        {slide, pred | succ, Id::?RT:key()} |
-        {jump, Id::?RT:key()} |
+        {slide, pred | succ, Id::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
+        {jump, Id::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
         {leave} |
         {none}.
 
--record(slide_op, {type       = ?required(slide_op, type)      :: type(),
-                   id         = ?required(slide_op, id)        :: id(),
-                   node       = ?required(slide_op, node)      :: node:node_type(), % the node, data is sent to/received from
-                   interval   = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
-                   target_id  = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
-                   tag        = ?required(slide_op, tag)       :: any(),
-                   source_pid = null          :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
-                   timer      = {null, nomsg} :: {reference(), comm:message()} | {null, nomsg}, % timeout timer
-                   timeouts   = 0             :: non_neg_integer(),
-                   phase      = null          :: phase(),
-                   next_op    = {none}          :: next_op()
-                  }).
+-record(slide_op,
+        {type              = ?required(slide_op, type)      :: type(),
+         id                = ?required(slide_op, id)        :: id(),
+         node              = ?required(slide_op, node)      :: node:node_type(), % the node, data is sent to/received from
+         interval          = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
+         target_id         = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
+         tag               = ?required(slide_op, tag)       :: any(),
+         source_pid        = null          :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
+         timer             = {null, nomsg} :: {reference(), comm:message()} | {null, nomsg}, % timeout timer
+         timeouts          = 0             :: non_neg_integer(),
+         phase             = null          :: phase(),
+         setup_at_other    = false         :: boolean(),
+         next_op           = {none}        :: next_op(),
+         other_max_entries = unknown       :: unknown | pos_integer()
+        }).
 -opaque slide_op() :: #slide_op{}.
 
 %% @doc Sets up a slide operation of the given type. One of the nodes will
 %%      change its ID to TargetId.
--spec new_slide(MoveId::util:global_uid(), Type::type(), TargetId::?RT:key(),
+-spec new_slide(MoveId::util:global_uid(), Type::type(), CurTargetId::?RT:key(),
                 Tag::any(), SourcePid::comm:erl_local_pid() | null,
-                State::dht_node_state:state()) -> slide_op().
-new_slide(MoveId, Type, TargetId, Tag, SourcePid, State) ->
+                OtherMTE::unknown | pos_integer(), NextOp::next_op(),
+                State::dht_node_state:state())
+        -> slide_op().
+new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, State) ->
     {PredOrSucc, SendOrReceive} =
         case Type of
             {slide, PoS, SoR} -> {PoS, SoR};
@@ -93,30 +105,52 @@ new_slide(MoveId, Type, TargetId, Tag, SourcePid, State) ->
             {jump, 'rcv'} ->  {pred, 'rcv'}
         end,
     {Interval, TargetNode} =
-        case PredOrSucc of
-            pred ->
-                Pred = dht_node_state:get(State, pred),
-                I = case SendOrReceive of
-                        'rcv'  -> node:mk_interval_between_ids(TargetId, node:id(Pred));
-                        'send' -> node:mk_interval_between_ids(node:id(Pred), TargetId)
-                    end,
-                {I, Pred};
-            succ ->
-                I = case SendOrReceive of
-                        'rcv'  -> node:mk_interval_between_ids(
-                                    dht_node_state:get(State, node_id), TargetId);
-                        'send' -> node:mk_interval_between_ids(
-                                    TargetId, dht_node_state:get(State, node_id))
-                    end,
-                {I, dht_node_state:get(State, succ)}
-        end,
+        get_interval_tnode(PredOrSucc, SendOrReceive, CurTargetId, State),
     #slide_op{type = Type,
               id = MoveId,
               node = TargetNode,
               interval = Interval,
-              target_id = TargetId,
+              target_id = CurTargetId,
               tag = Tag,
-              source_pid = SourcePid}.
+              source_pid = SourcePid,
+              next_op = NextOp,
+              other_max_entries = OtherMTE}.
+
+%% @doc Sets up an incremental slide operation of the given type. One of the
+%%      nodes will change its ID to CurTargetId and finally FinalTargetId.
+-spec new_slide_i(MoveId::util:global_uid(), Type::type(),
+                CurTargetId::?RT:key(), FinalTargetId::?RT:key(),
+                Tag::any(), SourcePid::comm:erl_local_pid() | null,
+                OtherMTE::unknown | pos_integer(), State::dht_node_state:state())
+        -> slide_op().
+new_slide_i(MoveId, Type, CurTargetId, FinalTargetId, Tag, SourcePid, OtherMTE, State) ->
+    NextOp = case FinalTargetId of
+                 CurTargetId -> {none};
+                 _           -> {slide, continue, FinalTargetId}
+             end,
+    new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, State).
+
+-spec get_interval_tnode(PredOrSucc::pred | succ, SendOrReceive::'send' | 'rcv',
+                         TargetId::?RT:key(), State::dht_node_state:state())
+        -> {intervals:interval(), node:node_type()}.
+get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, State) ->
+    case PredOrSucc of
+        pred ->
+            Pred = dht_node_state:get(State, pred),
+            I = case SendOrReceive of
+                    'rcv'  -> node:mk_interval_between_ids(TargetId, node:id(Pred));
+                    'send' -> node:mk_interval_between_ids(node:id(Pred), TargetId)
+                end,
+            {I, Pred};
+        succ ->
+            I = case SendOrReceive of
+                    'rcv'  -> node:mk_interval_between_ids(
+                                dht_node_state:get(State, node_id), TargetId);
+                    'send' -> node:mk_interval_between_ids(
+                                TargetId, dht_node_state:get(State, node_id))
+                end,
+            {I, dht_node_state:get(State, succ)}
+    end.
 
 %% @doc Sets up a new slide operation for a joining node (see
 %%      dht_node_join.erl). MyKey is the joining node's new Id and will be used
@@ -153,37 +187,63 @@ new_sending_slide_join(MoveId, JoiningNode, Tag, State) ->
 %%      position in the ring and transfer its data to its successor.
 -spec new_sending_slide_leave(MoveId::id(), Tag::any(), State::dht_node_state:state()) -> slide_op().
 new_sending_slide_leave(MoveId, Tag, State) ->
-    IntervalToSend = dht_node_state:get(State, my_range),
-    TargetNode = dht_node_state:get(State, succ),
+    TargetId = dht_node_state:get(State, pred_id),
+    new_sending_slide_leave(MoveId, TargetId, Tag, State).
+
+%% @doc Sets up a new slide operation for a node which is about to leave its
+%%      position in the ring incrementally (current step is to move to
+%%      CurTargetId) and transfer its data to its successor.
+-spec new_sending_slide_leave(MoveId::id(), CurTargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
+new_sending_slide_leave(MoveId, CurTargetId, Tag, State) ->
+    {Interval, TargetNode} =
+        get_interval_tnode('succ', 'send', CurTargetId, State),
+    NextOp = case dht_node_state:get(State, pred_id) of
+                 CurTargetId -> {none};
+                 _           -> {leave, continue}
+             end,
     #slide_op{type = {leave, 'send'},
               id = MoveId,
               node = TargetNode,
-              interval = IntervalToSend,
-              target_id = dht_node_state:get(State, pred_id),
+              interval = Interval,
+              target_id = CurTargetId,
               tag = Tag,
-              source_pid = null}.
+              source_pid = null,
+              next_op = NextOp}.
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring, transfer its data to its successor and afterwards
 %%      join somewhere else.
 -spec new_sending_slide_jump(MoveId::id(), TargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
 new_sending_slide_jump(MoveId, TargetId, Tag, State) ->
-    IntervalToSend = dht_node_state:get(State, my_range),
-    TargetNode = dht_node_state:get(State, succ),
+    TargetId = dht_node_state:get(State, pred_id),
+    new_sending_slide_jump(MoveId, TargetId, TargetId, Tag, State).
+
+%% @doc Sets up a new slide operation for a node which is about to leave its
+%%      position in the ring, transfer its data to its successor
+%%      incrementally (current step is to move to CurTargetId) and afterwards
+%%      join somewhere else.
+-spec new_sending_slide_jump(MoveId::id(), CurTargetId::?RT:key(), FinalTargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
+new_sending_slide_jump(MoveId, CurTargetId, FinalTargetId, Tag, State) ->
+    {Interval, TargetNode} =
+        get_interval_tnode('succ', 'send', CurTargetId, State),
+    NextOp = case FinalTargetId of
+                 CurTargetId -> {none};
+                 _           -> {jump, continue, FinalTargetId}
+             end,
     #slide_op{type = {jump, 'send'},
               id = MoveId,
               node = TargetNode,
-              interval = IntervalToSend,
-              target_id = dht_node_state:get(State, pred_id),
+              interval = Interval,
+              target_id = CurTargetId,
               tag = Tag,
               source_pid = null,
-              next_op = {join, TargetId}}.
+              next_op = NextOp}.
 
 %% @doc Returns the id of a receiving or sending slide operation.
 -spec get_id(SlideOp::slide_op()) -> id().
 get_id(#slide_op{id=Id}) -> Id.
 
-%% @doc Returns the pid of the node to exchange data with.
+%% @doc Returns the node to exchange data with.
 -spec get_node(SlideOp::slide_op()) -> node:node_type().
 get_node(#slide_op{node=Node}) -> Node.
 
@@ -277,6 +337,13 @@ is_leave(_Type, _SendOrReceive) -> false.
 is_jump(#slide_op{type=Type}) -> is_jump(Type);
 is_jump(Type) -> element(1, Type) =:= jump.
 
+%% @doc Returns whether the given slide op is part of an incremental slide.
+-spec is_incremental(SlideOp::slide_op()) -> boolean().
+is_incremental(#slide_op{next_op={slide, continue, _Id}}) -> true;
+is_incremental(#slide_op{next_op={jump, continue, _Id}}) -> true;
+is_incremental(#slide_op{next_op={leave, continue}}) -> true;
+is_incremental(_) -> false.
+
 %% @doc Returns the timer of the slide operation or {null, nomsg} if no timer
 %%      is set.
 -spec get_timer(SlideOp::slide_op()) -> {reference(), comm:message()} | {null, nomsg}.
@@ -327,8 +394,7 @@ inc_timeouts(SlideOp = #slide_op{timeouts=Timeouts}) ->
 
 %% @doc Resets the number of timeouts to 0.
 -spec reset_timeouts(SlideOp::slide_op()) -> slide_op().
-reset_timeouts(SlideOp) ->
-    SlideOp#slide_op{timeouts = 0}.
+reset_timeouts(SlideOp) -> SlideOp#slide_op{timeouts = 0}.
 
 %% @doc Returns the current phase of the slide operation.
 -spec get_phase(SlideOp::slide_op()) -> phase().
@@ -336,8 +402,26 @@ get_phase(#slide_op{phase=Phase}) -> Phase.
 
 %% @doc Sets the slide operation's current phase.
 -spec set_phase(SlideOp::slide_op(), NewPhase::phase()) -> slide_op().
-set_phase(SlideOp, NewPhase) ->
-    SlideOp#slide_op{phase = NewPhase}.
+set_phase(SlideOp, NewPhase) -> SlideOp#slide_op{phase = NewPhase}.
+
+%% @doc Returns wether the current slide op has already been set up at the
+%%      other node.
+-spec is_setup_at_other(SlideOp::slide_op()) -> boolean().
+is_setup_at_other(#slide_op{setup_at_other=SetupAtOther}) -> SetupAtOther.
+
+%% @doc Sets that the current slide op has already been set up at the
+%%      other node.
+-spec set_setup_at_other(SlideOp::slide_op()) -> slide_op().
+set_setup_at_other(SlideOp) -> SlideOp#slide_op{setup_at_other = true}.
 
 -spec get_next_op(SlideOp::slide_op()) -> next_op().
 get_next_op(#slide_op{next_op=Op}) -> Op.
+
+-spec set_next_op(SlideOp::slide_op(), NextOp::next_op()) -> slide_op().
+set_next_op(SlideOp, NextOp) -> SlideOp#slide_op{next_op = NextOp}.
+
+-spec get_other_max_entries(SlideOp::slide_op()) -> unknown | pos_integer().
+get_other_max_entries(#slide_op{other_max_entries=OtherMTE}) -> OtherMTE.
+
+-spec set_other_max_entries(SlideOp::slide_op(), OtherMTE::pos_integer()) -> slide_op().
+set_other_max_entries(SlideOp, OtherMTE) -> SlideOp#slide_op{other_max_entries = OtherMTE}.

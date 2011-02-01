@@ -15,7 +15,6 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Unit tests for src/dht_node_move.erl (slide and jump operations).
 %% @end
-%% TODO: add more detailed tests that tackle certain parts of the protocol itself
 %% @version $Id$
 -module(dht_node_move_SUITE).
 -author('kruber@zib.de').
@@ -28,10 +27,38 @@
 
 all() ->
     [
-     symm4_slide_succ1_load, symm4_slide_succ2_load,
-     symm4_slide_pred1_load, symm4_slide_pred2_load,
-     symm4_slide_succ1_load_v2, symm4_slide_succ2_load_v2,
-     symm4_slide_pred1_load_v2, symm4_slide_pred2_load_v2
+     symm4_slide_succ_rcv_load, symm4_slide_succ_send_load,
+     symm4_slide_pred_send_load, symm4_slide_pred_rcv_load,
+     symm4_slide_succ_rcv_load_v2, symm4_slide_succ_send_load_v2,
+     symm4_slide_pred_send_load_v2, symm4_slide_pred_rcv_load_v2,
+     symm4_slide_succ_rcv_load_v2_incremental_symm, symm4_slide_succ_send_load_v2_incremental_symm,
+     symm4_slide_pred_send_load_v2_incremental_symm, symm4_slide_pred_rcv_load_v2_incremental_symm,
+     symm4_slide_succ_rcv_load_v2_incremental, symm4_slide_succ_send_load_v2_incremental,
+     symm4_slide_pred_send_load_v2_incremental, symm4_slide_pred_rcv_load_v2_incremental,
+     tester_symm4_slide_succ_rcv_load_timeouts_succ_v2,
+     tester_symm4_slide_succ_rcv_load_timeouts_node_v2,
+     tester_symm4_slide_succ_rcv_load_timeouts_succ_v2_incremental_symm,
+     tester_symm4_slide_succ_rcv_load_timeouts_node_v2_incremental_symm,
+     tester_symm4_slide_succ_rcv_load_timeouts_succ_v2_incremental,
+     tester_symm4_slide_succ_rcv_load_timeouts_node_v2_incremental,
+     tester_symm4_slide_succ_send_load_timeouts_succ_v2,
+     tester_symm4_slide_succ_send_load_timeouts_node_v2,
+     tester_symm4_slide_succ_send_load_timeouts_succ_v2_incremental_symm,
+     tester_symm4_slide_succ_send_load_timeouts_node_v2_incremental_symm,
+     tester_symm4_slide_succ_send_load_timeouts_succ_v2_incremental,
+     tester_symm4_slide_succ_send_load_timeouts_node_v2_incremental,
+     tester_symm4_slide_pred_send_load_timeouts_pred_v2,
+     tester_symm4_slide_pred_send_load_timeouts_node_v2,
+     tester_symm4_slide_pred_send_load_timeouts_pred_v2_incremental_symm,
+     tester_symm4_slide_pred_send_load_timeouts_node_v2_incremental_symm,
+     tester_symm4_slide_pred_send_load_timeouts_pred_v2_incremental,
+     tester_symm4_slide_pred_send_load_timeouts_node_v2_incremental,
+     tester_symm4_slide_pred_rcv_load_timeouts_pred_v2,
+     tester_symm4_slide_pred_rcv_load_timeouts_node_v2,
+     tester_symm4_slide_pred_rcv_load_timeouts_pred_v2_incremental_symm,
+     tester_symm4_slide_pred_rcv_load_timeouts_node_v2_incremental_symm,
+     tester_symm4_slide_pred_rcv_load_timeouts_pred_v2_incremental,
+     tester_symm4_slide_pred_rcv_load_timeouts_node_v2_incremental
     ].
 
 suite() ->
@@ -52,6 +79,11 @@ init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}]}]),
     set_move_config_parameters(),
+    % write some data (use a function because left-over tx_timeout messages can disturb the tests):
+    Pid = erlang:spawn(fun() ->
+                               _ = [cs_api_v2:write(X, X) || X <- lists:seq(1, 100)]
+                       end),
+    unittest_helper:wait_for_process_to_die(Pid),
     timer:sleep(500), % wait a bit for the rm-processes to settle
     Config.
  
@@ -63,109 +95,561 @@ end_per_testcase(_TestCase, _Config) ->
 %% @doc Sets tighter timeouts for slides
 -spec set_move_config_parameters() -> ok.
 set_move_config_parameters() ->
-    config:write(move_notify_succ_timeout, 100),
-    config:write(move_notify_pred_timeout, 100),
-    config:write(move_send_data_timeout, 100),
-    config:write(move_send_delta_timeout, 100),
-    config:write(move_rcv_data_timeout, 100),
-    config:write(move_data_ack_timeout, 100).
+    config:write(move_use_incremental_slides, false),
+    config:write(move_symmetric_incremental_slides, false),
+    config:write(move_notify_other_timeout, 50),
+    config:write(move_send_data_timeout, 50),
+    config:write(move_send_delta_timeout, 50),
+    config:write(move_rcv_data_timeout, 50),
+    config:write(move_rcv_delta_timeout, 50),
+    
+    config:write(move_notify_other_retries, 2),
+    config:write(move_send_data_retries, 5),
+    config:write(move_send_delta_retries, 5),
+    config:write(move_rcv_data_retries, 5),
+    config:write(move_rcv_delta_retries, 5).
+
+%% @doc Sets tighter timeouts for slides
+-spec set_move_config_parameters_incremental_symm() -> ok.
+set_move_config_parameters_incremental_symm() ->
+    set_move_config_parameters(),
+    config:write(move_use_incremental_slides, true),
+    config:write(move_symmetric_incremental_slides, true),
+    config:write(move_max_transport_entries, 2).
+
+%% @doc Sets tighter timeouts for slides
+-spec set_move_config_parameters_incremental() -> ok.
+set_move_config_parameters_incremental() ->
+    set_move_config_parameters(),
+    config:write(move_use_incremental_slides, true),
+    config:write(move_symmetric_incremental_slides, false),
+    config:write(move_max_transport_entries, 2).
     
 
 %% @doc Test slide with successor, receiving data from it (using cs_api in the bench server).
-symm4_slide_succ1_load(_Config) ->
+symm4_slide_succ_rcv_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
-                      symm4_slide1_load_test(1, succ, "slide_succ1", fun succ_id_fun1/2),
-                      symm4_slide1_load_test(2, succ, "slide_succ1", fun succ_id_fun1/2),
-                      symm4_slide1_load_test(3, succ, "slide_succ1", fun succ_id_fun1/2),
-                      symm4_slide1_load_test(4, succ, "slide_succ1", fun succ_id_fun1/2),
+                      symm4_slide1_load_test(1, succ, "slide_succ_rcv", fun succ_id_fun1/2, 50),
+                      symm4_slide1_load_test(2, succ, "slide_succ_rcv", fun succ_id_fun1/2, 50),
+                      symm4_slide1_load_test(3, succ, "slide_succ_rcv", fun succ_id_fun1/2, 50),
+                      symm4_slide1_load_test(4, succ, "slide_succ_rcv", fun succ_id_fun1/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_succ1_load"),
-    check_size2_v1(40).
+              end, "symm4_slide_succ_rcv_load"),
+    check_size2_v1(440).
 
 %% @doc Test slide with successor, sending data to it (using cs_api in the bench server).
-symm4_slide_succ2_load(_Config) ->
+symm4_slide_succ_send_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
-                      symm4_slide2_load_test(1, succ, "slide_succ2", fun succ_id_fun2/2),
-                      symm4_slide2_load_test(2, succ, "slide_succ2", fun succ_id_fun2/2),
-                      symm4_slide2_load_test(3, succ, "slide_succ2", fun succ_id_fun2/2),
-                      symm4_slide2_load_test(4, succ, "slide_succ2", fun succ_id_fun2/2),
+                      symm4_slide2_load_test(1, succ, "slide_succ_send", fun succ_id_fun2/2, 50),
+                      symm4_slide2_load_test(2, succ, "slide_succ_send", fun succ_id_fun2/2, 50),
+                      symm4_slide2_load_test(3, succ, "slide_succ_send", fun succ_id_fun2/2, 50),
+                      symm4_slide2_load_test(4, succ, "slide_succ_send", fun succ_id_fun2/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_succ2_load"),
-    check_size2_v1(40).
+              end, "symm4_slide_succ_send_load"),
+    check_size2_v1(440).
 
 %% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server).
-symm4_slide_succ1_load_v2(_Config) ->
+symm4_slide_succ_rcv_load_v2(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
-                      symm4_slide1_load_test(1, succ, "slide_succ1_v2", fun succ_id_fun1/2),
-                      symm4_slide1_load_test(2, succ, "slide_succ1_v2", fun succ_id_fun1/2),
-                      symm4_slide1_load_test(3, succ, "slide_succ1_v2", fun succ_id_fun1/2),
-                      symm4_slide1_load_test(4, succ, "slide_succ1_v2", fun succ_id_fun1/2),
+                      symm4_slide1_load_test(1, succ, "slide_succ_rcv_v2", fun succ_id_fun1/2, 50),
+                      symm4_slide1_load_test(2, succ, "slide_succ_rcv_v2", fun succ_id_fun1/2, 50),
+                      symm4_slide1_load_test(3, succ, "slide_succ_rcv_v2", fun succ_id_fun1/2, 50),
+                      symm4_slide1_load_test(4, succ, "slide_succ_rcv_v2", fun succ_id_fun1/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_succ1_load_v2"),
-    check_size2_v2(40).
+              end, "symm4_slide_succ_rcv_load_v2"),
+    check_size2_v2(440).
 
 %% @doc Test slide with successor, sending data to it (using cs_api_v2 in the bench server).
-symm4_slide_succ2_load_v2(_Config) ->
+symm4_slide_succ_send_load_v2(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
-                      symm4_slide2_load_test(1, succ, "slide_succ2_v2", fun succ_id_fun2/2),
-                      symm4_slide2_load_test(2, succ, "slide_succ2_v2", fun succ_id_fun2/2),
-                      symm4_slide2_load_test(3, succ, "slide_succ2_v2", fun succ_id_fun2/2),
-                      symm4_slide2_load_test(4, succ, "slide_succ2_v2", fun succ_id_fun2/2),
+                      symm4_slide2_load_test(1, succ, "slide_succ_send_v2", fun succ_id_fun2/2, 50),
+                      symm4_slide2_load_test(2, succ, "slide_succ_send_v2", fun succ_id_fun2/2, 50),
+                      symm4_slide2_load_test(3, succ, "slide_succ_send_v2", fun succ_id_fun2/2, 50),
+                      symm4_slide2_load_test(4, succ, "slide_succ_send_v2", fun succ_id_fun2/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_succ2_load_v2"),
-    check_size2_v2(40).
+              end, "symm4_slide_succ_send_load_v2"),
+    check_size2_v2(440).
+
+%% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server).
+%%      Uses symmetric incremental slides.
+symm4_slide_succ_rcv_load_v2_incremental_symm(Config) ->
+    set_move_config_parameters_incremental_symm(),
+    symm4_slide_succ_rcv_load_v2(Config).
+
+%% @doc Test slide with successor, sending data to it (using cs_api_v2 in the bench server).
+%%      Uses symmetric incremental slides.
+symm4_slide_succ_send_load_v2_incremental_symm(Config) ->
+    set_move_config_parameters_incremental_symm(),
+    symm4_slide_succ_send_load_v2(Config).
+
+%% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server).
+%%      Uses incremental slides.
+symm4_slide_succ_rcv_load_v2_incremental(Config) ->
+    set_move_config_parameters_incremental(),
+    symm4_slide_succ_rcv_load_v2(Config).
+
+%% @doc Test slide with successor, sending data to it (using cs_api_v2 in the bench server).
+%%      Uses incremental slides.
+symm4_slide_succ_send_load_v2_incremental(Config) ->
+    set_move_config_parameters_incremental(),
+    symm4_slide_succ_send_load_v2(Config).
 
 %% @doc Test slide with predecessor, sending data to it (using cs_api in the bench server).
-symm4_slide_pred1_load(_Config) ->
+symm4_slide_pred_send_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
-                      symm4_slide1_load_test(1, pred, "slide_pred1", fun pred_id_fun1/2),
-                      symm4_slide1_load_test(2, pred, "slide_pred1", fun pred_id_fun1/2),
-                      symm4_slide1_load_test(3, pred, "slide_pred1", fun pred_id_fun1/2),
-                      symm4_slide1_load_test(4, pred, "slide_pred1", fun pred_id_fun1/2),
+                      symm4_slide1_load_test(1, pred, "slide_pred_send", fun pred_id_fun1/2, 50),
+                      symm4_slide1_load_test(2, pred, "slide_pred_send", fun pred_id_fun1/2, 50),
+                      symm4_slide1_load_test(3, pred, "slide_pred_send", fun pred_id_fun1/2, 50),
+                      symm4_slide1_load_test(4, pred, "slide_pred_send", fun pred_id_fun1/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_pred1_load"),
-    check_size2_v1(40).
+              end, "symm4_slide_pred_send_load"),
+    check_size2_v1(440).
 
 %% @doc Test slide with predecessor, receiving data from it (using cs_api in the bench server).
-symm4_slide_pred2_load(_Config) ->
+symm4_slide_pred_rcv_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment(10, 1000) end),
-                      symm4_slide2_load_test(1, pred, "slide_pred2", fun pred_id_fun2/2),
-                      symm4_slide2_load_test(2, pred, "slide_pred2", fun pred_id_fun2/2),
-                      symm4_slide2_load_test(3, pred, "slide_pred2", fun pred_id_fun2/2),
-                      symm4_slide2_load_test(4, pred, "slide_pred2", fun pred_id_fun2/2),
+                      symm4_slide2_load_test(1, pred, "slide_pred_rcv", fun pred_id_fun2/2, 50),
+                      symm4_slide2_load_test(2, pred, "slide_pred_rcv", fun pred_id_fun2/2, 50),
+                      symm4_slide2_load_test(3, pred, "slide_pred_rcv", fun pred_id_fun2/2, 50),
+                      symm4_slide2_load_test(4, pred, "slide_pred_rcv", fun pred_id_fun2/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_pred2_load"),
-    check_size2_v1(40).
+              end, "symm4_slide_pred_rcv_load"),
+    check_size2_v1(440).
 
 %% @doc Test slide with predecessor, sending data to it (using cs_api_v2 in the bench server).
-symm4_slide_pred1_load_v2(_Config) ->
+symm4_slide_pred_send_load_v2(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
-                      symm4_slide1_load_test(1, pred, "slide_pred1_v2", fun pred_id_fun1/2),
-                      symm4_slide1_load_test(2, pred, "slide_pred1_v2", fun pred_id_fun1/2),
-                      symm4_slide1_load_test(3, pred, "slide_pred1_v2", fun pred_id_fun1/2),
-                      symm4_slide1_load_test(4, pred, "slide_pred1_v2", fun pred_id_fun1/2),
+                      symm4_slide1_load_test(1, pred, "slide_pred_send_v2", fun pred_id_fun1/2, 50),
+                      symm4_slide1_load_test(2, pred, "slide_pred_send_v2", fun pred_id_fun1/2, 50),
+                      symm4_slide1_load_test(3, pred, "slide_pred_send_v2", fun pred_id_fun1/2, 50),
+                      symm4_slide1_load_test(4, pred, "slide_pred_send_v2", fun pred_id_fun1/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_pred1_load_v2"),
-    check_size2_v2(40).
+              end, "symm4_slide_pred_send_load_v2"),
+    check_size2_v2(440).
 
 %% @doc Test slide with predecessor, receiving data from it (using cs_api_v2 in the bench server).
-symm4_slide_pred2_load_v2(_Config) ->
+symm4_slide_pred_rcv_load_v2(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
-                      symm4_slide2_load_test(1, pred, "slide_pred2_v2", fun pred_id_fun2/2),
-                      symm4_slide2_load_test(2, pred, "slide_pred2_v2", fun pred_id_fun2/2),
-                      symm4_slide2_load_test(3, pred, "slide_pred2_v2", fun pred_id_fun2/2),
-                      symm4_slide2_load_test(4, pred, "slide_pred2_v2", fun pred_id_fun2/2),
+                      symm4_slide2_load_test(1, pred, "slide_pred_rcv_v2", fun pred_id_fun2/2, 50),
+                      symm4_slide2_load_test(2, pred, "slide_pred_rcv_v2", fun pred_id_fun2/2, 50),
+                      symm4_slide2_load_test(3, pred, "slide_pred_rcv_v2", fun pred_id_fun2/2, 50),
+                      symm4_slide2_load_test(4, pred, "slide_pred_rcv_v2", fun pred_id_fun2/2, 50),
                       unittest_helper:wait_for_process_to_die(BenchPid)
-              end, "symm4_slide_pred2_load_v2"),
-    check_size2_v2(40).
+              end, "symm4_slide_pred_rcv_load_v2"),
+    check_size2_v2(440).
+
+%% @doc Test slide with predecessor, sending data to it (using cs_api_v2 in the bench server).
+%%      Uses symmetric incremental slides.
+symm4_slide_pred_send_load_v2_incremental_symm(Config) ->
+    set_move_config_parameters_incremental_symm(),
+    symm4_slide_pred_send_load_v2(Config).
+
+%% @doc Test slide with predecessor, receiving data from it (using cs_api_v2 in the bench server).
+%%      Uses symmetric incremental slides.
+symm4_slide_pred_rcv_load_v2_incremental_symm(Config) ->
+    set_move_config_parameters_incremental_symm(),
+    symm4_slide_pred_rcv_load_v2(Config).
+
+%% @doc Test slide with predecessor, sending data to it (using cs_api_v2 in the bench server).
+%%      Uses incremental slides.
+symm4_slide_pred_send_load_v2_incremental(Config) ->
+    set_move_config_parameters_incremental(),
+    symm4_slide_pred_send_load_v2(Config).
+
+%% @doc Test slide with predecessor, receiving data from it (using cs_api_v2 in the bench server).
+%%      Uses incremental slides.
+symm4_slide_pred_rcv_load_v2_incremental(Config) ->
+    set_move_config_parameters_incremental(),
+    symm4_slide_pred_rcv_load_v2(Config).
+
+%%%%%%%%%%%%%%%%%%%%
+
+% keep in sync with dht_node_move and the timeout config parameters set in set_move_config_parameters/0
+-type move_message() ::
+%{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()}})
+    {{move, slide, '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+%{move, slide_get_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
+    {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+%{move, slide_w_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
+    {{move, slide_w_mte, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+%{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op()} |
+    {{move, slide, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+%{move, my_mte, MoveFullId::slide_op:id(), MaxTransportEntries::pos_integer()} | % max transport entries from a partner
+    {{move, my_mte, '_', '_'}, [], 1..2} |
+%{move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
+    {{move, change_op, '_', '_', '_'}, [], 1..2} |
+%{move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide
+    {{move, change_id, '_'}, [], 1..2} |
+%{move, change_id, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from succ to pred if pred has already set up the slide but succ made it an incremental slide
+    {{move, change_id, '_', '_', '_'}, [], 1..2} |
+%{move, slide_abort, pred | succ, MoveFullId::slide_op:id(), Reason::abort_reason()} |
+    {{move, slide_abort, '_', '_', '_'}, [], 1} |
+% note: do not loose local messages:
+%{move, node_update, Tag::{move, slide_op:id()}} | % message from RM that it has changed the node's id to TargetId
+%{move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
+%{move, req_data, MoveFullId::slide_op:id()} |
+    {{move, req_data, '_'}, [], 1..2} |
+%{move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id()} |
+    {{move, data, '_', '_'}, [], 1..5} |
+%{move, data_ack, MoveFullId::slide_op:id()} |
+    {{move, data_ack, '_'}, [], 1..5} |
+%{move, delta, ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
+    {{move, delta, '_', '_', '_'}, [], 1..5} |
+%{move, delta_ack, MoveFullId::slide_op:id()} |
+% note: this would result in the slide op being aborted with send_delta_timeout
+%       since only send_delta_timeout will handle this but at this point, the
+%       other node will not have this slide op anymore
+%    {{move, delta_ack, '_'}, [], 1..2} |
+%{move, delta_ack, MoveFullId::slide_op:id(), continue, NewSlideId::slide_op:id()} |
+    {{move, delta_ack, '_', continue, '_'}, [], 1..2} |
+%{move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
+    {{move, delta_ack, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2}.
+
+%% @doc Makes IgnoredMessages unique, i.e. only one msg per msg type.
+-spec fix_tester_ignored_msg_list(IgnoredMessages::[move_message(),...]) -> [move_message(),...].
+fix_tester_ignored_msg_list(IgnoredMessages) ->
+    lists:usort(fun(E1, E2) ->
+                        erlang:element(2, erlang:element(1, E1)) =<
+                            erlang:element(2, erlang:element(1, E2))
+                end, IgnoredMessages).
+
+-spec send_ignore_msg_list_to(NthNode::1..4, PredOrSuccOrNode::pred | succ | node, IgnoredMessages::[move_message(),...]) -> ok.
+send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    
+    FailMsg = lists:flatten(io_lib:format("~.0p (~B.*) ignoring messages: ~.0p",
+                                          [PredOrSuccOrNode, NthNode, IgnoredMessages])),
+    {Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
+    Other = case PredOrSuccOrNode of
+                succ -> Succ;
+                pred -> Pred;
+                node -> Node
+            end,
+    comm:send(node:pidX(Other), {mockup_dht_node, add_drop_specs, IgnoredMessages}).
+
+%% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server), ignore (some) messages on succ.
+-spec prop_symm4_slide_succ_rcv_load_timeouts_succ_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_succ_rcv_load_timeouts_succ_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, succ, IgnoredMessages),
+    symm4_slide1_load_test(1, succ, "slide_succ_rcv_timeouts_succ_v2", fun succ_id_fun1/2, 1),
+    send_ignore_msg_list_to(2, succ, IgnoredMessages),
+    symm4_slide1_load_test(2, succ, "slide_succ_rcv_timeouts_succ_v2", fun succ_id_fun1/2, 1),
+    send_ignore_msg_list_to(3, succ, IgnoredMessages),
+    symm4_slide1_load_test(3, succ, "slide_succ_rcv_timeouts_succ_v2", fun succ_id_fun1/2, 1),
+    send_ignore_msg_list_to(4, succ, IgnoredMessages),
+    symm4_slide1_load_test(4, succ, "slide_succ_rcv_timeouts_succ_v2", fun succ_id_fun1/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+%% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server), ignore (some) messages on node.
+-spec prop_symm4_slide_succ_rcv_load_timeouts_node_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_succ_rcv_load_timeouts_node_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, node, IgnoredMessages),
+    symm4_slide1_load_test(1, succ, "slide_succ_rcv_timeouts_node_v2", fun succ_id_fun1/2, 1),
+    send_ignore_msg_list_to(2, node, IgnoredMessages),
+    symm4_slide1_load_test(2, succ, "slide_succ_rcv_timeouts_node_v2", fun succ_id_fun1/2, 1),
+    send_ignore_msg_list_to(3, node, IgnoredMessages),
+    symm4_slide1_load_test(3, succ, "slide_succ_rcv_timeouts_node_v2", fun succ_id_fun1/2, 1),
+    send_ignore_msg_list_to(4, node, IgnoredMessages),
+    symm4_slide1_load_test(4, succ, "slide_succ_rcv_timeouts_node_v2", fun succ_id_fun1/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+tester_symm4_slide_succ_rcv_load_timeouts_succ_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_rcv_load_timeouts_node_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_rcv_load_timeouts_succ_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_rcv_load_timeouts_node_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_rcv_load_timeouts_succ_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_rcv_load_timeouts_node_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+%% @doc Test slide with successor, sending data to it (using cs_api_v2 in the bench server), ignore (some) messages on succ.
+-spec prop_symm4_slide_succ_send_load_timeouts_succ_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_succ_send_load_timeouts_succ_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, succ, IgnoredMessages),
+    symm4_slide2_load_test(1, succ, "slide_succ_send_timeouts_succ_v2", fun succ_id_fun2/2, 1),
+    send_ignore_msg_list_to(2, succ, IgnoredMessages),
+    symm4_slide2_load_test(2, succ, "slide_succ_send_timeouts_succ_v2", fun succ_id_fun2/2, 1),
+    send_ignore_msg_list_to(3, succ, IgnoredMessages),
+    symm4_slide2_load_test(3, succ, "slide_succ_send_timeouts_succ_v2", fun succ_id_fun2/2, 1),
+    send_ignore_msg_list_to(4, succ, IgnoredMessages),
+    symm4_slide2_load_test(4, succ, "slide_succ_send_timeouts_succ_v2", fun succ_id_fun2/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+%% @doc Test slide with successor, sending data to it (using cs_api_v2 in the bench server), ignore (some) messages on node.
+-spec prop_symm4_slide_succ_send_load_timeouts_node_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_succ_send_load_timeouts_node_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, node, IgnoredMessages),
+    symm4_slide2_load_test(1, succ, "slide_succ_send_timeouts_node_v2", fun succ_id_fun2/2, 1),
+    send_ignore_msg_list_to(2, node, IgnoredMessages),
+    symm4_slide2_load_test(2, succ, "slide_succ_send_timeouts_node_v2", fun succ_id_fun2/2, 1),
+    send_ignore_msg_list_to(3, node, IgnoredMessages),
+    symm4_slide2_load_test(3, succ, "slide_succ_send_timeouts_node_v2", fun succ_id_fun2/2, 1),
+    send_ignore_msg_list_to(4, node, IgnoredMessages),
+    symm4_slide2_load_test(4, succ, "slide_succ_send_timeouts_node_v2", fun succ_id_fun2/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+tester_symm4_slide_succ_send_load_timeouts_succ_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_send_load_timeouts_node_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_send_load_timeouts_succ_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_send_load_timeouts_node_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_send_load_timeouts_succ_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_succ_send_load_timeouts_node_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+%% @doc Test slide with predecessor, sending data to it (using cs_api_v2 in the bench server), ignore (some) messages on pred.
+-spec prop_symm4_slide_pred_send_load_timeouts_pred_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_pred_send_load_timeouts_pred_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, pred, IgnoredMessages),
+    symm4_slide1_load_test(1, pred, "slide_pred_send_timeouts_pred_v2", fun pred_id_fun1/2, 1),
+    send_ignore_msg_list_to(2, pred, IgnoredMessages),
+    symm4_slide1_load_test(2, pred, "slide_pred_send_timeouts_pred_v2", fun pred_id_fun1/2, 1),
+    send_ignore_msg_list_to(3, pred, IgnoredMessages),
+    symm4_slide1_load_test(3, pred, "slide_pred_send_timeouts_pred_v2", fun pred_id_fun1/2, 1),
+    send_ignore_msg_list_to(4, pred, IgnoredMessages),
+    symm4_slide1_load_test(4, pred, "slide_pred_send_timeouts_pred_v2", fun pred_id_fun1/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+%% @doc Test slide with predecessor, sending data to it (using cs_api_v2 in the bench server), ignore (some) messages on node.
+-spec prop_symm4_slide_pred_send_load_timeouts_node_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_pred_send_load_timeouts_node_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, node, IgnoredMessages),
+    symm4_slide1_load_test(1, pred, "slide_pred_send_timeouts_node_v2", fun pred_id_fun1/2, 1),
+    send_ignore_msg_list_to(2, node, IgnoredMessages),
+    symm4_slide1_load_test(2, pred, "slide_pred_send_timeouts_node_v2", fun pred_id_fun1/2, 1),
+    send_ignore_msg_list_to(3, node, IgnoredMessages),
+    symm4_slide1_load_test(3, pred, "slide_pred_send_timeouts_node_v2", fun pred_id_fun1/2, 1),
+    send_ignore_msg_list_to(4, node, IgnoredMessages),
+    symm4_slide1_load_test(4, pred, "slide_pred_send_timeouts_node_v2", fun pred_id_fun1/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+tester_symm4_slide_pred_send_load_timeouts_pred_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_pred_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_send_load_timeouts_node_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_send_load_timeouts_pred_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_pred_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_send_load_timeouts_node_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_send_load_timeouts_pred_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_pred_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_send_load_timeouts_node_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+%% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server), ignore (some) messages on pred.
+-spec prop_symm4_slide_pred_rcv_load_timeouts_pred_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_pred_rcv_load_timeouts_pred_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, pred, IgnoredMessages),
+    symm4_slide2_load_test(1, pred, "slide_pred_rcv_timeouts_pred_v2", fun pred_id_fun2/2, 1),
+    send_ignore_msg_list_to(2, pred, IgnoredMessages),
+    symm4_slide2_load_test(2, pred, "slide_pred_rcv_timeouts_pred_v2", fun pred_id_fun2/2, 1),
+    send_ignore_msg_list_to(3, pred, IgnoredMessages),
+    symm4_slide2_load_test(3, pred, "slide_pred_rcv_timeouts_pred_v2", fun pred_id_fun2/2, 1),
+    send_ignore_msg_list_to(4, pred, IgnoredMessages),
+    symm4_slide2_load_test(4, pred, "slide_pred_rcv_timeouts_pred_v2", fun pred_id_fun2/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+%% @doc Test slide with predecessor, receiving data from it (using cs_api_v2 in the bench server), ignore (some) messages on node.
+-spec prop_symm4_slide_pred_rcv_load_timeouts_node_v2(IgnoredMessages::[move_message(),...]) -> true.
+prop_symm4_slide_pred_rcv_load_timeouts_node_v2(IgnoredMessages_) ->
+    IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
+    
+    send_ignore_msg_list_to(1, node, IgnoredMessages),
+    symm4_slide2_load_test(1, pred, "slide_pred_rcv_timeouts_node_v2", fun pred_id_fun2/2, 1),
+    send_ignore_msg_list_to(2, node, IgnoredMessages),
+    symm4_slide2_load_test(2, pred, "slide_pred_rcv_timeouts_node_v2", fun pred_id_fun2/2, 1),
+    send_ignore_msg_list_to(3, node, IgnoredMessages),
+    symm4_slide2_load_test(3, pred, "slide_pred_rcv_timeouts_node_v2", fun pred_id_fun2/2, 1),
+    send_ignore_msg_list_to(4, node, IgnoredMessages),
+    symm4_slide2_load_test(4, pred, "slide_pred_rcv_timeouts_node_v2", fun pred_id_fun2/2, 1),
+    
+    % cleanup, just in case:
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+           || DhtNodePid <- pid_groups:find_all(dht_node)],
+    true.
+
+tester_symm4_slide_pred_rcv_load_timeouts_pred_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_rcv_load_timeouts_node_v2(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_rcv_load_timeouts_pred_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_rcv_load_timeouts_node_v2_incremental_symm(_Config) ->
+    set_move_config_parameters_incremental_symm(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_rcv_load_timeouts_pred_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+tester_symm4_slide_pred_rcv_load_timeouts_node_v2_incremental(_Config) ->
+    set_move_config_parameters_incremental(),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(10, 1000) end),
+    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node_v2, 1, 25),
+    check_size2_v2(440),
+    unittest_helper:wait_for_process_to_die(BenchPid).
+
+%%%%%%%%%%%%%%%%%%%%
 
 succ_id_fun1(MyId, SuccId) ->
     ?RT:get_split_key(MyId, SuccId, {1, 100}).
@@ -179,74 +663,84 @@ pred_id_fun1(MyId, PredId) ->
 pred_id_fun2(PredId, PredsPredId) ->
     ?RT:get_split_key(PredsPredId, PredId, {99, 100}).
 
--spec symm4_slide1_load_test(NthNode::1..4, PredOrSucc::pred | succ, Tag::any(),
-        TargetIdFun::fun((MyId::?RT:key(), OtherId::?RT:key()) -> TargetId::?RT:key())) -> ok.
-symm4_slide1_load_test(NthNode, PredOrSucc, Tag, TargetIdFun) ->
-    % get a random DHT node and let it slide with its successor/predecessor (50 times)
+-spec symm4_slide1_load_test(NthNode::1..4, PredOrSucc::pred | succ, Tag::string(),
+        TargetIdFun::fun((MyId::?RT:key(), OtherId::?RT:key()) -> TargetId::?RT:key()),
+        Count::pos_integer()) -> ok.
+symm4_slide1_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
+    % get a random DHT node and let it slide with its successor/predecessor (Count times)
     DhtNode = lists:nth(NthNode, pid_groups:find_all(dht_node)),
     [begin
-         comm:send_local(DhtNode, {get_node_details, comm:this(), [node, PredOrSucc]}),
-         receive
-             {get_node_details_response, NodeDetails} ->
-                 Node = node_details:get(NodeDetails, node),
-                 Other = node_details:get(NodeDetails, PredOrSucc),
-                 TargetId = TargetIdFun(node:id(Node), node:id(Other)),
-                 symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
-             Y ->
-                 ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message "
-                          "(waiting for get_node_details_response): ~.0p",
-                          [PredOrSucc, NthNode, N, DhtNode, Y])
-         end,
+         FailMsg = lists:flatten(
+                     io_lib:format("slide_~.0p(~B.~B, ~.0p)",
+                                   [PredOrSucc, NthNode, N, DhtNode])),
+         {Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
+         Other = case PredOrSucc of
+                     succ -> Succ;
+                     pred -> Pred
+                 end,
+         TargetId = TargetIdFun(node:id(Node), node:id(Other)),
+         NewTag = lists:flatten(io_lib:format("~s-~B.~B", [Tag, NthNode, N])),
+         symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
          receive Z ->
                      ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
                               [PredOrSucc, NthNode, N, DhtNode, Z])
          after 0 -> ok
          end
-     end || N <- lists:seq(1, 50)],
+     end || N <- lists:seq(1, Count)],
     ok.
 
 % note: calls TargetIdFun(MyId, PredId) for PredOrSucc =:= succ and
 %       TargetIdFun(PredId, PredsPredId) for PredOrSucc =:= pred
--spec symm4_slide2_load_test(NthNode::1..4, PredOrSucc::pred | succ, Tag::any(),
-        TargetIdFun::fun((MyId_or_PredId::?RT:key(), PredId_or_PredsPredId::?RT:key()) -> TargetId::?RT:key())) -> ok.
-symm4_slide2_load_test(NthNode, PredOrSucc, Tag, TargetIdFun) ->
-    % get a random DHT node and let it slide with its successor/predecessor (50 times)
+-spec symm4_slide2_load_test(NthNode::1..4, PredOrSucc::pred | succ, Tag::string(),
+        TargetIdFun::fun((MyId_or_PredId::?RT:key(), PredId_or_PredsPredId::?RT:key()) -> TargetId::?RT:key()),
+        Count::pos_integer()) -> ok.
+symm4_slide2_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
+    % get a random DHT node and let it slide with its successor/predecessor (Count times)
     DhtNode = lists:nth(NthNode, pid_groups:find_all(dht_node)),
     [begin
-         comm:send_local(DhtNode, {get_node_details, comm:this(), [node, pred, succ]}),
-         receive
-             {get_node_details_response, NodeDetails} ->
-                 Node = node_details:get(NodeDetails, node),
-                 Other = node_details:get(NodeDetails, PredOrSucc),
-                 Pred = node_details:get(NodeDetails, pred),
-                 TargetId =
-                     case PredOrSucc of
-                         succ -> TargetIdFun(node:id(Node), node:id(Pred));
-                         pred ->
-                             comm:send(node:pidX(Pred), {get_node_details, comm:this(), [pred]}),
-                             receive
-                                 {get_node_details_response, NodeDetails2} ->
-                                     PredsPred = node_details:get(NodeDetails2, pred),
-                                     TargetIdFun(node:id(Pred), node:id(PredsPred));
-                                 X ->
-                                     ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message "
-                                                  "(waiting for get_node_details_response): ~.0p",
-                                                  [PredOrSucc, NthNode, N, DhtNode, X])
-                             end
-                     end,
-                 symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
-             Y ->
-                 ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message "
-                          "(waiting for get_node_details_response): ~.0p",
-                          [PredOrSucc, NthNode, N, DhtNode, Y])
-         end,
+         FailMsg = lists:flatten(
+                     io_lib:format("slide_~.0p(~B.~B, ~.0p)",
+                                   [PredOrSucc, NthNode, N, DhtNode])),
+         {Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
+         {TargetId, Other} =
+             case PredOrSucc of
+                 succ -> {TargetIdFun(node:id(Node), node:id(Pred)), Succ};
+                 pred ->
+                     {PredsPred, _, _} = get_pred_node_succ2(node:pidX(Pred), FailMsg),
+                     {TargetIdFun(node:id(Pred), node:id(PredsPred)), Pred}
+             end,
+         NewTag = lists:flatten(io_lib:format("~s-~B.~B", [Tag, NthNode, N])),
+         symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
          receive Z ->
                      ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
                               [PredOrSucc, NthNode, N, DhtNode, Z])
          after 0 -> ok
          end
-     end || N <- lists:seq(1, 50)],
+     end || N <- lists:seq(1, Count)],
     ok.
+
+
+-spec get_pred_node_succ(NthNode::1..4, FailMsg::string()) -> {Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()}.
+get_pred_node_succ(NthNode, FailMsg) ->
+    DhtNodePid = lists:nth(NthNode, pid_groups:find_all(dht_node)),
+    get_pred_node_succ2(DhtNodePid, FailMsg).
+
+-spec get_pred_node_succ2(NodePid::pid() | comm:mypid(), FailMsg::string()) -> {Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()}.
+get_pred_node_succ2(NodePid, FailMsg) when is_pid(NodePid) ->
+    get_pred_node_succ2(comm:make_global(NodePid), FailMsg);
+get_pred_node_succ2(NodePid, FailMsg) ->
+    comm:send(NodePid, {get_node_details, comm:this(), [node, pred, succ]}),
+    receive
+        {get_node_details_response, NodeDetails} ->
+            Node = node_details:get(NodeDetails, node),
+            Pred = node_details:get(NodeDetails, pred),
+            Succ = node_details:get(NodeDetails, succ),
+            {Pred, Node, Succ};
+        Y ->
+            ?ct_fail("~s: unexpected message while "
+                         "waiting for get_node_details_response: ~.0p",
+                         [FailMsg, Y])
+    end.
 
 -spec symm4_slide_load_test_slide(DhtNode::pid(), PredOrSucc::pred | succ,
         TargetId::?RT:key(), Tag::any(), NthNode::1..4, N::pos_integer(),
@@ -258,7 +752,7 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
 %%             ct:pal("~p.~p ~.0p -> ~.0p", [NthNode, N, node:id(Node), TargetId]),
             ok;
         {move, result, Tag, Result} ->
-            case lists:member(Result, [ongoing_slide, wrong_pred_succ_node, notify_succ_timeout, notify_pred_timeout]) of
+            case lists:member(Result, [ongoing_slide, wrong_pred_succ_node]) of
                 true ->
                     ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...",
                            [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]),
