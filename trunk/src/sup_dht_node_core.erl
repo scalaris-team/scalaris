@@ -50,8 +50,12 @@ init({DHTNodeGroup, Options}) ->
         util:sup_worker_desc(acceptor, acceptor, start_link, [DHTNodeGroup]),
     Learner =
         util:sup_worker_desc(learner, learner, start_link, [DHTNodeGroup]),
+    DHTNodeModule = case util:is_unittest() of
+                        true -> mockup_dht_node;
+                        _    -> dht_node
+                    end,
     DHTNode =
-        util:sup_worker_desc(dht_node, dht_node, start_link,
+        util:sup_worker_desc(dht_node, DHTNodeModule, start_link,
                              [DHTNodeGroup, Options]),
     TX =
         util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
