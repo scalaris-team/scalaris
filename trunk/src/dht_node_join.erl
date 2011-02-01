@@ -94,7 +94,7 @@ join_as_first(Id, IdVersion, _Options) ->
 
 %% userdevguide-begin dht_node_join:join_as_other
 -spec join_as_other(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()])
-        -> {'$gen_component', [{on_handler, Handler::on}],
+        -> {'$gen_component', [{on_handler, Handler::on_join}],
             State::{join, phase2(), msg_queue:msg_queue()}}.
 join_as_other(Id, IdVersion, Options) ->
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
