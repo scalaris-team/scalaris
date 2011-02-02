@@ -278,21 +278,28 @@ has_churn(OldNeighborhood, NewNeighborhood) ->
                      OtherNeighborhood::nodelist:neighborhood())
         -> NewNeighborhood::nodelist:neighborhood().
 trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
-    NewNeighborhood1 = nodelist:add_nodes(OldNeighborhood, MyRndView, get_pred_list_length(), get_succ_list_length()),
-    NewNeighborhood2 = nodelist:merge(NewNeighborhood1, OtherNeighborhood, get_pred_list_length(), get_succ_list_length()),
+    % update node ids with information from the other node's neighborhood
+    OldNeighborhood2 =
+        nodelist:update_ids(OldNeighborhood,
+                            nodelist:to_list(OtherNeighborhood)),
+    PredL = get_pred_list_length(),
+    SuccL = get_succ_list_length(),
+    NewNeighborhood1 = 
+        nodelist:add_nodes(OldNeighborhood2, MyRndView, PredL, SuccL),
+    NewNeighborhood2 =
+        nodelist:merge(NewNeighborhood1, OtherNeighborhood, PredL, SuccL),
     
-    OldView = nodelist:to_list(OldNeighborhood),
+    OldView = nodelist:to_list(OldNeighborhood2),
     NewView = nodelist:to_list(NewNeighborhood2),
     ViewOrd = fun(A, B) ->
-                      nodelist:succ_ord_node(A, B, nodelist:node(OldNeighborhood))
+                      nodelist:succ_ord_node(A, B, nodelist:node(OldNeighborhood2))
               end,
     {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
     
     % TODO: add a local cache of contacted nodes in order not to contact them again
     _ = [comm:send(node:pidX(Node), {get_node_details, comm:this(), [node]})
            || Node <- NewNodes],
-    % update node ids with information from the other node's neighborhood
-    nodelist:update_ids(OldNeighborhood, nodelist:to_list(OtherNeighborhood)).
+    OldNeighborhood2.
 
 %% @doc Adds and removes the given nodes from the rm_tman state.
 %%      Note: Sets the new RandViewSize to 0 if NodesToRemove is not empty and
