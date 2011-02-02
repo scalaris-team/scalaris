@@ -97,11 +97,11 @@ end_per_testcase(_TestCase, _Config) ->
 set_move_config_parameters() ->
     config:write(move_use_incremental_slides, false),
     config:write(move_symmetric_incremental_slides, false),
-    config:write(move_notify_other_timeout, 50),
-    config:write(move_send_data_timeout, 50),
-    config:write(move_send_delta_timeout, 50),
-    config:write(move_rcv_data_timeout, 50),
-    config:write(move_rcv_delta_timeout, 50),
+    config:write(move_notify_other_timeout, 100),
+    config:write(move_send_data_timeout, 100),
+    config:write(move_send_delta_timeout, 100),
+    config:write(move_rcv_data_timeout, 100),
+    config:write(move_rcv_delta_timeout, 100),
     
     config:write(move_notify_other_retries, 2),
     config:write(move_send_data_retries, 5),
