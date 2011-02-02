@@ -210,11 +210,6 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
             case dht_node_state:is_db_responsible(Key, State) of
                 true -> comm:send_local(self(), Msg);
                 false ->
-                    DBRange = dht_node_state:get(State, db_range),
-                    DBRange2 = case intervals:is_continuous(DBRange) of
-                                   true -> intervals:get_bounds(DBRange);
-                                   _    -> DBRange
-                               end,
                     % it is possible that we received the message due to a
                     % forward while sliding and before the other node removed
                     % the forward -> do not warn then
@@ -232,6 +227,13 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
                               intervals:in(Key, nodelist:succ_range(Neighbors))) of
                         true -> ok;
                         false ->
+                            DBRange = dht_node_state:get(State, db_range),
+                            DBRange2 = [begin
+                                            case intervals:is_continuous(Interval) of
+                                                true -> {intervals:get_bounds(Interval), Id};
+                                                _    -> {Interval, Id}
+                                            end
+                                        end || {Interval, Id} <- DBRange],
                             log:log(warn,
                                     "[ ~.0p ] Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  msgfwd:~p~n  Key:~p",
                                     [self(), intervals:get_bounds(nodelist:node_range(Neighbors)),
