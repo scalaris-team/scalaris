@@ -229,6 +229,10 @@ install-erlang: compile
 	           bin/scalarisctl.conf \
 	           bin/scalaris.cfg \
 	           bin/scalaris.local.cfg.example
+	if [ -f bin/scalaris.local.cfg ]; then \
+	  install -m 644 -t $(ETCDIR) \
+	           bin/scalaris.local.cfg; \
+	fi
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/icons \
 	           $(DOCROOTDIR)/images/default \
