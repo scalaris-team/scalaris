@@ -36,18 +36,19 @@ issue_bulk_owner(I, Msg) ->
 -spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), Msg::comm:message()) -> ok.
 bulk_owner(State, I, Msg) ->
 %%     ct:pal("bulk_owner:~n self:~p,~n int :~p,~n rt  :~p~n", [dht_node_state:get(State, node), I, ?RT:to_list(State)]),
-    SuccInt = intervals:intersection(I, dht_node_state:get(State, succ_range)),
+    Neighbors = dht_node_state:get(State, neighbors),
+    SuccInt = intervals:intersection(I, nodelist:succ_range(Neighbors)),
     case intervals:is_empty(SuccInt) of
         true  -> ok;
         false ->
-            comm:send(dht_node_state:get(State, succ_pid),
+            comm:send(node:pidX(nodelist:succ(Neighbors)),
                       {bulkowner_deliver, SuccInt, Msg})
     end,
     case intervals:is_subset(I, SuccInt) of
         true  -> ok;
         false ->
             RTList = lists:reverse(?RT:to_list(State)),
-            bulk_owner_iter(RTList, I, Msg, dht_node_state:get(State, node_id))
+            bulk_owner_iter(RTList, I, Msg, node:id(nodelist:node(Neighbors)))
     end.
 
 %% @doc Iterates through the list of (unique) nodes in the routing table and

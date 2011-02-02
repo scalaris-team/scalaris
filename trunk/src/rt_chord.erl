@@ -283,8 +283,9 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
 next_hop(State, Id) ->
-    case intervals:in(Id, dht_node_state:get(State, succ_range)) of
-        true -> dht_node_state:get(State, succ_pid);
+    Neighbors = dht_node_state:get(State, neighbors),
+    case intervals:in(Id, nodelist:succ_range(Neighbors)) of
+        true -> node:pidX(nodelist:succ(Neighbors));
         _ ->
             % check routing table:
     RT = dht_node_state:get(State, rt),
@@ -293,7 +294,7 @@ next_hop(State, Id) ->
                          {value, _Key, N} ->
                              N;
                          nil when RTSize =:= 0 ->
-                             dht_node_state:get(State, succ);
+                             nodelist:succ(Neighbors);
                          nil -> % forward to largest finger
                              {_Key, N} = gb_trees:largest(RT),
                              N
@@ -303,8 +304,7 @@ next_hop(State, Id) ->
                     false -> NodeRT;
                     _     ->
                         % check neighborhood:
-                        nodelist:largest_smaller_than(
-                          dht_node_state:get(State, neighbors), Id, NodeRT)
+                        nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
                 end,
             node:pidX(FinalNode)
     end.
@@ -331,6 +331,6 @@ export_rt_to_dht_node(RT, Neighbors) ->
 %%      third=next longer finger,...
 to_list(State) ->
     RT = dht_node_state:get(State, rt),
-    Succ = dht_node_state:get(State, succ),
-    nodelist:mk_nodelist([Succ | gb_trees:values(RT)],
-                         dht_node_state:get(State, node)).
+    Neighbors = dht_node_state:get(State, neighbors),
+    nodelist:mk_nodelist([nodelist:succ(Neighbors) | gb_trees:values(RT)],
+                         nodelist:node(Neighbors)).

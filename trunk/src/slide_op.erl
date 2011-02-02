@@ -93,9 +93,9 @@
 -spec new_slide(MoveId::util:global_uid(), Type::type(), CurTargetId::?RT:key(),
                 Tag::any(), SourcePid::comm:erl_local_pid() | null,
                 OtherMTE::unknown | pos_integer(), NextOp::next_op(),
-                State::dht_node_state:state())
+                Neighbors::nodelist:neighborhood())
         -> slide_op().
-new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, State) ->
+new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, Neighbors) ->
     {PredOrSucc, SendOrReceive} =
         case Type of
             {slide, PoS, SoR} -> {PoS, SoR};
@@ -105,7 +105,7 @@ new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, State) ->
             {jump, 'rcv'} ->  {pred, 'rcv'}
         end,
     {Interval, TargetNode} =
-        get_interval_tnode(PredOrSucc, SendOrReceive, CurTargetId, State),
+        get_interval_tnode(PredOrSucc, SendOrReceive, CurTargetId, Neighbors),
     #slide_op{type = Type,
               id = MoveId,
               node = TargetNode,
@@ -121,35 +121,35 @@ new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, State) ->
 -spec new_slide_i(MoveId::util:global_uid(), Type::type(),
                 CurTargetId::?RT:key(), FinalTargetId::?RT:key(),
                 Tag::any(), SourcePid::comm:erl_local_pid() | null,
-                OtherMTE::unknown | pos_integer(), State::dht_node_state:state())
+                OtherMTE::unknown | pos_integer(), Neighbors::nodelist:neighborhood())
         -> slide_op().
-new_slide_i(MoveId, Type, CurTargetId, FinalTargetId, Tag, SourcePid, OtherMTE, State) ->
+new_slide_i(MoveId, Type, CurTargetId, FinalTargetId, Tag, SourcePid, OtherMTE, Neighbors) ->
     NextOp = case FinalTargetId of
                  CurTargetId -> {none};
                  _           -> {slide, continue, FinalTargetId}
              end,
-    new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, State).
+    new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, Neighbors).
 
 -spec get_interval_tnode(PredOrSucc::pred | succ, SendOrReceive::'send' | 'rcv',
-                         TargetId::?RT:key(), State::dht_node_state:state())
+                         TargetId::?RT:key(), Neighbors::nodelist:neighborhood())
         -> {intervals:interval(), node:node_type()}.
-get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, State) ->
+get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors) ->
     case PredOrSucc of
         pred ->
-            Pred = dht_node_state:get(State, pred),
+            Pred = nodelist:pred(Neighbors),
+            PredId = node:id(Pred),
             I = case SendOrReceive of
-                    'rcv'  -> node:mk_interval_between_ids(TargetId, node:id(Pred));
-                    'send' -> node:mk_interval_between_ids(node:id(Pred), TargetId)
+                    'rcv'  -> node:mk_interval_between_ids(TargetId, PredId);
+                    'send' -> node:mk_interval_between_ids(PredId, TargetId)
                 end,
             {I, Pred};
         succ ->
+            NodeId = nodelist:nodeid(Neighbors),
             I = case SendOrReceive of
-                    'rcv'  -> node:mk_interval_between_ids(
-                                dht_node_state:get(State, node_id), TargetId);
-                    'send' -> node:mk_interval_between_ids(
-                                TargetId, dht_node_state:get(State, node_id))
+                    'rcv'  -> node:mk_interval_between_ids(NodeId, TargetId);
+                    'send' -> node:mk_interval_between_ids(TargetId, NodeId)
                 end,
-            {I, dht_node_state:get(State, succ)}
+            {I, nodelist:succ(Neighbors)}
     end.
 
 %% @doc Sets up a new slide operation for a joining node (see
@@ -169,35 +169,43 @@ new_receiving_slide_join(MoveId, NewPred, NewSucc, MyNewKey, Tag) ->
 
 %% @doc Sets up a new slide operation for a node which sends a joining node
 %%      some of its data.
+%%      Throws 'throw:not_responsible' if the current node is not responsible
+%%      for the ID of JoiningNode.
 -spec new_sending_slide_join(MoveId::util:global_uid(), JoiningNode::node:node_type(),
-        Tag::any(), State::dht_node_state:state()) -> slide_op().
-new_sending_slide_join(MoveId, JoiningNode, Tag, State) ->
+        Tag::any(), Neighbors::nodelist:neighborhood()) -> slide_op().
+new_sending_slide_join(MoveId, JoiningNode, Tag, Neighbors) ->
     JoiningNodeId = node:id(JoiningNode),
-    IntervalToSend = node:mk_interval_between_ids(
-                       dht_node_state:get(State, pred_id), JoiningNodeId),
-    #slide_op{type = {join, 'send'},
-              id = MoveId,
-              node = JoiningNode,
-              interval = IntervalToSend,
-              target_id = JoiningNodeId,
-              tag = Tag,
-              source_pid = null}.
+    case intervals:in(JoiningNodeId, nodelist:node_range(Neighbors)) of
+        false -> erlang:throw(not_responsible);
+        _ ->
+            IntervalToSend = node:mk_interval_between_ids(
+                               node:id(nodelist:pred(Neighbors)), JoiningNodeId),
+            #slide_op{type = {join, 'send'},
+                      id = MoveId,
+                      node = JoiningNode,
+                      interval = IntervalToSend,
+                      target_id = JoiningNodeId,
+                      tag = Tag,
+                      source_pid = null}
+    end.
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring and transfer its data to its successor.
--spec new_sending_slide_leave(MoveId::id(), Tag::any(), State::dht_node_state:state()) -> slide_op().
-new_sending_slide_leave(MoveId, Tag, State) ->
-    TargetId = dht_node_state:get(State, pred_id),
-    new_sending_slide_leave(MoveId, TargetId, Tag, State).
+-spec new_sending_slide_leave(MoveId::id(), Tag::any(),
+        Neighbors::nodelist:neighborhood()) -> slide_op().
+new_sending_slide_leave(MoveId, Tag, Neighbors) ->
+    TargetId = node:id(nodelist:pred(Neighbors)),
+    new_sending_slide_leave(MoveId, TargetId, Tag, Neighbors).
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring incrementally (current step is to move to
 %%      CurTargetId) and transfer its data to its successor.
--spec new_sending_slide_leave(MoveId::id(), CurTargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
-new_sending_slide_leave(MoveId, CurTargetId, Tag, State) ->
+-spec new_sending_slide_leave(MoveId::id(), CurTargetId::?RT:key(), Tag::any(),
+        Neighbors::nodelist:neighborhood()) -> slide_op().
+new_sending_slide_leave(MoveId, CurTargetId, Tag, Neighbors) ->
     {Interval, TargetNode} =
-        get_interval_tnode('succ', 'send', CurTargetId, State),
-    NextOp = case dht_node_state:get(State, pred_id) of
+        get_interval_tnode('succ', 'send', CurTargetId, Neighbors),
+    NextOp = case node:id(nodelist:pred(Neighbors)) of
                  CurTargetId -> {none};
                  _           -> {leave, continue}
              end,
@@ -213,19 +221,22 @@ new_sending_slide_leave(MoveId, CurTargetId, Tag, State) ->
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring, transfer its data to its successor and afterwards
 %%      join somewhere else.
--spec new_sending_slide_jump(MoveId::id(), TargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
-new_sending_slide_jump(MoveId, TargetId, Tag, State) ->
-    TargetId = dht_node_state:get(State, pred_id),
-    new_sending_slide_jump(MoveId, TargetId, TargetId, Tag, State).
+-spec new_sending_slide_jump(MoveId::id(), TargetId::?RT:key(), Tag::any(),
+        Neighbors::nodelist:neighborhood()) -> slide_op().
+new_sending_slide_jump(MoveId, TargetId, Tag, Neighbors) ->
+    TargetId = node:id(nodelist:pred(Neighbors)),
+    new_sending_slide_jump(MoveId, TargetId, TargetId, Tag, Neighbors).
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring, transfer its data to its successor
 %%      incrementally (current step is to move to CurTargetId) and afterwards
 %%      join somewhere else.
--spec new_sending_slide_jump(MoveId::id(), CurTargetId::?RT:key(), FinalTargetId::?RT:key(), Tag::any(), State::dht_node_state:state()) -> slide_op().
-new_sending_slide_jump(MoveId, CurTargetId, FinalTargetId, Tag, State) ->
+-spec new_sending_slide_jump(MoveId::id(), CurTargetId::?RT:key(),
+        FinalTargetId::?RT:key(), Tag::any(), Neighbors::nodelist:neighborhood())
+        -> slide_op().
+new_sending_slide_jump(MoveId, CurTargetId, FinalTargetId, Tag, Neighbors) ->
     {Interval, TargetNode} =
-        get_interval_tnode('succ', 'send', CurTargetId, State),
+        get_interval_tnode('succ', 'send', CurTargetId, Neighbors),
     NextOp = case FinalTargetId of
                  CurTargetId -> {none};
                  _           -> {jump, continue, FinalTargetId}

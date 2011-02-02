@@ -422,31 +422,31 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
   when (not is_atom(NewPred)) -> % avoid confusion with not_responsible message
     ?TRACE1(_Msg, State),
     TargetId = node:id(NewPred),
-    % only reply to join request with keys in our range:
-    KeyInRange = dht_node_state:is_responsible(node:id(NewPred), State),
-    case KeyInRange andalso
-             dht_node_move:can_slide_pred(State, TargetId, {join, 'rcv'}) of
+    case dht_node_move:can_slide_pred(State, TargetId, {join, 'rcv'}) of
         true ->
-            % TODO: implement step-wise join
-            MoveFullId = util:get_global_uid(),
-            SlideOp = slide_op:new_sending_slide_join(
-                        MoveFullId, NewPred, join, State),
-            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_join),
-            RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
-            rm_loop:subscribe(self(), RMSubscrTag,
-                              fun(_OldNeighbors, NewNeighbors) ->
-                                      NewPred =:= nodelist:pred(NewNeighbors)
-                              end,
-                              fun dht_node_move:rm_notify_new_pred/4, 1),
-            State1 = dht_node_state:add_db_range(
-                       State, slide_op:get_interval(SlideOp1)),
-            send_join_response(State1, SlideOp1, NewPred, CandId);
-        _ when not KeyInRange ->
-            ?TRACE_SEND(node:pidX(NewPred),
-                        {join, join_response, not_responsible, CandId}),
-            comm:send(node:pidX(NewPred),
-                      {join, join_response, not_responsible, CandId}),
-            State;
+            try
+                % TODO: implement step-wise join
+                MoveFullId = util:get_global_uid(),
+                Neighbors = dht_node_state:get(State, neighbors),
+                SlideOp = slide_op:new_sending_slide_join(
+                            MoveFullId, NewPred, join, Neighbors),
+                SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_join),
+                RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
+                rm_loop:subscribe(self(), RMSubscrTag,
+                                  fun(_OldNeighbors, NewNeighbors) ->
+                                          NewPred =:= nodelist:pred(NewNeighbors)
+                                  end,
+                                  fun dht_node_move:rm_notify_new_pred/4, 1),
+                State1 = dht_node_state:add_db_range(
+                           State, slide_op:get_interval(SlideOp1)),
+                send_join_response(State1, SlideOp1, NewPred, CandId)
+            catch throw:not_responsible ->
+                      ?TRACE_SEND(node:pidX(NewPred),
+                                  {join, join_response, not_responsible, CandId}),
+                      comm:send(node:pidX(NewPred),
+                                {join, join_response, not_responsible, CandId}),
+                      State
+            end;
         _ ->
             ?TRACE("[ ~.0p ]~n  ignoring join_request from ~.0p due to a running slide~n",
                    [self(), NewPred]),
