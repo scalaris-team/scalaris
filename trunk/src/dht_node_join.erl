@@ -438,7 +438,8 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
                                   end,
                                   fun dht_node_move:rm_notify_new_pred/4, 1),
                 State1 = dht_node_state:add_db_range(
-                           State, slide_op:get_interval(SlideOp1)),
+                           State, slide_op:get_interval(SlideOp1),
+                           slide_op:get_id(SlideOp1)),
                 send_join_response(State1, SlideOp1, NewPred, CandId)
             catch throw:not_responsible ->
                       ?TRACE_SEND(node:pidX(NewPred),
@@ -475,8 +476,7 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId, CandId} = _M
                     _ = slide_op:reset_timer(SlideOp), % reset previous timeouts
                     RMSubscrTag = {move, slide_op:get_id(SlideOp)},
                     rm_loop:unsubscribe(self(), RMSubscrTag),
-                    State1 = dht_node_state:rm_db_range(
-                               State, slide_op:get_interval(SlideOp)),
+                    State1 = dht_node_state:rm_db_range(State, MoveFullId),
                     dht_node_state:set_slide(State1, pred, null)
             end;
         not_found -> State

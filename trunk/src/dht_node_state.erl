@@ -41,7 +41,7 @@
          set_slide/3,
          add_msg_fwd/3,
          rm_msg_fwd/2,
-         add_db_range/2,
+         add_db_range/3,
          rm_db_range/2]).
 
 -ifdef(with_export_type_support).
@@ -62,7 +62,7 @@
                 slide_succ = null :: slide_op:slide_op() | null,
                 msg_fwd    = []   :: [{intervals:interval(), comm:mypid()}],
                 % additional range to respond to during a move:
-                db_range   = intervals:empty() :: intervals:interval()
+                db_range   = []   :: [{intervals:interval(), slide_op:id()}]
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -123,7 +123,7 @@ new(RT, NeighbTable, DB) ->
          (state(), node) -> node:node_type();
          (state(), node_id) -> ?RT:key();
          (state(), my_range) -> intervals:interval();
-         (state(), db_range) -> intervals:interval();
+         (state(), db_range) -> [{intervals:interval(), slide_op:id()}];
          (state(), succ_range) -> intervals:interval();
          (state(), join_time) -> util:time();
          (state(), trans_log) -> #translog{};
@@ -202,7 +202,9 @@ is_responsible(Key, #state{neighbors=NeighbTable}) ->
 -spec is_db_responsible(Key::intervals:key(), State::state()) -> boolean().
 is_db_responsible(Key, State = #state{db_range=DBRange}) ->
     is_responsible(Key, State) orelse
-        intervals:in(Key, DBRange).
+        lists:any(fun({Interval, _Id}) ->
+                          intervals:in(Key, Interval)
+                  end, DBRange).
 
 %% @doc Tries to find a slide operation with the given MoveFullId and returns
 %%      it including its type (pred or succ) if successful and its pred/succ
@@ -262,13 +264,14 @@ add_msg_fwd(State = #state{msg_fwd=OldMsgFwd}, Interval, Pid) ->
 rm_msg_fwd(State = #state{msg_fwd=OldMsgFwd}, Interval) ->
     State#state{msg_fwd = [X || X = {I, _} <- OldMsgFwd, I =/= Interval]}.
 
--spec add_db_range(State::state(), Interval::intervals:interval()) -> state().
-add_db_range(State = #state{db_range=DBRange}, Interval) ->
-    State#state{db_range = intervals:union(DBRange, Interval)}.
+-spec add_db_range(State::state(), Interval::intervals:interval(),
+                   SlideId::slide_op:id()) -> state().
+add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
+    State#state{db_range = [{Interval, SlideId} | DBRange]}.
 
--spec rm_db_range(State::state(), Interval::intervals:interval()) -> state().
-rm_db_range(State = #state{db_range=DBRange}, Interval) ->
-    State#state{db_range = intervals:minus(DBRange, Interval)}.
+-spec rm_db_range(State::state(), SlideId::slide_op:id()) -> state().
+rm_db_range(State = #state{db_range=DBRange}, SlideId) ->
+    State#state{db_range = [X || X = {_, Id} <- DBRange, Id =/= SlideId]}.
 
 %%% util
 -spec dump(state()) -> ok.
