@@ -30,6 +30,7 @@
          set_db/2,
          details/1, details/2,
          % node responsibilities:
+         has_left/1,
          is_responsible/2,
          is_db_responsible/2,
          % transactions:
@@ -106,6 +107,8 @@ new(RT, NeighbTable, DB) ->
 %%        <li>slide_pred = information about the node's current slide operation with its predecessor.</li>
 %%        <li>slide_succ = information about the node's current slide operation with its successor.</li>
 %%      </ul>
+%%      Beware of race conditions sing the neighborhood may have changed at
+%%      the next call.
 -spec get(state(), rt) -> ?RT:external_rt();
          (state(), rt_size) -> non_neg_integer();
          (state(), neighbors) -> nodelist:neighborhood();
@@ -169,8 +172,16 @@ get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
         msg_fwd    -> MsgFwd
     end.
 
+%% @doc Checks whether the current node has already left the ring, i.e. the has
+%%      already changed his ID in order to leave or jump.
+-spec has_left(State::state()) -> boolean().
+has_left(#state{neighbors=NeighbTable}) ->
+    rm_loop:has_left(NeighbTable).
+
 %% @doc Checks whether the given key is in the node's range, i.e. the node is
 %%      responsible for this key.
+%%      Beware of race conditions sing the neighborhood may have changed at
+%%      the next call.
 -spec is_responsible(Key::intervals:key(), State::state()) -> boolean().
 is_responsible(Key, #state{neighbors=NeighbTable}) ->
     case rm_loop:has_left(NeighbTable) of
@@ -186,6 +197,8 @@ is_responsible(Key, #state{neighbors=NeighbTable}) ->
 %%      current range or for a range the node is temporarily responsible for
 %%      during a slide operation, i.e. we temporarily read/modify data a
 %%      neighbor is responsible for but hasn't yet received the data from us.
+%%      Beware of race conditions sing the neighborhood may have changed at
+%%      the next call.
 -spec is_db_responsible(Key::intervals:key(), State::state()) -> boolean().
 is_db_responsible(Key, State = #state{db_range=DBRange}) ->
     is_responsible(Key, State) orelse

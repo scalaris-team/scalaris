@@ -29,6 +29,7 @@
          
          % getters:
          node/1, nodeid/1, pred/1, preds/1, succ/1, succs/1,
+         node_range/1, succ_range/1,
          has_real_pred/1, has_real_succ/1,
          
          % modifiers:
@@ -173,6 +174,11 @@ node({_Preds, Node, _Succs}) ->
 nodeid({_Preds, Node, _Succs}) ->
     node:id(Node).
 
+%% @doc Returns the node's range.
+-spec node_range(neighborhood()) -> intervals:interval().
+node_range({[Pred | _], Node, _Succs}) ->
+    node:mk_interval_between_nodes(Pred, Node).
+
 %% @doc Updates the base node of the neighborhood if its ID is still between
 %%      the ID of the predecessor and successor. Otherwise throws an exception.
 -spec update_node(neighborhood(), NewBaseNode::node:node_type()) -> neighborhood().
@@ -217,6 +223,11 @@ succs({_Preds, _Node, Succs}) ->
 -spec succ(neighborhood()) -> node:node_type().
 succ({_Preds, _Node, [Succ | _]}) ->
     Succ.
+
+%% @doc Returns the successor's range.
+-spec succ_range(neighborhood()) -> intervals:interval().
+succ_range({_Preds, Node, [Succ | _]}) ->
+    node:mk_interval_between_nodes(Node, Succ).
 
 %% @doc Returns whether the neighborhood contains a real predecessor (one not
 %%      equal to the own node) or not (provided for convenience).

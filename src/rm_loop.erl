@@ -24,6 +24,15 @@
 
 -behavior(gen_component).
 
+%-define(TRACE(X,Y), ct:pal(X,Y)).
+-define(TRACE(X,Y), ok).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
+-define(TRACE1(Msg, State),
+        ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p~n", [self(), Msg, State])).
+-define(TRACE_STATE(State),
+        ?TRACE("[ ~.0p ]~n  new Neighbors: ~.0p~n",
+               [self(), nodelist:to_list(get_neighbors(erlang:element(1, State)))])).
+
 -export([start_link/1]).
 -export([init/1, on_startup/2, on/2,
          activate/3, leave/0, update_id/1,
@@ -211,7 +220,9 @@ on_startup({init_rm, Me, Pred, Succ}, {uninit, NeighbTable, SubscrTable, QueuedM
     RM_State = ?RM:init(NeighbTable, Me, Pred, Succ),
     set_failuredetector(get_neighbors(NeighbTable)),
     msg_queue:send(QueuedMessages),
-    gen_component:change_handler({NeighbTable, RM_State, SubscrTable}, on);
+    NewState = {NeighbTable, RM_State, SubscrTable},
+    ?TRACE_STATE(NewState),
+    gen_component:change_handler(NewState, on);
 
 on_startup(Msg, {uninit, NeighbTable, SubscrTable, QueuedMessages}) ->
     {uninit, NeighbTable, SubscrTable, msg_queue:add(QueuedMessages, Msg)}.
@@ -359,13 +370,18 @@ on(Message, {NeighbTable, RM_State, SubscrTable}) ->
             NewNeighborhood = get_neighbors(NeighbTable),
             call_subscribers(OldNeighborhood, NewNeighborhood, SubscrTable),
             update_failuredetector(OldNeighborhood, NewNeighborhood),
-            {NeighbTable, NewRM_State, SubscrTable}
+            NewState = {NeighbTable, NewRM_State, SubscrTable},
+            ?TRACE_STATE(NewState),
+            NewState
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Calls RMFun (which may update the Neighborhood using
+%%      update_neighbors/2), calls all subscribers and updates the failure
+%%      detector.
 -spec update_state(NeighbTable::tid(), SubscrTable::tid(),
                    RMFun::fun(() -> ?RM:state())) -> state_init().
 update_state(NeighbTable, SubscrTable, RMFun) ->
@@ -374,7 +390,9 @@ update_state(NeighbTable, SubscrTable, RMFun) ->
     NewNeighborhood = get_neighbors(NeighbTable),
     call_subscribers(OldNeighborhood, NewNeighborhood, SubscrTable),
     update_failuredetector(OldNeighborhood, NewNeighborhood),
-    {NeighbTable, NewRM_State, SubscrTable}.
+    NewState = {NeighbTable, NewRM_State, SubscrTable},
+    ?TRACE_STATE(NewState),
+    NewState.
 
 %% @doc Updates the stored neighborhood object. Only use inside the rm_loop
 %%      process, i.e. in the rm_* modules called from here. Fails otherwise.

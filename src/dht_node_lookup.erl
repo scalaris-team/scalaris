@@ -29,9 +29,10 @@
 -spec lookup_aux(State::dht_node_state:state(), Key::intervals:key(),
                  Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux(State, Key, Hops, Msg) ->
-    case intervals:in(Key, dht_node_state:get(State, succ_range)) of
+    Neighbors = dht_node_state:get(State, neighbors),
+    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true -> % found node -> terminate
-            P = dht_node_state:get(State, succ_pid),
+            P = node:pidX(nodelist:succ(Neighbors)),
             comm:send(P, {lookup_fin, Key, Hops + 1, Msg});
         _ ->
             P = ?RT:next_hop(State, Key),

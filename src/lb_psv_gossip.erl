@@ -113,7 +113,6 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                     OtherNodeDetails = node_details:set(node_details:new(), load, 0),
                     OtherNodeDetailsNew1 = node_details:set(node_details:new(), new_key, SplitKey),
                     OtherNodeDetailsNew2 = node_details:set(OtherNodeDetailsNew1, load, OtherLoadNew),
-                    MyPredId = dht_node_state:get(DhtNodeState, pred_id),
                     Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
                     OtherNodeDetailsNew = node_details:set(OtherNodeDetailsNew2, my_range, Interval),
                     lb_op:slide_op(OtherNodeDetails, MyNodeDetails,

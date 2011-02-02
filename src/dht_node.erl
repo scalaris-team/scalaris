@@ -220,6 +220,7 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
                     % the forward -> do not warn then
                     SlidePred = dht_node_state:get(State, slide_pred),
                     SlideSucc = dht_node_state:get(State, slide_succ),
+                    Neighbors = dht_node_state:get(State, neighbors),
                     case ((SlidePred =/= null andalso
                                slide_op:get_sendORreceive(SlidePred) =:= 'send' andalso
                                intervals:in(Key, slide_op:get_interval(SlidePred)))
@@ -228,12 +229,12 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
                                    slide_op:get_sendORreceive(SlideSucc) =:= 'send' andalso
                                    intervals:in(Key, slide_op:get_interval(SlideSucc)))
                          orelse
-                              intervals:in(Key, dht_node_state:get(State, succ_range))) of
+                              intervals:in(Key, nodelist:succ_range(Neighbors))) of
                         true -> ok;
                         false ->
                             log:log(warn,
                                     "[ ~.0p ] Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  msgfwd:~p~n  Key:~p",
-                                    [self(), intervals:get_bounds(dht_node_state:get(State, my_range)),
+                                    [self(), intervals:get_bounds(nodelist:node_range(Neighbors)),
                                      DBRange2, MsgFwd, Key])
                     end,
                     dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
