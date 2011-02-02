@@ -211,7 +211,7 @@ process_move_msg({move, my_mte, MoveFullId, OtherMTE} = _Msg, MyState) ->
                 Command = {ok, slide_op:get_type(SlideOp1)},
                 exec_setup_slide_not_found(
                   {dht_node_state:get(State1, neighbors), Command}, State1,
-                  slide_op:get_id(SlideOp1), slide_op:get_node(SlideOp1),
+                  MoveFullId, slide_op:get_node(SlideOp1),
                   slide_op:get_target_id(SlideOp1), slide_op:get_tag(SlideOp1),
                   OtherMTE, slide_op:get_source_pid(SlideOp1), my_mte, {none})
         end,
@@ -223,17 +223,14 @@ process_move_msg({move, change_op, MoveFullId, TargetId, NextOp} = _Msg, MyState
         fun(SlideOp, pred, State) ->
                 SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
                 % simply re-create the slide (TargetId or NextOp have changed)
-                % TODO: fix setup, use exec_setup... (msg_fwd is missing here)
-                NewSlideOp = slide_op:new_slide(
-                               MoveFullId, slide_op:get_type(SlideOp1),
-                               TargetId, slide_op:get_tag(SlideOp1),
-                               slide_op:get_source_pid(SlideOp1),
-                               slide_op:get_other_max_entries(SlideOp1),
-                               NextOp, dht_node_state:get(State, neighbors)),
-                NewSlideOp2 = slide_op:set_setup_at_other(NewSlideOp),
-                NewSlideOp3 = slide_op:set_phase(NewSlideOp2, wait_for_data),
                 State1 = dht_node_state:set_slide(State, pred, null), % just in case
-                notify_other(NewSlideOp3, State1)
+                Command = {ok, slide_op:get_type(SlideOp1)},
+                exec_setup_slide_not_found(
+                  {dht_node_state:get(State1, neighbors), Command}, State1,
+                  MoveFullId, slide_op:get_node(SlideOp1),
+                  TargetId, slide_op:get_tag(SlideOp1),
+                  slide_op:get_other_max_entries(SlideOp1),
+                  slide_op:get_source_pid(SlideOp1), change_op, NextOp)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_change_op], pred, change_op);
 
@@ -672,7 +669,7 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
         TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(),
         OtherMaxTransportEntries::unknown | pos_integer(),
         SourcePid::comm:erl_local_pid() | null,
-        MsgTag::nomsg | slide | slide_get_mte | slide_w_mte | delta_ack | change_id | my_mte,
+        MsgTag::nomsg | slide | slide_get_mte | slide_w_mte | delta_ack | change_id | my_mte | change_op,
         NextOp::slide_op:next_op()) -> dht_node_state:state().
 exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                            TargetId, Tag, OtherMTE, SourcePid, MsgTag, NextOp) ->
