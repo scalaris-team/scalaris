@@ -226,13 +226,15 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
                          orelse
                               (SlideSucc =/= null andalso
                                    slide_op:get_sendORreceive(SlideSucc) =:= 'send' andalso
-                                   intervals:in(Key, slide_op:get_interval(SlideSucc)))) of
+                                   intervals:in(Key, slide_op:get_interval(SlideSucc)))
+                         orelse
+                              intervals:in(Key, dht_node_state:get(State, succ_range))) of
                         true -> ok;
                         false ->
                             log:log(warn,
-                                    "Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  Key:~p",
-                                    [intervals:get_bounds(dht_node_state:get(State, my_range)),
-                                     DBRange2, Key])
+                                    "[ ~.0p ] Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  msgfwd:~p~n  Key:~p",
+                                    [self(), intervals:get_bounds(dht_node_state:get(State, my_range)),
+                                     DBRange2, MsgFwd, Key])
                     end,
                     dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
             end;
