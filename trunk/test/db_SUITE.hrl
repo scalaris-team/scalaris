@@ -1405,8 +1405,8 @@ prop_changed_keys_add_data(Data, ChangesInterval_) ->
     UniqueData = lists:usort(fun(A, B) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
                              end, lists:reverse(Data)),
-    [check_entry_in_changes(DB3, ChangesInterval, E, {false, db_entry:new(db_entry:get_key(E))}, "add_data_2")
-        || E <- UniqueData],
+    _ = [check_entry_in_changes(DB3, ChangesInterval, E, {false, db_entry:new(db_entry:get_key(E))}, "add_data_2")
+           || E <- UniqueData],
     
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "add_data_3"),
 
@@ -1544,16 +1544,22 @@ check_stop_record_changes(DB, ChangesInterval, Note) ->
 -spec check_changes(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Note::string()) -> true.
 check_changes(DB, ChangesInterval, Note) ->
     {ChangedEntries1, DeletedKeys1} = ?TEST_DB:get_changes(DB),
-    (lists:all(fun(E) -> intervals:in(db_entry:get_key(E), ChangesInterval) end,
-               ChangedEntries1) orelse
-         ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                  ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries1,
-                   ChangesInterval, lists:flatten(Note)])) andalso
-    (lists:all(fun(E) -> intervals:in(E, ChangesInterval) end, DeletedKeys1) orelse
-         ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                  ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys1,
-                   ChangesInterval, lists:flatten(Note)])) andalso
-    check_changes2(DB, ChangesInterval, ChangesInterval, Note) andalso
+    case lists:all(fun(E) -> intervals:in(db_entry:get_key(E), ChangesInterval) end,
+               ChangedEntries1) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries1,
+                      ChangesInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    case lists:all(fun(E) -> intervals:in(E, ChangesInterval) end, DeletedKeys1) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys1,
+                      ChangesInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    check_changes2(DB, ChangesInterval, ChangesInterval, Note),
     % select some random key from the changed entries and try get_changes/2
     % with an interval that does not contain this key
     case ChangedEntries1 =/= [] orelse DeletedKeys1 =/= [] of
@@ -1572,15 +1578,22 @@ check_changes(DB, ChangesInterval, Note) ->
 check_changes2(DB, ChangesInterval, GetChangesInterval, Note) ->
     {ChangedEntries2, DeletedKeys2} = ?TEST_DB:get_changes(DB, GetChangesInterval),
     FinalInterval = intervals:intersection(ChangesInterval, GetChangesInterval),
-    (lists:all(fun(E) -> intervals:in(db_entry:get_key(E), FinalInterval) end,
-               ChangedEntries2) orelse
-         ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                  ["element(1, ?TEST_DB:get_changes(DB, FinalInterval))",
-                   ChangedEntries2, FinalInterval, lists:flatten(Note)])) andalso
-    (lists:all(fun(E) -> intervals:in(E, FinalInterval) end, DeletedKeys2) orelse
-         ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                  ["element(2, ?TEST_DB:get_changes(DB, FinalInterval))",
-                   DeletedKeys2, FinalInterval, lists:flatten(Note)])).
+    case lists:all(fun(E) -> intervals:in(db_entry:get_key(E), FinalInterval) end,
+               ChangedEntries2) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(1, ?TEST_DB:get_changes(DB, FinalInterval))",
+                      ChangedEntries2, FinalInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    case lists:all(fun(E) -> intervals:in(E, FinalInterval) end, DeletedKeys2) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(2, ?TEST_DB:get_changes(DB, FinalInterval))",
+                      DeletedKeys2, FinalInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    true.
 
 %% @doc Checks that a key is present exactly once in the list of deleted
 %%      keys returned by ?TEST_DB:get_changes/1 if no lock is set on a
@@ -1594,9 +1607,12 @@ check_key_in_deleted(DB, ChangesInterval, Key, {OldExists, OldEntry}, Note) ->
                   db_entry:get_readlock(OldEntry) =:= 0) of
         true ->
             {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
-            length([K || K <- DeletedKeys, K =:= Key]) =:= 1 orelse
-                ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated to \"~w\" and did not contain 1x key ~w~n(~s)~n",
-                  [DeletedKeys, Key, lists:flatten(Note)]);
+            case length([K || K <- DeletedKeys, K =:= Key]) of
+                1 -> true;
+                _ -> ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated "
+                              "to \"~w\" and did not contain 1x key ~w~n(~s)~n",
+                              [DeletedKeys, Key, lists:flatten(Note)])
+            end;
         _    -> true
     end.
 
@@ -1610,9 +1626,12 @@ check_keys_in_deleted(DB, ChangesInterval, Keys, Note) ->
     [begin
          case intervals:in(Key, ChangesInterval) andalso OldExists of
              true ->
-                 length([K || K <- DeletedKeys, K =:= Key]) =:= 1 orelse
-                     ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated to \"~w\" and did not contain 1x key ~w~n(~s)~n",
-                              [DeletedKeys, Key, lists:flatten(Note)]);
+                 case length([K || K <- DeletedKeys, K =:= Key]) of
+                     1 -> ok;
+                     _ -> ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated "
+                                   "to \"~w\" and did not contain 1x key ~w~n(~s)~n",
+                                   [DeletedKeys, Key, lists:flatten(Note)])
+                 end;
              _    -> true
          end
      end || {Key, OldExists} <- Keys],
@@ -1622,16 +1641,18 @@ check_keys_in_deleted(DB, ChangesInterval, Keys, Note) ->
 %%      entries returned by ?TEST_DB:get_changes/1.
 -spec check_entry_in_changes(
         DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Entry::db_entry:entry(),
-        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> any().
+        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> ok.
 check_entry_in_changes(DB, ChangesInterval, NewEntry, {_OldExists, OldEntry}, Note) ->
     case intervals:in(db_entry:get_key(NewEntry), ChangesInterval) andalso 
              OldEntry =/= NewEntry of
         true ->
             {ChangedEntries, _DeletedKeys} = ?TEST_DB:get_changes(DB),
-            length([E || E <- ChangedEntries, E =:= NewEntry]) =:= 1  orelse
-                ?ct_fail("~s evaluated to \"~w\" and did not contain 1x entry ~w~n(~s)~n",
-                  ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries,
-                   NewEntry, lists:flatten(Note)]);
+            case length([E || E <- ChangedEntries, E =:= NewEntry]) of
+                1 -> ok;
+                _ -> ?ct_fail("~s evaluated to \"~w\" and did not contain 1x entry ~w~n(~s)~n",
+                              ["element(1, ?TEST_DB:get_changes(DB))",
+                               ChangedEntries, NewEntry, lists:flatten(Note)])
+            end;
         _    -> ok
     end.
 

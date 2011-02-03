@@ -76,7 +76,8 @@ start_link(DHTNodeGroup, Options) ->
 
 -spec init(Options::[tuple()]) -> state().
 init(Options) ->
-    module_state_to_my_state(dht_node:init(Options), {state, dht_node, on, null, []}).
+    ModuleState = dht_node:init(Options),
+    module_state_to_my_state(ModuleState, {state, dht_node, on, ModuleState, []}).
 
 -spec module_state_to_my_state(module_state(), state()) -> state().
 module_state_to_my_state(ModuleState, {state, Module, OldHandler, _, NewMatchSpecs}) ->
