@@ -261,6 +261,8 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
         %%   FIFO order has to be maintained for both (separately)
         %%%%%%%%%%%%%%%%%%%%
         {'$gen_component', kill} ->
+            log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
+                    [self(), Module, On]),
             ok;
         GenComponentMessage
           when is_tuple(GenComponentMessage),
@@ -311,7 +313,10 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                                              TmpComponentState, Module, On),
                     NextComponentState = bp_step_done(Module, On, Message, NewComponentState),
                     loop(Module, On, NewState, NextComponentState);
-                kill -> ok;
+                kill ->
+                    log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
+                            [self(), Module, On]),
+                    ok;
                 {'$gen_component', Config, NewState} ->
                     {on_handler, NewHandler} =
                         lists:keyfind(on_handler, 1, Config),
