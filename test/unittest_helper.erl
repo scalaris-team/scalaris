@@ -32,7 +32,8 @@
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
          get_all_children/1,
-         get_processes/0, init_per_suite/1, end_per_suite/1,
+         get_processes/0, kill_new_processes/1,
+         init_per_suite/1, end_per_suite/1,
          get_ring_data/0, print_ring_data/0]).
 
 -include("scalaris.hrl").
@@ -66,7 +67,7 @@ make_ring_with_ids(Ids, Options) when is_list(Ids) ->
 make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     % note: do not call IdsFun before the initial setup
     %       (it might use config or another process)
-    fix_cwd(),
+    _ = fix_cwd(),
     error_logger:tty(true),
     case ets:info(config_ets) of
         undefined -> ok;
@@ -77,7 +78,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     ct:pal("Trying to build Scalaris~n"),
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
-                    pid_groups:start_link(),
+                    _ = pid_groups:start_link(),
                     NewOptions =
                         [case Option of
                              {config, KVList} ->
@@ -91,11 +92,11 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                                   lists:append(KVList1, [{empty_node, true}])};
                              X -> X
                          end || Option <- Options],
-                    sup_scalaris:start_link(boot, NewOptions),
+                    _ = sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
                     Ids = IdsFun(), % config may be needed
-                    admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
-                    [admin:add_node_at_id(Id) || Id <- tl(Ids)],
+                    _ = admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
+                    _ = [admin:add_node_at_id(Id) || Id <- tl(Ids)],
                     ok
             end),
 %%     timer:sleep(1000),
@@ -119,7 +120,7 @@ make_ring(Size) ->
 %%      a {config, [{Key, Value},...]} option.
 -spec make_ring(Size::pos_integer(), Options::[tuple()]) -> pid().
 make_ring(Size, Options) ->
-    fix_cwd(),
+    _ = fix_cwd(),
     error_logger:tty(true),
     case ets:info(config_ets) of
         undefined -> ok;
@@ -130,7 +131,7 @@ make_ring(Size, Options) ->
                     ct:pal("Trying to build Scalaris~n"),
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
-                    pid_groups:start_link(),
+                    _ = pid_groups:start_link(),
                     NewOptions =
                         [case Option of
                              {config, KVList} ->
@@ -142,9 +143,9 @@ make_ring(Size, Options) ->
                                  {config, KVList1};
                              X -> X
                          end || Option <- Options],
-                    sup_scalaris:start_link(boot, NewOptions),
+                    _ = sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
-                    admin:add_nodes(Size - 1),
+                    _ = admin:add_nodes(Size - 1),
                     ok
             end),
 %%     timer:sleep(1000),
@@ -179,7 +180,7 @@ stop_ring(Pid) ->
             % still rely on it
 %%             randoms:stop(),
 %%             inets:stop(),
-            catch unregister(ct_test_ring),
+            catch(unregister(ct_test_ring)),
             ok
         end
     catch
@@ -291,30 +292,60 @@ get_all_children(Supervisor) ->
     SupChilds = [Pid || {_Id, Pid, supervisor, _Modules} <- AllChilds],
     lists:flatten([WorkerChilds | [get_all_children(S) || S <- SupChilds]]).
 
--spec get_processes() -> [{pid(), InitCall::mfa(), CurFun::mfa(), Info::term | failed | no_further_infos}].
+-type process_info() ::
+    {pid(), InitCall::mfa(), CurFun::mfa(), Info::term | failed | no_further_infos}.
+
+-spec get_processes() -> [process_info()].
 get_processes() ->
-    _Processes = [begin
-                      InitCall = element(2, lists:keyfind(initial_call, 1, Data)),
-                      CurFun = element(2, lists:keyfind(current_function, 1, Data)),
-                      Info =
-                          case {InitCall, CurFun} of
-                              {{gen_component, _, _}, {gen_component, _, _}} ->
-                                  gen_component:get_component_state(X);
-                              {_, {file_io_server, _, _}} ->
-                                  case file:pid2name(X) of
-                                      undefined -> {file, undefined};
-                                      {ok, FileName} -> {file, FileName};
-                                      FileName -> {file, FileName}
-                                  end;
-                              {_, {gen_server, _, _}} ->
-                                  sys:get_status(X);
-                              _ -> no_further_infos
-                          end,
-                      {X, InitCall, CurFun, Info}
+    [begin
+         InitCall = element(2, lists:keyfind(initial_call, 1, Data)),
+         CurFun = element(2, lists:keyfind(current_function, 1, Data)),
+         Info =
+             case {InitCall, CurFun} of
+                 {{gen_component, _, _}, {gen_component, _, _}} ->
+                     gen_component:get_component_state(X);
+                 {_, {file_io_server, _, _}} ->
+                     case file:pid2name(X) of
+                         undefined -> {file, undefined};
+                         {ok, FileName} -> {file, FileName};
+                         FileName -> {file, FileName}
+                     end;
+                 {_, {gen_server, _, _}} ->
+                     sys:get_status(X);
+                 _ -> no_further_infos
+             end,
+         {X, InitCall, CurFun, Info}
+     end
+     || X <- processes(),
+        Data <- [process_info(X, [current_function, initial_call])],
+        Data =/= undefined].
+
+-spec kill_new_processes(OldProcesses::[process_info()]) -> ok.
+kill_new_processes(OldProcesses) ->
+    NewProcesses = get_processes(),
+    {_OnlyOld, _Both, OnlyNew} =
+        util:split_unique(OldProcesses, NewProcesses,
+                          fun(P1, P2) ->
+                                  element(1, P1) =< element(1, P2)
+                          end, fun(_P1, P2) -> P2 end),
+%%     ct:pal("Proc-Old: ~.0p~n", [_OnlyOld]),
+%%     ct:pal("Proc-Both: ~.0p~n", [_Both]),
+%%     ct:pal("Proc-New: ~.0p~n", [_OnlyNew]),
+    Killed = [begin
+%%                   ct:pal("killing ~.0p", [Proc]),
+                  try erlang:exit(X, kill) of
+                      true -> wait_for_process_to_die(X),
+                              {ok, Proc}
+                  catch _:_ -> {fail, Proc}
                   end
-                  || X <- processes(),
-                     Data <- [process_info(X, [current_function, initial_call])],
-                     Data =/= undefined].
+              end || {X, InitCall, CurFun, _Info} = Proc <- OnlyNew,
+                     not (InitCall =:= {test_server_sup, timetrap, 3} andalso
+                              CurFun =:= {test_server_sup, timetrap, 3}),
+                     not (InitCall =:= {test_server_sup, timetrap, 2} andalso
+                              CurFun =:= {test_server_sup, timetrap, 2}),
+                     X =/= self(),
+                     element(1, CurFun) =/= file_io_server],
+    ct:pal("Killed processes: ~.0p", [Killed]).
 
 %% @doc Generic init_per_suite for all unit tests. Prints current state
 %%      information and stores information about all running processes.
@@ -341,31 +372,9 @@ end_per_suite(Config) ->
     unittest_helper:stop_ring(),
     % the following might still be running in case there was no ring:
     randoms:stop(),
-    inets:stop(),
+    _ = inets:stop(),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
-    NewProcesses = get_processes(),
-    {_OnlyOld, _Both, OnlyNew} = util:split_unique(OldProcesses, NewProcesses,
-                                                 fun(P1, P2) ->
-                                                         element(1, P1) =< element(1, P2)
-                                                 end, fun(_P1, P2) -> P2 end),
-%%     ct:pal("Old: ~.0p~n", [OnlyOld]),
-%%     ct:pal("Both: ~.0p~n", [Both]),
-%%     ct:pal("New: ~.0p~n", [OnlyNew]),
-    Killed = [begin
-%%                   ct:pal("killing ~.0p", [Proc]),
-                  try erlang:exit(X, kill) of
-                      true -> wait_for_process_to_die(X),
-                              {ok, Proc}
-                  catch _:_ -> {fail, Proc}
-                  end
-              end || {X, InitCall, CurFun, _Info} = Proc <- OnlyNew,
-                     not (InitCall =:= {test_server_sup, timetrap, 3} andalso
-                              CurFun =:= {test_server_sup, timetrap, 3}),
-                     not (InitCall =:= {test_server_sup, timetrap, 2} andalso
-                              CurFun =:= {test_server_sup, timetrap, 2}),
-                     X =/= self(),
-                     element(1, CurFun) =/= file_io_server],
-    ct:pal("Killed processes: ~.0p", [Killed]),
+    kill_new_processes(OldProcesses),
     Config.
 
 -spec get_ring_data() -> [{{intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, ?DB:db_as_list(), ok | timeout}].

@@ -26,13 +26,13 @@
 %%      given Date formatted using the Format string (see io_lib:format/2).
 %% -spec ct_fail(Format::atom() | string() | binary(), Data::[term()]) -> no_return().
 -define(ct_fail(Format, Data),
-        fun() ->
-                case erlang:whereis(ct_test_ring) of
-                    undefined -> ok;
-                    _         -> unittest_helper:print_ring_data()
-                end,
-                ct:fail(lists:flatten(io_lib:format(Format, Data)))
-        end()).
+        % if possible, do not use a function to silence dialyzer warnings about
+        % functions with no return
+        case erlang:whereis(ct_test_ring) of
+            undefined -> ok;
+            _         -> unittest_helper:print_ring_data()
+        end,
+        ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 
 -define(assert(Boolean),
         case Boolean of

@@ -42,7 +42,7 @@
 -type match_head_7() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
 -type match_head_8() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
 -type match_head_9() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
--type match_condition() :: none().
+%% -type match_condition() :: none().
 -type match_counter() :: pos_integer() | infinity.
 -type match_action_wc() :: drop_msg | fun((Msg::comm:message(), ModuleState) -> ModuleState).
 -type match_action_1() :: drop_msg | fun((Msg::{atom()}, ModuleState) -> ModuleState).
@@ -55,16 +55,16 @@
 -type match_action_8() :: drop_msg | fun((Msg::{atom(), term(), term(), term(), term(), term(), term(), term()}, ModuleState) -> ModuleState).
 -type match_action_9() :: drop_msg | fun((Msg::{atom(), term(), term(), term(), term(), term(), term(), term(), term()}, ModuleState) -> ModuleState).
 -type match_spec() ::
-    {Head::match_head_wc(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_wc()} |
-    {Head::match_head_1(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_1()} |
-    {Head::match_head_2(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_2()} |
-    {Head::match_head_3(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_3()} |
-    {Head::match_head_4(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_4()} |
-    {Head::match_head_5(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_5()} |
-    {Head::match_head_6(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_6()} |
-    {Head::match_head_7(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_7()} |
-    {Head::match_head_8(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_8()} |
-    {Head::match_head_9(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_9()}.
+    {Head::match_head_wc(), Conditions::[], Count::match_counter(), Action::match_action_wc()} |
+    {Head::match_head_1(), Conditions::[], Count::match_counter(), Action::match_action_1()} |
+    {Head::match_head_2(), Conditions::[], Count::match_counter(), Action::match_action_2()} |
+    {Head::match_head_3(), Conditions::[], Count::match_counter(), Action::match_action_3()} |
+    {Head::match_head_4(), Conditions::[], Count::match_counter(), Action::match_action_4()} |
+    {Head::match_head_5(), Conditions::[], Count::match_counter(), Action::match_action_5()} |
+    {Head::match_head_6(), Conditions::[], Count::match_counter(), Action::match_action_6()} |
+    {Head::match_head_7(), Conditions::[], Count::match_counter(), Action::match_action_7()} |
+    {Head::match_head_8(), Conditions::[], Count::match_counter(), Action::match_action_8()} |
+    {Head::match_head_9(), Conditions::[], Count::match_counter(), Action::match_action_9()}.
 
 -spec match_any(Msg::comm:message(), MatchSpecs::[match_spec()]) -> false | {true, Match::match_spec(), NewMatchSpecs::[match_spec()]}.
 match_any(Msg, MatchSpecs) ->
