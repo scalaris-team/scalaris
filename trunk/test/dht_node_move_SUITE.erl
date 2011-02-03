@@ -275,43 +275,47 @@ symm4_slide_pred_rcv_load_v2_incremental(Config) ->
 % keep in sync with dht_node_move and the timeout config parameters set in set_move_config_parameters/0
 -type move_message() ::
 %{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()}})
-    {{move, slide, '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+    {{move, slide, '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
 %{move, slide_get_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
-    {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+    {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
 %{move, slide_w_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
-    {{move, slide_w_mte, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+    {{move, slide_w_mte, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
 %{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op()} |
-    {{move, slide, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2} |
+    {{move, slide, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
 %{move, my_mte, MoveFullId::slide_op:id(), MaxTransportEntries::pos_integer()} | % max transport entries from a partner
-    {{move, my_mte, '_', '_'}, [], 1..2} |
+    {{move, my_mte, '_', '_'}, [], 1..2, drop_msg} |
 %{move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
-    {{move, change_op, '_', '_', '_'}, [], 1..2} |
+    {{move, change_op, '_', '_', '_'}, [], 1..2, drop_msg} |
 %{move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide
-    {{move, change_id, '_'}, [], 1..2} |
+    {{move, change_id, '_'}, [], 1..2, drop_msg} |
 %{move, change_id, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from succ to pred if pred has already set up the slide but succ made it an incremental slide
-    {{move, change_id, '_', '_', '_'}, [], 1..2} |
+    {{move, change_id, '_', '_', '_'}, [], 1..2, drop_msg} |
 %{move, slide_abort, pred | succ, MoveFullId::slide_op:id(), Reason::abort_reason()} |
-    {{move, slide_abort, '_', '_', '_'}, [], 1} |
+    {{move, slide_abort, '_', '_', '_'}, [], 1, drop_msg} |
 % note: do not loose local messages:
 %{move, node_update, Tag::{move, slide_op:id()}} | % message from RM that it has changed the node's id to TargetId
 %{move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
 %{move, req_data, MoveFullId::slide_op:id()} |
-    {{move, req_data, '_'}, [], 1..2} |
+    {{move, req_data, '_'}, [], 1..2, drop_msg} |
 %{move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id()} |
-    {{move, data, '_', '_'}, [], 1..5} |
+    {{move, data, '_', '_'}, [], 1..5, drop_msg} |
 %{move, data_ack, MoveFullId::slide_op:id()} |
-    {{move, data_ack, '_'}, [], 1..5} |
+    {{move, data_ack, '_'}, [], 1..5, drop_msg} |
 %{move, delta, ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
-    {{move, delta, '_', '_', '_'}, [], 1..5} |
+    {{move, delta, '_', '_', '_'}, [], 1..5, drop_msg} |
 %{move, delta_ack, MoveFullId::slide_op:id()} |
 % note: this would result in the slide op being aborted with send_delta_timeout
 %       since only send_delta_timeout will handle this but at this point, the
 %       other node will not have this slide op anymore
-%    {{move, delta_ack, '_'}, [], 1..2} |
+%    {{move, delta_ack, '_'}, [], 1..2, drop_msg} |
 %{move, delta_ack, MoveFullId::slide_op:id(), continue, NewSlideId::slide_op:id()} |
-    {{move, delta_ack, '_', continue, '_'}, [], 1..2} |
+    {{move, delta_ack, '_', continue, '_'}, [], 1..2, drop_msg} |
 %{move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
-    {{move, delta_ack, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2}.
+    {{move, delta_ack, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg}.
+% note: do not loose local messages:
+%{move, rm_db_range, MoveFullId::slide_op:id()} |
+% note: there's no timeout for this message
+%{move, done, MoveFullId::slide_op:id()} |
 
 %% @doc Makes IgnoredMessages unique, i.e. only one msg per msg type.
 -spec fix_tester_ignored_msg_list(IgnoredMessages::[move_message(),...]) -> [move_message(),...].
@@ -324,7 +328,7 @@ fix_tester_ignored_msg_list(IgnoredMessages) ->
 -spec send_ignore_msg_list_to(NthNode::1..4, PredOrSuccOrNode::pred | succ | node, IgnoredMessages::[move_message(),...]) -> ok.
 send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     
     FailMsg = lists:flatten(io_lib:format("~.0p (~B.*) ignoring messages: ~.0p",
@@ -335,7 +339,7 @@ send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
                 pred -> Pred;
                 node -> Node
             end,
-    comm:send(node:pidX(Other), {mockup_dht_node, add_drop_specs, IgnoredMessages}).
+    comm:send(node:pidX(Other), {mockup_dht_node, add_match_specs, IgnoredMessages}).
 
 %% @doc Test slide with successor, receiving data from it (using cs_api_v2 in the bench server), ignore (some) messages on succ.
 -spec prop_symm4_slide_succ_rcv_load_timeouts_succ_v2(IgnoredMessages::[move_message(),...]) -> true.
@@ -352,7 +356,7 @@ prop_symm4_slide_succ_rcv_load_timeouts_succ_v2(IgnoredMessages_) ->
     symm4_slide1_load_test(4, succ, "slide_succ_rcv_timeouts_succ_v2", fun succ_id_fun1/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 
@@ -371,7 +375,7 @@ prop_symm4_slide_succ_rcv_load_timeouts_node_v2(IgnoredMessages_) ->
     symm4_slide1_load_test(4, succ, "slide_succ_rcv_timeouts_node_v2", fun succ_id_fun1/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 
@@ -430,7 +434,7 @@ prop_symm4_slide_succ_send_load_timeouts_succ_v2(IgnoredMessages_) ->
     symm4_slide2_load_test(4, succ, "slide_succ_send_timeouts_succ_v2", fun succ_id_fun2/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 
@@ -449,7 +453,7 @@ prop_symm4_slide_succ_send_load_timeouts_node_v2(IgnoredMessages_) ->
     symm4_slide2_load_test(4, succ, "slide_succ_send_timeouts_node_v2", fun succ_id_fun2/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 
@@ -508,7 +512,7 @@ prop_symm4_slide_pred_send_load_timeouts_pred_v2(IgnoredMessages_) ->
     symm4_slide1_load_test(4, pred, "slide_pred_send_timeouts_pred_v2", fun pred_id_fun1/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 
@@ -527,7 +531,7 @@ prop_symm4_slide_pred_send_load_timeouts_node_v2(IgnoredMessages_) ->
     symm4_slide1_load_test(4, pred, "slide_pred_send_timeouts_node_v2", fun pred_id_fun1/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 
@@ -586,7 +590,7 @@ prop_symm4_slide_pred_rcv_load_timeouts_pred_v2(IgnoredMessages_) ->
     symm4_slide2_load_test(4, pred, "slide_pred_rcv_timeouts_pred_v2", fun pred_id_fun2/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 
@@ -605,7 +609,7 @@ prop_symm4_slide_pred_rcv_load_timeouts_node_v2(IgnoredMessages_) ->
     symm4_slide2_load_test(4, pred, "slide_pred_rcv_timeouts_node_v2", fun pred_id_fun2/2, 1),
     
     % cleanup, just in case:
-    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_drop_specs})
+    _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
     true.
 

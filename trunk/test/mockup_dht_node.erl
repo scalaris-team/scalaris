@@ -13,7 +13,8 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc    A dht_node mockup that can ignore some messages.
+%% @doc    A dht_node mockup that can ignore some messages or process them
+%%         differently compared to dht_node.
 %% @end
 %% @version $Id$
 -module(mockup_dht_node).
@@ -28,8 +29,8 @@
 
 -type message() ::
         comm:message() |
-        {mockup_dht_node, add_drop_specs, DropSpecs::[mockup:match_spec()]} |
-        {mockup_dht_node, clear_drop_specs}.
+        {mockup_dht_node, add_match_specs, DropSpecs::[mockup:match_spec()]} |
+        {mockup_dht_node, clear_match_specs}.
 -type module_state() ::
         dht_node_join:join_state() | dht_node_state:state() |
         {'$gen_component', [{on_handler, Handler::on}], dht_node_state:state()} | 
@@ -44,23 +45,28 @@
         ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p~n", [self(), Msg, State])).
 
 -spec on(message(), state()) -> state().
-on(_Msg = {mockup_dht_node, add_drop_specs, DropSpecs},
+on(_Msg = {mockup_dht_node, add_match_specs, DropSpecs},
     _State = {state, Module, Handler, ModuleState, MsgDropSpecs}) ->
     ?TRACE1(_Msg, _State),
     {state, Module, Handler, ModuleState, lists:append(MsgDropSpecs, DropSpecs)};
-on(_Msg = {mockup_dht_node, clear_drop_specs},
+on(_Msg = {mockup_dht_node, clear_match_specs},
     _State = {state, Module, Handler, ModuleState, _MsgDropSpecs}) ->
     ?TRACE1(_Msg, _State),
     {state, Module, Handler, ModuleState, []};
-on(Msg, _State = {state, Module, Handler, ModuleState, MsgDropSpecs}) ->
-%%     ?TRACE1(Msg, _State),
+on(Msg, State = {state, Module, Handler, ModuleState, MsgDropSpecs}) ->
+%%     ?TRACE1(Msg, State),
     case mockup:match_any(Msg, MsgDropSpecs) of
-        {true, NewMatchSpecs} ->
+        {true, {_Head, _Conditions, _Count, drop_msg}, NewMatchSpecs} ->
             ?TRACE("[ ~.0p ] ignoring ~.0p~n", [self(), Msg]),
             {state, Module, Handler, ModuleState, NewMatchSpecs};
-        {false, NewMatchSpecs} ->
+        {true, {_Head, _Conditions, _Count, ActionFun}, NewMatchSpecs}
+          when is_function(ActionFun) ->
+            ?TRACE("[ ~.0p ] calling ~.0p for message ~.0p~n", [self(), ActionFun, Msg]),
+            NewModuleState = ActionFun(Msg, ModuleState),
+            module_state_to_my_state(NewModuleState, {state, Module, Handler, ModuleState, NewMatchSpecs});
+        false ->
             NewModuleState = Module:Handler(Msg, ModuleState),
-            module_state_to_my_state(NewModuleState, {state, Module, Handler, ModuleState, NewMatchSpecs})
+            module_state_to_my_state(NewModuleState, State)
     end.
 
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
