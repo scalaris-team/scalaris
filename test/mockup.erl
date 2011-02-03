@@ -31,47 +31,66 @@
 -type match_variable() ::
     '$1' | '$2' | '$3' | '$4' | '$5' | '$6' | '$7' | '$8' | '$9'.
 -type match_head_part() ::  '_' | match_variable() |term().
--type match_head() ::
-    '_' |
-    % note: currently only defined up to 9-tuples
-    {match_head_part()} |
-    {match_head_part(), match_head_part()} |
-    {match_head_part(), match_head_part(), match_head_part()} |
-    {match_head_part(), match_head_part(), match_head_part(), match_head_part()} |
-    {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()} |
-    {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()} |
-    {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()} |
-    {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()} |
-    {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
+-type match_head_wc() :: '_'.
+% note: head and actions currently only defined up to 9-tuples
+-type match_head_1() :: {match_head_part()}.
+-type match_head_2() :: {match_head_part(), match_head_part()}.
+-type match_head_3() :: {match_head_part(), match_head_part(), match_head_part()}.
+-type match_head_4() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
+-type match_head_5() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
+-type match_head_6() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
+-type match_head_7() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
+-type match_head_8() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
+-type match_head_9() :: {match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part(), match_head_part()}.
 -type match_condition() :: none().
 -type match_counter() :: pos_integer() | infinity.
--type match_spec() :: {Head::match_head(), Conditions::[match_condition()], Count::match_counter()}.
+-type match_action_wc() :: drop_msg | fun((Msg::comm:message(), ModuleState) -> ModuleState).
+-type match_action_1() :: drop_msg | fun((Msg::{atom()}, ModuleState) -> ModuleState).
+-type match_action_2() :: drop_msg | fun((Msg::{atom(), term()}, ModuleState) -> ModuleState).
+-type match_action_3() :: drop_msg | fun((Msg::{atom(), term(), term()}, ModuleState) -> ModuleState).
+-type match_action_4() :: drop_msg | fun((Msg::{atom(), term(), term(), term()}, ModuleState) -> ModuleState).
+-type match_action_5() :: drop_msg | fun((Msg::{atom(), term(), term(), term(), term()}, ModuleState) -> ModuleState).
+-type match_action_6() :: drop_msg | fun((Msg::{atom(), term(), term(), term(), term(), term()}, ModuleState) -> ModuleState).
+-type match_action_7() :: drop_msg | fun((Msg::{atom(), term(), term(), term(), term(), term(), term()}, ModuleState) -> ModuleState).
+-type match_action_8() :: drop_msg | fun((Msg::{atom(), term(), term(), term(), term(), term(), term(), term()}, ModuleState) -> ModuleState).
+-type match_action_9() :: drop_msg | fun((Msg::{atom(), term(), term(), term(), term(), term(), term(), term(), term()}, ModuleState) -> ModuleState).
+-type match_spec() ::
+    {Head::match_head_wc(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_wc()} |
+    {Head::match_head_1(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_1()} |
+    {Head::match_head_2(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_2()} |
+    {Head::match_head_3(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_3()} |
+    {Head::match_head_4(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_4()} |
+    {Head::match_head_5(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_5()} |
+    {Head::match_head_6(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_6()} |
+    {Head::match_head_7(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_7()} |
+    {Head::match_head_8(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_8()} |
+    {Head::match_head_9(), Conditions::[match_condition()], Count::match_counter(), Action::match_action_9()}.
 
--spec match_any(Msg::comm:message(), MatchSpecs::[match_spec()]) -> {boolean(), NewMatchSpecs::[match_spec()]}.
+-spec match_any(Msg::comm:message(), MatchSpecs::[match_spec()]) -> false | {true, Match::match_spec(), NewMatchSpecs::[match_spec()]}.
 match_any(Msg, MatchSpecs) ->
     match_any(Msg, MatchSpecs, []).
 
--spec match_any(Msg::comm:message(), MatchSpecs::[match_spec()], ProcessedMatchSpecs::[match_spec()]) -> {boolean(), NewMatchSpecs::[match_spec()]}.
-match_any(_Msg, [], ProcessedMatchSpecs) ->
-    {false, lists:reverse(ProcessedMatchSpecs)};
-match_any(Msg, MatchSpecs = [First = {Head, Conditions, Count} | Rest], ProcessedMatchSpecs) ->
+-spec match_any(Msg::comm:message(), MatchSpecs::[match_spec()], ProcessedMatchSpecs::[match_spec()]) -> false | {true, Match::match_spec(), NewMatchSpecs::[match_spec()]}.
+match_any(_Msg, [], _ProcessedMatchSpecs) ->
+    false;
+match_any(Msg, MatchSpecs = [First = {Head, Conditions, Count, Action} | Rest], ProcessedMatchSpecs) ->
     case match(Msg, First) of
         false ->
             match_any(Msg, Rest, [First | ProcessedMatchSpecs]);
         true when Count =:= infinity ->
-            {true, lists:append(ProcessedMatchSpecs, MatchSpecs)};
+            {true, First, lists:append(ProcessedMatchSpecs, MatchSpecs)};
         true when (Count - 1) > 0 ->
-            {true, lists:append([ProcessedMatchSpecs, [{Head, Conditions, Count - 1}], Rest])};
+            {true, First, lists:append([ProcessedMatchSpecs, [{Head, Conditions, Count - 1, Action}], Rest])};
         true ->
-            {true, lists:append([ProcessedMatchSpecs, Rest])}
+            {true, First, lists:append([ProcessedMatchSpecs, Rest])}
     end.
 
 -spec match(Msg::comm:message(), match_spec()) -> boolean().
-match(_Msg, {'_', _Conditions = [], _Count}) ->
+match(_Msg, {'_', _Conditions = [], _Count, _Action}) ->
     true;
-match(Msg, {Head, _Conditions = [], _Count}) when tuple_size(Msg) =/= tuple_size(Head) ->
+match(Msg, {Head, _Conditions = [], _Count, _Action}) when tuple_size(Msg) =/= tuple_size(Head) ->
     false;
-match(Msg, {Head, _Conditions = [], _Count}) ->
+match(Msg, {Head, _Conditions = [], _Count, _Action}) ->
     lists:all(fun(X) ->
                       match_head(Msg, erlang:element(X, Msg), erlang:element(X, Head))
               end, lists:seq(1, tuple_size(Msg))).
