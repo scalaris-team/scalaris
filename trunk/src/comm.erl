@@ -37,7 +37,6 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--include("transstore/trecords.hrl").
 -include("scalaris.hrl").
 
 %% Sending messages
