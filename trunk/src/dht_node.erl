@@ -181,7 +181,10 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
                      case supervisor:start_child(SupTx, RTM_desc) of
                          {ok, TmpPid} -> TmpPid;
                          {ok, TmpPid, _} -> TmpPid;
-                         {error, _} ->
+                         {error, {already_started, TmpPid}} -> TmpPid;
+                         {error, Reason} ->
+                             log:log(warn, "[ ~.0p ] tx_tm_rtm start_child failed: ~.0p~n",
+                                     [comm:this(), Reason]),
                              msg_delay:send_local(1, self(), {get_rtm, Source_PID, Key, Process}),
                              failed
                      end;
