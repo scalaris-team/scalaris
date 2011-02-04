@@ -153,9 +153,12 @@ prop_plus_valid_base(A_, B_, Pos, Base) ->
     {A, B} = math_pos:make_same_length(A_, B_, Pos),
     A_plus_B = math_pos:plus(A, B, Base),
     ?equals(erlang:length(A_plus_B), erlang:length(A)),
-    lists:all(fun(E) -> E >= 0 andalso E < Base end, A_plus_B) orelse
-        ?ct_fail("math_pos:plus(A, B, ~B) evaluated to \"~.0p\" and contains invalid elements~n",
-                 [Base, A_plus_B]).
+    case lists:all(fun(E) -> E >= 0 andalso E < Base end, A_plus_B) of
+        true -> true;
+        _ -> ?ct_fail("math_pos:plus(A, B, ~B) evaluated to \"~.0p\" and "
+                      "contains invalid elements~n",
+                      [Base, A_plus_B])
+    end.
 
 -spec prop_plus_valid1(A::[0..9], B::[0..9]) -> true.
 prop_plus_valid1(A_, B_) -> prop_plus_valid_base(A_, B_, front, 10).
@@ -204,9 +207,12 @@ prop_minus_valid_base(A_, B_, Pos, Base) ->
     {A, B} = math_pos:make_same_length(A_, B_, Pos),
     A_minus_B = math_pos:minus(A, B, Base),
     ?equals(erlang:length(A_minus_B), erlang:length(A)),
-    lists:all(fun(E) -> E >= 0 andalso E < Base end, A_minus_B) orelse
-        ?ct_fail("math_pos:minus(A, B, ~B) evaluated to \"~.0p\" and contains invalid elements~n",
-                 [Base, A_minus_B]).
+    case lists:all(fun(E) -> E >= 0 andalso E < Base end, A_minus_B) of
+        true -> true;
+        _ -> ?ct_fail("math_pos:minus(A, B, ~B) evaluated to \"~.0p\" and "
+                      "contains invalid elements~n",
+                      [Base, A_minus_B])
+    end.
 
 -spec prop_minus_valid1(A::[0..9], B::[0..9]) -> true.
 prop_minus_valid1(A_, B_) -> prop_minus_valid_base(A_, B_, front, 10).
@@ -256,9 +262,12 @@ tester_minus(_Config) ->
 prop_divide_valid_base(A, Div, Base) ->
     A_div = math_pos:divide(A, Div, Base),
     ?equals(erlang:length(A_div), erlang:length(A)),
-    lists:all(fun(E) -> E >= 0 andalso E < Base end, A_div) orelse
-        ?ct_fail("math_pos:divide(A, Div, ~B) evaluated to \"~.0p\" and contains invalid elements~n",
-                 [Base, A_div]).
+    case lists:all(fun(E) -> E >= 0 andalso E < Base end, A_div) of
+        true -> true;
+        _ -> ?ct_fail("math_pos:divide(A, Div, ~B) evaluated to \"~.0p\" and "
+                      "contains invalid elements~n",
+                      [Base, A_div])
+    end.
 
 -spec prop_divide_valid1(A::[0..9], Div::pos_integer()) -> true.
 prop_divide_valid1(A, Div) -> prop_divide_valid_base(A, Div, 10).
@@ -283,9 +292,12 @@ prop_divide_valid(_Config) ->
 prop_multiply_valid_base(A, Fac, Base) ->
     A_prod = math_pos:multiply(A, Fac, Base),
     ?equals(erlang:length(A_prod), erlang:length(A)),
-    lists:all(fun(E) -> E >= 0 andalso E < Base end, A_prod) orelse
-        ?ct_fail("math_pos:multiply(A, Div, ~B) evaluated to \"~.0p\" and contains invalid elements~n",
-                 [Base, A_prod]).
+    case lists:all(fun(E) -> E >= 0 andalso E < Base end, A_prod) of
+        true -> true;
+        _ -> ?ct_fail("math_pos:multiply(A, Div, ~B) evaluated to \"~.0p\" and "
+                      "contains invalid elements~n",
+                      [Base, A_prod])
+    end.
 
 -spec prop_multiply_valid1(A::[0..9], Fac::0..9) -> true.
 prop_multiply_valid1(A, Fac) -> prop_multiply_valid_base(A, Fac, 10).
