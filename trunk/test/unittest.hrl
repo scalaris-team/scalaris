@@ -231,7 +231,7 @@
 %% expect_message_ignore(MsgPattern, IgnoredMessage) ->
 %%     receive
 %%         IgnoredMessage ->
-%%             ct:pal("ignored ~.0p", [IgnoredMessage]),
+%%             ct:pal("ignored ~.0p~n", [IgnoredMessage]),
 %%             expect_message_ignore(MsgPattern, IgnoredMessage);
 %%         MsgPattern ->
 %%             ok

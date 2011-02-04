@@ -247,7 +247,7 @@ parse_type({remote_type, _Line, [{atom, _Line2, TypeModule}, {atom, _line3, Type
 parse_type({type, _Line, 'function', []}, _Module, ParseState) ->
     {{'function'}, ParseState};
 parse_type({type, _Line, TypeName, []}, Module, ParseState) ->
-    %ct:pal("type1 ~p:~p", [Module, TypeName]),
+    %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
     case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
         true ->
             {{typedef, Module, TypeName}, ParseState};
@@ -300,7 +300,7 @@ parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState
     {Constraints, ParseState3} = lists:foldl(Foldl, {[], ParseState2}, ConstraintList),
     {{bounded_fun, InternalFunType, Constraints}, ParseState3};
 parse_type(TypeSpec, Module, ParseState) ->
-    ct:pal("unknown type ~p in module ~p", [TypeSpec, Module]),
+    ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
     {unkown, ParseState}.
 
 -spec parse_type_list/3 :: (list(type_spec()), module(), tester_parse_state:state()) -> {list(type_spec()), tester_parse_state:state()}.

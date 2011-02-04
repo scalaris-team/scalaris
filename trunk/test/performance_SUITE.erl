@@ -371,7 +371,7 @@ iter(Count, F, Tag) ->
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = Count / ElapsedTime,
-    ct:pal("~p iterations of ~p took ~ps: ~p1/s",
+    ct:pal("~p iterations of ~p took ~ps: ~p1/s~n",
            [Count, Tag, ElapsedTime, Frequency]),
     ok.
 
@@ -390,7 +390,7 @@ iter2(Count, F, Tag) ->
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = Count / ElapsedTime,
-    ct:pal("~p iterations of ~p took ~ps: ~p1/s",
+    ct:pal("~p iterations of ~p took ~ps: ~p1/s~n",
            [Count, Tag, ElapsedTime, Frequency]),
     ok.
 
@@ -409,7 +409,7 @@ iter2_foldl(Count, F, Acc0, Tag) ->
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = Count / ElapsedTime,
-    ct:pal("~p foldl iterations of ~p took ~ps: ~p1/s",
+    ct:pal("~p foldl iterations of ~p took ~ps: ~p1/s~n",
            [Count, Tag, ElapsedTime, Frequency]),
     FinalAcc.
 

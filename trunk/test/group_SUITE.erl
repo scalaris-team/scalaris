@@ -147,7 +147,7 @@ build_ring(_Config) ->
                          ok ->
                              true;
                          {failed, Msg} ->
-                             ct:pal("~p", [Msg]),
+                             ct:pal("~p~n", [Msg]),
                              false
                      end
              end),
@@ -179,7 +179,7 @@ build_ring_with_routing(_Config) ->
                          ok ->
                              true;
                          {failed, Msg} ->
-                             ct:pal("~p", [Msg]),
+                             ct:pal("~p~n", [Msg]),
                              false
                      end
              end),
@@ -206,7 +206,7 @@ wait_for(F) ->
 check_versions(ExpectedVersions, Length) ->
     fun () ->
             Versions = [V || {_, V} <- group_debug:dbg_version()],
-            %ct:pal("~p ~p", [lists:usort(Versions), group_debug:dbg_version()]),
+            %ct:pal("~p ~p~n", [lists:usort(Versions), group_debug:dbg_version()]),
             ExpectedVersions ==
                 lists:usort(Versions) andalso length(Versions) == Length
     end.
