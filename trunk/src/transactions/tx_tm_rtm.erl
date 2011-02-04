@@ -62,14 +62,22 @@ start_link(DHTNodeGroup, Role) ->
                              [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
 -type state() ::
-        {[{?RT:key(), comm:mypid() | unknown, non_neg_integer()}],  %% RTMs
-         pdb:tableid(),  %% TableName
-         pid_groups:pidname(), %% Role
-         pid(),  %% LocalAcceptor
-         pid()}. %% LocalLearner
+    {RTMs           :: [{?RT:key(), comm:mypid() | unknown, non_neg_integer()}],
+     TableName      :: pdb:tableid(),
+     Role           :: pid_groups:pidname(),
+     LocalAcceptor  :: pid(),
+     LocalLearner   :: pid()}. 
+
+-type state_uninit() ::
+    {RTMs           :: [{?RT:key(), comm:mypid() | unknown, non_neg_integer()}],
+     TableName      :: pdb:tableid(),
+     Role           :: pid_groups:pidname(),
+     LocalAcceptor  :: pid(),
+     LocalLearner   :: pid(),
+     QueuedMessages :: msg_queue:msg_queue()}.
 
 %% initialize: return initial state.
--spec init([]) -> state() | {'$gen_component', [{on_handler, on_init},...], state()}.
+-spec init([]) -> state() | {'$gen_component', [{on_handler, on_init},...], state_uninit()}.
 init([]) ->
     Role = pid_groups:my_pidname(),
     ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n",
@@ -97,7 +105,7 @@ init([]) ->
                            [ unknown || _X <- lists:seq(1, length(RTM_ids))],
                            lists:seq(0, length(RTM_ids) - 1)),
             my_RTM_update(NewRTMs),
-            State = {NewRTMs, TableName, Role, LAcceptor, LLearner},
+            State = {NewRTMs, TableName, Role, LAcceptor, LLearner, msg_queue:new()},
             gen_component:change_handler(State, on_init);
         _ -> {_RTMs = [], TableName, Role, LAcceptor, LLearner}
     end.
@@ -530,28 +538,33 @@ on({get_rtm_reply, InKey, InPid},
     rtms_of_same_dht_node(NewRTMs),
     {NewRTMs, TableName, Role, LAcceptor, LLearner}.
 
--spec on_init(comm:message(), state()) -> state().
+-spec on_init(comm:message(), state_uninit())
+    -> state_uninit() | 
+       {'$gen_component', [{on_handler, Handler::on}], State::state()}.
 %% While initializing
-on_init({update_RTMs}, State) ->
+on_init({update_RTMs},
+        {RTMs, _TableName, _Role, _LAcceptor, _LLearner, _QueuedMessages} = State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
-    on({update_RTMs}, State);
+    my_RTM_update(RTMs),
+    State;
 
 on_init({get_rtm_reply, InKey, InPid},
-        {RTMs, TableName, Role, LAcceptor, LLearner} = _State) ->
+        {RTMs, TableName, Role, LAcceptor, LLearner, QueuedMessages} = _State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:get_rtm_reply in Pid ~p for Pid ~p State ~p~n", [self(), InPid, _State]),
     NewRTMs = my_update_rtm_entry(RTMs, InKey, InPid),
     case lists:keyfind(unknown, 2, NewRTMs) of %% filled all entries?
         false ->
             rtms_of_same_dht_node(NewRTMs),
+            msg_queue:send(QueuedMessages),
             gen_component:change_handler(
               {NewRTMs, TableName, Role, LAcceptor, LLearner}, on);
-        _ -> {NewRTMs, TableName, Role, LAcceptor, LLearner}
+        _ -> {NewRTMs, TableName, Role, LAcceptor, LLearner, QueuedMessages}
     end;
 
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg,
-   State) ->
-    comm:send_local_after(1000, self(), Msg),
-    State.
+        {RTMs, TableName, Role, LAcceptor, LLearner, QueuedMessages} = _State) ->
+    NewQueuedMessages = msg_queue:add(QueuedMessages, Msg),
+    {RTMs, TableName, Role, LAcceptor, LLearner, NewQueuedMessages}.
 
 %% functions for periodic RTM updates
 
