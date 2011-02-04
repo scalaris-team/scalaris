@@ -291,7 +291,7 @@ stop_time(F, Tag) ->
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = 1 / ElapsedTime,
-    ct:pal("~p took ~ps: ~p1/s",
+    ct:pal("~p took ~ps: ~p1/s~n",
            [Tag, ElapsedTime, Frequency]),
     ok.
 

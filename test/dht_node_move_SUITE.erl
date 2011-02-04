@@ -753,12 +753,12 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
     comm:send_local(DhtNode, {move, start_slide, PredOrSucc, TargetId, Tag, self()}),
     receive
         {move, result, Tag, ok} ->
-%%             ct:pal("~p.~p ~.0p -> ~.0p", [NthNode, N, node:id(Node), TargetId]),
+%%             ct:pal("~p.~p ~.0p -> ~.0p~n", [NthNode, N, node:id(Node), TargetId]),
             ok;
         {move, result, Tag, Result} ->
             case lists:member(Result, [ongoing_slide, wrong_pred_succ_node]) of
                 true ->
-                    ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...",
+                    ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...~n",
                            [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]),
                     timer:sleep(100), % wait a bit before trying again
                     symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
@@ -796,7 +796,7 @@ stop_time(F, Tag) ->
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = 1 / ElapsedTime,
-    ct:pal("~p took ~ps: ~p1/s",
+    ct:pal("~p took ~ps: ~p1/s~n",
            [Tag, ElapsedTime, Frequency]),
     ok.
 

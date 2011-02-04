@@ -42,7 +42,7 @@ deliver(PaxosId, Proposal, State) ->
     IsDecisionFromOtherGroupId = is_decision_from_other_group_id(NextPaxosId, PaxosId),
     if
         IsCurrentDecision ->
-            ct:pal("deliver ~p in ~p", [Proposal, PaxosId]),
+            ct:pal("deliver ~p in ~p~n", [Proposal, PaxosId]),
             ?LOG("deliver ~p at ~p~n", [PaxosId, self()]),
             deliver_postponed_decisions(deliver_current_decision(PaxosId, Proposal, State));
         IsFutureDecision ->

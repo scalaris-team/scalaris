@@ -332,7 +332,7 @@ kill_new_processes(OldProcesses) ->
 %%     ct:pal("Proc-Both: ~.0p~n", [_Both]),
 %%     ct:pal("Proc-New: ~.0p~n", [_OnlyNew]),
     Killed = [begin
-%%                   ct:pal("killing ~.0p", [Proc]),
+%%                   ct:pal("killing ~.0p~n", [Proc]),
                   try erlang:exit(X, kill) of
                       true -> wait_for_process_to_die(X),
                               {ok, Proc}
@@ -345,7 +345,7 @@ kill_new_processes(OldProcesses) ->
                               CurFun =:= {test_server_sup, timetrap, 2}),
                      X =/= self(),
                      element(1, CurFun) =/= file_io_server],
-    ct:pal("Killed processes: ~.0p", [Killed]).
+    ct:pal("Killed processes: ~.0p~n", [Killed]).
 
 %% @doc Generic init_per_suite for all unit tests. Prints current state
 %%      information and stores information about all running processes.
@@ -354,7 +354,7 @@ kill_new_processes(OldProcesses) ->
 -spec init_per_suite([tuple()]) -> [tuple()].
 init_per_suite(Config) ->
     Processes = get_processes(),
-    ct:pal("Starting unittest ~p", [ct:get_status()]),
+    ct:pal("Starting unittest ~p~n", [ct:get_status()]),
     randoms:start(),
     [{processes, Processes} | Config].
 
@@ -367,7 +367,7 @@ init_per_suite(Config) ->
 %%      Prints information about the processes that have been killed.
 -spec end_per_suite([tuple()]) -> [tuple()].
 end_per_suite(Config) ->
-    ct:pal("Stopping unittest ~p", [ct:get_status()]),
+    ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
     %error_logger:tty(false),
     unittest_helper:stop_ring(),
     % the following might still be running in case there was no ring:
@@ -395,4 +395,4 @@ get_ring_data() ->
 -spec print_ring_data() -> ok.
 print_ring_data() ->
     DataAll = unittest_helper:get_ring_data(),
-    ct:pal("~.0p", [DataAll]).
+    ct:pal("~.0p~n", [DataAll]).
