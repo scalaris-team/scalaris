@@ -1,0 +1,410 @@
+#!/bin/bash
+# Copyright 2007-2011 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
+ERL=@ERL@
+EPMD=@EPMD@
+
+# /bin
+BINDIR=@bindir@
+# /etc/scalaris/
+ETCDIR=@sysconfdir@/scalaris
+# /lib/scalaris/
+SCALARISDIR=@libdir@/scalaris
+# /lib/scalaris/ebin
+BEAMDIR=@libdir@/scalaris/ebin
+# /lib/scalaris/docroot
+DOCROOTDIR=$SCALARISDIR/docroot
+# /share/doc/scalaris
+DOCDIR=@docdir@
+# /share/java
+JAVADIR=@datarootdir@/java
+# /var/log/scalaris
+LOGDIR=@localstatedir@/log/scalaris
+# /usr/bin/scalaris
+SCALARISCLIENT=${exec_prefix}/bin/scalaris
+
+TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
+
+daemonize=0
+first=0
+empty=0
+port=""
+yaws_port=""
+first_id=""
+
+usage(){
+    echo "usage: scalarisctl [options] <cmd>"
+    echo " options:"
+    echo "    -h                   help"
+    echo "    -d                   daemonize"
+    echo "    -f                   marks this node as the first"
+    echo "    -e                   start node without any dht nodes (empty)"
+    echo "    -n <name>            name for the Erlang VM"
+    echo "    -p <port>            TCP port for the Scalaris node"
+    echo "    -y <port>            TCP port for the built-in webserver"
+    echo "    -k <key>             the first dht_node in the created VM joins at the given key"
+    echo " commands:"
+    echo "    boot start           start boot server"
+    echo "    boot stop            stop boot server"
+    echo "    boot restart         restart boot server"
+    echo "    group start          start scalaris2"
+    echo "    node start           start normal node"
+    echo "    node stop            stop normal node"
+    echo "    node restart         restart normal node"
+    echo "    debug                connect to boot server"
+    echo "    checkinstallation    test installation"
+    echo "    list                 list erlang processes"
+    exit 0
+}
+
+fix_paths() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    # is this a svn checkout or an (rpm/deb/manual) installation?
+    if [ "$DIRNAME" != "$BINDIR" ]; then
+        # scalaris
+        SCALARISDIR=`dirname $DIRNAME`
+        # /etc/scalaris/
+        ETCDIR=$SCALARISDIR/bin
+        # scalaris/ebin
+        BEAMDIR=$SCALARISDIR/ebin
+        # scalaris/docroot
+        DOCROOTDIR=$SCALARISDIR/docroot
+        # scalaris/log
+        LOGDIR=$SCALARISDIR/log
+        # /usr/bin/scalaris
+        SCALARISCLIENT="$SCALARISDIR/java-api/scalaris --noconfig"
+    fi
+}
+
+# only get cookie from scalarisctl.conf if installed!
+get_cookie() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    if [ "$DIRNAME" = "$BINDIR" ]; then
+      # system config
+      . ${ETCDIR}/scalarisctl.conf
+
+      # load user scalaris configuration (overrides system config)
+      if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
+        . $HOME/.scalaris/scalarisctl.conf
+      fi
+    fi
+    echo -n ${cookie:-"chocolate chip cookie"}
+}
+
+checkinstallation() {
+    $ERL -noinput -eval 'halt(0).'
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erl could not be run"
+        echo "We were trying to run: erl -noinput -eval 'halt(0).'"
+        exit 1
+    fi
+
+    if [ ! -s `which erl` ]; then
+        echo "ERROR: your erl executable is of size zero bytes: `which erl`"
+        echo "ls -l `which erl`"
+        exit 1
+    fi
+
+    $ERL -noinput -name boot -eval 'halt(0).' > /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erl could not create a Erlang VM named 'boot'"
+        echo "Are you already running a Scalaris boot server?"
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
+        echo "We were trying to run: erl -noinput -name boot -eval 'halt(0).'"
+    fi
+
+    $ERL -noinput -name node -eval 'halt(0).' > /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erl could not create a Erlang VM named 'node'"
+        echo "Are you already running a Scalaris node?"
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
+        echo "We were trying to run: erl -noinput -name node -eval 'halt(0).'"
+    fi
+
+    $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erlang could not start the crypto module"
+        echo "We were trying to run: $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
+        exit 1
+    fi
+
+    if [ -e $ETCDIR/scalaris.cfg ]; then
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        FAILED=$?
+        if [ $FAILED -ne 0 ]; then
+            echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.cfg"
+            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            exit 1
+        fi
+    else
+        echo "ERROR: there is no config file: $ETCDIR/scalaris.cfg"
+    fi
+
+    if [ -e $ETCDIR/scalaris.local.cfg ]; then
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        FAILED=$?
+        if [ $FAILED -ne 0 ]; then
+            echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.local.cfg"
+            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.local.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            exit 1
+        fi
+    fi
+
+    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot_server), code:ensure_loaded(dht_node)} of {{module,boot_server},{module,dht_node}} -> halt(0); X -> halt(1) end.'
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not find Scalaris' beam files"
+        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(boot), code:ensure_loaded(dht_node)} of {{module,boot},{module,dht_node}} -> halt(0); X -> halt(1) end.'"
+        exit 1
+    fi
+
+    $SCALARISCLIENT > /dev/null 2>/dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -n "INFO: could not find Scalaris' Java-API files. "
+        echo "You won't be able to use the 'scalaris' command line script to access Scalaris."
+        echo "  'make java' will build the Java-API"
+        echo "We were trying to run: $SCALARISCLIENT"
+    else
+        ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
+        JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
+        if [ "$ERLANGHOST" != "$JAVAHOST" ]; then
+            echo "WARNING: the hostnames reported by Erlang and Java do not match. You won't be"
+            echo " able to connect to erlang using the Java-API through scalaris.jar. Also, the"
+            echo " java unit tests will probably not work."
+            echo " The java-api/scalaris script will work around this by asking erlang for its"
+            echo " hostname and using this for both."
+            echo " If you implement your own application either do not use \"@localhost\" in the"
+            echo " scalaris.properties file or set the scalaris.erlang.nodename system property"
+            echo " with the correct hostname (only the domain name part after the \"@\") or fix"
+            echo " your hostname setup system-wide."
+            echo " Please refer to your system's manual to set your hostname, e.g. change the"
+            echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
+            echo " the DNS."
+            echo "erlang: $ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
+            echo "     -> $ERLANGHOST"
+            echo "java:   $SCALARISCLIENT -lh"
+            echo "     -> $JAVAHOST"
+        fi
+    fi
+
+    CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
+        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0)."`
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "$CHECKCONFIGMSG"
+        echo "ERROR: some parameters in the config files are wrong or missing"
+        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0).\""
+        exit 1
+    fi
+    exit 0
+}
+
+bootstart(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
+    first=1
+    mode=boot
+    scalarisstart
+}
+
+debug(){
+    # look into epmd -list: boot or node
+    $ERL -setcookie "$SCALARIS_COOKIE" -name rem -remsh boot@`hostname -f`
+}
+
+bootstop(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
+    scalarisstop
+}
+
+nodestart(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
+    mode=node
+    scalarisstart
+}
+
+nodestop(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'node'}
+    scalarisstop
+}
+
+# pre: set NODE_NAME, mode
+scalarisstart(){
+    if [ $daemonize -ne 0 ]; then
+        BACKGROUND="-detached"
+    fi
+    if [ $empty -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris empty_node true"
+    fi
+    if [ $first -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris first true"
+    fi
+    if [ "$port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris cs_port $port"
+    fi
+    if [ "$yaws_port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris yaws_port $yaws_port"
+    fi
+    if [ "$first_id" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris first_id $first_id"
+    fi
+    mkdir -p "$LOGDIR/$NODE_NAME"
+    pushd $BEAMDIR > /dev/null
+    $ERL -setcookie "$SCALARIS_COOKIE" \
+        -pa $SCALARISDIR/contrib/yaws/ebin \
+        -pa $SCALARISDIR/contrib/log4erl/ebin \
+        -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
+        -yaws embedded true \
+        -scalaris mode $mode \
+        -scalaris log_path "\"$LOGDIR/$NODE_NAME\"" \
+        -scalaris docroot "\"$DOCROOTDIR\"" \
+        -scalaris config "\"$ETCDIR/scalaris.cfg\"" \
+        -scalaris local_config "\"$ETCDIR/scalaris.local.cfg\"" \
+        -connect_all false -hidden -name $NODE_NAME \
+        $SCALARIS_ADDITIONAL_PARAMETERS \
+        -s scalaris $*;
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not start scalaris"
+        echo "  consider running scalarisctl checkinstallation"
+        exit 1
+    fi
+    popd > /dev/null
+}
+
+
+# pre: set NODE_NAME
+scalarisstop(){
+    pushd $BEAMDIR > /dev/null
+    $ERL -setcookie "$SCALARIS_COOKIE" \
+        -name ctl \
+        -pa $BEAMDIR \
+        -noinput \
+        -s scalaris_ctl -extra $NODE_NAME@`hostname -f` stop
+    popd > /dev/null
+}
+
+groupstart(){
+    NODE_NAME=${SCALARIS_NODE_NAME:-'boot'}
+    if [ $daemonize -ne 0 ]; then
+        BACKGROUND="-detached"
+    fi
+    if [ $first -eq 1 ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 first true"
+    fi
+    if [ "$port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 cs_port $port"
+    fi
+    if [ "$yaws_port" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 yaws_port $yaws_port"
+    fi
+    if [ "$first_id" != "" ]; then
+        SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS -scalaris2 first_id $first_id"
+    fi
+    mkdir -p "$LOGDIR/$NODE_NAME"
+    pushd $BEAMDIR > /dev/null
+    $ERL -setcookie "$SCALARIS_COOKIE" \
+        -pa $SCALARISDIR/contrib/yaws/ebin \
+        -pa $SCALARISDIR/contrib/log4erl/ebin \
+        -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
+        -yaws embedded true \
+        -scalaris2 log_path "\"$LOGDIR/$NODE_NAME\"" \
+        -scalaris2 docroot "\"$DOCROOTDIR\"" \
+        -scalaris2 config "\"$ETCDIR/scalaris.cfg\"" \
+        -scalaris2 local_config "\"$ETCDIR/scalaris.local.cfg\"" \
+        -scalaris2 first true \
+        -connect_all false -hidden -name $NODE_NAME \
+        $SCALARIS_ADDITIONAL_PARAMETERS \
+        -s scalaris2 $*;
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not start scalaris"
+        echo "  consider running scalarisctl checkinstallation"
+        exit 1
+    fi
+    popd > /dev/null
+}
+
+list_erlang_processes(){
+    $EPMD -names || echo "could not run epmd"
+}
+
+fix_paths
+SCALARIS_COOKIE="`get_cookie`"
+
+while getopts "dhifen:p:y:k:" optionName; do
+    case "$optionName" in
+        d) daemonize=1;;
+        e) empty=1;;
+        f) first=1;;
+        h) usage 0;;
+        i) echo "WARN: interactive is now default";;
+        n) SCALARIS_NODE_NAME=$OPTARG;;
+        p) port=$OPTARG;;
+        y) yaws_port=$OPTARG;;
+        k) first_id=$OPTARG;;
+        [?]) usage "$badOptionHelp";;
+    esac
+done
+
+shift $(($OPTIND-1))
+
+case $1 in
+    list)
+        list_erlang_processes;;
+    checkinstallation)
+        checkinstallation;;
+    boot)
+        #[ 2 -eq $# ] || usage;
+        if [ $2 == "start" ]; then
+            shift 2
+            bootstart $*;
+        elif [ $2 == "stop" ]; then
+            bootstop;
+        elif [ $2 == "restart" ]; then
+            bootstop;
+            bootstart;
+        fi;;
+    debug)
+        debug;;
+    node)
+        #[ 2 -eq $# ] || usage;
+        if [ $2 == "start" ]; then
+            shift 2
+            nodestart $*;
+        elif [ $2 == "stop" ]; then
+            nodestop;
+        elif [ $2 == "restart" ]; then
+            nodestop;
+            nodestart;
+        fi;;
+    group)
+        #[ 2 -eq $# ] || usage;
+        if [ $2 == "start" ]; then
+            shift 2
+            groupstart $*;
+        fi;;
+    *) usage;;
+esac
+

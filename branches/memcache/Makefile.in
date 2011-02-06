@@ -1,0 +1,277 @@
+# Copyright 2007-2010 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ERLC = @ERLC@
+ERL = @ERL@
+DIALYZER = @ERLANG_ROOT_DIR@/bin/dialyzer
+ERL_LIB_DIR = @ERLANG_LIB_DIR@
+SVN = svn
+CD = cd
+MAKE = make
+VERSION=0.0.1
+OTP_ERLANG_VERSION=1.5.3.1
+
+.PHONY: all compile test test-vts java java-test java-bench java-* clean docs svn dialyzer rrd-init install install-erlang install-java install-docs test-clean %_SUITE %_SUITE-dialyzer
+
+YAWS_PATH= /usr/local/lib/yaws
+
+APP_NAME = @PACKAGE_TARNAME@
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
+VSN = $Id$
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+datarootdir = @datarootdir@
+
+# /bin
+BINDIR = $(DESTDIR)@bindir@
+# /etc/scalaris/
+ETCDIR = $(DESTDIR)@sysconfdir@/scalaris
+# /lib/scalaris/
+SCALARISDIR = $(DESTDIR)@libdir@/scalaris
+# /lib/scalaris/ebin
+BEAMDIR = $(DESTDIR)@libdir@/scalaris/ebin
+# /lib/scalaris/docroot
+DOCROOTDIR=$(SCALARISDIR)/docroot
+# /share/doc/scalaris
+DOCDIR=$(DESTDIR)@docdir@
+# /share/java
+JAVADIR=$(DESTDIR)@datarootdir@/java
+# /var/log/scalaris
+LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
+
+# paths of source files for make doc
+SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
+SOURCEPATHS_JAVA=java-api/src/de/zib/*/*.java java-api/src/de/zib/*/*/*.java java-api/test/de/zib/*/*.java
+
+# libraries needed to build a plt suitable for the dialyzer target
+DIALYZER_PLT_LIBS=$(ERL_LIB_DIR)/common_test-*/ebin $(ERL_LIB_DIR)/compiler-*/ebin $(ERL_LIB_DIR)/crypto-*/ebin $(ERL_LIB_DIR)/debugger-*/ebin $(ERL_LIB_DIR)/edoc-*/ebin $(ERL_LIB_DIR)/erts-*/ebin $(ERL_LIB_DIR)/et-*/ebin $(ERL_LIB_DIR)/gs-*/ebin $(ERL_LIB_DIR)/hipe-*/ebin $(ERL_LIB_DIR)/inets-*/ebin $(ERL_LIB_DIR)/kernel-*/ebin $(ERL_LIB_DIR)/mnesia-*/ebin $(ERL_LIB_DIR)/observer-*/ebin $(ERL_LIB_DIR)/public_key-*/ebin/ $(ERL_LIB_DIR)/runtime_tools-*/ebin $(ERL_LIB_DIR)/sasl-*/ebin $(ERL_LIB_DIR)/snmp-*/ebin $(ERL_LIB_DIR)/ssh-*/ebin $(ERL_LIB_DIR)/ssl-*/ebin $(ERL_LIB_DIR)/stdlib-*/ebin $(ERL_LIB_DIR)/syntax_tools-*/ebin $(ERL_LIB_DIR)/test_server-*/ebin/ $(ERL_LIB_DIR)/tools-*/ebin $(ERL_LIB_DIR)/webtool-*/ebin $(ERL_LIB_DIR)/wx-*/ebin $(ERL_LIB_DIR)/xmerl-*/ebin contrib/log4erl/ebin contrib/yaws/ebin
+#DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
+
+all: compile
+#all: compile dialyzer java test docs
+
+#cp priv/xbin/*beam bin/
+compile:
+	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
+
+test: compile
+	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg | tee ct.log ; \
+	grep " 0 failed" ct.log
+
+test-with-cover: compile
+	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec | tee ct.log ; \
+	grep " 0 failed" ct.log
+
+%_SUITE: compile
+	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; \
+	grep " 0 failed" ct.log
+
+test-vts: compile
+	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@
+
+test-clean:
+	-rm -rf ct_run.ct@* ct.log index.html all_runs.html variables-ct@* \
+            result_increment_10_1000.txt result_increment_1_10000.txt \
+            result_read_10_10000.txt result_read_1_100000.txt \
+            data/ct@*
+
+java:
+	ant -buildfile java-api/build.xml jar
+
+java-test: compile java
+	SCALARIS_NODE_NAME="jtest_boot" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14294 -scalaris yaws_port 8020 -scalaris boot_host {{127,0,0,1},14294,boot} -scalaris known_hosts [{{127,0,0,1},14294,service_per_vm}]" ./bin/scalarisctl -d boot start; \
+	SCALARIS_JAPI_NODE="jtest_boot@localhost" ant -buildfile java-api/build.xml test ; \
+	FAILED=$$? ; \
+	SCALARIS_NODE_NAME="jtest_boot" ./bin/scalarisctl boot stop ; \
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 log/jtest_boot/* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
+
+java-bench: compile java
+# replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
+	SCALARIS_NODE_NAME="jbench_boot" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14295 -scalaris yaws_port 8021 -scalaris boot_host {{127,0,0,1},14295,boot} -scalaris known_hosts [{{127,0,0,1},14295,service_per_vm}]" ./bin/scalarisctl -d -k 0 boot start ; \
+	SCALARIS_NODE_NAME="jbench_node1" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14296 -scalaris yaws_port 8022 -scalaris boot_host {{127,0,0,1},14295,boot} -scalaris known_hosts [{{127,0,0,1},14295,service_per_vm}]" ./bin/scalarisctl -d -k 85070591730234615865843651857942052864 node start ; \
+	SCALARIS_NODE_NAME="jbench_node2" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14297 -scalaris yaws_port 8023 -scalaris boot_host {{127,0,0,1},14295,boot} -scalaris known_hosts [{{127,0,0,1},14295,service_per_vm}]" ./bin/scalarisctl -d -k 170141183460469231731687303715884105728 node start ; \
+	SCALARIS_NODE_NAME="jbench_node3" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port 14298 -scalaris yaws_port 8024 -scalaris boot_host {{127,0,0,1},14295,boot} -scalaris known_hosts [{{127,0,0,1},14295,service_per_vm}]" ./bin/scalarisctl -d -k 255211775190703847597530955573826158592 node start ; \
+	sleep 5s ; \
+	SCALARIS_JAPI_NODE="jbench_boot@localhost" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
+	SCALARIS_NODE_NAME="jbench_boot" ./bin/scalarisctl boot stop ; \
+	SCALARIS_NODE_NAME="jbench_node1" ./bin/scalarisctl node stop ; \
+	SCALARIS_NODE_NAME="jbench_node2" ./bin/scalarisctl node stop ; \
+	SCALARIS_NODE_NAME="jbench_node3" ./bin/scalarisctl node stop ; \
+	true
+
+java-%:
+	ant -buildfile java-api/build.xml $*
+
+clean:
+	-rm -f .make-docs
+	-rm -rf bin/*.beam
+	-rm -rf ebin/*.beam
+	-rm -rf src/*.beam
+	-rm -rf src/comm_layer/*.beam
+	-rm -rf src/pubsub/*.beam
+	-rm -rf src/transstore/*.beam
+	-rm -rf contrib/yaws/ebin/*.beam
+	-rm -rf contrib/log4erl/ebin/*.beam
+	-rm -rf test/*.beam
+	-rm -rf doc/*.html
+	-rm -rf doc/*.css
+	-rm -rf doc/edoc-info
+	-rm -rf docroot/graphs/*.png
+
+docs: .make-docs
+
+.make-docs: $(SOURCEPATHS_ERL) $(SOURCEPATHS_JAVA)
+	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
+	'"."' '[{def,{vsn,"$(VSN)"}}]'
+	ant -buildfile java-api/build.xml doc
+	@touch .make-docs
+
+svn:
+	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl tests/*.erl ebin/*.app bin/*.cfg
+
+dialyzer: compile
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl --no_native | sed -f contrib/dialyzer-col.sed
+
+%_SUITE-dialyzer: compile
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wno_return -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/$*_SUITE.erl --no_native | sed -f contrib/dialyzer-col.sed
+
+plt: compile
+	$(DIALYZER) --plt_info > /dev/null ; \
+	FAILED=$$? ; \
+	if [ $$FAILED -ne 0 ]; then \
+	  $(DIALYZER) --build_plt  $(DIALYZER_PLT_LIBS) ; \
+	else \
+	  $(DIALYZER) --add_to_plt  $(DIALYZER_PLT_LIBS) ; \
+	fi
+
+rrd-init:
+	@echo This target is deprecated
+
+install-docs: docs
+	install -d $(DOCDIR)/erlang
+	install -d $(DOCDIR)/erlang/comm_layer
+	install -d $(DOCDIR)/erlang/pubsub
+	install -d $(DOCDIR)/erlang/transstore
+	install -m 644 -t $(DOCDIR)/erlang \
+	           doc/*.html \
+	           doc/*.png
+	install -m 644 -t $(DOCDIR)/erlang/comm_layer \
+	           doc/comm_layer/*.html
+	install -m 644 -t $(DOCDIR)/erlang/pubsub \
+	           doc/pubsub/*.html 
+	install -m 644 -t $(DOCDIR)/erlang/transstore \
+	           doc/transstore/*.html
+	install -d $(DOCDIR)/java-api
+	install -d $(DOCDIR)/java-api/index-files
+	install -d $(DOCDIR)/java-api/resources
+	install -d $(DOCDIR)/java-api/de/zib/scalaris/class-use
+	install -d $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use
+	install -m 644 -t $(DOCDIR)/java-api \
+	           java-api/doc/*.html
+	install -m 644 -t $(DOCDIR)/java-api/index-files \
+	           java-api/doc/index-files/*.html
+	install -m 644 -t $(DOCDIR)/java-api/resources \
+	           java-api/doc/resources/*.gif
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris \
+	           java-api/doc/de/zib/scalaris/*.html
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/class-use \
+	           java-api/doc/de/zib/scalaris/class-use/*.html
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/examples \
+	           java-api/doc/de/zib/scalaris/examples/*.html
+	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use \
+	           java-api/doc/de/zib/scalaris/examples/class-use/*.html
+
+install-java: java
+	install -d $(JAVADIR)/scalaris
+	install -d $(JAVADIR)/scalaris/lib
+	install -m 644 -t $(JAVADIR)/scalaris \
+	           java-api/scalaris.jar
+	install -m 644 -t $(JAVADIR)/scalaris/lib \
+	           java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar
+	install -m 644 java-api/scalaris-java.conf \
+	           $(ETCDIR)/scalaris-java.conf
+	install -m 644 -t $(ETCDIR) \
+	           java-api/scalaris-java.conf.sample
+	install -m 644 -t $(ETCDIR) \
+	           java-api/scalaris.properties 
+	install -d $(BINDIR)
+	install -m 755 -t $(BINDIR) \
+	           java-api/scalaris
+
+install-erlang: compile
+	install -d $(BEAMDIR)
+	install -m 644 -t $(BEAMDIR) \
+	           ebin/*.app \
+	           ebin/*.beam
+	install -d $(ETCDIR)
+	install -m 644 -t $(ETCDIR) \
+	           bin/scalarisctl.conf \
+	           bin/scalaris.cfg \
+	           bin/scalaris.local.cfg.example
+	if [ -f bin/scalaris.local.cfg ]; then \
+	  install -m 644 -t $(ETCDIR) \
+	           bin/scalaris.local.cfg; \
+	fi
+	install -d $(DOCROOTDIR) \
+	           $(DOCROOTDIR)/icons \
+	           $(DOCROOTDIR)/images/default \
+	           $(DOCROOTDIR)/images/default/dd \
+	           $(DOCROOTDIR)/images/default/panel \
+	           $(DOCROOTDIR)/images/default/tree \
+	           $(DOCROOTDIR)/images/default/grid
+	install -m 644 -t $(DOCROOTDIR) \
+	           docroot/*.yaws \
+	           docroot/*.css \
+	           docroot/*.js \
+	           docroot/*.gif
+	install -m 644 -t $(DOCROOTDIR)/icons \
+	           docroot/icons/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/dd \
+	           docroot/images/default/dd/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/panel \
+	           docroot/images/default/panel/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/panel \
+	           docroot/images/default/panel/*.png
+	install -m 644 -t $(DOCROOTDIR)/images/default/tree \
+	           docroot/images/default/tree/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/grid \
+	           docroot/images/default/grid/*.gif
+	install -m 644 -t $(DOCROOTDIR)/images/default/grid \
+	           docroot/images/default/grid/*.png
+	install -d $(SCALARISDIR)/contrib/yaws/ebin
+	install -d $(SCALARISDIR)/contrib/yaws/include
+	install -m 644 -t $(SCALARISDIR)/contrib/yaws/ebin \
+	           contrib/yaws/ebin/*.beam
+	install -m 644 -t $(SCALARISDIR)/contrib/yaws/include \
+	           contrib/yaws/include/yaws_api.hrl
+	install -d $(SCALARISDIR)/contrib/log4erl/ebin
+	install -m 644 -t $(SCALARISDIR)/contrib/log4erl/ebin \
+	           contrib/log4erl/ebin/*.beam \
+	           contrib/log4erl/ebin/*.app
+	install -d $(LOGDIR)
+	install -d $(BINDIR)
+	install -m 755 -t $(BINDIR) \
+	           bin/scalarisctl
+
+install: install-erlang install-java install-docs
