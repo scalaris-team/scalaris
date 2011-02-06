@@ -119,6 +119,8 @@ my_process_list(SupervisorType_, ServiceGroup, Options) ->
     Service =
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link,
                              [ServiceGroup]),
+	Memcache =
+		util:sup_worker_desc(memcache, memcache_server, start_link),
     YAWS =
         util:sup_worker_desc(yaws, yaws_wrapper, start_link,
                              [ config:read(docroot),
@@ -140,8 +142,8 @@ my_process_list(SupervisorType_, ServiceGroup, Options) ->
                      ClientsDelayer],
     %% do we want to run an empty boot-server?
     PostBootServer = case EmptyNode of
-                         true -> [YAWS, BenchServer, Ganglia];
-                         _    -> [YAWS, BenchServer, Ganglia, DHTNode]
+                         true -> [Memcache,YAWS, BenchServer, Ganglia];
+                         _    -> [Memcache,YAWS, BenchServer, Ganglia, DHTNode]
                      end,
     % check whether to start the boot server
     case SupervisorType of

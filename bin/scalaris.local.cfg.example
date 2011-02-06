@@ -12,10 +12,10 @@
 % Insert the appropriate IP-addresses for your setup
 % as comma separated integers:
 % IP Address, Port, and label of the boot server
-{boot_host, {{127,0,0,1},14195,boot}}.
+{boot_host, {{192,168,1,50},14195,boot}}.
 
 % IP Address, Port, and label of a node which is already in the system
-{known_hosts, [{{127,0,0,1},14195, service_per_vm}]}.
+{known_hosts, [{{192,168,1,50},14195, service_per_vm}]}.
 
 
 

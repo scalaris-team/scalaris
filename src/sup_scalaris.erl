@@ -113,6 +113,8 @@ my_process_list(SupervisorType_, ServiceGroup, Options) ->
     FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),
     Logger = util:sup_supervisor_desc(logger, log, start_link),
+    Memcache =
+		util:sup_worker_desc(memcache, memcache_server, start_link),
     MonitorTiming =
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link,
                              [ServiceGroup]),
@@ -140,8 +142,8 @@ my_process_list(SupervisorType_, ServiceGroup, Options) ->
                      ClientsDelayer],
     %% do we want to run an empty boot-server?
     PostBootServer = case EmptyNode of
-                         true -> [YAWS, BenchServer, Ganglia];
-                         _    -> [YAWS, BenchServer, Ganglia, DHTNode]
+                         true -> [YAWS,Memcache, BenchServer, Ganglia];
+                         _    -> [YAWS, Memcache,BenchServer, Ganglia, DHTNode]
                      end,
     % check whether to start the boot server
     case SupervisorType of
