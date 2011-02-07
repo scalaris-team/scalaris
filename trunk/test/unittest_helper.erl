@@ -100,9 +100,7 @@ add_my_config(KVList) ->
 
 -spec prepare_config(Options::[{atom(), term()}]) -> NewOptions::[{atom(), term()}].
 prepare_config(Options) ->
-    NewConfig = prepare_config_helper(Options, false, []),
-    ct:pal("new config: ~.0p", [NewConfig]),
-    NewConfig.
+    prepare_config_helper(Options, false, []).
 
 -spec prepare_config_helper(Options, boolean(), Options) -> Options when is_subtype(Options, [{atom(), term()}]).
 prepare_config_helper([], false, OldOptions) ->
