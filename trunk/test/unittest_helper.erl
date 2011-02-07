@@ -185,7 +185,8 @@ make_ring(Size, Options) ->
                     NewOptions = prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
-                    _ = admin:add_nodes(Size),
+                    _ = admin:add_node([{first}]),
+                    _ = admin:add_nodes(Size - 1),
                     ok
             end),
 %%     timer:sleep(1000),
