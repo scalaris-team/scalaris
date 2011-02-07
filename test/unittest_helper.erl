@@ -53,6 +53,70 @@ fix_cwd() ->
         Error -> Error
     end.
 
+%% @doc Adds unittest-specific config parameters to the given key-value list.
+%%      The following parameters are added7changed:
+%%       - SCALARIS_UNITTEST_PORT environment variable to specify the port to
+%%         listen on
+%%       - SCALARIS_UNITTEST_YAWS_PORT environment variable to specify the port
+%%         yaws listens on
+%%       - adds only a single known_hosts node
+%%       - specifies the node to be empty
+-spec add_my_config(ConfigKVList::[{atom(), term()}])
+    -> NewKVList::[{atom(), term()}].
+add_my_config(KVList) ->
+    % add empty_node to the end (so it is not overwritten)
+    % but add known_hosts to the beginning so it
+    % can be overwritten by the Options
+    KVList1 =
+        case os:getenv("SCALARIS_UNITTEST_PORT") of
+            false ->
+                [{known_hosts, [{{127,0,0,1}, 14195, service_per_vm}]},
+                 {boot_host, {{127,0,0,1}, 14195, boot}}
+                | KVList];
+            X ->
+                try erlang:list_to_integer(X) of
+                    Port ->
+                        [{known_hosts, [{{127,0,0,1}, Port, service_per_vm}]},
+                         {boot_host, {{127,0,0,1}, Port, boot}},
+                         {cs_port, Port} | KVList]
+                catch
+                    _:_ ->
+                        [{known_hosts, [{{127,0,0,1}, 14195, service_per_vm}]},
+                         {boot_host, {{127,0,0,1}, 14195, boot}}
+                        | KVList]
+                end
+        end,
+    KVList2 =
+        case os:getenv("SCALARIS_UNITTEST_YAWS_PORT") of
+            false -> KVList1;
+            Y ->
+                try erlang:list_to_integer(Y) of
+                    YawsPort -> [{yaws_port, YawsPort} | KVList1]
+                catch
+                    _:_      -> KVList1
+                end
+        end,
+    lists:append(KVList2, [{empty_node, true}]).
+
+-spec prepare_config(Options::[{atom(), term()}]) -> NewOptions::[{atom(), term()}].
+prepare_config(Options) ->
+    NewConfig = prepare_config_helper(Options, false, []),
+    ct:pal("new config: ~.0p", [NewConfig]),
+    NewConfig.
+
+-spec prepare_config_helper(Options, boolean(), Options) -> Options when is_subtype(Options, [{atom(), term()}]).
+prepare_config_helper([], false, OldOptions) ->
+    lists:reverse(OldOptions, [add_my_config([])]);
+prepare_config_helper([], true, OldOptions) ->
+    lists:reverse(OldOptions);
+prepare_config_helper([Option | Rest], OldConfigFound, OldOptions) ->
+    {NewOption, ConfigFound} =
+        case Option of
+            {config, KVList} -> {{config, add_my_config(KVList)}, true};
+            X                -> {X, OldConfigFound}
+        end,
+    prepare_config_helper(Rest, ConfigFound, [NewOption | OldOptions]).
+
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 -spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()])) -> pid().
 make_ring_with_ids(Ids) ->
@@ -79,19 +143,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     _ = pid_groups:start_link(),
-                    NewOptions =
-                        [case Option of
-                             {config, KVList} ->
-                                 % add empty_node to the end (so it is not overwritten)
-                                 % but add known_hosts to the beginning so it
-                                 % can be overwritten by the Options
-                                 KVList1 = [{known_hosts,
-                                             [{{127,0,0,1},14195, service_per_vm}]}
-                                           | KVList],
-                                 {config,
-                                  lists:append(KVList1, [{empty_node, true}])};
-                             X -> X
-                         end || Option <- Options],
+                    NewOptions = prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
                     Ids = IdsFun(), % config may be needed
@@ -132,20 +184,10 @@ make_ring(Size, Options) ->
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     _ = pid_groups:start_link(),
-                    NewOptions =
-                        [case Option of
-                             {config, KVList} ->
-                                 % but add known_hosts to the beginning so it
-                                 % can be overwritten by the Options
-                                 KVList1 = [{known_hosts,
-                                             [{{127,0,0,1},14195, service_per_vm}]}
-                                           | KVList],
-                                 {config, KVList1};
-                             X -> X
-                         end || Option <- Options],
+                    NewOptions = prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
-                    _ = admin:add_nodes(Size - 1),
+                    _ = admin:add_nodes(Size),
                     ok
             end),
 %%     timer:sleep(1000),
