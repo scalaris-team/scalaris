@@ -84,12 +84,10 @@ get_ring_details() ->
                 log:log(error,"[ ST ] Timeout getting node list from boot server"),
                 throw('boot_server_timeout')
             end,
-    This = self(),
-    _ = [erlang:spawn(
-           fun() ->
-                   SourcePid = comm:get(This, comm:this_with_cookie(Pid)),
-                   comm:send(Pid, {get_node_details, SourcePid})
-           end) || Pid <- Nodes],
+    _ = [begin
+             SourcePid = comm:this_with_cookie(Pid),
+             comm:send(Pid, {get_node_details, SourcePid})
+         end || Pid <- Nodes],
     Ring = get_node_details(Nodes, [], 0),
     lists:sort(fun compare_node_details/2, Ring).
 
