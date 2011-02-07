@@ -75,7 +75,7 @@ test-with-cover: compile
 	grep " 0 failed" ct.log
 
 %_SUITE: compile
-	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name ${SCALARIS_CT_NAME:-ct} @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-vts: compile
