@@ -65,8 +65,6 @@ init(Options) ->
     Reregister =
         util:sup_worker_desc(dht_node_reregister, dht_node_reregister,
                              start_link, [DHTNodeGroup]),
-    RingMaintenance =
-        util:sup_worker_desc(ring_maintenance, rm_loop, start_link, [DHTNodeGroup]),
     RoutingTable =
         util:sup_worker_desc(routing_table, rt_loop, start_link,
                              [DHTNodeGroup]),
@@ -85,7 +83,6 @@ init(Options) ->
            Delayer,
            Reregister,
            DeadNodeCache,
-           RingMaintenance,
            RoutingTable,
            Cyclon,
            Vivaldi,

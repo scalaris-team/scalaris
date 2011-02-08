@@ -789,18 +789,18 @@ send_join_response(State, SlideOp, NewPred, CandId) ->
                   QueuedMessages::msg_queue:msg_queue())
         -> dht_node_state:state().
 finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
-    rm_loop:activate(Me, Pred, Succ),
+    RMState = rm_loop:init(Me, Pred, Succ),
+    Neighbors = rm_loop:get_neighbors(RMState),
     % wait for the ring maintenance to initialize and tell us its table ID
-    NeighbTable = rm_loop:get_neighbors_table(),
-    rt_loop:activate(NeighbTable),
+    rt_loop:activate(Neighbors),
     cyclon:activate(),
     vivaldi:activate(),
     dc_clustering:activate(),
-    gossip:activate(),
+    gossip:activate(node:mk_interval_between_nodes(Pred, Me)),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
-    NewRT_ext = ?RT:empty_ext(rm_loop:get_neighbors(NeighbTable)),
-    dht_node_state:new(NewRT_ext, NeighbTable, DB).
+    NewRT_ext = ?RT:empty_ext(Neighbors),
+    dht_node_state:new(NewRT_ext, RMState, DB).
 
 -spec finish_join_and_slide(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::?DB:db(),

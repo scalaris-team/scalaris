@@ -92,6 +92,9 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 test_init(Config) ->
+    pid_groups:join_as("gossip_group", gossip),
+    DHT_Node = fake_node("gossip_group", dht_node),
+    
     config:write(gossip_interval, 100),
     EmptyMsgQueue = msg_queue:new(),
     GossipNewState = gossip_state:new_state(),
@@ -102,12 +105,14 @@ test_init(Config) ->
     {'$gen_component', [{on_handler, on_inactive}], InitialState1} = FullState1,
     ?expect_no_message(),
     
-    FullState2 = gossip:on_inactive({activate_gossip}, InitialState1),
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    FullState2 = gossip:on_inactive({activate_gossip, MyRange}, InitialState1),
     ?equals_pattern(FullState2,
                     {'$gen_component', [{on_handler, on_active}],
-                     {GossipNewState, GossipNewState, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}}),
+                     {GossipNewState, GossipNewState, EmptyMsgQueue, {'trigger_periodic', _TriggerState}, MyRange}}),
     ?expect_message({gossip_trigger}),
     ?expect_no_message(),
+    exit(DHT_Node, kill),
     Config.
 
 test_get_values_best0(Config) ->
@@ -139,19 +144,18 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
     
     pid_groups:join_as("gossip_group", dht_node),
     pid_groups:join_as("gossip_group", cyclon),
-    Pred = node:new(comm:make_global(fake_node("gossip_group_pred", dht_node)), PredId, 1),
-    Node = node:new(This, NodeId, 1),
-    fake_rm_loop(Pred, Node),
-    
+    MyRange = node:mk_interval_between_ids(PredId, NodeId),
     
     config:write(gossip_min_triggers_per_round, MinTpR),
     config:write(gossip_max_triggers_per_round, MaxTpR),
     config:write(gossip_converge_avg_count_start_new_round, ConvAvgCntSNR),
     
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, MsgQueue, get_ptrigger_nodelay()}),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
+        gossip:on_active({gossip_trigger}, {PreviousState, State, MsgQueue, get_ptrigger_nodelay(), MyRange}),
+    
+    ?equals(NewMyRange, MyRange),
 
-    IsLeader = intervals:in(?RT:hash_key(0), node:mk_interval_between_nodes(Pred, Node)),
+    IsLeader = intervals:in(?RT:hash_key(0), MyRange),
     StartNewRound = IsLeader andalso
                         (gossip_state:get(State, round) =:= 0 orelse
                              (gossip_state:get(State, triggered) + 1 > MinTpR andalso
@@ -278,9 +282,12 @@ test_on_trigger(_Config) ->
 prop_on_get_node_details_response_local_info(Load, PreviousState, State, MsgQueue) ->
     NodeDetails = node_details:set(node_details:new(), load, Load),
     TriggerState = get_ptrigger_nodelay(),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_node_details_response, NodeDetails},
-                  {PreviousState, State, MsgQueue, TriggerState}),
+                  {PreviousState, State, MsgQueue, TriggerState, MyRange}),
+    
+    ?equals(NewMyRange, MyRange),
     
     case gossip_state:get(State, initialized) of
         true -> 
@@ -396,12 +403,14 @@ test_on_cy_cache1(Config) ->
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
     % empty node cache
     Cache = [],
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({cy_cache, Cache},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
+                  {PreviousState, State, [], get_ptrigger_nodelay(), MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewState, State),
     ?equals(NewMsgQueue, []),
@@ -419,12 +428,14 @@ test_on_cy_cache2(Config) ->
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(10), ?RT:hash_key(0)),
     % non-empty node cache
     Cache = [node:new(comm:make_global(self()), 10, 0)],
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({cy_cache, Cache},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
+                  {PreviousState, State, [], get_ptrigger_nodelay(), MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewState, State),
     ?equals(NewMsgQueue, []),
@@ -444,12 +455,14 @@ test_on_cy_cache3(Config) ->
     PreviousState = create_gossip_state(GossipNewValues, true, 10, 2, 0),
     % given values, initialized, triggers = 0, msg_exchg = 0, conv_avg_count = 0
     State = create_gossip_state(Values, true, 0, 0, 0),
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(10), ?RT:hash_key(0)),
     % non-empty node cache
     Cache = [node:new(comm:this(), 10, 0)],
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({cy_cache, Cache},
-                  {PreviousState, State, [], get_ptrigger_nodelay()}),
+                  {PreviousState, State, [], get_ptrigger_nodelay(), MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewState, State),
     ?equals(NewMsgQueue, []),
@@ -473,10 +486,12 @@ test_on_get_values_best1(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_best, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -496,10 +511,12 @@ test_on_get_values_best2(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_best, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -519,10 +536,12 @@ test_on_get_values_best3(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_best, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -542,10 +561,12 @@ test_on_get_values_best4(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, false, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_best, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -565,10 +586,12 @@ test_on_get_values_best5(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, false, 20, 20, 2),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_best, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -588,10 +611,12 @@ test_on_get_values_best6(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, true, 20, 20, 2),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_best, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -611,10 +636,12 @@ test_on_get_values_all1(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_all, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -636,10 +663,12 @@ test_on_get_values_all2(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_all, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -661,10 +690,12 @@ test_on_get_values_all3(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, true, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_all, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -686,10 +717,12 @@ test_on_get_values_all4(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 20
     State = create_gossip_state(Values, false, 20, 20, 20),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_all, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -711,10 +744,12 @@ test_on_get_values_all5(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % not initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, false, 20, 20, 2),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_all, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -736,10 +771,12 @@ test_on_get_values_all6(Config) ->
     Values = gossip_state:new_internal(2.0, 2.0, 2.0, 2.0, 2, 2, 2),
     % initialized, triggers = 20, msg_exchg = 20, conv_avg_count = 2
     State = create_gossip_state(Values, true, 20, 20, 2),
-    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState} =
+    MyRange = node:mk_interval_between_ids(?RT:hash_key(0), ?RT:hash_key(0)),
+    {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
         gossip:on_active({get_values_all, self()},
-                  {PreviousState, State, [], TriggerNoDelay}),
+                  {PreviousState, State, [], TriggerNoDelay, MyRange}),
 
+    ?equals(NewMyRange, MyRange),
     ?equals(NewState, State),
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
@@ -800,26 +837,3 @@ get_ptrigger_delay(Delay) ->
 fake_node(RegisterGroup, RegisterName) ->
     unittest_helper:start_subprocess(
       fun() -> pid_groups:join_as(RegisterGroup, RegisterName) end).
-
--spec fake_rm_loop(Pred::node:node_type(), Node::node:node_type()) -> pid().
-fake_rm_loop(Pred, Node) ->
-    fake_rm_loop(Pred, Node, Pred).
-
--spec fake_rm_loop(Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()) -> pid().
-fake_rm_loop(Pred, Node, Succ) ->
-    unittest_helper:start_subprocess(
-      fun() -> pid_groups:join_as("gossip_group", ring_maintenance) end,
-      % recursive anonymous function:
-      fun() ->
-              Fun = fun(F) ->
-                            TableName = list_to_atom(string:concat(pid_groups:my_groupname(), ":rm_tman")),
-                            NeighbTable = ets:new(TableName, [ordered_set, protected]),
-                            rm_loop:update_neighbors(NeighbTable, nodelist:new_neighborhood(Pred, Node, Succ)),
-                            receive
-                                {done} -> ok;
-                                {get_neighb_tid, Pid} -> comm:send_local(Pid, {get_neighb_tid_response, NeighbTable})
-                            end,
-                            F(F)
-                    end,
-              Fun(Fun)
-      end).

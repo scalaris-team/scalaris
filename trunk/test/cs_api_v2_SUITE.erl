@@ -80,24 +80,25 @@ test_and_set(_Config) ->
 
 %% @doc Test for cs_api_v2:write taking at least 2s after stopping a ring and
 %%      starting a new one.
-write_test_race_mult_rings(_Config) ->
+write_test_race_mult_rings(Config) ->
     % first ring:
-    write_test(),
+    write_test(Config),
 %%     timer:sleep(10000),
     % second ring and more:
-    write_test(),
-    write_test(),
-    write_test(),
-    write_test(),
-    write_test(),
-    write_test(),
-    write_test().
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config).
 
--spec write_test() -> ok.
-write_test() -> 
+-spec write_test(Config::[tuple()]) -> ok.
+write_test(Config) -> 
     OldRegistered = erlang:registered(),
     OldProcesses = unittest_helper:get_processes(),
-    unittest_helper:make_ring(1),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     Self = self(),
     BenchPid1 = erlang:spawn(fun() ->
                                      {Time, _} = util:tc(cs_api_v2, write, [1, 1]),

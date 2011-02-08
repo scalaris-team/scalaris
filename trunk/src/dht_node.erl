@@ -54,13 +54,15 @@
       {rt_update, RoutingTable::?RT:external_rt()}).
 
 % accepted messages of dht_node processes
--type(message() ::
-      bulkowner_message() |
-      database_message() |
-      lookup_message() |
-      dht_node_join:join_message() |
-      rt_message() |
-      dht_node_move:move_message()).
+-type message() ::
+    bulkowner_message() |
+    database_message() |
+    lookup_message() |
+    dht_node_join:join_message() |
+    rt_message() |
+    dht_node_move:move_message() |
+    {zombie, Node::node:node_type()} |
+    {crash, DeadPid::comm:mypid()}.
 
 %% @doc message handler
 -spec on_join(message(), dht_node_join:join_state())
@@ -76,14 +78,35 @@ on(Msg, State) when element(1, Msg) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 % message with cookie for dht_node_join?
 on({Msg, Cookie} = FullMsg, State) when
-  (is_tuple(Msg) andalso element(1, Msg) =:= join) orelse
-      (is_tuple(Cookie) andalso element(1, Cookie) =:= join) ->
+  is_tuple(Msg) andalso is_atom(element(1, Msg)) andalso
+      (element(1, Msg) =:= join orelse
+           Cookie =:= join orelse
+           (is_tuple(Cookie) andalso element(1, Cookie) =:= join)) ->
     dht_node_join:process_join_msg(FullMsg, State);
 %% userdevguide-end dht_node:join_message
 
 % Move messages (see dht_node_move.erl)
 on(Msg, State) when element(1, Msg) =:= move ->
     dht_node_move:process_move_msg(Msg, State);
+
+% RM messages (see rm_loop.erl)
+on(Msg, State) when element(1, Msg) =:= rm ->
+    RMState = dht_node_state:get(State, rm_state),
+    RMState1 = rm_loop:on(Msg, RMState),
+    dht_node_state:set_rm(State, RMState1);
+on(Msg, State) when element(1, Msg) =:= rm_trigger ->
+    RMState = dht_node_state:get(State, rm_state),
+    RMState1 = rm_loop:on(Msg, RMState),
+    dht_node_state:set_rm(State, RMState1);
+% message with cookie for rm_loop?
+on({Msg, Cookie} = FullMsg, State) when
+  is_tuple(Msg) andalso is_atom(element(1, Msg)) andalso
+      (element(1, Msg) =:= rm orelse
+           Cookie =:= rm orelse
+           (is_tuple(Cookie) andalso element(1, Cookie) =:= rm)) ->
+    RMState = dht_node_state:get(State, rm_state),
+    RMState1 = rm_loop:on(FullMsg, RMState),
+    dht_node_state:set_rm(State, RMState1);
 
 %% Kill Messages
 on({kill}, _State) ->
@@ -327,6 +350,7 @@ on({dump}, State) ->
     State;
 
 on({web_debug_info, Requestor}, State) ->
+    RMState = dht_node_state:get(State, rm_state),
     Load = dht_node_state:get(State, load),
     % get a list of up to 50 KV pairs to display:
     DataListTmp = [{"",
@@ -337,11 +361,10 @@ on({web_debug_info, Requestor}, State) ->
                    true  -> lists:append(DataListTmp, [{"...", ""}]);
                    false -> DataListTmp
                end,
-    KeyValueList =
+    KVList1 =
         [{"rt_algorithm", lists:flatten(io_lib:format("~p", [?RT]))},
          {"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
-         {"me", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, node)]))},
-         {"my_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, my_range)]))},
+         {"my_range", lists:flatten(io_lib:format("~p", [intervals:get_bounds(dht_node_state:get(State, my_range))]))},
          {"db_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db_range)]))},
          {"load", lists:flatten(io_lib:format("~p", [Load]))},
          {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))]))},
@@ -351,11 +374,11 @@ on({web_debug_info, Requestor}, State) ->
          {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
          {"slide_pred", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, slide_pred)]))},
          {"slide_succ", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, slide_succ)]))},
-         {"msg_fwd", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, msg_fwd)]))},
-         {"data (db_entry):", ""} |
-            DataList 
+         {"msg_fwd", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, msg_fwd)]))}
         ],
-    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    KVList2 = lists:append(KVList1, [{"", ""} | rm_loop:get_web_debug_info(RMState)]),
+    KVList3 = lists:append(KVList2, [{"", ""} , {"data (db_entry):", ""} | DataList]),
+    comm:send_local(Requestor, {web_debug_info_reply, KVList3}),
     State;
 
 on({unittest_get_bounds_and_data, SourcePid}, State) ->
@@ -383,7 +406,21 @@ on({acceptor_ack, _PaxosId, _InRound, _Val, _Raccpeted} = Msg, State) ->
 on({acceptor_nack, _PaxosId, _NewerRound} = Msg, State) ->
     tx_tp:on_forward_to_proposer(Msg, State);
 on({acceptor_naccepted, _PaxosId, _NewerRound} = Msg, State) ->
-    tx_tp:on_forward_to_proposer(Msg, State).
+    tx_tp:on_forward_to_proposer(Msg, State);
+
+% failure detector, dead node cache
+on({crash, DeadPid}, State) ->
+    RMState = dht_node_state:get(State, rm_state),
+    RMState1 = rm_loop:crashed_node(RMState, DeadPid),
+    % TODO: call other modules, e.g. join, move
+    dht_node_state:set_rm(State, RMState1);
+
+% dead-node-cache reported dead node to be alive again
+on({zombie, Node}, State) ->
+    RMState = dht_node_state:get(State, rm_state),
+    RMState1 = rm_loop:zombie_node(RMState, Node),
+    % TODO: call other modules, e.g. join, move
+    dht_node_state:set_rm(State, RMState1).
 
 
 %% userdevguide-begin dht_node:start

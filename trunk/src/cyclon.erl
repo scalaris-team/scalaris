@@ -40,7 +40,8 @@
          check_config/0]).
 
 % helpers for creating getter messages:
--export([get_subset_rand/1, get_subset_rand_next_interval/1]).
+-export([get_subset_rand/1,
+         get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
 
 %% -export([get_ages/0, get_ages/1]).
 
@@ -116,12 +117,18 @@ get_subset_rand(N) ->
 %%      process' group asking for a random subset of the stored nodes with a
 %%      delay equal to the cyclon_interval config parameter.
 %%      see on_active({get_subset_rand, N, SourcePid}, State) and
-%%      msg_get_subset_response/2
+%%      msg_get_subset_response/2.
 -spec get_subset_rand_next_interval(N::pos_integer()) -> reference().
 get_subset_rand_next_interval(N) ->
+    get_subset_rand_next_interval(N, self()).
+
+%% @doc Same as get_subset_rand_next_interval/1 but sends the reply back to the
+%%      given Pid.
+-spec get_subset_rand_next_interval(N::pos_integer(), Pid::comm:erl_local_pid()) -> reference().
+get_subset_rand_next_interval(N, Pid) ->
     CyclonPid = pid_groups:get_my(cyclon),
     comm:send_local_after(get_shuffle_interval(), CyclonPid,
-                          {get_subset_rand, N, self()}).
+                          {get_subset_rand, N, Pid}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -155,7 +162,7 @@ init(Trigger) ->
         -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState, MonitorTable}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
-    rm_loop:subscribe(self(), cyclon, fun rm_loop:subscribe_default_filter/2,
+    rm_loop:subscribe(self(), cyclon, fun erlang:'=/='/2,
                       fun cyclon:rm_send_changes/4, inf),
     request_node_details([node, pred, succ]),
     comm:send_local_after(100, self(), {check_state}),

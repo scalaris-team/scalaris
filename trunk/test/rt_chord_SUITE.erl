@@ -58,16 +58,12 @@ end_per_suite(Config) ->
     ok.
 
 next_hop(_Config) ->
-    MyNode = node:new(fake_dht_node(), 0, 0),
-    Succ = node:new(fake_dht_node(), 1, 0),
-    Pred = node:new(fake_dht_node(), 1000000, 0),
-    % note: the ets table will be deleted automatically since ct starts a
-    % process for each test case (an ets table dies with its owner)
-    TableName = list_to_atom("performance_SUITE:rm_tman"),
-    NeighbTable = ets:new(TableName, [ordered_set, private]),
+    MyNode = node:new(self(), 0, 0),
+    pid_groups:join_as("performance_SUITE", dht_node),
+    Succ = node:new(fake_dht_node(".succ"), 1, 0),
+    Pred = node:new(fake_dht_node(".pred"), 1000000, 0),
     Neighbors = nodelist:new_neighborhood(Pred, MyNode, Succ),
-    ets:insert(NeighbTable, {neighbors, Neighbors}),
-    DHTNodes = [fake_dht_node() || _ <- lists:seq(1, 6)],
+    DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
     RT = gb_trees:from_orddict([{1, Succ},
                                 {2, node:new(lists:nth(1, DHTNodes), 2, 0)},
                                 {4, node:new(lists:nth(2, DHTNodes), 4, 0)},
@@ -75,10 +71,11 @@ next_hop(_Config) ->
                                 {16, node:new(lists:nth(4, DHTNodes), 16, 0)},
                                 {32, node:new(lists:nth(5, DHTNodes), 32, 0)},
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
+    RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
     DB = ?DB:new(),
-    State = dht_node_state:new(RT, NeighbTable, DB),
+    State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 0),
     ?equals(rt_chord:next_hop(State, 0), lists:nth(6, DHTNodes)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
@@ -92,35 +89,32 @@ next_hop(_Config) ->
     ?equals(rt_chord:next_hop(State, 1000), lists:nth(6, DHTNodes)),
     
     [exit(Node, kill) || Node <- DHTNodes],
-    exit(node:pidX(MyNode), kill),
+%%     exit(node:pidX(MyNode), kill),
     exit(node:pidX(Succ), kill),
     exit(node:pidX(Pred), kill),
     ?DB:close(DB),
     ok.
 
 next_hop2(_Config) ->
-    MyNode = node:new(fake_dht_node(), 0, 0),
-    Succ = node:new(fake_dht_node(), 1, 0),
-    SuccSucc = node:new(fake_dht_node(), 2, 0),
-    Pred = node:new(fake_dht_node(), 1000000, 0),
-    DHTNodes = [fake_dht_node() || _ <- lists:seq(1, 6)],
+    MyNode = node:new(self(), 0, 0),
+    pid_groups:join_as("performance_SUITE", dht_node),
+    Succ = node:new(fake_dht_node(".succ"), 1, 0),
+    SuccSucc = node:new(fake_dht_node(".succ.succ"), 2, 0),
+    Pred = node:new(fake_dht_node(".pred"), 1000000, 0),
+    DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
     RT = gb_trees:from_orddict([{1, Succ},
                                 {4, node:new(lists:nth(2, DHTNodes), 4, 0)},
                                 {8, node:new(lists:nth(3, DHTNodes), 8, 0)},
                                 {16, node:new(lists:nth(4, DHTNodes), 16, 0)},
                                 {32, node:new(lists:nth(5, DHTNodes), 32, 0)},
                                 {64, node:new(lists:nth(6, DHTNodes), 64, 0)}]),
-    % note: the ets table will be deleted automatically since ct starts a
-    % process for each test case (an ets table dies with its owner)
-    TableName = list_to_atom("performance_SUITE:rm_tman"),
-    NeighbTable = ets:new(TableName, [ordered_set, private]),
     Neighbors = nodelist:add_node(nodelist:new_neighborhood(Pred, MyNode, Succ),
                                   SuccSucc, 2, 2),
-    ets:insert(NeighbTable, {neighbors, Neighbors}),
+    RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
     DB = ?DB:new(),
-    State = dht_node_state:new(RT, NeighbTable, DB),
+    State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 10),
     ?equals(rt_chord:next_hop(State, 0), node:pidX(Pred)),
     ?equals(rt_chord:next_hop(State, 1), node:pidX(Succ)), % succ is responsible
@@ -134,7 +128,7 @@ next_hop2(_Config) ->
     ?equals(rt_chord:next_hop(State, 1000), lists:nth(6, DHTNodes)),
 
     [exit(Node, kill) || Node <- DHTNodes],
-    exit(node:pidX(MyNode), kill),
+%%     exit(node:pidX(MyNode), kill),
     exit(node:pidX(Succ), kill),
     exit(node:pidX(SuccSucc), kill),
     exit(node:pidX(Pred), kill),
@@ -204,6 +198,6 @@ tester_get_split_key(_Config) ->
 
 %% helpers
 
-fake_dht_node() ->
+fake_dht_node(Suffix) ->
     unittest_helper:start_subprocess(
-      fun() -> pid_groups:join_as("rt_chord_SUITE_group", dht_node) end).
+      fun() -> pid_groups:join_as("rt_chord_SUITE_group" ++ Suffix, dht_node) end).

@@ -71,8 +71,8 @@ tester_update_id(Config) ->
 %%      Precondition: existing scalaris ring with at least one node.
 -spec change_id_and_check(OldId::?RT:key() | unknown, NewId::?RT:key()) -> true.
 change_id_and_check(OldId, NewId) ->
-    RM = comm:make_global(pid_groups:find_a(ring_maintenance)),
-    comm:send_to_group_member(RM, dht_node, {get_node_details, comm:this(), [node]}),
+    DhtNode = comm:make_global(pid_groups:find_a(dht_node)),
+    comm:send(DhtNode, {get_node_details, comm:this(), [node]}),
     OldNode = receive
                   {get_node_details_response, OldNodeDetails} ->
                       node_details:get(OldNodeDetails, node)
@@ -83,12 +83,16 @@ change_id_and_check(OldId, NewId) ->
     end,
 %%     ct:pal("ct: ~p -> ~p~n", [node:id(OldNode), NewId]),
     
-    comm:send(RM, {subscribe, self(), rm_SUITE, fun rm_loop:subscribe_default_filter/2, fun rm_loop:send_changes_to_subscriber/4, inf}),
-    comm:send(RM, {update_id, NewId}),
-    comm:send(RM, {unsubscribe, self(), rm_SUITE}),
+    comm:send(DhtNode, {rm, subscribe, self(), rm_SUITE,
+                        fun erlang:'=/='/2,
+                        fun(Pid, Tag, OldNeighbors, NewNeighbors) ->
+                                comm:send_local(Pid, {rm_changed, Tag, OldNeighbors, NewNeighbors})
+                        end, inf}),
+    comm:send(DhtNode, {rm, update_id, NewId}),
+    comm:send(DhtNode, {rm, unsubscribe, self(), rm_SUITE}),
     
     % check that the new ID has been set:
-    comm:send_to_group_member(RM, dht_node, {get_node_details, comm:this(), [node, pred, succ]}),
+    comm:send(DhtNode, {get_node_details, comm:this(), [node, pred, succ]}),
     receive
         {get_node_details_response, NewNodeDetails} ->
             NewNode = node_details:get(NewNodeDetails, node),
