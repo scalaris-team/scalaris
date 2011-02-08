@@ -59,6 +59,8 @@ SOURCEPATHS_JAVA=java-api/src/de/zib/*/*.java java-api/src/de/zib/*/*/*.java jav
 DIALYZER_PLT_LIBS=$(ERL_LIB_DIR)/common_test-*/ebin $(ERL_LIB_DIR)/compiler-*/ebin $(ERL_LIB_DIR)/crypto-*/ebin $(ERL_LIB_DIR)/debugger-*/ebin $(ERL_LIB_DIR)/edoc-*/ebin $(ERL_LIB_DIR)/erts-*/ebin $(ERL_LIB_DIR)/et-*/ebin $(ERL_LIB_DIR)/gs-*/ebin $(ERL_LIB_DIR)/hipe-*/ebin $(ERL_LIB_DIR)/inets-*/ebin $(ERL_LIB_DIR)/kernel-*/ebin $(ERL_LIB_DIR)/mnesia-*/ebin $(ERL_LIB_DIR)/observer-*/ebin $(ERL_LIB_DIR)/public_key-*/ebin/ $(ERL_LIB_DIR)/runtime_tools-*/ebin $(ERL_LIB_DIR)/sasl-*/ebin $(ERL_LIB_DIR)/snmp-*/ebin $(ERL_LIB_DIR)/ssh-*/ebin $(ERL_LIB_DIR)/ssl-*/ebin $(ERL_LIB_DIR)/stdlib-*/ebin $(ERL_LIB_DIR)/syntax_tools-*/ebin $(ERL_LIB_DIR)/test_server-*/ebin/ $(ERL_LIB_DIR)/tools-*/ebin $(ERL_LIB_DIR)/webtool-*/ebin $(ERL_LIB_DIR)/wx-*/ebin $(ERL_LIB_DIR)/xmerl-*/ebin contrib/log4erl/ebin contrib/yaws/ebin
 #DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
 
+SCALARIS_CT_NAME ?= ct
+
 all: compile
 #all: compile dialyzer java test docs
 
@@ -67,25 +69,25 @@ compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
 test: compile
-	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 %_SUITE: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name ${SCALARIS_CT_NAME:-ct} @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-vts: compile
 	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@
 
 test-clean:
-	-rm -rf ct_run.ct@* ct.log index.html all_runs.html variables-ct@* \
+	-rm -rf ct_run.*@* ct.log index.html all_runs.html variables-*@* \
             result_increment_10_1000.txt result_increment_1_10000.txt \
             result_read_10_10000.txt result_read_1_100000.txt \
-            data/ct@*
+            data/ct*@*
 
 java:
 	ant -buildfile java-api/build.xml jar
