@@ -97,15 +97,9 @@ init([]) ->
     %% start getting rtms and maintain them.
     case Role of
         tx_tm ->
-            IdSelf = nodelist:nodeid(
-                       rm_loop:get_neighbors(rm_loop:get_neighbors_table())),
-            RTM_ids = my_get_RTM_ids(IdSelf),
-            NewRTMs =
-                lists:zip3(RTM_ids,
-                           [ unknown || _X <- lists:seq(1, length(RTM_ids))],
-                           lists:seq(0, length(RTM_ids) - 1)),
-            my_RTM_update(NewRTMs),
-            State = {NewRTMs, TableName, Role, LAcceptor, LLearner, msg_queue:new()},
+            comm:send_local(pid_groups:get_my(dht_node),
+                            {get_node_details, comm:this(), [node]}),
+            State = {_RTMs = [], TableName, Role, LAcceptor, LLearner, msg_queue:new()},
             gen_component:change_handler(State, on_init);
         _ -> {_RTMs = [], TableName, Role, LAcceptor, LLearner}
     end.
@@ -542,6 +536,17 @@ on({get_rtm_reply, InKey, InPid},
     -> state_uninit() | 
        {'$gen_component', [{on_handler, Handler::on}], State::state()}.
 %% While initializing
+on_init({get_node_details_response, NodeDetails},
+        {_RTMs, TableName, Role, LAcceptor, LLearner, QueuedMessages} = _State) ->
+    ?TRACE("tx_tm_rtm:on_init:get_node_details_response State; ~p~n", [_State]),
+    IdSelf = node:id(node_details:get(NodeDetails, node)),
+    RTM_ids = my_get_RTM_ids(IdSelf),
+    NewRTMs =
+        lists:zip3(RTM_ids,
+                   [ unknown || _X <- lists:seq(1, length(RTM_ids))],
+                   lists:seq(0, length(RTM_ids) - 1)),
+    my_RTM_update(NewRTMs),
+    {NewRTMs, TableName, Role, LAcceptor, LLearner, QueuedMessages};
 on_init({update_RTMs},
         {RTMs, _TableName, _Role, _LAcceptor, _LLearner, _QueuedMessages} = State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),

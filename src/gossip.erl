@@ -71,30 +71,35 @@
 
 % functions gen_component, the trigger and the config module use
 -export([init/1, on_inactive/2, on_active/2,
-         activate/0, deactivate/0,
+         activate/1, deactivate/0,
          get_base_interval/0, check_config/0]).
 
 % helpers for creating getter messages:
 -export([get_values_best/0, get_values_all/0]).
 
--type(state() :: gossip_state:state()).
+% interaction with the ring maintenance:
+-export([rm_my_range_changed/2, rm_send_new_range/4]).
+
+-type state() :: gossip_state:state().
 
 %% Full state of the gossip process:
 %% {PreviousState, CurrentState, QueuedMessages, TriggerState}
 %% -> previous and current state, queued messages (get_state messages received
 %% before local values are known) and the state of the trigger.
--type(full_state_active() :: {PreviousState::state(), CurrentState::state(),
+-type full_state_active() :: {PreviousState::state(), CurrentState::state(),
                               MessageQueue::msg_queue:msg_queue(),
-                              TriggerState::trigger:state()}).
--type(full_state_inactive() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
+                              TriggerState::trigger:state(),
+                              Range::intervals:interval()}.
+-type full_state_inactive() :: {uninit, QueuedMessages::msg_queue:msg_queue(),
                                 TriggerState::trigger:state(),
-                                PreviousState::state()}).
+                                PreviousState::state()}.
 %% -type(full_state() :: full_state_active() | full_state_inactive()).
 
 % accepted messages of gossip processes
 -type(message() ::
     {gossip_trigger} |
     {get_node_details_response, node_details:node_details()} |
+    {update_range, NewRange::intervals:interval()} |
     {get_state, comm:mypid(), gossip_state:values_internal()} |
     {get_state_response, gossip_state:values_internal()} |
     {cy_cache, RandomNodes::[node:node_type()]} |
@@ -104,10 +109,10 @@
 
 %% @doc Activates the gossip process. If not activated, the gossip process will
 %%      queue most messages without processing them.
--spec activate() -> ok.
-activate() ->
+-spec activate(MyRange::intervals:interval()) -> ok.
+activate(MyRange) ->
     Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {activate_gossip}).
+    comm:send_local(Pid, {activate_gossip, MyRange}).
 
 %% @doc Deactivates the gossip process.
 -spec deactivate() -> ok.
@@ -193,13 +198,17 @@ init(Trigger) ->
 %%      'activate_gossip' message is received). Queues getter-messages for
 %%      faster startup of dependent processes. 
 -spec on_inactive(message(), full_state_inactive()) -> full_state_inactive();
-                 ({activate_gossip}, full_state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::full_state_active()}.
-on_inactive({activate_gossip}, {uninit, QueuedMessages, TriggerState, PreviousState}) ->
+                 ({activate_gossip, MyRange::intervals:interval()}, full_state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::full_state_active()}.
+on_inactive({activate_gossip, MyRange},
+            {uninit, QueuedMessages, TriggerState, PreviousState}) ->
     log:log(info, "[ Gossip ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:now(TriggerState),
+    rm_loop:subscribe(self(), ?MODULE,
+                      fun gossip:rm_my_range_changed/2,
+                      fun gossip:rm_send_new_range/4, inf),
     State = gossip_state:new_state(),
     msg_queue:send(QueuedMessages),
-    gen_component:change_handler({PreviousState, State, [], TriggerState2}, on_active);
+    gen_component:change_handler({PreviousState, State, [], TriggerState2, MyRange}, on_active);
 
 on_inactive(Msg = {get_values_all, _SourcePid},
             {uninit, QueuedMessages, TriggerState, PreviousState}) ->
@@ -209,7 +218,8 @@ on_inactive(Msg = {get_values_best, _SourcePid},
             {uninit, QueuedMessages, TriggerState, PreviousState}) ->
     {uninit, msg_queue:add(QueuedMessages, Msg), TriggerState, PreviousState};
 
-on_inactive({web_debug_info, Requestor}, {uninit, QueuedMessages, _TriggerState, PreviousState} = State) ->
+on_inactive({web_debug_info, Requestor},
+            {uninit, QueuedMessages, _TriggerState, PreviousState} = State) ->
     % get a list of up to 50 queued messages to display:
     MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
                   || Message <- lists:sublist(QueuedMessages, 50)],
@@ -240,20 +250,24 @@ on_inactive(_Msg, State) ->
 %% @doc Message handler when the process is activated.
 -spec on_active(message(), full_state_active()) -> full_state_active();
                ({deactivate_gossip}, full_state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::full_state_inactive()}.
-on_active({deactivate_gossip}, {PreviousState, _State, _QueuedMessages, TriggerState}) ->
+on_active({deactivate_gossip},
+          {PreviousState, _State, _QueuedMessages, TriggerState, _MyRange}) ->
     log:log(info, "[ Gossip ~.0p ] deactivating...~n", [comm:this()]),
+    rm_loop:unsubscribe(self(), ?MODULE),
     gen_component:change_handler({uninit, msg_queue:new(), TriggerState, PreviousState},
                                  on_inactive);
 
-% ignore activate_gossip messages in active state
+% Only integrate the new range on activate_gossip messages in active state.
 % note: remove this if the gossip process is to be deactivated on leave (see
 % dht_node_move.erl). In the current implementation we can not distinguish
 % between the first join and a re-join but after every join, the process is
 % (re-)activated.
-on_active({activate_gossip}, State) ->
-    State;
+on_active({activate_gossip, NewRange},
+          {PreviousState, State, QueuedMessages, TriggerState, _OldMyRange}) ->
+    {PreviousState, State, QueuedMessages, TriggerState, NewRange};
 
-on_active({gossip_trigger}, {PreviousState, State, QueuedMessages, TriggerState}) ->
+on_active({gossip_trigger},
+          {PreviousState, State, QueuedMessages, TriggerState, MyRange}) ->
     % this message is received continuously when the Trigger calls
     % see gossip_trigger and gossip_interval in the scalaris.cfg file
     NewTriggerState = trigger:next(TriggerState),
@@ -261,7 +275,7 @@ on_active({gossip_trigger}, {PreviousState, State, QueuedMessages, TriggerState}
     % request a check whether we are the leader and can thus decide whether to
     % start a new round
     {NewPreviousState, NewState2} =
-        check_round(PreviousState, NewState1),
+        check_round(PreviousState, NewState1, MyRange),
     Round = gossip_state:get(NewState2, round),
     Initialized = gossip_state:get(NewState2, initialized),
     % only participate in (active) gossiping if we entered some valid round and
@@ -270,14 +284,14 @@ on_active({gossip_trigger}, {PreviousState, State, QueuedMessages, TriggerState}
         true -> request_random_node();
         false -> ok
     end,
-    {NewPreviousState, NewState2, QueuedMessages, NewTriggerState};
+    {NewPreviousState, NewState2, QueuedMessages, NewTriggerState, MyRange};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Responses to requests for information about the local node
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on_active({get_node_details_response, NodeDetails},
-   {PreviousState, State, QueuedMessages, TriggerState}) ->
+          {PreviousState, State, QueuedMessages, TriggerState, MyRange}) ->
     % this message is received when the (local) node was asked to tell us its
     % load and key range
 %%     io:format("gossip: got get_node_details_response: ~p~n",[NodeDetails]),
@@ -290,14 +304,18 @@ on_active({get_node_details_response, NodeDetails},
                 Load = node_details:get(NodeDetails, load),
                 {msg_queue:new(), integrate_local_info(State, Load)}
         end,
-    {PreviousState, NewState, NewQueuedMessages, TriggerState};
+    {PreviousState, NewState, NewQueuedMessages, TriggerState, MyRange};
+
+on_active({update_range, NewRange},
+          {PreviousState, State, QueuedMessages, TriggerState, _OldMyRange}) ->
+    {PreviousState, State, QueuedMessages, TriggerState, NewRange};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State exchange
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on_active({get_state, Source_PID, OtherValues} = Msg,
-   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
+          {MyPreviousState, MyState, QueuedMessages, TriggerState, MyRange}) ->
     % This message is received when a node asked our node for its state.
     % The piggy-backed other node's state will be used to update our own state
     % if we have already initialized it (otherwise postpone the message). A
@@ -307,21 +325,22 @@ on_active({get_state, Source_PID, OtherValues} = Msg,
         case Initialized of
             true ->
                 {QueuedMessages,
-                 integrate_state(OtherValues, MyPreviousState, MyState, true, Source_PID)};
+                 integrate_state(OtherValues, MyPreviousState, MyState, true,
+                                 Source_PID, MyRange)};
             false ->
                 {msg_queue:add(QueuedMessages, Msg),
-                 enter_round(MyPreviousState, MyState, OtherValues)}
+                 enter_round(MyPreviousState, MyState, OtherValues, MyRange)}
             end,
-    {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState};
+    {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState, MyRange};
 
 on_active({get_state_response, OtherValues},
-   {MyPreviousState, MyState, QueuedMessages, TriggerState}) ->
+          {MyPreviousState, MyState, QueuedMessages, TriggerState, MyRange}) ->
     % This message is received as a response to a get_state message and contains
     % another node's state. We will use it to update our own state
     % if both are valid.
     {MyNewPreviousState, MyNewState} =
-        integrate_state(OtherValues, MyPreviousState, MyState, false, none),
-    {MyNewPreviousState, MyNewState, QueuedMessages, TriggerState};
+        integrate_state(OtherValues, MyPreviousState, MyState, false, none, MyRange),
+    {MyNewPreviousState, MyNewState, QueuedMessages, TriggerState, MyRange};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contacting random nodes (response from cyclon)
@@ -332,18 +351,17 @@ on_active({cy_cache, []}, FullState)  ->
     FullState;
 
 on_active({cy_cache, [Node] = _Cache},
-    {_PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+          {_PreviousState, State, _QueuedMessages, _TriggerState, _MyRange} = FullState) ->
     % This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node. We will then contact this
     % random node and ask for a state exchange.
 %%     io:format("gossip: got random node from Cyclon: ~p~n",[_Cache]),
     % do not exchange states with itself
     case node:is_me(Node) of
-        false ->
-            comm:send_to_group_member(node:pidX(Node), gossip,
-                                         {get_state, comm:this(),
-                                          gossip_state:get(State, values)});
-        true -> ok
+        false -> comm:send_to_group_member(
+                   node:pidX(Node), gossip,
+                   {get_state, comm:this(), gossip_state:get(State, values)});
+        true  -> ok
     end,
     FullState;
 
@@ -352,14 +370,14 @@ on_active({cy_cache, [Node] = _Cache},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on_active({get_values_best, SourcePid},
-    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+          {PreviousState, State, _QueuedMessages, _TriggerState, _MyRange} = FullState) ->
     BestState = previous_or_current(PreviousState, State),
     BestValues = gossip_state:conv_state_to_extval(BestState),
     msg_get_values_best_response(SourcePid, BestValues),
     FullState;
 
 on_active({get_values_all, SourcePid},
-    {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+          {PreviousState, State, _QueuedMessages, _TriggerState, _MyRange} = FullState) ->
     PreviousValues = gossip_state:conv_state_to_extval(PreviousState),
     CurrentValues = gossip_state:conv_state_to_extval(State),
     BestState = previous_or_current(PreviousState, State),
@@ -372,7 +390,7 @@ on_active({get_values_all, SourcePid},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on_active({web_debug_info, Requestor},
-   {PreviousState, State, _QueuedMessages, _TriggerState} = FullState) ->
+          {PreviousState, State, _QueuedMessages, _TriggerState, _MyRange} = FullState) ->
     BestValues = gossip_state:conv_state_to_extval(previous_or_current(PreviousState, State)),
     KeyValueList =
         [{"prev_round",          gossip_state:get(PreviousState, round)},
@@ -415,11 +433,14 @@ on_active({web_debug_info, Requestor},
 % State update
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec integrate_state(gossip_state:values_internal(), state(), state(), true,
-                       comm:mypid()) -> {state(), state()}
-                    ; (gossip_state:values_internal(), state(), state(), false,
-                       any()) -> {state(), state()}.
-integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
+-spec integrate_state
+        (OtherValues::gossip_state:values_internal(), MyPrevState::state(),
+         MyState::state(), SendBack::true, Source_PID::comm:mypid(),
+         MyRange::intervals:interval()) -> {state(), state()};
+        (OtherValues::gossip_state:values_internal(), MyPrevState::state(),
+         MyState::state(), SendBack::false, Source_PID::any(),
+         MyRange::intervals:interval()) -> {state(), state()}.
+integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID, MyRange) ->
 %%     io:format("gossip:integrate_state: ~p~n",[{OtherValues, MyState}]),
     MyValues = gossip_state:get(MyState, values),
     Initialized = gossip_state:get(MyState, initialized),
@@ -432,7 +453,7 @@ integrate_state(OtherValues, MyPreviousState, MyState, SendBack, Source_PID) ->
             % received).
             (OtherRound > MyRound) ->
                 ShouldSend = false,
-                enter_round(MyPreviousState, MyState, OtherValues);
+                enter_round(MyPreviousState, MyState, OtherValues, MyRange);
             
             % We are in a higher round than the requesting node -> send it our
             % values if we have information about our own node. Do not update
@@ -607,19 +628,18 @@ integrate_local_info(MyState, Load) ->
 %% @doc Enters the given round and thus resets the current state with
 %%      information from another node's state. Also requests the own node's
 %%      load and key range to integrate into its own state.
--spec enter_round(state(), state(), gossip_state:values_internal()) -> {state(), state()}.
-enter_round(OldPreviousState, OldState, OtherValues) ->
+-spec enter_round(OldPrevState::state(), OldState::state(),
+                  OtherValues::gossip_state:values_internal(),
+                  MyRange::intervals:interval())
+        -> {OldState::state(), NewState::state()}.
+enter_round(OldPreviousState, OldState, OtherValues, MyRange) ->
     MyRound = gossip_state:get(OldState, round),
     OtherRound = gossip_state:get(OtherValues, round),
     case (MyRound =:= OtherRound) of 
         true -> {OldPreviousState, OldState};
         false ->
-            % note: no need to cache the neighborhood table, this call is quite rare
-            Neighbors = rm_loop:get_neighbors(rm_loop:get_neighbors_table()),
-            Node = nodelist:node(Neighbors),
-            Pred = nodelist:pred(Neighbors), 
             % set a size_inv value of 0 (only the leader sets 1)
-            NewState = new_state(OtherRound, Node, Pred, 0.0),
+            NewState = new_state(OtherRound, MyRange, 0.0),
             request_local_info(),
             {OldState, NewState}
     end.
@@ -631,9 +651,9 @@ enter_round(OldPreviousState, OldState, OtherValues) ->
 %% @doc Checks whether a new round should be started and starts a new round
 %%      if ?RT:hash_key(0) is in the interval between our predecessor and our
 %%      node.
--spec check_round(PreviousState::state(), State::state())
+-spec check_round(PreviousState::state(), State::state(), MyRange::intervals:interval())
         -> {NewPreviousState::state(), NewState::state()}.
-check_round(PreviousState, State) ->
+check_round(PreviousState, State, MyRange) ->
     Round = gossip_state:get(State, round),
     TriggerCount = gossip_state:get(State, triggered),
     ConvAvgCount = gossip_state:get(State, converge_avg_count),
@@ -646,17 +666,12 @@ check_round(PreviousState, State) ->
         true ->
             % condition to start new round met -> start new round if the node is the leader
             % note: no need to cache the neighborhood table, this call is quite rare
-            Neighbors = rm_loop:get_neighbors(rm_loop:get_neighbors_table()),
-            Node = nodelist:node(Neighbors),
-            Pred = nodelist:pred(Neighbors), 
-            case intervals:in(?RT:hash_key(0), node:mk_interval_between_nodes(Pred, Node)) of
-                % not the leader -> continue as normal with the old state
+            case is_leader(MyRange) of
                 false -> {PreviousState, State};
-                % leader -> start a new round
                 _ ->
                     % log:log(info, "gossip: start new round, I am the leader ~n"),
                     % the leader must set the size_inv to 1 (and only the leader)
-                    NewState = new_state(Round + 1, Node, Pred, 1.0),
+                    NewState = new_state(Round + 1, MyRange, 1.0),
                     request_local_info(),
                     {State, NewState}
             end;
@@ -674,12 +689,13 @@ request_local_info() ->
     comm:send_local(DHT_Node, {get_node_details, comm:this(), [load]}).
 
 %% @doc Creates a new state. 
--spec new_state(Round::gossip_state:round(), Node::node:node_type(),
-                Pred::node:node_type(), SizeInv::gossip_state:size_inv()) -> state().
-new_state(Round, Node, Pred, SizeInv) ->
-    NewValues1 = gossip_state:set(gossip_state:new_internal(), size_inv, SizeInv),
-    NewValues2 = gossip_state:set(NewValues1, avg_kr,
-                                  calc_initial_avg_kr(Pred, Node)),
+-spec new_state(Round::gossip_state:round(), MyRange::intervals:interval(),
+                SizeInv::gossip_state:size_inv()) -> state().
+new_state(Round, MyRange, SizeInv) ->
+    NewValues1 = gossip_state:set(
+                   gossip_state:new_internal(), size_inv, SizeInv),
+    NewValues2 = gossip_state:set(
+                   NewValues1, avg_kr, calc_initial_avg_kr(MyRange)),
     NewValues3 = gossip_state:set(NewValues2, round, Round),
     gossip_state:new_state(NewValues3).
     
@@ -699,16 +715,39 @@ request_random_node() ->
 %%      predecessor. If the second is larger than the first it wraps around and
 %%      thus the difference is the number of keys from the predecessor to the
 %%      end (of the ring) and from the start to the current node.
--spec calc_initial_avg_kr(Pred::node:node_type(), Me::node:node_type()) -> integer() | unknown.
-calc_initial_avg_kr(Pred, Me) ->
-    PredKey = node:id(Pred),
-    MyKey = node:id(Me),
+%%      Pre: MyRange is continuous
+-spec calc_initial_avg_kr(MyRange::intervals:interval()) -> integer() | unknown.
+calc_initial_avg_kr(MyRange) ->
+    {_, PredKey, MyKey, _} = intervals:get_bounds(MyRange),
     % we don't know whether we can subtract keys of type ?RT:key()
     % -> try it and if it fails, return unknown
     try ?RT:get_range(PredKey, MyKey)
     catch
         throw:not_supported -> unknown
     end.
+
+%% @doc Checks whether the node is the current leader.
+-spec is_leader(MyRange::intervals:interval()) -> boolean().
+is_leader(MyRange) ->
+    intervals:in(?RT:hash_key(0), MyRange).
+
+%% @doc Checks whether the node's range has changed, i.e. either the node
+%%      itself or its pred changed.
+-spec rm_my_range_changed(OldNeighbors::nodelist:neighborhood(),
+                          NewNeighbors::nodelist:neighborhood()) -> boolean().
+rm_my_range_changed(OldNeighbors, NewNeighbors) ->
+    nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
+        nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors).
+
+%% @doc Notifies the node's gossip process of a changed range.
+%%      Used to subscribe to the ring maintenance. 
+-spec rm_send_new_range(Subscriber::pid(), Tag::?MODULE,
+                        OldNeighbors::nodelist:neighborhood(),
+                        NewNeighbors::nodelist:neighborhood()) -> ok.
+rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors) ->
+    NewRange = node:mk_interval_between_nodes(nodelist:pred(NewNeighbors),
+                                              nodelist:node(NewNeighbors)),
+    comm:send_local(Pid, {update_range, NewRange}).
 
 %% @doc Checks whether config parameters of the gossip process exist and are
 %%      valid.

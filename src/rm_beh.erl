@@ -27,18 +27,20 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {init, 4},
-     {on, 3},
-     {zombie_node, 3},
-     {crashed_node, 3},
-     {new_pred, 3},
-     {new_succ, 3},
-     {leave, 2},
-     {remove_pred, 4},
-     {remove_succ, 4},
-     {updated_node, 4},
-     {get_web_debug_info, 2},
-     {check_config, 0}
+     {get_neighbors, 1},
+     {init, 3},
+     {on, 2},
+     {zombie_node, 2},
+     {crashed_node, 2},
+     {new_pred, 2},
+     {new_succ, 2},
+     {leave, 1},
+     {remove_pred, 3},
+     {remove_succ, 3},
+     {update_node, 2},
+     {get_web_debug_info, 1},
+     {check_config, 0},
+     {unittest_create_state, 1}
     ];
 
 behaviour_info(_Other) ->

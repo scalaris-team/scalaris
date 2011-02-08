@@ -24,125 +24,120 @@
 
 -behavior(rm_beh).
 
--type(state() :: trigger:state()).
+-type(state() :: {Neighbors    :: nodelist:neighborhood(),
+                  TriggerState :: trigger:state()}).
 
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::
-    {get_succlist, Source_Pid::comm:mypid()} |
-    {stabilize} |
-    {get_node_details_response, NodeDetails::node_details:node_details()} |
-    {get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
+    {rm_trigger} |
+    {rm, get_succlist, Source_Pid::comm:mypid()} |
+    {{get_node_details_response, NodeDetails::node_details:node_details()}, rm} |
+    {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
 
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").
+
+get_neighbors({Neighbors, _TriggerState}) ->
+    Neighbors.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initialises the state when rm_loop receives an init_rm message.
-init(Table, Me, Pred, Succ) ->
+init(Me, Pred, Succ) ->
     Trigger = config:read(ringmaintenance_trigger),
-    TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, stabilize),
+    TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, rm_trigger),
     NewTriggerState = trigger:now(TriggerState),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
-    rm_loop:update_neighbors(Table, Neighborhood),
     get_successorlist(node:pidX(Succ)),
-    NewTriggerState.
+    {Neighborhood, NewTriggerState}.
+
+unittest_create_state(Neighbors) ->
+    Trigger = config:read(ringmaintenance_trigger),
+    TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, rm_trigger),
+    {Neighbors, TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the module is fully initialized.
-on({get_succlist, Source_Pid}, TriggerState, NeighbTable) ->
-    Neighborhood = rm_loop:get_neighbors(NeighbTable),
-    comm:send(Source_Pid, {get_succlist_response,
-                           nodelist:node(Neighborhood),
-                           nodelist:succs(Neighborhood)}),
-    TriggerState;
-
-on({stabilize}, TriggerState, NeighbTable) ->
+on({rm_trigger}, {Neighborhood, TriggerState}) ->
     % new stabilization interval
-    Neighborhood = rm_loop:get_neighbors(NeighbTable),
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
-                          {get_node_details, comm:this(), [pred]});
+                          {get_node_details, comm:this_with_cookie(rm), [pred]});
         _    -> ok
     end,
-    trigger:next(TriggerState);
+    {Neighborhood, trigger:next(TriggerState)};
+
+on({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
+    comm:send(Source_Pid, {rm, get_succlist_response,
+                           nodelist:node(Neighborhood),
+                           nodelist:succs(Neighborhood)}),
+    State;
 
 % got node_details from our successor
-on({get_node_details_response, NodeDetails}, TriggerState, NeighbTable)  ->
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
+on({{get_node_details_response, NodeDetails}, rm},
+   {OldNeighborhood, TriggerState})  ->
     SuccsPred = node_details:get(NodeDetails, pred),
     NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [SuccsPred],
                                          predListLength(), succListLength()),
-    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
     get_successorlist(node:pidX(nodelist:succ(NewNeighborhood))),
-    TriggerState;
+    {NewNeighborhood, TriggerState};
 
-on({get_succlist_response, Succ, SuccsSuccList}, TriggerState, NeighbTable) ->
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
+on({rm, get_succlist_response, Succ, SuccsSuccList},
+   {OldNeighborhood, TriggerState}) ->
     NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [Succ | SuccsSuccList],
                                          predListLength(), succListLength()),
-    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
     %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
     rm_loop:notify_new_pred(node:pidX(nodelist:succ(NewNeighborhood)),
                             nodelist:node(NewNeighborhood)),
-    TriggerState.
+    {NewNeighborhood, TriggerState};
 
-new_pred(TriggerState, NeighbTable, NewPred) ->
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
+on(_, _State) -> unknown_event.
+
+new_pred({OldNeighborhood, TriggerState}, NewPred) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewPred,
                                         predListLength(), succListLength()),
-    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
-    TriggerState.
+    {NewNeighborhood, TriggerState}.
 
-new_succ(TriggerState, NeighbTable, NewSucc) ->
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
+new_succ({OldNeighborhood, TriggerState}, NewSucc) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewSucc,
                                         predListLength(), succListLength()),
-    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
-    TriggerState.
+    {NewNeighborhood, TriggerState}.
 
-remove_pred(TriggerState, NeighbTable, OldPred, PredsPred) ->
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
+remove_pred({OldNeighborhood, TriggerState}, OldPred, PredsPred) ->
     NewNbh1 = nodelist:remove(OldPred, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, predListLength(), succListLength()),
-    rm_loop:update_neighbors(NeighbTable, NewNbh2),
-    TriggerState.
+    {NewNbh2, TriggerState}.
 
-remove_succ(TriggerState, NeighbTable, OldSucc, SuccsSucc) ->
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
+remove_succ({OldNeighborhood, TriggerState}, OldSucc, SuccsSucc) ->
     NewNbh1 = nodelist:remove(OldSucc, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
-    rm_loop:update_neighbors(NeighbTable, NewNbh2),
-    TriggerState.
+    {NewNbh2, TriggerState}.
 
-updated_node(TriggerState, _NeighbTable, _OldMe, _NewMe) ->
+update_node({OldNeighborhood, TriggerState}, NewMe) ->
+    NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     NewTriggerState = trigger:now(TriggerState), % inform neighbors
-    NewTriggerState.
+    {NewNeighborhood, NewTriggerState}.
 
-leave(_State, _NeighbTable) -> ok.
+leave(_State) -> ok.
 
 % failure detector reported dead node
-crashed_node(TriggerState, NeighbTable, DeadPid) ->
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
+crashed_node({OldNeighborhood, TriggerState}, DeadPid) ->
     NewNeighborhood = nodelist:remove(DeadPid, OldNeighborhood),
-    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
-    TriggerState.
+    {NewNeighborhood, TriggerState}.
 
 % dead-node-cache reported dead node to be alive again
-zombie_node(TriggerState, NeighbTable, Node) ->
+zombie_node({OldNeighborhood, TriggerState}, Node) ->
     % this node could potentially be useful as it has been in our state before
-    OldNeighborhood = rm_loop:get_neighbors(NeighbTable),
     NewNeighborhood = nodelist:add_node(OldNeighborhood, Node,
                                         predListLength(), succListLength()),
-    rm_loop:update_neighbors(NeighbTable, NewNeighborhood),
-    TriggerState.
+    {NewNeighborhood, TriggerState}.
 
-get_web_debug_info(_State, _NeighbTable) -> [].
+get_web_debug_info(_State) -> [].
 
 %% @doc Checks whether config parameters of the rm_chord process exist and are
 %%      valid.
@@ -162,11 +157,11 @@ check_config() ->
 
 % @private
 
-%% @doc Sends a message to the remote node's ring_maintenance process asking for
+%% @doc Sends a message to the remote node's dht_node process asking for
 %%      its list of successors.
 -spec get_successorlist(comm:mypid()) -> ok.
 get_successorlist(RemoteDhtNodePid) ->
-    comm:send_to_group_member(RemoteDhtNodePid, ring_maintenance, {get_succlist, comm:this()}).
+    comm:send(RemoteDhtNodePid, {rm, get_succlist, comm:this()}).
 
 %% @doc the length of the successor list
 -spec predListLength() -> pos_integer().

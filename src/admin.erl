@@ -295,5 +295,5 @@ dd_check_ring() ->
 -spec dd_check_ring(non_neg_integer()) -> {token_on_the_way}.
 dd_check_ring(Token) ->
     One = pid_groups:find_a(dht_node),
-    _ = comm:send_local(One, {send_to_group_member, ring_maintenance, {init_check_ring, Token}}),
+    _ = comm:send_local(One, {rm, init_check_ring, Token}),
     {token_on_the_way}.

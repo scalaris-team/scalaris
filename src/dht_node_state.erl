@@ -27,6 +27,7 @@
          get/2,
          dump/1,
          set_rt/2,
+         set_rm/2,
          set_db/2,
          details/1, details/2,
          % node responsibilities:
@@ -50,7 +51,7 @@
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
-                neighbors  = ?required(state, neighbors) :: tid(),
+                rm_state   = ?required(state, rm_state)  :: rm_loop:state(),
                 join_time  = ?required(state, join_time) :: util:time(),
                 trans_log  = ?required(state, trans_log) :: #translog{},
                 db         = ?required(state, db)        :: ?DB:db(),
@@ -67,10 +68,10 @@
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
 
--spec new(?RT:external_rt(), Neighbors::tid(), ?DB:db()) -> state().
-new(RT, NeighbTable, DB) ->
+-spec new(?RT:external_rt(), RMState::rm_loop:state(), ?DB:db()) -> state().
+new(RT, RMState, DB) ->
     #state{rt = RT,
-           neighbors = NeighbTable,
+           rm_state = RMState,
            join_time = now(),
            trans_log = #translog{tid_tm_mapping = dict:new(),
                                  decided        = gb_trees:empty(),
@@ -133,31 +134,32 @@ new(RT, NeighbTable, DB) ->
          (state(), load) -> integer();
          (state(), slide_pred) -> slide_op:slide_op() | null;
          (state(), slide_succ) -> slide_op:slide_op() | null;
-         (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}].
-get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
+         (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
+         (state(), rm_state) -> rm_loop:state().
+get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc, msg_fwd=MsgFwd,
            db_range=DBRange}, Key) ->
     case Key of
         rt         -> RT;
         rt_size    -> ?RT:get_size(RT);
-        neighbors  -> rm_loop:get_neighbors(NeighbTable);
-        succlist   -> nodelist:succs(rm_loop:get_neighbors(NeighbTable));
-        succ       -> nodelist:succ(rm_loop:get_neighbors(NeighbTable));
-        succ_id    -> node:id(nodelist:succ(rm_loop:get_neighbors(NeighbTable)));
-        succ_pid   -> node:pidX(nodelist:succ(rm_loop:get_neighbors(NeighbTable)));
-        predlist   -> nodelist:preds(rm_loop:get_neighbors(NeighbTable));
-        pred       -> nodelist:pred(rm_loop:get_neighbors(NeighbTable));
-        pred_id    -> node:id(nodelist:pred(rm_loop:get_neighbors(NeighbTable)));
-        pred_pid   -> node:pidX(nodelist:pred(rm_loop:get_neighbors(NeighbTable)));
-        node       -> nodelist:node(rm_loop:get_neighbors(NeighbTable));
-        node_id    -> nodelist:nodeid(rm_loop:get_neighbors(NeighbTable));
-        my_range   -> Neighbors = rm_loop:get_neighbors(NeighbTable),
+        neighbors  -> rm_loop:get_neighbors(RMState);
+        succlist   -> nodelist:succs(rm_loop:get_neighbors(RMState));
+        succ       -> nodelist:succ(rm_loop:get_neighbors(RMState));
+        succ_id    -> node:id(nodelist:succ(rm_loop:get_neighbors(RMState)));
+        succ_pid   -> node:pidX(nodelist:succ(rm_loop:get_neighbors(RMState)));
+        predlist   -> nodelist:preds(rm_loop:get_neighbors(RMState));
+        pred       -> nodelist:pred(rm_loop:get_neighbors(RMState));
+        pred_id    -> node:id(nodelist:pred(rm_loop:get_neighbors(RMState)));
+        pred_pid   -> node:pidX(nodelist:pred(rm_loop:get_neighbors(RMState)));
+        node       -> nodelist:node(rm_loop:get_neighbors(RMState));
+        node_id    -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
+        my_range   -> Neighbors = rm_loop:get_neighbors(RMState),
                       node:mk_interval_between_nodes(
                         nodelist:pred(Neighbors),
                         nodelist:node(Neighbors));
         db_range   -> DBRange;
-        succ_range -> Neighbors = rm_loop:get_neighbors(NeighbTable),
+        succ_range -> Neighbors = rm_loop:get_neighbors(RMState),
                       node:mk_interval_between_nodes(
                         nodelist:node(Neighbors),
                         nodelist:succ(Neighbors));
@@ -169,25 +171,26 @@ get(#state{rt=RT, neighbors=NeighbTable, join_time=JoinTime,
         load       -> ?DB:get_load(DB);
         slide_pred -> SlidePred;
         slide_succ -> SlideSucc;
-        msg_fwd    -> MsgFwd
+        msg_fwd    -> MsgFwd;
+        rm_state   -> RMState
     end.
 
 %% @doc Checks whether the current node has already left the ring, i.e. the has
 %%      already changed his ID in order to leave or jump.
 -spec has_left(State::state()) -> boolean().
-has_left(#state{neighbors=NeighbTable}) ->
-    rm_loop:has_left(NeighbTable).
+has_left(#state{rm_state=RMState}) ->
+    rm_loop:has_left(RMState).
 
 %% @doc Checks whether the given key is in the node's range, i.e. the node is
 %%      responsible for this key.
 %%      Beware of race conditions sing the neighborhood may have changed at
 %%      the next call.
 -spec is_responsible(Key::intervals:key(), State::state()) -> boolean().
-is_responsible(Key, #state{neighbors=NeighbTable}) ->
-    case rm_loop:has_left(NeighbTable) of
+is_responsible(Key, #state{rm_state=RMState}) ->
+    case rm_loop:has_left(RMState) of
         true -> false;
         _ ->
-            Neighbors = rm_loop:get_neighbors(NeighbTable),
+            Neighbors = rm_loop:get_neighbors(RMState),
             intervals:in(Key,
                          node:mk_interval_between_nodes(
                            nodelist:pred(Neighbors), nodelist:node(Neighbors)))
@@ -234,6 +237,9 @@ set_db(State, DB) -> State#state{db = DB}.
 
 -spec set_rt(State::state(), NewRT::?RT:external_rt()) -> state().
 set_rt(State, RT) -> State#state{rt = RT}.
+
+-spec set_rm(State::state(), NewRMState::rm_loop:state()) -> state().
+set_rm(State, RMState) -> State#state{rm_state = RMState}.
 
 %% @doc Sets the transaction log.
 -spec set_trans_log(State::state(), NewLog::#translog{}) -> state().

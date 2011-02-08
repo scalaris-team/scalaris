@@ -300,6 +300,7 @@ md5(_Config) ->
     ok.
 
 next_hop_setup() ->
+    pid_groups:join_as("performance_SUITE", dht_node),
     Pred = node:new(pred, 1, 0),
     Me = node:new(me, 2, 0),
     Succ = node:new(succ, 3, 0),
@@ -312,18 +313,14 @@ next_hop_setup() ->
                gb_trees:enter(102, node:new(rt7, 102, 0),
                 gb_trees:enter(103, node:new(rt8, 103, 0),
                  rt_chord:empty_ext(Succ))))))))),
-    % note: the ets table will be deleted automatically since ct starts a
-    % process for each test case (an ets table dies with its owner)
-    TableName = list_to_atom("performance_SUITE:rm_tman"),
-    NeighbTable = ets:new(TableName, [ordered_set, private]),
-    Neighbors =
-        nodelist:add_nodes(
-          nodelist:new_neighborhood(Pred, Me, Succ),
-          [node:new(list_to_atom(lists:flatten(io_lib:format("succ~w", [Id]))), Id + 2, 0) || Id <- lists:seq(2, config:read(succ_list_length))] ++
-              [node:new(list_to_atom(lists:flatten(io_lib:format("pred~w", [Id]))), 1022 - Id, 0) || Id <- lists:seq(2, config:read(pred_list_length))],
-          config:read(succ_list_length), config:read(pred_list_length)),
-    ets:insert(NeighbTable, {neighbors, Neighbors}),
-    _State = dht_node_state:new(RT, NeighbTable, db).
+    RMState = rm_loop:unittest_create_state(
+                nodelist:add_nodes(
+                  nodelist:new_neighborhood(Pred, Me, Succ),
+                  [node:new(list_to_atom(lists:flatten(io_lib:format("succ~w", [Id]))), Id + 2, 0) || Id <- lists:seq(2, config:read(succ_list_length))] ++
+                      [node:new(list_to_atom(lists:flatten(io_lib:format("pred~w", [Id]))), 1022 - Id, 0) || Id <- lists:seq(2, config:read(pred_list_length))],
+                  config:read(succ_list_length), config:read(pred_list_length)),
+                false),
+    _State = dht_node_state:new(RT, RMState, db).
 
 next_hop_no_neighbors(_Config) ->
     State = next_hop_setup(),
