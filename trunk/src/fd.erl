@@ -133,6 +133,11 @@ on({add_watching_of, Pid}, State) ->
     forward_to_hbs(Pid, {add_watching_of, Pid}),
     State;
 
+on({del_watching_of, Pid}, State) ->
+    ?TRACE("FD: del_watching_of ~p~n", [Pid]),
+    forward_to_hbs(Pid, {del_watching_of, Pid}),
+    State;
+
 on({unittest_report_down, Pid}, State) ->
     ?TRACE("FD: unittest_report_down p~n", [Pid]),
     forward_to_hbs(
