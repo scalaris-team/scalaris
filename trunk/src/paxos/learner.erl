@@ -111,7 +111,7 @@ on({acceptor_accepted, PaxosID, Round, Value}, ETSTableName = State) ->
     MyState = case pdb:get(PaxosID, ETSTableName) of
                   undefined ->
                       msg_delay:send_local(
-                        config:read(learner_noinit_timeout) / 1000, self(),
+                        config:read(learner_noinit_timeout) div 1000, self(),
                         {learner_deleteid_if_still_no_client, PaxosID}),
                       learner_state:new(PaxosID, 128, none, no_cookie);
                   StateForID -> StateForID
@@ -158,5 +158,6 @@ decide(PaxosID, State) ->
 -spec check_config() -> boolean().
 check_config() ->
     config:is_integer(learner_noinit_timeout) and
+    config:is_greater_than_equal(learner_noinit_timeout, 1000) and
     config:is_greater_than(learner_noinit_timeout, tx_timeout).
 

@@ -240,7 +240,7 @@ on({timeout_id, Id}, {_Reps, _MajOk, _MajDeny, Table} = State) ->
 my_get_entry(Id, Table) ->
     case pdb:get(Id, Table) of
         undefined ->
-            msg_delay:send_local(config:read(transaction_lookup_timeout)/1000,
+            msg_delay:send_local(config:read(transaction_lookup_timeout) div 1000,
                                  self(), {timeout_id, Id}),
             rdht_tx_read_state:new(Id);
         Any -> Any
@@ -301,4 +301,4 @@ check_config() ->
     config:is_greater_than(replication_factor, 0) and
 
     config:is_integer(transaction_lookup_timeout) and
-    config:is_greater_than(transaction_lookup_timeout, 0).
+    config:is_greater_than_equal(transaction_lookup_timeout, 1000).
