@@ -49,16 +49,16 @@ bestStddev(Ops, MinSum2Change) ->
                                 -> boolean()))
         -> [lb_op:lb_op()].
 bestStddev(Ops, MinSum2Change, SortFun) ->
-%%     io:format("bestStddev(~.0p, ~.0p)~n", [Ops, MinSum2Change]),
+%%     ct:pal("[ ~.0p ] bestStddev(~.0p, ~.0p)~n", [self(), Ops, MinSum2Change]),
     OpsWithSum2Change =
         [{Op, Sum2Change} || Op <- Ops,
                              not lb_op:is_no_op(Op),
                              Sum2Change <- [calc_sum2Change(Op)],
                              MinSum2Change =:= plus_infinity orelse
                                  Sum2Change < MinSum2Change],
-%%     io:format("OpsWithSum2Change: ~.0p~n", [OpsWithSum2Change]),
+%%     ct:pal("[ ~.0p ] OpsWithSum2Change: ~.0p~n", [self(), OpsWithSum2Change]),
     OpsWithSum2Change_sort = lists:sort(SortFun, OpsWithSum2Change),
-%%     io:format("OpsWithSum2Change_sort: ~.0p~n", [OpsWithSum2Change_sort]),
+%%     ct:pal("[ ~.0p ] OpsWithSum2Change_sort: ~.0p~n", [self(), OpsWithSum2Change_sort]),
     [Op || {Op, _Sum2Change} <- OpsWithSum2Change_sort].
 
 %% @doc Calculates the change of the sum of the square of the nodes' loads
@@ -87,13 +87,14 @@ calc_sum2Change(Op) ->
 split_by_load(DhtNodeState, TargetLoad) ->
     DB = dht_node_state:get(DhtNodeState, db),
     Neighbors = dht_node_state:get(DhtNodeState, neighbors),
+%%     ct:pal("[ ~.0p ] data: ~.0p", [self(), ?DB:get_data(DB)]),
     {SplitKey, TargetLoadNew} =
         ?DB:get_split_key(DB, node:id(nodelist:pred(Neighbors)), TargetLoad, forward),
     _ = case intervals:in(SplitKey, nodelist:node_range(Neighbors)) of
             false -> erlang:throw('no key in range');
             _     -> ok
         end,
-%%     io:format(" TN: ~.0p, SK: ~.0p~n", [TargetLoadNew, SplitKey]),
+%%     ct:pal("[ ~.0p ]  TN: ~.0p, SK: ~.0p~n", [self(), TargetLoadNew, SplitKey]),
     {SplitKey, TargetLoadNew}.
 
 %% @doc Returns the SplitKey that splits the current node's address range in
@@ -106,8 +107,8 @@ split_my_range(DhtNodeState, SelectedKey) ->
     SplitKey = try ?RT:get_split_key(MyPredId, MyNodeId, {1, 2})
                catch throw:not_supported -> SelectedKey
                end,
-%%     io:format("Pred: ~.0p, My: ~.0p,~nSplit: ~.0p, Selected: ~.0p~n",
-%%               [MyPredId, MyNodeId, SplitKey, SelectedKey]),
+%%     ct:pal("[ ~.0p ] Pred: ~.0p, My: ~.0p,~nSplit: ~.0p, Selected: ~.0p~n",
+%%            [self(), MyPredId, MyNodeId, SplitKey, SelectedKey]),
     Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
     DB = dht_node_state:get(DhtNodeState, db),
     TargetLoadNew = ?DB:get_load(DB, Interval),

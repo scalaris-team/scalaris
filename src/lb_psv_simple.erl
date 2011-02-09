@@ -57,41 +57,51 @@ get_number_of_samples_remote(SourcePid, Connection) ->
 %%      with all the data needed in sort_candidates/1.
 %%      Note: this is executed at an existing node.
 create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
-    Candidate =
-        try
-            MyNode = dht_node_state:get(DhtNodeState, node),
-            MyNodeId = node:id(MyNode),
-            case SelectedKey of
-                MyNodeId ->
-                    log:log(warn, "[ Node ~w ] join requested for my ID, "
-                                "sending no_op...", [self()]),
-                    lb_op:no_op();
-                _ ->
-                    MyPredId = dht_node_state:get(DhtNodeState, pred_id),
-                    MyLoad = dht_node_state:get(DhtNodeState, load),
-                    DB = dht_node_state:get(DhtNodeState, db),
-                    Interval = node:mk_interval_between_ids(MyPredId, SelectedKey),
-                    OtherLoadNew = ?DB:get_load(DB, Interval),
-                    MyLoadNew = MyLoad - OtherLoadNew,
-                    MyNodeDetails = node_details:set(
-                                      node_details:set(node_details:new(), node, MyNode), load, MyLoad),
-                    MyNodeDetailsNew = node_details:set(MyNodeDetails, load, MyLoadNew),
-                    OtherNodeDetails = node_details:set(node_details:new(), load, 0),
-                    OtherNodeDetailsNew = node_details:set(
-                                            node_details:set(node_details:new(), new_key, SelectedKey), load, OtherLoadNew),
-                    lb_op:slide_op(OtherNodeDetails, MyNodeDetails,
-                                   OtherNodeDetailsNew, MyNodeDetailsNew)
-            end
-        catch
-            Error:Reason ->
-                log:log(error, "[ Node ~w ] could not create a candidate "
-                            "for another node: ~.0p:~.0p~n"
-                            "  SelectedKey: ~.0p, SourcePid: ~.0p~n  State: ~.0p",
-                        [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
-                lb_op:no_op()
-        end,
-    ?TRACE_SEND(SourcePid, {join, get_candidate_response, SelectedKey, Candidate, Conn}),
-    comm:send(SourcePid, {join, get_candidate_response, SelectedKey, Candidate, Conn}),
+    case dht_node_state:get(DhtNodeState, slide_pred) of
+        null ->
+            Candidate =
+                try
+                    MyNode = dht_node_state:get(DhtNodeState, node),
+                    MyNodeId = node:id(MyNode),
+                    case SelectedKey of
+                        MyNodeId ->
+                            log:log(warn, "[ Node ~w ] join requested for my ID, "
+                                        "sending no_op...", [self()]),
+                            lb_op:no_op();
+                        _ ->
+                            MyPredId = dht_node_state:get(DhtNodeState, pred_id),
+                            MyLoad = dht_node_state:get(DhtNodeState, load),
+                            DB = dht_node_state:get(DhtNodeState, db),
+                            Interval = node:mk_interval_between_ids(MyPredId, SelectedKey),
+                            OtherLoadNew = ?DB:get_load(DB, Interval),
+                            MyLoadNew = MyLoad - OtherLoadNew,
+                            MyNodeDetails = node_details:set(
+                                              node_details:set(node_details:new(), node, MyNode), load, MyLoad),
+                            MyNodeDetailsNew = node_details:set(MyNodeDetails, load, MyLoadNew),
+                            OtherNodeDetails = node_details:set(node_details:new(), load, 0),
+                            OtherNodeDetailsNew = node_details:set(
+                                                    node_details:set(node_details:new(), new_key, SelectedKey), load, OtherLoadNew),
+                            lb_op:slide_op(OtherNodeDetails, MyNodeDetails,
+                                           OtherNodeDetailsNew, MyNodeDetailsNew)
+                    end
+                catch
+                    Error:Reason ->
+                        log:log(error, "[ Node ~w ] could not create a candidate "
+                                    "for another node: ~.0p:~.0p~n"
+                                    "  SelectedKey: ~.0p, SourcePid: ~.0p~n  State: ~.0p",
+                                [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
+                        lb_op:no_op()
+                end,
+            Msg = {join, get_candidate_response, SelectedKey, Candidate, Conn},
+            ?TRACE_SEND(SourcePid, Msg),
+            comm:send(SourcePid, Msg);
+        _ ->
+            % postpone message:
+            Msg = {join, get_candidate, SourcePid, SelectedKey, ?MODULE, Conn},
+            ?TRACE_SEND(SourcePid, Msg),
+            _ = comm:send_local_after(100, self(), Msg),
+            ok
+    end,
     DhtNodeState.
 
 %% @doc Sorts all provided operations so that the one with the biggest change

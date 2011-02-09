@@ -25,6 +25,11 @@
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
+%-define(TRACE(X,Y), ct:pal(X,Y)).
+-define(TRACE(X,Y), ok).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p)~n", [self(), Pid, Msg])).
+-define(TRACE1(Msg, State), ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
+
 -behaviour(lb_psv_beh).
 -include("lb_psv_beh.hrl").
 
@@ -53,80 +58,108 @@ get_number_of_samples_remote(SourcePid, Connection) ->
 %%      with all the data needed in sort_candidates/1.
 %%      Note: this is executed at an existing node.
 create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
-    MyPidWithCookie =
-        comm:self_with_cookie({join, ?MODULE,
-                               {create_join, SelectedKey, SourcePid, Conn}}),
-    GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {get_values_best, MyPidWithCookie}),
+    case dht_node_state:get(DhtNodeState, slide_pred) of
+        null ->
+            MyPidWithCookie =
+                comm:self_with_cookie({join, ?MODULE,
+                                       {create_join, SelectedKey, SourcePid, Conn}}),
+            GossipPid = pid_groups:get_my(gossip),
+            Msg = {get_values_best, MyPidWithCookie},
+            ?TRACE_SEND(GossipPid, Msg),
+            comm:send_local(GossipPid, Msg);
+        _ ->
+            % postpone message:
+            Msg = {join, get_candidate, SourcePid, SelectedKey, ?MODULE, Conn},
+            ?TRACE_SEND(SourcePid, Msg),
+            _ = comm:send_local_after(100, self(), Msg),
+            ok
+    end,
     DhtNodeState.
 
 -spec create_join2(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(),
                    SourcePid::comm:mypid(), BestValues::gossip_state:values(),
                    Conn::dht_node_join:connection()) -> dht_node_state:state().
 create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
-    Candidate =
-        try
-            MyNode = dht_node_state:get(DhtNodeState, node),
-            MyNodeId = node:id(MyNode),
-            MyLoad = dht_node_state:get(DhtNodeState, load),
-            {SplitKey, OtherLoadNew} =
-                case MyLoad >= 2 of
-                    true ->
-                        TargetLoad =
-                            case gossip_state:get(BestValues, avgLoad) of
-                                unknown -> util:floor(MyLoad / 2);
-                                AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
-                                    util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
-                                _       -> util:floor(MyLoad / 2)
-                            end,
-%%                         io:format("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
-                        try lb_common:split_by_load(DhtNodeState, TargetLoad)
-                        catch
-                            throw:'no key in range' ->
-%%                                 log:log(info, "[ Node ~w ] could not split load - no key in my range, "
-%%                                             "splitting address range instead", [self()]),
-                                lb_common:split_my_range(DhtNodeState, SelectedKey);
-                            'EXIT':{undef, _} ->
-                                % splitting load did not work because ?DB:get_chunk is not
-                                % yet available in all DB implementations
-                                % -> split address range
+    case dht_node_state:get(DhtNodeState, slide_pred) of
+        null ->
+            Candidate =
+                try
+                    MyNode = dht_node_state:get(DhtNodeState, node),
+                    MyNodeId = node:id(MyNode),
+                    MyLoad = dht_node_state:get(DhtNodeState, load),
+                    {SplitKey, OtherLoadNew} =
+                        case MyLoad >= 2 of
+                            true ->
+%%                                 ct:pal("[ ~.0p ] trying split by load", [self()]),
+                                TargetLoad =
+                                    case gossip_state:get(BestValues, avgLoad) of
+                                        unknown -> util:floor(MyLoad / 2);
+                                        AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
+                                            util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
+                                        _       -> util:floor(MyLoad / 2)
+                                    end,
+%%                                 ct:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
+                                try lb_common:split_by_load(DhtNodeState, TargetLoad)
+                                catch
+                                    throw:'no key in range' ->
+                                        %%                                 log:log(info, "[ Node ~w ] could not split load - no key in my range, "
+                                        %%                                             "splitting address range instead", [self()]),
+                                        lb_common:split_my_range(DhtNodeState, SelectedKey);
+                                    'EXIT':{undef, _} ->
+                                        % splitting load did not work because ?DB:get_chunk is not
+                                        % yet available in all DB implementations
+                                        % -> split address range
+                                        lb_common:split_my_range(DhtNodeState, SelectedKey)
+                                end;
+                            _ -> % split address range (fall-back):
+%%                                 ct:pal("[ ~.0p ] trying split by address range", [self()]),
                                 lb_common:split_my_range(DhtNodeState, SelectedKey)
-                        end;
-                    _ -> % split address range (fall-back):
-                        lb_common:split_my_range(DhtNodeState, SelectedKey)
+                        end,
+                    MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),
+                    case SplitKey of
+                        MyNodeId ->
+                            log:log(warn, "[ Node ~w ] join requested for my ID, "
+                                        "sending no_op...", [self()]),
+                            lb_op:no_op();
+                        MyPredId ->
+                            log:log(warn, "[ Node ~w ] join requested for my pred's ID, "
+                                        "sending no_op...", [self()]),
+                            lb_op:no_op();
+                        _ ->
+                            MyLoadNew = MyLoad - OtherLoadNew,
+                            MyNodeDetails1 = node_details:set(node_details:new(), node, MyNode),
+                            MyNodeDetails = node_details:set(MyNodeDetails1, load, MyLoad),
+                            MyNodeDetailsNew = node_details:set(MyNodeDetails, load, MyLoadNew),
+                            OtherNodeDetails = node_details:set(node_details:new(), load, 0),
+                            OtherNodeDetailsNew1 = node_details:set(node_details:new(), new_key, SplitKey),
+                            OtherNodeDetailsNew2 = node_details:set(OtherNodeDetailsNew1, load, OtherLoadNew),
+                            Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
+                            OtherNodeDetailsNew = node_details:set(OtherNodeDetailsNew2, my_range, Interval),
+                            lb_op:slide_op(OtherNodeDetails, MyNodeDetails,
+                                           OtherNodeDetailsNew, MyNodeDetailsNew)
+                    end
+                catch
+                    Error:Reason ->
+                        log:log(error, "[ Node ~w ] could not create a candidate "
+                                    "for another node: ~.0p:~.0p~n"
+                                    "  SelectedKey: ~.0p, SourcePid: ~.0p~n  State: ~.0p",
+                                [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
+                        lb_op:no_op()
                 end,
-            MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),
-            case SplitKey of
-                MyNodeId ->
-                    log:log(warn, "[ Node ~w ] join requested for my ID, "
-                                "sending no_op...", [self()]),
-                    lb_op:no_op();
-                MyPredId ->
-                    log:log(warn, "[ Node ~w ] join requested for my pred's ID, "
-                                "sending no_op...", [self()]),
-                    lb_op:no_op();
-                _ ->
-                    MyLoadNew = MyLoad - OtherLoadNew,
-                    MyNodeDetails1 = node_details:set(node_details:new(), node, MyNode),
-                    MyNodeDetails = node_details:set(MyNodeDetails1, load, MyLoad),
-                    MyNodeDetailsNew = node_details:set(MyNodeDetails, load, MyLoadNew),
-                    OtherNodeDetails = node_details:set(node_details:new(), load, 0),
-                    OtherNodeDetailsNew1 = node_details:set(node_details:new(), new_key, SplitKey),
-                    OtherNodeDetailsNew2 = node_details:set(OtherNodeDetailsNew1, load, OtherLoadNew),
-                    Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
-                    OtherNodeDetailsNew = node_details:set(OtherNodeDetailsNew2, my_range, Interval),
-                    lb_op:slide_op(OtherNodeDetails, MyNodeDetails,
-                                   OtherNodeDetailsNew, MyNodeDetailsNew)
-            end
-        catch
-            Error:Reason ->
-                log:log(error, "[ Node ~w ] could not create a candidate "
-                            "for another node: ~.0p:~.0p~n"
-                            "  SelectedKey: ~.0p, SourcePid: ~.0p~n  State: ~.0p",
-                        [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
-                lb_op:no_op()
-        end,
-    comm:send(SourcePid, {join, get_candidate_response, SelectedKey, Candidate, Conn}),
+            Msg = {join, get_candidate_response, SelectedKey, Candidate, Conn},
+            ?TRACE_SEND(SourcePid, Msg),
+            comm:send(SourcePid, Msg);
+        _ ->
+            % postpone message:
+            MyPidWithCookie =
+                comm:self_with_cookie({join, ?MODULE,
+                                       {create_join, SelectedKey, SourcePid, Conn}}),
+            GossipPid = pid_groups:get_my(gossip),
+            Msg = {get_values_best, MyPidWithCookie},
+            ?TRACE_SEND(GossipPid, Msg),
+            _ = comm:send_local_after(100, GossipPid, Msg),
+            ok
+    end,
     DhtNodeState.
 
 %% @doc Sorts all provided operations so that the one with the biggest change
