@@ -131,7 +131,7 @@ on({learner_decide, ItemId, _PaxosID, Value} = Msg,
             %% io:format("Holding back a learner decide for ~p~n", [_Role]),
             TmpItemState = tx_item_state:hold_back(Msg, ItemState),
             NewItemState = tx_item_state:set_status(TmpItemState, uninitialized),
-            msg_delay:send_local(config:read(tx_timeout) * 3 / 1000, self(),
+            msg_delay:send_local((config:read(tx_timeout) * 3) div 1000, self(),
                                  {tx_tm_rtm_delete_itemid, ItemId}),
             my_set_entry(NewItemState, State);
         false -> %% ok
@@ -257,7 +257,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
                   [ {PaxId, Role} || {PaxId, _RTlog, _TP}
                     <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
               end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
-%%            msg_delay:send_local(config:read(tx_timeout) * 2 / 1000, LAcceptor,
+%%            msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, LAcceptor,
 %%                                 {acceptor_deleteids, lists:flatten(AllPaxIds)});
             comm:send_local(LAcceptor,
                                {acceptor_deleteids, lists:flatten(AllPaxIds)});
@@ -405,7 +405,7 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
             %% io:format("Holding back a registerTP for id ~p in ~p~n", [Tid, Role]),
             T2TxState = tx_state:hold_back(Msg, TmpTxState),
             NewTxState = tx_state:set_status(T2TxState, uninitialized),
-            msg_delay:send_local(config:read(tx_timeout) * 3 / 1000, self(),
+            msg_delay:send_local((config:read(tx_timeout) * 3) div 1000, self(),
                                  {tx_tm_rtm_delete_txid, Tid}),
             my_set_entry(NewTxState, State);
         false -> %% ok
@@ -768,5 +768,9 @@ check_config() ->
     config:is_integer(tx_timeout) and
     config:is_greater_than(tx_timeout, 0) and
     config:is_integer(tx_rtm_update_interval) and
-    config:is_greater_than(tx_rtm_update_interval, 0).
+    config:is_greater_than(tx_rtm_update_interval, 0) and
+
+    config:is_greater_than_equal(tx_timeout, 1000/3)
+%%     config:is_greater_than_equal(tx_timeout, 1000/2)
+    .
 

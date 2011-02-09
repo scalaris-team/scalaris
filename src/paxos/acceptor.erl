@@ -127,7 +127,7 @@ on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
     {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
     case ErrCode of
         new -> msg_delay:send_local(
-                 config:read(acceptor_noinit_timeout) / 1000, self(),
+                 config:read(acceptor_noinit_timeout) div 1000, self(),
                  {acceptor_delete_if_no_learner, PaxosID});
         _ -> ok
     end,
@@ -145,7 +145,7 @@ on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = Sta
     ?TRACE("acceptor:accept for paxos id: ~p round ~p~n", [PaxosID, InRound]),
     {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
     case ErrCode of
-        new -> msg_delay:send_local(config:read(tx_timeout) * 4 / 1000, self(),
+        new -> msg_delay:send_local((config:read(tx_timeout) * 4) div 1000, self(),
                          {acceptor_delete_if_no_learner, PaxosID});
         _ -> ok
     end,
@@ -214,4 +214,6 @@ inform_learner(Learner, PaxosID, StateForID) ->
 -spec check_config() -> boolean().
 check_config() ->
     config:is_integer(acceptor_noinit_timeout) and
+    config:is_greater_than_equal(acceptor_noinit_timeout, 1000) and
+    config:is_greater_than_equal(tx_timeout, 1000/4) and
     config:is_greater_than(acceptor_noinit_timeout, tx_timeout).

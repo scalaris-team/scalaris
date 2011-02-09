@@ -214,7 +214,7 @@ commit(TLog) ->
         TM ->
             tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
     end,
-    msg_delay:send_local_as_client(config:read(tx_timeout) / 1000,
+    msg_delay:send_local_as_client(config:read(tx_timeout) div 1000,
                          self(), {tx_timeout, ClientsId}),
     _Result =
         receive
@@ -243,5 +243,5 @@ receive_answer() ->
 -spec check_config() -> boolean().
 check_config() ->
     config:is_integer(tx_timeout) and
-    config:is_greater_than(tx_timeout, 0).
+    config:is_greater_than_equal(tx_timeout, 1000).
 
