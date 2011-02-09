@@ -114,7 +114,7 @@ add_2x3_load(Config) ->
     dht_node_move_SUITE:check_size2_v1(4).
 
 add_2x3_load_test() ->
-    BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 5000) end),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 1000) end),
     admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
@@ -144,7 +144,7 @@ add_3_rm_2_load(Config) ->
     dht_node_move_SUITE:check_size2_v1(4).
 
 add_3_rm_2_load_test() ->
-    BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 5000) end),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 1000) end),
     admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
