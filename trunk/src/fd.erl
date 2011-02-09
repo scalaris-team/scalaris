@@ -194,9 +194,14 @@ get_hbs(Pid) ->
 
 -spec start_and_register_hbs(comm:mypid()) -> pid().
 start_and_register_hbs(Pid) ->
-    NewHBS = element(2, fd_hbs:start_link(Pid)),
-    ets:insert(fd_hbs, {comm:get(fd, Pid), NewHBS}),
-    NewHBS.
+    FDPid = comm:get(fd, Pid),
+    case ets:lookup(fd_hbs, FDPid) of
+        [] ->
+            NewHBS = element(2, fd_hbs:start_link(Pid)),
+            ets:insert(fd_hbs, {comm:get(fd, Pid), NewHBS}),
+            NewHBS;
+        [Res] -> element(2, Res)
+    end.
 
 -spec forward_to_hbs(comm:mypid(), comm:message()) -> ok.
 forward_to_hbs(Pid, Msg) ->

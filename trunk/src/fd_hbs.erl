@@ -48,7 +48,7 @@
 %% @doc spawns a fd_hbs instance
 -spec start_link(comm:mypid()) -> {ok, pid()}.
 start_link(RemotePid) ->
-   gen_component:start_link(?MODULE, [RemotePid], []).
+   gen_component:start_link(?MODULE, [RemotePid], [wait_for_init]).
 
 -spec init([pid() | comm:mypid()]) -> state().
 init([RemotePid]) ->
