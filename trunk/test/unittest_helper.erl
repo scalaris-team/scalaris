@@ -37,7 +37,8 @@
          init_per_suite/1, end_per_suite/1,
          get_ring_data/0, print_ring_data/0,
          macro_equals/4, macro_equals/5,
-         expect_no_message_timeout/1]).
+         expect_no_message_timeout/1,
+         prepare_config/1]).
 
 -include("scalaris.hrl").
 
