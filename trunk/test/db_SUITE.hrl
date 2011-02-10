@@ -1,4 +1,4 @@
-% @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+% @copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -1531,13 +1531,13 @@ get_random_interval_from_changes(DB) ->
 check_stop_record_changes(DB, ChangesInterval, Note) ->
     I1 = get_random_interval_from_changes(DB),
     DB2 = ?TEST_DB:stop_record_changes(DB, I1),
-    check_changes(DB2, intervals:minus(ChangesInterval, I1), string:concat(Note, "a")),
+    check_changes(DB2, intervals:minus(ChangesInterval, I1), Note ++ "a"),
 
     DB3 = ?TEST_DB:stop_record_changes(DB2),
-    ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, string:concat(Note, "b")),
+    ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, Note ++ "b"),
 
     DB3.
-    
+
 
 %% @doc Checks that all entries returned by ?TEST_DB:get_changes/1 are in the
 %%      given interval.

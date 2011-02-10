@@ -1,5 +1,5 @@
-% @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
-%                 onScale solutions GmbH
+% @copyright 2009-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+%            2009 onScale solutions GmbH
 % @end
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -76,6 +76,7 @@ init([]) ->
     TimeTableName =
         list_to_atom(lists:flatten(
                        io_lib:format("~s_msg_delay", [MyGroup]))),
+%    TimeTableName = list_to_atom(MyGroup ++ "_msg_delay"),
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
     TimeTable = pdb:new(TimeTableName, [set, protected, named_table]),

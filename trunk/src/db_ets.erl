@@ -1,4 +1,4 @@
-% @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+% @copyright 2009-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
 %            2009 onScale solutions
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,8 +45,8 @@
 new_() ->
     % ets prefix: DB_ + random name
     RandomName = randoms:getRandomId(),
-    DBname = list_to_atom(string:concat("db_", RandomName)),
-    CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
+    DBname = list_to_atom("db_" ++ RandomName),
+    CKDBname = list_to_atom("db_ck_" ++ RandomName), % changed keys
     % better protected? All accesses would have to go to DB-process
     {ets:new(DBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]), intervals:empty(), ?CKETS:new(CKDBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS])}.
 

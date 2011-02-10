@@ -1,4 +1,4 @@
-%  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2010, 2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -154,8 +154,8 @@ unsubscribe(RegPid, Tag) ->
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
     % create the ets table storing the subscriptions
-    TableName = string:concat(pid_groups:my_groupname(), ":rm_tman"),
-    SubscrTable = ets:new(list_to_atom(string:concat(TableName, ":subscribers")),
+    TableName = pid_groups:my_groupname() ++ ":rm_tman",
+    SubscrTable = ets:new(list_to_atom(TableName ++ ":subscribers"),
                           [ordered_set, protected]),
     dn_cache:subscribe(),
     RM_State = ?RM:init(Me, Pred, Succ),
@@ -168,8 +168,8 @@ init(Me, Pred, Succ) ->
 %%      Pre: the process must have joined a group. See pid_groups:join_as/2.
 -spec unittest_create_state(Neighbors::nodelist:neighborhood(), HasLeft::boolean()) -> state().
 unittest_create_state(Neighbors, HasLeft) ->
-    TableName = string:concat(pid_groups:my_groupname(), ":rm_tman"),
-    SubscrTable = ets:new(list_to_atom(string:concat(TableName, ":subscribers")),
+    TableName = pid_groups:my_groupname() ++ ":rm_tman",
+    SubscrTable = ets:new(list_to_atom(TableName ++ ":subscribers"),
                           [ordered_set, protected]),
     {?RM:unittest_create_state(Neighbors), HasLeft, SubscrTable}.
 

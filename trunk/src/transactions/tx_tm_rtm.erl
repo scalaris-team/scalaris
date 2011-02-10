@@ -84,10 +84,8 @@ init([]) ->
            [pid_groups:my_groupname(), Role]),
     %% For easier debugging, use a named table (generates an atom)
     TableName =
-        list_to_atom(lists:flatten(
-                       io_lib:format("~p_tx_tm_rtm_~p",
-                                     [pid_groups:my_groupname(),
-                                      Role]))),
+        list_to_atom(pid_groups:my_groupname() ++ "_tx_tm_rtm_"
+                     ++ atom_to_list(Role)),
     pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
@@ -754,7 +752,7 @@ rtms_of_same_dht_node(InRTMs) ->
 
 -spec get_nth_rtm_name(pos_integer()) -> atom().
 get_nth_rtm_name(Nth) ->
-    list_to_atom(lists:flatten(io_lib:format("tx_rtm~p", [Nth]))).
+    list_to_atom("tx_rtm" ++ integer_to_list(Nth)).
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.

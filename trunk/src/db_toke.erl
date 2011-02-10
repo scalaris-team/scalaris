@@ -1,4 +1,4 @@
-%  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2010, 2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ new_db(FileName, TokeOptions) ->
     case toke_drv:new(DB) of
         ok ->
             RandomName = randoms:getRandomId(),
-            CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
+            CKDBname = list_to_atom("db_ck_" ++ RandomName), % changed keys
             case toke_drv:open(DB, FileName, TokeOptions) of
                 ok     -> {{DB, FileName}, intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])};
                 Error2 -> log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
