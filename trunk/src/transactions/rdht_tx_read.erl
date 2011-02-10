@@ -1,5 +1,5 @@
-%% @copyright 2009-2010 onScale solutions GmbH
-
+%% @copyright 2009-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%%            2009 onScale solutions GmbH
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -169,8 +169,7 @@ init([]) ->
     ?TRACE("rdht_tx_read: Starting rdht_tx_read for DHT node: ~p~n", [DHTNodeGroup]),
     %% For easier debugging, use a named table (generates an atom)
     Table =
-        list_to_atom(lists:flatten(
-                       io_lib:format("~p_rdht_tx_read", [DHTNodeGroup]))),
+        list_to_atom(DHTNodeGroup ++ "_rdht_tx_read"),
     pdb:new(Table, [set, private, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     %% Table = ets:new(?MODULE, [set, private]),

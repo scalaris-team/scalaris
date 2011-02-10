@@ -1,5 +1,5 @@
-%% @copyright 2009, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%%            and onScale solutions GmbH
+%% @copyright 2009-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%%            2010 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -34,8 +34,7 @@
 -spec init() -> atom().
 init() ->
     InstanceID = pid_groups:my_groupname(),
-    Table = list_to_atom(lists:flatten(
-                           io_lib:format("~p_tx_tp", [InstanceID]))),
+    Table = list_to_atom(InstanceID ++ "_tx_tp"),
     pdb:new(Table, [set, private, named_table]).
 
 %%
