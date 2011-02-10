@@ -105,7 +105,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 count() ->

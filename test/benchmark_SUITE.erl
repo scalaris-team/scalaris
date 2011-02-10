@@ -46,7 +46,7 @@ init_per_suite(Config) ->
     Config2.
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 run_increment_1_1000(_Config) ->

@@ -77,7 +77,7 @@ end_per_suite(Config) ->
     error_logger:tty(false),
     log:set_log_level(none),
     exit(Pid, kill),
-    unittest_helper:end_per_suite(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 new(_Config) ->

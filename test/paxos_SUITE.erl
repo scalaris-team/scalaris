@@ -43,7 +43,7 @@ init_per_suite(Config) ->
     Config2.
 
 end_per_suite(Config) ->
-    unittest_helper:end_per_suite(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 -spec make_groupname(Prefix::string(), Number::integer()) -> pid_groups:groupname().

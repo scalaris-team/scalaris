@@ -42,7 +42,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     scalaris2:stop(),
-    unittest_helper:end_per_suite(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 init_per_testcase(_TestCase, Config) ->
