@@ -54,7 +54,7 @@ end_per_testcase(_TestCase, _Config) ->
 % ...
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_update_id(?RT:key(), ?RT:key()) -> boolean().
+-spec prop_update_id(?RT:key(), ?RT:key()) -> true.
 prop_update_id(OldId, NewId) ->
     Ring = unittest_helper:make_ring_with_ids([OldId], [{config, [pdb:get(log_path, ?MODULE)]}]),
     change_id_and_check(OldId, NewId),
@@ -131,7 +131,7 @@ check_subscr_node_update(OldNode, NewNode) ->
             ?ct_fail("expected message {rm_changed, rm_SUITE, OldNeighbors, NewNeighbors} but got \"~.0p\"~n", [ActualMessage])
     end.
 
--spec prop_update_id2(?RT:key()) -> boolean().
+-spec prop_update_id2(?RT:key()) -> true.
 prop_update_id2(NewId) ->
     change_id_and_check(unknown, NewId).
 

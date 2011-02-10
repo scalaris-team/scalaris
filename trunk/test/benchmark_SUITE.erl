@@ -91,9 +91,9 @@ run_read_10_10000(_Config) ->
 
 write_result(Filename, Result) ->
     % make_ring switched to the bin sub-dir...go to top-level:
-    file:set_cwd(".."),
+    _ = file:set_cwd(".."),
     {ok, F} = file:open(Filename, [write]),
     io:fwrite(F, "~p~n", [Result]),
-    file:close(F),
-    file:set_cwd("bin"),
+    _ = file:close(F),
+    _ = file:set_cwd("bin"),
     ok.

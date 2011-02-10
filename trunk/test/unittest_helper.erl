@@ -35,7 +35,9 @@
          get_all_children/1,
          get_processes/0, kill_new_processes/1,
          init_per_suite/1, end_per_suite/1,
-         get_ring_data/0, print_ring_data/0]).
+         get_ring_data/0, print_ring_data/0,
+         macro_equals/4, macro_equals/5,
+         expect_no_message_timeout/1]).
 
 -include("scalaris.hrl").
 
@@ -137,7 +139,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     ct:pal("Trying to build Scalaris~n"),
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
-                    _ = pid_groups:start_link(),
+                    {ok, _GroupsPid} = pid_groups:start_link(),
                     NewOptions = prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
@@ -178,7 +180,7 @@ make_ring(Size, Options) ->
                     ct:pal("Trying to build Scalaris~n"),
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
-                    _ = pid_groups:start_link(),
+                    {ok, _GroupsPid} = pid_groups:start_link(),
                     NewOptions = prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
                     boot_server:connect(),
@@ -435,3 +437,37 @@ get_ring_data() ->
 print_ring_data() ->
     DataAll = unittest_helper:get_ring_data(),
     ct:pal("~.0p~n", [DataAll]).
+
+-include("unittest.hrl").
+
+-spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string()) -> ok | no_return().
+macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr) ->
+    case Actual of
+        ExpectedVal -> ok;
+        Any ->
+            ct:pal("Failed: Stacktrace ~p~n", [util:get_stacktrace()]),
+            ?ct_fail("~s evaluated to \"~.0p\" which is "
+                         "not the expected ~s that evaluates to \"~.0p\"~n",
+                         [ActualStr, Any, ExpectedStr, ExpectedVal])
+    end.
+
+-spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> ok | no_return().
+macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr, Note) ->
+    case Actual of
+        ExpectedVal -> ok;
+        Any ->
+            ct:pal("Failed: Stacktrace ~p~n",
+                   [util:get_stacktrace()]),
+            ?ct_fail("~s evaluated to \"~.0p\" which is "
+                         "not the expected ~s that evaluates to \"~.0p\"~n"
+                             "(~s)~n",
+                             [ActualStr, Any, ExpectedStr, ExpectedVal, lists:flatten(Note)])
+    end.
+
+-spec expect_no_message_timeout(Timeout::pos_integer()) -> ok | no_return().
+expect_no_message_timeout(Timeout) ->
+    receive
+        ActualMessage ->
+            ?ct_fail("expected no message but got \"~.0p\"~n", [ActualMessage])
+    after Timeout -> ok
+end.

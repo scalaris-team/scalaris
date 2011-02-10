@@ -119,7 +119,7 @@ write_test(Config) ->
     dht_node_move_SUITE:check_size2_v2(4  * 2),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), %doesn't matter
-    inets:stop(),
+    _ = inets:stop(),
     unittest_helper:kill_new_processes(OldProcesses),
     {_, _, OnlyNewReg} =
         util:split_unique(OldRegistered, erlang:registered()),

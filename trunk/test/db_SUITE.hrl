@@ -69,13 +69,13 @@ suite() ->
 
 -spec spawn_config_processes(Config::[tuple()]) -> pid().
 spawn_config_processes(Config) ->
-    unittest_helper:fix_cwd(),
+    ok = unittest_helper:fix_cwd(),
     unittest_helper:start_process(
       fun() ->
-              pid_groups:start_link(),
+              {ok, _GroupsPid} = pid_groups:start_link(),
               {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-              config:start_link2([{config, [{log_path, PrivDir}]}]),
-              log:start_link()
+              {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
+              {ok, _LogPid} = log:start_link()
       end).
 
 %% @doc Returns the min of Desired and max_rw_tests_per_suite().

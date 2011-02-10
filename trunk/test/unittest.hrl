@@ -41,37 +41,10 @@
         end).
 
 -define(equals(Actual, Expected),
-        % wrap in function so that the internal variables are out of the calling function's scope
-        fun() ->
-                % Expected might be a function call which is not allowed in case statements
-                ExpectedVal = Expected,
-                case Actual of
-                    ExpectedVal -> ok;
-                    Any ->
-                        ct:pal("Failed: Stacktrace ~p~n",
-                               [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~.0p\" which is "
-                               "not the expected ~s that evaluates to \"~.0p\"~n",
-                               [??Actual, Any, ??Expected, ExpectedVal])
-                end
-        end()).
+        unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected)).
 
 -define(equals_w_note(Actual, Expected, Note),
-        % wrap in function so that the internal variables are out of the calling function's scope
-        fun() ->
-                % Expected might be a function call which is not allowed in case statements
-                ExpectedVal = Expected,
-                case Actual of
-                    ExpectedVal -> ok;
-                    Any ->
-                        ct:pal("Failed: Stacktrace ~p~n",
-                               [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~.0p\" which is "
-                               "not the expected ~s that evaluates to \"~.0p\"~n"
-                               "(~s)~n",
-                               [??Actual, Any, ??Expected, ExpectedVal, lists:flatten(Note)])
-                end
-        end()).
+        unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected, Note)).
 
 -define(equals_pattern(Actual, ExpectedPattern),
         % wrap in function so that the internal variables are out of the calling function's scope
@@ -144,15 +117,7 @@
 -define(expect_message(MsgPattern), ?expect_message_timeout(MsgPattern, 1000)).
 
 -define(expect_no_message_timeout(Timeout),
-        % wrap in function so that the internal variables are out of the calling function's scope
-        fun() ->
-                receive
-                    ActualMessage ->
-                        ?ct_fail("expected no message but got \"~.0p\"~n", [ActualMessage])
-                after
-                    Timeout -> ok
-                end
-        end()).
+        unittest_helper:expect_no_message_timeout(Timeout)).
 -define(expect_no_message(), ?expect_no_message_timeout(100)).
 
 -define(consume_message(Message, Timeout),

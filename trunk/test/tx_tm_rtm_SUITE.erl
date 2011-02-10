@@ -55,89 +55,90 @@ abort_prepared_r(_) ->
     %% tx decisions
     %% modify DB and then do operations on the changed DB
     %% quorum reads should alway succeed
-    [ begin
-          Key = init_new_db_key("abort_prepared_r"),
-          abort_prepared(Key, read, [MC1, MC2, MC3, MC4], ok)
-      end
-     || MC1 <- causes(), MC2 <- causes(),
-        MC3 <- causes(), MC4 <- causes()],
+    _ = [ begin
+              Key = init_new_db_key("abort_prepared_r"),
+              abort_prepared(Key, read, [MC1, MC2, MC3, MC4], ok)
+          end
+          || MC1 <- causes(), MC2 <- causes(),
+             MC3 <- causes(), MC4 <- causes()],
     ok.
 
 abort_prepared_w(_) ->
     %% check all combinations of abort / prepared and the corresponding
     %% tx decisions
     %% modify DB and then do operations on the changed DB
-    [ begin
-          Key = init_new_db_key("abort_prepared_w"),
-          abort_prepared(Key, write, [MC1, MC2, MC3, MC4],
-                         calc_w_outcome([MC1, MC2, MC3, MC4]))
-      end
-      || MC1 <- causes(), MC2 <- causes(),
-         MC3 <- causes(), MC4 <- causes()],
+    _ = [ begin
+              Key = init_new_db_key("abort_prepared_w"),
+              abort_prepared(Key, write, [MC1, MC2, MC3, MC4],
+                             calc_w_outcome([MC1, MC2, MC3, MC4]))
+          end
+          || MC1 <- causes(), MC2 <- causes(),
+             MC3 <- causes(), MC4 <- causes()],
     ok.
 
 abort_prepared_rc(_) ->
     %% check all combinations of abort / prepared and the corresponding
     %% tx decisions
     %% modify DB and then do operations on the changed DB
-    [ begin
-          Key = init_new_db_key("abort_prepared_rc"),
-          abort_prepared(Key, read_commit, [MC1, MC2, MC3, MC4],
-                         calc_rc_outcome([MC1, MC2, MC3, MC4]))
-      end
-     || MC1 <- causes(), MC2 <- causes(),
-        MC3 <- causes(), MC4 <- causes()],
+    _ = [ begin
+              Key = init_new_db_key("abort_prepared_rc"),
+              abort_prepared(Key, read_commit, [MC1, MC2, MC3, MC4],
+                             calc_rc_outcome([MC1, MC2, MC3, MC4]))
+          end
+          || MC1 <- causes(), MC2 <- causes(),
+             MC3 <- causes(), MC4 <- causes()],
     ok.
 
 abort_prepared_rmc(_) ->
      %% modify DB after work_phase, before validation
      %% read - modify - commit (rmc)
-     [begin
-          Key = init_new_db_key("abort_prepared_rmc"),
-          {TLog, _} =
-              ?CS_API:process_request_list(?CS_API:new_tlog(),
-                                           [{read, Key}]),
-          abort_prepared(Key, {commit_tlog, TLog}, [MC1, MC2, MC3, MC4],
-                         calc_rmc_outcome([MC1, MC2, MC3, MC4]))
-      end
-      || MC1 <- causes(), MC2 <- causes(),
-         MC3 <- causes(), MC4 <- causes()],
+    _ = [ begin
+              Key = init_new_db_key("abort_prepared_rmc"),
+              {TLog, _} =
+                  ?CS_API:process_request_list(?CS_API:new_tlog(),
+                                               [{read, Key}]),
+              abort_prepared(Key, {commit_tlog, TLog}, [MC1, MC2, MC3, MC4],
+                             calc_rmc_outcome([MC1, MC2, MC3, MC4]))
+          end
+          || MC1 <- causes(), MC2 <- causes(),
+             MC3 <- causes(), MC4 <- causes()],
     ok.
 
 abort_prepared_wmc(_) ->
      %% modify DB after work_phase, before validation
      %% write - modify - commit (rmc)
-     [begin
-          Key = init_new_db_key("abort_prepared_wmc"),
-          {TLog, _} =
-              ?CS_API:process_request_list(?CS_API:new_tlog(),
-                                           [{write, Key, "wmc"}]),
-          Pattern = [MC1, MC2, MC3, MC4],
-          abort_prepared(Key, {commit_tlog, TLog}, Pattern,
-                         calc_wmc_outcome(Pattern))
-      end
-      || MC1 <- causes(), MC2 <- causes(),
-         MC3 <- causes(), MC4 <- causes()],
+    _ = [ begin
+              Key = init_new_db_key("abort_prepared_wmc"),
+              {TLog, _} =
+                  ?CS_API:process_request_list(?CS_API:new_tlog(),
+                                               [{write, Key, "wmc"}]),
+              Pattern = [MC1, MC2, MC3, MC4],
+              abort_prepared(Key, {commit_tlog, TLog}, Pattern,
+                             calc_wmc_outcome(Pattern))
+          end
+          || MC1 <- causes(), MC2 <- causes(),
+             MC3 <- causes(), MC4 <- causes()],
     ok.
 
 abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
     Keys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     DBEntries = get_db_entries(Keys),
-    NewDBEntries = [ begin
-          NewDBEntry =
-              case PreOp of
-                  readlock -> db_entry:inc_readlock(DBEntry);
-                  writelock -> db_entry:set_writelock(DBEntry);
-                  versiondec -> db_entry:set_version(DBEntry, db_entry:get_version(DBEntry) -1);
-                  versioninc -> db_entry:inc_version(DBEntry);
-                  none -> DBEntry
-              end,
-          lookup:unreliable_lookup(db_entry:get_key(DBEntry),
-                                   {set_key_entry, comm:this(), NewDBEntry}),
-          receive {set_key_entry_reply, NewDBEntry} -> ok end,
-          NewDBEntry
-      end
-      || {DBEntry, PreOp} <- lists:zip(DBEntries, PreOps) ],
+    NewDBEntries =
+        [ begin
+              NewDBEntry =
+                  case PreOp of
+                      readlock -> db_entry:inc_readlock(DBEntry);
+                      writelock -> db_entry:set_writelock(DBEntry);
+                      versiondec -> db_entry:set_version(DBEntry, db_entry:get_version(DBEntry) -1);
+                      versioninc -> db_entry:inc_version(DBEntry);
+                      none -> DBEntry
+                  end,
+              lookup:unreliable_lookup(db_entry:get_key(DBEntry),
+                                       {set_key_entry, comm:this(), NewDBEntry}),
+              receive {set_key_entry_reply, NewDBEntry} -> ok end,
+              NewDBEntry
+          end
+          || {DBEntry, PreOp} <- lists:zip(DBEntries, PreOps) ],
 
     Outcome =
         case Op of
@@ -262,17 +263,17 @@ init_new_db_key(Value) ->
     UID = util:get_global_uid(),
     NewKey = lists:flatten(io_lib:format("~p", [UID])),
     Keys = ?RT:get_replica_keys(?RT:hash_key(NewKey)),
-    [ begin
-          E1 = db_entry:new(Key),
-          %% inc twice, so decversion is ok
-          E2 = db_entry:inc_version(E1),
-          E3 = db_entry:inc_version(E2),
-          %% set a value
-          E4 = db_entry:set_value(E3, Value),
-          lookup:unreliable_lookup(db_entry:get_key(E4),
-                                   {set_key_entry, comm:this(), E4}),
-          receive {set_key_entry_reply, E4} -> ok end
-      end || Key <- Keys ],
+    _ = [ begin
+              E1 = db_entry:new(Key),
+              %% inc twice, so decversion is ok
+              E2 = db_entry:inc_version(E1),
+              E3 = db_entry:inc_version(E2),
+              %% set a value
+              E4 = db_entry:set_value(E3, Value),
+              lookup:unreliable_lookup(db_entry:get_key(E4),
+                                       {set_key_entry, comm:this(), E4}),
+              receive {set_key_entry_reply, E4} -> ok end
+          end || Key <- Keys ],
     NewKey.
 
 get_db_entries(Keys) ->
@@ -287,13 +288,13 @@ get_db_entries(Keys) ->
 
 tm_crash(_) ->
     ct:pal("Starting tm_crash~n"),
-    cs_api_v2:write("a", "Hello world!"),
+    _ = cs_api_v2:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
     TMs = pid_groups:find_all(tx_tm),
     %% all TMs break at next commit request:
-    [ gen_component:bp_set(X, tx_tm_rtm_commit, tm_crash) || X <- TMs ],
+    _ = [ gen_component:bp_set(X, tx_tm_rtm_commit, tm_crash) || X <- TMs ],
     %% ct:pal("Breakpoints set~n"),
-    [ gen_component:bp_barrier(X) || X <- TMs ],
+    _ = [ gen_component:bp_barrier(X) || X <- TMs ],
     %% ct:pal("Barriers set~n"),
 
     %% TM only performs the tx_tm_rtm_commit that lead to the BP
@@ -306,9 +307,9 @@ tm_crash(_) ->
 
     ct:pal("Res: ~p~n", [Res]),
 
-    [ erlang:exit(Pid, kill) || Pid <- Pids ],
+    _ = [ erlang:exit(Pid, kill) || Pid <- Pids ],
 
-    [ gen_component:bp_del(X, tm_crash) || X <- TMs ],
+    _ = [ gen_component:bp_del(X, tm_crash) || X <- TMs ],
 
     [ gen_component:bp_cont(X) || X <- TMs ].
 %%ok.

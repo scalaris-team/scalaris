@@ -673,24 +673,24 @@ pred_id_fun2(PredId, PredsPredId) ->
 symm4_slide1_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
     % get a random DHT node and let it slide with its successor/predecessor (Count times)
     DhtNode = lists:nth(NthNode, pid_groups:find_all(dht_node)),
-    [begin
-         FailMsg = lists:flatten(
-                     io_lib:format("slide_~.0p(~B.~B, ~.0p)",
-                                   [PredOrSucc, NthNode, N, DhtNode])),
-         {Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
-         Other = case PredOrSucc of
-                     succ -> Succ;
-                     pred -> Pred
-                 end,
-         TargetId = TargetIdFun(node:id(Node), node:id(Other)),
-         NewTag = lists:flatten(io_lib:format("~s-~B.~B", [Tag, NthNode, N])),
-         symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
-         receive Z ->
-                     ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
-                              [PredOrSucc, NthNode, N, DhtNode, Z])
-         after 0 -> ok
-         end
-     end || N <- lists:seq(1, Count)],
+    _ = [begin
+             FailMsg = lists:flatten(
+                         io_lib:format("slide_~.0p(~B.~B, ~.0p)",
+                                       [PredOrSucc, NthNode, N, DhtNode])),
+             {Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
+             Other = case PredOrSucc of
+                         succ -> Succ;
+                         pred -> Pred
+                     end,
+             TargetId = TargetIdFun(node:id(Node), node:id(Other)),
+             NewTag = lists:flatten(io_lib:format("~s-~B.~B", [Tag, NthNode, N])),
+             symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
+             receive Z ->
+                         ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
+                                  [PredOrSucc, NthNode, N, DhtNode, Z])
+             after 0 -> ok
+             end
+         end || N <- lists:seq(1, Count)],
     ok.
 
 % note: calls TargetIdFun(MyId, PredId) for PredOrSucc =:= succ and
@@ -701,26 +701,26 @@ symm4_slide1_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
 symm4_slide2_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
     % get a random DHT node and let it slide with its successor/predecessor (Count times)
     DhtNode = lists:nth(NthNode, pid_groups:find_all(dht_node)),
-    [begin
-         FailMsg = lists:flatten(
-                     io_lib:format("slide_~.0p(~B.~B, ~.0p)",
-                                   [PredOrSucc, NthNode, N, DhtNode])),
-         {Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
-         {TargetId, Other} =
-             case PredOrSucc of
-                 succ -> {TargetIdFun(node:id(Node), node:id(Pred)), Succ};
-                 pred ->
-                     {PredsPred, _, _} = get_pred_node_succ2(node:pidX(Pred), FailMsg),
-                     {TargetIdFun(node:id(Pred), node:id(PredsPred)), Pred}
-             end,
-         NewTag = lists:flatten(io_lib:format("~s-~B.~B", [Tag, NthNode, N])),
-         symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
-         receive Z ->
-                     ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
-                              [PredOrSucc, NthNode, N, DhtNode, Z])
-         after 0 -> ok
-         end
-     end || N <- lists:seq(1, Count)],
+    _ = [begin
+             FailMsg = lists:flatten(
+                         io_lib:format("slide_~.0p(~B.~B, ~.0p)",
+                                       [PredOrSucc, NthNode, N, DhtNode])),
+             {Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
+             {TargetId, Other} =
+                 case PredOrSucc of
+                     succ -> {TargetIdFun(node:id(Node), node:id(Pred)), Succ};
+                     pred ->
+                         {PredsPred, _, _} = get_pred_node_succ2(node:pidX(Pred), FailMsg),
+                         {TargetIdFun(node:id(Pred), node:id(PredsPred)), Pred}
+                 end,
+             NewTag = lists:flatten(io_lib:format("~s-~B.~B", [Tag, NthNode, N])),
+             symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
+             receive Z ->
+                         ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
+                                  [PredOrSucc, NthNode, N, DhtNode, Z])
+             after 0 -> ok
+             end
+         end || N <- lists:seq(1, Count)],
     ok.
 
 
