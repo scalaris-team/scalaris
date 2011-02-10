@@ -1,4 +1,4 @@
-%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ end_per_suite(Config) ->
 
 -spec make_groupname(Prefix::string(), Number::integer()) -> pid_groups:groupname().
 make_groupname(Prefix, Number) ->
-    lists:flatten(io_lib:format("~s.~B", [Prefix, Number])).
+    Prefix ++ integer_to_list(Number).
 
 %% make proposers, acceptors, and learners
 -spec make(P::pos_integer(), A::pos_integer(), L::pos_integer(), Prefix::string())
@@ -57,11 +57,11 @@ make(P, A, L, Prefix) ->
     NumMDs = lists:max([P,A,L]),
     _  = [ msg_delay:start_link(make_groupname(Prefix, X))
              || X <- lists:seq(1, NumMDs)],
-    Ps = [ comm:make_global(element(2, proposer:start_link(make_groupname(Prefix, X))))
+    Ps = [ comm:make_global(element(2, proposer:start_link(make_groupname(Prefix, X), paxos_proposer)))
              || X <- lists:seq(1, P)],
-    As = [ comm:make_global(element(2, acceptor:start_link(make_groupname(Prefix, X))))
+    As = [ comm:make_global(element(2, acceptor:start_link(make_groupname(Prefix, X), paxos_acceptor)))
              || X <- lists:seq(1, A)],
-    Ls = [ comm:make_global(element(2, learner:start_link(make_groupname(Prefix, X))))
+    Ls = [ comm:make_global(element(2, learner:start_link(make_groupname(Prefix, X), paxos_learner)))
              || X <- lists:seq(1,L)],
     {Ps, As, Ls}.
 
