@@ -40,15 +40,15 @@ suite() ->
 
 -spec spawn_config_processes(Config::[tuple()]) -> pid().
 spawn_config_processes(Config) ->
-    unittest_helper:fix_cwd(),
+    ok = unittest_helper:fix_cwd(),
     error_logger:tty(true),
     unittest_helper:start_process(
       fun() ->
-              pid_groups:start_link(),
+              {ok, _GroupsPid} = pid_groups:start_link(),
               {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-              config:start_link2([{config, [{log_path, PrivDir}]}]),
-              log:start_link(),
-              comm_server:start_link(pid_groups:new("comm_layer_")),
+              {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
+              {ok, _LogPid} = log:start_link(),
+              {ok, _CommPid} = sup_comm_layer:start_link(),
               comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port())
       end).
 
@@ -77,7 +77,7 @@ dn_detection(Config) ->
     NodePid = fake_node(),
     NodePidG = comm:make_global(NodePid),
     Node = node:new(NodePidG, ?RT:hash_key(0), 0),
-    dn_cache:start_link("dn_cache_group"),
+    {ok, _DNCachePid} = dn_cache:start_link("dn_cache_group"),
     
     dn_cache:subscribe(),
     comm:send(NodePidG, {sleep}),

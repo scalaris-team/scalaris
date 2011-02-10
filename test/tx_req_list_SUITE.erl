@@ -53,7 +53,7 @@ write(_Config) ->
     ok.
 
 tx_req_list(_Config) ->
-    cs_api:write("A", 7),
+    _ = cs_api:write("A", 7),
     cs_api:read("A"),
     %% write new item
     A = cs_api:process_request_list(cs_api:new_tlog(), [{write, "B", 7}, {commit}]),

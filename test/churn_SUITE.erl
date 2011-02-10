@@ -69,7 +69,7 @@ end_per_suite(Config) ->
 transactions_1_failure_4_nodes_read(_) ->
     ?equals_w_note(cs_api_v2:write(0, 1), ok, "write_0_a"),
     ?equals_w_note(cs_api_v2:read(0), 1, "read_0_a"),
-    admin:del_nodes(1),
+    _ = admin:del_nodes(1),
     unittest_helper:check_ring_size(3),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
@@ -88,7 +88,7 @@ transactions_3_failures_4_nodes_read(_) ->
 transactions_more_failures_4_nodes_read(FailedNodes) ->
     ?equals_w_note(cs_api_v2:write(0, 1), ok, "write_0_a"),
     ?equals_w_note(cs_api_v2:read(0), 1, "read_0_a"),
-    admin:del_nodes(FailedNodes),
+    _ = admin:del_nodes(FailedNodes),
     unittest_helper:check_ring_size(4 - FailedNodes),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
@@ -142,17 +142,17 @@ transactions_more_failures_4_nodes_networksplit_write(FailedNodes) ->
     
     ok.
 
--type pause_spec() :: {pid_groups:groupname(), comm:erl_local_pid()}.
+-type pause_spec() :: {pid_groups:groupname(), [pid()]}.
 
 -spec pause_node(DhtNodeSupPid::pid()) -> pause_spec().
 pause_node(DhtNodeSupPid) ->
     GroupName = pid_groups:group_of(DhtNodeSupPid),
     DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
     DhtNodeSupChilds = unittest_helper:get_all_children(DhtNodeSupPid),
-    [begin
-         gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
-         gen_component:bp_barrier(Pid)
-     end || Pid <- DhtNodeSupChilds],
+    _ = [begin
+             gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
+             gen_component:bp_barrier(Pid)
+         end || Pid <- DhtNodeSupChilds],
     comm:send_local(fd, {unittest_report_down, comm:make_global(DhtNodePid)}),
     
     pid_groups:hide(GroupName),
@@ -163,8 +163,8 @@ unpause_node({GroupName, DhtNodeSupChilds}) ->
     ct:pal("restarting node~n"),
     pid_groups:unhide(GroupName),
     % restart the node again:
-    [begin
-         gen_component:bp_del(Pid, sleep),
-         gen_component:bp_cont(Pid)
-     end || Pid <- DhtNodeSupChilds],
+    _ = [begin
+             gen_component:bp_del(Pid, sleep),
+             gen_component:bp_cont(Pid)
+         end || Pid <- DhtNodeSupChilds],
     ok.

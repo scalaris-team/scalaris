@@ -84,13 +84,13 @@ end_per_group(GroupName, Config) ->
 
 -spec spawn_config_processes(Config::[tuple()]) -> pid().
 spawn_config_processes(Config) ->
-    unittest_helper:fix_cwd(),
+    ok = unittest_helper:fix_cwd(),
     unittest_helper:start_process(
       fun() ->
-              pid_groups:start_link(),
+              {ok, _GroupsPid} = pid_groups:start_link(),
               {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-              config:start_link2([{config, [{log_path, PrivDir}]}]),
-              log:start_link()
+              {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
+              {ok, _LogPid} = log:start_link()
       end).
 
 -spec stop_config_processes(pid()) -> ok.
@@ -120,7 +120,7 @@ empty(_Config) ->
     ok.
 
 ets_ordset_lookup1(_Config) ->
-    ets:new(ets_ordset_lookup1, [ordered_set, private, named_table]),
+    _ = ets:new(ets_ordset_lookup1, [ordered_set, private, named_table]),
     ets:insert(ets_ordset_lookup1, {123456, "foo"}),
     iter(count(), fun() ->
                           ets:lookup(ets_ordset_lookup1, 123456)
@@ -138,7 +138,7 @@ ets_ordset_lookup2(_Config) ->
     ok.
 
 ets_ordset_insert1(_Config) ->
-    ets:new(ets_ordset_insert1, [ordered_set, private, named_table]),
+    _ = ets:new(ets_ordset_insert1, [ordered_set, private, named_table]),
     iter(count(), fun() ->
                           ets:insert(ets_ordset_insert1, {performance, "abc"})
                   end, "ets(ordered_set):insert"),
@@ -203,7 +203,7 @@ gb_sets_add_element(_Config) ->
     ok.
 
 ets_set_insert1N(_Config) ->
-    ets:new(ets_set_insert1N, [set, private, named_table]),
+    _ = ets:new(ets_set_insert1N, [set, private, named_table]),
     iter2(count(), fun(N) ->
                            ets:insert(ets_set_insert1N, {N})
                    end, "ets(set):insert (1N)"),
@@ -225,7 +225,7 @@ ets_set_insert2N(_Config) ->
     ok.
 
 ets_ordset_insert1N(_Config) ->
-    ets:new(ets_ordset_insert1N, [ordered_set, private, named_table]),
+    _ = ets:new(ets_ordset_insert1N, [ordered_set, private, named_table]),
     iter2(count(), fun(N) ->
                            ets:insert(ets_ordset_insert1N, {N})
                    end, "ets(ordered_set):insert (1N)"),
@@ -379,38 +379,38 @@ iter_inner(N, F) ->
     F(),
     iter_inner(N - 1, F).
 
--spec iter2(Count::pos_integer(), F::fun((Count::pos_integer()) -> any()), Tag::string()) -> ok.
+-spec iter2(Count::pos_integer(), F::fun((Count::non_neg_integer()) -> any()), Tag::string()) -> ok.
 iter2(Count, F, Tag) ->
-    F(0),
+    _ = F(0),
     Start = erlang:now(),
     iter2_inner(Count, F),
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = Count / ElapsedTime,
-    ct:pal("~p iterations of ~p took ~ps: ~p1/s~n",
+    ct:pal("~p iterations of ~s took ~ps: ~p1/s~n",
            [Count, Tag, ElapsedTime, Frequency]),
     ok.
 
--spec iter2_inner(Count::pos_integer(), F::fun((Count::pos_integer()) -> any())) -> ok.
+-spec iter2_inner(Count::non_neg_integer(), F::fun((Count::non_neg_integer()) -> any())) -> ok.
 iter2_inner(0, _) ->
     ok;
 iter2_inner(N, F) ->
-    F(N),
+    _ = F(N),
     iter2_inner(N - 1, F).
 
--spec iter2_foldl(Count::pos_integer(), F::fun((Count::pos_integer(), Acc) -> Acc), Acc, Tag::string()) -> Acc.
+-spec iter2_foldl(Count::pos_integer(), F::fun((Count::non_neg_integer(), Acc) -> Acc), Acc, Tag::string()) -> Acc.
 iter2_foldl(Count, F, Acc0, Tag) ->
-    F(0, Acc0),
+    _ = F(0, Acc0),
     Start = erlang:now(),
     FinalAcc = iter2_foldl_helper(Count, F, Acc0),
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = Count / ElapsedTime,
-    ct:pal("~p foldl iterations of ~p took ~ps: ~p1/s~n",
+    ct:pal("~p foldl iterations of ~s took ~ps: ~p1/s~n",
            [Count, Tag, ElapsedTime, Frequency]),
     FinalAcc.
 
--spec iter2_foldl_helper(Count::pos_integer(), F::fun((Count::pos_integer(), Acc) -> Acc), Acc) -> Acc.
+-spec iter2_foldl_helper(Count::non_neg_integer(), F::fun((Count::non_neg_integer(), Acc) -> Acc), Acc) -> Acc.
 iter2_foldl_helper(0, _F, Acc) -> Acc;
 iter2_foldl_helper(Count, F, Acc) ->
-    iter2_foldl_helper(Count, F, F(Count, Acc)).
+    iter2_foldl_helper(Count - 1, F, F(Count, Acc)).

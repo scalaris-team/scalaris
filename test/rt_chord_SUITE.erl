@@ -35,15 +35,15 @@ suite() ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:fix_cwd(),
+    ok = unittest_helper:fix_cwd(),
     error_logger:tty(true),
     Pid = unittest_helper:start_process(
             fun() ->
-                    pid_groups:start_link(),
+                    {ok, _GroupsPid} = pid_groups:start_link(),
                     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-                    config:start_link2([{config, [{log_path, PrivDir}]}]),
-                    log:start_link(),
-                    comm_server:start_link(pid_groups:new("comm_layer_")),
+                    {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
+                    {ok, _LogPid} = log:start_link(),
+                    {ok, _CommPid} = sup_comm_layer:start_link(),
                     comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port())
             end),
     [{wrapper_pid, Pid} | Config2].

@@ -41,14 +41,14 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    scalaris2:stop(),
+    _ = scalaris2:stop(),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
 init_per_testcase(_TestCase, Config) ->
-    unittest_helper:fix_cwd(),
-    scalaris2:stop(), % if end_per_testcase failed
-    scalaris2:start(),
+    ok = unittest_helper:fix_cwd(),
+    _ = scalaris2:stop(), % if end_per_testcase failed
+    ok = scalaris2:start(),
     config:write(dht_node_sup, sup_group_node),
     config:write(dht_node, group_node),
     config:write(group_node_trigger, trigger_periodic),
@@ -56,25 +56,25 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_TestCase, Config) ->
-    scalaris2:stop(),
+    _ = scalaris2:stop(),
     Config.
 
 add_9(_Config) ->
-    admin:add_nodes(9),
+    _ = admin:add_nodes(9),
     wait_for(check_versions([{1, 11}], 10)),
     ok.
 
 add_9_remove_4(_Config) ->
-    admin:add_nodes(9),
+    _ = admin:add_nodes(9),
     wait_for(check_versions([{1, 11}], 10)),
-    admin:del_nodes(4),
+    _ = admin:del_nodes(4),
     timer:sleep(3000),
     wait_for(check_versions([{1, 15}], 6)),
     ok.
 
 db_repair(_Config) ->
     % add one node
-    admin:add_nodes(1),
+    _ = admin:add_nodes(1),
     % check group_state
     wait_for(check_versions([{1, 3}], 2)),
     % check db
@@ -82,7 +82,7 @@ db_repair(_Config) ->
     % write one kv-pair
     group_api:paxos_write(1,2),
     % add one node
-    admin:add_nodes(1),
+    _ = admin:add_nodes(1),
     % check group_state
     wait_for(check_versions([{1, 5}], 3)),
     % check db
@@ -92,7 +92,7 @@ db_repair(_Config) ->
 group_split(_Config) ->
     config:write(group_node_base_interval, 60000),
     config:write(group_max_size, 9),
-    admin:add_nodes(9),
+    _ = admin:add_nodes(9),
     % check group_state
     wait_for(check_versions([{1, 11}], 10)),
     % check db
@@ -105,7 +105,7 @@ group_split(_Config) ->
 group_split_with_data(_Config) ->
     config:write(group_node_base_interval, 60000),
     config:write(group_max_size, 9),
-    admin:add_nodes(9),
+    _ = admin:add_nodes(9),
     % check group_state
     wait_for(check_versions([{1, 11}], 10)),
     % check db
@@ -124,7 +124,7 @@ group_split_with_data(_Config) ->
 build_ring(_Config) ->
     config:write(group_node_base_interval, 60000),
     config:write(group_max_size, 4),
-    admin:add_nodes(31),
+    _ = admin:add_nodes(31),
     % check group_state
     wait_for(check_versions([{1, 33}], 32)),
     % check db
@@ -134,7 +134,7 @@ build_ring(_Config) ->
     timer:sleep(1000),
     % wait for the 8 groups
     wait_for(fun () ->
-                     [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
+                     _ = [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
                      F = check_versions([{8, 2}, {9, 2}, {10, 2}, {11, 2},
                                          {12, 2}, {13, 2}, {14, 2}, {15, 2}],
                                         32),
@@ -142,7 +142,7 @@ build_ring(_Config) ->
              end),
     %% wait for repaired ring I
     wait_for(fun () ->
-                     [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
+                     _ = [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
                      case group_debug:check_ring() of
                          ok ->
                              true;
@@ -156,7 +156,7 @@ build_ring(_Config) ->
 build_ring_with_routing(_Config) ->
     config:write(group_node_base_interval, 60000),
     config:write(group_max_size, 4),
-    admin:add_nodes(31),
+    _ = admin:add_nodes(31),
     % check group_state
     wait_for(check_versions([{1, 33}], 32)),
     % check db
@@ -166,7 +166,7 @@ build_ring_with_routing(_Config) ->
     timer:sleep(1000),
     % wait for the 8 groups
     wait_for(fun () ->
-                     [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
+                     _ = [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
                      F = check_versions([{8, 2}, {9, 2}, {10, 2}, {11, 2},
                                          {12, 2}, {13, 2}, {14, 2}, {15, 2}],
                                         32),
@@ -174,7 +174,7 @@ build_ring_with_routing(_Config) ->
              end),
     %% wait for repaired ring I
     wait_for(fun () ->
-                     [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
+                     _ = [Pid ! {trigger} || Pid <- pid_groups:find_all(group_node)],
                      case group_debug:check_ring() of
                          ok ->
                              true;

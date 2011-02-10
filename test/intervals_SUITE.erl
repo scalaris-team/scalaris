@@ -59,12 +59,12 @@ suite() ->
 
 -spec spawn_config_processes(Config::[tuple()]) -> pid().
 spawn_config_processes(Config) ->
-    unittest_helper:fix_cwd(),
+    ok = unittest_helper:fix_cwd(),
     unittest_helper:start_process(
       fun() ->
               {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-              config:start_link2([{config, [{log_path, PrivDir}]}]),
-              log:start_link()
+              {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
+              {ok, _LogPid} = log:start_link()
       end).
 
 init_per_suite(Config) ->
@@ -317,7 +317,7 @@ prop_new4_bounds(XBr, X, Y, YBr) ->
             true
     end.
 
--spec prop_new4(intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()) -> boolean().
+-spec prop_new4(intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()) -> true.
 prop_new4(XBr, X, Y, YBr) ->
     I = intervals:new(XBr, X, Y, YBr),
     case (X =:= Y andalso (XBr =:= '(' orelse YBr =:= ')')) orelse
@@ -357,7 +357,7 @@ prop_from_elements1_well_formed(X) ->
 prop_from_elements1(X) ->
     I = intervals:from_elements(X),
     ?equals(?implies(X =/= [], not intervals:is_empty(I)), true),
-    [?equals(intervals:in(K, I), true) || K <- X],
+    _ = [?equals(intervals:in(K, I), true) || K <- X],
     true.
 
 tester_from_elements1_well_formed(_Config) ->

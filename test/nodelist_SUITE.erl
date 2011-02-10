@@ -2697,7 +2697,7 @@ prop_largest_smaller_than3_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLen
                     % in this case no node can be found
                     ?equals_w_note(LSTNode, node:null(), "empty_neighbors");
                 _ ->
-                    ?assert(node:is_valid(LSTNode)),
+%%                     ?assert(node:is_valid(LSTNode)), % always valid!
                     ?assert(node:id(LSTNode) =/= Id),
                     BetterNodes =
                         [Node || Node <- [BaseNode | nodelist:to_list(Neighbors2)],

@@ -184,7 +184,7 @@ start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::full_state_inactive()}.
+-spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::full_state_inactive()}.
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, fun get_base_interval/0, gossip_trigger),
     gen_component:change_handler({uninit, msg_queue:new(), TriggerState, gossip_state:new_state()},

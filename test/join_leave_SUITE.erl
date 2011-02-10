@@ -82,18 +82,18 @@ add_9(Config) ->
     stop_time(fun add_9_test/0, "add_9").
 
 add_9_test() ->
-    admin:add_nodes(9),
+    _ = admin:add_nodes(9),
     check_size(10).
 
 rm_5(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
-    admin:add_nodes(9),
+    _ = admin:add_nodes(9),
     check_size(10),
     stop_time(fun rm_5_test/0, "rm_5").
 
 rm_5_test() ->
-    admin:del_nodes(5),
+    _ = admin:del_nodes(5),
     check_size(5).
 
 add_9_rm_5(Config) ->
@@ -102,9 +102,9 @@ add_9_rm_5(Config) ->
     stop_time(fun add_9_rm_5_test/0, "add_9_rm_5").
 
 add_9_rm_5_test() ->
-    admin:add_nodes(9),
+    _ = admin:add_nodes(9),
     check_size(10),
-    admin:del_nodes(5),
+    _ = admin:del_nodes(5),
     check_size(5).
 
 add_2x3_load(Config) ->
@@ -115,10 +115,10 @@ add_2x3_load(Config) ->
 
 add_2x3_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 1000) end),
-    admin:add_nodes(3),
+    _ = admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
-    admin:add_nodes(3),
+    _ = admin:add_nodes(3),
     check_size(7),
     unittest_helper:wait_for_process_to_die(BenchPid).
 
@@ -130,10 +130,10 @@ add_2x3_load_v2(Config) ->
 
 add_2x3_load_v2_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(1, 5000) end),
-    admin:add_nodes(3),
+    _ = admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
-    admin:add_nodes(3),
+    _ = admin:add_nodes(3),
     check_size(7),
     unittest_helper:wait_for_process_to_die(BenchPid).
 
@@ -145,7 +145,7 @@ add_3_rm_2_load(Config) ->
 
 add_3_rm_2_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 1000) end),
-    admin:add_nodes(3),
+    _ = admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
     % let 2 nodes gracefully leave
@@ -162,7 +162,7 @@ add_3_rm_2_load_v2(Config) ->
 
 add_3_rm_2_load_v2_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(1, 5000) end),
-    admin:add_nodes(3),
+    _ = admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
     % let 2 nodes gracefully leave
@@ -176,7 +176,7 @@ prop_join_at(FirstId, SecondId) ->
     BenchSlaves = 2, BenchRuns = 50,
     unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(BenchSlaves, BenchRuns) end),
-    admin:add_node_at_id(SecondId),
+    _ = admin:add_node_at_id(SecondId),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid),
     dht_node_move_SUITE:check_size2_v1(BenchSlaves * 4),
@@ -188,7 +188,7 @@ prop_join_at_v2(FirstId, SecondId) ->
     BenchSlaves = 2, BenchRuns = 50,
     unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(BenchSlaves, BenchRuns) end),
-    admin:add_node_at_id(SecondId),
+    _ = admin:add_node_at_id(SecondId),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid),
     dht_node_move_SUITE:check_size2_v2(BenchSlaves * 4),
@@ -270,12 +270,12 @@ prop_join_at_timeouts_v2(FirstId, SecondId, IgnoredMessages_) ->
     send_ignore_msg_list_to(1, node, IgnoredMessages),
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(BenchSlaves, BenchRuns) end),
     unittest_helper:wait_for_process_to_die(BenchPid),
-    admin:add_node_at_id(SecondId),
+    _ = admin:add_node_at_id(SecondId),
     check_size(2),
     dht_node_move_SUITE:check_size2_v2(BenchSlaves * 4),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), % tester may need it
-    inets:stop(),
+    _ = inets:stop(),
     unittest_helper:kill_new_processes(OldProcesses),
     true.
 
