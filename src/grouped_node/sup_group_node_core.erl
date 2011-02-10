@@ -1,4 +1,4 @@
-%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,33 +26,29 @@
 -spec start_link(pid_groups:groupname(), [any()]) -> {ok, Pid::pid()} | ignore |
                                            {error, Error::{already_started, Pid::pid()} |
                                                            shutdown | term()}.
-start_link(InstanceId, Options) ->
-    supervisor:start_link(?MODULE, [InstanceId, Options]).
+start_link(NodeGrpName, Options) ->
+    supervisor:start_link(?MODULE, [NodeGrpName, Options]).
 
 %% userdevguide-begin sup_group_node_core:init
 -spec init([pid_groups:groupname() | [any()]]) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
                                                PeriodInSeconds::pos_integer()},
                                               [ProcessDescr::any()]}}.
-init([InstanceId, Options]) ->
-    pid_groups:join_as(InstanceId, sup_dht_node_core),
-    Proposer =
-        util:sup_worker_desc(proposer, proposer, start_link, [InstanceId]),
-    Acceptor =
-        util:sup_worker_desc(acceptor, acceptor, start_link, [InstanceId]),
-    Learner =
-        util:sup_worker_desc(learner, learner, start_link, [InstanceId]),
+init([NodeGrpName, Options]) ->
+    pid_groups:join_as(NodeGrpName, sup_dht_node_core),
+    PaxosProcesses = util:sup_supervisor_desc(sup_paxos, sup_paxos,
+                                              start_link, [NodeGrpName, []]),
     Node =
         util:sup_worker_desc(group_node, group_node, start_link,
-                             [InstanceId, Options]),
+                             [NodeGrpName, Options]),
     Delayer =
         util:sup_worker_desc(msg_delay, msg_delay, start_link,
-                             [InstanceId]),
+                             [NodeGrpName]),
     _TX =
         util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
-                                 [InstanceId]),
+                                 [NodeGrpName]),
     {ok, {{one_for_all, 10, 1},
           [
-           Proposer, Acceptor, Learner,
+           PaxosProcesses,
            Node,
            Delayer
            %TX

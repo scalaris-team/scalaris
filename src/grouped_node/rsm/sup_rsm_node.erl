@@ -1,4 +1,4 @@
-%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -38,12 +38,8 @@ start_link(GroupName, Options, AppModule) ->
                                               [ProcessDescr::any()]}}.
 init([GroupName, Options, AppModule]) ->
     pid_groups:join_as(GroupName, sup_rsm_node),
-    Proposer =
-        util:sup_worker_desc(proposer, proposer, start_link, [GroupName]),
-    Acceptor =
-        util:sup_worker_desc(acceptor, acceptor, start_link, [GroupName]),
-    Learner =
-        util:sup_worker_desc(learner, learner, start_link, [GroupName]),
+    PaxosProcesses = util:sup_supervisor_desc(sup_paxos, sup_paxos,
+                                              start_link, [GroupName, []]),
     Node =
         util:sup_worker_desc(rsm_node, rsm_node, start_link,
                              [GroupName, Options, AppModule]),
@@ -52,7 +48,7 @@ init([GroupName, Options, AppModule]) ->
                              [GroupName]),
     {ok, {{one_for_all, 10, 1},
           [
-           Proposer, Acceptor, Learner,
+           PaxosProcesses,
            Node,
            Delayer
            %TX

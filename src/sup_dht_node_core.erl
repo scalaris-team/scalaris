@@ -1,4 +1,4 @@
-%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -44,12 +44,8 @@ start_link(DHTNodeGroup, Options) ->
                         [ProcessDescr::any()]}}.
 init({DHTNodeGroup, Options}) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
-    Proposer =
-        util:sup_worker_desc(proposer, proposer, start_link, [DHTNodeGroup]),
-    Acceptor =
-        util:sup_worker_desc(acceptor, acceptor, start_link, [DHTNodeGroup]),
-    Learner =
-        util:sup_worker_desc(learner, learner, start_link, [DHTNodeGroup]),
+    PaxosProcesses = util:sup_supervisor_desc(sup_paxos, sup_paxos,
+                                              start_link, [DHTNodeGroup, []]),
     DHTNodeModule = case util:is_unittest() of
                         true -> mockup_dht_node;
                         _    -> dht_node
@@ -62,7 +58,7 @@ init({DHTNodeGroup, Options}) ->
                                  [DHTNodeGroup]),
     {ok, {{one_for_all, 10, 1},
           [
-           Proposer, Acceptor, Learner,
+           PaxosProcesses,
            DHTNode,
            TX
           ]}}.

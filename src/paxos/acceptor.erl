@@ -1,5 +1,5 @@
-% @copyright 2009, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
-%                 onScale solutions GmbH
+% @copyright 2009-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+%            2010 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %% @end
 %% @version $Id$
 -module(acceptor).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
@@ -34,7 +34,7 @@
 -export([add_learner/3]).
 -export([msg_accepted/4]).
 %%% functions for gen_component module and supervisor callbacks
--export([start_link/1]).
+-export([start_link/2]).
 -export([on/2, init/1]).
 -export([check_config/0]).
 
@@ -88,11 +88,11 @@ add_learner(Acceptor, PaxosID, Learner) ->
     comm:send(Acceptor, {acceptor_add_learner, PaxosID, Learner}).
 
 %% be startable via supervisor, use gen_component
--spec start_link(pid_groups:groupname()) -> {ok, pid()}.
-start_link(DHTNodeGroup) ->
+-spec start_link(pid_groups:groupname(), pid_groups:pidname()) -> {ok, pid()}.
+start_link(DHTNodeGroup, PidName) ->
     gen_component:start_link(?MODULE,
                              [],
-                             [{pid_groups_join_as, DHTNodeGroup, paxos_acceptor}]).
+                             [{pid_groups_join_as, DHTNodeGroup, PidName}]).
 
 %% initialize: return initial state.
 -spec init([]) -> atom().

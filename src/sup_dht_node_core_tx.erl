@@ -1,5 +1,4 @@
 %  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%  and onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -17,7 +16,7 @@
 %% @doc    Supervisor for each DHT node that is responsible for keeping
 %%         its transaction processes running.
 %%
-%%         If one of the supervised processes fails, all will be re-started!
+%%         If one of the supervised processes fails, it will be re-started!
 %% @end
 %% @version $Id$
 -module(sup_dht_node_core_tx).
@@ -34,7 +33,10 @@
 start_link(DHTNodeGroup) ->
     supervisor:start_link(?MODULE, DHTNodeGroup).
 
--spec init(pid_groups:groupname()) -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
+-spec init(pid_groups:groupname()) ->
+                  {ok, {{one_for_one, MaxRetries::pos_integer(),
+                         PeriodInSeconds::pos_integer()},
+                        [ProcessDescr::any()]}}.
 init(DHTNodeGroup) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     RDHT_tx_read = util:sup_worker_desc(rdht_tx_read, rdht_tx_read, start_link,

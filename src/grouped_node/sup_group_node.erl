@@ -1,4 +1,4 @@
-%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -47,30 +47,30 @@ start_link() ->
                                [ProcessDescr::any()]}}.
 init(Options) ->
     db_ets = ?DB, % assert ?DB is ets
-    InstanceId = string:concat("group_node_", randoms:getRandomId()),
-    pid_groups:join_as(InstanceId, sup_dht_node),
+    NodeGrpName = string:concat("group_node_", randoms:getRandomId()),
+    pid_groups:join_as(NodeGrpName, sup_dht_node),
     boot_server:connect(),
     Supervisor_AND =
         util:sup_supervisor_desc(cs_supervisor_and, sup_group_node_core, start_link,
-                                 [InstanceId, Options]),
+                                 [NodeGrpName, Options]),
     _RingMaintenance =
-        util:sup_worker_desc(?RM, ?RM, start_link, [InstanceId]),
+        util:sup_worker_desc(?RM, ?RM, start_link, [NodeGrpName]),
     _RoutingTable =
-        util:sup_worker_desc(routingtable, rt_loop, start_link, [InstanceId]),
+        util:sup_worker_desc(routingtable, rt_loop, start_link, [NodeGrpName]),
     _DeadNodeCache =
-        util:sup_worker_desc(deadnodecache, dn_cache, start_link, [InstanceId]),
+        util:sup_worker_desc(deadnodecache, dn_cache, start_link, [NodeGrpName]),
     _Vivaldi =
-        util:sup_worker_desc(vivaldi, vivaldi, start_link, [InstanceId]),
+        util:sup_worker_desc(vivaldi, vivaldi, start_link, [NodeGrpName]),
     Reregister =
         util:sup_worker_desc(dht_node_reregister, dht_node_reregister, start_link,
-                             [InstanceId]),
+                             [NodeGrpName]),
     _DC_Clustering =
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
-                             [InstanceId]),
+                             [NodeGrpName]),
     _Cyclon =
-        util:sup_worker_desc(cyclon, cyclon, start_link, [InstanceId]),
+        util:sup_worker_desc(cyclon, cyclon, start_link, [NodeGrpName]),
     _Gossip =
-        util:sup_worker_desc(gossip, gossip, start_link, [InstanceId]),
+        util:sup_worker_desc(gossip, gossip, start_link, [NodeGrpName]),
     {ok, {{one_for_one, 10, 1},
           [
            Reregister,
