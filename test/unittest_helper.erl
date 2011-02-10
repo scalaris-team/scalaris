@@ -348,7 +348,9 @@ get_processes() ->
                  {_, {file_io_server, _, _}} ->
                      case file:pid2name(X) of
                          undefined -> {file, undefined};
-                         {ok, FileName} -> {file, FileName}
+                         {ok, FileName} -> {file, FileName};
+                         %% case occuring in older Erlang versions:
+                         FileName -> {file, FileName}
                      end;
                  {_, {gen_server, _, _}} ->
                      sys:get_status(X);
