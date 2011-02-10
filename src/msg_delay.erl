@@ -73,10 +73,7 @@ start_link(DHTNodeGroup) ->
 init([]) ->
     MyGroup = pid_groups:my_groupname(),
     ?TRACE("msg_delay:init for pid group ~p~n", [MyGroup]),
-    TimeTableName =
-        list_to_atom(lists:flatten(
-                       io_lib:format("~s_msg_delay", [MyGroup]))),
-%    TimeTableName = list_to_atom(MyGroup ++ "_msg_delay"),
+    TimeTableName = list_to_atom(MyGroup ++ "_msg_delay"),
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
     TimeTable = pdb:new(TimeTableName, [set, protected, named_table]),
