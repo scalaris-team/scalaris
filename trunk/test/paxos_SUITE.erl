@@ -39,7 +39,7 @@ init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
     unittest_helper:make_ring(2, [{config, [{log_path, PrivDir}]}]),
-    comm_server:set_local_address({127,0,0,1},14195),
+    comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port()),
     Config2.
 
 end_per_suite(Config) ->

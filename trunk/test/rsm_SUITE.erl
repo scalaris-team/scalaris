@@ -105,7 +105,7 @@ start_env(Config) ->
     {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
     {ok, _CommPid} = sup_comm_layer:start_link(),
     {ok, _FDPid} = fd:start_link("fd_group"),
-    comm:send({{127,0,0,1}, 14195, self()}, {foo}), %% argh
+    comm:send({{127,0,0,1}, unittest_helper:get_scalaris_port(), self()}, {foo}), %argh
     wait_for(fun () -> comm:is_valid(comm:this()) end).
 
 wait_for(F) ->

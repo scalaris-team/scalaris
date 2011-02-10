@@ -71,7 +71,7 @@ init_per_suite(Config) ->
                     config:start_link2([{config, [{log_path, PrivDir}]}]),
                     log:start_link(),
                     comm_server:start_link(pid_groups:new("comm_layer_")),
-                    comm_server:set_local_address({127,0,0,1},14195)
+                    comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port())
             end),
     [{wrapper_pid, Pid} | Config2].
 
