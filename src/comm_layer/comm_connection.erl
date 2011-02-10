@@ -50,15 +50,13 @@ start_link(CommLayerGroup, DestIP, DestPort) ->
 start_link(CommLayerGroup, DestIP, DestPort, Socket) ->
     {IP1, IP2, IP3, IP4} = DestIP,
     {_, LocalListenPort} = comm_server:get_local_address_port(),
-    PidName =
-        case Socket of
-            notconnected ->
-                lists:flatten(io_lib:format("to > ~p.~p.~p.~p:~p",
-                                            [IP1, IP2, IP3, IP4, DestPort]));
-            _ ->
-                lists:flatten(io_lib:format("from < ~p.~p.~p.~p:~p",
-                                            [IP1, IP2, IP3, IP4, DestPort]))
-        end,
+    PidNamePrefix = case Socket of
+                        notconnected -> "to > ";
+                        _ -> "from > "
+                    end,
+    PidName = PidNamePrefix ++ integer_to_list(IP1) ++ "."
+        ++ integer_to_list(IP2) ++ "." ++ integer_to_list(IP3) ++ "."
+        ++ integer_to_list(IP4) ++ ":" ++ integer_to_list(DestPort),
     gen_component:start_link(?MODULE,
                              [DestIP, DestPort, LocalListenPort, Socket],
                              [ {pid_groups_join_as, CommLayerGroup, PidName}

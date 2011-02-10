@@ -47,7 +47,7 @@ start_link() ->
                                [ProcessDescr::any()]}}.
 init(Options) ->
     db_ets = ?DB, % assert ?DB is ets
-    NodeGrpName = string:concat("group_node_", randoms:getRandomId()),
+    NodeGrpName = "group_node_" ++ randoms:getRandomId(),
     pid_groups:join_as(NodeGrpName, sup_dht_node),
     boot_server:connect(),
     Supervisor_AND =

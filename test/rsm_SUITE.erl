@@ -46,11 +46,11 @@ end_per_suite(Config) ->
     ok.
 
 init_per_testcase(_TestCase, Config) ->
-    unittest_helper:fix_cwd(),
+    _ = unittest_helper:fix_cwd(),
     Config.
 
 end_per_testcase(_TestCase, Config) ->
-    unittest_helper:stop_pid_groups(),
+    _ = unittest_helper:stop_pid_groups(),
     Config.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -58,8 +58,8 @@ end_per_testcase(_TestCase, Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 deliver_1(Config) ->
     start_env(Config),
-    {ok, _SupPid} = rsm_api:start_link(rsm_SUITE_deliver, first, rsm_SUITE),
-    Pid = comm:make_global(pid_groups:pid_of(rsm_SUITE_deliver, rsm_node)),
+    {ok, _SupPid} = rsm_api:start_link("rsm_SUITE_deliver", first, rsm_SUITE),
+    Pid = comm:make_global(pid_groups:pid_of("rsm_SUITE_deliver", rsm_node)),
 
     % first deliver
     Msg = {msg1},
@@ -71,8 +71,8 @@ deliver_1(Config) ->
 
 deliver_1_add_1_deliver1(Config) ->
     start_env(Config),
-    {ok, _SupPid} = rsm_api:start_link(rsm_SUITE_node1, first, rsm_SUITE),
-    Pid = comm:make_global(pid_groups:pid_of(rsm_SUITE_node1, rsm_node)),
+    {ok, _SupPid} = rsm_api:start_link("rsm_SUITE_node1", first, rsm_SUITE),
+    Pid = comm:make_global(pid_groups:pid_of("rsm_SUITE_node1", rsm_node)),
 
     % first deliver
     Msg = {msg1},
@@ -80,8 +80,8 @@ deliver_1_add_1_deliver1(Config) ->
     wait_for(rsm_app_state([Pid], [Msg])),
 
     %add node
-    {ok, _SupPid2} = rsm_api:start_link(rsm_SUITE_node2, {join, [Pid]}, rsm_SUITE),
-    Pid2 = comm:make_global(pid_groups:pid_of(rsm_SUITE_node2, rsm_node)),
+    {ok, _SupPid2} = rsm_api:start_link("rsm_SUITE_node2", {join, [Pid]}, rsm_SUITE),
+    Pid2 = comm:make_global(pid_groups:pid_of("rsm_SUITE_node2", rsm_node)),
     wait_for(rsm_size(Pid, 2)),
     wait_for(rsm_version([Pid, Pid2], 2)),
     ok.
@@ -104,8 +104,8 @@ start_env(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
     {ok, _CommPid} = sup_comm_layer:start_link(),
-    {ok, _FDPid} = fd:start_link(fd_group),
-    comm:send({{127,0,0,1}, 14195, self()}, {foo}),                        %argh
+    {ok, _FDPid} = fd:start_link("fd_group"),
+    comm:send({{127,0,0,1}, 14195, self()}, {foo}), %% argh
     wait_for(fun () -> comm:is_valid(comm:this()) end).
 
 wait_for(F) ->

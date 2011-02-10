@@ -1,4 +1,4 @@
-% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+% @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
 %            2008 onScale solutions
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -544,5 +544,5 @@ get_indexed_id(Node) ->
 -spec get_flag(Hostname::node_details:hostname()) -> html_type().
 get_flag(Hostname) ->
     Country = string:substr(Hostname, 1 + string:rchr(Hostname, $.)),
-    URL = string:concat("icons/", string:concat(Country, ".gif")),
+    URL = "icons/" ++ Country ++ ".gif",
     {img, [{src, URL}, {width, 26}, {height, 16}], []}.

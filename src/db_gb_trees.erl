@@ -1,4 +1,4 @@
-%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@
 %% @doc Initializes a new database.
 new_() ->
     RandomName = randoms:getRandomId(),
-    CKDBname = list_to_atom(string:concat("db_ck_", RandomName)), % changed keys
+    CKDBname = list_to_atom("db_ck_" ++ RandomName), % changed keys
     {gb_trees:empty(), intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])}.
 
 %% @doc Re-opens a previously existing database (not supported by gb_trees

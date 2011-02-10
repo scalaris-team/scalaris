@@ -1,4 +1,4 @@
-%% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -201,7 +201,8 @@ start(Module, Args, Options, Supervisor) ->
         {pid_groups_join_as, GroupId, PidName} ->
             pid_groups:join_as(GroupId, PidName),
             log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
-            ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self());
+            ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
+                                         ++ randoms:getRandomId()), self());
         false ->
             log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module])
     end,
@@ -213,7 +214,8 @@ start(Module, Args, Options, Supervisor) ->
                     end,
                 catch(register(Name, self()));
             false ->
-                ?DEBUG_REGISTER(list_to_atom(lists:flatten(io_lib:format("~p_~p",[Module,randoms:getRandomId()]))),self()),
+                ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
+                                             ++ randoms:getRandomId()), self()),
                 ok
         end,
     _ = case lists:member(wait_for_init, Options) of

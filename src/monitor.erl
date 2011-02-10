@@ -215,7 +215,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
-    TableName = string:concat(pid_groups:my_groupname(), ":monitor"),
+    TableName = pid_groups:my_groupname() ++ ":monitor",
     msg_delay:send_local(get_purge_old_data_interval(), self(), {purge_old_data}),
     ets:new(list_to_atom(TableName), [bag, protected]).
 

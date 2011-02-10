@@ -1,4 +1,4 @@
-%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -348,8 +348,7 @@ get_processes() ->
                  {_, {file_io_server, _, _}} ->
                      case file:pid2name(X) of
                          undefined -> {file, undefined};
-                         {ok, FileName} -> {file, FileName};
-                         FileName -> {file, FileName}
+                         {ok, FileName} -> {file, FileName}
                      end;
                  {_, {gen_server, _, _}} ->
                      sys:get_status(X);
