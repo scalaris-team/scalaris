@@ -23,6 +23,7 @@
 -vsn('$Id$').
 
 -export([fix_cwd/0,
+         get_scalaris_port/0, get_yaws_port/0,
          make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2,
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
@@ -53,6 +54,25 @@ fix_cwd() ->
         Error -> Error
     end.
 
+-spec get_port(EnvName::string(), Default::pos_integer()) -> pos_integer().
+get_port(EnvName, Default) ->
+    case os:getenv(EnvName) of
+        false -> Default;
+        X ->
+            try erlang:list_to_integer(X)
+            catch
+                _:_ -> Default
+            end
+    end.
+
+-spec get_scalaris_port() -> pos_integer().
+get_scalaris_port() ->
+    get_port("SCALARIS_UNITTEST_PORT", 14195).
+
+-spec get_yaws_port() -> pos_integer().
+get_yaws_port() ->
+    get_port("SCALARIS_UNITTEST_YAWS_PORT", 8000).
+
 %% @doc Adds unittest-specific config parameters to the given key-value list.
 %%      The following parameters are added7changed:
 %%       - SCALARIS_UNITTEST_PORT environment variable to specify the port to
@@ -67,36 +87,13 @@ add_my_config(KVList) ->
     % add empty_node to the end (so it is not overwritten)
     % but add known_hosts to the beginning so it
     % can be overwritten by the Options
-    KVList1 =
-        case os:getenv("SCALARIS_UNITTEST_PORT") of
-            false ->
-                [{known_hosts, [{{127,0,0,1}, 14195, service_per_vm}]},
-                 {boot_host, {{127,0,0,1}, 14195, boot}}
-                | KVList];
-            X ->
-                try erlang:list_to_integer(X) of
-                    Port ->
-                        [{known_hosts, [{{127,0,0,1}, Port, service_per_vm}]},
-                         {boot_host, {{127,0,0,1}, Port, boot}},
-                         {cs_port, Port} | KVList]
-                catch
-                    _:_ ->
-                        [{known_hosts, [{{127,0,0,1}, 14195, service_per_vm}]},
-                         {boot_host, {{127,0,0,1}, 14195, boot}}
-                        | KVList]
-                end
-        end,
-    KVList2 =
-        case os:getenv("SCALARIS_UNITTEST_YAWS_PORT") of
-            false -> KVList1;
-            Y ->
-                try erlang:list_to_integer(Y) of
-                    YawsPort -> [{yaws_port, YawsPort} | KVList1]
-                catch
-                    _:_      -> KVList1
-                end
-        end,
-    lists:append(KVList2, [{empty_node, true}]).
+    ScalarisPort = get_scalaris_port(),
+    YawsPort = get_yaws_port(),
+    KVList1 = [{known_hosts, [{{127,0,0,1}, ScalarisPort, service_per_vm}]},
+               {boot_host, {{127,0,0,1}, ScalarisPort, boot}},
+               {cs_port, ScalarisPort},
+               {yaws_port, YawsPort} | KVList],
+    lists:append(KVList1, [{empty_node, true}]).
 
 -spec prepare_config(Options::[{atom(), term()}]) -> NewOptions::[{atom(), term()}].
 prepare_config(Options) ->
