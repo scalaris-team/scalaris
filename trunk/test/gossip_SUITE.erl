@@ -81,7 +81,7 @@ end_per_suite(Config) ->
     log:set_log_level(none),
     exit(Pid, kill),
     unittest_helper:stop_pid_groups(),
-    unittest_helper:end_per_suite(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 init_per_testcase(_TestCase, Config) ->

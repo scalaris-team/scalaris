@@ -68,7 +68,7 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     {wrapper_pid, Pid} = lists:keyfind(wrapper_pid, 1, Config),
     stop_config_processes(Pid),
-    unittest_helper:end_per_suite(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 dn_detection(Config) ->
