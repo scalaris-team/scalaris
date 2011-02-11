@@ -1,4 +1,4 @@
-%  Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -314,11 +314,13 @@ next_hop_setup() ->
                 gb_trees:enter(103, node:new(rt8, 103, 0),
                  rt_chord:empty_ext(Succ))))))))),
     RMState = rm_loop:unittest_create_state(
-                nodelist:add_nodes(
-                  nodelist:new_neighborhood(Pred, Me, Succ),
-                  [node:new(list_to_atom(lists:flatten(io_lib:format("succ~w", [Id]))), Id + 2, 0) || Id <- lists:seq(2, config:read(succ_list_length))] ++
-                      [node:new(list_to_atom(lists:flatten(io_lib:format("pred~w", [Id]))), 1022 - Id, 0) || Id <- lists:seq(2, config:read(pred_list_length))],
-                  config:read(succ_list_length), config:read(pred_list_length)),
+               nodelist:add_nodes(
+                nodelist:new_neighborhood(Pred, Me, Succ),
+                 [node:new(list_to_atom("succ" ++ integer_to_list(Id)), Id + 2, 0)
+                  || Id <- lists:seq(2, config:read(succ_list_length))] ++
+                     [node:new(list_to_atom("pred" ++ integer_to_list(Id)), 1022 - Id, 0)
+                      || Id <- lists:seq(2, config:read(pred_list_length))],
+                 config:read(succ_list_length), config:read(pred_list_length)),
                 false),
     _State = dht_node_state:new(RT, RMState, db).
 
