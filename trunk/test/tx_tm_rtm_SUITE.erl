@@ -33,7 +33,7 @@ all() ->
      abort_prepared_rc,
      abort_prepared_rmc,
      abort_prepared_wmc,%,
-     tm_crash
+     tm_crash, tp_crash
     ].
 
 suite() -> [{timetrap, {seconds, 120}}].
@@ -313,3 +313,30 @@ tm_crash(_) ->
 
     [ gen_component:bp_cont(X) || X <- TMs ].
 %%ok.
+
+tp_crash(_) ->
+    ct:pal("Starting tp_crash, simulated by holding the dht_node_proposer~n"),
+    cs_api_v2:write("a", "Hello world!"),
+    %% ct:pal("written initial value and setting breakpoints now~n"),
+    Proposers = pid_groups:find_all(paxos_proposer),
+    %% all TMs break at next commit request:
+    [ gen_component:bp_set(X, proposer_initialize, tp_crash) || X <- Proposers ],
+    %% ct:pal("Breakpoints set~n"),
+    [ gen_component:bp_barrier(X) || X <- Proposers ],
+    %% ct:pal("Barriers set~n"),
+
+    %% TM only performs the tx_tm_rtm_commit that lead to the BP
+    %% bp_step blocks. Do it asynchronously. (We don't know which TM
+    %% got the request.
+    %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
+
+    %% ct:pal("Starting read commit~n"),
+    Res = cs_api_v2:process_request_list(cs_api:new_tlog(), [{read, "a"}, {commit}]),
+
+    ct:pal("Res: ~p~n", [Res]),
+
+    %%[ erlang:exit(Pid, kill) || Pid <- Pids ],
+
+    [ gen_component:bp_del(X, tp_crash) || X <- Proposers ],
+
+    [ gen_component:bp_cont(X) || X <- Proposers ].

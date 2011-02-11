@@ -49,7 +49,7 @@ init({PidGroup, Options}) ->
         case lists:keyfind(sup_paxos_prefix, 1, Options) of
             {sup_paxos_prefix, Prefix} ->
                 PrefixS = atom_to_list(Prefix),
-                {list_to_atom(PrefixS ++ atom_to_list(?MODULE)),
+                {list_to_atom(PrefixS ++ "_" ++ atom_to_list(?MODULE)),
                  list_to_atom(PrefixS ++ atom_to_list('_proposer')),
                  list_to_atom(PrefixS ++ atom_to_list('_acceptor')),
                  list_to_atom(PrefixS ++ atom_to_list('_learner'))};

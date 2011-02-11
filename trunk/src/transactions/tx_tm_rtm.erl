@@ -66,7 +66,7 @@ start_link(DHTNodeGroup, Role) ->
      TableName      :: pdb:tableid(),
      Role           :: pid_groups:pidname(),
      LocalAcceptor  :: pid(),
-     LocalLearner   :: pid()}. 
+     LocalLearner   :: pid()}.
 
 -type state_uninit() ::
     {RTMs           :: [{?RT:key(), comm:mypid() | unknown, non_neg_integer()}],
@@ -83,14 +83,13 @@ init([]) ->
     ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n",
            [pid_groups:my_groupname(), Role]),
     %% For easier debugging, use a named table (generates an atom)
-    TableName =
-        list_to_atom(pid_groups:my_groupname() ++ "_tx_tm_rtm_"
-                     ++ atom_to_list(Role)),
+    TableName = list_to_atom(pid_groups:my_groupname() ++ "_tx_tm_rtm_"
+                             ++ atom_to_list(Role)),
     pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     %% TableName = pdb:new(?MODULE, [set, private]),
-    LAcceptor = pid_groups:get_my(paxos_acceptor),
-    LLearner = pid_groups:get_my(paxos_learner),
+    LAcceptor = pid_groups:get_my(paxos_name_for_rtm_role(Role, acceptor)),
+    LLearner = pid_groups:get_my(paxos_name_for_rtm_role(Role, learner)),
 
     %% start getting rtms and maintain them.
     case Role of
@@ -108,6 +107,13 @@ on({proposer_accept, Proposer, PaxosID, Round, Value} = _Msg,
    {_RTMs, _TableName, Role, LAcceptor, _LLearner} = State) ->
     ?TRACE("tx_tm_rtm:on(~p) as ~p~n", [_Msg, Role]),
     comm:send_local(LAcceptor, {proposer_accept, Proposer, {PaxosID, Role}, Round, Value}),
+    State;
+
+%% forward to local acceptor but add my role to the paxos id
+on({proposer_prepare, Proposer, PaxosID, Round} = _Msg,
+   {_RTMs, _TableName, Role, LAcceptor, _LLearner} = State) ->
+    ?TRACE("tx_tm_rtm:on(~p) as ~p~n", [_Msg, Role]),
+    comm:send_local(LAcceptor, {proposer_prepare, Proposer, {PaxosID, Role}, Round}),
     State;
 
 %% forward from acceptor to local learner (take 'Role' away from PaxosId)
@@ -439,7 +445,7 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
 
 % timeout on Tid maybe a proposer crashed? Force proposals with abort.
 on({tx_tm_rtm_propose_yourself, Tid},
-   {_RTMs, _TableName, _Role, _LAcceptor, LLearner} = State) ->
+   {_RTMs, _TableName, Role, _LAcceptor, LLearner} = State) ->
     ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, _Role]),
     %% after timeout take over and initiate new paxos round as proposer
     {ErrCodeTx, TxState} = my_get_tx_entry(Tid, State),
@@ -467,17 +473,23 @@ on({tx_tm_rtm_propose_yourself, Tid},
                                                       MySelf, ItemId),
                                 %% add learner to running paxos acceptors via RTMs
                                 _ = [ begin
-                                      RTMizedPaxId = {PaxId, get_nth_rtm_name(Nth)},
-                                      comm:send_to_group_member(RTMPid, paxos_acceptor,
-                                                                {acceptor_add_learner, RTMizedPaxId, MySelf}) %% we are proxy for the acceptor to remove Role from ID
+                                          RTMizedPaxId = {PaxId, get_nth_rtm_name(Nth)},
+                                          comm:send_to_group_member(RTMPid, paxos_name_for_rtm_role(get_nth_rtm_name(Nth), acceptor),
+                                                                    {acceptor_add_learner, RTMizedPaxId,
+                                                                     MySelf})
+                                          %% we are proxy for the acceptor to remove Role from ID
                                   end
                                   || {_Key, RTMPid, Nth} <- tx_state:get_rtms(TxState)],
+
                                 %% ct:pal("start proposer for Id ~.0p~n", [PaxId]),
-                                %% proposer:start_paxosid(
-                                %% Proposer, PaxId, Acceptors, abort,
-                                %% Majority, MaxProposers, InitialRound) ->
-                                %% proposer:start_paxosid(GLLearner, PaxId, Maj,
-                                %% MySelf, ItemId)
+                                Proposer = comm:make_global(pid_groups:get_my(paxos_name_for_rtm_role(Role, proposer))),
+                                {_, RTMs, _} = lists:unzip3(tx_state:get_rtms(TxState)),
+                                {_, _, ThisRTMsNumber} = lists:keyfind(comm:this(), 2,
+                                                                      tx_state:get_rtms(TxState)),
+                                proposer:start_paxosid_with_proxy(
+                                  comm:make_global(pid_groups:get_my(dht_node)),
+                                  Proposer, PaxId, _Acceptors = RTMs, abort,
+                                  Maj, length(RTMs) + 1, ThisRTMsNumber),
                                 ok
                             end
                             || {PaxId, _RTLog, _TP}
@@ -750,9 +762,14 @@ rtms_of_same_dht_node(InRTMs) ->
             true
     end.
 
--spec get_nth_rtm_name(pos_integer()) -> atom().
+-spec get_nth_rtm_name(pos_integer()) -> pid_groups:pidname().
 get_nth_rtm_name(Nth) ->
-    list_to_atom("tx_rtm" ++ integer_to_list(Nth)).
+    list_to_existing_atom("tx_rtm" ++ integer_to_list(Nth)).
+
+-spec paxos_name_for_rtm_role(pid_groups:pidname(), atom()) -> pid_groups:pidname().
+paxos_name_for_rtm_role(Role, PaxosRole) ->
+    list_to_existing_atom(atom_to_list(Role) ++ "_" ++ atom_to_list(PaxosRole)).
+
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.

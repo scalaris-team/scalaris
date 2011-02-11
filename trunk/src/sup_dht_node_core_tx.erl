@@ -1,4 +1,4 @@
-%  @copyright 2009-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2009-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,16 +45,36 @@ init(DHTNodeGroup) ->
                                          start_link, [DHTNodeGroup]),
     TX_TM = util:sup_worker_desc(tx_tm, tx_tm_rtm, start_link,
                                  [DHTNodeGroup, tx_tm]),
+    TX_TM_Paxos = util:sup_supervisor_desc(
+                    sup_paxos_tm, sup_paxos, start_link,
+                    [DHTNodeGroup, [{sup_paxos_prefix, tx_tm}]]),
     TX_RTM0 = util:sup_worker_desc(tx_rtm0, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm0]),
+    TX_RTM0_Paxos = util:sup_supervisor_desc(
+                sup_paxos_rtm0, sup_paxos, start_link,
+                [DHTNodeGroup, [{sup_paxos_prefix, tx_rtm0}]]),
     TX_RTM1 = util:sup_worker_desc(tx_rtm1, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm1]),
+    TX_RTM1_Paxos = util:sup_supervisor_desc(
+                    sup_paxos_rtm1, sup_paxos, start_link,
+                    [DHTNodeGroup, [{sup_paxos_prefix, tx_rtm1}]]),
     TX_RTM2 = util:sup_worker_desc(tx_rtm2, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm2]),
+    TX_RTM2_Paxos = util:sup_supervisor_desc(
+                    sup_paxos_rtm2, sup_paxos, start_link,
+                    [DHTNodeGroup, [{sup_paxos_prefix, tx_rtm2}]]),
     TX_RTM3 = util:sup_worker_desc(tx_rtm3, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm3]),
+    TX_RTM3_Paxos = util:sup_supervisor_desc(
+                    sup_paxos_rtm3, sup_paxos, start_link,
+                    [DHTNodeGroup, [{sup_paxos_prefix, tx_rtm3}]]),
     {ok, {{one_for_one, 10, 1},
           [
            RDHT_tx_read, RDHT_tx_write,
-           TX_TM, TX_RTM0, TX_RTM1, TX_RTM2, TX_RTM3
+           %% start paxos supervisors before tx processes to create used atoms
+           TX_TM_Paxos, TX_TM,
+           TX_RTM0_Paxos, TX_RTM0,
+           TX_RTM1_Paxos, TX_RTM1,
+           TX_RTM2_Paxos, TX_RTM2,
+           TX_RTM3_Paxos, TX_RTM3
           ]}}.
