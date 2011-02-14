@@ -29,7 +29,6 @@
 %%% functions for gen_component module and supervisor callbacks
 -export([init/0, on_init_TP/2]).
 -export([on_tx_commitreply/3, on_tx_commitreply_fwd/4]).
--export([on_forward_to_proposer/2]).
 
 -spec init() -> atom().
 init() ->
@@ -39,7 +38,7 @@ init() ->
 
 %%
 %% Attention: this is not a separate process!!
-%% It runs inside the dht_node to get access to the ?DB
+%%            It runs inside the dht_node to get access to the ?DB
 %%
 
 -spec on_init_TP({tx_state:tx_id(),
@@ -49,9 +48,8 @@ init() ->
                   tx_item_state:paxos_id()},
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
-on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_State) ->
+on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
-    %% need Acceptors (given via RTMs), Learner,
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),
     Key = tx_tlog:get_entry_key(RTLogEntry),
@@ -71,10 +69,10 @@ on_init_TP({Tid, RTMs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_State) 
                 %% initiate a paxos proposer round 0 with the proposal
                 Proposer = comm:make_global(dht_node_state:get(DHT_Node_State,
                                                                proposer)),
-                proposer:start_paxosid_with_proxy(comm:this(), Proposer, PaxId,
-                                                  _Acceptors = RTMs, Proposal,
-                                                  _Maj = 3, _MaxProposers = 5,
-                                                  0),
+                proposer:start_paxosid(Proposer, PaxId,
+                                       _Acceptors = Accs, Proposal,
+                                       _Maj = 3, _MaxProposers = 5,
+                                       0),
                 %% send registerTP to each RTM (send with it the learner id)
                 _ = [ comm:send(X, {register_TP, {Tid, ItemId, PaxId,
                                                   comm:this()}})
@@ -130,13 +128,6 @@ on_tx_commitreply({PaxosId, RTLogEntry}, Result, DHT_Node_State) ->
 on_tx_commitreply_fwd(RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
     NewDB = update_db_or_forward(RTLogEntry, Result, OwnProposal, DHT_Node_State),
     dht_node_state:set_db(DHT_Node_State, NewDB).
-
--spec on_forward_to_proposer(tuple(),
-                             dht_node_state:state()) -> dht_node_state:state().
-on_forward_to_proposer(Msg, DHT_Node_State) ->
-    Proposer = dht_node_state:get(DHT_Node_State, proposer),
-    comm:send_local(Proposer, Msg),
-    DHT_Node_State.
 
 update_db_or_forward(RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
     %% Check for DB responsibility:

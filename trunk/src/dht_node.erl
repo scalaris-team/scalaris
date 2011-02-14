@@ -1,4 +1,4 @@
-%  @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -217,7 +217,8 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
         failed -> State;
         _ ->
             GPid = comm:make_global(NewPid),
-            comm:send(Source_PID, {get_rtm_reply, Key, GPid}),
+            GPidAcc = comm:make_global(tx_tm_rtm:get_my(Process, acceptor)),
+            comm:send(Source_PID, {get_rtm_reply, Key, GPid, GPidAcc}),
             State
     end;
 
@@ -399,14 +400,6 @@ on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
     tx_tp:on_tx_commitreply(Id, Result, State);
 on({tx_tm_rtm_commit_reply_fwd, RTLogEntry, Result, OwnProposal}, State) ->
     tx_tp:on_tx_commitreply_fwd(RTLogEntry, Result, OwnProposal, State);
-%% messages handled as proxy for a proposer in the role of a
-%% transaction participant (TP) (possible replies from an acceptor)
-on({acceptor_ack, _PaxosId, _InRound, _Val, _Raccpeted} = Msg, State) ->
-    tx_tp:on_forward_to_proposer(Msg, State);
-on({acceptor_nack, _PaxosId, _NewerRound} = Msg, State) ->
-    tx_tp:on_forward_to_proposer(Msg, State);
-on({acceptor_naccepted, _PaxosId, _NewerRound} = Msg, State) ->
-    tx_tp:on_forward_to_proposer(Msg, State);
 
 % failure detector, dead node cache
 on({crash, DeadPid}, State) ->

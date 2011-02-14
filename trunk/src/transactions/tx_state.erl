@@ -1,5 +1,5 @@
-% @copyright 2009, 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
-%    and onScale solutions GmbH
+% @copyright 2009-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%            2009 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@
          tx_state,                 %% type-marker (unnecessary in principle)
          comm:mypid() | unknown,   %% Client
          any(),                    %% ClientsId,
-         [{?RT:key(), comm:mypid(), non_neg_integer()}], %% [{Key, RTM, Nth}]
+         [tx_tm_rtm:rtms()], %% [{Key, RTM, Nth}]
          [{tx_tlog:tlog_entry(),
            tx_item_state:tx_item_id()}], %% _tlogtxitemids = [{TLogEntry, TxItemId}],
          [comm:mypid()],           %% Learners,
@@ -101,10 +101,9 @@ set_client(State, Val) ->         setelement(3, State, Val).
 get_clientsid(State) ->           element(4, State).
 -spec set_clientsid(tx_state(), any()) -> tx_state().
 set_clientsid(State, Val) ->      setelement(4, State, Val).
--spec get_rtms(tx_state()) -> [{?RT:key(), comm:mypid(), non_neg_integer()}].
+-spec get_rtms(tx_state()) -> tx_tm_rtm:rtms().
 get_rtms(State) ->                element(5, State).
--spec set_rtms(tx_state(), [{?RT:key(), comm:mypid(), non_neg_integer()}])
-              -> tx_state().
+-spec set_rtms(tx_state(), tx_tm_rtm:rtms()) -> tx_state().
 set_rtms(State, Val) ->           setelement(5, State, Val).
 -spec get_tlog_txitemids(tx_state()) -> [{tx_tlog:tlog_entry(),
                                           tx_item_state:tx_item_id()}].
