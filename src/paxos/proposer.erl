@@ -32,7 +32,6 @@
 %%% public interface for triggering a paxos proposer executed in any process
 %%% a Fast-Paxos is triggered by giving 0 as initial round number explicitly
 -export([start_paxosid/6,start_paxosid/7]).
--export([start_paxosid_with_proxy/7,start_paxosid_with_proxy/8]).
 -export([stop_paxosids/2]).
 -export([trigger/2]).
 -export([msg_accept/5]).
@@ -79,23 +78,6 @@ start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
               Majority, MaxProposers, InitialRound) ->
     Msg = {proposer_initialize, PaxosID, Acceptors, Proposal,
            Majority, MaxProposers, InitialRound},
-    comm:send(Proposer, Msg).
-
--spec start_paxosid_with_proxy(comm:mypid(), comm:mypid(),
-                               any(), [ comm:mypid() ], any(),
-                               pos_integer(), pos_integer()) -> ok.
-start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
-                         Majority, MaxProposers) ->
-    start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
-                             Majority, MaxProposers, 1).
--spec start_paxosid_with_proxy(comm:mypid(), comm:mypid(),
-                               any(), [ comm:mypid() ], any(),
-                               pos_integer(), pos_integer(), non_neg_integer())
-                              -> ok.
-start_paxosid_with_proxy(Proxy, Proposer, PaxosID, Acceptors, Proposal,
-                         Majority, MaxProposers, InitialRound) ->
-    Msg = {proposer_initialize, PaxosID, Acceptors, Proposal,
-           Majority, MaxProposers, InitialRound, Proxy},
     comm:send(Proposer, Msg).
 
 -spec stop_paxosids(comm:mypid(), any()) -> ok.
