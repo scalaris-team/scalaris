@@ -190,7 +190,7 @@ on({web_debug_info, Requestor}, State) ->
           ({inet:ip_address(), integer(), inet:socket()}, unpack_msg_bundle, [{pid(), term()}]) ->
                    notconnected | port().
 send({Address, Port, Socket}, Pid, Message) ->
-    BinaryMessage = term_to_binary({deliver, Pid, Message}),
+    BinaryMessage = term_to_binary({deliver, Pid, Message}, [{compressed, 2}]),
     NewSocket =
         case gen_tcp:send(Socket, BinaryMessage) of
             ok ->
