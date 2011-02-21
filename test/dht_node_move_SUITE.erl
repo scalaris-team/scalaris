@@ -73,19 +73,29 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-init_per_testcase(_TestCase, Config) ->
+init_per_testcase(TestCase, Config) ->
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}]}]),
-    set_move_config_parameters(),
-    % write some data (use a function because left-over tx_timeout messages can disturb the tests):
-    Pid = erlang:spawn(fun() ->
-                               _ = [cs_api_v2:write(X, X) || X <- lists:seq(1, 100)]
-                       end),
-    unittest_helper:wait_for_process_to_die(Pid),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
-    Config.
+
+    % note: cs_api (v1) and slide may interfere and data may be written where
+    % it should not be due to the lack of forward pointers in cs_api (v1)
+    case lists:member(TestCase,
+                      [symm4_slide_succ_rcv_load, symm4_slide_succ_send_load,
+                       symm4_slide_pred_send_load, symm4_slide_pred_rcv_load]) of
+        true -> 
+            {skip, "sliding with cs_api (v1) client access is not supported"};
+        _ ->
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}]}]),
+            set_move_config_parameters(),
+            % write some data (use a function because left-over tx_timeout messages can disturb the tests):
+            Pid = erlang:spawn(fun() ->
+                                       _ = [cs_api_v2:write(X, X) || X <- lists:seq(1, 100)]
+                               end),
+            unittest_helper:wait_for_process_to_die(Pid),
+            timer:sleep(500), % wait a bit for the rm-processes to settle
+            Config
+    end.
  
 end_per_testcase(_TestCase, _Config) ->
     %error_logger:tty(false),
