@@ -23,8 +23,23 @@
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p)~n", [self(), Pid, Msg])).
--define(TRACE1(Msg, State), ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
--define(TRACE_STATE(State), ?TRACE("[ ~.0p ]~n  State: ~.0p~n", [self(), State])).
+-define(TRACE_JOIN1(Msg, JoinState),
+        ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  Phase: ~.0p~n  JoinUUID: ~.0p"
+               "~n  Version: ~.0p~n  Contacts: ~.0p~n  JoinIDs: ~.0p"
+               "~n  Candidates: ~.0p~n",
+               [self(), Msg, get_phase(JoinState), get_join_uuid(JoinState), get_id_version(JoinState),
+                lists:sublist(lists:reverse(get_connections(JoinState)), erlang:min(5, length(get_connections(JoinState)))),
+                get_join_ids(JoinState),
+                lists:sublist(get_candidates(JoinState), erlang:min(5, length(get_candidates(JoinState))))])).
+-define(TRACE1(Msg, State),
+        ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
+-define(TRACE_JOIN_STATE(State), ?TRACE("[ ~.0p ]~n  Phase: ~.0p~n  JoinUUID: ~.0p"
+        "~n  Version: ~.0p~n  Contacts: ~.0p~n  JoinIDs: ~.0p"
+        "~n  Candidates: ~.0p~n",
+        [self(), get_phase(State), get_join_uuid(State), get_id_version(State),
+         lists:sublist(lists:reverse(get_connections(State)), erlang:min(5, length(get_connections(State)))),
+         get_join_ids(State),
+         lists:sublist(get_candidates(State), erlang:min(5, length(get_candidates(State))))])).
 
 -export([join_as_first/3, join_as_other/3,
          process_join_state/2, process_join_msg/2, check_config/0]).
@@ -121,7 +136,7 @@ join_as_other(Id, IdVersion, Options) ->
 process_join_state({join, known_hosts_timeout, JoinUUId} = _Msg,
                    {join, JoinState, _QueuedMessages} = State) 
   when element(2, JoinState) =:= JoinUUId ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     case get_connections(JoinState) of
         [] -> get_known_nodes(JoinUUId);
         [_|_] -> ok
@@ -131,7 +146,7 @@ process_join_state({join, known_hosts_timeout, JoinUUId} = _Msg,
 % ignore unrelated known_hosts_timeout:
 process_join_state({join, known_hosts_timeout, _JoinId} = _Msg,
                    {join, _JoinState, _QueuedMessages} = State) ->
-    ?TRACE1(_Msg, {join, _JoinState}),
+    ?TRACE_JOIN1(_Msg, _JoinState),
     State;
 
 %% userdevguide-begin dht_node_join:join_other_p2
@@ -139,11 +154,11 @@ process_join_state({join, known_hosts_timeout, _JoinId} = _Msg,
 process_join_state({get_dht_nodes_response, Nodes} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase2 ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     Connections = [{null, Node} || Node <- Nodes, Node =/= comm:this()],
     JoinState1 = add_connections(Connections, JoinState, back),
     NewJoinState = phase2_next_step(JoinState1, Connections),
-    ?TRACE_STATE(NewJoinState),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 % in all other phases, just add the provided nodes:
@@ -152,10 +167,10 @@ process_join_state({get_dht_nodes_response, Nodes} = _Msg,
   when element(1, JoinState) =:= phase2b orelse
            element(1, JoinState) =:= phase3 orelse
            element(1, JoinState) =:= phase4 ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     Connections = [{null, Node} || Node <- Nodes, Node =/= comm:this()],
     JoinState1 = add_connections(Connections, JoinState, back),
-    ?TRACE_STATE(JoinState1),
+    ?TRACE_JOIN_STATE(JoinState1),
     {join, JoinState1, QueuedMessages};
 %% userdevguide-end dht_node_join:join_other_p2
 
@@ -167,18 +182,18 @@ process_join_state({get_dht_nodes_response, Nodes} = _Msg,
 process_join_state({join, get_number_of_samples_timeout, Conn, JoinUUId} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(2, JoinState) =:= JoinUUId ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     JoinState1 = remove_connection(Conn, JoinState),
     NewJoinState = case get_phase(JoinState1) of
                        phase2b -> start_over(JoinState1);
                        _       -> JoinState1
                    end,
-    ?TRACE_STATE(NewJoinState),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 process_join_state({join, get_number_of_samples_timeout, _Conn, _JoinId} = _Msg,
                    {join, _JoinState, _QueuedMessages} = State) ->
-    ?TRACE1(_Msg, {join, _JoinState}),
+    ?TRACE_JOIN1(_Msg, _JoinState),
     State;
 
 %% userdevguide-begin dht_node_join:join_other_p2b
@@ -188,22 +203,21 @@ process_join_state({join, get_number_of_samples, Samples, Conn} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase2 orelse
            element(1, JoinState) =:= phase2b ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     % prefer node that send get_number_of_samples as first contact node
     JoinState1 = reset_connection(Conn, JoinState),
-    % (re-)issue lookups for all existing IDs
-    JoinState2 = lookup(JoinState1),
-    % then create additional samples, if required
-    NewJoinState = lookup_new_ids2(Samples, JoinState2),
-    ?TRACE_STATE(NewJoinState),
+    % (re-)issue lookups for all existing IDs and
+    % create additional samples, if required
+    NewJoinState = lookup_new_ids2(Samples, JoinState1),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 % ignore message arriving in other phases:
 process_join_state({join, get_number_of_samples, _Samples, Conn} = _Msg,
                    {join, JoinState, QueuedMessages}) ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     NewJoinState = reset_connection(Conn, JoinState),
-    ?TRACE_STATE(NewJoinState),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 %% userdevguide-end dht_node_join:join_other_p2b
 
@@ -212,34 +226,34 @@ process_join_state({join, lookup_timeout, Conn, JoinUUId} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase3 andalso
            element(2, JoinState) =:= JoinUUId ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     % do not know whether the contact node is dead or the lookup takes too long
     % -> simple solution: try with an other contact node, remove the current one
     JoinState1 = remove_connection(Conn, JoinState),
     NewJoinState = lookup(JoinState1),
-    ?TRACE_STATE(NewJoinState),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 % only remove the failed connection in other phases:
 process_join_state({join, lookup_timeout, Conn, JoinUUId} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(2, JoinState) =:= JoinUUId ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     NewJoinState = remove_connection(Conn, JoinState),
-    ?TRACE_STATE(NewJoinState),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 % ignore unrelated lookup_timeout messages:
 process_join_state({join, lookup_timeout, _Conn, _JoinId} = _Msg,
-                   {join, JoinState, _QueuedMessages} = State) ->
-    ?TRACE1(_Msg, {join, JoinState}),
+                   {join, _JoinState, _QueuedMessages} = State) ->
+    ?TRACE_JOIN1(_Msg, _JoinState),
     State;
 
 %% userdevguide-begin dht_node_join:join_other_p3
 process_join_state({join, get_candidate_response, OrigJoinId, Candidate, Conn} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase3 ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     JoinState0 = reset_connection(Conn, JoinState),
     JoinState1 = remove_join_id(OrigJoinId, JoinState0),
     JoinState2 = integrate_candidate(Candidate, JoinState1, front),
@@ -250,7 +264,7 @@ process_join_state({join, get_candidate_response, OrigJoinId, Candidate, Conn} =
             [_|_] -> % still some unprocessed join ids -> wait
                 JoinState2
         end,
-    ?TRACE_STATE(NewJoinState),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 % In phase 2 or 2b, also add the candidate but do not continue.
@@ -262,14 +276,14 @@ process_join_state({join, get_candidate_response, OrigJoinId, Candidate, Conn} =
   when element(1, JoinState) =:= phase2 orelse
            element(1, JoinState) =:= phase2b orelse
            element(1, JoinState) =:= phase4 ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     JoinState0 = reset_connection(Conn, JoinState),
     JoinState1 = remove_join_id(OrigJoinId, JoinState0),
     JoinState2 = case get_phase(JoinState1) of
                      phase4 -> integrate_candidate(Candidate, JoinState1, back);
                      _      -> integrate_candidate(Candidate, JoinState1, front)
                  end,
-    ?TRACE_STATE(JoinState2),
+    ?TRACE_JOIN_STATE(JoinState2),
     {join, JoinState2, QueuedMessages};
 %% userdevguide-end dht_node_join:join_other_p3
 
@@ -278,7 +292,7 @@ process_join_state({join, join_request_timeout, Timeouts, CandId, JoinUUId} = _M
                    {join, JoinState, QueuedMessages} = State)
   when element(1, JoinState) =:= phase4 andalso
            element(2, JoinState) =:= JoinUUId ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     case get_candidates(JoinState) of
         [] -> State; % no candidates -> late timeout, ignore
         [BestCand | _] ->
@@ -297,7 +311,7 @@ process_join_state({join, join_request_timeout, Timeouts, CandId, JoinUUId} = _M
                                               "trying next candidate", [self()]),
                                 try_next_candidate(JoinState)
                         end,
-                    ?TRACE_STATE(NewJoinState),
+                    ?TRACE_JOIN_STATE(NewJoinState),
                     {join, NewJoinState, QueuedMessages}
             end
     end;
@@ -305,14 +319,14 @@ process_join_state({join, join_request_timeout, Timeouts, CandId, JoinUUId} = _M
 % ignore late or unrelated join_request_timeout message:
 process_join_state({join, join_request_timeout, _Timeouts, _CandId, _JoinId} = _Msg,
                    {join, _JoinState, _QueuedMessages} = State) ->
-    ?TRACE1(_Msg, {join, _JoinState}),
+    ?TRACE_JOIN1(_Msg, _JoinState),
     State;
 
 %% userdevguide-begin dht_node_join:join_other_p4
 process_join_state({join, join_response, not_responsible, CandId} = _Msg,
                    {join, JoinState, QueuedMessages} = State)
   when element(1, JoinState) =:= phase4 ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     % the node we contacted is not responsible for the selected key anymore
     % -> try the next candidate, if the message is related to the current candidate
     case get_candidates(JoinState) of
@@ -320,7 +334,7 @@ process_join_state({join, join_response, not_responsible, CandId} = _Msg,
             log:log(error, "[ Node ~w ] empty candidate list in join phase 4, "
                         "starting over", [self()]),
             NewJoinState = start_over(JoinState),
-            ?TRACE_STATE(NewJoinState),
+            ?TRACE_JOIN_STATE(NewJoinState),
             {join, NewJoinState, QueuedMessages};
         [Candidate | _Rest] ->
             case lb_op:get(Candidate, id) =:= CandId of
@@ -331,7 +345,7 @@ process_join_state({join, join_response, not_responsible, CandId} = _Msg,
                             "for the selected ID (anymore), trying next candidate",
                             [self()]),
                     NewJoinState = try_next_candidate(JoinState),
-                    ?TRACE_STATE(NewJoinState),
+                    ?TRACE_JOIN_STATE(NewJoinState),
                     {join, NewJoinState, QueuedMessages}
             end
     end;
@@ -339,13 +353,13 @@ process_join_state({join, join_response, not_responsible, CandId} = _Msg,
 % in other phases remove the candidate from the list (if it still exists):
 process_join_state({join, join_response, not_responsible, CandId} = _Msg,
                    {join, JoinState, QueuedMessages}) ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     {join, remove_candidate(CandId, JoinState), QueuedMessages};
 
 % note: accept (delayed) join_response messages in any phase
 process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
                    {join, JoinState, QueuedMessages} = State) ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     % only act on related messages, i.e. messages from the current candidate
     Phase = get_phase(JoinState),
     State1 = case get_candidates(JoinState) of
@@ -353,7 +367,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
             log:log(error, "[ Node ~w ] empty candidate list in join phase 4, "
                            "starting over", [self()]),
             NewJoinState = start_over(JoinState),
-            ?TRACE_STATE(NewJoinState),
+            ?TRACE_JOIN_STATE(NewJoinState),
             {join, NewJoinState, QueuedMessages};
         [] -> State; % in all other phases, ignore the delayed join_response
                      % if no candidates exist
@@ -370,7 +384,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
                     log:log(error, "[ Node ~w ] got join_response but the node "
                                   "changed, trying next candidate", [self()]),
                     NewJoinState = try_next_candidate(JoinState),
-                    ?TRACE_STATE(NewJoinState),
+                    ?TRACE_JOIN_STATE(NewJoinState),
                     {join, NewJoinState, QueuedMessages};
                 _ ->
                     MyId = node_details:get(lb_op:get(Candidate, n1_new), new_key),
@@ -382,7 +396,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
                             % note: can not keep Id, even if skip_psv_lb is set
                             JoinState1 = remove_candidate_front(JoinState),
                             NewJoinState = contact_best_candidate(JoinState1),
-                            ?TRACE_STATE(NewJoinState),
+                            ?TRACE_JOIN_STATE(NewJoinState),
                             {join, NewJoinState, QueuedMessages};
                         _ ->
                             ?TRACE("[ ~.0p ]~n  joined MyId:~.0p, MyIdVersion:~.0p~n  "
@@ -409,21 +423,21 @@ process_join_state({join, timeout, JoinUUId} = _Msg, {join, JoinState, QueuedMes
             element(1, JoinState) =:= phase3 orelse
             element(1, JoinState) =:= phase4) andalso
            element(2, JoinState) =:= JoinUUId ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     log:log(warn, "[ Node ~w ] join timeout hit, starting over...", [self()]),
     NewJoinState = start_over(JoinState),
-    ?TRACE_STATE(NewJoinState),
+    ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 % ignore unrelated join timeout message:
 process_join_state({join, timeout, _JoinId} = _Msg,
                    {join, _JoinState, _QueuedMessages} = State) ->
-    ?TRACE1(_Msg, {join, _JoinState}),
+    ?TRACE_JOIN1(_Msg, _JoinState),
     State;
 
 process_join_state({web_debug_info, Requestor} = _Msg,
                    {join, JoinState, QueuedMessages} = State) ->
-    ?TRACE1(_Msg, {join, JoinState}),
+    ?TRACE_JOIN1(_Msg, JoinState),
     % get a list of up to 50 queued messages to display:
     MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
                   || Message <- lists:sublist(QueuedMessages, 50)],
@@ -453,7 +467,7 @@ process_join_state({web_debug_info, Requestor} = _Msg,
     
 % Catch all other messages until the join procedure is complete
 process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
-    ?TRACE1(Msg, {join, JoinState}),
+    ?TRACE_JOIN1(Msg, JoinState),
     %log:log(info("[dhtnode] [~p] postponed delivery of ~p", [self(), Msg]),
     {join, JoinState, msg_queue:add(QueuedMessages, Msg)}.
 
@@ -579,15 +593,14 @@ get_known_nodes(JoinUUId) ->
                          {join, known_hosts_timeout, JoinUUId}).
 
 -spec phase2_next_step(JoinState::phase2(), Connections::[connection()])
-        -> phase2() | phase2b() | phase3().
+        -> phase_2_4().
 phase2_next_step(JoinState, Connections) ->
     case skip_psv_lb(JoinState) of
         true -> % skip phase2b (use only the given ID)
-            % (re-)issue lookups for all existing IDs
-            JoinState2 = lookup(JoinState),
-            % the chosen Id may have been removed due to a collision, for example
-            % -> make sure there is at least one id:
-            lookup_new_ids2(1, JoinState2);
+            % (re-)issue lookups for all existing IDs and make sure there is at
+            % least one id (the chosen Id may have been removed due to a
+            % collision, for example)
+            lookup_new_ids2(1, JoinState);
         _    -> get_number_of_samples(JoinState, Connections)
     end.
 
@@ -613,9 +626,9 @@ get_number_of_samples(JoinState, [Conn | _]) ->
 
 %% @doc Select Count new (random) IDs and issue lookups.
 -spec lookup_new_ids1
-        (Count::non_neg_integer(), JoinState::phase2() | phase2b() | phase3())
+        (Count::pos_integer(), JoinState::phase2() | phase2b() | phase3())
             -> phase2() | phase3();
-        (Count::non_neg_integer(), JoinState::phase4()) -> phase4().
+        (Count::pos_integer(), JoinState::phase4()) -> phase4().
 lookup_new_ids1(Count, JoinState) ->
     OldIds = get_join_ids(JoinState),
     {NewJoinIds, OnlyNewJoinIds} = create_join_ids(Count, OldIds),
@@ -624,19 +637,31 @@ lookup_new_ids1(Count, JoinState) ->
     lookup(JoinState1, OnlyNewJoinIds).
 
 %% @doc Select as many new (random) IDs as needed to create (at least)
-%%      TotalCount candidates and issue lookups.
-%%      Note: existing IDs are not removed.
+%%      TotalCount candidates and issue lookups for all existing as well as the
+%%      new IDs.
+%%      Note: Existing IDs are not removed.
+%%      Note: If no join IDs remain, the next best candidate will be contacted!
 -spec lookup_new_ids2(TotalCount::pos_integer(), JoinState::phase2() | phase2b())
-        -> phase2() | phase3().
+        -> phase_2_4().
 lookup_new_ids2(TotalCount, JoinState) ->
-    OldIds = get_join_ids(JoinState),
-    CurCount = length(OldIds) + length(get_candidates(JoinState)),
+    % (re-)issue lookups for all existing IDs
+    JoinState2 = lookup(JoinState),
+    OldIds = get_join_ids(JoinState2),
+    CurCount = length(OldIds) + length(get_candidates(JoinState2)),
     NewIdsCount = erlang:max(TotalCount - CurCount, 0),
-    lookup_new_ids1(NewIdsCount, JoinState).
+    case NewIdsCount of
+        0 -> 
+            % if there are no join IDs left, then there will be no candidate response
+            % -> contact best candidate
+            case get_join_ids(JoinState2) of
+                []    -> contact_best_candidate(JoinState2);
+                [_|_] -> JoinState2
+            end;
+        _ -> lookup_new_ids1(NewIdsCount, JoinState2)
+    end.
 
 %% @doc Creates Count new (unique) additional IDs.
--spec create_join_ids(Count::non_neg_integer(), OldIds::[?RT:key()]) -> {AllKeys::[?RT:key()], OnlyNewKeys::[?RT:key()]}.
-create_join_ids(0, OldIds) -> {OldIds, []};
+-spec create_join_ids(Count::pos_integer(), OldIds::[?RT:key()]) -> {AllKeys::[?RT:key(),...], OnlyNewKeys::[?RT:key(),...]}.
 create_join_ids(Count, OldIds) ->
     OldIdsSet = gb_sets:from_list(OldIds),
     NewIdsSet = create_join_ids_helper(Count, OldIdsSet),
@@ -657,15 +682,20 @@ create_join_ids_helper(Count, Ids) ->
 %%      A node that has been contacted will be put at the end of the
 %%      ContactNodes list.
 %%      Note: the returned join state will stay in phase 4 if already in phase 4
--spec lookup(phase2() | phase2b() | phase3()) -> NewState::phase2() | phase3().
+-spec lookup(phase2() | phase2b() | phase3()) -> NewState::phase_2_4().
 lookup(JoinState) ->
-    lookup(JoinState, get_join_ids(JoinState)).
+    case get_join_ids(JoinState) of
+        [] ->
+            ?TRACE("[ Node ~w ] tried to look up nodes with an empty list "
+                   "of IDs, trying to contact best candidate...", [self()]),
+            contact_best_candidate(JoinState);
+        [_|_] = JoinIds -> lookup(JoinState, JoinIds)
+    end.
 
 %% @doc Like lookup/1 but only looks up the given JoinIds (if there are any).
 %%      Note: the returned join state will stay in phase 4 if already in phase 4.
--spec lookup(phase2() | phase2b() | phase3(), JoinIds::[?RT:key()]) -> NewState::phase2() | phase3();
-            (phase4(), JoinIds::[?RT:key()]) -> NewState::phase4().
-lookup(JoinState, []) -> JoinState;
+-spec lookup(phase2() | phase2b() | phase3(), JoinIds::[?RT:key(),...]) -> NewState::phase2() | phase3();
+            (phase4(), JoinIds::[?RT:key(),...]) -> NewState::phase4().
 lookup(JoinState, JoinIds = [_|_]) ->
     Phase = get_phase(JoinState),
     case get_connections(JoinState) of
