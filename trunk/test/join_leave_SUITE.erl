@@ -48,7 +48,13 @@ end_per_suite(Config) ->
     ok.
 
 init_per_testcase(TestCase, Config) ->
+    Api_v1_unsupported =
+        lists:member(TestCase, [tester_join_at, add_2x3_load, add_3_rm_2_load]),
     case TestCase of
+        % note: cs_api (v1) and slide may interfere and data may be written where
+        % it should not be due to the lack of forward pointers in cs_api (v1)
+        _ when Api_v1_unsupported ->
+            {skip, "sliding with cs_api (v1) client access is not supported"};
         % note: the craceful leave tests only work if transactions are
         % transferred to new TMs if the TM dies or the bench_server restarts
         % the transactions
