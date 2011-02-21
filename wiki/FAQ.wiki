@@ -93,6 +93,7 @@ We build rpm and deb packages using checkouts from svn trunk and the latest tagg
 || RHEL || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_5/] ||
 || RHEL || 6 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/RHEL_6/] ||
 || Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Debian_5.0/] ||
+|| Debian || 6.0 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/Debian_6.0/] ||
 || Ubuntu || 9.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.04/] ||
 || Ubuntu || 9.10 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_9.10/] ||
 || Ubuntu || 10.04 || Repository: [http://download.opensuse.org/repositories/home:/tschuett/xUbuntu_10.04/] ||
