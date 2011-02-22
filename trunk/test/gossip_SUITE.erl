@@ -68,7 +68,8 @@ init_per_suite(Config) ->
             fun() ->
                     {ok, _GroupsPid} = pid_groups:start_link(),
                     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-                    {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
+                    ConfigOptions = unittest_helper:prepare_config([{config, [{log_path, PrivDir}]}]),
+                    {ok, _ConfigPid} = config:start_link2(ConfigOptions),
                     {ok, _LogPid} = log:start_link(),
                     {ok, _CommPid} = sup_comm_layer:start_link(),
                     comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port())
