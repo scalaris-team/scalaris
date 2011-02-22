@@ -1,4 +1,4 @@
-% Copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+% Copyright 2008-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -38,11 +38,11 @@ make_tfun(Key) ->
 
 -spec inc(Key::string()) -> ok | {failure, Reason::term()}.
 inc(Key) ->
-    {TLog1, {results, [{read, Key, ReadResult}]}} =
+    {TLog1, [{read, Key, ReadResult}]} =
         cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{read, Key}]),
     case ReadResult of
         {value, Value} ->
-            {_TLog, {results, [{write, Key, {value, _Written}}, CommitResult]}} =
+            {_TLog, [{write, Key, {value, _Written}}, CommitResult]} =
                 cs_api_v2:process_request_list(
                   TLog1, [{write, Key, Value + 1}, {commit}]),
             case CommitResult of

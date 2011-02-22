@@ -25,34 +25,13 @@ handler(range_read, [From, To]) ->
 
 handler(test_and_set, [Key, OldValue, NewValue]) ->
     %io:format("Request = test_and_set(~p)~n", [_Request]),
-    case cs_api:test_and_set(Key, OldValue, NewValue) of
-        ok -> "ok";
-        {fail, {key_changed, Value}} ->
-            {struct, [{failure, "key_changed"},
-                      {value, lists:flatten(io_lib:format("~s", [Value]))}]};
-        {fail, abort} ->
-            {struct, [{failure, "abort"}]};
-        Res ->
-            io:format("test_and_set: ~p~n", [Res]),
-            lists:flatten(io_lib:write(Res))
-    end;
+    api_tx_json:test_and_set(Key, OldValue, NewValue);
 
 handler(read, [Key]) ->
-       %io:format("Request = read(~p)~n", [_Request]),
-    case cs_api:read(Key) of
-        {fail, Reason} ->
-            {struct, [{failure, atom_to_list(Reason)}]};
-        Value ->
-            Value
-    end;
+    api_tx_json:read(Key);
 
 handler(write, [Key, Value]) ->
-    %io:format("Request = write(~p)~n", [_Request]),
-    case cs_api:write(Key, Value) of
-        ok -> "ok";
-        {fail, Reason} ->
-            {struct, [{failure, atom_to_list(Reason)}]}
-    end;
+    api_tx_json:write(Key, Value);
 
 handler(delete, [Key]) ->
     %io:format("Request = delete(~p)~n", [_Request]),
@@ -69,21 +48,10 @@ handler(delete, [Key]) ->
     end;
 
 handler(req_list, [Param]) ->
-    handler(req_list, [translog_to_json(txlog:new()), Param]);
+    api_tx_json:req_list(Param);
 
-handler(req_list, [TransLog, {array, ReqList}]) ->
-    % convert req-list to clean reqlist without json artefacts
-    CleanReqList = [ case Elem of
-                         {read, Key} ->
-                             {read, Key};
-                         {write, {struct, [{Key, Val}]}} ->
-                             {write, atom_to_list(Key), Val};
-                         {commit, Commit} ->
-                             {commit};
-                         Any -> Any
-                     end || {struct, [Elem]} <- ReqList ],
-    ErlResult = cs_api:process_request_list(json_to_translog(TransLog), CleanReqList),
-    make_result_json_conforming(ErlResult);
+handler(req_list, [TLog, ReqList]) ->
+    api_tx_json:req_list(TLog, ReqList);
 
 handler(publish, [Topic, Content]) ->
     case pubsub_api:publish(Topic, Content) of
@@ -117,33 +85,6 @@ handler(notify, [Topic, Value]) ->
 handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~p(~p)~n", [AnyOp, AnyParams]),
     {struct, [{failure, "unknownreq"}]}.
-
-make_result_json_conforming(ErlResult) ->
-    case ErlResult of
-        {TLog, {results, Results}} ->
-            {struct, [{translog, translog_to_json(TLog)}, {results, results_to_json(Results)}]};
-        Any ->
-            ok
-    end.
-
-translog_to_json(TLog) ->
-    base64:encode_to_string(term_to_binary(TLog, [compressed])).
-
-json_to_translog(JsonTLog) ->
-    binary_to_term(base64:decode(JsonTLog)).
-
-results_to_json(Results) ->
-    Entries = [ {struct, [{op, atom_to_list(Op)},
-                          case Op of
-                              commit -> {key, atom_to_list(Key)};
-                              Any -> {key, Key}
-                          end,
-                          case Val of
-                              {fail, Reason} -> {fail, atom_to_list(Reason)};
-                              {value, Value} -> {value, Value}
-                          end ]}
-                || {Op, Key, Val} <- Results ],
-    {array, Entries}.
 
 data_to_json(Data) ->
     {array, [ {struct, [{key, Key},

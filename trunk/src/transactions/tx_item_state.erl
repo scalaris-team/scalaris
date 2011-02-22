@@ -74,7 +74,8 @@ new(ItemId) ->
 new(ItemId, TxId, TLogEntry) ->
     %% expand TransLogEntry to replicated translog entries
     RTLogEntries = apply(element(1, TLogEntry), validate_prefilter, [TLogEntry]),
-    PaxosIds = [ {paxos_id, util:get_global_uid()} || _ <- RTLogEntries ],
+%%    PaxosIds = [ {paxos_id, util:get_global_uid()} || _ <- RTLogEntries ],
+    PaxosIds = [ {util:get_global_uid()} || _ <- RTLogEntries ],
     TPs = [ unknown || _ <- PaxosIds ],
     PaxIDsRTLogsTPs = lists:zip3(PaxosIds, RTLogEntries, TPs),
     ReplDeg = config:read(replication_factor),

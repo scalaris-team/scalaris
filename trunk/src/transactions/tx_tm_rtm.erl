@@ -499,25 +499,25 @@ on({crash, _Pid, _Cookie},
 
 %% periodic RTM update
 on({update_RTMs},
-   {RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
+   {RTMs, _TableName, tx_tm, _LAcceptor, _GLLearner} = State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:update_RTMs in Pid ~p ~n", [self()]),
     my_RTM_update(RTMs),
     State;
 
 %% accept RTM updates
 on({get_rtm_reply, InKey, InPid, InAcceptor},
-   {RTMs, TableName, Role, LAcceptor, GLLearner} = _State) ->
+   {RTMs, TableName, tx_tm, LAcceptor, GLLearner} = _State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:get_rtm_reply in Pid ~p for Pid ~p and State ~p~n", [self(), InPid, _State]),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
     rtms_of_same_dht_node(NewRTMs),
-    {NewRTMs, TableName, Role, LAcceptor, GLLearner}.
+    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner}.
 
 -spec on_init(comm:message(), state_uninit())
     -> state_uninit() |
        {'$gen_component', [{on_handler, Handler::on}], State::state()}.
 %% While initializing
 on_init({get_node_details_response, NodeDetails},
-        {_RTMs, TableName, Role, LAcceptor, GLLearner, QueuedMessages} = _State) ->
+        {_RTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages} = _State) ->
     ?TRACE("tx_tm_rtm:on_init:get_node_details_response State; ~p~n", [_State]),
     IdSelf = node:id(node_details:get(NodeDetails, node)),
     %% provide ids for RTMs (sorted by increasing latency to them).
@@ -529,16 +529,16 @@ on_init({get_node_details_response, NodeDetails},
                 end,
                 {[], length(RTM_ids) - 1}, RTM_ids),
     my_RTM_update(NewRTMs),
-    {NewRTMs, TableName, Role, LAcceptor, GLLearner, QueuedMessages};
+    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages};
 
 on_init({update_RTMs},
-        {RTMs, _TableName, _Role, _LAcceptor, _GLLearner, _QueuedMessages} = State) ->
+        {RTMs, _TableName, tx_tm, _LAcceptor, _GLLearner, _QueuedMessages} = State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
     my_RTM_update(RTMs),
     State;
 
 on_init({get_rtm_reply, InKey, InPid, InAcceptor},
-        {RTMs, TableName, Role, LAcceptor, GLLearner, QueuedMessages} = _State) ->
+        {RTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages} = _State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:get_rtm_reply in Pid ~p for Pid ~p State ~p~n", [self(), InPid, _State]),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
     case lists:keyfind(unknown, 2, NewRTMs) of %% filled all entries?
@@ -546,14 +546,14 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor},
             rtms_of_same_dht_node(NewRTMs),
             msg_queue:send(QueuedMessages),
             gen_component:change_handler(
-              {NewRTMs, TableName, Role, LAcceptor, GLLearner}, on);
-        _ -> {NewRTMs, TableName, Role, LAcceptor, GLLearner, QueuedMessages}
+              {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner}, on);
+        _ -> {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages}
     end;
 
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg,
-        {RTMs, TableName, Role, LAcceptor, GLLearner, QueuedMessages} = _State) ->
+        {RTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages} = _State) ->
     NewQueuedMessages = msg_queue:add(QueuedMessages, Msg),
-    {RTMs, TableName, Role, LAcceptor, GLLearner, NewQueuedMessages}.
+    {RTMs, TableName, tx_tm, LAcceptor, GLLearner, NewQueuedMessages}.
 
 %% functions for periodic RTM updates
 -spec my_RTM_update(rtms()) -> ok.
@@ -620,7 +620,7 @@ my_init_TPs(TxState, ItemStates) ->
 -spec my_get_tx_entry(tx_state:tx_id(), state())
                      -> {new | ok | uninitialized, tx_state:tx_state()}.
 my_get_tx_entry(Id,
-                {_RTMS, TableName, _Role, _LAcceptor, _GLLearner} = _State) ->
+                {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = _State) ->
     case pdb:get(Id, TableName) of
         undefined -> {new, tx_state:new(Id)};
         Entry -> {tx_state:get_status(Entry), Entry}
@@ -629,7 +629,7 @@ my_get_tx_entry(Id,
 -spec my_get_item_entry(tx_item_state:tx_item_id(), state()) ->
                                {new | uninitialized | ok,
                                 tx_item_state:tx_item_state()}.
-my_get_item_entry(Id, {_RTMS, TableName, _Role, _LAcceptor, _GLLearner} = _State) ->
+my_get_item_entry(Id, {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = _State) ->
     case pdb:get(Id, TableName) of
         undefined -> {new, tx_item_state:new(Id)};
         Entry -> {tx_item_state:get_status(Entry), Entry}
@@ -637,7 +637,7 @@ my_get_item_entry(Id, {_RTMS, TableName, _Role, _LAcceptor, _GLLearner} = _State
 
 -spec my_set_entry(tx_state:tx_state() | tx_item_state:tx_item_state(),
                    state()) -> state().
-my_set_entry(NewEntry, {_RTMS, TableName, _Role, _LAcceptor, _GLLearner} = State) ->
+my_set_entry(NewEntry, {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = State) ->
     pdb:set(NewEntry, TableName),
     State.
 

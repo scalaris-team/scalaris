@@ -39,15 +39,19 @@
 -type result() :: [ result_entry() ].
 
 -spec process_request_list(tx_tlog:tlog(), [request()]) ->
-        {tx_tlog:tlog(), {results, result()}}.
+        {tx_tlog:tlog(), result()}.
 %% single request and empty translog, done separately for optimization only
 process_request_list([], [SingleReq]) ->
     RdhtOpWithReqId = initiate_rdht_ops([{1, SingleReq}]),
     {NewTLog, TmpResultList, [], [], []} =
         collect_results_and_do_translogops({[], [], RdhtOpWithReqId, [], []}),
     TransLogResult = NewTLog,
-    [{_, ResultEntry}] = TmpResultList,
-    {TransLogResult, {results, [ResultEntry]}};
+    [{_ReqNum, ResultEntry}] = TmpResultList,
+    {TransLogResult, [ResultEntry]};
+
+process_request_list([], [SingleReq, {commit}]) ->
+    {TLog, [Res1]} = process_request_list([], [SingleReq]),
+    {TLog, [Res1, commit(TLog)]};
 
 process_request_list(TLog, PlainReqList) ->
     ?TRACE("rdht_tx:process_request_list(~p, ~p)~n", [TLog, PlainReqList]),
@@ -83,7 +87,7 @@ process_request_list(TLog, PlainReqList) ->
                      _ -> lists:append(Tmp2ResultList, [CommitResult])
                  end,
     %% return the NewTLog and a result list
-    {TransLogResult, {results, ResultList}}.
+    {TransLogResult, ResultList}.
 
 %% implementation
 my_split_ops(TLog, ReqList) ->
@@ -120,7 +124,7 @@ my_key_in_numbered_reqlist(Key, [{_Num, Entry} | Tail]) ->
 initiate_rdht_ops(ReqList) ->
     ?TRACE("rdht_tx:initiate_rdht_ops(~p)~n", [ReqList]),
     [ begin
-          NewReqId = {rdht_req_id, util:get_global_uid()}, % local id not sufficient
+          NewReqId = util:get_global_uid(), % local id not sufficient
           apply(element(1, Entry), work_phase, [self(), NewReqId, Entry]),
           {NewReqId, {Num, Entry}}
       end || {Num, Entry} <- ReqList ].

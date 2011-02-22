@@ -57,7 +57,7 @@ def req_list()
   rlist2[1] = { :read => 'keyB' }
   result = json_call('req_list', [rlist2])
 
-  translog = result['translog']
+  translog = result['tlog']
   values = result['results']
 
   puts "  Read key #{values[0]['key']} as: #{values[0]['value']}"
@@ -92,7 +92,7 @@ def req_list2()
   rlist2[1] = { :read => 'keyB' }
   result = json_call('req_list', [rlist2])
 
-  translog = result['translog']
+  translog = result['tlog']
   values = result['results']
 
   rlist3 = []
