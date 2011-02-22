@@ -89,7 +89,8 @@ spawn_config_processes(Config) ->
       fun() ->
               {ok, _GroupsPid} = pid_groups:start_link(),
               {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-              {ok, _ConfigPid} = config:start_link2([{config, [{log_path, PrivDir}]}]),
+              ConfigOptions = unittest_helper:prepare_config([{config, [{log_path, PrivDir}]}]),
+              {ok, _ConfigPid} = config:start_link2(ConfigOptions),
               {ok, _LogPid} = log:start_link()
       end).
 
