@@ -15,10 +15,10 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc This is the scalaris2 application module.
 %% @end
-%% @version $Id: boot.erl 953 2010-08-03 13:52:39Z kruber@zib.de $
+%% @version $Id$
 -module(scalaris2).
 -author('schuett@zib.de').
--vsn('$Id: boot.erl 953 2010-08-03 13:52:39Z kruber@zib.de $').
+-vsn('$Id$').
 
 -export([start/0, stop/0]).
 

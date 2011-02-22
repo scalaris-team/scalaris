@@ -98,13 +98,15 @@ add_my_config(KVList) ->
                {yaws_port, YawsPort} | KVList],
     lists:append(KVList1, [{empty_node, true}]).
 
+%% @doc Adds unittest specific ports from the environment to the list of
+%%      options for the config process.
 -spec prepare_config(Options::[{atom(), term()}]) -> NewOptions::[{atom(), term()}].
 prepare_config(Options) ->
     prepare_config_helper(Options, false, []).
 
--spec prepare_config_helper(Options, boolean(), Options) -> Options when is_subtype(Options, [{atom(), term()}]).
+-spec prepare_config_helper(Options, ConfigFound::boolean(), Options) -> Options when is_subtype(Options, [{atom(), term()}]).
 prepare_config_helper([], false, OldOptions) ->
-    lists:reverse(OldOptions, [add_my_config([])]);
+    lists:reverse(OldOptions, [{config, add_my_config([])}]);
 prepare_config_helper([], true, OldOptions) ->
     lists:reverse(OldOptions);
 prepare_config_helper([Option | Rest], OldConfigFound, OldOptions) ->
