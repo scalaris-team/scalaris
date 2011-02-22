@@ -16,7 +16,7 @@
 %% @doc Service functions for handling quorums.
 -module(quorum).
 -author('schintke@zib.de').
--vsn('$Id:$').
+-vsn('$Id$').
 
 -export([majority_for_accept/1, majority_for_deny/1]).
 
