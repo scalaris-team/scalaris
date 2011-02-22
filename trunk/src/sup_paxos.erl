@@ -25,10 +25,10 @@
 %%      the processes register as 'paxos_proposer', 'paxos_acceptor',
 %%      and 'paxos_learner' directly.
 %% @end
-%% @version $Id:$
+%% @version $Id$
 -module(sup_paxos).
 -author('schintke@zib.de').
--vsn('$Id: $').
+-vsn('$Id$').
 -behaviour(supervisor).
 -export([start_link/2, init/1]).
 

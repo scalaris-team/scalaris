@@ -14,10 +14,10 @@
 
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc JSON API for transactional, consistent access to replicated DHT items
-%% @version $Id: cs_api_v2.erl 1325 2010-12-27 13:04:53Z kruber@zib.de $
+%% @version $Id$
 -module(api_tx_json).
 -author('schintke@zib.de').
--vsn('$Id: cs_api_v2.erl 1325 2010-12-27 13:04:53Z kruber@zib.de $').
+-vsn('$Id$').
 
 -export([req_list/1, req_list/2, read/1, write/2, test_and_set/3]).
 
