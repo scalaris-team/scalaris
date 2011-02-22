@@ -1,4 +1,4 @@
-%% @copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -34,9 +34,9 @@
 -spec new_tlog() -> tx_tlog:tlog().
 new_tlog() -> tx_tlog:empty().
 
--spec process_request_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), {results, [result()]}}.
+-spec process_request_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
 process_request_list([], [{commit}]) ->
-    {[], {results, [commit]}};
+    {[], [commit]};
 process_request_list(TLog, ReqList) ->
     %% @todo should choose a dht_node in the local VM at random or even
     %% better round robin.
@@ -49,13 +49,8 @@ process_request_list(TLog, ReqList) ->
                      end || Entry <- ReqList ],
     %% sanity checks on ReqList:
     %% @TODO Scan for fail in TransLog, then return immediately?
-    {TmpTransLogResult, {results, TmpResultList}} =
+    {TransLogResult, TmpResultList} =
         rdht_tx:process_request_list(TLog, RDHT_ReqList),
-%%     TransLogResult = [ case element(1, Entry) of
-%%                            rdht_tx_read -> setelement(1, Entry, read);
-%%                            rdht_tx_write -> setelement(1, Entry, write)
-%%                        end || Entry <- TmpTransLogResult ],
-    TransLogResult = TmpTransLogResult,
     ResultList = [ case element(1, Entry) of
                        rdht_tx_read -> setelement(1, Entry, read);
                        rdht_tx_write -> setelement(1, Entry, write);
@@ -63,28 +58,28 @@ process_request_list(TLog, ReqList) ->
                    end || Entry <- TmpResultList ],
     %% this returns the NewTLog and an ordered
     %% result list in the form
-    {TransLogResult, {results, ResultList}}.
+    {TransLogResult, ResultList}.
 
 %% @doc reads the value of a key
 %% @spec read(client_key()) -> client_value() | {fail, term()}
 -spec read(client_key()) -> client_value() | {fail, term()}.
 read(Key) ->
-    ReqList = [{read, Key}],
-    case process_request_list(tx_tlog:empty(), ReqList) of
-        {_TLog, {results, [{read, Key, {fail, Reason}}]}} -> {fail, Reason};
-        {_TLog, {results, [{read, Key, {value, Value}}]}} -> Value
+    ReqList = [{rdht_tx_read, Key}],
+    case rdht_tx:process_request_list(tx_tlog:empty(), ReqList) of
+        {_TLog, [{rdht_tx_read, Key, {value, Value}}]} -> Value;
+        {_TLog, [{rdht_tx_read, Key, {fail, Reason}}]} -> {fail, Reason}
     end.
 
 %% @doc writes the value of a key
 %% @spec write(client_key(), client_value()) -> ok | {fail, term()}
 -spec write(client_key(), client_value()) -> ok | {fail, term()}.
 write(Key, Value) ->
-    ReqList = [{write, Key, Value}, {commit}],
-    case process_request_list(tx_tlog:empty(), ReqList) of
-        {_TLog, {results, [{write, Key, {value, Value}}, commit]}} -> ok;
-        {_TLog, {results, [{write, Key, {fail, timeout}}, Reason]}} ->
+    ReqList = [{rdht_tx_write, Key, Value}, {commit}],
+    case rdht_tx:process_request_list(tx_tlog:empty(), ReqList) of
+        {_TLog, [{rdht_tx_write, Key, {value, Value}}, {commit}]} -> ok;
+        {_TLog, [{rdht_tx_write, Key, {fail, timeout}}, {Reason}]} ->
             {fail, Reason};
-        {_TLog, {results, [{write, Key, {value, Value}}, Reason]}} ->
+        {_TLog, [{rdht_tx_write, Key, {value, Value}}, {Reason}]} ->
             {fail, Reason}
     end.
 
@@ -103,13 +98,13 @@ test_and_set(Key, OldValue, NewValue) ->
     ReadReqList = [{read, Key}],
     WriteReqList = [{write, Key, NewValue}, {commit}],
     {TLog, Results} = process_request_list(tx_tlog:empty(), ReadReqList),
-    {results, [{read, Key, Result}]} = Results,
+    [{read, Key, Result}] = Results,
     case Result of
         {fail, timeout} -> {{fail, timeout}, TLog};
         _ -> if (Result =:= {fail, not_found})
                 orelse (Result =:= {value, OldValue}) ->
                      {_TLog2, Results2} = process_request_list(TLog, WriteReqList),
-                     {results, [_, Result2]} = Results2,
+                     [_, Result2] = Results2,
                      case Result2 of
                          commit -> ok;
                          abort -> {fail, write}

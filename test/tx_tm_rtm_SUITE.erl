@@ -153,20 +153,20 @@ abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
                 case ?CS_API:process_request_list(?CS_API:new_tlog(),
                                                   [{read, Key}, {commit}]) of
                     %% cs_api
-                    {_TLog, {results, [_, {commit, fail, {fail, abort}}]}} -> {fail, abort};
-                    {_TLog, {results, [_, {commit, ok, _}]}} -> ok;
+                    {_TLog, [_, {commit, fail, {fail, abort}}]} -> {fail, abort};
+                    {_TLog, [_, {commit, ok, _}]} -> ok;
                     %% cs_api_v2
-                    {_TLog, {results, [_, abort]}} -> {fail, abort};
-                    {_TLog, {results, [_, commit]}} -> ok
+                    {_TLog, [_, abort]} -> {fail, abort};
+                    {_TLog, [_, commit]} -> ok
                 end;
             {commit_tlog, TLog} ->
                 case ?CS_API:process_request_list(TLog, [{commit}]) of
                     %% cs_api
-                    {_TLog, {results, [{commit, fail, {fail, abort}}]}} -> {fail, abort};
-                    {_TLog, {results, [{commit, ok, _}]}} -> ok;
+                    {_TLog, [{commit, fail, {fail, abort}}]} -> {fail, abort};
+                    {_TLog, [{commit, ok, _}]} -> ok;
                     %% cs_api_v2
-                    {_TLog, {results, [abort]}} -> {fail, abort};
-                    {_TLog, {results, [commit]}} -> ok
+                    {_TLog, [abort]} -> {fail, abort};
+                    {_TLog, [commit]} -> ok
                 end
         end,
     case ExpectedOutcome of

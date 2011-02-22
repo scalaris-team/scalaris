@@ -33,20 +33,19 @@ end_per_suite(Config) ->
     ok.
 
 money_transfer(A, B) ->
-    TLog0 = cs_api_v2:new_tlog(),
-    Req1 = [{read, A}, {read, B}],
-    {TLog1, {results, Res1}} = cs_api_v2:process_request_list(TLog0, Req1),
-    [{read,A,{value, ABalance}},{read,B,{value, BBalance}}] = Res1,
-    {DeltaA, DeltaB} = case ABalance > BBalance of
-                           true -> {-1, 1};
-                           false -> {1, -1}
-                       end,
-    Req2 = [{write, A, ABalance + DeltaA},
-            {write, B, BBalance + DeltaB},
+    TLog0 = api_tx:new_tlog(),
+    Req1 = [{read, A},
+            {read, B}],
+    {TLog1, [{ok, ABalance}, {ok, BBalance}]} = api_tx:req_list(TLog0, Req1),
+    AtoB = case ABalance > BBalance of
+               true  ->  1;
+               false -> -1
+           end,
+    Req2 = [{write, A, ABalance - AtoB},
+            {write, B, BBalance + AtoB},
             {commit}],
-    {_TLog2, {results, [_Res2, _Res3, CommitAbort]}} =
-        cs_api_v2:process_request_list(TLog1, Req2),
-    CommitAbort.
+    {_TLog2, [_, _, ResCommit]} = api_tx:req_list(TLog1, Req2),
+    ResCommit.
 
 process(Parent, A, B, Count) ->
     process_iter(Parent, A, B, Count, 0).
@@ -55,15 +54,15 @@ process_iter(Parent, _A, _B, 0, AbortCount) ->
     Parent ! {done, AbortCount};
 process_iter(Parent, A, B, Count, AbortCount) ->
     case money_transfer(A, B) of
-        commit -> process_iter(Parent, A, B, Count - 1, AbortCount);
-        abort -> process_iter(Parent, A, B, Count, AbortCount + 1)
+        {ok} -> process_iter(Parent, A, B, Count - 1, AbortCount);
+        _ -> process_iter(Parent, A, B, Count, AbortCount + 1)
     end.
 
 banking_account(_Config) ->
     Total = 1000,
-    ?equals(cs_api_v2:write("a", Total), ok),
-    ?equals(cs_api_v2:write("b", 0), ok),
-    ?equals(cs_api_v2:write("c", 0), ok),
+    ?equals(api_tx:write("a", Total), {ok}),
+    ?equals(api_tx:write("b", 0), {ok}),
+    ?equals(api_tx:write("c", 0), {ok}),
     Self = self(),
     Count = 1000,
     spawn(banking_account_SUITE, process, [Self, "a", "b", Count]),
@@ -73,9 +72,9 @@ banking_account(_Config) ->
     ct:pal("Committed Tx: ~p~n", [3 * Count]),
     ct:pal("Aborted and restarted Tx due to concurrent conflicting Txs: ~p~n",
            [lists:sum(Aborts)]),
-    A = cs_api_v2:read("a"),
-    B = cs_api_v2:read("b"),
-    C = cs_api_v2:read("c"),
+    {ok, A} = api_tx:read("a"),
+    {ok, B} = api_tx:read("b"),
+    {ok, C} = api_tx:read("c"),
     ct:pal("balance: ~p ~p ~p~n", [A, B, C]),
     ?equals(A + B + C, Total),
     ok.
