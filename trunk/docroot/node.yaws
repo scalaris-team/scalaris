@@ -43,7 +43,7 @@ render_node(Node) ->
   Id = node:id(Node),
   Pid = node:pidX(Node),
   URL = get_yaws_url_for_node(Pid),
-  {a, [{href, URL}], {p, [], io_lib:format("~w", [Id])}}.
+  {a, [{href, URL}], {p, [], io_lib:format("~.16B", [Id])}}.
 
 get_ring_info(NodeDetails) ->
   {ehtml, {fieldset, [{style, "border: 1px black solid"}],
@@ -126,7 +126,7 @@ render_node(Node) ->
   Id = node:id(Node),
   Pid = node:pidX(Node),
   URL = get_yaws_url_for_node(Pid),
-  {a, [{href, URL}], {p, [], io_lib:format("~w", [Id])}}.
+  {a, [{href, URL}], {p, [], io_lib:format("~.16B", [Id])}}.
 
 make_table(RT) ->
    {Rows, _} = lists:foldl(fun({_, Node}, {Rows, Idx}) ->
