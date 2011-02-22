@@ -339,6 +339,12 @@ on({bulkowner_deliver, Range, {bulk_read_entry, Issuer}}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({get_yaws_info, Pid}, State) ->
+    comm:send(Pid, {get_yaws_info_response, comm:get_ip(comm:this()), config:read(yaws_port), pid_groups:my_groupname()}),
+    State;
+on({get_state, Pid, Which}, State) ->
+    comm:send(Pid, {get_state_response, dht_node_state:get(State, Which)}),
+    State;
 on({get_node_details, Pid}, State) ->
     comm:send(Pid, {get_node_details_response, dht_node_state:details(State)}),
     State;
