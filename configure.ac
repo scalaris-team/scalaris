@@ -23,10 +23,13 @@ AC_INIT(scalaris, 0.2, schuett@zib.de)
 
 ENABLE_TOKE=
 TOKEPREFIX=
-AC_ARG_ENABLE([toke], AS_HELP_STRING([--disable-toke], [disable support for tokyo cabinet through toke]), [TOKEPREFIX=no])
+AC_ARG_ENABLE([toke],
+              AS_HELP_STRING([--disable-toke],
+                 [disable support for tokyo cabinet through toke]),
+              [TOKEPREFIX=no])
 AC_ARG_ENABLE([toke],
               AS_HELP_STRING([--enable-toke@<:@=DIR@:>@],
-              [enable support for tokyo cabinet through toke]),
+                 [enable support for tokyo cabinet through toke]),
               [ENABLE_TOKE=yes
                TOKEPREFIX=$enableval])
 
@@ -48,6 +51,18 @@ AC_SUBST(BROWSER)
 
 AS_IF([test ! -x "$BROWSER"],
       [AC_MSG_WARN(["$BROWSER" was not found or is not executable ('make test-vts' will likely fail)])])
+
+###########################################################
+#
+# check whether to compile to native code using HiPE
+#
+###########################################################
+
+COMPILE_NATIVE=no
+AC_ARG_ENABLE([native],
+              AS_HELP_STRING([--enable-native],
+                [enable compilation to native code using HiPE]),
+              [COMPILE_NATIVE=yes])
 
 ###########################################################
 #
@@ -107,6 +122,9 @@ AS_IF([test "x$TOKEPREFIX" != xno],
                 AC_MSG_FAILURE($ERLANG_TOKE_MESSAGE))])
             ])
 AC_SUBST([ERLANG_TOKE_FLAGS])
+
+ERLANG_NATIVE_FLAGS=
+AS_IF([test "x$COMPILE_NATIVE" != xno], [ERLANG_NATIVE_FLAGS=", native"])
 
 AC_ERLANG_CHECK_LIB(tools, , AC_MSG_FAILURE([erlang-tools not found - you won't be able compile the erlang sources]))
 
@@ -189,7 +207,7 @@ AC_RUN_IFELSE(
        [AC_MSG_NOTICE([httpc is available])],
        [AC_MSG_NOTICE([httpc unavailable, using wrapper module]);EMAKEFILECOMPILECOMPAT=["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]])
 
-EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $TIDISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $EXPORTTYPESUPPORT"
+EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $TIDISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $EXPORTTYPESUPPORT $ERLANG_NATIVE_FLAGS"
 DIALYZER_FLAGS="$HAVETOKE_DIALYZER $GBTREESISBUILTIN_DIALYZER $TERMISBUILTIN_DIALYZER $NODEISBUILTIN_DIALYZER $MODULEISBUILTIN_DIALYZER $BOOLEANISBUILTIN_DIALYZER $TIDISBUILTIN_DIALYZER $RECURSIVETYPESALLOWED_DIALYZER $TYPEFORWARDDECLARATIONS_DIALYZER $FORWARDORRECURSIVE_DIALYZER $EXPORTTYPESUPPORT_DIALYZER"
 
 AC_SUBST(EMAKEFILEDEFINES)
