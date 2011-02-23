@@ -80,6 +80,8 @@ write(Key, Value) ->
         {_TLog, [{rdht_tx_write, Key, {fail, timeout}}, {Reason}]} ->
             {fail, Reason};
         {_TLog, [{rdht_tx_write, Key, {value, Value}}, {Reason}]} ->
+            {fail, Reason};
+        {_TLog, [{rdht_tx_write, Key, {value, Value}}, {failed, Reason}]} ->
             {fail, Reason}
     end.
 
