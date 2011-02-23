@@ -195,24 +195,16 @@ renderVivaldiMap(CC_list, Nodes) ->
                         lists:nth(1, Min)-R*4,
                         lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
                         R*2,
-                        floor(lists:nth(1, Max)-lists:nth(1, Min))])++
+                        util:floor(lists:nth(1, Max)-lists:nth(1, Min))])++
         io_lib:format("<text x=\"~p\" y=\"~p\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
                        [lists:nth(1, Min)+(lists:nth(1, Max)-lists:nth(1, Min))/3,
                         lists:nth(2, Max)+R*4,
                          R*2,
-                        floor(lists:nth(2, Max)-lists:nth(2, Min))]),
+                        util:floor(lists:nth(2, Max)-lists:nth(2, Min))]),
 
     Content=gen_Nodes(CC_list, Nodes, R),
     Foot="</svg>",
     Head++Content++Foot.
-
--spec floor(X::number()) -> integer().
-floor(X) ->
-    T = trunc(X),
-    case X - T == 0 of
-        true -> T;
-        false -> T - 1
-    end.
 
 -spec gen_Nodes(CC_list::[vivaldi:network_coordinate()], Nodes::[comm:mypid()], R::float()) -> string().
 gen_Nodes([],_,_) ->
@@ -245,22 +237,12 @@ get_min_max([H | T]) ->
 %% @doc Gets the smallest coordinate in each dimension of the given vectors.
 -spec min_list(L1::vivaldi:network_coordinate(), L2::vivaldi:network_coordinate()) -> vivaldi:network_coordinate().
 min_list(L1, L2) ->
-    lists:zipwith(fun(X, Y) ->
-                          case X < Y of
-                              true -> X;
-                              _ -> Y
-                          end
-                  end, L1, L2).
+    lists:zipwith(fun erlang:min/2, L1, L2).
 
 %% @doc Gets the largest coordinate in each dimension of the given vectors.
 -spec max_list(L1::vivaldi:network_coordinate(), L2::vivaldi:network_coordinate()) -> vivaldi:network_coordinate().
 max_list(L1, L2) ->
-    lists:zipwith(fun(X, Y) ->
-                          case X > Y of
-                              true -> X;
-                              _ -> Y
-                          end
-                  end, L1, L2).
+    lists:zipwith(fun erlang:max/2, L1, L2).
 
 -spec pid_to_integer(comm:mypid()) -> integer().
 -ifdef(TCP_LAYER).
