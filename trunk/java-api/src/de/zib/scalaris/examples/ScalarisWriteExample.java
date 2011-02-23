@@ -17,6 +17,7 @@ package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.Scalaris;
 import de.zib.scalaris.TimeoutException;
@@ -76,11 +77,15 @@ public class ScalarisWriteExample {
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") failed with timeout: "
 					+ e.getMessage());
+        } catch (AbortException e) {
+            System.out.println("      write(" + otpKey.stringValue() + ", "
+                    + otpValue.stringValue() + ") failed with abort: "
+                    + e.getMessage());
 		} catch (UnknownException e) {
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") failed with unknown: "
 					+ e.getMessage());
-		}
+        }
 
 		try {
 			System.out.println("  creating object...");
@@ -95,6 +100,10 @@ public class ScalarisWriteExample {
 		} catch (TimeoutException e) {
 			System.out.println("      write(" + key + ", " + value
 					+ ") failed with timeout: " + e.getMessage());
+        } catch (AbortException e) {
+            System.out.println("      write(" + otpKey.stringValue() + ", "
+                    + otpValue.stringValue() + ") failed with abort: "
+                    + e.getMessage());
 		} catch (UnknownException e) {
 			System.out.println("      write(" + key + ", " + value
 					+ ") failed with unknown: " + e.getMessage());

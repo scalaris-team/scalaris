@@ -22,22 +22,22 @@ import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.PubSub;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the <tt>getSubscribers</tt> methods of the
- * {@link Scalaris} class.
+ * {@link PubSub} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
- * @since 2.0
+ * @version 2.5
+ * @since 2.5
  */
-public class ScalarisGetSubscribersExample {
+public class PubSubGetSubscribersExample {
 	/**
 	 * Prints a list of all subscribers to a given topic, provided on the
 	 * command line with the <tt>getSubscribers</tt> methods of
-	 * {@link Scalaris}.<br />
+	 * {@link PubSub}.<br />
 	 * If no topic is given, the default topic <tt>"topic"</tt> is used.
 	 * 
 	 * @param args
@@ -58,11 +58,11 @@ public class ScalarisGetSubscribersExample {
 		OtpErlangList otpSubscribers;
 		List<String> subscribers;
 
-		System.out.println("Reading values with the class `Scalaris`:");
+		System.out.println("Reading values with the class `PubSub`:");
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			PubSub sc = new PubSub();
 			System.out
 					.println("    `OtpErlangList getSubscribers(OtpErlangString)`...");
 			otpSubscribers = sc.getSubscribers(otpTopic);
@@ -78,7 +78,7 @@ public class ScalarisGetSubscribersExample {
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			PubSub sc = new PubSub();
 			System.out
 					.println("    `Vector<String> getSubscribers(String)`...");
 			subscribers = sc.getSubscribers(topic);

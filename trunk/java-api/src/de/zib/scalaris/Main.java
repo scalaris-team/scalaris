@@ -128,9 +128,11 @@ public class Main {
 				printException("write failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
 				printException("write failed with timeout", e, verbose);
+            } catch (AbortException e) {
+                printException("write failed with abort", e, verbose);
 			} catch (UnknownException e) {
 				printException("write failed with unknown", e, verbose);
-			}
+            }
 		} else if (line.hasOption("p")) { // publish
 			String[] optionValues = line.getOptionValues("publish");
 			checkArguments(optionValues, 2, options, "p");
@@ -141,7 +143,7 @@ public class Main {
 				printException("Parsing failed", new ParseException("missing content for option p"), verbose);
 			}
 			try {
-				Scalaris sc = new Scalaris();
+			    PubSub sc = new PubSub();
 				sc.publish(topic, content);
 				System.out.println("publish(" + topic + ", " + content + "): ok");
 			} catch (ConnectionException e) {
@@ -153,7 +155,7 @@ public class Main {
 			String topic = optionValues[0];
 			String url = optionValues[1];
 			try {
-				Scalaris sc = new Scalaris();
+			    PubSub sc = new PubSub();
 				sc.subscribe(topic, url);
 				System.out.println("subscribe(" + topic + ", " + url + "): ok");
 			} catch (ConnectionException e) {
@@ -169,7 +171,7 @@ public class Main {
 			String topic = optionValues[0];
 			String url = optionValues[1];
 			try {
-				Scalaris sc = new Scalaris();
+			    PubSub sc = new PubSub();
 				sc.unsubscribe(topic, url);
 				System.out.println("unsubscribe(" + topic + ", " + url + "): ok");
 			} catch (ConnectionException e) {
@@ -185,7 +187,7 @@ public class Main {
 			String topic = line.getOptionValue("getsubscribers");
 			checkArguments(topic, options, "g");
 			try {
-				Scalaris sc = new Scalaris();
+			    PubSub sc = new PubSub();
 				ArrayList<String> subscribers = sc.getSubscribers(topic);
 				System.out.println("getSubscribers(" + topic + ") == "
 						+ subscribers);
@@ -373,6 +375,18 @@ public class Main {
 	private final static void printException(String description, UnknownException e, boolean verbose) {
 		printException(description, e, verbose, 5);
 	}
+    
+    /**
+     * Prints the given exception with the given description and terminates the
+     * JVM.
+     * 
+     * @param description  will be prepended to the error message
+     * @param e            the exception to print
+     * @param verbose      specifies whether to include the stack trace or not
+     */
+    private final static void printException(String description, NodeNotFoundException e, boolean verbose) {
+        printException(description, e, verbose, 6);
+    }
 	
 	/**
 	 * Prints the given exception with the given description and terminates the
@@ -382,8 +396,8 @@ public class Main {
 	 * @param e            the exception to print
 	 * @param verbose      specifies whether to include the stack trace or not
 	 */
-	private final static void printException(String description, NodeNotFoundException e, boolean verbose) {
-		printException(description, e, verbose, 6);
+	private final static void printException(String description, AbortException e, boolean verbose) {
+		printException(description, e, verbose, 7);
 	}
 	
 	/**

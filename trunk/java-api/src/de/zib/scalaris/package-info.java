@@ -18,10 +18,10 @@
  * 
  * <h3>The Scalaris class</h3>
  * <p>
- * The {@link de.zib.scalaris.Scalaris} class provides methods for reading and writing values,
- * publishing topics, subscribing to urls and getting a list of subscribers with both erlang
- * objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and Java {@link java.lang.String}
- * objects.
+ * The {@link de.zib.scalaris.Scalaris} class provides methods for reading,
+ * writing and deleting values, with both,
+ * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and
+ * Java {@link java.lang.String} objects.
  * </p>
  * 
  * <h4>Example:</h4>
@@ -78,8 +78,34 @@
  * 
  * <p>See the {@link de.zib.scalaris.Transaction} class documentation for more details.</p>
  * 
+ * <h3>The PubSub class</h3>
+ * <p>
+ * The {@link de.zib.scalaris.PubSub} class provides methods for publishing
+ * topics, subscribing to urls and getting a list of subscribers with both,
+ * erlang strings ({@link com.ericsson.otp.erlang.OtpErlangString}) and
+ * Java {@link java.lang.String} strings.
+ * </p>
+ * 
+ * <h4>Example:</h4>
+ * <pre>
+ * <code style="white-space:pre;">
+ *   try {
+ *     PubSub sc = new PubSub();
+ *     PubSub value = sc.subscribe("topic", "http://localhost:8000");
+ *   } catch (ConnectionException e) {
+ *     System.err.println("read failed: " + e.getMessage());
+ *   } catch (TimeoutException e) {
+ *     System.err.println("read failed with timeout: " + e.getMessage());
+ *   } catch (UnknownException e) {
+ *     System.err.println("read failed with unknown: " + e.getMessage());
+ *   }
+ * </code>
+ * </pre>
+ * 
+ * <p>See the {@link de.zib.scalaris.PubSub} class documentation for more details.</p>
+ * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
+ * @version 2.5
  * @since 2.0
  */
 package de.zib.scalaris;
