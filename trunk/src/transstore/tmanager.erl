@@ -1,4 +1,4 @@
-%  Copyright 2007-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2007-2011 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 %%% Created :  11 Feb 2007 by Monika Moser <moser@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Monika Moser <moser@zib.de>
-%% @copyright 2007-2008 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @copyright 2007-2011 Zuse Institute Berlin
 %% @version $Id$
 %% @doc
 -module(tmanager).

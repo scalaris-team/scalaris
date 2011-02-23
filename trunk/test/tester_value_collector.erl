@@ -1,4 +1,4 @@
-%  Copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  Copyright 2010-2011 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 %%% Created :  30 April 2010 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%% @copyright 2010-2011 Zuse Institute Berlin
 %% @version $Id$
 -module(tester_value_collector).
 
