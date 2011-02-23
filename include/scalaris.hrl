@@ -1,4 +1,4 @@
-%  @copyright 2008-2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2008-2011 Zuse Institute Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");

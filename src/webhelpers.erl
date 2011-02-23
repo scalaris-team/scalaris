@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin,
+% @copyright 2007-2011 Zuse Institute Berlin,
 %            2008 onScale solutions
 
 %   Licensed under the Apache License, Version 2.0 (the "License");

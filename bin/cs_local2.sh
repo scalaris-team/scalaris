@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+# Copyright 2007-2011 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
