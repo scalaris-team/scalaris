@@ -18,20 +18,20 @@ package de.zib.scalaris.examples;
 import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.PubSub;
 
 /**
  * Provides an example for using the <tt>publish</tt> methods of the
- * {@link Scalaris} class.
+ * {@link PubSub} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
- * @since 2.0
+ * @version 2.5
+ * @since 2.5
  */
-public class ScalarisPublishExample {
+public class PubSubPublishExample {
 	/**
 	 * Publishes content under a given topic, both provided on the command line,
-	 * with the <tt>publish</tt> methods of {@link Scalaris}.<br />
+	 * with the <tt>publish</tt> methods of {@link PubSub}.<br />
 	 * If no content or topic is given, the default key <tt>"key"</tt> and the
 	 * default value <tt>"value"</tt> is used.
 	 * 
@@ -58,11 +58,11 @@ public class ScalarisPublishExample {
 		OtpErlangString otpContent = new OtpErlangString(content);
 
 		System.out
-				.println("Publishing content under a topic with the class `Scalaris`:");
+				.println("Publishing content under a topic with the class `PubSub`:");
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			PubSub sc = new PubSub();
 			System.out
 					.println("    `void publish(OtpErlangString, OtpErlangString)`...");
 			sc.publish(otpTopic, otpContent);
@@ -75,7 +75,7 @@ public class ScalarisPublishExample {
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			PubSub sc = new PubSub();
 			System.out.println("    `void publish(String, String)`...");
 			sc.publish(topic, content);
 			System.out.println("      publish(" + topic + ", " + content

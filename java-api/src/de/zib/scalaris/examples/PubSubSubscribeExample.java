@@ -17,23 +17,23 @@ package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
-import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.PubSub;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the <tt>subscribe</tt> methods of the
- * {@link Scalaris} class.
+ * {@link PubSub} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
- * @since 2.0
+ * @version 2.5
+ * @since 2.5
  */
-public class ScalarisSubscribeExample {
+public class PubSubSubscribeExample {
 	/**
 	 * Subscribes a given URL to a given topic, both provided on the command
-	 * line, with the <tt>subscribe</tt> methods of {@link Scalaris}.<br />
+	 * line, with the <tt>subscribe</tt> methods of {@link PubSub}.<br />
 	 * If no URL or topic is given, the default URL <tt>"url"</tt> and the
 	 * default topic <tt>"topic"</tt> is used.
 	 * 
@@ -60,11 +60,11 @@ public class ScalarisSubscribeExample {
 		OtpErlangString otpURL = new OtpErlangString(URL);
 
 		System.out
-				.println("Subscribing a URL to a topic with the class `Scalaris`:");
+				.println("Subscribing a URL to a topic with the class `PubSub`:");
 		
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			PubSub sc = new PubSub();
 			System.out
 					.println("    `void subscribe(OtpErlangString, OtpErlangString)`...");
 			sc.subscribe(otpTopic, otpURL);
@@ -86,7 +86,7 @@ public class ScalarisSubscribeExample {
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			PubSub sc = new PubSub();
 			System.out.println("    `void subscribe(String, String)`...");
 			sc.subscribe(topic, URL);
 			System.out.println("      subscribe(" + topic + ", " + URL

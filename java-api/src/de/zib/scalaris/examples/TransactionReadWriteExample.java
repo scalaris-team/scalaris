@@ -17,6 +17,7 @@ package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.TimeoutException;
@@ -227,10 +228,13 @@ public class TransactionReadWriteExample {
 			} catch (TransactionNotFinishedException e) {
 				// transaction.start()
 				System.out.println("failed: " + e.getMessage());
+            } catch (AbortException e) {
+                System.out.println("    Transaction aborted during commit: "
+                        + e.getMessage());
 			} catch (UnknownException e) {
 				// any operation
 				System.out.println("failed: " + e.getMessage());
-			}
+            }
 
 		} catch (ConnectionException e) {
 			System.out.println("failed: " + e.getMessage());
@@ -360,6 +364,9 @@ public class TransactionReadWriteExample {
 			} catch (TransactionNotFinishedException e) {
 				// transaction.start()
 				System.out.println("failed: " + e.getMessage());
+            } catch (AbortException e) {
+                System.out.println("    Transaction aborted during commit: "
+                        + e.getMessage());
 			} catch (UnknownException e) {
 				// any operation
 				System.out.println("failed: " + e.getMessage());

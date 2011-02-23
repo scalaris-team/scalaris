@@ -139,9 +139,11 @@ public class TransactionTest {
 	 * 
 	 * @throws ConnectionException
 	 * @throws UnknownException 
+	 * @throws AbortException 
+	 * @throws TimeoutException 
 	 */
 	@Test(expected=TransactionNotStartedException.class)
-	public void testCommit_NotStarted() throws ConnectionException, UnknownException {
+	public void testCommit_NotStarted() throws ConnectionException, UnknownException, TimeoutException, AbortException {
 		Transaction t = new Transaction();
 		try {
 			t.commit();
@@ -158,11 +160,12 @@ public class TransactionTest {
 	 * @throws ConnectionException
 	 * @throws NotFoundException
 	 * @throws TransactionNotFinishedException
+	 * @throws AbortException 
 	 */
 	@Test(expected=ConnectionException.class)
 	public void testCommit_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
+			TransactionNotFinishedException, AbortException {
 		Transaction t = new Transaction();
 		try {
 			t.start();
@@ -180,9 +183,11 @@ public class TransactionTest {
 	 * @throws ConnectionException
 	 * @throws TransactionNotFinishedException
 	 * @throws UnknownException
+	 * @throws AbortException 
+	 * @throws TimeoutException 
 	 */
 	@Test
-	public void testCommit_Empty() throws ConnectionException, UnknownException, TransactionNotFinishedException {
+	public void testCommit_Empty() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, AbortException {
 		Transaction t = new Transaction();
 		try {
 			t.start();
@@ -494,9 +499,10 @@ public class TransactionTest {
 	 * @throws UnknownException
 	 * @throws TimeoutException
 	 * @throws TransactionNotFinishedException
+	 * @throws AbortException 
 	 */
 	@Test
-	public void testWrite() throws ConnectionException, TimeoutException, UnknownException, NotFoundException, TransactionNotFinishedException {
+	public void testWrite() throws ConnectionException, TimeoutException, UnknownException, NotFoundException, TransactionNotFinishedException, AbortException {
 		Transaction t = new Transaction();
 		try {
 			t.start();
@@ -587,12 +593,13 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws TransactionNotFinishedException 
+     * @throws AbortException 
 	 * 
 	 * TODO: fix test for the original data set of 160 items (is way too slow or not working at all)
 	 */
 	@Test
 	public void testWriteObject() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException, TransactionNotFinishedException {
+			TimeoutException, UnknownException, NotFoundException, TransactionNotFinishedException, AbortException {
 		Transaction t = new Transaction();
 		try {
 			t.start();
