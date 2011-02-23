@@ -28,13 +28,10 @@
 -type request() :: {read, client_key()}
                  | {write, client_key(), client_value()}
                  | {commit}.
--type result() :: {ok, client_value()} %% for read
-                | {ok}                 %% for write or commit
-                | {fail,
-                   abort               %% for failed commit
-                   | timeout
-                   | not_found
-                  }.
+-type read_result() :: {ok, client_value()} | {fail, timeout | not_found}.
+-type write_result() :: {ok} | {fail, timeout}.
+-type commit_result() :: {ok} | {fail, abort | timeout}.
+-type result() :: read_result() | write_result() | commit_result().
 
 -spec new_tlog() -> tx_tlog:tlog().
 new_tlog() -> tx_tlog:empty().
@@ -67,22 +64,22 @@ req_list(TLog, ReqList) ->
     {TransLogResult, ResultList}.
 
 %% @doc reads the value of a key
--spec read(client_key()) -> result().
+-spec read(client_key()) -> read_result().
 read(Key) ->
     ReqList = [{read, Key}],
     {_TLog, [Res]} = api_tx:req_list(tx_tlog:empty(), ReqList),
     Res.
 
 %% @doc writes the value of a key
--spec write(client_key(), client_value()) -> result().
+-spec write(client_key(), client_value()) -> commit_result().
 write(Key, Value) ->
     ReqList = [{write, Key, Value}, {commit}],
     {_TLog, [_Res1, Res2]} = api_tx:req_list(tx_tlog:empty(), ReqList),
     Res2.
 
 %% @doc atomic compare and swap
--spec test_and_set(client_key(), client_value(), client_value()) ->
-                          result() | {fail, {key_changed, client_value()}}.
+-spec test_and_set(client_key(), client_value(), client_value())
+        -> commit_result() | {fail, {key_changed, client_value()}}.
 test_and_set(Key, OldValue, NewValue) ->
     ReadReqList = [{read, Key}],
     WriteReqList = [{write, Key, NewValue}, {commit}],
