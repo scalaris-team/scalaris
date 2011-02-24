@@ -66,7 +66,7 @@ init([RemotePid]) ->
     Now = erlang:now(),
     state_new(_RemoteHBS = RemoteFDPid, _RemotePids = [{RemotePid, 1}],
               _LastPong = {0,0,0},
-              _CrashedAfter = time_plus(Now, 3*failureDetectorInterval()),
+              _CrashedAfter = util:time_plus_ms(Now, 3 * failureDetectorInterval()),
               TableName).
 
 -spec on(comm:message(), state()) -> state() | kill.
@@ -119,7 +119,7 @@ on({pong, _Subscriber}, State) ->
 %    CrashedAfter = state_get_crashed_after(State),
     Delay = abs(timer:now_diff(Now, LastPong)),
     S1 = state_set_last_pong(State, Now),
-    NewCrashedAfter = time_plus(Now, 3*Delay),
+    NewCrashedAfter = util:time_plus_us(Now, 3 * Delay),
 %    state_set_crashed_after(S1, erlang:max(NewCrashedAfter, CrashedAfter));
     state_set_crashed_after(S1, NewCrashedAfter);
 
@@ -194,13 +194,6 @@ report_crash(State) ->
 %% @doc The interval between two failure detection runs.
 -spec failureDetectorInterval() -> pos_integer().
 failureDetectorInterval() -> config:read(failure_detector_interval).
-
--spec time_plus(util:time(), integer()) -> util:time().
-time_plus(Now, Delta) ->
-    Seconds = Delta div 1000000,
-    MilliSeconds = Delta rem 1000000,
-    T1 = setelement(2, Now, element(2, Now) + Seconds),
-    setelement(3, T1, element(3, T1) + MilliSeconds).
 
 -spec state_new(comm:mypid(), [{comm:mypid(), pos_integer()}],
                 util:time(), util:time(), atom()) -> state().
