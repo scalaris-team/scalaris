@@ -34,11 +34,11 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.Test;
-import org.mortbay.jetty.Request;
-import org.mortbay.jetty.Server;
-import org.mortbay.jetty.handler.AbstractHandler;
-import org.mortbay.util.ajax.JSON;
 
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangString;
@@ -1507,9 +1507,9 @@ public class PubSubTest {
 			}
 		}
 
-		public void handle(String target, HttpServletRequest request,
-				HttpServletResponse response, int dispatch) throws IOException,
-				ServletException {
+        public void handle(String target, Request baseRequest,
+                HttpServletRequest request, HttpServletResponse response)
+                throws IOException, ServletException {
 			response.setContentType("text/html");
 			response.setStatus(HttpServletResponse.SC_OK);
 			PrintWriter out = response.getWriter();
