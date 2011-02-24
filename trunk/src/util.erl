@@ -39,7 +39,8 @@
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
          smerge2/2, smerge2/3, smerge2/4,
          is_unittest/0, make_filename/1,
-         app_get_env/2]).
+         app_get_env/2,
+         time_plus_s/2, time_plus_ms/2, time_plus_us/2]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 
@@ -589,3 +590,25 @@ app_check_known() ->
             error_logger:warning_msg("unknown application: ~.0p~n", [App]),
             ok
     end.
+
+-spec time_plus_us(Time::time(), Delta_MicroSeconds::integer()) -> time().
+time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->
+    MicroSecs1 = MicroSecs + Delta,
+    NewMicroSecs = MicroSecs1 rem 1000000,
+    Secs1 = Secs + (MicroSecs1 div 1000000),
+    NewSecs = Secs1 rem 1000000,
+    MegaSecs1 = MegaSecs + (Secs1 div 1000000),
+    NewMegaSecs = MegaSecs1 rem 1000000,
+    {NewMegaSecs, NewSecs, NewMicroSecs}.
+
+-spec time_plus_ms(Time::time(), Delta_MilliSeconds::integer()) -> time().
+time_plus_ms(Time, Delta) ->
+    time_plus_us(Time, Delta * 1000).
+
+-spec time_plus_s(Time::time(), Delta_Seconds::integer()) -> time().
+time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
+    Secs1 = Secs + Delta,
+    NewSecs = Secs1 rem 1000000,
+    MegaSecs1 = MegaSecs + (Secs1 div 1000000),
+    NewMegaSecs = MegaSecs1 rem 1000000,
+    {NewMegaSecs, NewSecs, MicroSecs}.
