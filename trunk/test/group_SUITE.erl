@@ -55,6 +55,7 @@ init_per_testcase(_TestCase, Config) ->
     config:write(dht_node, group_node),
     config:write(group_node_trigger, trigger_periodic),
     config:write(group_node_base_interval, 30000),
+    _ = admin:add_node([{first}]),
     Config.
 
 end_per_testcase(_TestCase, Config) ->
