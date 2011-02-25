@@ -169,12 +169,12 @@ public class PubSub {
 			throws ConnectionException {
 		try {
 			/**
-             * The specification of <tt>pubsub_api:publish/2</tt> states
+             * The specification of <tt>api_pubsub:publish/2</tt> states
              * that the only returned value is <tt>ok</tt>, so no further evaluation is
              * necessary.
 			 */
 			connection
-					.doRPC("pubsub_api", "publish", new OtpErlangList(
+					.doRPC("api_pubsub", "publish", new OtpErlangList(
 							new OtpErlangObject[] { topic, content }));
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
@@ -232,7 +232,7 @@ public class PubSub {
 			TimeoutException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			received_raw = connection.doRPC("pubsub_api", "subscribe",
+			received_raw = connection.doRPC("api_pubsub", "subscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
 			OtpErlangObject received = received_raw;
 
@@ -320,7 +320,7 @@ public class PubSub {
 			UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			received_raw = connection.doRPC("pubsub_api", "unsubscribe",
+			received_raw = connection.doRPC("api_pubsub", "unsubscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
 			OtpErlangObject received = received_raw;
 
@@ -425,7 +425,7 @@ public class PubSub {
 		OtpErlangObject received_raw = null;
 		try {
 			// return value: [string,...]
-			received_raw = connection.doRPC("pubsub_api", "get_subscribers",
+			received_raw = connection.doRPC("api_pubsub", "get_subscribers",
 					new OtpErlangList(topic));
 			OtpErlangList received = (OtpErlangList) received_raw;
 			return received;

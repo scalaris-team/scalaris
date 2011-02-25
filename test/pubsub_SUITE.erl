@@ -1,4 +1,4 @@
-%  Copyright 2008 Zuse Institute Berlin
+%  Copyright 2008-2011 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,13 +27,9 @@
 
 -include("unittest.hrl").
 
-all() ->
-    [test_db].
+all() -> [test_db].
 
-suite() ->
-    [
-     {timetrap, {seconds, 120}}
-    ].
+suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
@@ -46,16 +42,16 @@ end_per_suite(Config) ->
     ok.
 
 test_db(_Config) ->
-    ?equals(pubsub_api:get_subscribers("TestTopic"), []),
-    ?equals(pubsub_api:subscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
-    ?equals(pubsub_api:get_subscribers("TestTopic"), ["http://localhost:8000/pubsub.yaws"]),
-    ?equals(pubsub_api:publish("TestTopic", "TestContent"), ok),
-    ?equals(pubsub_api:subscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
-    ?equals(pubsub_api:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
-    ?equals(pubsub_api:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
-    ?equals(pubsub_api:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), {fail, not_found}),
-    ?equals(pubsub_api:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
-    ?equals(pubsub_api:unsubscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
-    ?equals(pubsub_api:get_subscribers("TestTopic"), []),
+    ?equals(api_pubsub:get_subscribers("TestTopic"), []),
+    ?equals(api_pubsub:subscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
+    ?equals(api_pubsub:get_subscribers("TestTopic"), ["http://localhost:8000/pubsub.yaws"]),
+    ?equals(api_pubsub:publish("TestTopic", "TestContent"), ok),
+    ?equals(api_pubsub:subscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
+    ?equals(api_pubsub:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), ok),
+    ?equals(api_pubsub:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
+    ?equals(api_pubsub:unsubscribe("TestTopic", "http://localhost:8000/pubsub.yaws"), {fail, not_found}),
+    ?equals(api_pubsub:get_subscribers("TestTopic"), ["http://localhost2:8000/pubsub.yaws"]),
+    ?equals(api_pubsub:unsubscribe("TestTopic", "http://localhost2:8000/pubsub.yaws"), ok),
+    ?equals(api_pubsub:get_subscribers("TestTopic"), []),
     ok.
 

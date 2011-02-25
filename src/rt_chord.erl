@@ -81,8 +81,8 @@ init_stabilize(Neighbors, RT) ->
     Id = nodelist:nodeid(Neighbors),
     Key = calculateKey(Id, first_index()),
     % trigger a lookup for Key
-    lookup:unreliable_lookup(Key, {send_to_group_member, routing_table,
-                                   {rt_get_node, comm:this(), first_index()}}),
+    api_dht_raw:unreliable_lookup(Key, {send_to_group_member, routing_table,
+                                        {rt_get_node, comm:this(), first_index()}}),
     RT.
 %% userdevguide-end rt_chord:init_stabilize
 
@@ -161,8 +161,8 @@ stabilize(Id, Succ, RT, Index, Node) ->
             NewRT = gb_trees:enter(Index, Node, RT),
             Key = calculateKey(Id, next_index(Index)),
             Msg = {rt_get_node, comm:this(), next_index(Index)},
-            lookup:unreliable_lookup(Key,
-                                     {send_to_group_member, routing_table, Msg}),
+            api_dht_raw:unreliable_lookup(
+              Key, {send_to_group_member, routing_table, Msg}),
             NewRT;
         _ -> RT
     end.
