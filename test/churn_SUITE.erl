@@ -153,7 +153,6 @@ transactions_more_failures_4_nodes_networksplit_write(FailedNodes) ->
 -spec pause_node(DhtNodeSupPid::pid()) -> pause_spec().
 pause_node(DhtNodeSupPid) ->
     GroupName = pid_groups:group_of(DhtNodeSupPid),
-    DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
     DhtNodeSupChilds = unittest_helper:get_all_children(DhtNodeSupPid),
     _ = [begin
              gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),

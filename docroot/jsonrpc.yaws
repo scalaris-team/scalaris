@@ -25,13 +25,13 @@ handler(range_read, [From, To]) ->
 
 handler(test_and_set, [Key, OldValue, NewValue]) ->
     %io:format("Request = test_and_set(~p)~n", [_Request]),
-    api_tx_json:test_and_set(Key, OldValue, NewValue);
+    api_json:tx_test_and_set(Key, OldValue, NewValue);
 
 handler(read, [Key]) ->
-    api_tx_json:read(Key);
+    api_json:tx_read(Key);
 
 handler(write, [Key, Value]) ->
-    api_tx_json:write(Key, Value);
+    api_json:tx_write(Key, Value);
 
 handler(delete, [Key]) ->
     %io:format("Request = delete(~p)~n", [_Request]),
@@ -48,10 +48,10 @@ handler(delete, [Key]) ->
     end;
 
 handler(req_list, [Param]) ->
-    api_tx_json:req_list(Param);
+    api_json:tx_req_list(Param);
 
 handler(req_list, [TLog, ReqList]) ->
-    api_tx_json:req_list(TLog, ReqList);
+    api_json:tx_req_list(TLog, ReqList);
 
 handler(publish, [Topic, Content]) ->
     case pubsub_api:publish(Topic, Content) of
