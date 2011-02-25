@@ -16,25 +16,18 @@
 %% @doc Publish/Subscribe API functions
 %% @end
 %% @version $Id$
--module(pubsub_api).
+-module(api_pubsub).
 -author('schuett@zib.de').
 -vsn('$Id$').
 
 -export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
-
-%%====================================================================
-%% public functions
-%%====================================================================
 
 %% @doc publishs an event under a given topic.
 %%      called e.g. from the java-interface
 -spec publish(string(), string()) -> ok.
 publish(Topic, Content) ->
     Subscribers = get_subscribers(Topic),
-    lists:foreach(fun (Subscriber) -> 
-			  pubsub_publish:publish(Subscriber, Topic, Content) 
-		  end, 
-		  Subscribers),
+    [ pubsub_publish:publish(X, Topic, Content) || X <- Subscribers ],
     ok.
 
 %% @doc subscribes a url for a topic.
@@ -72,17 +65,18 @@ subscribe(Topic, URL) ->
 -spec unsubscribe(string(), string()) -> ok | {fail, any()}.
 unsubscribe(Topic, URL) ->
     TFun = fun(TransLog) ->
-		   {Subscribers, TransLog1} = transaction_api:read2(TransLog, Topic),
-		   case (Subscribers =/= empty_val) andalso
+                   {Subscribers, TransLog1} =
+                       transaction_api:read2(TransLog, Topic),
+                   case (Subscribers =/= empty_val) andalso
                        lists:member(URL, Subscribers) of
                        true ->
-			   NewSubscribers = lists:delete(URL, Subscribers),
-			   TransLog2 = transaction_api:write2(TransLog1, Topic, NewSubscribers),
-			   {{ok, ok}, TransLog2};
-		       false ->
-			   {{fail, not_found}, TransLog}
-		   end
-	   end,
+                           NewSubscribers = lists:delete(URL, Subscribers),
+                           TransLog2 = transaction_api:write2(TransLog1, Topic, NewSubscribers),
+                           {{ok, ok}, TransLog2};
+                       false ->
+                           {{fail, not_found}, TransLog}
+                   end
+           end,
     transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).
 
 %% @doc queries the subscribers of a query
@@ -90,12 +84,9 @@ unsubscribe(Topic, URL) ->
 -spec get_subscribers(Topic::string()) -> [string()].
 get_subscribers(Topic) ->
     {Res, _Value} = transaction_api:quorum_read(Topic),
-    if
+    case Res of
         %% Fl is either empty/fail or the Value/Subscribers
-	Res =:= empty_val ->
-	    [];
-        Res =:= fail ->
-            [];
-	true ->
-	    Res
+        empty_val -> [];
+        fail -> [];
+        _ -> Res
     end.

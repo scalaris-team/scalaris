@@ -117,9 +117,9 @@ read_or_write(Key, Value, TransLog, Operation) ->
             %% information from remote
             ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
             Cookie = util:get_pids_uid(),
-            _ = [ lookup:unreliable_lookup(
+            _ = [ api_dht_raw:unreliable_lookup(
                     X, {get_key, comm:this_with_cookie(Cookie), X})
-                    || X <- ReplicaKeys ],
+                  || X <- ReplicaKeys ],
             TRef = erlang:send_after(config:read(transaction_lookup_timeout),
                                      self(),
                               {write_read_receive_timeout, hd(ReplicaKeys)}),
@@ -163,7 +163,7 @@ quorum_read(Key, SourcePID)->
 do_quorum_read(Key, SourcePID, InstanceId)->
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     Cookie = util:get_pids_uid(),
-    _ = [ lookup:unreliable_lookup(
+    _ = [ api_dht_raw:unreliable_lookup(
             X, {get_key, comm:this_with_cookie(Cookie), X})
             || X <- ReplicaKeys ],
     TRef = erlang:send_after(config:read(transaction_lookup_timeout), self(),
@@ -274,7 +274,7 @@ parallel_reads(Keys, TransLog) ->
                     Elem <- ToLookup ],
 
             _ = lists:map(fun(ReplicaKeys)->
-                                  [ lookup:unreliable_get_key(ReplicaKey) ||
+                                  [ api_dht_raw:unreliable_get_key(ReplicaKey) ||
                                       ReplicaKey <- ReplicaKeys ]
                           end,
                           ReplicaKeysAll),
@@ -489,7 +489,7 @@ delete(SourcePID, Key) ->
 -spec do_delete(Key::iodata() | integer(), SourcePid::comm:mypid(), InstanceId::pid_groups:groupname()) -> ok.
 do_delete(Key, SourcePID, InstanceId)->
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    _ = [ lookup:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
+    _ = [ api_dht_raw:unreliable_lookup(Replica, {delete_key, comm:this(), Replica}) ||
             Replica <- ReplicaKeys],
     erlang:send_after(config:read(transaction_lookup_timeout), self(), {timeout}),
     delete_collect_results(ReplicaKeys, SourcePID, []).

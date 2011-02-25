@@ -1115,7 +1115,7 @@ calls itself using tail-recursion in each branch. The loop works on a
 
 \section{Routing Tables}
 \label{chapter.routing}
-\svnrev{r1236}
+\svnrev{r1453}
 \erlmoduleindex{rt\_beh}
 
 Each node of the ring can perform searches in the overlay.
@@ -1125,7 +1125,7 @@ other demands for communication between peers. \scalaris{} provides
 a general interface to route a message to the (other) peer, which is
 currently responsible for a given \code{key}.
 
-\codesnippet{lookup.erl}{lookup:lookup}{../src/lookup.erl}
+\codesnippet{api_dht_raw.erl}{api_dht_raw:lookup}{../src/api_dht_raw.erl}
 
 The message \code{Msg} could be a \code{get_key} which retrieves content from
 the responsible node or a \code{get_node} message, which returns a pointer

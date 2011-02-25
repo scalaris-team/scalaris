@@ -478,7 +478,7 @@ on({crash, Pid},
     _ = [ begin
               Name = get_nth_rtm_name(get_nth(RTM)),
               Key = get_rtmkey(RTM),
-              lookup:unreliable_lookup(
+              api_dht_raw:unreliable_lookup(
                 Key, {get_rtm, comm:this(), Key, Name})
           end
       || RTM <- RTMs, get_rtmpid(RTM) =:= Pid ],
@@ -561,7 +561,7 @@ my_RTM_update(RTMs) ->
     _ = [ begin
               Name = get_nth_rtm_name(get_nth(RTM)),
               Key = get_rtmkey(RTM),
-              lookup:unreliable_lookup(Key, {get_rtm, comm:this(), Key, Name})
+              api_dht_raw:unreliable_lookup(Key, {get_rtm, comm:this(), Key, Name})
           end
           || RTM <- RTMs],
     comm:send_local_after(config:read(tx_rtm_update_interval),
@@ -610,7 +610,7 @@ my_init_TPs(TxState, ItemStates) ->
                 Msg1 = {init_TP, {Tid, CleanRTMs, Accs, TM, RTLog, ItemId, PaxId}},
                 %% delivers message to a dht_node process, which has
                 %% also the role of a TP
-                lookup:unreliable_lookup(Key, Msg1)
+                api_dht_raw:unreliable_lookup(Key, Msg1)
             end
             || {PaxId, RTLog, _TP} <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
               %%      end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],

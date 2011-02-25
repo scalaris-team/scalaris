@@ -54,26 +54,26 @@ handler(req_list, [TLog, ReqList]) ->
     api_json:tx_req_list(TLog, ReqList);
 
 handler(publish, [Topic, Content]) ->
-    case pubsub_api:publish(Topic, Content) of
+    case api_pubsub:publish(Topic, Content) of
         ok -> "ok"
     end;
 
 handler(subscribe, [Topic, URL]) ->
-    case pubsub_api:subscribe(Topic, URL) of
+    case api_pubsub:subscribe(Topic, URL) of
         ok -> "ok";
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]}
     end;
 
 handler(unsubscribe, [Topic, URL]) ->
-    case pubsub_api:unsubscribe(Topic, URL) of
+    case api_pubsub:unsubscribe(Topic, URL) of
         ok -> "ok";
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]}
     end;
 
 handler(get_subscribers, [Topic]) ->
-    case pubsub_api:get_subscribers(Topic) of
+    case api_pubsub:get_subscribers(Topic) of
         [] -> {array, []};
         Any -> {array, Any}
     end;

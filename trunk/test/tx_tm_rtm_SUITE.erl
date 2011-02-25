@@ -133,7 +133,7 @@ abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
                       versioninc -> db_entry:inc_version(DBEntry);
                       none -> DBEntry
                   end,
-              lookup:unreliable_lookup(db_entry:get_key(DBEntry),
+              api_dht_raw:unreliable_lookup(db_entry:get_key(DBEntry),
                                        {set_key_entry, comm:this(), NewDBEntry}),
               receive {set_key_entry_reply, NewDBEntry} -> ok end,
               NewDBEntry
@@ -270,7 +270,7 @@ init_new_db_key(Value) ->
               E3 = db_entry:inc_version(E2),
               %% set a value
               E4 = db_entry:set_value(E3, Value),
-              lookup:unreliable_lookup(db_entry:get_key(E4),
+              api_dht_raw:unreliable_lookup(db_entry:get_key(E4),
                                        {set_key_entry, comm:this(), E4}),
               receive {set_key_entry_reply, E4} -> ok end
           end || Key <- Keys ],
@@ -278,7 +278,7 @@ init_new_db_key(Value) ->
 
 get_db_entries(Keys) ->
     [ begin
-          lookup:unreliable_lookup(X, {get_key_entry, comm:this(), X}),
+          api_dht_raw:unreliable_lookup(X, {get_key_entry, comm:this(), X}),
           receive
               {get_key_entry_reply, Entry} -> Entry
           end

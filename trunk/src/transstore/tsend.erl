@@ -47,7 +47,7 @@ send_to_rtms_with_lookup(TID, Message)->
     ?TLOG("sent_to_rtms_with_lookup"),
     {MessName, TMMessage} = Message,
     F = fun(X) -> NewTMMessage = TMMessage#tm_message{tm_key = X},
-                  lookup:unreliable_lookup(X, {MessName, NewTMMessage})
+                  api_dht_raw:unreliable_lookup(X, {MessName, NewTMMessage})
         end,
     [ F(RKey) || RKey <- RTMKeys ].
 
@@ -62,7 +62,7 @@ send_to_replica_with_lookup(Key, Message)->
     {MessName, MessText} = Message,
     F = fun(XKey) -> NewMessText =
                       MessText#tp_message{item_key = XKey, orig_key = Key},
-                  lookup:unreliable_lookup(XKey, {MessName, NewMessText})
+                  api_dht_raw:unreliable_lookup(XKey, {MessName, NewMessText})
         end,
     [ F(RKey) || RKey <- ReplKeys ].
 

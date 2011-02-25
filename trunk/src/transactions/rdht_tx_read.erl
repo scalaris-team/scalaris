@@ -89,7 +89,7 @@ quorum_read(CollectorPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
     Key = element(2, Request),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    _ = [ lookup:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
+    _ = [ api_dht_raw:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
     ok.
 
 %% May make several ones from a single TransLog item (item replication)
@@ -180,7 +180,7 @@ init([]) ->
     _State = {Reps, MajOk, MajDeny, Table}.
 
 -spec on(comm:message(), state()) -> state().
-%% reply triggered by lookup:unreliable_get_key/3
+%% reply triggered by api_dht_raw:unreliable_get_key/3
 on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
    {Reps, MajOk, MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(get_key_with_id_reply) ID ~p~n", [self(), Id]),
