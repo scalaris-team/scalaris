@@ -159,8 +159,10 @@ pause_node(DhtNodeSupPid) ->
              gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
              gen_component:bp_barrier(Pid)
          end || Pid <- DhtNodeSupChilds],
-    comm:send_local(fd, {unittest_report_down, comm:make_global(DhtNodePid)}),
-    
+
+    [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
+      || X <- unittest_helper:get_all_children(DhtNodeSupPid)],
+
     pid_groups:hide(GroupName),
     {GroupName, DhtNodeSupChilds}.
 
