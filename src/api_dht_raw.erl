@@ -16,10 +16,10 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc API for raw access to DHT based on (already hashed keys).
-%% @version $Id: cs_api_v2.erl 1325 2010-12-27 13:04:53Z kruber@zib.de $
+%% @version $Id$
 -module(api_dht_raw).
 -author('schintke@zib.de').
--vsn('$Id: cs_api_v2.erl 1325 2010-12-27 13:04:53Z kruber@zib.de $').
+-vsn('$Id$').
 
 -export([range_read/2]).
 

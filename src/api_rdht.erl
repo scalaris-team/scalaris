@@ -15,10 +15,10 @@
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc API for inconsistent access to the replicated DHT items. This
 %%      is not compatible with the api_tx functions.
-%% @version $Id: cs_api_v2.erl 1325 2010-12-27 13:04:53Z kruber@zib.de $
+%% @version $Id$
 -module(api_rdht).
 -author('kruber@zib.de').
--vsn('$Id: cs_api_v2.erl 1325 2010-12-27 13:04:53Z kruber@zib.de $').
+-vsn('$Id$').
 
 -export([delete/1]).
 -include("scalaris.hrl").
