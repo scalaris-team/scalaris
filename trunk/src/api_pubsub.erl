@@ -34,59 +34,37 @@ publish(Topic, Content) ->
 %%      called e.g. from the java-interface
 -spec subscribe(string(), string()) -> ok | {fail, Reason::term()}.
 subscribe(Topic, URL) ->
-    TFun = fun(TransLog) ->
-		   {{Success, _ValueOrReason} = Result, TransLog1} = transaction_api:read(Topic, TransLog),
-		   {Result2, TransLog2} = 
-                       case Success of
-                           fail ->
-                               transaction_api:write(Topic, [URL], TransLog); %obacht: muss TransLog sein!
-                           _Any ->
-                               {value, Subscribers} =
-                                   case Result of
-                                       {value, empty_val} -> {value, []};
-                                       _ -> Result
-                                   end,
-                               case [ X || X <- Subscribers, X =:= URL ] of
-                                   [] ->
-                                       transaction_api:write(Topic, [URL | Subscribers], TransLog1);
-                                   _ -> {ok, TransLog1}
-                               end
-                       end,
-                   if
-		       Result2 =:= ok ->
-			   {{ok, ok}, TransLog2};
-		       true ->
-			   {Result2, TransLog2}
-		   end
-	   end,
-    transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).
+    {TLog, [Res]} = api_tx:req_list(api_tx:new_tlog(), [{read, Topic}]),
+    {_TLog2, [_, CommitRes]} =
+        case Res of
+            {fail, not_found} -> api_tx:req_list(TLog, [{write, Topic, [URL]}, {commit}]);
+            {ok, URLs}        -> api_tx:req_list(TLog, [{write, Topic, [URL | URLs]}, {commit}]);
+            {fail, timeout}   -> {TLog, [nothing, {fail, timeout}]}
+        end,
+    case CommitRes of {ok} -> ok; _ -> CommitRes end.
 
 %% @doc unsubscribes a url for a topic.
 -spec unsubscribe(string(), string()) -> ok | {fail, any()}.
 unsubscribe(Topic, URL) ->
-    TFun = fun(TransLog) ->
-                   {Subscribers, TransLog1} =
-                       transaction_api:read2(TransLog, Topic),
-                   case (Subscribers =/= empty_val) andalso
-                       lists:member(URL, Subscribers) of
-                       true ->
-                           NewSubscribers = lists:delete(URL, Subscribers),
-                           TransLog2 = transaction_api:write2(TransLog1, Topic, NewSubscribers),
-                           {{ok, ok}, TransLog2};
-                       false ->
-                           {{fail, not_found}, TransLog}
-                   end
-           end,
-    transaction_api:do_transaction(TFun, fun (_) -> ok end, fun (X) -> {fail, X} end).
+    {TLog, [Res]} = api_tx:req_list(api_tx:new_tlog(), [{read, Topic}]),
+    case Res of
+        {ok, URLs} ->
+            case lists:member(URL, URLs) of
+                true ->
+                    {_TLog2, [_, CommitRes]} =
+                        api_tx:req_list(TLog, [{write, Topic, lists:delete(URL, URLs)}, {commit}]),
+                    case CommitRes of {ok} -> ok; _ -> CommitRes end;
+                false -> {fail, not_found}
+            end;
+        _ -> Res
+    end.
 
 %% @doc queries the subscribers of a query
 %% @spec get_subscribers(string()) -> [string()]
 -spec get_subscribers(Topic::string()) -> [string()].
 get_subscribers(Topic) ->
-    {Res, _Value} = transaction_api:quorum_read(Topic),
+    {Res, Value} = api_tx:read(Topic),
     case Res of
-        %% Fl is either empty/fail or the Value/Subscribers
-        empty_val -> [];
-        fail -> [];
-        _ -> Res
+        ok -> Value;
+        fail -> []
     end.
