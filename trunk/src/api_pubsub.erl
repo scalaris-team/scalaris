@@ -34,11 +34,11 @@ publish(Topic, Content) ->
 %%      called e.g. from the java-interface
 -spec subscribe(string(), string()) -> ok | {fail, Reason::term()}.
 subscribe(Topic, URL) ->
-    {TLog, [Res]} = api_tx:req_list(api_tx:new_tlog(), [{read, Topic}]),
+    {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
     {_TLog2, [_, CommitRes]} =
         case Res of
-            {fail, not_found} -> api_tx:req_list(TLog, [{write, Topic, [URL]}, {commit}]);
             {ok, URLs}        -> api_tx:req_list(TLog, [{write, Topic, [URL | URLs]}, {commit}]);
+            {fail, not_found} -> api_tx:req_list(TLog, [{write, Topic, [URL]}, {commit}]);
             {fail, timeout}   -> {TLog, [nothing, {fail, timeout}]}
         end,
     case CommitRes of {ok} -> ok; _ -> CommitRes end.
@@ -46,7 +46,7 @@ subscribe(Topic, URL) ->
 %% @doc unsubscribes a url for a topic.
 -spec unsubscribe(string(), string()) -> ok | {fail, any()}.
 unsubscribe(Topic, URL) ->
-    {TLog, [Res]} = api_tx:req_list(api_tx:new_tlog(), [{read, Topic}]),
+    {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
     case Res of
         {ok, URLs} ->
             case lists:member(URL, URLs) of

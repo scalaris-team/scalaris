@@ -13,13 +13,26 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc API for transactional, consistent access to the replicated DHT items
+%% @doc API for transactional access to replicated DHT items.
+%% For single request/single item operations, we provide read/1,
+%% write/2, and test_and_set/3 functions that directly commit.
+%%
+%% For compound transactions a transaction log has to be passed
+%% through all operations and finally has to be committed. This is
+%% supported by the functions new_tlog/0, read/2, write/3, req_list/2,
+%% and commit/1.
+%% @end
 %% @version $Id$
 -module(api_tx).
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([new_tlog/0, req_list/2, read/1, write/2, test_and_set/3]).
+%% Perform a chain of operations (passing a transaction log) and
+%% finally commit the transaction.
+-export([new_tlog/0, req_list/2, read/2, write/3, commit/1]).
+
+%% Perform single operation transactions.
+-export([read/1, write/2, test_and_set/3]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -33,9 +46,11 @@
 -type commit_result() :: {ok} | {fail, abort | timeout}.
 -type result() :: read_result() | write_result() | commit_result().
 
+%% @doc Get an empty transaction log to start a new transaction.
 -spec new_tlog() -> tx_tlog:tlog().
 new_tlog() -> tx_tlog:empty().
 
+%% @doc Perform several requests inside a transaction.
 -spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
 req_list([], [{commit}]) ->
     {[], [{ok}]};
@@ -63,21 +78,41 @@ req_list(TLog, ReqList) ->
     %% this returns the NewTLog and an ordered result list
     {TransLogResult, ResultList}.
 
-%% @doc reads the value of a key
+%% @doc Perform a read inside a transaction.
+-spec read(tx_tlog:tlog(), client_key())
+          -> {tx_tlog:tlog(), read_result()}.
+read(TLog, Key) ->
+    {NewTLog, [Result]} = req_list(TLog, [{read, Key}]),
+    {NewTLog, Result}.
+
+%% @doc Perform a write inside a transaction.
+-spec write(tx_tlog:tlog(), client_key(), client_value())
+           -> {tx_tlog:tlog(), write_result()}.
+write(TLog, Key, Value) ->
+    {NewTLog, [Result]} = req_list(TLog, [{write, Key, Value}]),
+    {NewTLog, Result}.
+
+%% @doc Finish a transaction and materialize it atomically on the DHT.
+-spec commit(tx_tlog:tlog()) -> commit_result().
+commit(TLog) ->
+    {_NewTLog, [Result]} = req_list(TLog, [{commit}]),
+    Result.
+
+%% @doc Atomically read a single key (not as part of a transaction).
 -spec read(client_key()) -> read_result().
 read(Key) ->
     ReqList = [{read, Key}],
     {_TLog, [Res]} = api_tx:req_list(tx_tlog:empty(), ReqList),
     Res.
 
-%% @doc writes the value of a key
+%% @doc Atomically write and commit a single key (not as part of a transaction).
 -spec write(client_key(), client_value()) -> commit_result().
 write(Key, Value) ->
     ReqList = [{write, Key, Value}, {commit}],
     {_TLog, [_Res1, Res2]} = api_tx:req_list(tx_tlog:empty(), ReqList),
     Res2.
 
-%% @doc atomic compare and swap
+%% @doc Atomically compare and swap a value for a key (not as part of a transaction).
 -spec test_and_set(client_key(), client_value(), client_value())
         -> commit_result() | {fail, {key_changed, client_value()}}.
 test_and_set(Key, OldValue, NewValue) ->
