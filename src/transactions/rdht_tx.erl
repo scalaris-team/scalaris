@@ -49,7 +49,7 @@ process_request_list([], [SingleReq]) ->
     [{_ReqNum, ResultEntry}] = TmpResultList,
     {TransLogResult, [ResultEntry]};
 
-process_request_list([], [SingleReq, {commit}]) ->
+process_request_list([], [{write, _K, _V} = SingleReq, {commit}]) ->
     {TLog, [Res1]} = process_request_list([], [SingleReq]),
     {TLog, [Res1, commit(TLog)]};
 
@@ -61,7 +61,8 @@ process_request_list(TLog, PlainReqList) ->
     %% accumulated translog.
     %% if translog entry exists, do work_phase inside this process to
     %% reduce overall latency.
-    ReqList = lists:zip(lists:seq(1, length(PlainReqList)), PlainReqList),
+    NumReqs = length(PlainReqList),
+    ReqList = lists:zip(lists:seq(1, NumReqs), PlainReqList),
     %% split into 'rdht', 'delayed' and 'translog based' operations
     {RdhtOps, Delayed, TransLogOps, Commit} = my_split_ops(TLog, ReqList),
 
@@ -71,23 +72,26 @@ process_request_list(TLog, PlainReqList) ->
                                             Delayed, TransLogOps}),
     %% Now all op lists are empty.
     %% @TODO only if TransLog is ok, do the validation here if requested
-    CommitResult = case Commit of
-                       []                -> none;
-                       [{_Num,{commit}}] -> commit(NewTLog)
-                   end,
-    TransLogResult = NewTLog,
+    CommitResults =
+        case Commit of
+            []               -> [];
+            [{NumReqs,{commit}}] -> [{NumReqs, commit(NewTLog)}];
+            [{Pos,{commit}}] ->
+                log:log(warn, "Commit not at end of a request list. "
+                        "Deciding abort."),
+                [{Pos, {abort}}];
+            Commits          ->
+                log:log(warn, "Multiple commits in a request list. "
+                        "Deciding abort."),
+                [ {Num, {abort}} || {Num, {commit}} <- Commits ]
+        end,
     %% Sort resultlist and eliminate numbering
-    {_, Tmp2ResultList} = lists:unzip(
+    {_, ResultList} = lists:unzip(
                         lists:sort(fun(A, B) ->
                                            element(1, A) =< element(1, B)
-                                   end, TmpResultList)),
-    %% append result entry for commit
-    ResultList = case CommitResult of
-                     none -> Tmp2ResultList;
-                     _ -> lists:append(Tmp2ResultList, [CommitResult])
-                 end,
+                                   end, TmpResultList ++ CommitResults)),
     %% return the NewTLog and a result list
-    {TransLogResult, ResultList}.
+    {NewTLog, ResultList}.
 
 %% implementation
 my_split_ops(TLog, ReqList) ->
@@ -140,7 +144,9 @@ collect_results_and_do_translogops({[], [], [RdhtOpWithReqId], [], []}
         false ->
             %% Drop outdated result...
             collect_results_and_do_translogops(Args);
-        _ -> {[RdhtTlog], [{1, RdhtResult}], [], [], []}
+        _ ->
+            {_, {Num,_}} = RdhtOpWithReqId,
+            {[RdhtTlog], [{Num, RdhtResult}], [], [], []}
     end;
 
 %% all translogops done -> wait for a RdhtOpReply
