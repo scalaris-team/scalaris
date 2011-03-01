@@ -24,36 +24,40 @@
 
 %% @doc publishs an event under a given topic.
 %%      called e.g. from the java-interface
--spec publish(string(), string()) -> ok.
+-spec publish(string(), string()) -> {ok}.
 publish(Topic, Content) ->
     Subscribers = get_subscribers(Topic),
-    [ pubsub_publish:publish(X, Topic, Content) || X <- Subscribers ],
-    ok.
+    _ = [ pubsub_publish:publish(X, Topic, Content) || X <- Subscribers ],
+    {ok}.
 
 %% @doc subscribes a url for a topic.
 %%      called e.g. from the java-interface
--spec subscribe(string(), string()) -> ok | {fail, Reason::term()}.
+-spec subscribe(string(), string()) -> api_tx:commit_result().
 subscribe(Topic, URL) ->
     {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
     {_TLog2, [_, CommitRes]} =
         case Res of
-            {ok, URLs}        -> api_tx:req_list(TLog, [{write, Topic, [URL | URLs]}, {commit}]);
-            {fail, not_found} -> api_tx:req_list(TLog, [{write, Topic, [URL]}, {commit}]);
-            {fail, timeout}   -> {TLog, [nothing, {fail, timeout}]}
+            {ok, URLs} ->
+                api_tx:req_list(TLog, [{write, Topic, [URL | URLs]}, {commit}]);
+            {fail, not_found} ->
+                api_tx:req_list(TLog, [{write, Topic, [URL]}, {commit}]);
+            {fail, timeout} ->
+                {TLog, [nothing, {fail, timeout}]}
         end,
-    case CommitRes of {ok} -> ok; _ -> CommitRes end.
+    CommitRes.
 
 %% @doc unsubscribes a url for a topic.
--spec unsubscribe(string(), string()) -> ok | {fail, any()}.
+-spec unsubscribe(string(), string()) -> api_tx:commit_result() | {fail, not_found}.
 unsubscribe(Topic, URL) ->
     {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
     case Res of
         {ok, URLs} ->
             case lists:member(URL, URLs) of
                 true ->
+                    NewURLs = lists:delete(URL, URLs),
                     {_TLog2, [_, CommitRes]} =
-                        api_tx:req_list(TLog, [{write, Topic, lists:delete(URL, URLs)}, {commit}]),
-                    case CommitRes of {ok} -> ok; _ -> CommitRes end;
+                        api_tx:req_list(TLog, [{write, Topic, NewURLs}, {commit}]),
+                    CommitRes;
                 false -> {fail, not_found}
             end;
         _ -> Res

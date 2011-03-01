@@ -225,11 +225,13 @@ public class PubSub {
 	 *             sends a message containing an invalid cookie
 	 * @throws TimeoutException
 	 *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if the commit of the subscribe failed
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 */
 	public void subscribe(OtpErlangString topic, OtpErlangString url) throws ConnectionException,
-			TimeoutException, UnknownException {
+			TimeoutException, AbortException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
 			received_raw = connection.doRPC("api_pubsub", "subscribe",
@@ -237,18 +239,21 @@ public class PubSub {
 			OtpErlangObject received = received_raw;
 
 			/*
-			 * possible return values: - ok - {fail, not_found} - {fail,
-			 * timeout} - {fail, fail} - {fail, abort}
+			 * possible return values:
+			 *   {ok} | {fail, abort | timeout}.
 			 */
-			if (received.equals(new OtpErlangAtom("ok"))) {
+			if (received.equals(CommonErlangObjects.okTupleAtom)) {
 				return;
 			} else {
 				// {fail, Reason}
 				OtpErlangTuple returnValue = (OtpErlangTuple) received;
+				OtpErlangAtom failReason = (OtpErlangAtom) returnValue.elementAt(1);
 
-				if (returnValue.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
+				if (failReason.equals(CommonErlangObjects.timeoutAtom)) {
 					throw new TimeoutException(received_raw);
-				} else {
+				} else if (failReason.equals(CommonErlangObjects.abortAtom)) {
+                    throw new AbortException(received_raw);
+                } else {
 					throw new UnknownException(received_raw);
 				}
 			}
@@ -283,11 +288,13 @@ public class PubSub {
 	 *             sends a message containing an invalid cookie
 	 * @throws TimeoutException
 	 *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if the commit of the subscribe failed
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 */
 	public void subscribe(String topic, String url) throws ConnectionException,
-			TimeoutException, UnknownException {
+			TimeoutException, AbortException, UnknownException {
 		subscribe(new OtpErlangString(topic), new OtpErlangString(url));
 	}
 	
@@ -312,36 +319,41 @@ public class PubSub {
 	 * @throws NotFoundException
 	 *             if the topic does not exist or the given subscriber is not
 	 *             subscribed to the given topic
+     * @throws AbortException
+     *             if the commit of the subscribe failed
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 */
 	public void unsubscribe(OtpErlangString topic, OtpErlangString url)
 			throws ConnectionException, TimeoutException, NotFoundException,
-			UnknownException {
+			AbortException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
 			received_raw = connection.doRPC("api_pubsub", "unsubscribe",
 					new OtpErlangList(new OtpErlangObject[] { topic, url }));
 			OtpErlangObject received = received_raw;
 
-			/*
-			 * possible return values: - ok - {fail, not_found} - {fail,
-			 * timeout} - {fail, fail} - {fail, abort}
-			 */
-			if (received.equals(new OtpErlangAtom("ok"))) {
-				return;
-			} else {
-				// {fail, Reason}
-				OtpErlangTuple returnValue = (OtpErlangTuple) received;
+            /*
+             * possible return values:
+             *   {ok} | {fail, abort | timeout | not_found}.
+             */
+            if (received.equals(CommonErlangObjects.okTupleAtom)) {
+                return;
+            } else {
+                // {fail, Reason}
+                OtpErlangTuple returnValue = (OtpErlangTuple) received;
+                OtpErlangAtom failReason = (OtpErlangAtom) returnValue.elementAt(1);
 
-				if (returnValue.elementAt(1).equals(new OtpErlangAtom("timeout"))) {
-					throw new TimeoutException(received_raw);
-				} else if (returnValue.elementAt(1).equals(new OtpErlangAtom("not_found"))) {
-					throw new NotFoundException(received_raw);
-				} else {
-					throw new UnknownException(received_raw);
-				}
-			}
+                if (failReason.equals(CommonErlangObjects.timeoutAtom)) {
+                    throw new TimeoutException(received_raw);
+                } else if (failReason.equals(CommonErlangObjects.abortAtom)) {
+                    throw new AbortException(received_raw);
+                } else if (failReason.equals(CommonErlangObjects.notFoundAtom)) {
+                    throw new NotFoundException(received_raw);
+                } else {
+                    throw new UnknownException(received_raw);
+                }
+            }
 		} catch (OtpErlangExit e) {
 			// e.printStackTrace();
 			throw new ConnectionException(e);
@@ -375,12 +387,14 @@ public class PubSub {
 	 * @throws NotFoundException
 	 *             if the topic does not exist or the given subscriber is not
 	 *             subscribed to the given topic
+     * @throws AbortException
+     *             if the commit of the subscribe failed
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 */
 	public void unsubscribe(String topic, String url)
 			throws ConnectionException, TimeoutException, NotFoundException,
-			UnknownException {
+			AbortException, UnknownException {
 		unsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
 	}
 
@@ -424,7 +438,7 @@ public class PubSub {
 			OtpErlangString topic) throws ConnectionException, UnknownException {
 		OtpErlangObject received_raw = null;
 		try {
-			// return value: [string,...]
+			// return value: [string()]
 			received_raw = connection.doRPC("api_pubsub", "get_subscribers",
 					new OtpErlangList(topic));
 			OtpErlangList received = (OtpErlangList) received_raw;

@@ -34,6 +34,10 @@
 %% Perform single operation transactions.
 -export([read/1, write/2, test_and_set/3]).
 
+-ifdef(with_export_type_support).
+-export_type([read_result/0, write_result/0, commit_result/0, result/0]).
+-endif.
+
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
