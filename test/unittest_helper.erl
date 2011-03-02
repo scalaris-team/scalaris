@@ -28,6 +28,7 @@
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
          check_ring_size/1,
+         wait_for/1, wait_for/2,
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
          wait_for_process_to_die/1,
          start_process/1, start_process/2,
@@ -245,41 +246,40 @@ stop_pid_groups() ->
     catch unregister(pid_groups),
     ok.
 
+-spec wait_for(fun(() -> any())) -> ok.
+wait_for(F) -> wait_for(F, 10).
+
+-spec wait_for(fun(() -> any()), WaitTimeInMs::pos_integer()) -> ok.
+wait_for(F, WaitTime) ->
+    case F() of
+        true  -> ok;
+        false -> timer:sleep(WaitTime),
+                 wait_for(F)
+    end.
+
 -spec wait_for_process_to_die(pid()) -> ok.
 wait_for_process_to_die(Pid) ->
-    case is_process_alive(Pid) of
-        true -> timer:sleep(100),
-                wait_for_process_to_die(Pid);
-        _    -> ok
-    end.
+    wait_for(fun() -> not is_process_alive(Pid) end).
 
 -spec wait_for_table_to_disappear(tid() | atom()) -> ok.
 wait_for_table_to_disappear(Table) ->
-    case ets:info(Table) of
-        undefined -> ok;
-        _         -> timer:sleep(100),
-                     wait_for_table_to_disappear(Table)
-    end.
+    wait_for(fun() -> ets:info(Table) =:= undefined end).
 
 -spec wait_for_stable_ring() -> ok.
 wait_for_stable_ring() ->
-    R = admin:check_ring(),
-    ct:pal("CheckRing: ~p~n",[R]),
-    case R of
-        ok -> ok;
-        _  -> timer:sleep(500),
-              wait_for_stable_ring()
-    end.
+    wait_for(fun() ->
+                     R = admin:check_ring(),
+                     ct:pal("CheckRing: ~p~n", [R]),
+                     R =:= ok
+             end, 500).
 
 -spec wait_for_stable_ring_deep() -> ok.
 wait_for_stable_ring_deep() ->
-    R = admin:check_ring_deep(),
-    ct:pal("CheckRingDeep: ~p~n",[R]),
-    case R of
-        ok -> ok;
-        _  -> timer:sleep(500),
-              wait_for_stable_ring_deep()
-    end.
+    wait_for(fun() ->
+                     R = admin:check_ring_deep(),
+                     ct:pal("CheckRingDeep: ~p~n", [R]),
+                     R =:= ok
+             end, 500).
 
 -spec check_ring_size(non_neg_integer()) -> ok.
 check_ring_size(Size) ->
