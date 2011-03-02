@@ -54,10 +54,6 @@ public class TransactionReadWriteExample {
 	 *   result2 = read(key2);
 	 *   result3 = read(key3);
 	 *   
-	 *   if (key3 not found) {
-	 *     revertLastOp();
-	 *   }
-	 *   
 	 *   write(key3, result1 + result2);
 	 *   
 	 *   result3 = read(key3);
@@ -124,10 +120,6 @@ public class TransactionReadWriteExample {
 	 *   result2 = read(key2);
 	 *   result3 = read(key3);
 	 *   
-	 *   if (key3 not found) {
-	 *     revertLastOp();
-	 *   }
-	 *   
 	 *   write(key3, result1 + result2);
 	 *   
 	 *   result3 = read(key3);
@@ -173,9 +165,7 @@ public class TransactionReadWriteExample {
 				try {
 					result3 = otpRead(transaction, key3);
 				} catch (NotFoundException e) {
-					System.out.print("    `revertLastOp()`...");
-					transaction.revertLastOp();
-					System.out.println("done");
+//					System.out.println("    caught not_found for " + key3);
 				}
 
 				otpWrite(transaction, key3, result1 + result2);
@@ -202,9 +192,7 @@ public class TransactionReadWriteExample {
 				try {
 					result3 = read(transaction, key3);
 				} catch (NotFoundException e) {
-					System.out.print("    `revertLastOp()`...");
-					transaction.revertLastOp();
-					System.out.println("done");
+//                  System.out.println("    caught not_found for " + key3);
 				}
 
 				write(transaction, key3, result1 + result2);
