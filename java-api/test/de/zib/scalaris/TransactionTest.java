@@ -169,55 +169,6 @@ public class TransactionTest {
 			t.closeConnection();
 		}
 	}
-	
-	/**
-	 * Test method for {@link Transaction#reset()} which evaluates the case
-	 * where the transaction was not started.
-	 * 
-	 * @throws ConnectionException
-	 */
-	@Test
-	public void testReset_NotStarted() throws ConnectionException {
-		Transaction t = new Transaction();
-		try {
-			t.reset();
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#reset()} with a closed connection.
-	 * 
-	 * @throws UnknownException
-	 * @throws TimeoutException
-	 * @throws ConnectionException
-	 * @throws NotFoundException
-	 */
-	@Test
-	public void testReset_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException {
-		Transaction t = new Transaction();
-		t.closeConnection();
-		t.reset();
-	}
-
-	/**
-	 * Test method for {@link Transaction#reset()} which resets an empty
-	 * transaction.
-	 * 
-	 * @throws UnknownException 
-	 * @throws ConnectionException 
-	 */
-	@Test
-	public void testReset_Empty() throws ConnectionException, UnknownException {
-		Transaction t = new Transaction();
-		try {
-			t.reset();
-		} finally {
-			t.closeConnection();
-		}
-	}
 
 	/**
 	 * Test method for {@link Transaction#read(String)}.

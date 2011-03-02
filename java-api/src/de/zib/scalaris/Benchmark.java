@@ -305,7 +305,6 @@ public class Benchmark {
 			for (int i = 0; i < testRuns; ++i) {
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
-				transaction.reset();
 			}
 			transaction.closeConnection();
 
@@ -431,7 +430,6 @@ public class Benchmark {
 			for (int i = 0; i < testRuns; ++i) {
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
-				transaction.reset();
 			}
 			transaction.closeConnection();
 
@@ -556,7 +554,6 @@ public class Benchmark {
 			for (int i = 0; i < testRuns; ++i) {
 				transaction.write(key + i, value);
 				transaction.commit();
-				transaction.reset();
 			}
 			transaction.closeConnection();
 

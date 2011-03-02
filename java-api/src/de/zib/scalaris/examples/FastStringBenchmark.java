@@ -252,7 +252,6 @@ public class FastStringBenchmark extends Benchmark {
 			for (int i = 0; i < testRuns; ++i) {
 				transaction.writeCustom(key + i, new CustomOtpFastStringObject(value));
 				transaction.commit();
-				transaction.reset();
 			}
 			transaction.closeConnection();
 
