@@ -103,7 +103,7 @@ public class Main {
 			String key = line.getOptionValue("read");
 			checkArguments(key, options, "r");
 			try {
-				Scalaris sc = new Scalaris();
+				TransactionSingleOp sc = new TransactionSingleOp();
 				String value = sc.read(key);
 				System.out.println("read(" + key + ") == " + value);
 			} catch (ConnectionException e) {
@@ -121,7 +121,7 @@ public class Main {
 			String key = optionValues[0];
 			String value = optionValues[1];
 			try {
-				Scalaris sc = new Scalaris();
+				TransactionSingleOp sc = new TransactionSingleOp();
 				sc.write(key, value);
 				System.out.println("write(" + key + ", " + value + "): ok");
 			} catch (ConnectionException e) {

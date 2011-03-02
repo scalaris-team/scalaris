@@ -45,7 +45,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   int timeout;
  *   DeleteResult result;
  *   
- *   Scalaris sc = new Scalaris();
+ *   TransactionSingleOp sc = new TransactionSingleOp();
  *   sc.delete(key);                    // {@link #delete(String)}
  *   sc.delete(key, timeout);           // {@link #delete(String, int)}
  *   result = sc.getLastDeleteResult(); // {@link #getLastDeleteResult()}
@@ -74,7 +74,7 @@ public class ReplicatedDHT {
     private OtpErlangList lastDeleteResult = null;
     
 	/**
-	 * Connection to a Scalaris node.
+	 * Connection to a TransactionSingleOp node.
 	 */
 	private Connection connection;
 	

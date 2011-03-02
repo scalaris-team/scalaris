@@ -44,7 +44,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpTopic;
  *   OtpErlangString otpContent;
  *   
- *   Scalaris sc = new Scalaris();
+ *   TransactionSingleOp sc = new TransactionSingleOp();
  *   sc.publish(topic, content);       // {@link #publish(String, String)}
  *   sc.publish(otpTopic, otpContent); // {@link #publish(OtpErlangString, OtpErlangString)}
  * </code>
@@ -60,7 +60,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpTopic;
  *   OtpErlangString otpURL;
  *   
- *   Scalaris sc = new Scalaris();
+ *   TransactionSingleOp sc = new TransactionSingleOp();
  *   sc.subscribe(topic, URL);       // {@link #subscribe(String, String)}
  *   sc.subscribe(otpTopic, otpURL); // {@link #subscribe(OtpErlangString, OtpErlangString)}
  * </code>
@@ -81,7 +81,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpTopic;
  *   OtpErlangString otpURL;
  *   
- *   Scalaris sc = new Scalaris();
+ *   TransactionSingleOp sc = new TransactionSingleOp();
  *   sc.unsubscribe(topic, URL);       // {@link #unsubscribe(String, String)}
  *   sc.unsubscribe(otpTopic, otpURL); // {@link #unsubscribe(OtpErlangString, OtpErlangString)}
  * </code>
@@ -97,7 +97,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangList otpSubscribers;
  *   
  *   // non-static:
- *   Scalaris sc = new Scalaris();
+ *   TransactionSingleOp sc = new TransactionSingleOp();
  *   subscribers = sc.getSubscribers(topic);             // {@link #getSubscribers(String)}
  *   otpSubscribers = sc.singleGetSubscribers(otpTopic); // {@link #getSubscribers(OtpErlangString)}
  * </code>
@@ -120,7 +120,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  */
 public class PubSub {
 	/**
-	 * Connection to a Scalaris node.
+	 * Connection to a TransactionSingleOp node.
 	 */
 	private Connection connection;
 	

@@ -24,13 +24,13 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
- * Unit test for the {@link Scalaris} class.
+ * Unit test for the {@link TransactionSingleOp} class.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.5
  * @since 2.0
  */
-public class ScalarisTest {
+public class TransactionSingleOpTest {
 	private final static long testTime = System.currentTimeMillis();
 	
 	private final static String[] testData = {
@@ -62,28 +62,28 @@ public class ScalarisTest {
 
 	/**
 	 * Test method for
-	 * {@link Scalaris#Scalaris()}.
+	 * {@link TransactionSingleOp#TransactionSingleOp()}.
 	 * @throws ConnectionException 
 	 */
 	@Test
-	public void testScalaris1() throws ConnectionException {
-		Scalaris conn = new Scalaris();
+	public void testTransactionSingleOp1() throws ConnectionException {
+		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
 	}
 	
 	/**
 	 * Test method for
-	 * {@link Scalaris#Scalaris(Connection)}.
+	 * {@link TransactionSingleOp#TransactionSingleOp(Connection)}.
 	 * @throws ConnectionException 
 	 */
 	@Test
-	public void testScalaris2() throws ConnectionException {
-		Scalaris conn = new Scalaris(ConnectionFactory.getInstance().createConnection("test"));
+	public void testTransactionSingleOp2() throws ConnectionException {
+		TransactionSingleOp conn = new TransactionSingleOp(ConnectionFactory.getInstance().createConnection("test"));
 		conn.closeConnection();
 	}
 
 	/**
-	 * Test method for {@link Scalaris#read(String)}.
+	 * Test method for {@link TransactionSingleOp#read(String)}.
 	 * 
 	 * @throws NotFoundException
 	 * @throws UnknownException
@@ -94,7 +94,7 @@ public class ScalarisTest {
 	public void testRead_NotFound() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String key = "_Read_NotFound";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 		try {
 			conn.read(testTime + key);
 		} finally {
@@ -103,7 +103,7 @@ public class ScalarisTest {
 	}
 
 	/**
-	 * Test method for {@link Scalaris#readObject(OtpErlangString)}.
+	 * Test method for {@link TransactionSingleOp#readObject(OtpErlangString)}.
 	 * 
 	 * @throws NotFoundException
 	 * @throws UnknownException
@@ -114,7 +114,7 @@ public class ScalarisTest {
 	public void testReadObject_NotFound() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String key = "_ReadObject_NotFound";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 		try {
 			conn.readObject(new OtpErlangString(testTime + key));
 		} finally {
@@ -123,7 +123,7 @@ public class ScalarisTest {
 	}
 
 	/**
-	 * Test method for {@link Scalaris#read(String)} with a closed connection.
+	 * Test method for {@link TransactionSingleOp#read(String)} with a closed connection.
 	 * 
 	 * @throws NotFoundException
 	 * @throws UnknownException
@@ -134,13 +134,13 @@ public class ScalarisTest {
 	public void testRead_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String key = "_Read_NotConnected";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
 		conn.readObject(new OtpErlangString(testTime + key));
 	}
 
 	/**
-	 * Test method for {@link Scalaris#readObject(OtpErlangString)} with a
+	 * Test method for {@link TransactionSingleOp#readObject(OtpErlangString)} with a
 	 * closed connection.
 	 * 
 	 * @throws NotFoundException
@@ -152,14 +152,14 @@ public class ScalarisTest {
 	public void testReadObject_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
 		String key = "_ReadObject_NotConnected";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
 		conn.readObject(new OtpErlangString(testTime + key));
 	}
 
 	/**
 	 * Test method for
-	 * {@link Scalaris#writeObject(OtpErlangString, OtpErlangObject)} with a
+	 * {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)} with a
 	 * closed connection.
 	 * 
 	 * @throws UnknownException
@@ -172,7 +172,7 @@ public class ScalarisTest {
 	public void testWriteObject_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
 		String key = "_WriteObject_NotConnected";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
 		OtpErlangObject[] data = new OtpErlangObject[] {
 				new OtpErlangString(testData[0]),
@@ -184,8 +184,8 @@ public class ScalarisTest {
 	
 	/**
 	 * Test method for
-	 * {@link Scalaris#writeObject(OtpErlangString, OtpErlangObject)}
-	 * and {@link Scalaris#readObject(OtpErlangString)}.
+	 * {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)}
+	 * and {@link TransactionSingleOp#readObject(OtpErlangString)}.
 	 * Writes erlang tuples and uses a distinct key for each value. Tries to read the data afterwards.
 	 * 
 	 * @throws UnknownException
@@ -198,7 +198,7 @@ public class ScalarisTest {
 	public void testWriteObject1() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
 		String key = "_WriteObject1_";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 
 		try {
 			for (int i = 0; i < testData.length - 1; i += 2) {
@@ -229,8 +229,8 @@ public class ScalarisTest {
 	
 	/**
 	 * Test method for
-	 * {@link Scalaris#writeObject(OtpErlangString, OtpErlangObject)}
-	 * and {@link Scalaris#readObject(OtpErlangString)}.
+	 * {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)}
+	 * and {@link TransactionSingleOp#readObject(OtpErlangString)}.
 	 * Writes erlang tuples and uses a single key for all the values. Tries to read the data afterwards.
 	 * 
 	 * @throws UnknownException
@@ -243,7 +243,7 @@ public class ScalarisTest {
 	public void testWriteObject2() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
 		String key = "_WriteObject2";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 
 		try {
 			OtpErlangObject[] data = new OtpErlangObject[0];
@@ -269,7 +269,7 @@ public class ScalarisTest {
 	}
 
 	/**
-	 * Test method for {@link Scalaris#write(String, String)} with a
+	 * Test method for {@link TransactionSingleOp#write(String, String)} with a
 	 * closed connection.
 	 * 
 	 * @throws UnknownException
@@ -282,15 +282,15 @@ public class ScalarisTest {
 	public void testWrite_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
 		String key = "_Write_NotConnected";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
 		conn.write(testTime + key, testData[0]);
 	}
 	
 	/**
 	 * Test method for
-	 * {@link Scalaris#write(String, String)}
-	 * and {@link Scalaris#read(String)}.
+	 * {@link TransactionSingleOp#write(String, String)}
+	 * and {@link TransactionSingleOp#read(String)}.
 	 * Writes strings and uses a distinct key for each value. Tries to read the data afterwards.
 	 * 
 	 * @throws UnknownException
@@ -303,7 +303,7 @@ public class ScalarisTest {
 	public void testWrite1() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
 		String key = "_Write1_";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 		
 		try {
 			for (int i = 0; i < testData.length; ++i) {
@@ -322,8 +322,8 @@ public class ScalarisTest {
 	
 	/**
 	 * Test method for
-	 * {@link Scalaris#write(String, String)}
-	 * and {@link Scalaris#read(String)}.
+	 * {@link TransactionSingleOp#write(String, String)}
+	 * and {@link TransactionSingleOp#read(String)}.
 	 * Writes strings and uses a single key for all the values. Tries to read the data afterwards.
 	 * 
 	 * @throws UnknownException
@@ -336,7 +336,7 @@ public class ScalarisTest {
 	public void testWrite2() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
 		String key = "_Write2";
-		Scalaris conn = new Scalaris();
+		TransactionSingleOp conn = new TransactionSingleOp();
 
 		try {
 			for (int i = 0; i < testData.length; ++i) {

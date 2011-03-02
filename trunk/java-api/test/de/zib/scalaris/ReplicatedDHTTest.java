@@ -109,7 +109,7 @@ public class ReplicatedDHTTest {
 	
 	/**
 	 * Test method for {@link ReplicatedDHT#delete(String)} and
-	 * {@link Scalaris#write(String, String)}.
+	 * {@link TransactionSingleOp#write(String, String)}.
 	 * Inserts some values, tries to delete them afterwards and tries the
 	 * delete again.
 	 * 
@@ -125,7 +125,7 @@ public class ReplicatedDHTTest {
 		String key = "_Delete1";
 		Connection c = ConnectionFactory.getInstance().createConnection("test");
 		ReplicatedDHT rdht = new ReplicatedDHT(c);
-        Scalaris sc = new Scalaris(c);
+        TransactionSingleOp sc = new TransactionSingleOp(c);
 
 		try {
 			for (int i = 0; i < testData.length; ++i) {
@@ -156,7 +156,7 @@ public class ReplicatedDHTTest {
 	
 	/**
 	 * Test method for {@link ReplicatedDHT#delete(String)} and
-	 * {@link Scalaris#write(String, String)}.
+	 * {@link TransactionSingleOp#write(String, String)}.
 	 * Inserts some values, tries to delete them afterwards, inserts them again
 	 * and tries to delete them again (twice).
 	 * 
@@ -172,7 +172,7 @@ public class ReplicatedDHTTest {
 		String key = "_Delete2";
         Connection c = ConnectionFactory.getInstance().createConnection("test");
         ReplicatedDHT rdht = new ReplicatedDHT(c);
-        Scalaris sc = new Scalaris(c);
+        TransactionSingleOp sc = new TransactionSingleOp(c);
 
 		try {
 			for (int i = 0; i < testData.length; ++i) {

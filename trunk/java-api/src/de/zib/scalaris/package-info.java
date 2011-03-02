@@ -16,9 +16,9 @@
 /**
  * This package contains means to communicate with the erlang scalaris ring from Java.
  * 
- * <h3>The Scalaris class</h3>
+ * <h3>The TransactionSingleOp class</h3>
  * <p>
- * The {@link de.zib.scalaris.Scalaris} class provides methods for reading,
+ * The {@link de.zib.scalaris.TransactionSingleOp} class provides methods for reading,
  * writing and deleting values, with both,
  * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and
  * Java {@link java.lang.String} objects.
@@ -28,7 +28,7 @@
  * <pre>
  * <code style="white-space:pre;">
  *   try {
- *     Scalaris sc = new Scalaris();
+ *     TransactionSingleOp sc = new TransactionSingleOp();
  *     String value = sc.read("key");
  *   } catch (ConnectionException e) {
  *     System.err.println("read failed: " + e.getMessage());
@@ -42,7 +42,7 @@
  * </code>
  * </pre>
  * 
- * <p>See the {@link de.zib.scalaris.Scalaris} class documentation for more details.</p>
+ * <p>See the {@link de.zib.scalaris.TransactionSingleOp} class documentation for more details.</p>
  * 
  * <h3>The Transaction class</h3>
  * <p>
