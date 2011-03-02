@@ -15,7 +15,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Nico Kruber <kruber@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc API for raw access to DHT based on (already hashed keys).
+%% @doc API for raw access to DHT based on (already) hashed keys.
 %% @version $Id$
 -module(api_dht_raw).
 -author('schintke@zib.de').

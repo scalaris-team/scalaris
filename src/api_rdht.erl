@@ -20,14 +20,14 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--export([delete/1]).
+-export([delete/1, delete/2]).
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
 -spec delete(Key::client_key())
         -> {ok, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
            {fail, timeout} |
-           {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | locks_set | undef]} |
            {fail, node_not_found}.
 delete(Key) ->
     delete(Key, 2000).
@@ -36,9 +36,9 @@ delete(Key) ->
 %%      successfully deleted.  WARNING: this function can lead to
 %%      inconsistencies for api_tx functions.
 -spec delete(client_key(), Timeout::pos_integer())
-        -> {ok, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+        -> {ok, ResultsOk::pos_integer(), ResultList::[ok | locks_set | undef]} |
            {fail, timeout} |
-           {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | undef]} |
+           {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | locks_set | undef]} |
            {fail, node_not_found}.
 delete(Key, Timeout) ->
     case pid_groups:find_a(dht_node) of

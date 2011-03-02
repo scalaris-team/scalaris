@@ -10,10 +10,10 @@ import com.ericsson.otp.erlang.OtpErlangList;
  * Stores the result of a delete operation.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.2
+ * @version 2.6
  * @since 2.2
  * 
- * @see Scalaris#delete(String)
+ * @see ReplicatedDHT#delete(String)
  */
 public class DeleteResult {
 	/**

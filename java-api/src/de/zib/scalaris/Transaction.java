@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.ericsson.otp.erlang.OtpAuthException;
+import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
@@ -243,12 +244,13 @@ public class Transaction {
             ArrayList<OtpErlangObject> result = new ArrayList<OtpErlangObject>(lastResult.arity());
             for (OtpErlangObject result_i : lastResult) {
                 OtpErlangTuple result_i_tpl = (OtpErlangTuple) result_i;
+                OtpErlangAtom result_i_state = (OtpErlangAtom) result_i_tpl.elementAt(0);
                 if(result_i_tpl.equals(CommonErlangObjects.okTupleAtom)) {
                     // result of a commit request
-                } else if (result_i_tpl.elementAt(0).equals(CommonErlangObjects.okAtom)) {
+                } else if (result_i_state.equals(CommonErlangObjects.okAtom) && result_i_tpl.arity() == 2) {
                     // contains a value
                     result.add(result_i_tpl.elementAt(1));
-                } else if (result_i_tpl.elementAt(0).equals(CommonErlangObjects.failAtom)) {
+                } else if (result_i_state.equals(CommonErlangObjects.failAtom) && result_i_tpl.arity() == 2) {
                     OtpErlangObject reason = result_i_tpl.elementAt(1);
                     if (reason.equals(CommonErlangObjects.abortAtom)) {
                         abort();
