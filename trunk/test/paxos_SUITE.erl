@@ -281,11 +281,3 @@ step_until_decide(Processes, PaxId, SumSteps) ->
 
 test_rnd_interleave(_Config) ->
     tester:test(paxos_SUITE, prop_rnd_interleave, _Params = 3, _Iter = 100).
-
-wait_for(Name) ->
-    case whereis(Name) of
-        undefined ->
-            wait_for(Name);
-        _ ->
-            ok
-    end.
