@@ -168,7 +168,6 @@ public class FastStringBenchmark extends Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction();
-				transaction.start();
 				transaction.writeCustom(key + i, new CustomOtpFastStringObject(value));
 				transaction.commit();
 				transaction.closeConnection();
@@ -211,7 +210,6 @@ public class FastStringBenchmark extends Benchmark {
 			Connection connection = ConnectionFactory.getInstance().createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
-				transaction.start();
 				transaction.writeCustom(key + i, new CustomOtpFastStringObject(value));
 				transaction.commit();
 			}
@@ -252,7 +250,6 @@ public class FastStringBenchmark extends Benchmark {
 
 			Transaction transaction = new Transaction();
 			for (int i = 0; i < testRuns; ++i) {
-				transaction.start();
 				transaction.writeCustom(key + i, new CustomOtpFastStringObject(value));
 				transaction.commit();
 				transaction.reset();

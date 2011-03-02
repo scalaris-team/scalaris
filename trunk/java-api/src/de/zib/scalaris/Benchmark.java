@@ -219,7 +219,6 @@ public class Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction();
-				transaction.start();
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
 				transaction.closeConnection();
@@ -263,7 +262,6 @@ public class Benchmark {
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
-				transaction.start();
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
 			}
@@ -305,7 +303,6 @@ public class Benchmark {
 
 			Transaction transaction = new Transaction();
 			for (int i = 0; i < testRuns; ++i) {
-				transaction.start();
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
 				transaction.reset();
@@ -348,7 +345,6 @@ public class Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction();
-				transaction.start();
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
 				transaction.closeConnection();
@@ -392,7 +388,6 @@ public class Benchmark {
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
-				transaction.start();
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
 			}
@@ -434,7 +429,6 @@ public class Benchmark {
 
 			Transaction transaction = new Transaction();
 			for (int i = 0; i < testRuns; ++i) {
-				transaction.start();
 				transaction.writeObject(new OtpErlangString(key + i), value);
 				transaction.commit();
 				transaction.reset();
@@ -476,7 +470,6 @@ public class Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction();
-				transaction.start();
 				transaction.write(key + i, value);
 				transaction.commit();
 				transaction.closeConnection();
@@ -520,7 +513,6 @@ public class Benchmark {
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
-				transaction.start();
 				transaction.write(key + i, value);
 				transaction.commit();
 			}
@@ -562,7 +554,6 @@ public class Benchmark {
 
 			Transaction transaction = new Transaction();
 			for (int i = 0; i < testRuns; ++i) {
-				transaction.start();
 				transaction.write(key + i, value);
 				transaction.commit();
 				transaction.reset();

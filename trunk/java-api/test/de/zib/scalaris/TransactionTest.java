@@ -81,94 +81,20 @@ public class TransactionTest {
 	}
 
 	/**
-	 * Test method for {@link Transaction#start()} with a closed connection.
+	 * Test method for {@link Transaction#commit()} with a closed connection.
 	 * 
 	 * @throws UnknownException
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException
-	 */
-	@Test(expected=ConnectionException.class)
-	public void testStart_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
-		Transaction t = new Transaction();
-		t.closeConnection();
-		t.start();
-	}
-	
-	/**
-	 * Test method for {@link Transaction#start()} which starts a transaction once.
-	 * 
-	 * @throws TransactionNotFinishedException 
-	 * @throws UnknownException 
-	 * @throws ConnectionException 
-	 */
-	@Test
-	public void testStart1() throws ConnectionException, UnknownException, TransactionNotFinishedException {
-		Transaction t = new Transaction();
-		try {
-			t.start();
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#start()} which tries to start a second
-	 * transaction on a given transaction object.
-	 * 
-	 * @throws TransactionNotFinishedException
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 */
-	@Test(expected=TransactionNotFinishedException.class)
-	public void testStart2() throws ConnectionException, UnknownException, TransactionNotFinishedException {
-		Transaction t = new Transaction();try {
-			t.start();
-			t.start();
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#commit()} which evaluates the case
-	 * where the transaction was not started.
-	 * 
-	 * @throws ConnectionException
-	 * @throws UnknownException 
-	 * @throws AbortException 
-	 * @throws TimeoutException 
-	 */
-	@Test(expected=TransactionNotStartedException.class)
-	public void testCommit_NotStarted() throws ConnectionException, UnknownException, TimeoutException, AbortException {
-		Transaction t = new Transaction();
-		try {
-			t.commit();
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#start()} with a closed connection.
-	 * 
-	 * @throws UnknownException
-	 * @throws TimeoutException
-	 * @throws ConnectionException
-	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException
 	 * @throws AbortException 
 	 */
 	@Test(expected=ConnectionException.class)
 	public void testCommit_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException, AbortException {
+			AbortException {
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.closeConnection();
 			t.commit();
 		} finally {
@@ -178,21 +104,18 @@ public class TransactionTest {
 	
 	/**
 	 * Test method for {@link Transaction#commit()} which commits an empty
-	 * transaction and tries to start a new one afterwards.
+	 * transaction.
 	 * 
 	 * @throws ConnectionException
-	 * @throws TransactionNotFinishedException
 	 * @throws UnknownException
 	 * @throws AbortException 
 	 * @throws TimeoutException 
 	 */
 	@Test
-	public void testCommit_Empty() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, AbortException {
+	public void testCommit_Empty() throws ConnectionException, UnknownException, TimeoutException, AbortException {
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.commit();
-			t.start();
 		} finally {
 			t.closeConnection();
 		}
@@ -221,12 +144,10 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException
 	 */
 	@Test
 	public void testAbort_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
+			TimeoutException, UnknownException, NotFoundException {
 		Transaction t = new Transaction();
 		t.closeConnection();
 		t.abort();
@@ -234,19 +155,16 @@ public class TransactionTest {
 
 	/**
 	 * Test method for {@link Transaction#abort()} which aborts an empty
-	 * transaction and tries to start a new one afterwards.
+	 * transaction.
 	 * 
-	 * @throws TransactionNotFinishedException 
 	 * @throws UnknownException 
 	 * @throws ConnectionException 
 	 */
 	@Test
-	public void testAbort_Empty() throws ConnectionException, UnknownException, TransactionNotFinishedException {
+	public void testAbort_Empty() throws ConnectionException, UnknownException {
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.abort();
-			t.start();
 		} finally {
 			t.closeConnection();
 		}
@@ -275,12 +193,10 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException
 	 */
 	@Test
 	public void testReset_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
+			TimeoutException, UnknownException, NotFoundException {
 		Transaction t = new Transaction();
 		t.closeConnection();
 		t.reset();
@@ -288,19 +204,16 @@ public class TransactionTest {
 
 	/**
 	 * Test method for {@link Transaction#reset()} which resets an empty
-	 * transaction and tries to start a new one afterwards.
+	 * transaction.
 	 * 
-	 * @throws TransactionNotFinishedException 
 	 * @throws UnknownException 
 	 * @throws ConnectionException 
 	 */
 	@Test
-	public void testReset_Empty() throws ConnectionException, UnknownException, TransactionNotFinishedException {
+	public void testReset_Empty() throws ConnectionException, UnknownException {
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.reset();
-			t.start();
 		} finally {
 			t.closeConnection();
 		}
@@ -309,7 +222,6 @@ public class TransactionTest {
 	/**
 	 * Test method for {@link Transaction#read(String)}.
 	 * 
-	 * @throws TransactionNotFinishedException 
 	 * @throws UnknownException 
 	 * @throws ConnectionException 
 	 * @throws NotFoundException 
@@ -317,31 +229,9 @@ public class TransactionTest {
 	 */
 	@Test(expected = NotFoundException.class)
 	public void testRead_NotFound() throws ConnectionException,
-			UnknownException, TransactionNotFinishedException,
+			UnknownException,
 			TimeoutException, NotFoundException {
 		String key = "_Read_NotFound";
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			t.read(testTime + key);
-		} finally {
-			t.closeConnection();
-		}
-	}
-	
-	/**
-	 * Test method for {@link Transaction#read(String)} which evaluates the case
-	 * where the transaction was not started.
-	 * 
-	 * @throws ConnectionException
-	 * @throws NotFoundException 
-	 * @throws UnknownException 
-	 * @throws TimeoutException 
-	 */
-	@Test(expected = TransactionNotStartedException.class)
-	public void testRead_NotStarted() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException {
-		String key = "_Read_NotStarted";
 		Transaction t = new Transaction();
 		try {
 			t.read(testTime + key);
@@ -358,16 +248,13 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException 
 	 */
 	@Test(expected = ConnectionException.class)
 	public void testRead_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
+			TimeoutException, UnknownException, NotFoundException {
 		String key = "_Read_NotConnected";
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.closeConnection();
 			t.read(testTime + key);
 		} finally {
@@ -378,7 +265,6 @@ public class TransactionTest {
 	/**
 	 * Test method for {@link Transaction#readObject(OtpErlangString)}.
 	 * 
-	 * @throws TransactionNotFinishedException 
 	 * @throws UnknownException 
 	 * @throws ConnectionException 
 	 * @throws NotFoundException 
@@ -386,31 +272,9 @@ public class TransactionTest {
 	 */
 	@Test(expected = NotFoundException.class)
 	public void testReadObject_NotFound() throws ConnectionException,
-			UnknownException, TransactionNotFinishedException,
+			UnknownException,
 			TimeoutException, NotFoundException {
 		String key = "_ReadObject_NotFound";
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			t.readObject(new OtpErlangString(testTime + key));
-		} finally {
-			t.closeConnection();
-		}
-	}
-	
-	/**
-	 * Test method for {@link Transaction#readObject(OtpErlangString)} which evaluates the case
-	 * where the transaction was not started.
-	 * 
-	 * @throws UnknownException 
-	 * @throws ConnectionException 
-	 * @throws NotFoundException 
-	 * @throws TimeoutException 
-	 */
-	@Test(expected = TransactionNotStartedException.class)
-	public void testReadObject_NotStarted() throws ConnectionException,
-			UnknownException, TimeoutException, NotFoundException {
-		String key = "_ReadObject_NotStarted";
 		Transaction t = new Transaction();
 		try {
 			t.readObject(new OtpErlangString(testTime + key));
@@ -427,39 +291,15 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException 
 	 */
 	@Test(expected = ConnectionException.class)
 	public void testReadObject_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
+			TimeoutException, UnknownException, NotFoundException {
 		String key = "_ReadObject_NotConnected";
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.closeConnection();
 			t.readObject(new OtpErlangString(testTime + key));
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#write(String, String)} which evaluates
-	 * the case where the transaction was not started.
-	 * 
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 * @throws NotFoundException
-	 * @throws TimeoutException
-	 */
-	@Test(expected = TransactionNotStartedException.class)
-	public void testWrite_NotStarted() throws ConnectionException,
-			UnknownException, TimeoutException, NotFoundException {
-		String key = "_Write_notStarted";
-		Transaction t = new Transaction();
-		try {
-			t.write(testTime + key, testData[0]);
 		} finally {
 			t.closeConnection();
 		}
@@ -473,16 +313,13 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException 
 	 */
 	@Test(expected = ConnectionException.class)
 	public void testWrite_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
+			TimeoutException, UnknownException, NotFoundException {
 		String key = "_Write_NotConnected";
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.closeConnection();
 			t.write(testTime + key, testData[0]);
 		} finally {
@@ -496,19 +333,17 @@ public class TransactionTest {
      * writing a value for a key for which a previous read returned a
      * NotFoundException is possible.
      * 
-     * @throws TransactionNotFinishedException
      * @throws UnknownException
      * @throws ConnectionException
      * @throws TimeoutException
      * @throws NotFoundException
      */
     @Test
-    public void testWrite_NotFound() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
+    public void testWrite_NotFound() throws ConnectionException, UnknownException, TimeoutException, NotFoundException {
         String key = "_Write_notFound";
         Transaction t = new Transaction();
         try {
             boolean notFound = false;
-            t.start();
             try {
                 t.read(testTime + key);
             } catch (NotFoundException e) {
@@ -531,14 +366,12 @@ public class TransactionTest {
 	 * @throws NotFoundException
 	 * @throws UnknownException
 	 * @throws TimeoutException
-	 * @throws TransactionNotFinishedException
 	 * @throws AbortException 
 	 */
 	@Test
-	public void testWrite() throws ConnectionException, TimeoutException, UnknownException, NotFoundException, TransactionNotFinishedException, AbortException {
+	public void testWrite() throws ConnectionException, TimeoutException, UnknownException, NotFoundException, AbortException {
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			for (int i = 0; i < testData.length; ++i) {
 				t.write(testTime + "_testWriteString1_" + i, testData[i]);
 			}
@@ -554,35 +387,10 @@ public class TransactionTest {
 			
 			t.commit();
 			t = new Transaction();
-			t.start();
 			for (int i = 0; i < testData.length; ++i) {
 				String actual = t.read(testTime + "_testWriteString1_" + i);
 				assertEquals(new OtpErlangString(testData[i]), actual);
 			}
-		} finally {
-			t.closeConnection();
-		}
-	}
-	
-	/**
-	 * Test method for
-	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} which
-	 * evaluates the case where the transaction was not started.
-	 * 
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 * @throws NotFoundException
-	 * @throws TimeoutException
-	 */
-	@Test(expected = TransactionNotStartedException.class)
-	public void testWriteObject_NotStarted() throws ConnectionException,
-			UnknownException, TimeoutException, NotFoundException {
-		String key = "_WriteObject_notStarted";
-		Transaction t = new Transaction();
-		try {
-			t.writeObject(
-					new OtpErlangString(testTime + key),
-					new OtpErlangString(testData[0]));
 		} finally {
 			t.closeConnection();
 		}
@@ -597,16 +405,13 @@ public class TransactionTest {
 	 * @throws TimeoutException
 	 * @throws ConnectionException
 	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException 
 	 */
 	@Test(expected = ConnectionException.class)
 	public void testWriteObject_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
+			TimeoutException, UnknownException, NotFoundException {
 		String key = "_WriteObject_NotConnected";
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			t.closeConnection();
 			t.writeObject(
 					new OtpErlangString(testTime + key),
@@ -622,19 +427,17 @@ public class TransactionTest {
      * should show that writing a value for a key for which a previous read
      * returned a NotFoundException is possible.
      * 
-     * @throws TransactionNotFinishedException
      * @throws UnknownException
      * @throws ConnectionException
      * @throws TimeoutException
      * @throws NotFoundException
      */
     @Test
-    public void testWriteObject_NotFound() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
+    public void testWriteObject_NotFound() throws ConnectionException, UnknownException, TimeoutException, NotFoundException {
         String key = "_WriteObject_notFound";
         Transaction t = new Transaction();
         try {
             boolean notFound = false;
-            t.start();
             try {
                 t.readObject(new OtpErlangString(testTime + key));
             } catch (NotFoundException e) {
@@ -660,17 +463,15 @@ public class TransactionTest {
 	 * @throws UnknownException
 	 * @throws TimeoutException
 	 * @throws ConnectionException
-	 * @throws TransactionNotFinishedException 
      * @throws AbortException 
 	 * 
 	 * TODO: fix test for the original data set of 160 items (is way too slow or not working at all)
 	 */
 	@Test
 	public void testWriteObject() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException, TransactionNotFinishedException, AbortException {
+			TimeoutException, UnknownException, NotFoundException, AbortException {
 		Transaction t = new Transaction();
 		try {
-			t.start();
 			for (int i = 0; i < testData.length - 1; ++i) {
 				OtpErlangObject[] data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),
@@ -696,7 +497,6 @@ public class TransactionTest {
 			
 			t.commit();
 			t = new Transaction();
-			t.start();
 			for (int i = 0; i < testData.length - 1; i += 2) {
 				OtpErlangObject[] data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),

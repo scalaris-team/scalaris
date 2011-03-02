@@ -57,7 +57,6 @@
  * <code style="white-space:pre;">
  *   try {
  *     Transaction transaction = new Transaction();
- *     transaction.start();
  *     String value = transaction.read("key");
  *     transaction.write("key", "value");
  *     transaction.commit();
@@ -69,9 +68,6 @@
  *     System.err.println("read failed with unknown: " + e.getMessage());
  *   } catch (NotFoundException e) {
  *     System.err.println("read failed with not found: " + e.getMessage());
- *   } catch (TransactionNotFinishedException e) {
- *     System.out.println("failed: " + e.getMessage());
- *     return;
  *   }
  * </code>
  * </pre>
