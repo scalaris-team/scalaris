@@ -19,22 +19,22 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the <tt>write</tt> methods of the
- * {@link Scalaris} class.
+ * {@link TransactionSingleOp} class.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
  * @since 2.0
  */
-public class ScalarisWriteExample {
+public class TransactionSingleOpWriteExample {
 	/**
 	 * Writes a key/value pair given on the command line with the <tt>write</tt>
-	 * methods of {@link Scalaris}.<br />
+	 * methods of {@link TransactionSingleOp}.<br />
 	 * If no value or key is given, the default key <tt>"key"</tt> and the
 	 * default value <tt>"value"</tt> is used.
 	 * 
@@ -60,11 +60,11 @@ public class ScalarisWriteExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue = new OtpErlangString(value);
 
-		System.out.println("Writing values with the class `Scalaris`:");
+		System.out.println("Writing values with the class `TransactionSingleOp`:");
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			System.out
 					.println("    `void writeObject(OtpErlangString, OtpErlangObject)`...");
 			sc.writeObject(otpKey, otpValue);
@@ -89,7 +89,7 @@ public class ScalarisWriteExample {
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			System.out.println("    `void write(String, String)`...");
 			sc.write(key, value);
 			System.out.println("      write(" + key + ", " + value

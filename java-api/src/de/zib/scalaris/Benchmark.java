@@ -75,7 +75,7 @@ public class Benchmark {
 		String[] columns;
 		String[] rows;
 		
-		System.out.println("Benchmark of de.zib.scalaris.Scalaris:");
+		System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
 
 		results[0][0] = benchmarks == -1 || benchmarks == 1 ? scalarisBench1(BENCH_DATA_SIZE, testruns) : -1;
 		results[1][0] = benchmarks == -1 || benchmarks == 2 ? scalarisBench2(BENCH_DATA_SIZE, testruns) : -1;
@@ -88,13 +88,13 @@ public class Benchmark {
 		results[2][2] = benchmarks == -1 || benchmarks == 9 ? scalarisBench9(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
-				"Scalaris.writeObject(OtpErlangString, OtpErlangBinary)",
-				"Scalaris.writeObject(OtpErlangString, OtpErlangString)",
-				"Scalaris.write(String, String)" };
+				"TransactionSingleOp.writeObject(OtpErlangString, OtpErlangBinary)",
+				"TransactionSingleOp.writeObject(OtpErlangString, OtpErlangString)",
+				"TransactionSingleOp.write(String, String)" };
 		rows = new String[] {
 				"separate connection",
 				"re-use connection",
-				"re-use Scalaris object" };
+				"re-use TransactionSingleOp object" };
 		printResults(columns, rows, results, testruns);
 		
 		
@@ -567,7 +567,7 @@ public class Benchmark {
 
 	/**
 	 * Performs a benchmark writing {@link OtpErlangBinary} objects (random
-	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris}
+	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link TransactionSingleOp}
 	 * object for each test.
 	 * 
 	 * @param size
@@ -579,7 +579,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench1(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris().writeObject(OtpErlangString, OtpErlangBinary) "
+			// System.out.println("Testing TransactionSingleOp().writeObject(OtpErlangString, OtpErlangBinary) "
 			// +
 			// "with separate connections...");
 			byte[] data = new byte[size];
@@ -592,7 +592,7 @@ public class Benchmark {
 			testBegin();
 
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris();
+				TransactionSingleOp sc = new TransactionSingleOp();
 				sc.writeObject(new OtpErlangString(key + i), value);
 				sc.closeConnection();
 			}
@@ -607,7 +607,7 @@ public class Benchmark {
 
 	/**
 	 * Performs a benchmark writing {@link OtpErlangBinary} objects (random
-	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris}
+	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link TransactionSingleOp}
 	 * object but re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
@@ -619,7 +619,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench2(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris(Connection).writeObject(OtpErlangString, OtpErlangBinary) "
+			// System.out.println("Testing TransactionSingleOp(Connection).writeObject(OtpErlangString, OtpErlangBinary) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -634,7 +634,7 @@ public class Benchmark {
 			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris(connection);
+				TransactionSingleOp sc = new TransactionSingleOp(connection);
 				sc.writeObject(new OtpErlangString(key + i), value);
 			}
 			connection.close();
@@ -649,7 +649,7 @@ public class Benchmark {
 
 	/**
 	 * Performs a benchmark writing {@link OtpErlangBinary} objects (random
-	 * data, size = {@link #BENCH_DATA_SIZE}) using a single {@link Scalaris}
+	 * data, size = {@link #BENCH_DATA_SIZE}) using a single {@link TransactionSingleOp}
 	 * object for all tests.
 	 * 
 	 * @param size
@@ -661,7 +661,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench3(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris().writeObject(OtpErlangString, OtpErlangBinary) "
+			// System.out.println("Testing TransactionSingleOp().writeObject(OtpErlangString, OtpErlangBinary) "
 			// +
 			// "re-using a single transaction...");
 			byte[] data = new byte[size];
@@ -673,7 +673,7 @@ public class Benchmark {
 
 			testBegin();
 
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			for (int i = 0; i < testRuns; ++i) {
 				sc.writeObject(new OtpErlangString(key + i), value);
 			}
@@ -690,7 +690,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link OtpErlangString} objects (random
 	 * data, size = {@link #BENCH_DATA_SIZE}) first using a new
-	 * {@link Scalaris} object for each test.
+	 * {@link TransactionSingleOp} object for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -701,7 +701,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench4(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris().writeObject(OtpErlangString, OtpErlangString) "
+			// System.out.println("Testing TransactionSingleOp().writeObject(OtpErlangString, OtpErlangString) "
 			// +
 			// "with separate connections...");
 			byte[] data = new byte[size];
@@ -714,7 +714,7 @@ public class Benchmark {
 			testBegin();
 
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris();
+				TransactionSingleOp sc = new TransactionSingleOp();
 				sc.writeObject(new OtpErlangString(key + i), value);
 				sc.closeConnection();
 			}
@@ -729,7 +729,7 @@ public class Benchmark {
 
 	/**
 	 * Performs a benchmark writing {@link OtpErlangString} objects (random
-	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris}
+	 * data, size = {@link #BENCH_DATA_SIZE}) using a new {@link TransactionSingleOp}
 	 * object but re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
@@ -741,7 +741,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench5(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris(Connection).writeObject(OtpErlangString, OtpErlangString) "
+			// System.out.println("Testing TransactionSingleOp(Connection).writeObject(OtpErlangString, OtpErlangString) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -756,7 +756,7 @@ public class Benchmark {
 			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris(connection);
+				TransactionSingleOp sc = new TransactionSingleOp(connection);
 				sc.writeObject(new OtpErlangString(key + i), value);
 			}
 			connection.close();
@@ -772,7 +772,7 @@ public class Benchmark {
 	/**
 	 * Performs a benchmark writing {@link OtpErlangString} objects (random
 	 * data, size = {@link #BENCH_DATA_SIZE}) re-using a single
-	 * {@link Scalaris} object for all tests..
+	 * {@link TransactionSingleOp} object for all tests..
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -783,7 +783,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench6(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris().writeObject(OtpErlangString, OtpErlangString) "
+			// System.out.println("Testing TransactionSingleOp().writeObject(OtpErlangString, OtpErlangString) "
 			// +
 			// "re-using a single transaction...");
 			byte[] data = new byte[size];
@@ -795,7 +795,7 @@ public class Benchmark {
 
 			testBegin();
 
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			for (int i = 0; i < testRuns; ++i) {
 				sc.writeObject(new OtpErlangString(key + i), value);
 			}
@@ -811,7 +811,7 @@ public class Benchmark {
 
 	/**
 	 * Performs a benchmark writing {@link String} objects (random data, size =
-	 * {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris} object for each
+	 * {@link #BENCH_DATA_SIZE}) using a new {@link TransactionSingleOp} object for each
 	 * test.
 	 * 
 	 * @param size
@@ -823,7 +823,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench7(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris().write(String, String) "
+			// System.out.println("Testing TransactionSingleOp().write(String, String) "
 			// +
 			// "with separate connections...");
 			byte[] data = new byte[size];
@@ -836,7 +836,7 @@ public class Benchmark {
 			testBegin();
 
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris();
+				TransactionSingleOp sc = new TransactionSingleOp();
 				sc.write(key + i, value);
 				sc.closeConnection();
 			}
@@ -851,7 +851,7 @@ public class Benchmark {
 
 	/**
 	 * Performs a benchmark writing {@link String} objects (random data, size =
-	 * {@link #BENCH_DATA_SIZE}) using a new {@link Scalaris} object but
+	 * {@link #BENCH_DATA_SIZE}) using a new {@link TransactionSingleOp} object but
 	 * re-using a single {@link Connection} for each test.
 	 * 
 	 * @param size
@@ -863,7 +863,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench8(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris(Connection).write(String, String) "
+			// System.out.println("Testing TransactionSingleOp(Connection).write(String, String) "
 			// +
 			// "re-using a single connection...");
 			byte[] data = new byte[size];
@@ -878,7 +878,7 @@ public class Benchmark {
 			Connection connection = ConnectionFactory.getInstance()
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris(connection);
+				TransactionSingleOp sc = new TransactionSingleOp(connection);
 				sc.write(key + i, value);
 			}
 			connection.close();
@@ -893,7 +893,7 @@ public class Benchmark {
 
 	/**
 	 * Performs a benchmark writing {@link String} objects (random data, size =
-	 * {@link #BENCH_DATA_SIZE}) re-using a single {@link Scalaris} object for
+	 * {@link #BENCH_DATA_SIZE}) re-using a single {@link TransactionSingleOp} object for
 	 * all tests.
 	 * 
 	 * @param size
@@ -905,7 +905,7 @@ public class Benchmark {
 	 */
 	protected static long scalarisBench9(int size, int testRuns) {
 		try {
-			// System.out.println("Testing Scalaris().write(String, String) "
+			// System.out.println("Testing TransactionSingleOp().write(String, String) "
 			// +
 			// "re-using a single transaction...");
 			byte[] data = new byte[size];
@@ -917,7 +917,7 @@ public class Benchmark {
 
 			testBegin();
 
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			for (int i = 0; i < testRuns; ++i) {
 				sc.write(key + i, value);
 			}

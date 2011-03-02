@@ -23,7 +23,7 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import de.zib.scalaris.Benchmark;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
-import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.Transaction;
 
 /**
@@ -85,7 +85,7 @@ public class FastStringBenchmark extends Benchmark {
 		String[] columns;
 		String[] rows;
 		
-		System.out.println("Benchmark of de.zib.scalaris.Scalaris:");
+		System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
 
 		results[0][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench1(BENCH_DATA_SIZE, testruns) : -1;
 		results[1][0] = benchmarks == -1 || benchmarks == 1 ? Benchmark.scalarisBench2(BENCH_DATA_SIZE, testruns) : -1;
@@ -101,14 +101,14 @@ public class FastStringBenchmark extends Benchmark {
     	results[2][3] = benchmarks == -1 || benchmarks == 1 ? fastScalarisBench3(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
-				"Scalaris.writeObject(OtpErlangString, OtpErlangBinary)",
-				"Scalaris.writeObject(OtpErlangString, OtpErlangString)",
-				"Scalaris.write(String, String)",
-				"Scalaris.writeCustom(String, CustomOtpFastStringObject)" };
+				"TransactionSingleOp.writeObject(OtpErlangString, OtpErlangBinary)",
+				"TransactionSingleOp.writeObject(OtpErlangString, OtpErlangString)",
+				"TransactionSingleOp.write(String, String)",
+				"TransactionSingleOp.writeCustom(String, CustomOtpFastStringObject)" };
 		rows = new String[] {
 				"separate connection",
 				"re-use connection",
-				"re-use Scalaris object" };
+				"re-use TransactionSingleOp object" };
 		printResults(columns, rows, results, testruns);
 		
 		
@@ -266,7 +266,7 @@ public class FastStringBenchmark extends Benchmark {
 	/**
 	 * Performs a benchmark writing {@link String} objects by converting them to
 	 * {@link OtpErlangBinary}s (random data, size = {@link #BENCH_DATA_SIZE})
-	 * using a new {@link Scalaris} object for each test.
+	 * using a new {@link TransactionSingleOp} object for each test.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -289,7 +289,7 @@ public class FastStringBenchmark extends Benchmark {
 			testBegin();
 
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris();
+				TransactionSingleOp sc = new TransactionSingleOp();
 				sc.writeCustom(key + i, new CustomOtpFastStringObject(value));
 				sc.closeConnection();
 			}
@@ -305,7 +305,7 @@ public class FastStringBenchmark extends Benchmark {
 	/**
 	 * Performs a benchmark writing {@link String} objects by converting them to
 	 * {@link OtpErlangBinary}s (random data, size = {@link #BENCH_DATA_SIZE})
-	 * using a new {@link Scalaris} object but re-using a single
+	 * using a new {@link TransactionSingleOp} object but re-using a single
 	 * {@link Connection} for each test.
 	 * 
 	 * @param size
@@ -330,7 +330,7 @@ public class FastStringBenchmark extends Benchmark {
 
 			Connection connection = ConnectionFactory.getInstance().createConnection();
 			for (int i = 0; i < testRuns; ++i) {
-				Scalaris sc = new Scalaris(connection);
+				TransactionSingleOp sc = new TransactionSingleOp(connection);
 				sc.writeCustom(key + i, new CustomOtpFastStringObject(value));
 			}
 			connection.close();
@@ -346,7 +346,7 @@ public class FastStringBenchmark extends Benchmark {
 	/**
 	 * Performs a benchmark writing {@link String} objects by converting them to
 	 * {@link OtpErlangBinary}s (random data, size = {@link #BENCH_DATA_SIZE})
-	 * using a single {@link Scalaris} object for all tests.
+	 * using a single {@link TransactionSingleOp} object for all tests.
 	 * 
 	 * @param size
 	 *            the size of a single data item
@@ -368,7 +368,7 @@ public class FastStringBenchmark extends Benchmark {
 
 			testBegin();
 
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			for (int i = 0; i < testRuns; ++i) {
 				sc.writeCustom(key + i, new CustomOtpFastStringObject(value));
 			}

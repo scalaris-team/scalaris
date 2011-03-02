@@ -19,22 +19,22 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.Scalaris;
+import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the <tt>read</tt> methods of the
- * {@link Scalaris} class.
+ * {@link TransactionSingleOp} class.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
  * @since 2.0
  */
-public class ScalarisReadExample {
+public class TransactionSingleOpReadExample {
 	/**
 	 * Reads a key given on the command line with the <tt>read</tt> methods of
-	 * {@link Scalaris}.<br />
+	 * {@link TransactionSingleOp}.<br />
 	 * If no key is given, the default key <tt>"key"</tt> is used.
 	 * 
 	 * @param args
@@ -54,11 +54,11 @@ public class ScalarisReadExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue;
 
-		System.out.println("Reading values with the class `Scalaris`:");
+		System.out.println("Reading values with the class `TransactionSingleOp`:");
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			System.out
 					.println("    `OtpErlangObject readObject(OtpErlangString)`...");
 			otpValue = (OtpErlangString) sc.readObject(otpKey);
@@ -83,7 +83,7 @@ public class ScalarisReadExample {
 
 		try {
 			System.out.println("  creating object...");
-			Scalaris sc = new Scalaris();
+			TransactionSingleOp sc = new TransactionSingleOp();
 			System.out.println("    `String read(String)`...");
 			value = sc.read(key);
 			System.out.println("      read(" + key + ") == " + value);

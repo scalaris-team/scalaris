@@ -1927,17 +1927,18 @@ documentation:
 The documentation can then be found in \code{java-api/doc/index.html}
 (javadoc) and\\ \code{java-api/doc-doxygen/html/index.html} (doxygen).
 
-We provide two kinds of APIs:
+The API is divided into four classes:
 
 \begin{itemize}
-\item high-level access with \code{de.zib.scalaris.Scalaris}
-\item low-level access with \code{de.zib.scalaris.Transaction}
+\item \code{de.zib.scalaris.Transaction} for (multiple) operations inside a
+       transaction
+\item \code{de.zib.scalaris.TransactionSingleOp} for single transactional
+       operations
+\item \code{de.zib.scalaris.ReplicatedDHT} for non-transactional (inconsistent)
+       access to the replicated DHT items, e.g. deleting items
+\item \code{de.zib.scalaris.PubSub} for topic-based publish/subscribe
+       operations
 \end{itemize}
-
-The former provides general functions for reading, writing and deleting
-single key-value pairs and an API for the built-in PubSub-service. The
-latter allows the user to write custom transactions which can modify an
-arbitrary number of key-value pairs within one transaction.
 
 \bibliographystyle{plainnat}
 

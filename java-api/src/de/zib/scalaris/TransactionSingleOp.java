@@ -35,8 +35,8 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * 
  * <p>
  * Instances of this class can be generated using a given connection to a
- * scalaris node using {@link #Scalaris(Connection)} or without a
- * connection ({@link #Scalaris()}) in which case a new connection is
+ * scalaris node using {@link #TransactionSingleOp(Connection)} or without a
+ * connection ({@link #TransactionSingleOp()}) in which case a new connection is
  * created using {@link ConnectionFactory#createConnection()}.
  * </p>
  * 
@@ -63,13 +63,13 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   String key;
  *   OtpErlangString otpKey;
  *   
- *   Scalaris sc = new Scalaris();
+ *   TransactionSingleOp sc = new TransactionSingleOp();
  *   String value             = sc.read(key);          // {@link #read(String)}
  *   OtpErlangObject optValue = sc.readObject(otpKey); // {@link #readObject(OtpErlangString)}
  * </code>
  * </pre>
  * 
- * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisReadExample}</p>
+ * <p>For the full example, see {@link de.zib.scalaris.examples.TransactionSingleOpReadExample}</p>
  * 
  * <h3>Writing values</h3>
  * <pre>
@@ -79,13 +79,13 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpKey;
  *   OtpErlangString otpValue;
  *   
- *   Scalaris sc = new Scalaris();
+ *   TransactionSingleOp sc = new TransactionSingleOp();
  *   sc.write(key, value);             // {@link #write(String, String)}
  *   sc.writeObject(otpKey, otpValue); // {@link #writeObject(OtpErlangString, OtpErlangObject)}
  * </code>
  * </pre>
  * 
- * <p>For the full example, see {@link de.zib.scalaris.examples.ScalarisWriteExample}</p>
+ * <p>For the full example, see {@link de.zib.scalaris.examples.TransactionSingleOpWriteExample}</p>
  * 
  * <h3>Connection errors</h3>
  * 
@@ -100,9 +100,9 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * @version 2.6
  * @since 2.0
  */
-public class Scalaris {
+public class TransactionSingleOp {
 	/**
-	 * Connection to a Scalaris node.
+	 * Connection to a TransactionSingleOp node.
 	 */
 	private Connection connection;
 	
@@ -113,7 +113,7 @@ public class Scalaris {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	public Scalaris() throws ConnectionException {
+	public TransactionSingleOp() throws ConnectionException {
 		connection = ConnectionFactory.getInstance().createConnection();
 	}
 
@@ -126,7 +126,7 @@ public class Scalaris {
 	 * @throws ConnectionException
 	 *             if the connection fails
 	 */
-	public Scalaris(Connection conn) throws ConnectionException {
+	public TransactionSingleOp(Connection conn) throws ConnectionException {
 		connection = conn;
 	}
 	
