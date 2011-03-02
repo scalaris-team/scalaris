@@ -108,7 +108,7 @@ encode(L) when is_list(L) ->
     case is_string(L) of
 	yes -> encode_string(L);
 	unicode -> encode_string(xmerl_ucs:to_utf8(L));
-	no -> exit({json_encode, {not_string, L}})
+	no -> encode({array, L})
     end;
 encode({array, Props}) when is_list(Props) -> encode_array(Props);
 encode({struct, Props} = T) when is_list(Props) -> encode_object(T);
