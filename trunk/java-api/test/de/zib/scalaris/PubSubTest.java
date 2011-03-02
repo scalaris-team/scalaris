@@ -23,6 +23,8 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
+import java.net.Inet4Address;
+import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +39,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.Test;
 
@@ -52,7 +55,7 @@ import com.ericsson.otp.erlang.OtpErlangString;
  */
 public class PubSubTest {
 	/**
-	 * First port to use for jetty servers (subsequent servers will use
+	 * First port to try to use for jetty servers (subsequent servers will use
 	 * subsequent port numbers).
 	 */
 	private final static int startPort = 8081;
@@ -79,10 +82,6 @@ public class PubSubTest {
 		"sai2aiTa", "ohKi9rie", "ei2ioChu", "aaNgah9y", "ooJai1Ie", "shoh0oH9", "Ool4Ahya", "poh0IeYa", 
 		"Uquoo0Il", "eiGh4Oop", "ooMa0ufe", "zee6Zooc", "ohhao4Ah", "Uweekek5", "aePoos9I", "eiJ9noor", 
 		"phoong1E", "ianieL2h", "An7ohs4T", "Eiwoeku3", "sheiS3ao", "nei5Thiw", "uL5iewai", "ohFoh9Ae"};
-
-	private HashMap<String, Vector<String>> notifications_server1;
-	private HashMap<String, Vector<String>> notifications_server2;
-	private HashMap<String, Vector<String>> notifications_server3;
 	
 	/**
 	 * wait that long for notifications to arrive
@@ -1132,6 +1131,60 @@ public class PubSubTest {
 	// unsubscribe() test methods end
 	
 	/**
+	 * Finds the first available port starting at startPort.
+	 * 
+	 * @param startPort  the first port to try
+	 */
+    private int firstAvailablePort(int startPort) {
+        do {
+            ServerSocket socket = null;
+            try {
+                socket = new ServerSocket(startPort, 0,
+                        Inet4Address.getByAddress(
+                                "localhost", new byte[] { 127, 0, 0, 1 }));
+                socket.setReuseAddress(true);
+                return startPort;
+            } catch (IOException e) {
+            } finally {
+                if (socket != null) {
+                    try {
+                        socket.close();
+                    } catch (IOException e) {
+                        /* should not be thrown */
+                    }
+                }
+            }
+            ++startPort;
+        } while (true);
+	}
+	
+	/**
+	 * Creates a new subscription server and tries to start it at {@link #startPort}.
+     * 
+     * @param startPort  the first port to try
+	 */
+    private Server newSubscriptionServer(int startPort)
+            throws Exception {
+        do {
+            Server server = new Server();
+            SelectChannelConnector connector = new SelectChannelConnector();
+            connector.setHost("127.0.0.1");
+            // note: checking for available ports here eliminates unnecessary warnings by jetty
+            connector.setPort(firstAvailablePort(startPort));
+            server.addConnector(connector);
+            server.setHandler(new SubscriptionHandler());
+            try {
+                server.start();
+                return server;
+            } catch (java.net.BindException e) {
+                // although we already checked for port availability, it may
+                // now be inavailable again -> try the next port
+                ++startPort;
+            }
+        } while (true);
+    }
+	
+	/**
 	 * Test method for the publish/subscribe system.
 	 * Single server, subscription to one topic, multiple publishs.
 	 * 
@@ -1141,20 +1194,18 @@ public class PubSubTest {
 	public void testSubscription1() throws Exception {
 		String topic = testTime + "_Subscription1";
 		PubSub conn = new PubSub();
-		notifications_server1 = new HashMap<String, Vector<String>>();
-		Server server1 = new Server(startPort);
+		Server server1 = newSubscriptionServer(startPort);
 
 		try {
-			server1.setHandler(new SubscriptionHandler(notifications_server1));
-			server1.start();
-			
-			conn.subscribe(topic, "http://127.0.0.1:" + startPort);
+			conn.subscribe(topic, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
 			
 			for (int i = 0; i < testData.length; ++i) {
 				conn.publish(topic, testData[i]);
 			}
 			
-			// wait max 'notifications_timeout' seconds for notifications:
+            // wait max 'notifications_timeout' seconds for notifications:
+            Map<String, Vector<String>> notifications_server1 =
+                ((SubscriptionHandler) server1.getHandler()).notifications;
 			for (int i = 0; i < notifications_timeout
 					&& (notifications_server1.get(topic) == null ||
 						notifications_server1.get(topic).size() < testData.length); ++i) {
@@ -1176,7 +1227,7 @@ public class PubSubTest {
 			}
 			
 		} finally {
-			server1.stop();
+            server1.stop();
 			conn.closeConnection();
 		}
 	}
@@ -1191,30 +1242,26 @@ public class PubSubTest {
 	public void testSubscription2() throws Exception {
 		String topic = testTime + "_Subscription2";
 		PubSub conn = new PubSub();
-		notifications_server1 = new HashMap<String, Vector<String>>();
-		notifications_server2 = new HashMap<String, Vector<String>>();
-		notifications_server3 = new HashMap<String, Vector<String>>();
-		Server server1 = new Server(startPort);
-		Server server2 = new Server(startPort + 1);
-		Server server3 = new Server(startPort + 2);
+		Server server1 = newSubscriptionServer(startPort);
+		Server server2 = newSubscriptionServer(startPort + 1);
+		Server server3 = newSubscriptionServer(startPort + 2);
 
 		try {
-			server1.setHandler(new SubscriptionHandler(notifications_server1));
-			server1.start();
-			server2.setHandler(new SubscriptionHandler(notifications_server2));
-			server2.start();
-			server3.setHandler(new SubscriptionHandler(notifications_server3));
-			server3.start();
-			
-			conn.subscribe(topic, "http://127.0.0.1:" + startPort);
-			conn.subscribe(topic, "http://127.0.0.1:" + (startPort + 1));
-			conn.subscribe(topic, "http://127.0.0.1:" + (startPort + 2));
+			conn.subscribe(topic, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
+			conn.subscribe(topic, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
+			conn.subscribe(topic, "http://127.0.0.1:" + server3.getConnectors()[0].getPort());
 			
 			for (int i = 0; i < testData.length; ++i) {
 				conn.publish(topic, testData[i]);
 			}
 			
 			// wait max 'notifications_timeout' seconds for notifications:
+            Map<String, Vector<String>> notifications_server1 =
+                ((SubscriptionHandler) server1.getHandler()).notifications;
+            Map<String, Vector<String>> notifications_server2 =
+                ((SubscriptionHandler) server2.getHandler()).notifications;
+            Map<String, Vector<String>> notifications_server3 =
+                ((SubscriptionHandler) server3.getHandler()).notifications;
 			for (int i = 0; i < notifications_timeout
 					&& (notifications_server1.get(topic) == null || 
 						notifications_server1.get(topic).size() < testData.length ||
@@ -1288,24 +1335,14 @@ public class PubSubTest {
 		String topic2 = testTime + "_Subscription3_2";
 		String topic3 = testTime + "_Subscription3_3";
 		PubSub conn = new PubSub();
-		notifications_server1 = new HashMap<String, Vector<String>>();
-		notifications_server2 = new HashMap<String, Vector<String>>();
-		notifications_server3 = new HashMap<String, Vector<String>>();
-		Server server1 = new Server(startPort);
-		Server server2 = new Server(startPort + 1);
-		Server server3 = new Server(startPort + 2);
+        Server server1 = newSubscriptionServer(startPort);
+        Server server2 = newSubscriptionServer(startPort + 1);
+        Server server3 = newSubscriptionServer(startPort + 2);
 
 		try {
-			server1.setHandler(new SubscriptionHandler(notifications_server1));
-			server1.start();
-			server2.setHandler(new SubscriptionHandler(notifications_server2));
-			server2.start();
-			server3.setHandler(new SubscriptionHandler(notifications_server3));
-			server3.start();
-			
-			conn.subscribe(topic1, "http://127.0.0.1:" + startPort);
-			conn.subscribe(topic2, "http://127.0.0.1:" + (startPort + 1));
-			conn.subscribe(topic3, "http://127.0.0.1:" + (startPort + 2));
+            conn.subscribe(topic1, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
+            conn.subscribe(topic2, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
+            conn.subscribe(topic3, "http://127.0.0.1:" + server3.getConnectors()[0].getPort());
 			
 			int topic1_elements = 0;
 			int topic3_elements = 0;
@@ -1326,6 +1363,12 @@ public class PubSubTest {
 			}
 			
 			// wait max 'notifications_timeout' seconds for notifications:
+            Map<String, Vector<String>> notifications_server1 =
+                ((SubscriptionHandler) server1.getHandler()).notifications;
+            Map<String, Vector<String>> notifications_server2 =
+                ((SubscriptionHandler) server2.getHandler()).notifications;
+            Map<String, Vector<String>> notifications_server3 =
+                ((SubscriptionHandler) server3.getHandler()).notifications;
 			for (int i = 0; i < notifications_timeout
 					&& (notifications_server1.get(topic1) == null || 
 						notifications_server1.get(topic1).size() < topic1_elements ||
@@ -1400,25 +1443,15 @@ public class PubSubTest {
 		String topic2 = testTime + "_Subscription4_2";
 		String topic3 = testTime + "_Subscription4_3";
 		PubSub conn = new PubSub();
-		notifications_server1 = new HashMap<String, Vector<String>>();
-		notifications_server2 = new HashMap<String, Vector<String>>();
-		notifications_server3 = new HashMap<String, Vector<String>>();
-		Server server1 = new Server(startPort);
-		Server server2 = new Server(startPort + 1);
-		Server server3 = new Server(startPort + 2);
+        Server server1 = newSubscriptionServer(startPort);
+        Server server2 = newSubscriptionServer(startPort + 1);
+        Server server3 = newSubscriptionServer(startPort + 2);
 
 		try {
-			server1.setHandler(new SubscriptionHandler(notifications_server1));
-			server1.start();
-			server2.setHandler(new SubscriptionHandler(notifications_server2));
-			server2.start();
-			server3.setHandler(new SubscriptionHandler(notifications_server3));
-			server3.start();
-			
-			conn.subscribe(topic1, "http://127.0.0.1:" + startPort);
-			conn.subscribe(topic2, "http://127.0.0.1:" + (startPort + 1));
-			conn.subscribe(topic3, "http://127.0.0.1:" + (startPort + 2));
-			conn.unsubscribe(topic2, "http://127.0.0.1:" + (startPort + 1));
+            conn.subscribe(topic1, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
+            conn.subscribe(topic2, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
+            conn.subscribe(topic3, "http://127.0.0.1:" + server3.getConnectors()[0].getPort());
+            conn.unsubscribe(topic2, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
 			
 			int topic1_elements = 0;
 			int topic3_elements = 0;
@@ -1439,6 +1472,12 @@ public class PubSubTest {
 			}
 			
 			// wait max 'notifications_timeout' seconds for notifications:
+            Map<String, Vector<String>> notifications_server1 =
+                ((SubscriptionHandler) server1.getHandler()).notifications;
+            Map<String, Vector<String>> notifications_server2 =
+                ((SubscriptionHandler) server2.getHandler()).notifications;
+            Map<String, Vector<String>> notifications_server3 =
+                ((SubscriptionHandler) server3.getHandler()).notifications;
 			for (int i = 0; i < notifications_timeout
 					&& (notifications_server1.get(topic1) == null || 
 						notifications_server1.get(topic1).size() < topic1_elements ||
@@ -1492,10 +1531,9 @@ public class PubSubTest {
 	}
 	
 	private static class SubscriptionHandler extends AbstractHandler {
-		public Map<String, Vector<String>> notifications;
+		public Map<String, Vector<String>> notifications = new HashMap<String, Vector<String>>();
 		
-		public SubscriptionHandler(Map<String, Vector<String>> notifications) {
-			this.notifications = notifications;
+		public SubscriptionHandler() {
 		}
 
 		private String[] getParametersFromJSON(Reader reader)
