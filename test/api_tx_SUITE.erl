@@ -65,6 +65,14 @@ req_list_2(_Config) ->
                                     [{read, "non-existing"}, {commit}]),
                     {_TLog, [_ReadRes = {fail, not_found},
                              _CommitRes = {ok}]}), %% or {fail, abort}?
+    %% read non-existing item and write to that item afterwards
+    ?equals_pattern(api_tx:req_list(EmptyTLog,
+                                    [{read, "non-existing1"},
+                                     {write, "non-existing1", "value"},
+                                     {commit}]),
+                    {_TLog, [_ReadRes = {fail, not_found},
+                             _WriteRes = {ok},
+                             _CommitRes = {ok}]}), %% or {fail, abort}?
     %% exec more complex transaction with repeated requests
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{read, "B"}, {read, "B"},

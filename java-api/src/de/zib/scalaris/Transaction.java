@@ -84,19 +84,6 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * {@link de.zib.scalaris.examples.TransactionReadWriteExample}.
  * </p>
  * 
- * <h3>Attention:</h3>
- * <p>
- * If a read or write operation fails within a transaction all subsequent
- * operations on that key will fail as well. This behaviour may particularly be
- * undesirable if a read operation just checks whether a value already exists or
- * not. To overcome this situation, call {@link #revertLastOp()} immediately
- * after the failed operation which restores the state as it was before that
- * operation.<br />
- * The {@link de.zib.scalaris.examples.TransactionReadWriteExample} example
- * shows such a use case.<br />
- * Alternatively, use {@link Scalaris#read(String)} and alike for such checks
- * </p>
- * 
  * <h3>Connection errors</h3>
  * 
  * Errors when setting up connections or trying to send/receive RPCs will be
@@ -115,13 +102,6 @@ public class Transaction {
 	 * erlang transaction log
 	 */
 	private OtpErlangObject transLog = null;
-	
-	/**
-	 * erlang transaction log before the last operation
-	 * 
-	 * @see #revertLastOp()
-	 */
-	private OtpErlangObject transLog_old = null;
 	
 	private OtpErlangList lastResult = null;
 
@@ -161,7 +141,6 @@ public class Transaction {
 	 */
 	public void reset() {
 		transLog = null;
-		transLog_old = null;
 	}
 	
 	/**
@@ -177,7 +156,7 @@ public class Transaction {
 	 */
 	public void start() throws ConnectionException,
 			TransactionNotFinishedException {
-		if (transLog != null || transLog_old != null) {
+		if (transLog != null) {
 			throw new TransactionNotFinishedException();
 		}
 		OtpErlangObject received_raw = null;
@@ -236,7 +215,6 @@ public class Transaction {
             received_raw = connection.doRPC("api_tx", "req_list",
                     new OtpErlangList(new OtpErlangObject[] {transLog, req}));
             OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            transLog_old = transLog;
             transLog = received.elementAt(0);
             lastResult = (OtpErlangList) received.elementAt(1);
             
@@ -536,29 +514,6 @@ public class Transaction {
 	public void writeCustom(String key, CustomOtpObject<?> value)
 			throws ConnectionException, TimeoutException, UnknownException {
 		writeObject(new OtpErlangString(key), value.getOtpValue());
-	}
-
-	/**
-	 * Reverts the last (read, parallelRead or write) operation by restoring the
-	 * last state.
-	 * 
-	 * If there was no operation or the last operation was already
-	 * reverted, this method does nothing.
-	 * 
-	 * <p>
-	 * This method is especially useful if after an unsuccessful read a value
-	 * with the same key should be written which is not possible if the failed
-	 * read is still in the transaction's log.
-	 * </p>
-	 * <p>
-	 * NOTE: This method works only ONCE! Subsequent calls will do nothing.
-	 * </p>
-	 */
-	public void revertLastOp() {
-		if (transLog_old != null) {
-			transLog = transLog_old;
-			transLog_old = null;
-		}
 	}
 
     /**

@@ -490,6 +490,39 @@ public class TransactionTest {
 		}
 	}
 
+    /**
+     * Test method for {@link Transaction#read(String)} and
+     * {@link Transaction#write(String, String)} which should show that
+     * writing a value for a key for which a previous read returned a
+     * NotFoundException is possible.
+     * 
+     * @throws TransactionNotFinishedException
+     * @throws UnknownException
+     * @throws ConnectionException
+     * @throws TimeoutException
+     * @throws NotFoundException
+     */
+    @Test
+    public void testWrite_NotFound() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
+        String key = "_Write_notFound";
+        Transaction t = new Transaction();
+        try {
+            boolean notFound = false;
+            t.start();
+            try {
+                t.read(testTime + key);
+            } catch (NotFoundException e) {
+                notFound = true;
+            }
+            assertTrue(notFound);
+            t.write(testTime + key, testData[0]);
+            
+            assertEquals(testData[0], t.read(testTime + key));
+        } finally {
+            t.closeConnection();
+        }
+    }
+
 	/**
 	 * Test method for {@link Transaction#write(String, String)} and
 	 * {@link Transaction#read(String)}.
@@ -583,6 +616,41 @@ public class TransactionTest {
 		}
 	}
 
+    /**
+     * Test method for {@link Transaction#readObject(OtpErlangString)} and
+     * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} which
+     * should show that writing a value for a key for which a previous read
+     * returned a NotFoundException is possible.
+     * 
+     * @throws TransactionNotFinishedException
+     * @throws UnknownException
+     * @throws ConnectionException
+     * @throws TimeoutException
+     * @throws NotFoundException
+     */
+    @Test
+    public void testWriteObject_NotFound() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
+        String key = "_WriteObject_notFound";
+        Transaction t = new Transaction();
+        try {
+            boolean notFound = false;
+            t.start();
+            try {
+                t.readObject(new OtpErlangString(testTime + key));
+            } catch (NotFoundException e) {
+                notFound = true;
+            }
+            assertTrue(notFound);
+            t.writeObject(
+                    new OtpErlangString(testTime + key),
+                    new OtpErlangString(testData[0]));
+            
+            assertEquals(testData[0], t.read(testTime + key));
+        } finally {
+            t.closeConnection();
+        }
+    }
+
 	/**
 	 * Test method for
 	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} and
@@ -639,197 +707,6 @@ public class TransactionTest {
 
 				assertEquals(expected, actual);
 			}
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#revertLastOp()} which tries to revert
-	 * an operation without starting a transaction.
-	 * 
-	 * @throws TransactionNotFinishedException
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 * @throws TimeoutException
-	 * @throws NotFoundException
-	 */
-	@Test
-	public void testRevertLastOp_NotStarted() throws ConnectionException,
-			UnknownException, TransactionNotFinishedException,
-			TimeoutException, NotFoundException {
-		Transaction t = new Transaction();
-		try {
-			t.revertLastOp();
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#revertLastOp()} with a closed
-	 * connection.
-	 * 
-	 * @throws UnknownException
-	 * @throws TimeoutException
-	 * @throws ConnectionException
-	 * @throws NotFoundException
-	 * @throws TransactionNotFinishedException 
-	 */
-	@Test
-	public void testRevertLastOp_NotConnected() throws ConnectionException,
-			TimeoutException, UnknownException, NotFoundException,
-			TransactionNotFinishedException {
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			t.closeConnection();
-			t.revertLastOp();
-		} finally {
-			t.closeConnection();
-		}
-	}
-	
-	/**
-	 * Test method for {@link Transaction#revertLastOp()},
-	 * {@link Transaction#write(String, String)} and
-	 * {@link Transaction#read(String)} which overwrites to a single key
-	 * twice after an initial write and tries to revert the last write. A
-	 * final read verifies that the old value was restored.
-	 * 
-	 * @throws TransactionNotFinishedException
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 * @throws TimeoutException
-	 * @throws NotFoundException
-	 */
-	@Test
-	public void testRevertLastOp1() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			t.write(testTime + "_RevertLastOp1", testData[0]);
-			t.write(testTime + "_RevertLastOp1", testData[1]);
-			t.write(testTime + "_RevertLastOp1", testData[2]);
-			t.revertLastOp();
-			
-			assertEquals(testData[1], t.read(testTime + "_RevertLastOp1"));
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#revertLastOp()},
-	 * {@link Transaction#write(String, String)} and
-	 * {@link Transaction#read(String)} which overwrites to a single key
-	 * twice after an initial write and tries to revert the last two write
-	 * operations. A final read verifies that only the last write was reverted.
-	 * 
-	 * @throws TransactionNotFinishedException
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 * @throws TimeoutException
-	 * @throws NotFoundException
-	 */
-	@Test
-	public void testRevertLastOp2() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			t.write(testTime + "_RevertLastOp2", testData[0]);
-			t.write(testTime + "_RevertLastOp2", testData[1]);
-			t.write(testTime + "_RevertLastOp2", testData[2]);
-			t.revertLastOp();
-			t.revertLastOp();
-			
-			assertEquals(testData[1], t.read(testTime + "_RevertLastOp2"));
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#revertLastOp()},
-	 * {@link Transaction#write(String, String)} and
-	 * {@link Transaction#read(String)} which writes a value and tries to
-	 * revert this write operations. A final read verifies that the write
-	 * operation was reverted.
-	 * 
-	 * @throws TransactionNotFinishedException
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 * @throws TimeoutException
-	 * @throws NotFoundException
-	 */
-	@Test(expected=NotFoundException.class)
-	public void testRevertLastOp3() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			t.write(testTime + "_RevertLastOp3", testData[0]);
-			t.revertLastOp();
-			
-			assertEquals(testData[1], t.read(testTime + "_RevertLastOp3"));
-		} finally {
-			t.closeConnection();
-		}
-	}
-
-	/**
-	 * Test method for {@link Transaction#revertLastOp()},
-	 * {@link Transaction#write(String, String)} and
-	 * {@link Transaction#read(String)} which should show that
-	 * writing a value for a key for which a previous read returned a
-	 * NotFoundException is possible without reverting the last operation.
-	 * 
-	 * @throws TransactionNotFinishedException
-	 * @throws UnknownException
-	 * @throws ConnectionException
-	 * @throws TimeoutException
-	 * @throws NotFoundException
-	 */
-	@Test
-	public void testRevertLastOp4() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			try {
-				t.read(testTime + "_RevertLastOp4_notFound");
-			} catch (NotFoundException e) {
-			}
-			t.write(testTime + "_RevertLastOp4_notFound", testData[0]);
-			
-			assertEquals(testData[0], t.read(testTime + "_RevertLastOp4_notFound"));
-		} finally {
-			t.closeConnection();
-		}
-	}
-	
-	/**
-	 * Test method for {@link Transaction#revertLastOp()},
-	 * {@link Transaction#write(String, String)} and
-	 * {@link Transaction#read(String)}.
-	 * 
-	 * @throws TransactionNotFinishedException 
-	 * @throws UnknownException 
-	 * @throws ConnectionException 
-	 * @throws TimeoutException 
-	 * @throws NotFoundException 
-	 */
-	@Test
-	public void testRevertLastOp5() throws ConnectionException, UnknownException, TransactionNotFinishedException, TimeoutException, NotFoundException {
-		Transaction t = new Transaction();
-		try {
-			t.start();
-			try {
-				t.read(testTime + "_RevertLastOp5_notFound");
-			} catch (NotFoundException e) {
-			}
-			t.revertLastOp();
-			t.write(testTime + "_RevertLastOp5_notFound", testData[0]);
-			
-			assertEquals(testData[0], t.read(testTime + "_RevertLastOp5_notFound"));
 		} finally {
 			t.closeConnection();
 		}
