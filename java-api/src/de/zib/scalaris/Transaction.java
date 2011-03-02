@@ -66,7 +66,6 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   String result;
  *   
  *   Transaction t1 = new Transaction(); // {@link #Transaction()}
- *   t1.start();                         // {@link #start()}
  *   
  *   t1.write(key, value);             // {@link #write(String, String)}
  *   t1.writeObject(otpKey, otpValue); // {@link #writeObject(OtpErlangString, OtpErlangObject)}
@@ -142,40 +141,6 @@ public class Transaction {
 	public void reset() {
 		transLog = null;
 	}
-	
-	/**
-	 * Starts a new transaction by generating a new transaction log.
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TransactionNotFinishedException
-	 *             if an old transaction is not finished (via {@link #commit()}
-	 *             or {@link #abort()}) yet
-	 */
-	public void start() throws ConnectionException,
-			TransactionNotFinishedException {
-		if (transLog != null) {
-			throw new TransactionNotFinishedException();
-		}
-		OtpErlangObject received_raw = null;
-		try {
-			// return value: tx_tlog:tlog()
-            received_raw = connection.doRPC("api_tx", "new_tlog",
-                    new OtpErlangList());
-			transLog = received_raw;
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		}
-	}
 
     /**
      * Executes all requests in <code>req</code>.
@@ -203,17 +168,21 @@ public class Transaction {
     private List<OtpErlangObject> req_list(OtpErlangList req)
             throws ConnectionException, TimeoutException, NotFoundException,
             AbortException, UnknownException {
-        if (transLog == null) {
-            throw new TransactionNotStartedException();
-        }
         OtpErlangObject received_raw = null;
         try {
             /*
              * possible return values:
              *  {tx_tlog:tlog(), [{ok} | {ok, Value} | {fail, abort | timeout | not_found}]}
              */
-            received_raw = connection.doRPC("api_tx", "req_list",
-                    new OtpErlangList(new OtpErlangObject[] {transLog, req}));
+            if (transLog == null) {
+                received_raw = connection.doRPC("api_tx", "req_list",
+                        new OtpErlangList(new OtpErlangObject[] { req }));
+            } else {
+                received_raw = connection.doRPC("api_tx", "req_list",
+                        new OtpErlangList(
+                                new OtpErlangObject[] { transLog, req }));
+            }
+            
             OtpErlangTuple received = (OtpErlangTuple) received_raw;
             transLog = received.elementAt(0);
             lastResult = (OtpErlangList) received.elementAt(1);
@@ -269,7 +238,7 @@ public class Transaction {
 	 * <p>
 	 * The transaction's log is reset if the commit was successful, otherwise it
 	 * still retains in the transaction which must be successfully committed,
-	 * aborted or reset in order to be restarted.
+	 * aborted or reset in order to be (re-)used for another transaction.
 	 * </p>
 	 * 
 	 * @throws ConnectionException
@@ -290,9 +259,6 @@ public class Transaction {
 	 * @see #reset()
 	 */
 	public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
-		if (transLog == null) {
-			throw new TransactionNotStartedException();
-		}
 		try {
 			// not_found should never be returned by a commit
 		    OtpErlangList req = new OtpErlangList(CommonErlangObjects.commitTupleAtom);
@@ -343,9 +309,6 @@ public class Transaction {
     public OtpErlangObject readObject(OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
-		if (transLog == null) {
-			throw new TransactionNotStartedException();
-		}
         try {
             // abort should never be returned by a read
             OtpErlangList req =
@@ -447,9 +410,6 @@ public class Transaction {
 	 */
 	public void writeObject(OtpErlangString key, OtpErlangObject value)
 			throws ConnectionException, TimeoutException, UnknownException {
-		if (transLog == null) {
-			throw new TransactionNotStartedException();
-		}
         try {
             // abort and not_found should never be returned by a write
             OtpErlangList req =

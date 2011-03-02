@@ -22,7 +22,6 @@ import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
-import de.zib.scalaris.TransactionNotFinishedException;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -45,8 +44,6 @@ public class TransactionReadWriteExample {
 	 * 
 	 * <h3>Transaction 1:</h3>
 	 * <code style="white-space:pre;">
-	 *   start();
-	 *   
 	 *   write(key1, value1);
 	 *   write(key2, value2);
 	 *   
@@ -63,16 +60,13 @@ public class TransactionReadWriteExample {
 	 * 
 	 * <h3>Transaction 2:</h3>
 	 * <code style="white-space:pre;">
-	 *   start();
 	 *   write(key1, value1);
 	 *   commit();
 	 *   
-	 *   start();
 	 *   write(key1, "WRONG value");
 	 *   read(key1);
 	 *   abort();
 	 *   
-	 *   start();
 	 *   read(key1);
 	 *   commit();
 	 * </code>
@@ -111,8 +105,6 @@ public class TransactionReadWriteExample {
 	 * 
 	 * <p>
 	 * <code style="white-space:pre;">
-	 *   start();
-	 *   
 	 *   write(key1, value1);
 	 *   write(key2, value2);
 	 *   
@@ -154,7 +146,6 @@ public class TransactionReadWriteExample {
 
 			try {
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 				
 				otpWrite(transaction, key1, value1);
@@ -181,7 +172,6 @@ public class TransactionReadWriteExample {
 				System.out.println();
 
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 
 				write(transaction, key1, value1);
@@ -213,9 +203,6 @@ public class TransactionReadWriteExample {
 				System.out
 						.println("    Transaction aborted because elements were not found although they should exist: "
 								+ e.getMessage());
-			} catch (TransactionNotFinishedException e) {
-				// transaction.start()
-				System.out.println("failed: " + e.getMessage());
             } catch (AbortException e) {
                 System.out.println("    Transaction aborted during commit: "
                         + e.getMessage());
@@ -236,16 +223,13 @@ public class TransactionReadWriteExample {
 	 * 
 	 * <p>
 	 * <code style="white-space:pre;">
-	 *   start();
 	 *   write(key1, value1);
 	 *   commit();
 	 *   
-	 *   start();
 	 *   write(key1, "WRONG value");
 	 *   read(key1);
 	 *   abort();
 	 *   
-	 *   start();
 	 *   read(key1);
 	 *   commit();
 	 * </code>
@@ -273,7 +257,6 @@ public class TransactionReadWriteExample {
 
 			try {
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 				
 				otpWrite(transaction, key1, value1);
@@ -283,7 +266,6 @@ public class TransactionReadWriteExample {
 				System.out.println("done");
 
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 
 				otpWrite(transaction, key1, "WRONG value");
@@ -294,7 +276,6 @@ public class TransactionReadWriteExample {
 				System.out.println("done");
 
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 
 				otpRead(transaction, key1);
@@ -308,7 +289,6 @@ public class TransactionReadWriteExample {
 				System.out.println();
 
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 
 				write(transaction, key1, value1);
@@ -318,7 +298,6 @@ public class TransactionReadWriteExample {
 				System.out.println("done");
 
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 
 				write(transaction, key1, "WRONG value");
@@ -329,7 +308,6 @@ public class TransactionReadWriteExample {
 				System.out.println("done");
 
 				System.out.print("    Starting transaction... ");
-				transaction.start();
 				System.out.println("done");
 
 				read(transaction, key1);
@@ -349,9 +327,6 @@ public class TransactionReadWriteExample {
 				System.out
 						.println("    Transaction aborted because elements were not found although they should exist: "
 								+ e.getMessage());
-			} catch (TransactionNotFinishedException e) {
-				// transaction.start()
-				System.out.println("failed: " + e.getMessage());
             } catch (AbortException e) {
                 System.out.println("    Transaction aborted during commit: "
                         + e.getMessage());

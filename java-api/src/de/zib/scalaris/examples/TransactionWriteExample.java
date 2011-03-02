@@ -23,7 +23,6 @@ import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
-import de.zib.scalaris.TransactionNotFinishedException;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -83,7 +82,6 @@ public class TransactionWriteExample {
 			System.out.println("done");
 
 			System.out.print("    Starting transaction... ");
-			transaction.start();
 			System.out.println("done");
 
 			System.out
@@ -135,9 +133,6 @@ public class TransactionWriteExample {
 			transaction.commit();
 			System.out.println("done");
 		} catch (ConnectionException e) {
-			System.out.println("failed: " + e.getMessage());
-			return;
-		} catch (TransactionNotFinishedException e) {
 			System.out.println("failed: " + e.getMessage());
 			return;
         } catch (TimeoutException e) {

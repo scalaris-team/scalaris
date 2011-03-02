@@ -29,7 +29,7 @@
 
 %% Perform a chain of operations (passing a transaction log) and
 %% finally commit the transaction.
--export([new_tlog/0, req_list/2, read/2, write/3, commit/1]).
+-export([new_tlog/0, req_list/1, req_list/2, read/2, write/3, commit/1]).
 
 %% Perform single operation transactions.
 -export([read/1, write/2, test_and_set/3]).
@@ -53,6 +53,11 @@
 %% @doc Get an empty transaction log to start a new transaction.
 -spec new_tlog() -> tx_tlog:tlog().
 new_tlog() -> tx_tlog:empty().
+
+%% @doc Perform several requests starting a new transaction.
+-spec req_list([request()]) -> {tx_tlog:tlog(), [result()]}.
+req_list(ReqList) ->
+    req_list(new_tlog(), ReqList).
 
 %% @doc Perform several requests inside a transaction.
 -spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
