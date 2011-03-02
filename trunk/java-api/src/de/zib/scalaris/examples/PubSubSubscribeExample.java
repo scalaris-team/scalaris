@@ -17,6 +17,7 @@ package de.zib.scalaris.examples;
 
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.PubSub;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.TimeoutException;
@@ -74,9 +75,13 @@ public class PubSubSubscribeExample {
 			System.out.println("      subscribe(" + otpTopic.stringValue()
 					+ ", " + otpURL.stringValue() + ") failed: "
 					+ e.getMessage());
-		} catch (TimeoutException e) {
+        } catch (TimeoutException e) {
+            System.out.println("      subscribe(" + otpTopic.stringValue()
+                    + ", " + otpURL.stringValue() + ") failed with timeout: "
+                    + e.getMessage());
+		} catch (AbortException e) {
 			System.out.println("      subscribe(" + otpTopic.stringValue()
-					+ ", " + otpURL.stringValue() + ") failed with timeout: "
+					+ ", " + otpURL.stringValue() + ") failed with abort: "
 					+ e.getMessage());
 		} catch (UnknownException e) {
 			System.out.println("      subscribe(" + otpTopic.stringValue()
@@ -94,9 +99,12 @@ public class PubSubSubscribeExample {
 		} catch (ConnectionException e) {
 			System.out.println("      subscribe(" + topic + ", " + URL
 					+ ") failed: " + e.getMessage());
-		} catch (TimeoutException e) {
+        } catch (TimeoutException e) {
+            System.out.println("      subscribe(" + topic + ", " + URL
+                    + ") failed with timeout: " + e.getMessage());
+		} catch (AbortException e) {
 			System.out.println("      subscribe(" + topic + ", " + URL
-					+ ") failed with timeout: " + e.getMessage());
+					+ ") failed with abort: " + e.getMessage());
 		} catch (UnknownException e) {
 			System.out.println("      subscribe(" + topic + ", " + URL
 					+ ") failed with unknown: " + e.getMessage());
