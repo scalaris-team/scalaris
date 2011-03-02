@@ -217,7 +217,7 @@ public class Main {
 				}
 			}
 			try {
-				Scalaris sc = new Scalaris();
+				ReplicatedDHT sc = new ReplicatedDHT();
 				sc.delete(key, timeout);
 				DeleteResult deleteResult = sc.getLastDeleteResult();
 				System.out.println("delete(" + key + ", " + timeout + "): "

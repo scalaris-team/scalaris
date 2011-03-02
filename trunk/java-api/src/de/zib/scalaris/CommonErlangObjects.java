@@ -32,6 +32,7 @@ final class CommonErlangObjects {
     static final OtpErlangAtom abortAtom = new OtpErlangAtom("abort");
     static final OtpErlangAtom timeoutAtom = new OtpErlangAtom("timeout");
     static final OtpErlangAtom notFoundAtom = new OtpErlangAtom("not_found");
+    static final OtpErlangAtom nodeNotFoundAtom = new OtpErlangAtom("node_not_found");
     static final OtpErlangTuple okTupleAtom = new OtpErlangTuple(okAtom);
     static final OtpErlangTuple commitTupleAtom = new OtpErlangTuple(new OtpErlangAtom("commit"));
 }
