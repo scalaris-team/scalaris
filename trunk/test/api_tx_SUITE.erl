@@ -28,7 +28,8 @@ all()   -> [new_tlog_0,
             read_1,
             write_2,
             test_and_set_3,
-            conflicting_tx
+            conflicting_tx,
+            conflicting_tx2
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -168,6 +169,8 @@ write_2(_Config) ->
     ok.
 
 test_and_set_3(_Config) ->
+    ?equals(api_tx:test_and_set("test_and_set_3", "Value", "NextValue"), {fail, not_found}),
+    
     ?equals(api_tx:write("test_and_set_3", "Value"), {ok}),
 
     ?equals(api_tx:test_and_set("test_and_set_3", "Value", "NextValue"), {ok}),
@@ -216,4 +219,23 @@ conflicting_tx(_Config) ->
 
     %% Tx4: try to commit a read and succeed (no updates in the meantime)
     ?equals_pattern(api_tx:commit(Tx4TLog), {ok}),
+    ok.
+
+conflicting_tx2(_Config) ->
+    EmptyTLog = api_tx:new_tlog(),
+    
+    
+    %% read non-existing item
+    {TLog1a, [ReadRes1a]} =
+        api_tx:req_list(EmptyTLog, [{read, "conflicting_tx2_non-existing"}]),
+    ?equals(ReadRes1a, {fail, not_found}),
+    
+    api_tx:write("conflicting_tx2_non-existing", "Value"),
+    
+    ?equals_pattern(api_tx:req_list(TLog1a,
+                                    [{write, "conflicting_tx2_non-existing", "NewValue"},
+                                     {commit}]),
+                    {_TLog, [_WriteRes = {ok},
+                             _CommitRes = {fail, abort}]}), %% or {fail, abort}?
+    ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
     ok.

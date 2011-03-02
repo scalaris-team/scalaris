@@ -121,19 +121,19 @@ write(Key, Value) ->
     {_TLog, [_Res1, Res2]} = api_tx:req_list(tx_tlog:empty(), ReqList),
     Res2.
 
-%% @doc Atomically compare and swap a value for a key (not as part of a transaction).
--spec test_and_set(client_key(), client_value(), client_value())
-        -> commit_result() | {fail, {key_changed, client_value()}}.
+%% @doc Atomically compare and set a value for a key (not as part of a transaction).
+%%      If the value stored at Key is the same as OldValue, then NewValue will
+%%      be stored.
+-spec test_and_set(Key::client_key(), OldValue::client_value(), NewValue::client_value())
+        -> commit_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
 test_and_set(Key, OldValue, NewValue) ->
     ReadReqList = [{read, Key}],
     WriteReqList = [{write, Key, NewValue}, {commit}],
     {TLog, [Result]} = req_list(tx_tlog:empty(), ReadReqList),
     case Result of
-        {fail, timeout} -> {fail, timeout};
-        _ -> if (Result =:= {fail, not_found})
-                orelse (Result =:= {ok, OldValue}) ->
-                     {_TLog2, [_, Res2]} = req_list(TLog, WriteReqList),
-                     Res2;
-                true -> {fail, {key_changed, element(2,Result)}}
-             end
+        X = {fail, timeout} -> X;
+        Y = {fail, not_found} -> Y;
+        {ok, OldValue} -> {_TLog2, [_, Res2]} = req_list(TLog, WriteReqList),
+                          Res2;
+        {ok, RealOldValue} -> {fail, {key_changed, RealOldValue}}
     end.
