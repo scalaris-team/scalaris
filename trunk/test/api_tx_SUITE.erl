@@ -17,7 +17,6 @@
 -module(api_tx_SUITE).
 -author('schintke@zib.de').
 -vsn('$Id: api_tx.erl 1457 2011-02-28 15:08:00Z schintke $').
-
 -compile(export_all).
 -include("unittest.hrl").
 
@@ -185,12 +184,12 @@ conflicting_tx(_Config) ->
     {Tx2TLog, {ok, Bal2}} = api_tx:read(EmptyTLog, "Account A"),
     ?equals_pattern(
        api_tx:req_list(Tx2TLog, [{write, "Account A", Bal2 + 100}, {commit}]),
-       {_, [_WriteRes = {ok}, CommitRes = {ok}]}),
+       {_, [_WriteRes = {ok}, _CommitRes = {ok}]}),
     ct:pal("tx2 done~n"),
 
     %% Tx1 tries to increases it atomically and fails
     ?equals_pattern(
        api_tx:req_list(Tx1TLog, [{write, "Account A", Bal1 + 100}, {commit}]),
-       {_, [_WriteRes = {ok}, CommitRes = {fail, abort}]}),
+       {_, [_WriteRes = {ok}, _CommitRes = {fail, abort}]}),
 
     ok.

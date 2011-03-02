@@ -25,7 +25,7 @@ suite() -> [ {timetrap, {seconds, 1}} ].
 
 init_per_suite(Config) -> Config.
 
-end_per_suite(Config) -> ok.
+end_per_suite(_Config) -> ok.
 
 yaws_patch_applied(_Config) ->
     %% By default json:encode/1 rejects lists that are not strings.
