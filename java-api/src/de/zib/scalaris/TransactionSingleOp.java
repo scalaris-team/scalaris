@@ -97,7 +97,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * number of automatic retries is adjustable (default: 3).
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.6
+ * @version 2.7
  * @since 2.0
  */
 public class TransactionSingleOp {
@@ -265,36 +265,36 @@ public class TransactionSingleOp {
 		}
 	}
 
-	// /////////////////////////////
-	// write methods
-	// /////////////////////////////
+    // /////////////////////////////
+    // write methods
+    // /////////////////////////////
 
-	/**
-	 * Stores the given <tt>key</tt>/<tt>value</tt> pair.
-	 * 
-	 * @param key
-	 *            the key to store the value for
-	 * @param value
-	 *            the value to store
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to write the value
+    /**
+     * Stores the given <tt>key</tt>/<tt>value</tt> pair.
+     * 
+     * @param key
+     *            the key to store the value for
+     * @param value
+     *            the value to store
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit of the write failed
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 */
-	public void writeObject(OtpErlangString key, OtpErlangObject value)
-			throws ConnectionException, TimeoutException, AbortException, UnknownException {
-		OtpErlangObject received_raw = null;
-		try {
-			received_raw = connection.doRPC("api_tx", "write",
-					new OtpErlangList(new OtpErlangObject[] { key, value }));
-			OtpErlangTuple received = (OtpErlangTuple) received_raw;
+     * @throws UnknownException
+     *             if any other error occurs
+     */
+    public void writeObject(OtpErlangString key, OtpErlangObject value)
+            throws ConnectionException, TimeoutException, AbortException, UnknownException {
+        OtpErlangObject received_raw = null;
+        try {
+            received_raw = connection.doRPC("api_tx", "write",
+                    new OtpErlangList(new OtpErlangObject[] { key, value }));
+            OtpErlangTuple received = (OtpErlangTuple) received_raw;
             OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
 
             /*
@@ -315,75 +315,236 @@ public class TransactionSingleOp {
             } else {
                 throw new UnknownException(received_raw);
             }
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			// received_raw is not null since the first class cast is after the RPC!
-			throw new UnknownException(e, received_raw);
-		}
-	}
+        } catch (OtpErlangExit e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (OtpAuthException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (IOException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (ClassCastException e) {
+            // e.printStackTrace();
+            // received_raw is not null since the first class cast is after the RPC!
+            throw new UnknownException(e, received_raw);
+        }
+    }
 
-	/**
-	 * Stores the given <tt>key</tt>/<tt>value</tt> pair.
-	 * 
-	 * @param key
-	 *            the key to store the value for
-	 * @param value
-	 *            the value to store
-	 *
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to write the value
+    /**
+     * Stores the given <tt>key</tt>/<tt>value</tt> pair.
+     * 
+     * @param key
+     *            the key to store the value for
+     * @param value
+     *            the value to store
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit of the write failed
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 *
-	 * @see #writeObject(OtpErlangString, OtpErlangObject)
-	 */
-	public void write(String key, String value) throws ConnectionException,
-			TimeoutException, AbortException, UnknownException {
-		writeCustom(key, new CustomOtpStringObject(value));
-//		writeObject(new OtpErlangString(key), new OtpErlangString(value));
-	}
-	
-	/**
-	 * Stores the given <tt>key</tt>/<tt>value</tt> pair.
-	 * 
-	 * @param key
-	 *            the key to store the value for
-	 * @param value
-	 *            the value to store
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to write the value
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #writeObject(OtpErlangString, OtpErlangObject)
+     */
+    public void write(String key, String value) throws ConnectionException,
+            TimeoutException, AbortException, UnknownException {
+        writeCustom(key, new CustomOtpStringObject(value));
+//      writeObject(new OtpErlangString(key), new OtpErlangString(value));
+    }
+    
+    /**
+     * Stores the given <tt>key</tt>/<tt>value</tt> pair.
+     * 
+     * @param key
+     *            the key to store the value for
+     * @param value
+     *            the value to store
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit of the write failed
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 * 
-	 * @see #writeObject(OtpErlangString, OtpErlangObject)
-	 * @since 2.1
-	 */
-	public void writeCustom(String key, CustomOtpObject<?> value)
-			throws ConnectionException, TimeoutException, AbortException, UnknownException {
-		writeObject(new OtpErlangString(key), value.getOtpValue());
-	}
+     * @throws UnknownException
+     *             if any other error occurs
+     * 
+     * @see #writeObject(OtpErlangString, OtpErlangObject)
+     * @since 2.1
+     */
+    public void writeCustom(String key, CustomOtpObject<?> value)
+            throws ConnectionException, TimeoutException, AbortException, UnknownException {
+        writeObject(new OtpErlangString(key), value.getOtpValue());
+    }
+
+    // /////////////////////////////
+    // test and set
+    // /////////////////////////////
+
+    /**
+     * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
+     * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
+     * 
+     * @param key
+     *            the key to store the value for
+     * @param old_value
+     *            the old value to check
+     * @param new_value
+     *            the value to store
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws UnknownException
+     *             if any other error occurs
+     * @throws KeyChangedException
+     *             if the key did not match <tt>old_value</tt>
+     * 
+     * @since 2.7
+     */
+    public void testAndSetObject(OtpErlangString key,
+            OtpErlangObject old_value, OtpErlangObject new_value)
+            throws ConnectionException, TimeoutException, AbortException,
+            NotFoundException, KeyChangedException, UnknownException {
+        OtpErlangObject received_raw = null;
+        try {
+            received_raw = connection.doRPC("api_tx", "test_and_set",
+                    new OtpErlangList(new OtpErlangObject[] { key, old_value, new_value }));
+            OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
+
+            /*
+             * possible return values:
+             *  {ok} | {fail, timeout | abort | not_found | {key_changed, RealOldValue}
+             */
+            if (received.equals(CommonErlangObjects.okTupleAtom)) {
+                return;
+            } else if (state.equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
+                OtpErlangObject reason = received.elementAt(1);
+                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
+                    throw new TimeoutException(received_raw);
+                } else if (reason.equals(CommonErlangObjects.abortAtom)) {
+                    throw new AbortException(received_raw);
+                } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
+                    throw new NotFoundException(received_raw);
+                } else {
+                    OtpErlangTuple reason_tpl = (OtpErlangTuple) reason;
+                    if (reason_tpl.elementAt(0).equals(
+                            CommonErlangObjects.keyChangedAtom)
+                            && reason_tpl.arity() == 2) {
+                        throw new KeyChangedException(reason_tpl.elementAt(1));
+                    } else {
+                        throw new UnknownException(received_raw);
+                    }
+                }
+            } else {
+                throw new UnknownException(received_raw);
+            }
+        } catch (OtpErlangExit e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (OtpAuthException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (IOException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (ClassCastException e) {
+            // e.printStackTrace();
+            // received_raw is not null since the first class cast is after the RPC!
+            throw new UnknownException(e, received_raw);
+        }
+    }
+
+    /**
+     * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
+     * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
+     * 
+     * @param key
+     *            the key to store the value for
+     * @param old_value
+     *            the old value to check
+     * @param new_value
+     *            the value to store
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws KeyChangedException
+     *             if the key did not match <tt>old_value</tt>
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #writeObject(OtpErlangString, OtpErlangObject)
+     * @since 2.7
+     */
+    public void testAndSet(String key, String old_value, String new_value)
+            throws ConnectionException, TimeoutException, AbortException,
+            NotFoundException, KeyChangedException, UnknownException {
+        testAndSetCustom(key, new CustomOtpStringObject(old_value),
+                new CustomOtpStringObject(new_value));
+//        testAndSetObject(new OtpErlangString(key), new OtpErlangString(old_value),
+//                new OtpErlangString(new_value));
+    }
+    
+    /**
+     * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
+     * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
+     * 
+     * @param key
+     *            the key to store the value for
+     * @param old_value
+     *            the old value to check
+     * @param new_value
+     *            the value to store
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws KeyChangedException
+     *             if the key did not match <tt>old_value</tt>
+     * @throws UnknownException
+     *             if any other error occurs
+     * 
+     * @see #writeObject(OtpErlangString, OtpErlangObject)
+     * @since 2.7
+     */
+    public void testAndSetCustom(String key, CustomOtpObject<?> old_value,
+            CustomOtpObject<?> new_value) throws ConnectionException,
+            TimeoutException, AbortException, NotFoundException,
+            KeyChangedException, UnknownException {
+        testAndSetObject(new OtpErlangString(key), old_value.getOtpValue(),
+                new_value.getOtpValue());
+    }
 	
 	/**
 	 * Closes the transaction's connection to a scalaris node.
