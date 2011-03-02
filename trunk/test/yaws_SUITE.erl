@@ -13,10 +13,10 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
-%% @version $Id:$
+%% @version $Id$
 -module(yaws_SUITE).
 -author('schintke@zib.de').
--vsn('$Id:$').
+-vsn('$Id$').
 -compile(export_all).
 -include("unittest.hrl").
 

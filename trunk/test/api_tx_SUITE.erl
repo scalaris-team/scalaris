@@ -13,10 +13,10 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
-%% @version $Id: api_tx.erl 1457 2011-02-28 15:08:00Z schintke $
+%% @version $Id$
 -module(api_tx_SUITE).
 -author('schintke@zib.de').
--vsn('$Id: api_tx.erl 1457 2011-02-28 15:08:00Z schintke $').
+-vsn('$Id$').
 -compile(export_all).
 -include("unittest.hrl").
 
