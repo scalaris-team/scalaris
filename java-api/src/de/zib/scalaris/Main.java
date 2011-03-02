@@ -162,6 +162,8 @@ public class Main {
 				printException("subscribe failed with connection error", e, verbose);
 			} catch (TimeoutException e) {
 				printException("subscribe failed with timeout", e, verbose);
+            } catch (AbortException e) {
+                printException("write failed with abort", e, verbose);
 			} catch (UnknownException e) {
 				printException("subscribe failed with unknown", e, verbose);
 			}
@@ -180,6 +182,8 @@ public class Main {
 				printException("unsubscribe failed with timeout", e, verbose);
 			} catch (NotFoundException e) {
 				printException("unsubscribe failed with not found", e, verbose);
+            } catch (AbortException e) {
+                printException("write failed with abort", e, verbose);
 			} catch (UnknownException e) {
 				printException("unsubscribe failed with unknown", e, verbose);
 			}
