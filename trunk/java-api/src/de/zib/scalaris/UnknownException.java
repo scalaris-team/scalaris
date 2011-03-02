@@ -15,7 +15,6 @@
  */
 package de.zib.scalaris;
 
-import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
@@ -27,7 +26,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
  * @version 2.2
  * @since 2.0
  */
-public class UnknownException extends OtpErlangException {
+public class UnknownException extends RuntimeException {
 	/**
 	 * class version for serialisation
 	 */

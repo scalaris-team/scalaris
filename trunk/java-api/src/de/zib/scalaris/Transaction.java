@@ -251,6 +251,7 @@ public class Transaction {
                     // contains a value
                     result.add(result_i_tpl.elementAt(1));
                 } else if (result_i_state.equals(CommonErlangObjects.failAtom) && result_i_tpl.arity() == 2) {
+                    // transaction failed
                     OtpErlangObject reason = result_i_tpl.elementAt(1);
                     if (reason.equals(CommonErlangObjects.abortAtom)) {
                         abort();
@@ -263,7 +264,6 @@ public class Transaction {
                         throw new UnknownException(received_raw);
                     }
                 } else {
-                    // transaction failed
                     throw new UnknownException(received_raw);
                 }
             }
@@ -473,7 +473,7 @@ public class Transaction {
 			throw new TransactionNotStartedException();
 		}
         try {
-            // abort should never be returned by a read
+            // abort and not_found should never be returned by a write
             OtpErlangList req =
                 new OtpErlangList(
                         new OtpErlangTuple(
