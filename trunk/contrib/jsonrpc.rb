@@ -177,7 +177,6 @@ reql = Benchmark.realtime {
   end
 }
 
-
 puts "testing pub sub once more ..."
 def pubsub()
   subs = get_subscribers("Topic")
@@ -195,6 +194,9 @@ def pubsub()
 end
 
 pubsub()
+
+puts "testing range read once more (with pubsub data in the ring -- lists as values) ..."
+range_query()
 
 printf("              time[s]\t1/s\n")
 printf("nop          : %0.02f     %0.02f\n", nop, n/nop)
