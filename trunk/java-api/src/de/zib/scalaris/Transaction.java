@@ -133,15 +133,6 @@ public class Transaction {
 		connection = conn;
 	}
 
-	/**
-	 * Resets the transaction to its initial state.
-	 * 
-	 * This action is not reversible.
-	 */
-	public void reset() {
-		transLog = null;
-	}
-
     /**
      * Executes all requests in <code>req</code>.
      * 
@@ -254,9 +245,8 @@ public class Transaction {
      *             an unknown type/structure, this exception is thrown. Neither
      *             the transaction log nor the local operations buffer is
      *             emptied, so that the commit can be tried again.
-	 * 
-	 * @see #abort()
-	 * @see #reset()
+     * 
+     * @see #abort()
 	 */
 	public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
 		try {
@@ -264,7 +254,7 @@ public class Transaction {
 		    OtpErlangList req = new OtpErlangList(CommonErlangObjects.commitTupleAtom);
 		    req_list(req);
             // transaction was successful: reset transaction log
-            reset();
+	        transLog = null;
 		} catch (NotFoundException e) {
 			// e.printStackTrace();
 			throw new UnknownException(e);
@@ -281,10 +271,9 @@ public class Transaction {
 	 * </p>
 	 *
 	 * @see #commit()
-	 * @see #reset()
 	 */
 	public void abort() {
-		reset();
+        transLog = null;
 	}
 
 	/**
