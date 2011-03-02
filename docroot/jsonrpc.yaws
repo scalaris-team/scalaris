@@ -38,10 +38,10 @@ handler(delete, [Key]) ->
     case cs_api:delete(Key) of
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]};
-        {ok,NumOk,StateList} ->
+        {ok, NumOk, StateList} ->
             {struct, [{ok, NumOk},
                       {results,
-                       {array, [ atom_to_list(X) || X <- StateList]}
+                       {array, [ atom_to_list(X) || X <- StateList ]}
                       }
                      ]
             }
@@ -55,19 +55,19 @@ handler(req_list, [TLog, ReqList]) ->
 
 handler(publish, [Topic, Content]) ->
     case api_pubsub:publish(Topic, Content) of
-        ok -> "ok"
+        {ok} -> "ok"
     end;
 
 handler(subscribe, [Topic, URL]) ->
     case api_pubsub:subscribe(Topic, URL) of
-        ok -> "ok";
+        {ok} -> "ok";
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]}
     end;
 
 handler(unsubscribe, [Topic, URL]) ->
     case api_pubsub:unsubscribe(Topic, URL) of
-        ok -> "ok";
+        {ok} -> "ok";
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]}
     end;
@@ -90,5 +90,5 @@ data_to_json(Data) ->
     {array, [ {struct, [{key, Key},
                         {value, Value},
                         {version, Version}]} ||
-		{Key, Value, Version, WriteLock, ReadLock} <- Data]}.
+               {Key, Value, Version, WriteLock, ReadLock} <- Data]}.
 </erl>
