@@ -176,8 +176,11 @@ conflicting_tx(_Config) ->
     api_tx:write("Account A", 100),
 
     ct:pal("INIT done~n"),
-    %% Tx1 reads the balance and then sleeps a bit
+    %% Tx1: read the balance and later try to modify it
     {Tx1TLog, {ok, Bal1}} = api_tx:read(EmptyTLog, "Account A"),
+
+    %% Tx3: read the balance and later try to commit the read
+    {Tx3TLog, {ok, _Bal3}} = api_tx:read(EmptyTLog, "Account A"),
 
     ct:pal("tx2 start~n"),
     %% Tx2 reads the balance and increases it
@@ -192,4 +195,17 @@ conflicting_tx(_Config) ->
        api_tx:req_list(Tx1TLog, [{write, "Account A", Bal1 + 100}, {commit}]),
        {_, [_WriteRes = {ok}, _CommitRes = {fail, abort}]}),
 
+    %% Tx3: try to commit the read and fail (value changed in the meantime)
+    ?equals_pattern(api_tx:commit(Tx3TLog), {fail, abort}),
+
+    %% check that two reading transactions can coexist
+    %% Tx4: read the balance and later try to commit the read
+    {Tx4TLog, {ok, _Bal4}} = api_tx:read(EmptyTLog, "Account A"),
+
+    %% Tx5: read the balance and commit the read
+    {Tx5TLog, {ok, _Bal5}} = api_tx:read(EmptyTLog, "Account A"),
+    ?equals_pattern(api_tx:commit(Tx5TLog), {ok}),
+
+    %% Tx4: try to commit a read and succeed (no updates in the meantime)
+    ?equals_pattern(api_tx:commit(Tx4TLog), {ok}),
     ok.
