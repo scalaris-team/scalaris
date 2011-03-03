@@ -91,18 +91,18 @@ on({trigger}, {Queue, Subscriber, TriggerState}) ->
     {Queue, Subscriber, NewTriggerState};
 
 on({{pong}, Zombie}, {Queue, Subscriber, TriggerState}) ->
-    log:log(warn,"[ dn_cache ~p ] found zombie ~p", [comm:this(), Zombie]),
+    log:log(warn,"[ dn_cache ~p ] found zombie ~.0p", [comm:this(), Zombie]),
     NewQueue =
-        case node:is_valid(Zombie) of
+        case node:is_valid(Zombie) of % comm:mypid() or node:node_type()?
             true ->
                 gb_sets:fold(fun(X, _) ->
                                      comm:send_local(X, {zombie, Zombie})
-                             end, 0, Subscriber),
+                             end, ok, Subscriber),
                 fix_queue:remove(Zombie, Queue, fun node:same_process/2);
             _ ->
                 gb_sets:fold(fun(X, _) ->
                                      comm:send_local(X, {zombie_pid, Zombie})
-                             end, 0, Subscriber),
+                             end, ok, Subscriber),
                 fix_queue:remove(Zombie, Queue, fun erlang:'=:='/2)
     end,
     {NewQueue, Subscriber, TriggerState};
