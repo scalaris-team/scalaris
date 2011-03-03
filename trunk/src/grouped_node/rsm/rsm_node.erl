@@ -28,7 +28,7 @@
 
 -export([on/2, on_joining/2, init/1]).
 
--export([is_alive/1]).
+-export([is_alive/1, is_alive_no_join/1]).
 
 -type(message() :: any()).
 
@@ -161,6 +161,10 @@ is_alive(Pid) ->
         rsm_state:get_mode(gen_component:get_state(Pid)) =:= joined
     catch _:_ -> false
     end.
+
+-spec is_alive_no_join(Pid::pid()) -> boolean().
+is_alive_no_join(Pid) ->
+    is_alive(Pid).
 
 -spec send_all(rsm_state:rsm_pid_type(), any()) -> ok.
 send_all(RSMPid, Msg) when is_list(RSMPid) ->

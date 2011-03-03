@@ -35,7 +35,7 @@
 
 -export([on/2, on_joining/2, init/1]).
 
--export([is_alive/1, get_base_interval/0]).
+-export([is_alive/1, is_alive_no_join/1, get_base_interval/0]).
 
 -type(message() :: any()).
 
@@ -346,6 +346,10 @@ is_alive(Pid) ->
         group_state:get_mode(gen_component:get_state(Pid)) =:= joined
     catch _:_ -> false
     end.
+
+-spec is_alive_no_join(Pid::pid()) -> boolean().
+is_alive_no_join(Pid) ->
+    is_alive(Pid).
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
