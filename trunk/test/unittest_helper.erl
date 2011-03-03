@@ -378,7 +378,10 @@ get_processes() ->
                          FileName -> {file, FileName}
                      end;
                  {_, {gen_server, _, _}} ->
-                     sys:get_status(X);
+                     % may throw exit due to a killed process
+                     try sys:get_status(X)
+                     catch _:_ -> no_further_infos
+                     end;
                  _ -> no_further_infos
              end,
          {X, InitCall, CurFun, Info}
