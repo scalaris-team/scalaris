@@ -38,7 +38,8 @@ run_1() ->
     Worker = list_to_integer(os:getenv("WORKER")),
     Iterations = list_to_integer(os:getenv("ITERATIONS")),
     RingSize = list_to_integer(os:getenv("RING_SIZE")),
-    io:format("Start ~p Nodes with ~p Clients per VMs and ~p Iterations~n",[Size,Worker,Iterations]),
+    io:format("Start ~p Nodes with ~p Clients per VMs and ~p Iterations~n",
+              [Size, Worker, Iterations]),
     _ = admin:add_nodes(Size-1),
     timer:sleep(1000),
     check_ring_size(RingSize),
@@ -58,28 +59,19 @@ run_1() ->
 
 wait_for_stable_ring() ->
     R = admin:check_ring(),
-    
     case R of
-	ok ->
-	    ok;
-	_ ->
-	    timer:sleep(1000),
-            wait_for_stable_ring()
+        ok -> ok;
+        _  -> timer:sleep(1000),
+              wait_for_stable_ring()
     end.
 
 check_ring_size(Size) ->
     boot_server:number_of_nodes(),
-    RSize = receive
-        {get_list_length_response,L} ->
-            L
-    end,
-    
+    RSize = receive {get_list_length_response, L} -> L end,
     case (RSize =:= Size) of
-	true ->
-	    ok;
-	_ ->
-	    timer:sleep(1000),
-	    check_ring_size(Size)
+        true -> ok;
+        _    -> timer:sleep(1000),
+                check_ring_size(Size)
     end.
 
 %% @doc the interval between two finger/pointer stabilization runs
