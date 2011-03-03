@@ -1343,10 +1343,9 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
                     % (this message should not have been received anyway!)
                     ErrorMsg = io_lib:format("~.0p received for a slide with ~s, but only expected for slides with~s~n",
                                              [MoveMsgTag, PredOrSucc, PredOrSuccExp]),
-                    NewState = abort_slide(State, SlideOp, {protocol_error, ErrorMsg}, false),
                     log:log(warn, "[ dht_node_move ~.0p ] ~.0p received for a slide with my ~s, but only expected for slides with ~s~n"
                                       "(operation: ~.0p)~n", [comm:this(), MoveMsgTag, PredOrSucc, PredOrSuccExp, SlideOp]),
-                    NewState
+                    abort_slide(State, SlideOp, {protocol_error, ErrorMsg}, false)
             end;
         not_found when MoveMsgTag =:= rm_new_pred ->
             % ignore (local) rm_new_pred messages arriving too late
@@ -1376,13 +1375,12 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
         {wrong_neighbor, PredOrSucc, SlideOp} -> % wrong pred or succ
             case lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
                 true ->
-                    NewState = abort_slide(State, SlideOp, wrong_pred_succ_node, true),
                     log:log(warn,"[ dht_node_move ~.0p ] ~.0p received but ~s "
                            "changed during move (ID: ~.0p, node(slide): ~.0p, new_~s: ~.0p)~n",
                             [comm:this(), MoveMsgTag, PredOrSucc, MoveFullId,
                              slide_op:get_node(SlideOp),
                              PredOrSucc, dht_node_state:get(State, PredOrSucc)]),
-                    NewState;
+                    abort_slide(State, SlideOp, wrong_pred_succ_node, true);
                 _ -> State
             end
     end.
