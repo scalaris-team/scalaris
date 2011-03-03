@@ -342,7 +342,10 @@ trigger_known_nodes() ->
 
 -spec is_alive(pid()) -> boolean().
 is_alive(Pid) ->
-    group_state:get_mode(gen_component:get_state(Pid)) =:= joined.
+    try
+        group_state:get_mode(gen_component:get_state(Pid)) =:= joined
+    catch _:_ -> false
+    end.
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->

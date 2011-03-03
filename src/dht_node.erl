@@ -471,4 +471,5 @@ is_first(Options) ->
 
 -spec is_alive(Pid::pid()) -> boolean().
 is_alive(Pid) ->
-    element(1, gen_component:get_state(Pid)) =:= state.
+    State = gen_component:get_state(Pid),
+    erlang:is_tuple(State) andalso element(1, State) =:= state.
