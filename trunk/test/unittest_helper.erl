@@ -421,18 +421,21 @@ end_per_suite(Config) ->
     kill_new_processes(OldProcesses),
     Config.
 
--spec get_ring_data() -> [{{intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, ?DB:db_as_list(), ok | timeout}].
+-spec get_ring_data() -> [{pid(), {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, ?DB:db_as_list(), ok | timeout}].
 get_ring_data() ->
     DHTNodes = pid_groups:find_all(dht_node),
     lists:sort(
+      fun(E1, E2) ->
+              erlang:element(2, E1) =< erlang:element(2, E2)
+      end,
       [begin
            comm:send_local(DhtNode,
                            {unittest_get_bounds_and_data, comm:this()}),
-           % note: no timeout possible - can not leave messages in queue!
            receive
                {unittest_get_bounds_and_data_response, Bounds, Data} ->
-                   {Bounds, Data, ok}
-%%            after 500 -> {empty, [], timeout}
+                   {DhtNode, Bounds, Data, ok}
+           % note: no timeout possible - can not leave messages in queue!
+%%            after 500 -> {DhtNode, empty, [], timeout}
            end
        end || DhtNode <- DHTNodes]).
 
