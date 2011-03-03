@@ -86,35 +86,54 @@ runnable(Pid) ->
         true -> true
     end.
 
--spec get_state(Pid::pid()) -> term().
+-spec receive_state_if_alive(Pid::pid(),
+        MsgTag::get_state_response | get_component_state_response)
+            -> term() | failed.
+receive_state_if_alive(Pid, MsgTag) ->
+    case erlang:is_process_alive(Pid) of
+        true ->
+            receive
+                {'$gen_component', MsgTag, State} -> State
+                after 100 ->
+                    receive_state_if_alive(Pid, MsgTag)
+            end;
+        _ -> failed
+    end.
+
+-spec receive_state_if_alive(Pid::pid(),
+        MsgTag::get_state_response | get_component_state_response,
+        Timeout::non_neg_integer()) -> term() | failed.
+receive_state_if_alive(Pid, MsgTag, Timeout) when Timeout >= 0->
+    case erlang:is_process_alive(Pid) of
+        true ->
+            receive
+                {'$gen_component', MsgTag, State} -> State
+                after 100 ->
+                    receive_state_if_alive(Pid, MsgTag, Timeout - 100)
+            end;
+        _ -> failed
+    end;
+receive_state_if_alive(_Pid, _MsgTag, _Timeout) -> failed.
+
+-spec get_state(Pid::pid()) -> term() | failed.
 get_state(Pid) ->
     Pid ! {'$gen_component', get_state, self()},
-    receive
-        {'$gen_component', get_state_response, State} -> State
-    end.
+    receive_state_if_alive(Pid, get_state_response).
 
 -spec get_state(Pid::pid(), Timeout::non_neg_integer()) -> term() | failed.
 get_state(Pid, Timeout) ->
     Pid ! {'$gen_component', get_state, self()},
-    receive
-        {'$gen_component', get_state_response, State} -> State
-    after Timeout -> failed
-    end.
+    receive_state_if_alive(Pid, get_state_response, Timeout).
 
 -spec get_component_state(Pid::pid()) -> term().
 get_component_state(Pid) ->
     Pid ! {'$gen_component', get_component_state, self()},
-    receive
-        {'$gen_component', get_component_state_response, State} -> State
-    end.
+    receive_state_if_alive(Pid, get_component_state_response).
 
 -spec get_component_state(Pid::pid(), Timeout::non_neg_integer()) -> {Module::module(), Handler::atom(), ComponentState::term()} | failed.
 get_component_state(Pid, Timeout) ->
     Pid ! {'$gen_component', get_component_state, self()},
-    receive
-        {'$gen_component', get_component_state_response, State} -> State
-    after Timeout -> failed
-    end.
+    receive_state_if_alive(Pid, get_component_state_response, Timeout).
 
 %% @doc change the handler for handling messages
 -spec change_handler(State, Handler::atom())

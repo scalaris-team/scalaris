@@ -157,7 +157,10 @@ start_link(GroupName, Options, AppModule) ->
 
 -spec is_alive(pid()) -> boolean().
 is_alive(Pid) ->
-    rsm_state:get_mode(gen_component:get_state(Pid)) =:= joined.
+    try
+        rsm_state:get_mode(gen_component:get_state(Pid)) =:= joined
+    catch _:_ -> false
+    end.
 
 -spec send_all(rsm_state:rsm_pid_type(), any()) -> ok.
 send_all(RSMPid, Msg) when is_list(RSMPid) ->

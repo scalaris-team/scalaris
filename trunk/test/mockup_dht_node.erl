@@ -98,6 +98,7 @@ module_state_to_my_state(ModuleState, {state, Module, OldHandler, _, NewMatchSpe
 is_alive(Pid) ->
     case gen_component:get_state(Pid) of
         {state, _Module, _Handler, ModuleState, _MsgDropSpecs}
-          when element(1, ModuleState) =:= state -> true;
+          when erlang:is_tuple(ModuleState) andalso
+                   element(1, ModuleState) =:= state -> true;
         _ -> false
     end.
