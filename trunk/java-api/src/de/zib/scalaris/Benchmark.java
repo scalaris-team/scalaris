@@ -94,7 +94,7 @@ public class Benchmark {
 		rows = new String[] {
 				"separate connection",
 				"re-use connection",
-				"re-use TransactionSingleOp object" };
+				"re-use object" };
 		printResults(columns, rows, results, testruns);
 		
 		
@@ -119,7 +119,7 @@ public class Benchmark {
 		rows = new String[] {
 				"separate connection",
 				"re-use connection",
-				"re-use transaction" };
+				"re-use object" };
 		printResults(columns, rows, results, testruns);
 	}
 
