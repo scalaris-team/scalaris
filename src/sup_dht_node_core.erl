@@ -28,7 +28,7 @@
 
 -behaviour(supervisor).
 
--export([start_link/2, init/1]).
+-export([start_link/2, init/1, check_config/0]).
 
 -spec start_link(pid_groups:groupname(), Options::[tuple()]) ->
                         {ok, Pid::pid()} | ignore |
@@ -46,13 +46,9 @@ init({DHTNodeGroup, Options}) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     PaxosProcesses = util:sup_supervisor_desc(sup_paxos, sup_paxos,
                                               start_link, [DHTNodeGroup, []]),
-    DHTNodeModule = case util:is_unittest() of
-                        true -> mockup_dht_node;
-                        _    -> dht_node
-                    end,
-    DHTNode =
-        util:sup_worker_desc(dht_node, DHTNodeModule, start_link,
-                             [DHTNodeGroup, Options]),
+    DHTNodeModule = config:read(dht_node),
+    DHTNode = util:sup_worker_desc(dht_node, DHTNodeModule, start_link,
+                                   [DHTNodeGroup, Options]),
     TX =
         util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
                                  [DHTNodeGroup]),
@@ -63,3 +59,9 @@ init({DHTNodeGroup, Options}) ->
            TX
           ]}}.
 %% userdevguide-end sup_dht_node_core:init
+
+%% @doc Checks whether config parameters for the sup_dht_node_core supervisor
+%%      exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_module(dht_node).

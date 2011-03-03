@@ -272,7 +272,7 @@ prop_join_at_timeouts_v2(FirstId, SecondId, IgnoredMessages_) ->
     
     unittest_helper:make_ring_with_ids(
       [FirstId],
-      [{config, [pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
+      [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
     send_ignore_msg_list_to(1, node, IgnoredMessages),
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(BenchSlaves, BenchRuns) end),
     unittest_helper:wait_for_process_to_die(BenchPid),

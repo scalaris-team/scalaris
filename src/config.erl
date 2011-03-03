@@ -172,6 +172,7 @@ check_config() ->
     log:check_config() and
         sup_scalaris:check_config() and
         sup_scalaris2:check_config() and
+        sup_dht_node_core:check_config() and
         cyclon:check_config() and
         acceptor:check_config() and
         gossip:check_config() and
