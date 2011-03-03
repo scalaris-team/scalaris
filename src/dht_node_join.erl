@@ -880,6 +880,7 @@ send_join_response(State, SlideOp, NewPred, CandId) ->
 %% userdevguide-end dht_node_join:join_request2
 
 %% userdevguide-begin dht_node_join:finish_join
+%% @doc Finishes the join and sends all queued messages.
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::?DB:db(),
                   QueuedMessages::msg_queue:msg_queue())
@@ -898,6 +899,8 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     NewRT_ext = ?RT:empty_ext(Neighbors),
     dht_node_state:new(NewRT_ext, RMState, DB).
 
+%% @doc Finishes the join by setting up a slide operation to get the data from
+%%      the other node and sends all queued messages.
 -spec finish_join_and_slide(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::?DB:db(),
                   QueuedMessages::msg_queue:msg_queue(), MoveId::slide_op:id())
@@ -912,9 +915,7 @@ finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
                State1, slide_op:get_interval(SlideOp1),
                node:pidX(slide_op:get_node(SlideOp1))),
     RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
-    NewMsgQueue = msg_queue:add(QueuedMessages,
-                                {move, node_update, RMSubscrTag}),
-    msg_queue:send(NewMsgQueue),
+    comm:send_local(self(), {move, node_update, RMSubscrTag}),
     gen_component:change_handler(State2, on).
 %% userdevguide-end dht_node_join:finish_join
 
@@ -1011,8 +1012,8 @@ remove_connection(Conn, {Phase, JoinUUId, Options, CurIdVersion, Connections, Jo
     {Phase, JoinUUId, Options, CurIdVersion, [C || C <- Connections, C =/= Conn],
      JoinIds, Candidates}.
 
-%% @doc Checks whether config parameters of the rm_tman process exist and are
-%%      valid.
+%% @doc Checks whether config parameters of the dht_node process during join
+%%      exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
     config:is_integer(join_response_timeout) and
