@@ -281,16 +281,26 @@ wait_for_stable_ring_deep() ->
                      R =:= ok
              end, 500).
 
--spec check_ring_size(non_neg_integer()) -> ok.
+-spec check_ring_size(non_neg_integer()) -> non_neg_integer().
 check_ring_size(Size) ->
-    boot_server:number_of_nodes(),
-    RSize = receive {get_list_length_response, L} -> L
-            end,
-    case (RSize =:= Size) of
-        true -> Size;
-        _    -> timer:sleep(500),
-                check_ring_size(Size)
-    end.
+    DhtModule = config:read(dht_node),
+    wait_for(
+      fun() ->
+              % note: we use a single VM in unit tests, therefore no
+              % boot_server is needed - if one exists though, then check
+              % the correct size
+              BootSize =
+                  try
+                      boot_server:number_of_nodes(),
+                      receive {get_list_length_response, L} -> L end
+                  catch _:_ -> Size
+                  end,
+              BootSize =:= Size andalso
+                  Size =:= erlang:length(
+                [P || P <- pid_groups:find_all(DhtModule),
+                      DhtModule:is_alive(P)])
+      end, 500),
+    Size.
 
 -spec start_process(StartFun::fun(() -> any())) -> pid().
 start_process(StartFun) ->
