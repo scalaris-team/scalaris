@@ -26,7 +26,7 @@
 -behaviour(gen_component).
 
 -export([start_link/2, on/2, init/1,
-         is_alive/1]).
+         is_alive/1, is_alive_no_join/1]).
 
 -type message() ::
         comm:message() |
@@ -101,4 +101,16 @@ is_alive(Pid) ->
           when erlang:is_tuple(ModuleState) andalso
                    element(1, ModuleState) =:= state -> true;
         _ -> false
+    end.
+
+-spec is_alive_no_join(Pid::pid()) -> boolean().
+is_alive_no_join(Pid) ->
+    State = gen_component:get_state(Pid),
+    try
+        {state, _Module, _Handler, ModuleState, _MsgDropSpecs} = State,
+        SlidePred = dht_node_state:get(ModuleState, slide_pred),
+        SlideSucc = dht_node_state:get(ModuleState, slide_succ),
+        (SlidePred =:= null orelse not slide_op:is_join(SlidePred)) andalso
+            (SlideSucc =:= null orelse not slide_op:is_join(SlideSucc))
+    catch _:_ -> false
     end.

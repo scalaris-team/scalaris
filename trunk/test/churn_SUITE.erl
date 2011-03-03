@@ -49,7 +49,11 @@ init_per_testcase(TestCase, Config) ->
             % stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring_with_ids(
+              fun() ->
+                      ?RT:get_replica_keys(?RT:hash_key(0))
+              end, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:check_ring_size_fully_joined(4),
             Config
 %%             {skip, "temporarily"}
     end.
@@ -161,6 +165,8 @@ transactions_more_failures_4_nodes_networksplit_write(FailedNodes) ->
 -spec pause_node(DhtNodeSupPid::pid()) -> pause_spec().
 pause_node(DhtNodeSupPid) ->
     GroupName = pid_groups:group_of(DhtNodeSupPid),
+    DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
+    ct:log("Pausing pid ~p~n", [DhtNodePid]),
     DhtNodeSupChilds = unittest_helper:get_all_children(DhtNodeSupPid),
     _ = [begin
              gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
@@ -175,8 +181,9 @@ pause_node(DhtNodeSupPid) ->
 
 -spec unpause_node(pause_spec()) -> ok.
 unpause_node({GroupName, DhtNodeSupChilds}) ->
-    ct:pal("restarting node~n"),
     pid_groups:unhide(GroupName),
+    DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
+    ct:pal("Restarting pid ~p~n", [DhtNodePid]),
     % restart the node again:
     _ = [begin
              gen_component:bp_del(Pid, sleep),

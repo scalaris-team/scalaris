@@ -27,7 +27,7 @@
          make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2,
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
-         check_ring_size/1,
+         check_ring_size/1, check_ring_size_fully_joined/1,
          wait_for/1, wait_for/2,
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
          wait_for_process_to_die/1,
@@ -301,6 +301,19 @@ check_ring_size(Size) ->
                       DhtModule:is_alive(P)])
       end, 500),
     Size.
+
+%% @doc Checks whether Size nodes have fully joined the ring (including
+%%      finished join-related slides).
+-spec check_ring_size_fully_joined(Size::non_neg_integer()) -> ok.
+check_ring_size_fully_joined(Size) ->
+    DhtModule = config:read(dht_node),
+    wait_for(
+      fun() ->
+              erlang:whereis(config) =/= undefined andalso
+                  Size =:= erlang:length(
+                [P || P <- pid_groups:find_all(DhtModule),
+                      DhtModule:is_alive_no_join(P)])
+      end, 100).
 
 -spec start_process(StartFun::fun(() -> any())) -> pid().
 start_process(StartFun) ->

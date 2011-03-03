@@ -28,7 +28,7 @@
 -export([start_link/2, on/2, on_join/2, init/1,
          trigger_known_nodes/0]).
 
--export([is_first/1, is_alive/1]).
+-export([is_first/1, is_alive/1, is_alive_no_join/1]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0]).
@@ -473,3 +473,14 @@ is_first(Options) ->
 is_alive(Pid) ->
     State = gen_component:get_state(Pid),
     erlang:is_tuple(State) andalso element(1, State) =:= state.
+
+-spec is_alive_no_join(Pid::pid()) -> boolean().
+is_alive_no_join(Pid) ->
+    State = gen_component:get_state(Pid),
+    try
+        SlidePred = dht_node_state:get(State, slide_pred),
+        SlideSucc = dht_node_state:get(State, slide_succ),
+        (SlidePred =:= null orelse not slide_op:is_join(SlidePred)) andalso
+            (SlideSucc =:= null orelse not slide_op:is_join(SlideSucc))
+    catch _:_ -> false
+    end.
