@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 
 -export([new_primary/2, new_replica/2,
-         set_mode/2,
+         get_mode/1, set_mode/2,
          get_rsm_pid/1,
          get_view/1, set_view/2,
          get_app_state/1, set_app_state/2,
@@ -69,6 +69,10 @@ new_primary(App, View) ->
       app_module = App,
       app_state = App:init_state()
      }.
+
+-spec get_mode(state()) -> mode_type().
+get_mode(State) ->
+    State#state.mode.
 
 -spec set_mode(state(), mode_type()) -> state().
 set_mode(State, Mode) ->
