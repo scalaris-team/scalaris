@@ -86,7 +86,10 @@ init_per_testcase(TestCase, Config) ->
             {skip, "sliding with cs_api (v1) client access is not supported"};
         _ ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring_with_ids(
+              fun() ->
+                      ?RT:get_replica_keys(?RT:hash_key(0))
+              end, [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}]}]),
             set_move_config_parameters(),
             % write some data (use a function because left-over tx_timeout messages can disturb the tests):
             Pid = erlang:spawn(fun() ->

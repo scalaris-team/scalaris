@@ -74,8 +74,9 @@ on({get_dht_nodes, Pid}, ok) ->
 
 -spec get_live_dht_nodes() -> [comm:mypid()].
 get_live_dht_nodes() ->
-    [comm:make_global(Pid) || Pid <- pid_groups:find_all(config:read(dht_node)),
-                              (config:read(dht_node)):is_alive(Pid)].
+    DhtModule = config:read(dht_node),
+    [comm:make_global(Pid) || Pid <- pid_groups:find_all(DhtModule),
+                              DhtModule:is_alive(Pid)].
 
 -spec get_round_trip(GPid::comm:mypid(), Iterations::pos_integer()) -> float().
 get_round_trip(GPid, Iterations) ->

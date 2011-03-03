@@ -25,7 +25,8 @@
 
 -behaviour(gen_component).
 
--export([start_link/2, on/2, init/1]).
+-export([start_link/2, on/2, init/1,
+         is_alive/1]).
 
 -type message() ::
         comm:message() |
@@ -71,11 +72,13 @@ on(Msg, State = {state, Module, Handler, ModuleState, MsgDropSpecs}) ->
 
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
-    gen_component:start_link(?MODULE, Options,
+    gen_component:start_link(?MODULE, {DHTNodeGroup, Options},
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 
--spec init(Options::[tuple()]) -> state().
-init(Options) ->
+-spec init({DHTNodeGroup::pid_groups:groupname(), Options::[tuple()]}) -> state().
+init({DHTNodeGroup, Options}) ->
+    % at first, join pid_groups - allow dht_node to overwrite my_pid (it will join as dht_node!):
+    pid_groups:join_as(DHTNodeGroup, mockup_dht_node),
     ModuleState = dht_node:init(Options),
     module_state_to_my_state(ModuleState, {state, dht_node, on, ModuleState, []}).
 
@@ -90,3 +93,11 @@ module_state_to_my_state(ModuleState, {state, Module, OldHandler, _, NewMatchSpe
                       OldHandler
               end,
     {state, Module, Handler, ModuleRealState, NewMatchSpecs}.
+
+-spec is_alive(Pid::pid()) -> boolean().
+is_alive(Pid) ->
+    case gen_component:get_state(Pid) of
+        {state, _Module, _Handler, ModuleState, _MsgDropSpecs}
+          when element(1, ModuleState) =:= state -> true;
+        _ -> false
+    end.
