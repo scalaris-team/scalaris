@@ -38,19 +38,14 @@ make_tfun(Key) ->
 
 -spec inc(Key::string()) -> ok | {failure, Reason::term()}.
 inc(Key) ->
-    {TLog1, [{read, Key, ReadResult}]} =
-        cs_api_v2:process_request_list(cs_api_v2:new_tlog(), [{read, Key}]),
+    {TLog1, [ReadResult]} =
+        api_tx:req_list([{read, Key}]),
     case ReadResult of
-        {value, Value} ->
-            {_TLog, [{write, Key, {value, _Written}}, CommitResult]} =
-                cs_api_v2:process_request_list(
-                  TLog1, [{write, Key, Value + 1}, {commit}]),
-            case CommitResult of
-                commit -> ok;
-                Reason -> {failure, Reason}
-            end;
-        {fail, Reason} ->
-            {failure, Reason}
+        {ok, Value} ->
+            {_TLog, [{ok}, CommitResult]} =
+                api_tx:req_list(TLog1, [{write, Key, Value + 1}, {commit}]),
+            CommitResult;
+        Fail -> Fail
     end.
 
 -spec process(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer()) -> ok.
@@ -91,15 +86,13 @@ process_iter_v2(Parent, _Key, 0, AbortCount) ->
 process_iter_v2(Parent, Key, Count, AbortCount) ->
     Result = inc(Key),
     case Result of
-        ok ->
+        {ok} ->
             process_iter_v2(Parent, Key, Count - 1, AbortCount);
-        {failure, abort} ->
+        {fail, abort} ->
             process_iter_v2(Parent, Key, Count, AbortCount + 1);
-        {failure, timeout} ->
+        {fail, timeout} ->
             process_iter_v2(Parent, Key, Count, AbortCount + 1);
-        {failure, failed} ->
-            process_iter_v2(Parent, Key, Count, AbortCount + 1);
-        {failure, not_found} ->
+        {fail, not_found} ->
             process_iter_v2(Parent, Key, Count, AbortCount + 1);
         X ->
             log:log(warn, "~p", [X])
@@ -140,7 +133,7 @@ bench_fprof() ->
     Count = fprof:apply(bench_increment, bench_raw, [], [{procs, pid_groups:processes()}]),
     fprof:profile(),
     %fprof:analyse(),
-    fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), % , totals, no_details, no_callers, {sort, acc}, 
+    fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), % , totals, no_details, no_callers, {sort, acc},
     Count.
 
 
