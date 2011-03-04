@@ -47,7 +47,6 @@ isPost(A) ->
             Result::{Value::?DB:value(), Version::?DB:version()} |
                     {fail, not_found} | {fail, timeout} | {fail, fail}}.
 lookup(Key) ->
-%%    timer:tc(cs_api, read, [Key]).
     timer:tc(transaction_api, quorum_read, [Key]).
 
 -spec set_key(Key::?RT:key(), Value::?DB:value())
