@@ -32,6 +32,8 @@ all()   -> [new_tlog_0,
             test_and_set_3,
             conflicting_tx,
             conflicting_tx2,
+            write2_read2,
+            multi_write,
             write_test_race_mult_rings
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
@@ -252,6 +254,31 @@ conflicting_tx2(_Config) ->
                              _CommitRes = {fail, abort}]}), %% or {fail, abort}?
     ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
     ok.
+
+write2_read2(_Config) ->
+    KeyA = "KeyA",
+    KeyB = "KeyB",
+    ValueA = "Value1",
+    ValueB = "Value2",
+
+    {TLog1, _} = api_tx:write(api_tx:new_tlog(), KeyA, ValueA),
+    {TLog2, _} = api_tx:write(TLog1, KeyB, ValueB),
+    {ok} = api_tx:commit(TLog2),
+
+    ?equals_pattern(api_tx:req_list([{read, KeyA}, {read, KeyB}, {commit}]),
+                    {_TLog4, [{ok, ValueA}, {ok, ValueB}, {ok}]}),
+    ok.
+
+multi_write(_Config) ->
+    Key = "MultiWrite",
+    Value1 = "Value1",
+    Value2 = "Value2",
+    {TLog1, _} = api_tx:write(api_tx:new_tlog(), Key, Value1),
+    {TLog2, _} = api_tx:write(TLog1, Key, Value2),
+    ?equals(api_tx:commit(TLog2), {ok}),
+    ?equals(api_tx:read(Key), {ok, Value2}),
+    ok.
+
 
 %% @doc Test for api_tx:write taking at least 2s after stopping a ring
 %%      and starting a new one.

@@ -34,10 +34,7 @@ all() ->
      transactions_2_failures_4_nodes_networksplit_write,
      transactions_3_failures_4_nodes_networksplit_write].
 
-suite() ->
-    [
-     {timetrap, {seconds, 30}}
-    ].
+suite() -> [ {timetrap, {seconds, 30}} ].
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
@@ -57,7 +54,7 @@ init_per_testcase(TestCase, Config) ->
             Config
 %%             {skip, "temporarily"}
     end.
- 
+
 end_per_testcase(_TestCase, _Config) ->
     %error_logger:tty(false),
     unittest_helper:stop_ring(),
@@ -71,22 +68,22 @@ end_per_suite(Config) ->
     ok.
 
 transactions_1_failure_4_nodes_read(_) ->
-    ?equals_w_note(cs_api_v2:write(0, 1), ok, "write_0_a"),
-    ?equals_w_note(cs_api_v2:read(0), 1, "read_0_a"),
+    ?equals_w_note(api_tx:write(0, 1), {ok}, "write_0_a"),
+    ?equals_w_note(api_tx:read(0), {ok, 1}, "read_0_a"),
     % wait for late write messages to arrive at the original nodes
     % if all writes have arrived, a range read should return 4 values
     unittest_helper:wait_for(
       fun() ->
-              {Status, Values} = cs_api_v2:range_read(0, 0),
+              {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= 4
       end),
     _ = admin:del_nodes(1),
     unittest_helper:check_ring_size(3),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
-    ?equals_w_note(cs_api_v2:read(0), 1, "read_0_b"),
-    ?equals_w_note(cs_api_v2:write(0, 2), ok, "write_0_b"),
-    ?equals_w_note(cs_api_v2:read(0), 2, "read_0_c"),
+    ?equals_w_note(api_tx:read(0), {ok, 1}, "read_0_b"),
+    ?equals_w_note(api_tx:write(0, 2), {ok}, "write_0_b"),
+    ?equals_w_note(api_tx:read(0), {ok, 2}, "read_0_c"),
     ok.
 
 transactions_2_failures_4_nodes_read(_) ->
@@ -97,22 +94,22 @@ transactions_3_failures_4_nodes_read(_) ->
 
 -spec transactions_more_failures_4_nodes_read(FailedNodes::2 | 3) -> ok.
 transactions_more_failures_4_nodes_read(FailedNodes) ->
-    ?equals_w_note(cs_api_v2:write(0, 1), ok, "write_0_a"),
-    ?equals_w_note(cs_api_v2:read(0), 1, "read_0_a"),
+    ?equals_w_note(api_tx:write(0, 1), {ok}, "write_0_a"),
+    ?equals_w_note(api_tx:read(0), {ok, 1}, "read_0_a"),
     % wait for late write messages to arrive at the original nodes
     % if all writes have arrived, a range read should return 4 values
     unittest_helper:wait_for(
       fun() ->
-              {Status, Values} = cs_api_v2:range_read(0, 0),
+              {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= 4
       end),
     _ = admin:del_nodes(FailedNodes),
     unittest_helper:check_ring_size(4 - FailedNodes),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
-    ?equals_w_note(cs_api_v2:read(0), {fail, not_found}, "read_0_b"),
-    ?equals_w_note(cs_api_v2:write(0, 2), {fail, abort}, "write_0_b"),
-    ?equals_w_note(cs_api_v2:read(0), {fail, not_found}, "read_0_c"),
+    ?equals_w_note(api_tx:read(0), {fail, not_found}, "read_0_b"),
+    ?equals_w_note(api_tx:write(0, 2), {fail, abort}, "write_0_b"),
+    ?equals_w_note(api_tx:read(0), {fail, not_found}, "read_0_c"),
     ok.
 
 transactions_1_failure_4_nodes_networksplit_write(_) ->
@@ -122,16 +119,16 @@ transactions_1_failure_4_nodes_networksplit_write(_) ->
     unittest_helper:check_ring_size(3),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
-    
+
     ct:pal("attempting write_0_a~n"),
-    ?equals_w_note(cs_api_v2:write(0, 1), ok, "write_0_a"),
+    ?equals_w_note(api_tx:write(0, 1), {ok}, "write_0_a"),
     ct:pal("attempting read_0_a~n"),
-    ?equals_w_note(cs_api_v2:read(0), 1, "read_0_a"),
+    ?equals_w_note(api_tx:read(0), {ok, 1}, "read_0_a"),
 
     unpause_node(PauseSpec),
 
     ct:pal("attempting read_0_b~n"),
-    ?equals_w_note(cs_api_v2:read(0), 1, "read_0_b"),
+    ?equals_w_note(api_tx:read(0), {ok, 1}, "read_0_b"),
     ok.
 
 transactions_2_failures_4_nodes_networksplit_write(_) ->
@@ -146,18 +143,18 @@ transactions_more_failures_4_nodes_networksplit_write(FailedNodes) ->
     unittest_helper:check_ring_size(4 - FailedNodes),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
-    
+
     ct:pal("attempting write_0_a~n"),
-    ?equals_w_note(cs_api_v2:write(0, 1), {fail, abort}, "write_0_a"),
+    ?equals_w_note(api_tx:write(0, 1), {fail, abort}, "write_0_a"),
     ct:pal("attempting read_0_a~n"),
-    ?equals_w_note(cs_api_v2:read(0), {fail, abort}, "read_0_a"),
-    
+    ?equals_w_note(api_tx:read(0), {fail, abort}, "read_0_a"),
+
     _ = [unpause_node(PauseSpec) || PauseSpec <- PauseSpecs],
 
     ct:pal("attempting write_0_b~n"),
-    ?equals_w_note(cs_api_v2:write(0, 2), ok, "write_0_b"),
-    ?equals_w_note(cs_api_v2:read(0), 2, "read_0_b"),
-    
+    ?equals_w_note(api_tx:write(0, 2), {ok}, "write_0_b"),
+    ?equals_w_note(api_tx:read(0), {ok, 2}, "read_0_b"),
+
     ok.
 
 -type pause_spec() :: {pid_groups:groupname(), [pid()]}.
