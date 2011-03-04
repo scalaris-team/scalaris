@@ -20,7 +20,7 @@ handler(nop, [Value]) ->
     "ok";
 
 handler(range_read, [From, To]) ->
-    {ErrorCode, Data} = cs_api:range_read(From, To),
+    {ErrorCode, Data} = api_dht_raw:range_read(From, To),
     {struct, [{success, atom_to_list(ErrorCode)}, {data, data_to_json(Data)}]};
 
 handler(test_and_set, [Key, OldValue, NewValue]) ->
@@ -35,7 +35,7 @@ handler(write, [Key, Value]) ->
 
 handler(delete, [Key]) ->
     %io:format("Request = delete(~p)~n", [_Request]),
-    case cs_api:delete(Key) of
+    case api_rdht:delete(Key) of
         {fail, Reason} ->
             {struct, [{failure, atom_to_list(Reason)}]};
         {ok, NumOk, StateList} ->
