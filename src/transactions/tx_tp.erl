@@ -42,7 +42,7 @@ init() ->
 %%
 
 -spec on_init_TP({tx_state:tx_id(),
-                  [comm:mypid()], comm:mypid(),
+                  [comm:mypid()], [comm:mypid()], comm:mypid(),
                   tx_tlog:tlog_entry(),
                   tx_item_state:tx_item_id(),
                   tx_item_state:paxos_id()},

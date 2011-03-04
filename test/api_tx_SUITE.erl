@@ -13,6 +13,8 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @author Nico Kruber <kruber@zib.de>
 %% @version $Id$
 -module(api_tx_SUITE).
 -author('schintke@zib.de').
@@ -29,19 +31,33 @@ all()   -> [new_tlog_0,
             write_2,
             test_and_set_3,
             conflicting_tx,
-            conflicting_tx2
+            conflicting_tx2,
+            write_test_race_mult_rings
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
-    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-    Config2.
+    unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
+
+init_per_testcase(TestCase, Config) ->
+    case TestCase of
+        write_test_race_mult_rings ->
+            Config;
+        _ ->
+            %% stop ring from previous test case (it may have run into a timeout
+            unittest_helper:stop_ring(),
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+            Config
+    end.
+
+end_per_testcase(_TestCase, Config) ->
+    unittest_helper:stop_ring(),
+    Config.
 
 new_tlog_0(_Config) ->
     ?equals(api_tx:new_tlog(), []),
@@ -159,47 +175,47 @@ commit_1(_Config) ->
 
 read_1(_Config) ->
     ?equals(api_tx:read("non-existing"), {fail, not_found}),
+    ?equals(api_tx:read("read_1_ReadKey"), {fail, not_found}),
+    ?equals(api_tx:write("read_1_ReadKey", "IsSet"), {ok}),
+    ?equals(api_tx:read("read_1_ReadKey"), {ok, "IsSet"}),
     ok.
 
 write_2(_Config) ->
-    ?equals(api_tx:write("WriteKey", "Value"), {ok}),
+    ?equals(api_tx:write("write_2_WriteKey", "Value"), {ok}),
+    ?equals(api_tx:read("write_2_WriteKey"), {ok, "Value"}),
+    ?equals(api_tx:write("write_2_WriteKey", "Value2"), {ok}),
+    ?equals(api_tx:read("write_2_WriteKey"), {ok, "Value2"}),
 
     %% invalid key
     ?equals_pattern(catch api_tx:write([a,b,c], "Value"), {'EXIT',{badarg,_}}),
     ok.
 
 test_and_set_3(_Config) ->
-    ?equals(api_tx:test_and_set("test_and_set_3", "Value", "NextValue"), {fail, not_found}),
-    
+    ?equals(api_tx:test_and_set("test_and_set_3", "Value", "NextValue"),
+            {fail, not_found}),
     ?equals(api_tx:write("test_and_set_3", "Value"), {ok}),
-
     ?equals(api_tx:test_and_set("test_and_set_3", "Value", "NextValue"), {ok}),
-
     ?equals(api_tx:test_and_set("test_and_set_3", "wrong", "NewValue"),
             {fail, {key_changed, "NextValue"}}),
-
     ok.
 
 conflicting_tx(_Config) ->
     EmptyTLog = api_tx:new_tlog(),
     %% ops with other interleaving tx
     %% prepare an account
-    api_tx:write("Account A", 100),
+    _ = api_tx:write("Account A", 100),
 
-    ct:pal("INIT done~n"),
     %% Tx1: read the balance and later try to modify it
     {Tx1TLog, {ok, Bal1}} = api_tx:read(EmptyTLog, "Account A"),
 
     %% Tx3: read the balance and later try to commit the read
     {Tx3TLog, {ok, _Bal3}} = api_tx:read(EmptyTLog, "Account A"),
 
-    ct:pal("tx2 start~n"),
     %% Tx2 reads the balance and increases it
     {Tx2TLog, {ok, Bal2}} = api_tx:read(EmptyTLog, "Account A"),
     ?equals_pattern(
        api_tx:req_list(Tx2TLog, [{write, "Account A", Bal2 + 100}, {commit}]),
        {_, [_WriteRes = {ok}, _CommitRes = {ok}]}),
-    ct:pal("tx2 done~n"),
 
     %% Tx1 tries to increases it atomically and fails
     ?equals_pattern(
@@ -222,16 +238,13 @@ conflicting_tx(_Config) ->
     ok.
 
 conflicting_tx2(_Config) ->
-    EmptyTLog = api_tx:new_tlog(),
-    
-    
     %% read non-existing item
     {TLog1a, [ReadRes1a]} =
-        api_tx:req_list(EmptyTLog, [{read, "conflicting_tx2_non-existing"}]),
+        api_tx:req_list([{read, "conflicting_tx2_non-existing"}]),
     ?equals(ReadRes1a, {fail, not_found}),
-    
-    api_tx:write("conflicting_tx2_non-existing", "Value"),
-    
+
+    _ = api_tx:write("conflicting_tx2_non-existing", "Value"),
+
     ?equals_pattern(api_tx:req_list(TLog1a,
                                     [{write, "conflicting_tx2_non-existing", "NewValue"},
                                      {commit}]),
@@ -239,3 +252,51 @@ conflicting_tx2(_Config) ->
                              _CommitRes = {fail, abort}]}), %% or {fail, abort}?
     ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
     ok.
+
+%% @doc Test for api_tx:write taking at least 2s after stopping a ring
+%%      and starting a new one.
+write_test_race_mult_rings(Config) ->
+    % first ring:
+    write_test(Config),
+    % second ring and more:
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config),
+    write_test(Config).
+
+-spec write_test(Config::[tuple()]) -> ok.
+write_test(Config) ->
+    OldRegistered = erlang:registered(),
+    OldProcesses = unittest_helper:get_processes(),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
+    Self = self(),
+    BenchPid1 = erlang:spawn(fun() ->
+                                     {Time, _} = util:tc(api_tx, write, [1, 1]),
+                                     comm:send_local(Self, {time, Time}),
+                                     ct:pal("~.0pus~n", [Time])
+                             end),
+    receive {time, FirstWriteTime} -> ok
+    end,
+    unittest_helper:wait_for_process_to_die(BenchPid1),
+    BenchPid2 = erlang:spawn(fun() ->
+                                     {Time, _} = util:tc(api_tx, write, [2, 2]),
+                                     comm:send_local(Self, {time, Time}),
+                                     ct:pal("~.0pus~n", [Time])
+                             end),
+    receive {time, SecondWriteTime} -> ok
+    end,
+    unittest_helper:wait_for_process_to_die(BenchPid2),
+    dht_node_move_SUITE:check_size2_v2(4  * 2),
+    unittest_helper:stop_ring(),
+%%     randoms:stop(), %doesn't matter
+    _ = inets:stop(),
+    unittest_helper:kill_new_processes(OldProcesses),
+    {_, _, OnlyNewReg} =
+        util:split_unique(OldRegistered, erlang:registered()),
+    ct:pal("NewReg: ~.0p~n", [OnlyNewReg]),
+    ?equals_pattern(FirstWriteTime, X when X =< 1000000),
+    ?equals_pattern(SecondWriteTime, X when X =< 1000000).

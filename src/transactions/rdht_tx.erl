@@ -49,8 +49,8 @@ process_request_list([], [SingleReq]) ->
     [{_ReqNum, ResultEntry}] = TmpResultList,
     {TransLogResult, [ResultEntry]};
 
-process_request_list([], [{write, _K, _V} = SingleReq, {commit}]) ->
-    {TLog, [Res1]} = process_request_list([], [SingleReq]),
+process_request_list([], [{rdht_tx_write, _K, _V} = SingleReq, {commit}]) ->
+    {TLog, [Res1]} = process_request_list(tx_tlog:empty(), [SingleReq]),
     {TLog, [Res1, commit(TLog)]};
 
 process_request_list(TLog, PlainReqList) ->
