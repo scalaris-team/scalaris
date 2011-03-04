@@ -298,7 +298,7 @@ scalarisstart(){
 scalarisstop(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name ctl \
+        -name ctl_$RANDOM \
         -pa $BEAMDIR \
         -noinput \
         -s scalaris_ctl -extra $NODE_NAME@`hostname -f` stop
