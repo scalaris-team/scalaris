@@ -105,7 +105,7 @@ public class TransactionSingleOpTest {
 	}
 
 	/**
-	 * Test method for {@link TransactionSingleOp#readObject(OtpErlangString)}.
+	 * Test method for {@link TransactionSingleOp#read(OtpErlangString)}.
 	 * 
 	 * @throws NotFoundException
 	 * @throws UnknownException
@@ -113,12 +113,12 @@ public class TransactionSingleOpTest {
 	 * @throws ConnectionException
 	 */
 	@Test(expected=NotFoundException.class)
-	public void testReadObject_NotFound() throws ConnectionException,
+	public void testReadOtp_NotFound() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
-		String key = "_ReadObject_NotFound";
+		String key = "_ReadOtp_NotFound";
 		TransactionSingleOp conn = new TransactionSingleOp();
 		try {
-			conn.readObject(new OtpErlangString(testTime + key));
+			conn.read(new OtpErlangString(testTime + key));
 		} finally {
 			conn.closeConnection();
 		}
@@ -138,11 +138,11 @@ public class TransactionSingleOpTest {
 		String key = "_Read_NotConnected";
 		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
-		conn.readObject(new OtpErlangString(testTime + key));
+		conn.read(testTime + key);
 	}
 
 	/**
-	 * Test method for {@link TransactionSingleOp#readObject(OtpErlangString)} with a
+	 * Test method for {@link TransactionSingleOp#read(OtpErlangString)} with a
 	 * closed connection.
 	 * 
 	 * @throws NotFoundException
@@ -151,17 +151,17 @@ public class TransactionSingleOpTest {
 	 * @throws ConnectionException
 	 */
 	@Test(expected=ConnectionException.class)
-	public void testReadObject_NotConnected() throws ConnectionException,
+	public void testReadOtp_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
-		String key = "_ReadObject_NotConnected";
+		String key = "_ReadOtp_NotConnected";
 		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
-		conn.readObject(new OtpErlangString(testTime + key));
+		conn.read(new OtpErlangString(testTime + key));
 	}
 
 	/**
 	 * Test method for
-	 * {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)} with a
+	 * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)} with a
 	 * closed connection.
 	 * 
 	 * @throws UnknownException
@@ -171,23 +171,23 @@ public class TransactionSingleOpTest {
 	 * @throws AbortException 
 	 */
 	@Test(expected=ConnectionException.class)
-	public void testWriteObject_NotConnected() throws ConnectionException,
+	public void testWriteOtp_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
-		String key = "_WriteObject_NotConnected";
+		String key = "_WriteOtp_NotConnected";
 		TransactionSingleOp conn = new TransactionSingleOp();
 		conn.closeConnection();
 		OtpErlangObject[] data = new OtpErlangObject[] {
 				new OtpErlangString(testData[0]),
 				new OtpErlangString(testData[1]) };
-		conn.writeObject(
+		conn.write(
 				new OtpErlangString(testTime + key),
 				new OtpErlangTuple(data) );
 	}
 	
 	/**
 	 * Test method for
-	 * {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)}
-	 * and {@link TransactionSingleOp#readObject(OtpErlangString)}.
+	 * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}
+	 * and {@link TransactionSingleOp#read(OtpErlangString)}.
 	 * Writes erlang tuples and uses a distinct key for each value. Tries to read the data afterwards.
 	 * 
 	 * @throws UnknownException
@@ -197,9 +197,9 @@ public class TransactionSingleOpTest {
 	 * @throws AbortException 
 	 */
 	@Test
-	public void testWriteObject1() throws ConnectionException,
+	public void testWriteOtp1() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
-		String key = "_WriteObject1_";
+		String key = "_WriteOtp1_";
 		TransactionSingleOp conn = new TransactionSingleOp();
 
 		try {
@@ -207,7 +207,7 @@ public class TransactionSingleOpTest {
 				OtpErlangObject[] data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),
 						new OtpErlangString(testData[i + 1]) };
-				conn.writeObject(
+				conn.write(
 						new OtpErlangString(testTime + key + i),
 						new OtpErlangTuple(data) );
 			}
@@ -218,7 +218,7 @@ public class TransactionSingleOpTest {
 				OtpErlangObject[] data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),
 						new OtpErlangString(testData[i + 1]) };
-				OtpErlangObject actual = conn.readObject(
+				OtpErlangObject actual = conn.read(
 						new OtpErlangString(testTime + key + i));
 				OtpErlangTuple expected = new OtpErlangTuple(data);
 				
@@ -231,8 +231,8 @@ public class TransactionSingleOpTest {
 	
 	/**
 	 * Test method for
-	 * {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)}
-	 * and {@link TransactionSingleOp#readObject(OtpErlangString)}.
+	 * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}
+	 * and {@link TransactionSingleOp#read(OtpErlangString)}.
 	 * Writes erlang tuples and uses a single key for all the values. Tries to read the data afterwards.
 	 * 
 	 * @throws UnknownException
@@ -242,9 +242,9 @@ public class TransactionSingleOpTest {
 	 * @throws AbortException 
 	 */
 	@Test
-	public void testWriteObject2() throws ConnectionException,
+	public void testWriteOtp2() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
-		String key = "_WriteObject2";
+		String key = "_WriteOtp2";
 		TransactionSingleOp conn = new TransactionSingleOp();
 
 		try {
@@ -253,14 +253,14 @@ public class TransactionSingleOpTest {
 				data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),
 						new OtpErlangString(testData[i + 1]) };
-				conn.writeObject(
+				conn.write(
 						new OtpErlangString(testTime + key),
 						new OtpErlangTuple(data));
 			}
 			
 			// now try to read the data:
 			
-			OtpErlangObject actual = conn.readObject(
+			OtpErlangObject actual = conn.read(
 					new OtpErlangString(testTime + key));
 			OtpErlangTuple expected = new OtpErlangTuple(data);
 			
@@ -314,7 +314,7 @@ public class TransactionSingleOpTest {
 			
 			// now try to read the data:
 			for (int i = 0; i < testData.length; ++i) {
-				String actual = conn.read(testTime + key + i);
+				String actual = conn.read(testTime + key + i).toString();
 				assertEquals(testData[i], actual);
 			}
 		} finally {
@@ -346,18 +346,16 @@ public class TransactionSingleOpTest {
 			}
 			
 			// now try to read the data:
-			String actual = conn.read(testTime + key);
+			String actual = conn.read(testTime + key).toString();
 			assertEquals(testData[testData.length - 1], actual);
 		} finally {
 			conn.closeConnection();
 		}
 	}
-	
-	//TODO: test_and_set
 
     /**
      * Test method for
-     * {@link TransactionSingleOp#testAndSetObject(OtpErlangString, OtpErlangObject, OtpErlangObject)}
+     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)}
      * with a closed connection.
      * 
      * @throws UnknownException
@@ -370,15 +368,15 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test(expected=ConnectionException.class)
-    public void testTestAndSetObject_NotConnected() throws ConnectionException,
+    public void testTestAndSetOtp_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSetObject_NotConnected";
+        String key = "_TestAndSetOtp_NotConnected";
         TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
         OtpErlangObject[] data = new OtpErlangObject[] {
                 new OtpErlangString(testData[0]),
                 new OtpErlangString(testData[1]) };
-        conn.testAndSetObject(
+        conn.testAndSet(
                 new OtpErlangString(testTime + key),
                 new OtpErlangAtom("ok"),
                 new OtpErlangTuple(data) );
@@ -386,7 +384,7 @@ public class TransactionSingleOpTest {
     
     /**
      * Test method for
-     * {@link TransactionSingleOp#testAndSetObject(OtpErlangString, OtpErlangObject, OtpErlangObject)}.
+     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)}.
      * Tries test_and_set with a non-existing key.
      * 
      * @throws UnknownException
@@ -399,16 +397,16 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test(expected=NotFoundException.class)
-    public void testTestAndSetObject_NotFound() throws ConnectionException,
+    public void testTestAndSetOtp_NotFound() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSetObject_NotFound";
+        String key = "_TestAndSetOtp_NotFound";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
             OtpErlangObject[] data = new OtpErlangObject[] {
                     new OtpErlangString(testData[0]),
                     new OtpErlangString(testData[1]) };
-            conn.testAndSetObject(
+            conn.testAndSet(
                     new OtpErlangString(testTime + key),
                     new OtpErlangAtom("ok"),
                     new OtpErlangTuple(data) );
@@ -419,9 +417,9 @@ public class TransactionSingleOpTest {
     
     /**
      * Test method for
-     * {@link TransactionSingleOp#testAndSetObject(OtpErlangString, OtpErlangObject, OtpErlangObject)},
-     * {@link TransactionSingleOp#readObject(OtpErlangString)}
-     * and {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)}.
+     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
+     * {@link TransactionSingleOp#read(OtpErlangString)}
+     * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
      * Writes an erlang tuple and tries to overwrite it using test_and_set
      * knowing the correct old value. Tries to read the data afterwards.
      * 
@@ -435,9 +433,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test
-    public void testTestAndSetObject1() throws ConnectionException,
+    public void testTestAndSetOtp1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSetObject1";
+        String key = "_TestAndSetOtp1";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -446,7 +444,7 @@ public class TransactionSingleOpTest {
                 OtpErlangObject[] data = new OtpErlangObject[] {
                         new OtpErlangString(testData[i]),
                         new OtpErlangString(testData[i + 1]) };
-                conn.writeObject(
+                conn.write(
                         new OtpErlangString(testTime + key + i),
                         new OtpErlangTuple(data));
             }
@@ -459,7 +457,7 @@ public class TransactionSingleOpTest {
                 OtpErlangObject[] new_data = new OtpErlangObject[] {
                         new OtpErlangString(testData[i + 1]),
                         new OtpErlangString(testData[i]) };
-                conn.testAndSetObject(
+                conn.testAndSet(
                         new OtpErlangString(testTime + key + i),
                         new OtpErlangTuple(old_data),
                         new OtpErlangTuple(new_data));
@@ -470,7 +468,7 @@ public class TransactionSingleOpTest {
                 OtpErlangObject[] data = new OtpErlangObject[] {
                         new OtpErlangString(testData[i + 1]),
                         new OtpErlangString(testData[i]) };
-                OtpErlangObject actual = conn.readObject(
+                OtpErlangObject actual = conn.read(
                         new OtpErlangString(testTime + key + i));
                 OtpErlangTuple expected = new OtpErlangTuple(data);
                 assertEquals(expected, actual);
@@ -482,9 +480,9 @@ public class TransactionSingleOpTest {
     
     /**
      * Test method for
-     * {@link TransactionSingleOp#testAndSetObject(OtpErlangString, OtpErlangObject, OtpErlangObject)},
-     * {@link TransactionSingleOp#readObject(OtpErlangString)}
-     * and {@link TransactionSingleOp#writeObject(OtpErlangString, OtpErlangObject)}.
+     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
+     * {@link TransactionSingleOp#read(OtpErlangString)}
+     * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
      * Writes an erlang tuple and tries to overwrite it using test_and_set
      * knowing the wrong old value. Tries to read the data afterwards.
      * 
@@ -497,9 +495,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test
-    public void testTestAndSetObject2() throws ConnectionException,
+    public void testTestAndSetOtp2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_TestAndSetObject2";
+        String key = "_TestAndSetOtp2";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -508,7 +506,7 @@ public class TransactionSingleOpTest {
                 OtpErlangObject[] data = new OtpErlangObject[] {
                         new OtpErlangString(testData[i]),
                         new OtpErlangString(testData[i + 1]) };
-                conn.writeObject(
+                conn.write(
                         new OtpErlangString(testTime + key + i),
                         new OtpErlangTuple(data));
             }
@@ -520,7 +518,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i]) };
                 OtpErlangObject new_value = CommonErlangObjects.failAtom;
                 try {
-                    conn.testAndSetObject(
+                    conn.testAndSet(
                             new OtpErlangString(testTime + key + i),
                             new OtpErlangTuple(old_data), new_value);
                     // a key changed exception must be thrown
@@ -539,7 +537,7 @@ public class TransactionSingleOpTest {
                 OtpErlangObject[] data = new OtpErlangObject[] {
                         new OtpErlangString(testData[i]),
                         new OtpErlangString(testData[i + 1]) };
-                OtpErlangObject actual = conn.readObject(
+                OtpErlangObject actual = conn.read(
                         new OtpErlangString(testTime + key + i));
                 OtpErlangTuple expected = new OtpErlangTuple(data);
                 assertEquals(expected, actual);
@@ -635,7 +633,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             for (int i = 0; i < testData.length - 1; i += 2) {
-                assertEquals(testData[i + 1], conn.read(testTime + key + i));
+                assertEquals(testData[i + 1], conn.read(testTime + key + i).toString());
             }
         } finally {
             conn.closeConnection();
@@ -684,7 +682,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             for (int i = 0; i < testData.length - 1; i += 2) {
-                assertEquals(testData[i], conn.read(testTime + key + i));
+                assertEquals(testData[i], conn.read(testTime + key + i).toString());
             }
         } finally {
             conn.closeConnection();

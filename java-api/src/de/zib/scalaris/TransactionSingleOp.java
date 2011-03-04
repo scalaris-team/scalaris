@@ -26,7 +26,7 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
- * Provides methods to read and write key/value pairs to a scalaris ring.
+ * Provides methods to read and write key/value pairs to/from a scalaris ring.
  * 
  * <p>
  * Each operation is a single transaction. If you are looking for more
@@ -35,24 +35,30 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * 
  * <p>
  * Instances of this class can be generated using a given connection to a
- * scalaris node using {@link #TransactionSingleOp(Connection)} or without a
- * connection ({@link #TransactionSingleOp()}) in which case a new connection is
- * created using {@link ConnectionFactory#createConnection()}.
+ * scalaris node ({@link #TransactionSingleOp(Connection)}) or without a
+ * connection ({@link #TransactionSingleOp()}) in which case a new connection
+ * is created using {@link ConnectionFactory#createConnection()}.
  * </p>
  * 
  * <p>
  * There are two paradigms for reading and writing values:
  * <ul>
- *  <li> using Java {@link String}s: {@link #read(String)}, {@link #write(String, String)}
- *       <p>This is the safe way of accessing scalaris where type conversions
- *       are handled by the API and the user doesn't have to worry about anything else.</p>
- *       <p>Be aware though that this is not the most efficient way of handling strings!</p>
- *  <li> using custom {@link OtpErlangObject}s: {@link #readObject(OtpErlangString)},
- *       {@link #writeObject(OtpErlangString, OtpErlangObject)}
- *       <p>Here the user can specify custom behaviour and increase performance.
- *       Handling the stored types correctly is at the user's hand.</p>
- *       <p>An example using erlang objects to improve performance for inserting strings is
- *       provided by {@link de.zib.scalaris.examples.CustomOtpFastStringObject} and can be
+ *  <li> using arbitrary erlang objects extending OtpErlangObject:
+ *       {@link #read(OtpErlangString)},
+ *       {@link #write(OtpErlangString, OtpErlangObject)}
+ *  <li> using (supported) Java objects:
+ *       {@link #read(String)}, {@link #write(String, Object)}
+ *       <p>These types can be accessed from any Scalaris API and translate to
+ *       each language's native types, e.g. String and OtpErlangString.
+ *       A list of supported types can be found in the {@link ErlangValue}
+ *       class which will perform the conversion.</p>
+ *       <p>Additional (custom) types can be used by providing a class that
+ *       extends the {@link ErlangValue} class.
+ *       The user can specify custom behaviour but the correct
+ *       handling of these values is at the user's hand.</p>
+ *       <p>An example using erlang objects to improve performance for
+ *       inserting strings is provided by
+ *       {@link de.zib.scalaris.examples.ErlangValueFastString} and can be
  *       tested by {@link de.zib.scalaris.examples.FastStringBenchmark}.</p>
  * </ul> 
  * </p>
@@ -64,12 +70,13 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpKey;
  *   
  *   TransactionSingleOp sc = new TransactionSingleOp();
- *   String value             = sc.read(key);          // {@link #read(String)}
- *   OtpErlangObject optValue = sc.readObject(otpKey); // {@link #readObject(OtpErlangString)}
+ *   String value             = sc.read(key).toString(); // {@link #read(String)}
+ *   OtpErlangObject optValue = sc.read(otpKey);         // {@link #read(OtpErlangString)}
  * </code>
  * </pre>
  * 
- * <p>For the full example, see {@link de.zib.scalaris.examples.TransactionSingleOpReadExample}</p>
+ * <p>For the full example, see
+ * {@link de.zib.scalaris.examples.TransactionSingleOpReadExample}</p>
  * 
  * <h3>Writing values</h3>
  * <pre>
@@ -81,23 +88,24 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   
  *   TransactionSingleOp sc = new TransactionSingleOp();
  *   sc.write(key, value);             // {@link #write(String, String)}
- *   sc.writeObject(otpKey, otpValue); // {@link #writeObject(OtpErlangString, OtpErlangObject)}
+ *   sc.writeObject(otpKey, otpValue); // {@link #write(OtpErlangString, OtpErlangObject)}
  * </code>
  * </pre>
  * 
- * <p>For the full example, see {@link de.zib.scalaris.examples.TransactionSingleOpWriteExample}</p>
+ * <p>For the full example, see
+ * {@link de.zib.scalaris.examples.TransactionSingleOpWriteExample}</p>
  * 
  * <h3>Connection errors</h3>
  * 
  * Errors when setting up connections or trying to send/receive RPCs will be
  * handed to the {@link ConnectionPolicy} that has been set when the connection
  * was created. By default, {@link ConnectionFactory} uses
- * {@link DefaultConnectionPolicy} which implements automatic connection-retries
- * by classifying nodes as good or bad depending on their previous state. The
- * number of automatic retries is adjustable (default: 3).
+ * {@link DefaultConnectionPolicy} which implements automatic connection
+ * retries by classifying nodes as good or bad depending on their previous
+ * state. The number of automatic retries is adjustable (default: 3).
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.7
+ * @version 2.8
  * @since 2.0
  */
 public class TransactionSingleOp {
@@ -152,8 +160,10 @@ public class TransactionSingleOp {
 	 *             if the requested key does not exist
 	 * @throws UnknownException
 	 *             if any other error occurs
+     * 
+     * @since 2.9
 	 */
-	public OtpErlangObject readObject(OtpErlangString key)
+	public OtpErlangObject read(OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
 		OtpErlangObject received_raw = null;
@@ -216,54 +226,13 @@ public class TransactionSingleOp {
 	 * @throws UnknownException
 	 *             if any other error occurs
 	 * 
-	 * @see #readObject(OtpErlangString)
+	 * @see #read(OtpErlangString)
+     * @since 2.9
 	 */
-	public String read(String key) throws ConnectionException,
-			TimeoutException, NotFoundException, UnknownException {
-		try {
-			CustomOtpStringObject result = new CustomOtpStringObject();
-			readCustom(key, result);
-			return result.getValue();
-//			return ((OtpErlangString) readObject(new OtpErlangString(key)))
-//					.stringValue();
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e);
-		}
-	}
-	
-	/**
-	 * Gets the value stored under the given <tt>key</tt>.
-	 * 
-	 * @param key
-	 *            the key to look up
-	 * @param value 
-	 *            container that stores the value returned by scalaris
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to fetch the value
-	 * @throws NotFoundException
-	 *             if the requested key does not exist
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 * 
-	 * @see #readObject(OtpErlangString)
-	 * @since 2.1
-	 */
-	public void readCustom(String key, CustomOtpObject<?> value)
-            throws ConnectionException, TimeoutException, NotFoundException,
-            UnknownException {
-		try {
-			value.setOtpValue(readObject(new OtpErlangString(key)));
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e);
-		}
-	}
+    public ErlangValue read(String key) throws ConnectionException,
+            TimeoutException, NotFoundException, UnknownException {
+        return new ErlangValue(read(new OtpErlangString(key)));
+    }
 
     // /////////////////////////////
     // write methods
@@ -287,8 +256,10 @@ public class TransactionSingleOp {
      *             if the commit of the write failed
      * @throws UnknownException
      *             if any other error occurs
+     * 
+     * @since 2.9
      */
-    public void writeObject(OtpErlangString key, OtpErlangObject value)
+    public void write(OtpErlangString key, OtpErlangObject value)
             throws ConnectionException, TimeoutException, AbortException, UnknownException {
         OtpErlangObject received_raw = null;
         try {
@@ -334,6 +305,9 @@ public class TransactionSingleOp {
     /**
      * Stores the given <tt>key</tt>/<tt>value</tt> pair.
      * 
+     * @param <T>
+     *            the type of the value to store.
+     *            See {@link ErlangValue} for a list of supported types.
      * @param key
      *            the key to store the value for
      * @param value
@@ -350,39 +324,12 @@ public class TransactionSingleOp {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @see #writeObject(OtpErlangString, OtpErlangObject)
+     * @see #write(OtpErlangString, OtpErlangObject)
+     * @since 2.9
      */
-    public void write(String key, String value) throws ConnectionException,
+    public <T> void write(String key, T value) throws ConnectionException,
             TimeoutException, AbortException, UnknownException {
-        writeCustom(key, new CustomOtpStringObject(value));
-//      writeObject(new OtpErlangString(key), new OtpErlangString(value));
-    }
-    
-    /**
-     * Stores the given <tt>key</tt>/<tt>value</tt> pair.
-     * 
-     * @param key
-     *            the key to store the value for
-     * @param value
-     *            the value to store
-     * 
-     * @throws ConnectionException
-     *             if the connection is not active or a communication error
-     *             occurs or an exit signal was received or the remote node
-     *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
-     * @throws AbortException
-     *             if the commit of the write failed
-     * @throws UnknownException
-     *             if any other error occurs
-     * 
-     * @see #writeObject(OtpErlangString, OtpErlangObject)
-     * @since 2.1
-     */
-    public void writeCustom(String key, CustomOtpObject<?> value)
-            throws ConnectionException, TimeoutException, AbortException, UnknownException {
-        writeObject(new OtpErlangString(key), value.getOtpValue());
+        write(new OtpErlangString(key), new ErlangValue(value).value());
     }
 
     // /////////////////////////////
@@ -415,9 +362,9 @@ public class TransactionSingleOp {
      * @throws KeyChangedException
      *             if the key did not match <tt>old_value</tt>
      * 
-     * @since 2.7
+     * @since 2.9
      */
-    public void testAndSetObject(OtpErlangString key,
+    public void testAndSet(OtpErlangString key,
             OtpErlangObject old_value, OtpErlangObject new_value)
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
@@ -475,6 +422,9 @@ public class TransactionSingleOp {
      * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
      * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
      * 
+     * @param <T>
+     *            the type of the value to store.
+     *            See {@link ErlangValue} for a list of supported types.
      * @param key
      *            the key to store the value for
      * @param old_value
@@ -497,53 +447,15 @@ public class TransactionSingleOp {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @see #writeObject(OtpErlangString, OtpErlangObject)
-     * @since 2.7
+     * @see #testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)
+     * @since 2.9
      */
-    public void testAndSet(String key, String old_value, String new_value)
+    public <T> void testAndSet(String key, T old_value, T new_value)
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
-        testAndSetCustom(key, new CustomOtpStringObject(old_value),
-                new CustomOtpStringObject(new_value));
-//        testAndSetObject(new OtpErlangString(key), new OtpErlangString(old_value),
-//                new OtpErlangString(new_value));
-    }
-    
-    /**
-     * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
-     * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
-     * 
-     * @param key
-     *            the key to store the value for
-     * @param old_value
-     *            the old value to check
-     * @param new_value
-     *            the value to store
-     * 
-     * @throws ConnectionException
-     *             if the connection is not active or a communication error
-     *             occurs or an exit signal was received or the remote node
-     *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
-     * @throws AbortException
-     *             if the commit of the write failed
-     * @throws NotFoundException
-     *             if the requested key does not exist
-     * @throws KeyChangedException
-     *             if the key did not match <tt>old_value</tt>
-     * @throws UnknownException
-     *             if any other error occurs
-     * 
-     * @see #writeObject(OtpErlangString, OtpErlangObject)
-     * @since 2.7
-     */
-    public void testAndSetCustom(String key, CustomOtpObject<?> old_value,
-            CustomOtpObject<?> new_value) throws ConnectionException,
-            TimeoutException, AbortException, NotFoundException,
-            KeyChangedException, UnknownException {
-        testAndSetObject(new OtpErlangString(key), old_value.getOtpValue(),
-                new_value.getOtpValue());
+        testAndSet(new OtpErlangString(key),
+                new ErlangValue(old_value).value(),
+                new ErlangValue(new_value).value());
     }
 	
 	/**

@@ -214,7 +214,7 @@ public class TransactionTest {
 	}
 	
 	/**
-	 * Test method for {@link Transaction#readObject(OtpErlangString)}.
+	 * Test method for {@link Transaction#read(OtpErlangString)}.
 	 * 
 	 * @throws UnknownException 
 	 * @throws ConnectionException 
@@ -222,13 +222,13 @@ public class TransactionTest {
 	 * @throws TimeoutException 
 	 */
 	@Test(expected = NotFoundException.class)
-	public void testReadObject_NotFound() throws ConnectionException,
+	public void testReadOtp_NotFound() throws ConnectionException,
 			UnknownException,
 			TimeoutException, NotFoundException {
-		String key = "_ReadObject_NotFound";
+		String key = "_ReadOtp_NotFound";
 		Transaction t = new Transaction();
 		try {
-			t.readObject(new OtpErlangString(testTime + key));
+			t.read(new OtpErlangString(testTime + key));
 		} finally {
 			t.closeConnection();
 		}
@@ -244,13 +244,13 @@ public class TransactionTest {
 	 * @throws NotFoundException
 	 */
 	@Test(expected = ConnectionException.class)
-	public void testReadObject_NotConnected() throws ConnectionException,
+	public void testReadOtp_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
-		String key = "_ReadObject_NotConnected";
+		String key = "_ReadOtp_NotConnected";
 		Transaction t = new Transaction();
 		try {
 			t.closeConnection();
-			t.readObject(new OtpErlangString(testTime + key));
+			t.read(new OtpErlangString(testTime + key));
 		} finally {
 			t.closeConnection();
 		}
@@ -303,7 +303,7 @@ public class TransactionTest {
             assertTrue(notFound);
             t.write(testTime + key, testData[0]);
             
-            assertEquals(testData[0], t.read(testTime + key));
+            assertEquals(testData[0], t.read(testTime + key).toString());
         } finally {
             t.closeConnection();
         }
@@ -330,8 +330,8 @@ public class TransactionTest {
 			// now try to read the data:
 			
 			for (int i = 0; i < testData.length; ++i) {
-				String actual = t.read(testTime + "_testWriteString1_" + i);
-				assertEquals(new OtpErlangString(testData[i]), actual);
+				String actual = t.read(testTime + "_testWriteString1_" + i).toString();
+				assertEquals(testData[i], actual);
 			}
 			
 			// commit the transaction and try to read the data with a new one:
@@ -339,8 +339,8 @@ public class TransactionTest {
 			t.commit();
 			t = new Transaction();
 			for (int i = 0; i < testData.length; ++i) {
-				String actual = t.read(testTime + "_testWriteString1_" + i);
-				assertEquals(new OtpErlangString(testData[i]), actual);
+				String actual = t.read(testTime + "_testWriteString1_" + i).toString();
+				assertEquals(testData[i], actual);
 			}
 		} finally {
 			t.closeConnection();
@@ -349,7 +349,7 @@ public class TransactionTest {
 
 	/**
 	 * Test method for
-	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} with a
+	 * {@link Transaction#write(OtpErlangString, OtpErlangObject)} with a
 	 * closed connection.
 	 * 
 	 * @throws UnknownException
@@ -358,13 +358,13 @@ public class TransactionTest {
 	 * @throws NotFoundException
 	 */
 	@Test(expected = ConnectionException.class)
-	public void testWriteObject_NotConnected() throws ConnectionException,
+	public void testWriteOtp_NotConnected() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException {
-		String key = "_WriteObject_NotConnected";
+		String key = "_WriteOtp_NotConnected";
 		Transaction t = new Transaction();
 		try {
 			t.closeConnection();
-			t.writeObject(
+			t.write(
 					new OtpErlangString(testTime + key),
 					new OtpErlangString(testData[0]));
 		} finally {
@@ -373,8 +373,8 @@ public class TransactionTest {
 	}
 
     /**
-     * Test method for {@link Transaction#readObject(OtpErlangString)} and
-     * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} which
+     * Test method for {@link Transaction#read(OtpErlangString)} and
+     * {@link Transaction#write(OtpErlangString, OtpErlangObject)} which
      * should show that writing a value for a key for which a previous read
      * returned a NotFoundException is possible.
      * 
@@ -384,22 +384,22 @@ public class TransactionTest {
      * @throws NotFoundException
      */
     @Test
-    public void testWriteObject_NotFound() throws ConnectionException, UnknownException, TimeoutException, NotFoundException {
-        String key = "_WriteObject_notFound";
+    public void testWriteOtp_NotFound() throws ConnectionException, UnknownException, TimeoutException, NotFoundException {
+        String key = "_WriteOtp_notFound";
         Transaction t = new Transaction();
         try {
             boolean notFound = false;
             try {
-                t.readObject(new OtpErlangString(testTime + key));
+                t.read(new OtpErlangString(testTime + key));
             } catch (NotFoundException e) {
                 notFound = true;
             }
             assertTrue(notFound);
-            t.writeObject(
+            t.write(
                     new OtpErlangString(testTime + key),
                     new OtpErlangString(testData[0]));
             
-            assertEquals(testData[0], t.read(testTime + key));
+            assertEquals(testData[0], t.read(testTime + key).toString());
         } finally {
             t.closeConnection();
         }
@@ -407,8 +407,8 @@ public class TransactionTest {
 
 	/**
 	 * Test method for
-	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} and
-	 * {@link Transaction#readObject(OtpErlangString)}.
+	 * {@link Transaction#write(OtpErlangString, OtpErlangObject)} and
+	 * {@link Transaction#read(OtpErlangString)}.
 	 * 
 	 * @throws NotFoundException
 	 * @throws UnknownException
@@ -419,7 +419,7 @@ public class TransactionTest {
 	 * TODO: fix test for the original data set of 160 items (is way too slow or not working at all)
 	 */
 	@Test
-	public void testWriteObject() throws ConnectionException,
+	public void testWriteOtp() throws ConnectionException,
 			TimeoutException, UnknownException, NotFoundException, AbortException {
 		Transaction t = new Transaction();
 		try {
@@ -427,7 +427,7 @@ public class TransactionTest {
 				OtpErlangObject[] data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),
 						new OtpErlangString(testData[i + 1]) };
-				t.writeObject(new OtpErlangString(testTime + "_testWriteObject1_" + i),
+				t.write(new OtpErlangString(testTime + "_testWriteOtp1_" + i),
 						new OtpErlangTuple(data));
 			}
 
@@ -437,8 +437,8 @@ public class TransactionTest {
 				OtpErlangObject[] data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),
 						new OtpErlangString(testData[i + 1]) };
-				OtpErlangObject actual = t.readObject(
-						new OtpErlangString(testTime + "_testWriteObject1_" + i));
+				OtpErlangObject actual = t.read(
+						new OtpErlangString(testTime + "_testWriteOtp1_" + i));
 				OtpErlangTuple expected = new OtpErlangTuple(data);
 
 				assertEquals(expected, actual);
@@ -452,8 +452,8 @@ public class TransactionTest {
 				OtpErlangObject[] data = new OtpErlangObject[] {
 						new OtpErlangString(testData[i]),
 						new OtpErlangString(testData[i + 1]) };
-				OtpErlangObject actual = t.readObject(
-						new OtpErlangString(testTime + "_testWriteObject1_" + i));
+				OtpErlangObject actual = t.read(
+						new OtpErlangString(testTime + "_testWriteOtp1_" + i));
 				OtpErlangTuple expected = new OtpErlangTuple(data);
 
 				assertEquals(expected, actual);

@@ -369,7 +369,7 @@ public class TransactionReadWriteExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue = new OtpErlangString(value);
 		try {
-			transaction.writeObject(otpKey, otpValue);
+			transaction.write(otpKey, otpValue);
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") succeeded");
 		} catch (ConnectionException e) {
@@ -459,7 +459,7 @@ public class TransactionReadWriteExample {
 		OtpErlangString otpKey = new OtpErlangString(key);
 		OtpErlangString otpValue;
 		try {
-			otpValue = (OtpErlangString) transaction.readObject(otpKey);
+			otpValue = (OtpErlangString) transaction.read(otpKey);
 			System.out.println("      read(" + otpKey.stringValue() + ") == "
 					+ otpValue.stringValue());
 			return otpValue.stringValue();
@@ -513,7 +513,7 @@ public class TransactionReadWriteExample {
 		System.out.println("    `String read(String)`...");
 		String value;
 		try {
-			value = transaction.read(key);
+			value = transaction.read(key).toString();
 			System.out.println("      read(" + key + ") == " + value);
 			return value;
 		} catch (ConnectionException e) {

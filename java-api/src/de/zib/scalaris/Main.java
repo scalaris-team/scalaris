@@ -104,7 +104,7 @@ public class Main {
 			checkArguments(key, options, "r");
 			try {
 				TransactionSingleOp sc = new TransactionSingleOp();
-				String value = sc.read(key);
+				String value = sc.read(key).value().toString();
 				System.out.println("read(" + key + ") == " + value);
 			} catch (ConnectionException e) {
 				printException("read failed with connection error", e, verbose);

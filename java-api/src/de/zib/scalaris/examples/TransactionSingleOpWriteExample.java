@@ -67,7 +67,7 @@ public class TransactionSingleOpWriteExample {
 			TransactionSingleOp sc = new TransactionSingleOp();
 			System.out
 					.println("    `void writeObject(OtpErlangString, OtpErlangObject)`...");
-			sc.writeObject(otpKey, otpValue);
+			sc.write(otpKey, otpValue);
 			System.out.println("      write(" + otpKey.stringValue() + ", "
 					+ otpValue.stringValue() + ") succeeded");
 		} catch (ConnectionException e) {

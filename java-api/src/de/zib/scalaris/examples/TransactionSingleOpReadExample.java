@@ -61,7 +61,7 @@ public class TransactionSingleOpReadExample {
 			TransactionSingleOp sc = new TransactionSingleOp();
 			System.out
 					.println("    `OtpErlangObject readObject(OtpErlangString)`...");
-			otpValue = (OtpErlangString) sc.readObject(otpKey);
+			otpValue = (OtpErlangString) sc.read(otpKey);
 			System.out.println("      read(" + otpKey.stringValue() + ") == "
 					+ otpValue.stringValue());
 		} catch (ConnectionException e) {
@@ -70,35 +70,38 @@ public class TransactionSingleOpReadExample {
 		} catch (TimeoutException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with timeout: " + e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("      read(" + otpKey.stringValue()
-					+ ") failed with unknown: " + e.getMessage());
 		} catch (NotFoundException e) {
 			System.out.println("      read(" + otpKey.stringValue()
 					+ ") failed with not found: " + e.getMessage());
 		} catch (ClassCastException e) {
 			System.out.println("      read(" + otpKey.stringValue()
-					+ ") failed with unknown return type: " + e.getMessage());
+					+ ") failed with unexpected return type: " + e.getMessage());
+        } catch (UnknownException e) {
+            System.out.println("      read(" + otpKey.stringValue()
+                    + ") failed with unknown: " + e.getMessage());
 		}
 
 		try {
 			System.out.println("  creating object...");
 			TransactionSingleOp sc = new TransactionSingleOp();
 			System.out.println("    `String read(String)`...");
-			value = sc.read(key);
+			value = sc.read(key).toString();
 			System.out.println("      read(" + key + ") == " + value);
 		} catch (ConnectionException e) {
 			System.out.println("      read(" + key + ") failed: "
 					+ e.getMessage());
 		} catch (TimeoutException e) {
 			System.out.println("      read(" + key + ") failed with timeout: "
-					+ e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("      read(" + key + ") failed with unknown: "
-					+ e.getMessage());
+                    + e.getMessage());
+        } catch (ClassCastException e) {
+            System.out.println("      read(" + key + ") failed with unexpected return type: "
+                    + e.getMessage());
 		} catch (NotFoundException e) {
-			System.out.println("      read(" + key
-					+ ") failed with not found: " + e.getMessage());
+			System.out.println("      read(" + key + ") failed with not found: "
+			        + e.getMessage());
+        } catch (UnknownException e) {
+            System.out.println("      read(" + key + ") failed with unknown: "
+                    + e.getMessage());
 		}
 	}
 }
