@@ -62,7 +62,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * number of automatic retries is adjustable (default: 3).
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.6
+ * @version 2.8
  * @since 2.6
  */
 public class ReplicatedDHT {
@@ -125,12 +125,12 @@ public class ReplicatedDHT {
      * @throws UnknownException
      *             if any other error occurs
      * 
-     * @since 2.2
+     * @since 2.8
      * 
-     * @see #delete(String, int)
+     * @see #delete(OtpErlangString, int)
      */
-    public long delete(String key) throws ConnectionException,
-    TimeoutException, UnknownException, NodeNotFoundException {
+    public long delete(OtpErlangString key) throws ConnectionException,
+    TimeoutException, NodeNotFoundException, UnknownException {
         return delete(key, 2000);
     }
 
@@ -159,18 +159,16 @@ public class ReplicatedDHT {
      * @throws UnknownException
      *             if any other error occurs
      * 
-     * @since 2.2
-     * 
-     * @see #delete(String)
+     * @since 2.8
      */
-    public long delete(String key, int timeout) throws ConnectionException,
-    TimeoutException, UnknownException, NodeNotFoundException {
+    public long delete(OtpErlangString key, int timeout) throws ConnectionException,
+    TimeoutException, NodeNotFoundException, UnknownException {
         OtpErlangObject received_raw = null;
         lastDeleteResult = null;
         try {
             received_raw = connection.doRPC("api_rdht", "delete",
                     new OtpErlangList( new OtpErlangObject[] {
-                            new OtpErlangString(key),
+                            key,
                             new OtpErlangInt(timeout) }));
             OtpErlangTuple received = (OtpErlangTuple) received_raw;
             OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
@@ -219,6 +217,68 @@ public class ReplicatedDHT {
             // received_raw is not null since the first class cast is after the RPC!
             throw new UnknownException(e, received_raw);
         }
+    }
+    
+    /**
+     * Tries to delete all replicas of the given <tt>key</tt> in 2000ms.
+     * 
+     * @param key
+     *            the key to delete
+     * 
+     * @return the number of successfully deleted replicas
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to delete the value
+     * @throws NodeNotFoundException
+     *             if no scalaris node was found
+     * @throws UnknownException
+     *             if any other error occurs
+     * 
+     * @since 2.2
+     * 
+     * @see #delete(String, int)
+     */
+    public long delete(String key) throws ConnectionException,
+    TimeoutException, NodeNotFoundException, UnknownException {
+        return delete(key, 2000);
+    }
+
+    /**
+     * Tries to delete all replicas of the given <tt>key</tt>.
+     * 
+     * WARNING: This function can lead to inconsistent data (e.g. deleted items
+     * can re-appear). Also when re-creating an item the version before the
+     * delete can re-appear.
+     * 
+     * @param key
+     *            the key to delete
+     * @param timeout
+     *            the time (in milliseconds) to wait for results
+     * 
+     * @return the number of successfully deleted replicas
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to delete the value
+     * @throws NodeNotFoundException
+     *             if no scalaris node was found
+     * @throws UnknownException
+     *             if any other error occurs
+     * 
+     * @since 2.2
+     * 
+     * @see #delete(OtpErlangString, int)
+     */
+    public long delete(String key, int timeout) throws ConnectionException,
+    TimeoutException, NodeNotFoundException, UnknownException {
+        return delete(new OtpErlangString(key), timeout);
     }
 
     /**
