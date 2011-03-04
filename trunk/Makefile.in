@@ -63,6 +63,7 @@ SCALARIS_CT_NAME ?= ct
 # for java-test and java-bench:
 SCALARIS_UNITTEST_PORT ?= 14194
 SCALARIS_UNITTEST_YAWS_PORT ?= 8000
+SCALARIS_JTEST_NAME ?= jtest_boot
 
 all: compile
 #all: compile dialyzer java test docs
@@ -96,15 +97,15 @@ java:
 	ant -buildfile java-api/build.xml jar
 
 java-test: compile java
-	SCALARIS_NODE_NAME="jtest_boot" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port $(SCALARIS_UNITTEST_PORT) -scalaris yaws_port $(SCALARIS_UNITTEST_YAWS_PORT) -scalaris boot_host {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),boot} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" ./bin/scalarisctl -d boot start; \
-	SCALARIS_JAPI_NODE="jtest_boot@localhost" ant -buildfile java-api/build.xml test ; \
+	SCALARIS_NODE_NAME="$(SCALARIS_JTEST_NAME)" SCALARIS_ADDITIONAL_PARAMETERS="-scalaris cs_port $(SCALARIS_UNITTEST_PORT) -scalaris yaws_port $(SCALARIS_UNITTEST_YAWS_PORT) -scalaris boot_host {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),boot} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" ./bin/scalarisctl -d boot start; \
+	SCALARIS_JAPI_NODE="$(SCALARIS_JTEST_NAME)@localhost" ant -buildfile java-api/build.xml test ; \
 	FAILED=$$? ; \
-	SCALARIS_NODE_NAME="jtest_boot" ./bin/scalarisctl boot stop ; \
+	SCALARIS_NODE_NAME="$(SCALARIS_JTEST_NAME)" ./bin/scalarisctl boot stop ; \
 	if [ $$FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/jtest_boot/* ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
