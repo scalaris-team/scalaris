@@ -196,10 +196,10 @@ run_bench_read_v2(Owner, _Key, 0, Fail) ->
     io:format("repeated requests: ~p~n", [Fail]),
     comm:send_local(Owner , {done, ok});
 run_bench_read_v2(Owner, Key, Iterations, Fail) ->
-    case cs_api_v2:read(Key) of
+    case api_tx:read(Key) of
         {fail, _Reason} ->
             run_bench_read_v2(Owner, Key, Iterations, Fail + 1);
-        _Value ->
+        {ok, _Value} ->
             run_bench_read_v2(Owner, Key, Iterations - 1, Fail)
     end.
 
@@ -249,8 +249,8 @@ get_and_init_key() ->
 get_and_init_key(_Key, 0) ->
     fail;
 get_and_init_key(Key, Count) ->
-    case cs_api_v2:write(Key, 0) of
-        ok ->
+    case api_tx:write(Key, 0) of
+        {ok} ->
             Key;
         {fail, abort} ->
             io:format("geT_and_init_key 1 failed, retrying~n", []),
