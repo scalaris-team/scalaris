@@ -20,9 +20,6 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--define(CS_API, cs_api_v2).
-%-define(CS_API, cs_api).
-
 -compile(export_all).
 -include("unittest.hrl").
 -include("scalaris.hrl").
@@ -57,7 +54,7 @@ abort_prepared_r(_) ->
     %% quorum reads should alway succeed
     _ = [ begin
               Key = init_new_db_key("abort_prepared_r"),
-              abort_prepared(Key, read, [MC1, MC2, MC3, MC4], ok)
+              abort_prepared(Key, read, [MC1, MC2, MC3, MC4], {ok, "abort_prepared_r"})
           end
           || MC1 <- causes(), MC2 <- causes(),
              MC3 <- causes(), MC4 <- causes()],
@@ -95,7 +92,7 @@ abort_prepared_rmc(_) ->
     _ = [ begin
               Key = init_new_db_key("abort_prepared_rmc"),
               {TLog, _} =
-                  ?CS_API:process_request_list(?CS_API:new_tlog(),
+                  api_tx:req_list(api_tx:new_tlog(),
                                                [{read, Key}]),
               abort_prepared(Key, {commit_tlog, TLog}, [MC1, MC2, MC3, MC4],
                              calc_rmc_outcome([MC1, MC2, MC3, MC4]))
@@ -110,7 +107,7 @@ abort_prepared_wmc(_) ->
     _ = [ begin
               Key = init_new_db_key("abort_prepared_wmc"),
               {TLog, _} =
-                  ?CS_API:process_request_list(?CS_API:new_tlog(),
+                  api_tx:req_list(api_tx:new_tlog(),
                                                [{write, Key, "wmc"}]),
               Pattern = [MC1, MC2, MC3, MC4],
               abort_prepared(Key, {commit_tlog, TLog}, Pattern,
@@ -142,32 +139,15 @@ abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
 
     Outcome =
         case Op of
-            write -> ?CS_API:write(Key,
-                                     io_lib:format("~p with ~p", [Op, PreOps]));
+            write ->
+                api_tx:write(Key, io_lib:format("~p with ~p", [Op, PreOps]));
             read ->
-                case ?CS_API:read(Key) of
-                    {fail, Reason} -> {fail, Reason};
-                    _ -> ok
-                end;
+                api_tx:read(Key);
             read_commit ->
-                case ?CS_API:process_request_list(?CS_API:new_tlog(),
-                                                  [{read, Key}, {commit}]) of
-                    %% cs_api
-                    {_TLog, [_, {commit, fail, {fail, abort}}]} -> {fail, abort};
-                    {_TLog, [_, {commit, ok, _}]} -> ok;
-                    %% cs_api_v2
-                    {_TLog, [_, abort]} -> {fail, abort};
-                    {_TLog, [_, commit]} -> ok
-                end;
+                {_TLog, [_, Res]} = api_tx:req_list([{read, Key}, {commit}]),
+                Res;
             {commit_tlog, TLog} ->
-                case ?CS_API:process_request_list(TLog, [{commit}]) of
-                    %% cs_api
-                    {_TLog, [{commit, fail, {fail, abort}}]} -> {fail, abort};
-                    {_TLog, [{commit, ok, _}]} -> ok;
-                    %% cs_api_v2
-                    {_TLog, [abort]} -> {fail, abort};
-                    {_TLog, [commit]} -> ok
-                end
+                api_tx:commit(TLog)
         end,
     case ExpectedOutcome of
         ok_or_abort ->
@@ -187,12 +167,12 @@ calc_w_outcome(PreOps) ->
     NumVersionInc = length([ X || X <- PreOps, X =:= versioninc ]),
     NumNone =       length([ X || X <- PreOps, X =:= none ]),
 
-    if (4 =:= NumVersionInc) -> ok;
-       (4 =:= NumVersionDec) -> ok;
-       (4 =:= NumNone) -> ok;
-       (1 =:= NumReadlock andalso NumNone =:= 3) -> ok;
-       (1 =:= NumWritelock andalso NumNone =:= 3) -> ok;
-       (1 =:= NumVersionDec andalso NumNone =:= 3) -> ok;
+    if (4 =:= NumVersionInc) -> {ok};
+       (4 =:= NumVersionDec) -> {ok};
+       (4 =:= NumNone) -> {ok};
+       (1 =:= NumReadlock andalso NumNone =:= 3) -> {ok};
+       (1 =:= NumWritelock andalso NumNone =:= 3) -> {ok};
+       (1 =:= NumVersionDec andalso NumNone =:= 3) -> {ok};
        (1 =:= NumVersionInc andalso 3 =:= NumNone) -> ok_or_abort;
 
        (3 =:= NumVersionDec andalso 1 =:= NumReadlock) -> ok_or_abort;
@@ -200,9 +180,9 @@ calc_w_outcome(PreOps) ->
        (3 =:= NumVersionDec andalso 1 =:= NumVersionInc) -> ok_or_abort;
        (3 =:= NumVersionDec andalso 1 =:= NumNone) -> ok_or_abort;
        (3 =:= NumVersionInc andalso 1 =:= NumReadlock) -> ok_or_abort;
-       (3 =:= NumVersionInc andalso 1 =:= NumVersionDec) -> ok;
-       (3 =:= NumVersionInc andalso 1 =:= NumNone) -> ok;
-       (3 =:= NumVersionInc andalso 1 =:= NumWritelock) -> ok;
+       (3 =:= NumVersionInc andalso 1 =:= NumVersionDec) -> {ok};
+       (3 =:= NumVersionInc andalso 1 =:= NumNone) -> {ok};
+       (3 =:= NumVersionInc andalso 1 =:= NumWritelock) -> {ok};
 
        true -> {fail, abort}
     end.
@@ -214,8 +194,8 @@ calc_rc_outcome(PreOps) ->
     NumWritelock =  length([ X || X <- PreOps, X =:= writelock ]),
     NumVersionInc = length([ X || X <- PreOps, X =:= versioninc ]),
 
-    if (0 =:= NumWritelock) -> ok;
-       (1 =:= NumWritelock andalso 1 =/= NumVersionInc) -> ok;
+    if (0 =:= NumWritelock) -> {ok};
+       (1 =:= NumWritelock andalso 1 =/= NumVersionInc) -> {ok};
        (1 =:= NumWritelock andalso 1 =:= NumVersionInc) -> ok_or_abort;
 
        true -> {fail, abort}
@@ -228,14 +208,14 @@ calc_rmc_outcome(PreOps) ->
     NumVersionInc = length([ X || X <- PreOps, X =:= versioninc ]),
     NumNone =       length([ X || X <- PreOps, X =:= none ]),
 
-    if (4 =:= (NumReadlock + NumNone)) -> ok;
-       (3 =:= NumReadlock) -> ok;
-       (3 =:= NumReadlock + NumVersionDec + NumNone) -> ok;
+    if (4 =:= (NumReadlock + NumNone)) -> {ok};
+       (3 =:= NumReadlock) -> {ok};
+       (3 =:= NumReadlock + NumVersionDec + NumNone) -> {ok};
        (2 =< NumReadlock + NumNone)
-       andalso (0 =:= NumWritelock + NumVersionInc) -> ok;
+       andalso (0 =:= NumWritelock + NumVersionInc) -> {ok};
        (1 =:= NumWritelock) -> {fail, abort};
-       (3 =:= NumVersionDec) -> ok;
-       (4 =:= NumVersionDec) -> ok;
+       (3 =:= NumVersionDec) -> {ok};
+       (4 =:= NumVersionDec) -> {ok};
 
        true -> {fail, abort}
     end.
@@ -250,11 +230,11 @@ calc_wmc_outcome(PreOps) ->
     if (NumVersionInc >= 2) -> {fail, abort};
        (NumVersionDec >= 2) -> {fail, abort};
        (NumReadlock >= 2) -> {fail, abort};
-       (NumReadlock =:= 1 andalso NumNone =:= 3) -> ok;
-       (NumWritelock =:= 1 andalso NumNone =:= 3) -> ok;
-       (NumVersionDec =:= 1 andalso NumNone =:= 3) -> ok;
-       (NumNone =:= 4) -> ok;
-       (NumVersionInc =:= 1 andalso NumNone =:= 3) -> ok;
+       (NumReadlock =:= 1 andalso NumNone =:= 3) -> {ok};
+       (NumWritelock =:= 1 andalso NumNone =:= 3) -> {ok};
+       (NumVersionDec =:= 1 andalso NumNone =:= 3) -> {ok};
+       (NumNone =:= 4) -> {ok};
+       (NumVersionInc =:= 1 andalso NumNone =:= 3) -> {ok};
 
        true -> {fail, abort}
     end.
@@ -288,7 +268,7 @@ get_db_entries(Keys) ->
 
 tm_crash(_) ->
     ct:pal("Starting tm_crash~n"),
-    _ = cs_api_v2:write("a", "Hello world!"),
+    _ = api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
     TMs = pid_groups:find_all(tx_tm),
     %% all TMs break at next commit request:
@@ -303,7 +283,7 @@ tm_crash(_) ->
     Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- TMs ],
 
     %% ct:pal("Starting read commit~n"),
-    Res = cs_api_v2:process_request_list(cs_api:new_tlog(), [{read, "a"}, {commit}]),
+    Res = api_tx:req_list([{read, "a"}, {commit}]),
 
     ct:pal("Res: ~p~n", [Res]),
 
@@ -316,7 +296,7 @@ tm_crash(_) ->
 
 tp_crash(_) ->
     ct:pal("Starting tp_crash, simulated by holding the dht_node_proposer~n"),
-    cs_api_v2:write("a", "Hello world!"),
+    api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
     Proposers = pid_groups:find_all(paxos_proposer),
     %% all TMs break at next commit request:
@@ -331,7 +311,7 @@ tp_crash(_) ->
     %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
 
     %% ct:pal("Starting read commit~n"),
-    Res = cs_api_v2:process_request_list(cs_api:new_tlog(), [{read, "a"}, {commit}]),
+    Res = api_tx:req_list([{read, "a"}, {commit}]),
 
     ct:pal("Res: ~p~n", [Res]),
 
