@@ -88,8 +88,8 @@ public class Benchmark {
 		results[2][2] = benchmarks == -1 || benchmarks == 9 ? scalarisBench9(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
-				"TransactionSingleOp.writeObject(OtpErlangString, OtpErlangBinary)",
-				"TransactionSingleOp.writeObject(OtpErlangString, OtpErlangString)",
+				"TransactionSingleOp.write(OtpErlangString, OtpErlangBinary)",
+				"TransactionSingleOp.write(OtpErlangString, OtpErlangString)",
 				"TransactionSingleOp.write(String, String)" };
 		rows = new String[] {
 				"separate connection",
@@ -113,8 +113,8 @@ public class Benchmark {
 		results[2][2] = benchmarks == -1 || benchmarks == 9 ? transBench9(BENCH_DATA_SIZE, testruns) : -1;
 
 		columns = new String[] {
-				"Transaction.writeObject(OtpErlangString, OtpErlangBinary)",
-				"Transaction.writeObject(OtpErlangString, OtpErlangString)",
+				"Transaction.write(OtpErlangString, OtpErlangBinary)",
+				"Transaction.write(OtpErlangString, OtpErlangString)",
 				"Transaction.write(String, String)" };
 		rows = new String[] {
 				"separate connection",
@@ -219,7 +219,7 @@ public class Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction();
-				transaction.writeObject(new OtpErlangString(key + i), value);
+				transaction.write(new OtpErlangString(key + i), value);
 				transaction.commit();
 				transaction.closeConnection();
 			}
@@ -262,7 +262,7 @@ public class Benchmark {
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
-				transaction.writeObject(new OtpErlangString(key + i), value);
+				transaction.write(new OtpErlangString(key + i), value);
 				transaction.commit();
 			}
 			connection.close();
@@ -303,7 +303,7 @@ public class Benchmark {
 
 			Transaction transaction = new Transaction();
 			for (int i = 0; i < testRuns; ++i) {
-				transaction.writeObject(new OtpErlangString(key + i), value);
+				transaction.write(new OtpErlangString(key + i), value);
 				transaction.commit();
 			}
 			transaction.closeConnection();
@@ -344,7 +344,7 @@ public class Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction();
-				transaction.writeObject(new OtpErlangString(key + i), value);
+				transaction.write(new OtpErlangString(key + i), value);
 				transaction.commit();
 				transaction.closeConnection();
 			}
@@ -387,7 +387,7 @@ public class Benchmark {
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				Transaction transaction = new Transaction(connection);
-				transaction.writeObject(new OtpErlangString(key + i), value);
+				transaction.write(new OtpErlangString(key + i), value);
 				transaction.commit();
 			}
 			connection.close();
@@ -428,7 +428,7 @@ public class Benchmark {
 
 			Transaction transaction = new Transaction();
 			for (int i = 0; i < testRuns; ++i) {
-				transaction.writeObject(new OtpErlangString(key + i), value);
+				transaction.write(new OtpErlangString(key + i), value);
 				transaction.commit();
 			}
 			transaction.closeConnection();
@@ -593,7 +593,7 @@ public class Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				TransactionSingleOp sc = new TransactionSingleOp();
-				sc.writeObject(new OtpErlangString(key + i), value);
+				sc.write(new OtpErlangString(key + i), value);
 				sc.closeConnection();
 			}
 
@@ -635,7 +635,7 @@ public class Benchmark {
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				TransactionSingleOp sc = new TransactionSingleOp(connection);
-				sc.writeObject(new OtpErlangString(key + i), value);
+				sc.write(new OtpErlangString(key + i), value);
 			}
 			connection.close();
 
@@ -675,7 +675,7 @@ public class Benchmark {
 
 			TransactionSingleOp sc = new TransactionSingleOp();
 			for (int i = 0; i < testRuns; ++i) {
-				sc.writeObject(new OtpErlangString(key + i), value);
+				sc.write(new OtpErlangString(key + i), value);
 			}
 			sc.closeConnection();
 
@@ -715,7 +715,7 @@ public class Benchmark {
 
 			for (int i = 0; i < testRuns; ++i) {
 				TransactionSingleOp sc = new TransactionSingleOp();
-				sc.writeObject(new OtpErlangString(key + i), value);
+				sc.write(new OtpErlangString(key + i), value);
 				sc.closeConnection();
 			}
 
@@ -757,7 +757,7 @@ public class Benchmark {
 					.createConnection();
 			for (int i = 0; i < testRuns; ++i) {
 				TransactionSingleOp sc = new TransactionSingleOp(connection);
-				sc.writeObject(new OtpErlangString(key + i), value);
+				sc.write(new OtpErlangString(key + i), value);
 			}
 			connection.close();
 
@@ -797,7 +797,7 @@ public class Benchmark {
 
 			TransactionSingleOp sc = new TransactionSingleOp();
 			for (int i = 0; i < testRuns; ++i) {
-				sc.writeObject(new OtpErlangString(key + i), value);
+				sc.write(new OtpErlangString(key + i), value);
 			}
 			sc.closeConnection();
 

@@ -38,7 +38,7 @@ public class TransactionWriteExample {
 	 * Writes all key/value pairs given on the command line (given as "key1
 	 * value1 key2 value2 ...") with the
 	 * {@link Transaction#write(String, String)} and
-	 * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} methods
+	 * {@link Transaction#write(OtpErlangString, OtpErlangObject)} methods
 	 * in a single transaction.<br />
 	 * If no key/value pair is given, the default pairs <code>(key1, value1)</code>,
 	 * <code>(key2, value2)</code> and <code>(key3, value3)</code> are used.
@@ -91,7 +91,7 @@ public class TransactionWriteExample {
 				OtpErlangString otpValue = (OtpErlangString) otpValues
 						.elementAt(i);
 				try {
-					transaction.writeObject(otpKey, otpValue);
+					transaction.write(otpKey, otpValue);
 					System.out.println("      write(" + otpKey.stringValue()
 							+ ", " + otpValue.stringValue() + ") succeeded");
 				} catch (ConnectionException e) {

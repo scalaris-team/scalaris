@@ -37,7 +37,7 @@ public class TransactionReadExample {
 	/**
 	 * Reads all keys given on the command line (given as "key1 key2 ...") with
 	 * the {@link Transaction#read(String)} and
-	 * {@link Transaction#readObject(OtpErlangString)} methods in a single
+	 * {@link Transaction#read(OtpErlangString)} methods in a single
 	 * transaction.<br />
 	 * If no keys are given, the default keys <code>"key1"</code>, <code>"key2"</code>,
 	 * <code>"key3"</code> are used.
@@ -77,7 +77,7 @@ public class TransactionReadExample {
 			for (int i = 0; i < otpKeys.arity(); ++i) {
 				OtpErlangString otpKey = (OtpErlangString) otpKeys.elementAt(i);
 				try {
-					otpValue = (OtpErlangString) transaction.readObject(otpKey);
+					otpValue = (OtpErlangString) transaction.read(otpKey);
 					System.out.println("      read(" + otpKey.stringValue()
 							+ ") == " + otpValue.stringValue());
 				} catch (ConnectionException e) {
@@ -102,7 +102,7 @@ public class TransactionReadExample {
 			for (int i = 0; i < keys.length; ++i) {
 				String key = keys[i];
 				try {
-					value = transaction.read(key);
+					value = transaction.read(key).toString();
 					System.out.println("      read(" + key + ") == " + value);
 				} catch (ConnectionException e) {
 					System.out.println("      read(" + key + ") failed: "

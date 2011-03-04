@@ -18,10 +18,10 @@
  * 
  * <h3>The TransactionSingleOp class</h3>
  * <p>
- * The {@link de.zib.scalaris.TransactionSingleOp} class provides methods for reading,
- * writing and deleting values, with both,
+ * The {@link de.zib.scalaris.TransactionSingleOp} class provides methods for
+ * reading, writing and deleting values, with both,
  * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and
- * Java {@link java.lang.String} objects.
+ * Java objects like {@link java.lang.String}.
  * </p>
  * 
  * <h4>Example:</h4>
@@ -29,27 +29,31 @@
  * <code style="white-space:pre;">
  *   try {
  *     TransactionSingleOp sc = new TransactionSingleOp();
- *     String value = sc.read("key");
+ *     String value = sc.read("key").toString();
  *   } catch (ConnectionException e) {
  *     System.err.println("read failed: " + e.getMessage());
  *   } catch (TimeoutException e) {
  *     System.err.println("read failed with timeout: " + e.getMessage());
- *   } catch (UnknownException e) {
- *     System.err.println("read failed with unknown: " + e.getMessage());
  *   } catch (NotFoundException e) {
  *     System.err.println("read failed with not found: " + e.getMessage());
+ *   } catch (ClassCastException e) {
+ *     System.err.println("read failed with unexpected return type: " + e.getMessage());
+ *   } catch (UnknownException e) {
+ *     System.err.println("read failed with unknown: " + e.getMessage());
  *   }
  * </code>
  * </pre>
  * 
- * <p>See the {@link de.zib.scalaris.TransactionSingleOp} class documentation for more details.</p>
+ * <p>See the {@link de.zib.scalaris.TransactionSingleOp} class documentation
+ * for more details.</p>
  * 
  * <h3>The Transaction class</h3>
  * <p>
- * The {@link de.zib.scalaris.Transaction} class provides means to realise a scalaris transaction
- * from Java. After starting a transaction, there are methods to read and write values with both
- * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and Java {@link java.lang.String}
- * objects. The transaction can then be committed, aborted or reset.
+ * The {@link de.zib.scalaris.Transaction} class provides means to realise a
+ * scalaris transaction from Java. There are methods to read and write values
+ * with both erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject})
+ * and Java objects like {@link java.lang.String}. The transaction can then be
+ * committed or aborted.
  * </p>
  * 
  * <h4>Example:</h4>
@@ -64,22 +68,23 @@
  *     System.err.println("read failed: " + e.getMessage());
  *   } catch (TimeoutException e) {
  *     System.err.println("read failed with timeout: " + e.getMessage());
- *   } catch (UnknownException e) {
- *     System.err.println("read failed with unknown: " + e.getMessage());
  *   } catch (NotFoundException e) {
  *     System.err.println("read failed with not found: " + e.getMessage());
+ *   } catch (UnknownException e) {
+ *     System.err.println("read failed with unknown: " + e.getMessage());
  *   }
  * </code>
  * </pre>
  * 
- * <p>See the {@link de.zib.scalaris.Transaction} class documentation for more details.</p>
+ * <p>See the {@link de.zib.scalaris.Transaction} class documentation for more
+ * details.</p>
  * 
  * <h3>The PubSub class</h3>
  * <p>
  * The {@link de.zib.scalaris.PubSub} class provides methods for publishing
  * topics, subscribing to urls and getting a list of subscribers with both,
  * erlang strings ({@link com.ericsson.otp.erlang.OtpErlangString}) and
- * Java {@link java.lang.String} strings.
+ * Java strings ({@link java.lang.String}).
  * </p>
  * 
  * <h4>Example:</h4>
@@ -92,16 +97,50 @@
  *     System.err.println("read failed: " + e.getMessage());
  *   } catch (TimeoutException e) {
  *     System.err.println("read failed with timeout: " + e.getMessage());
+ *   } catch (AbortException e) {
+ *     System.err.println("read failed with timeout: " + e.getMessage());
  *   } catch (UnknownException e) {
  *     System.err.println("read failed with unknown: " + e.getMessage());
  *   }
  * </code>
  * </pre>
  * 
- * <p>See the {@link de.zib.scalaris.PubSub} class documentation for more details.</p>
+ * <p>See the {@link de.zib.scalaris.PubSub} class documentation for more
+ * details.</p>
+ * 
+ * <h3>The ReplicatedDHT class</h3>
+ * <p>
+ * The {@link de.zib.scalaris.ReplicatedDHT} class provides methods for
+ * working inconsistently on replicated key/value pairs, e.g. to delete
+ * replicas. It supports both, erlang strings
+ * ({@link com.ericsson.otp.erlang.OtpErlangString}) and Java strings
+ * ({@link java.lang.String}).
+ * </p>
+ * 
+ * <h4>Example:</h4>
+ * <pre>
+ * <code style="white-space:pre;">
+ *   try {
+ *     ReplicatedDHT sc = new ReplicatedDHT();
+ *     long deleted = sc.delete("key");
+ *     DeleteResult delRes = sc.getLastDeleteResult();
+ *   } catch (ConnectionException e) {
+ *     System.err.println("read failed: " + e.getMessage());
+ *   } catch (TimeoutException e) {
+ *     System.err.println("read failed with timeout: " + e.getMessage());
+ *   } catch (NodeNotFoundException e) {
+ *     System.err.println("read failed with node not found: " + e.getMessage());
+ *   } catch (UnknownException e) {
+ *     System.err.println("read failed with unknown: " + e.getMessage());
+ *   }
+ * </code>
+ * </pre>
+ * 
+ * <p>See the {@link de.zib.scalaris.ReplicatedDHT} class documentation for
+ * more details.</p>
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.5
+ * @version 2.9
  * @since 2.0
  */
 package de.zib.scalaris;
