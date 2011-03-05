@@ -75,17 +75,7 @@ req_list(TLog, ReqList) ->
                      end || Entry <- ReqList ],
     %% sanity checks on ReqList:
     %% @TODO Scan for fail in TransLog, then return immediately?
-    {TransLogResult, TmpResultList} =
-        rdht_tx:process_request_list(TLog, RDHT_ReqList),
-    ResultList = [ case Entry of
-                       {rdht_tx_read, _Key, {value, Value}} -> {ok, Value};
-                       {rdht_tx_write, _Key, {value, _Value}} -> {ok};
-                       {_Operation, _Key, Failure} -> Failure;
-                       {commit} -> {ok};
-                       {abort} -> {fail, abort}
-                   end || Entry <- TmpResultList ],
-    %% this returns the NewTLog and an ordered result list
-    {TransLogResult, ResultList}.
+    rdht_tx:req_list(TLog, RDHT_ReqList).
 
 %% @doc Perform a read inside a transaction.
 -spec read(tx_tlog:tlog(), client_key())

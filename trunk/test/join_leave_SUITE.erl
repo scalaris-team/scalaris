@@ -32,7 +32,7 @@ all() ->
      add_9, rm_5, add_9_rm_5,
      add_2x3_load,
      add_3_rm_2_load,
-     tester_join_at_timeouts_v2
+     tester_join_at_timeouts
     ].
 
 suite() -> [ {timetrap, {seconds, 30}} ].
@@ -45,13 +45,7 @@ end_per_suite(Config) ->
     ok.
 
 init_per_testcase(TestCase, Config) ->
-    Api_v1_unsupported =
-        lists:member(TestCase, [tester_join_at, add_2x3_load, add_3_rm_2_load]),
     case TestCase of
-        % note: cs_api (v1) and slide may interfere and data may be written where
-        % it should not be due to the lack of forward pointers in cs_api (v1)
-        _ when Api_v1_unsupported ->
-            {skip, "sliding with cs_api (v1) client access is not supported"};
         % note: the craceful leave tests only work if transactions are
         % transferred to new TMs if the TM dies or the bench_server restarts
         % the transactions
@@ -112,7 +106,7 @@ add_2x3_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
     stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
-    dht_node_move_SUITE:check_size2_v1(4).
+    dht_node_move_SUITE:check_size2(4).
 
 add_2x3_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 1000) end),
@@ -127,7 +121,7 @@ add_3_rm_2_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
     stop_time(fun add_3_rm_2_load_test/0, "add_2x3_load"),
-    dht_node_move_SUITE:check_size2_v1(4).
+    dht_node_move_SUITE:check_size2(4).
 
 add_3_rm_2_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 1000) end),
@@ -148,7 +142,7 @@ prop_join_at(FirstId, SecondId) ->
     _ = admin:add_node_at_id(SecondId),
     check_size(2),
     unittest_helper:wait_for_process_to_die(BenchPid),
-    dht_node_move_SUITE:check_size2_v1(BenchSlaves * 4),
+    dht_node_move_SUITE:check_size2(BenchSlaves * 4),
     unittest_helper:stop_ring(),
     true.
 
@@ -208,9 +202,9 @@ send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
             end,
     comm:send(node:pidX(Other), {mockup_dht_node, add_match_specs, IgnoredMessages}).
 
--spec prop_join_at_timeouts_v2(FirstId::?RT:key(), SecondId::?RT:key(),
+-spec prop_join_at_timeouts(FirstId::?RT:key(), SecondId::?RT:key(),
         IgnoredMessages::[join_message(),...]) -> true.
-prop_join_at_timeouts_v2(FirstId, SecondId, IgnoredMessages_) ->
+prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_) ->
     OldProcesses = unittest_helper:get_processes(),
     BenchSlaves = 2, BenchRuns = 50,
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
@@ -223,17 +217,17 @@ prop_join_at_timeouts_v2(FirstId, SecondId, IgnoredMessages_) ->
     unittest_helper:wait_for_process_to_die(BenchPid),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),
-    dht_node_move_SUITE:check_size2_v2(BenchSlaves * 4),
+    dht_node_move_SUITE:check_size2(BenchSlaves * 4),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), % tester may need it
     _ = inets:stop(),
     unittest_helper:kill_new_processes(OldProcesses),
     true.
 
-tester_join_at_timeouts_v2(Config) ->
+tester_join_at_timeouts(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     pdb:set({log_path, PrivDir}, ?MODULE),
-    tester:test(?MODULE, prop_join_at_timeouts_v2, 3, 5).
+    tester:test(?MODULE, prop_join_at_timeouts, 3, 5).
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
