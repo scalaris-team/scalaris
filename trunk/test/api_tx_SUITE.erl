@@ -317,7 +317,7 @@ write_test(Config) ->
     receive {time, SecondWriteTime} -> ok
     end,
     unittest_helper:wait_for_process_to_die(BenchPid2),
-    dht_node_move_SUITE:check_size2_v2(4  * 2),
+    dht_node_move_SUITE:check_size2(4  * 2),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), %doesn't matter
     _ = inets:stop(),
