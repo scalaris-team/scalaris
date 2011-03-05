@@ -23,20 +23,9 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--import(transaction_api, [read2/2, write2/3]).
-
 -export([bench/0, bench_raw/0, process/3]).
--export([process_v2/3]).
 
--spec make_tfun(Key::string()) -> fun((TransLog) -> {{ok, ok}, TransLog}).
-make_tfun(Key) ->
-    fun (TransLog)->
-             {Counter, TransLog1} = read2(TransLog, Key),
-             TransLog2 = write2(TransLog1, Key, Counter + 1),
-             {{ok, ok}, TransLog2}
-    end.
-
--spec inc(Key::string()) -> ok | {failure, Reason::term()}.
+-spec inc(Key::string()) -> api_tx:commit_result() | api_tx:read_result().
 inc(Key) ->
     {TLog1, [ReadResult]} =
         api_tx:req_list([{read, Key}]),
@@ -50,52 +39,20 @@ inc(Key) ->
 
 -spec process(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer()) -> ok.
 process(Parent, Key, Count) ->
-    SuccessFun = fun(X) -> {success, X} end,
-    FailureFun = fun(Reason)-> {failure, Reason} end,
-    process_iter(Parent, make_tfun(Key), Count, SuccessFun, FailureFun, 0).
+    process_iter(Parent, Key, Count, 0).
 
--spec process_v2(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer()) -> ok.
-process_v2(Parent, Key, Count) ->
-    process_iter_v2(Parent, Key, Count, 0).
-
--spec process_iter(Parent::comm:erl_local_pid(), TFun::fun((TransLog) -> {{ok, ok}, TransLog}),
-                   Count::non_neg_integer(),
-                   SuccesFun::fun(({user_abort | commit, ok}) -> {success, {user_abort | commit, ok}}),
-                   FailFun::fun((Reason::abort | timeout | not_found) -> {failure, abort | timeout | not_found}),
+-spec process_iter(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer(),
                    AbortCount::non_neg_integer()) -> ok.
-process_iter(Parent, _TFun, 0, _SuccessFun, _FailureFun, AbortCount) ->
+process_iter(Parent, _Key, 0, AbortCount) ->
     comm:send_local(Parent , {done, AbortCount});
-process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount) ->
-    case transaction_api:do_transaction(TFun, SuccessFun, FailureFun) of
-        {success, {commit, _Y}} ->
-            process_iter(Parent, TFun, Count - 1, SuccessFun, FailureFun, AbortCount);
-        {failure, abort} ->
-            process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-        {failure, timeout} ->
-            process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-        {failure, not_found} ->
-            process_iter(Parent, TFun, Count, SuccessFun, FailureFun, AbortCount + 1);
-        X ->
-            log:log(warn, "~p", [X])
-    end.
-
--spec process_iter_v2(Parent::comm:erl_local_pid(), Key::string(), Count::non_neg_integer(),
-                      AbortCount::non_neg_integer()) -> ok.
-process_iter_v2(Parent, _Key, 0, AbortCount) ->
-    comm:send_local(Parent , {done, AbortCount});
-process_iter_v2(Parent, Key, Count, AbortCount) ->
+process_iter(Parent, Key, Count, AbortCount) ->
     Result = inc(Key),
     case Result of
-        {ok} ->
-            process_iter_v2(Parent, Key, Count - 1, AbortCount);
-        {fail, abort} ->
-            process_iter_v2(Parent, Key, Count, AbortCount + 1);
-        {fail, timeout} ->
-            process_iter_v2(Parent, Key, Count, AbortCount + 1);
-        {fail, not_found} ->
-            process_iter_v2(Parent, Key, Count, AbortCount + 1);
-        X ->
-            log:log(warn, "~p", [X])
+        {ok}              -> process_iter(Parent, Key, Count - 1, AbortCount);
+        {fail, abort}     -> process_iter(Parent, Key, Count, AbortCount + 1);
+        {fail, timeout}   -> process_iter(Parent, Key, Count, AbortCount + 1);
+        {fail, not_found} -> process_iter(Parent, Key, Count, AbortCount + 1);
+        X -> log:log(warn, "~p", [X])
     end.
 
 -spec bench() -> pos_integer().
@@ -136,12 +93,11 @@ bench_fprof() ->
     fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), % , totals, no_details, no_callers, {sort, acc},
     Count.
 
-
 -spec increment_test() -> ok.
 increment_test() ->
     % init: i = 0
     Key = "i",
-    commit = transaction_api:single_write(Key, 0),
+    {ok} = api_tx:write(Key, 0),
 
     {Time, Value} = util:tc(bench_increment, bench, []),
     io:format("executed ~p transactions in ~p us: ~p~n", [Value, Time, Value / Time * 1000000]),

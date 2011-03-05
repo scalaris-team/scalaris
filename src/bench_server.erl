@@ -20,8 +20,8 @@
 -vsn('$Id$').
 
 -export([start_link/0, start/0]).
--export([run_increment/2, run_increment_v2/2, run_increment/3, run_increment_locally/2]).
--export([run_read/2, run_read_v2/2, run_read/3, bench_runner/3]).
+-export([run_increment/2]).
+-export([run_read/2, bench_runner/3]).
 
 -include("scalaris.hrl").
 
@@ -34,74 +34,21 @@ run_increment(ThreadsPerVM, Iterations) ->
     Msg = {bench_increment, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
--spec run_increment_v2(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
-run_increment_v2(ThreadsPerVM, Iterations) ->
-    Msg = {bench_increment_v2, ThreadsPerVM, Iterations, comm:this()},
-    runner(ThreadsPerVM, Iterations, [verbose], Msg).
-
--spec run_increment_locally(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
-run_increment_locally(ThreadsPerVM, Iterations) ->
-    Msg = {bench_increment, ThreadsPerVM, Iterations, comm:this()},
-    runner(ThreadsPerVM, Iterations, [locally, verbose], Msg).
-
-%% @doc run an increment benchmark (i++) on all nodes
-%% profile : enable profiling
-%% {copies, Copies}: run in the benchmark in Copies nodes
--spec run_increment(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::[locally | verbose | profile | {copies, non_neg_integer()}]) -> ok.
-run_increment(ThreadsPerVM, Iterations, Options) ->
-    Msg = {bench_increment, ThreadsPerVM, Iterations, comm:this()},
-    runner(ThreadsPerVM, Iterations, Options, Msg).
-
 %% @doc run an read benchmark on all nodes
 -spec run_read(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
 run_read(ThreadsPerVM, Iterations) ->
     Msg = {bench_read, ThreadsPerVM, Iterations, comm:this()},
     runner(ThreadsPerVM, Iterations, [verbose], Msg).
 
--spec run_read_v2(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
-run_read_v2(ThreadsPerVM, Iterations) ->
-    Msg = {bench_read_v2, ThreadsPerVM, Iterations, comm:this()},
-    runner(ThreadsPerVM, Iterations, [verbose], Msg).
-
--spec run_read(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::[locally | verbose | profile | {copies, non_neg_integer()}]) -> ok.
-run_read(ThreadsPerVM, Iterations, Options) ->
-    Msg = {bench_read, ThreadsPerVM, Iterations, comm:this()},
-    runner(ThreadsPerVM, Iterations, Options, Msg).
-
 -spec runner(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::[locally | verbose | profile | {copies, non_neg_integer()}], Message::comm:message()) -> ok.
 runner(ThreadsPerVM, Iterations, Options, Message) ->
-    ServerList = case lists:member(locally, Options) of
-                     true ->
-                         [comm:make_global(bench_server)];
-                     false ->
-                         case lists:keyfind(copies, 1, Options) of
-                             {copies, Copies} ->
-                                 lists:sublist(util:get_nodes(), Copies);
-                             false ->
-                                 util:get_nodes()
-                         end
-                 end,
+    ServerList = util:get_nodes(),
     %io:format("~p~n", [ServerList]),
     {BeforeDump, _} = admin:get_dump(),
     Before = erlang:now(),
-    Times = case lists:member(profile, Options) of
-                false ->
-                    _ = [comm:send(Server, Message) || Server <- ServerList],
-                    io:format("Collecting results... ~n"),
-                    [receive {done, X, Time} -> io:format("BS: ~p @ ~p~n",[Time, X]),Time end || _Server <- ServerList];
-                true ->
-                    Result =
-                        fprof:apply(
-                          fun () ->
-                                   _ = [comm:send(Server, Message) || Server <- ServerList],
-                                   [receive {done, _X, Time} -> Time end || _Server <- ServerList]
-                          end,
-                          [], [{procs, pid_groups:processes()}]),
-                    fprof:profile(),
-                    %fprof:analyse(),
-                    fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]),
-                    Result
-            end,
+    _ = [comm:send(Server, Message) || Server <- ServerList],
+    io:format("Collecting results... ~n"),
+    Times = [receive {done, X, Time} -> io:format("BS: ~p @ ~p~n",[Time, X]),Time end || _Server <- ServerList],
     After = erlang:now(),
     case lists:member(verbose, Options) of
         true ->
@@ -130,19 +77,7 @@ runner(ThreadsPerVM, Iterations, Options, Message) ->
 bench_increment(Threads, Iterations, Owner) ->
     Bench = fun (Parent) ->
                     Key = get_and_init_key(),
-                    bench_increment:process(Parent,
-                                            Key,
-                                            Iterations)
-            end,
-    {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
-    ok.
-
--spec bench_increment_v2(Threads::pos_integer(), Iterations::pos_integer(), Owner::comm:mypid()) -> ok.
-bench_increment_v2(Threads, Iterations, Owner) ->
-    Bench = fun (Parent) ->
-                    Key = get_and_init_key(),
-                    bench_increment:process_v2(Parent, Key, Iterations)
+                    bench_increment:process(Parent, Key, Iterations)
             end,
     {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
     comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
@@ -153,17 +88,7 @@ bench_increment_v2(Threads, Iterations, Owner) ->
 bench_read(Threads, Iterations, Owner) ->
     Bench = fun (Parent) ->
                     Key = get_and_init_key(),
-                    run_bench_read(Parent, Key, Iterations)
-            end,
-    {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
-    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
-    ok.
-
--spec bench_read_v2(Threads::pos_integer(), Iterations::pos_integer(), Owner::comm:mypid()) -> ok.
-bench_read_v2(Threads, Iterations, Owner) ->
-    Bench = fun (Parent) ->
-                    Key = get_and_init_key(),
-                    run_bench_read_v2(Parent, Key, Iterations, 0)
+                    run_bench_read(Parent, Key, Iterations, 0)
             end,
     {Time, _} = util:tc(?MODULE, bench_runner, [Threads, Iterations, Bench]),
     comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
@@ -180,27 +105,16 @@ bench_runner(Threads, Iterations, Bench) ->
         {done, _} -> ok
     end.
 
--spec run_bench_read(Parent::comm:erl_local_pid(), Key::string(), Iterations::non_neg_integer()) -> ok.
-run_bench_read(Owner, _Key, 0) ->
-    comm:send_local(Owner, {done, ok});
-run_bench_read(Owner, Key, Iterations) ->
-    case transaction_api:quorum_read(Key) of
-        {fail, _Reason} ->
-            run_bench_read(Owner, Key, Iterations);
-        {_Value, _Version} ->
-            run_bench_read(Owner, Key, Iterations - 1)
-    end.
-
--spec run_bench_read_v2(Parent::comm:erl_local_pid(), Key::string(), Iterations::non_neg_integer(), FailedReads::non_neg_integer()) -> ok.
-run_bench_read_v2(Owner, _Key, 0, Fail) ->
+-spec run_bench_read(Parent::comm:erl_local_pid(), Key::string(), Iterations::non_neg_integer(), FailedReads::non_neg_integer()) -> ok.
+run_bench_read(Owner, _Key, 0, Fail) ->
     io:format("repeated requests: ~p~n", [Fail]),
     comm:send_local(Owner , {done, ok});
-run_bench_read_v2(Owner, Key, Iterations, Fail) ->
+run_bench_read(Owner, Key, Iterations, Fail) ->
     case api_tx:read(Key) of
         {fail, _Reason} ->
-            run_bench_read_v2(Owner, Key, Iterations, Fail + 1);
+            run_bench_read(Owner, Key, Iterations, Fail + 1);
         {ok, _Value} ->
-            run_bench_read_v2(Owner, Key, Iterations - 1, Fail)
+            run_bench_read(Owner, Key, Iterations - 1, Fail)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -211,12 +125,8 @@ loop() ->
     receive
         {bench_increment, Threads, Iterations, Owner} ->
             spawn(fun () -> bench_increment(Threads, Iterations, Owner) end);
-        {bench_increment_v2, Threads, Iterations, Owner} ->
-            spawn(fun () -> bench_increment_v2(Threads, Iterations, Owner) end);
         {bench_read, Threads, Iterations, Owner} ->
-            spawn(fun () -> bench_read(Threads, Iterations, Owner) end);
-        {bench_read_v2, Threads, Iterations, Owner} ->
-            spawn(fun () -> bench_read_v2(Threads, Iterations, Owner) end)
+            spawn(fun () -> bench_read(Threads, Iterations, Owner) end)
     end,
     loop().
 
@@ -253,9 +163,6 @@ get_and_init_key(Key, Count) ->
         {ok} ->
             Key;
         {fail, abort} ->
-            io:format("geT_and_init_key 1 failed, retrying~n", []),
-            get_and_init_key(Key, Count - 1);
-        {fail, failed} ->
             io:format("geT_and_init_key 1 failed, retrying~n", []),
             get_and_init_key(Key, Count - 1);
         {fail, timeout} ->

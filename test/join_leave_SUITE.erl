@@ -28,17 +28,14 @@
 
 all() ->
     [
-     tester_join_at, tester_join_at_v2,
+     tester_join_at,
      add_9, rm_5, add_9_rm_5,
-     add_2x3_load, add_2x3_load_v2,
-     add_3_rm_2_load, add_3_rm_2_load_v2,
+     add_2x3_load,
+     add_3_rm_2_load,
      tester_join_at_timeouts_v2
     ].
 
-suite() ->
-    [
-     {timetrap, {seconds, 30}}
-    ].
+suite() -> [ {timetrap, {seconds, 30}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -59,8 +56,6 @@ init_per_testcase(TestCase, Config) ->
         % transferred to new TMs if the TM dies or the bench_server restarts
         % the transactions
         add_3_rm_2_load ->
-            {skip, "no graceful leave yet"};
-        add_3_rm_2_load_v2 ->
             {skip, "no graceful leave yet"};
         _ ->
             % stop ring from previous test case (it may have run into a timeout)
@@ -128,21 +123,6 @@ add_2x3_load_test() ->
     check_size(7),
     unittest_helper:wait_for_process_to_die(BenchPid).
 
-add_2x3_load_v2(Config) ->
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
-    stop_time(fun add_2x3_load_v2_test/0, "add_2x3_load_v2"),
-    dht_node_move_SUITE:check_size2_v2(4).
-
-add_2x3_load_v2_test() ->
-    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(1, 5000) end),
-    _ = admin:add_nodes(3),
-    check_size(4),
-    timer:sleep(500),
-    _ = admin:add_nodes(3),
-    check_size(7),
-    unittest_helper:wait_for_process_to_die(BenchPid).
-
 add_3_rm_2_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
@@ -151,23 +131,6 @@ add_3_rm_2_load(Config) ->
 
 add_3_rm_2_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(1, 1000) end),
-    _ = admin:add_nodes(3),
-    check_size(4),
-    timer:sleep(500),
-    % let 2 nodes gracefully leave
-    _ = [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
-%%     admin:del_nodes(2),
-    check_size(2),
-    unittest_helper:wait_for_process_to_die(BenchPid).
-
-add_3_rm_2_load_v2(Config) ->
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
-    stop_time(fun add_3_rm_2_load_v2_test/0, "add_2x3_load_v2"),
-    dht_node_move_SUITE:check_size2_v2(4).
-
-add_3_rm_2_load_v2_test() ->
-    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(1, 5000) end),
     _ = admin:add_nodes(3),
     check_size(4),
     timer:sleep(500),
@@ -189,29 +152,11 @@ prop_join_at(FirstId, SecondId) ->
     unittest_helper:stop_ring(),
     true.
 
--spec prop_join_at_v2(FirstId::?RT:key(), SecondId::?RT:key()) -> true.
-prop_join_at_v2(FirstId, SecondId) ->
-    BenchSlaves = 2, BenchRuns = 50,
-    unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
-    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(BenchSlaves, BenchRuns) end),
-    _ = admin:add_node_at_id(SecondId),
-    check_size(2),
-    unittest_helper:wait_for_process_to_die(BenchPid),
-    dht_node_move_SUITE:check_size2_v2(BenchSlaves * 4),
-    unittest_helper:stop_ring(),
-    true.
-
 tester_join_at(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     pdb:set({log_path, PrivDir}, ?MODULE),
     prop_join_at(0, 0),
     tester:test(?MODULE, prop_join_at, 2, 5).
-
-tester_join_at_v2(Config) ->
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    pdb:set({log_path, PrivDir}, ?MODULE),
-    prop_join_at_v2(0, 0),
-    tester:test(?MODULE, prop_join_at_v2, 2, 5).
 
 % TODO: simulate more message drops,
 % TODO: simulate certain protocol runs, e.g. the other node replying with noop, etc.
@@ -235,7 +180,7 @@ tester_join_at_v2(Config) ->
 %{join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
     {{join, join_request, '_', '_'}, [], 1..2, drop_msg}.
 %{join, join_response_timeout, NewPred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
-%{Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() | 
+%{Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() |
 %      lb_psv_gossip:custom_message(),
 % {join, LbPsv::module(), LbPsvState::term()}}
 
@@ -252,7 +197,7 @@ send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
-    
+
     FailMsg = lists:flatten(io_lib:format("~.0p (~B.*) ignoring messages: ~.0p",
                                           [PredOrSuccOrNode, NthNode, IgnoredMessages])),
     {Pred, Node, Succ} = dht_node_move_SUITE:get_pred_node_succ(NthNode, FailMsg),
@@ -269,12 +214,12 @@ prop_join_at_timeouts_v2(FirstId, SecondId, IgnoredMessages_) ->
     OldProcesses = unittest_helper:get_processes(),
     BenchSlaves = 2, BenchRuns = 50,
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     unittest_helper:make_ring_with_ids(
       [FirstId],
       [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
     send_ignore_msg_list_to(1, node, IgnoredMessages),
-    BenchPid = erlang:spawn(fun() -> bench_server:run_increment_v2(BenchSlaves, BenchRuns) end),
+    BenchPid = erlang:spawn(fun() -> bench_server:run_increment(BenchSlaves, BenchRuns) end),
     unittest_helper:wait_for_process_to_die(BenchPid),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),

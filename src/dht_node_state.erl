@@ -19,7 +19,6 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--include("transstore/trecords.hrl").
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
@@ -35,7 +34,6 @@
          is_responsible/2,
          is_db_responsible/2,
          % transactions:
-         set_trans_log/2,
          set_tx_tp_db/2,
          % node moves:
          get_slide_op/2,
@@ -53,7 +51,6 @@
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
                 rm_state   = ?required(state, rm_state)  :: rm_loop:state(),
                 join_time  = ?required(state, join_time) :: util:time(),
-                trans_log  = ?required(state, trans_log) :: #translog{},
                 db         = ?required(state, db)        :: ?DB:db(),
                 tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
                 proposer   = ?required(state, proposer)  :: pid(),
@@ -73,10 +70,6 @@ new(RT, RMState, DB) ->
     #state{rt = RT,
            rm_state = RMState,
            join_time = now(),
-           trans_log = #translog{tid_tm_mapping = dict:new(),
-                                 decided        = gb_trees:empty(),
-                                 undecided      = gb_trees:empty()
-                                },
            db = DB,
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer)
@@ -127,7 +120,6 @@ new(RT, RMState, DB) ->
          (state(), db_range) -> [{intervals:interval(), slide_op:id()}];
          (state(), succ_range) -> intervals:interval();
          (state(), join_time) -> util:time();
-         (state(), trans_log) -> #translog{};
          (state(), db) -> ?DB:db();
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();
@@ -137,7 +129,7 @@ new(RT, RMState, DB) ->
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
-           trans_log=TransLog, db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
+           db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc, msg_fwd=MsgFwd,
            db_range=DBRange}, Key) ->
     case Key of
@@ -164,7 +156,6 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
                         nodelist:node(Neighbors),
                         nodelist:succ(Neighbors));
         join_time  -> JoinTime;
-        trans_log  -> TransLog;
         db         -> DB;
         tx_tp_db   -> TxTpDb;
         proposer   -> Proposer;
@@ -240,11 +231,6 @@ set_rt(State, RT) -> State#state{rt = RT}.
 
 -spec set_rm(State::state(), NewRMState::rm_loop:state()) -> state().
 set_rm(State, RMState) -> State#state{rm_state = RMState}.
-
-%% @doc Sets the transaction log.
--spec set_trans_log(State::state(), NewLog::#translog{}) -> state().
-set_trans_log(State, NewLog) ->
-    State#state{trans_log = NewLog}.
 
 -spec set_slide(state(), pred | succ, slide_op:slide_op() | null) -> state().
 set_slide(State, pred, SlidePred) -> State#state{slide_pred=SlidePred};

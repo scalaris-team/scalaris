@@ -1,4 +1,4 @@
-%  Copyright 2008 Zuse Institute Berlin
+%  Copyright 2008, 2011 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -34,10 +34,7 @@ all() ->
     [run_increment_1_1000, run_increment_10_100,
      run_read_1_100000, run_read_10_10000].
 
-suite() ->
-    [
-     {timetrap, {seconds, 120}}
-    ].
+suite() -> [ {timetrap, {seconds, 120}} ].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
@@ -53,7 +50,7 @@ run_increment_1_1000(_Config) ->
     Threads    = 1,
     Iterations = 10000,
     Start = erlang:now(),
-    bench_server:run_increment(Threads, Iterations, [locally]),
+    bench_server:run_increment(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_increment_1_10000.txt", Threads * Iterations / RunTime * 1000000.0),
@@ -63,7 +60,7 @@ run_increment_10_100(_Config) ->
     Threads    = 10,
     Iterations = 1000,
     Start = erlang:now(),
-    bench_server:run_increment(Threads, Iterations, [locally]),
+    bench_server:run_increment(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_increment_10_1000.txt", Threads * Iterations / RunTime * 1000000.0),
@@ -73,7 +70,7 @@ run_read_1_100000(_Config) ->
     Threads    = 1,
     Iterations = 100000,
     Start = erlang:now(),
-    bench_server:run_read(Threads, Iterations, [locally]),
+    bench_server:run_read(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_read_1_100000.txt", Threads * Iterations / RunTime * 1000000.0),
@@ -83,7 +80,7 @@ run_read_10_10000(_Config) ->
     Threads    = 10,
     Iterations = 10000,
     Start = erlang:now(),
-    bench_server:run_read(Threads, Iterations, [locally]),
+    bench_server:run_read(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_read_10_10000.txt", Threads * Iterations / RunTime * 1000000.0),
