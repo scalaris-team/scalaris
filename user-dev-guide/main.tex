@@ -341,11 +341,9 @@ and the actual implementation is in \code{src/rt\_chord.erl}.
 transaction algorithms. The most current description of the algorithms
 and background is in \cite{enhanced-paxos}.
 
-We have currently two generations of transaction algorithms. The
-older one is in \code{src/transstore}. The newer one is more
-modular. It provides an implementation of the paxos algorithm in
-\code{src/paxos} and the transaction algorithms itself in
-\code{src/transactions} (see also Chap.~\ref{chapter.transactions}).
+The implementation consists of the paxos algorithm in \code{src/paxos} and
+the transaction algorithms itself in \code{src/transactions} (see also
+Chap.~\ref{chapter.transactions}).
 
 {\bf Ring Maintenance.} We changed the ring maintenance algorithm in
 Scalaris. It is not the standard Chord one, but a variation of

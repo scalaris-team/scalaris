@@ -135,7 +135,6 @@ clean:
 	-rm -rf ebin/*.beam
 	-rm -rf src/*.beam
 	-rm -rf src/comm_layer/*.beam
-	-rm -rf src/transstore/*.beam
 	-rm -rf contrib/yaws/ebin/*.beam
 	-rm -rf contrib/log4erl/ebin/*.beam
 	-rm -rf test/*.beam
@@ -179,14 +178,11 @@ rrd-init:
 install-docs: docs
 	install -d $(DOCDIR)/erlang
 	install -d $(DOCDIR)/erlang/comm_layer
-	install -d $(DOCDIR)/erlang/transstore
 	install -m 644 -t $(DOCDIR)/erlang \
 	           doc/*.html \
 	           doc/*.png
 	install -m 644 -t $(DOCDIR)/erlang/comm_layer \
 	           doc/comm_layer/*.html
-	install -m 644 -t $(DOCDIR)/erlang/transstore \
-	           doc/transstore/*.html
 	install -d $(DOCDIR)/java-api
 	install -d $(DOCDIR)/java-api/index-files
 	install -d $(DOCDIR)/java-api/resources

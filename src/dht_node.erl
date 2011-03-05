@@ -21,11 +21,9 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
-
 -behaviour(gen_component).
 
--export([start_link/2, on/2, on_join/2, init/1,
-         trigger_known_nodes/0]).
+-export([start_link/2, on/2, on_join/2, init/1, trigger_known_nodes/0]).
 
 -export([is_first/1, is_alive/1, is_alive_no_join/1]).
 
@@ -169,8 +167,16 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
             State
     end;
 
+%% messages handled as a transaction participant (TP)
+on({init_TP, Params}, State) ->
+    tx_tp:on_init_TP(Params, State);
+on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
+    tx_tp:on_tx_commitreply(Id, Result, State);
+on({tx_tm_rtm_commit_reply_fwd, RTLogEntry, Result, OwnProposal}, State) ->
+    tx_tp:on_tx_commitreply_fwd(RTLogEntry, Result, OwnProposal, State);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Lookup (see lookup.erl)
+% Lookup (see api_dht_raw.erl and dht_node_look up.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
@@ -268,7 +274,7 @@ on({start_bulk_owner, I, Msg}, State) ->
 
 on({bulkowner_deliver, Range, {bulk_read_entry, Issuer}}, State) ->
     MsgFwd = dht_node_state:get(State, msg_fwd),
-    
+
     F = fun({FwdInt, FwdPid}, AccI) ->
                 case intervals:is_subset(FwdInt, AccI) of
                     true ->
@@ -344,14 +350,6 @@ on({unittest_get_bounds_and_data, SourcePid}, State) ->
 on({get_dht_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
     State;
-
-%% messages handled as a transaction participant (TP)
-on({init_TP, Params}, State) ->
-    tx_tp:on_init_TP(Params, State);
-on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
-    tx_tp:on_tx_commitreply(Id, Result, State);
-on({tx_tm_rtm_commit_reply_fwd, RTLogEntry, Result, OwnProposal}, State) ->
-    tx_tp:on_tx_commitreply_fwd(RTLogEntry, Result, OwnProposal, State);
 
 % failure detector, dead node cache
 on({crash, DeadPid}, State) ->
