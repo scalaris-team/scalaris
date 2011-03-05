@@ -1,4 +1,4 @@
-%  Copyright 2008 Zuse Institute Berlin
+%  Copyright 2008, 2011 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,13 +28,9 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-all() ->
-    [count].
+all() -> [count].
 
-suite() ->
-    [
-     {timetrap, {seconds, 10}}
-    ].
+suite() -> [ {timetrap, {seconds, 10}} ].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
@@ -47,32 +43,32 @@ end_per_suite(Config) ->
     ok.
 
 count(_Config) ->
-    ?equals(transaction_api:single_write("i", 2), commit),
-    ?equals(transaction_api:single_write("j", 3), commit),
-    ?equals(transaction_api:single_write("k", 5), commit),
-    ?equals(transaction_api:single_write("l", 7), commit),
+    ?equals(api_tx:write("i", 2), {ok}),
+    ?equals(api_tx:write("j", 3), {ok}),
+    ?equals(api_tx:write("k", 5), {ok}),
+    ?equals(api_tx:write("l", 7), {ok}),
     bulkowner:issue_bulk_owner(intervals:all(), {bulk_read_entry, comm:this()}),
     ?equals(collect(0), 68),
     ok.
 
 collect(Sum) ->
     if
-	Sum < 68 ->
+        Sum < 68 ->
 %%         ct:pal("sum: ~p ~p~n", [Sum, Sum]),
-	    receive
+            receive
             {bulk_read_entry_response, _NowDone, Data} ->
                 collect(Sum + reduce(Data))
-        end;
-	Sum == 68 ->
-	    receive
-            {bulk_read_entry_response, _NowDone, Data} ->
-                Sum + reduce(Data)
-	    after 1000 ->
-		    Sum
-	    end;
-	Sum > 68 ->
-	    ct:pal("sum: ~p ~p~n", [Sum, Sum]),
-	    Sum
+            end;
+        Sum == 68 ->
+            receive
+                {bulk_read_entry_response, _NowDone, Data} ->
+                    Sum + reduce(Data)
+            after 1000 ->
+                    Sum
+            end;
+        Sum > 68 ->
+            ct:pal("sum: ~p ~p~n", [Sum, Sum]),
+            Sum
     end.
 
 -spec reduce(?DB:db_as_list()) -> integer().

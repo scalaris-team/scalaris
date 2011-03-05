@@ -47,14 +47,14 @@ isPost(A) ->
             Result::{Value::?DB:value(), Version::?DB:version()} |
                     {fail, not_found} | {fail, timeout} | {fail, fail}}.
 lookup(Key) ->
-    timer:tc(transaction_api, quorum_read, [Key]).
+    timer:tc(api_tx, read, [Key]).
 
 -spec set_key(Key::?RT:key(), Value::?DB:value())
         -> {TimeInMs::integer(),
             Result::commit | userabort | {fail, not_found} | {fail, timeout} |
                     {fail, fail} | {fail, abort}}.
 set_key(Key, Value) ->
-    timer:tc(transaction_api, single_write, [Key, Value]).
+    timer:tc(api_tx, write, [Key, Value]).
 
 -spec delete_key(Key::?RT:key(), Timeout::pos_integer())
         -> {TimeInMs::integer(),
@@ -62,7 +62,7 @@ set_key(Key, Value) ->
                     {fail, timeout, pos_integer(), list()} |
                     {fail, node_not_found}}.
 delete_key(Key, Timeout) ->
-    timer:tc(transaction_api, delete, [Key, Timeout]).
+    timer:tc(api_rdht, delete, [Key, Timeout]).
 
 %%%-----------------------------Load----------------------------------
 

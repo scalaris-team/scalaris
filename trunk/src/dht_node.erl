@@ -20,7 +20,6 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--include("transstore/trecords.hrl").
 -include("scalaris.hrl").
 
 -behaviour(gen_component).
@@ -131,60 +130,8 @@ on({rt_update, RoutingTable}, State) ->
     dht_node_state:set_rt(State, RoutingTable);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Transactions (see transstore/*.erl, transactions/*.erl)
+% Transactions (see transactions/*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({read, SourcePID, Key}, State) ->
-    transaction:quorum_read(Key, SourcePID),
-    State;
-
-on({delete, SourcePID, Key}, State) ->
-    transaction:delete(SourcePID, Key),
-    State;
-
-on({parallel_reads, SourcePID, Keys, TLog}, State) ->
-    transaction:parallel_quorum_reads(Keys, TLog, SourcePID),
-    State;
-
-%%  initiate a read phase
-on({do_transaction, TransFun, SuccessFun, FailureFun, Owner}, State) ->
-    _ = transaction:do_transaction(State, TransFun, SuccessFun, FailureFun, Owner),
-    State;
-
-%% do a transaction without a read phase
-on({do_transaction_wo_rp, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner}, State) ->
-    _ = transaction:do_transaction_wo_readphase(State, Items, SuccessFunArgument, SuccessFun, FailureFun, Owner),
-    State;
-
-%% answer - lookup for transaction participant
-on({lookup_tp, Message}, State) ->
-    {Leader} = Message#tp_message.message,
-    comm:send(Leader, {tp, Message#tp_message.item_key, Message#tp_message.orig_key, comm:this()}),
-    State;
-
-%% answer - lookup for replicated transaction manager
-on({init_rtm, Message}, State) ->
-    transaction:initRTM(State, Message);
-
-%% a validation request for a node acting as a transaction participant
-on({validate, TransID, Item}, State) ->
-    tparticipant:tp_validate(State, TransID, Item);
-
-%% this message contains the final decision for a certain transaction
-on({decision, Message}, State) ->
-    {_, TransID, Decision} = Message#tp_message.message,
-    if
-        Decision =:= commit ->
-            tparticipant:tp_commit(State, TransID);
-        true ->
-            tparticipant:tp_abort(State, TransID)
-    end;
-
-%% remove tm->tid mapping after transaction manager stopped
-on({remove_tm_tid_mapping, TransID, _TMPid}, State) ->
-    {translog, TID_TM_Mapping, Decided, Undecided} = dht_node_state:get(State, trans_log),
-    NewTID_TM_Mapping = dict:erase(TransID, TID_TM_Mapping),
-    dht_node_state:set_trans_log(State, {translog, NewTID_TM_Mapping, Decided, Undecided});
-
 on({get_process_in_group, Source_PID, Key, Process}, State) ->
     Pid = pid_groups:get_my(Process),
     GPid = comm:make_global(Pid),
@@ -376,7 +323,6 @@ on({web_debug_info, Requestor}, State) ->
          {"load", lists:flatten(io_lib:format("~p", [Load]))},
          {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))]))},
 %%          {"db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db)]))},
-%%          {"translog", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, trans_log)]))},
 %%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
          {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
          {"slide_pred", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, slide_pred)]))},
