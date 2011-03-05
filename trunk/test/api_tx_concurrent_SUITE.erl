@@ -14,7 +14,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : api_tx_concurrent_SUITE.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Unit tests for src/transstore/*.erl
+%%% Description : Unit tests for src/api_tx
 %%%
 %%% Created :  18 Aug 2008 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
