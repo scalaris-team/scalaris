@@ -201,14 +201,14 @@ my_make_tlog_result_entry(TLogEntry, Request) ->
     case Status of
         value ->
             {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
-            {?MODULE, Key, {value, WriteValue}}};
+            {ok}};
         not_found ->
             {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
-             {?MODULE, Key, {value, WriteValue}}};
+             {ok}};
         {fail, timeout} ->
             {tx_tlog:new_entry(?MODULE, Key, {fail, timeout},
                                WriteValue, Version),
-             {?MODULE, Key, {fail, timeout}}}
+             {fail, timeout}}
     end.
 
 %% @doc Checks whether used config parameters exist and are valid.

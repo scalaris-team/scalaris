@@ -1,5 +1,5 @@
 % @copyright 2009-2011 Zuse Institute Berlin,
-%                 onScale solutions GmbH
+%            2009 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,17 +13,17 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@onscale.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc    API for transactions on replicated DHT items.
 %% @version $Id$
 -module(rdht_tx).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
--export([process_request_list/2]).
+-export([req_list/2]).
 -export([check_config/0]).
 
 -include("scalaris.hrl").
@@ -38,10 +38,10 @@
 -type result_entry() :: any(). %% TODO: specify more strict.
 -type result() :: [ result_entry() ].
 
--spec process_request_list(tx_tlog:tlog(), [request()]) ->
+-spec req_list(tx_tlog:tlog(), [request()]) ->
         {tx_tlog:tlog(), result()}.
 %% single request and empty translog, done separately for optimization only
-process_request_list([], [SingleReq]) ->
+req_list([], [SingleReq]) ->
     RdhtOpWithReqId = initiate_rdht_ops([{1, SingleReq}]),
     {NewTLog, TmpResultList, [], [], []} =
         collect_results_and_do_translogops({[], [], RdhtOpWithReqId, [], []}),
@@ -49,12 +49,12 @@ process_request_list([], [SingleReq]) ->
     [{_ReqNum, ResultEntry}] = TmpResultList,
     {TransLogResult, [ResultEntry]};
 
-process_request_list([], [{rdht_tx_write, _K, _V} = SingleReq, {commit}]) ->
-    {TLog, [Res1]} = process_request_list(tx_tlog:empty(), [SingleReq]),
+req_list([], [{rdht_tx_write, _K, _V} = SingleReq, {commit}]) ->
+    {TLog, [Res1]} = req_list(tx_tlog:empty(), [SingleReq]),
     {TLog, [Res1, commit(TLog)]};
 
-process_request_list(TLog, PlainReqList) ->
-    ?TRACE("rdht_tx:process_request_list(~p, ~p)~n", [TLog, PlainReqList]),
+req_list(TLog, PlainReqList) ->
+    ?TRACE("rdht_tx:req_list(~p, ~p)~n", [TLog, PlainReqList]),
     %% PRE: no 'abort/tx_failed' in TLog
     %% rdht requests for independent keys are processed in parallel.
     %% requests for the same key are executed in order with
@@ -79,11 +79,11 @@ process_request_list(TLog, PlainReqList) ->
             [{Pos,{commit}}] ->
                 log:log(warn, "Commit not at end of a request list. "
                         "Deciding abort."),
-                [{Pos, {abort}}];
+                [{Pos, {fail, abort}}];
             Commits          ->
                 log:log(warn, "Multiple commits in a request list. "
                         "Deciding abort."),
-                [ {Num, {abort}} || {Num, {commit}} <- Commits ]
+                [ {Num, {fail, abort}} || {Num, {commit}} <- Commits ]
         end,
     %% Sort resultlist and eliminate numbering
     {_, ResultList} = lists:unzip(
@@ -228,11 +228,13 @@ commit(TLog) ->
                          self(), {tx_timeout, ClientsId}),
     _Result =
         receive
-            {tx_tm_rtm_commit_reply, ClientsId, Decision} ->
-                {Decision}; %% commit / abort;
+            {tx_tm_rtm_commit_reply, ClientsId, commit} ->
+                {ok}; %% commit / abort;
+            {tx_tm_rtm_commit_reply, ClientsId, abort} ->
+                {fail, abort}; %% commit / abort;
             {tx_timeout, ClientsId} ->
                 log:log(error, "No result for commit received!"),
-                {failed, timeout}
+                {fail, timeout}
         end.
 
 receive_answer() ->
