@@ -2,11 +2,10 @@
 -compile(export_all).
 
 out(A) ->
-    Peer = if
-               tuple(A#arg.clisock),
-               element(1, A#arg.clisock) =:= sslsocket ->
+    Peer = if is_tuple(A#arg.clisock) andalso
+              element(1, A#arg.clisock) =:= sslsocket ->
                    ssl:peername(A#arg.clisock);
-               true ->
+              true ->
                    inet:peername(A#arg.clisock)
            end,
     {ok, {IP, _}} = Peer,
@@ -16,67 +15,21 @@ out(A) ->
 handler([{ip, _IP}] = _State, {call, Operation, Params}, Session) ->
     {true, 0, Session, {response, handler(Operation, Params)}}.
 
-handler(nop, [Value]) ->
-    "ok";
+handler(nop, [Value]) -> "ok";
 
-handler(range_read, [From, To]) ->
-    {ErrorCode, Data} = api_dht_raw:range_read(From, To),
-    {struct, [{success, atom_to_list(ErrorCode)}, {data, data_to_json(Data)}]};
+handler(range_read, [From, To])    -> api_json:dht_raw_range_read(From, To);
+handler(delete, [Key])             -> api_json:rdht_delete(Key);
+handler(req_list, [Param])         -> api_json:tx_req_list(Param);
+handler(req_list, [TLog, ReqList]) -> api_json:tx_req_list(TLog, ReqList);
+handler(read, [Key])               -> api_json:tx_read(Key);
+handler(write, [Key, Value])       -> api_json:tx_write(Key, Value);
+handler(test_and_set, [Key, OldV, NewV]) ->
+    api_json:tx_test_and_set(Key, OldV, NewV);
 
-handler(test_and_set, [Key, OldValue, NewValue]) ->
-    %io:format("Request = test_and_set(~p)~n", [_Request]),
-    api_json:tx_test_and_set(Key, OldValue, NewValue);
-
-handler(read, [Key]) ->
-    api_json:tx_read(Key);
-
-handler(write, [Key, Value]) ->
-    api_json:tx_write(Key, Value);
-
-handler(delete, [Key]) ->
-    %io:format("Request = delete(~p)~n", [_Request]),
-    case api_rdht:delete(Key) of
-        {fail, Reason} ->
-            {struct, [{failure, atom_to_list(Reason)}]};
-        {ok, NumOk, StateList} ->
-            {struct, [{ok, NumOk},
-                      {results,
-                       {array, [ atom_to_list(X) || X <- StateList ]}
-                      }
-                     ]
-            }
-    end;
-
-handler(req_list, [Param]) ->
-    api_json:tx_req_list(Param);
-
-handler(req_list, [TLog, ReqList]) ->
-    api_json:tx_req_list(TLog, ReqList);
-
-handler(publish, [Topic, Content]) ->
-    case api_pubsub:publish(Topic, Content) of
-        {ok} -> "ok"
-    end;
-
-handler(subscribe, [Topic, URL]) ->
-    case api_pubsub:subscribe(Topic, URL) of
-        {ok} -> "ok";
-        {fail, Reason} ->
-            {struct, [{failure, atom_to_list(Reason)}]}
-    end;
-
-handler(unsubscribe, [Topic, URL]) ->
-    case api_pubsub:unsubscribe(Topic, URL) of
-        {ok} -> "ok";
-        {fail, Reason} ->
-            {struct, [{failure, atom_to_list(Reason)}]}
-    end;
-
-handler(get_subscribers, [Topic]) ->
-    case api_pubsub:get_subscribers(Topic) of
-        [] -> {array, []};
-        Any -> {array, Any}
-    end;
+handler(publish, [Topic, Content]) -> api_json:pubsub_publish(Topic, Content);
+handler(subscribe, [Topic, URL])   -> api_json:pubsub_subscribe(Topic, URL);
+handler(unsubscribe, [Topic, URL]) -> api_json:pubsub_unsubscribe(Topic, URL);
+handler(get_subscribers, [Topic])  -> api_json:pubsub_get_subscribers(Topic);
 
 handler(notify, [Topic, Value]) ->
     io:format("Got pubsub notify ~p -> ~p~n", [Topic, Value]),
@@ -85,10 +38,4 @@ handler(notify, [Topic, Value]) ->
 handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~p(~p)~n", [AnyOp, AnyParams]),
     {struct, [{failure, "unknownreq"}]}.
-
-data_to_json(Data) ->
-    {array, [ {struct, [{key, Key},
-                        {value, Value},
-                        {version, Version}]} ||
-               {Key, Value, Version, WriteLock, ReadLock} <- Data]}.
 </erl>
