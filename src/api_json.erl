@@ -22,9 +22,17 @@
 -export([tx_req_list/1, tx_req_list/2, tx_read/1, tx_write/2,
          tx_test_and_set/3]).
 
+-export([pubsub_publish/2, pubsub_subscribe/2, pubsub_unsubscribe/2,
+         pubsub_get_subscribers/1]).
+
+-export([rdht_delete/1]).
+
+-export([dht_raw_range_read/2]).
+
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
+%% interface for api_tx calls
 % Public Interface
 -type request() :: {read, client_key()}
                  | {write, client_key(), client_value()}
@@ -114,4 +122,52 @@ tlog_to_json(TLog) ->
 json_to_tlog(JsonTLog) ->
     binary_to_term(base64:decode(JsonTLog)).
 
+%% interface for api_pubsub calls
+-spec pubsub_publish(string(), string()) -> commit_result().
+pubsub_publish(Topic, Content) ->
+    Res = api_pubsub:publish(Topic, Content),
+    result_to_json(Res).
 
+-spec pubsub_subscribe(string(), string()) -> commit_result().
+pubsub_subscribe(Topic, URL) ->
+    Res = api_pubsub:subscribe(Topic, URL),
+    result_to_json(Res).
+
+-spec pubsub_unsubscribe(string(), string()) -> commit_result().
+pubsub_unsubscribe(Topic, URL) ->
+    Res = api_pubsub:unsubscribe(Topic, URL),
+    result_to_json(Res).
+
+-spec pubsub_get_subscribers(string()) -> {array, [string()]}.
+pubsub_get_subscribers(Topic) ->
+    case api_pubsub:get_subscribers(Topic) of
+        [] -> {array, []};
+        Any -> {array, Any}
+    end.
+
+%% interface for api_rdht calls
+-spec rdht_delete(client_key()) -> {struct, [{failure, string()}
+                                         | {ok, non_neg_integer()}
+                                         | {results, {array, [string()]}}]}.
+rdht_delete(Key) ->
+    case api_rdht:delete(Key) of
+        {fail, Reason, NumOK, StateList} ->
+            {struct, [{failure, atom_to_list(Reason)},
+                      {ok, NumOK},
+                      {results, {array, [atom_to_list(X) || X <- StateList]}}]};
+        {ok, NumOk, StateList} ->
+            {struct, [{ok, NumOk},
+                      {results, {array, [atom_to_list(X) || X <- StateList ]}}]}
+    end.
+
+%% interface for api_dht_raw calls
+-spec dht_raw_range_read(intervals:key(), intervals:key()) -> result().
+dht_raw_range_read(From, To) ->
+    {ErrorCode, Data} = api_dht_raw:range_read(From, To),
+    {struct, [{status, atom_to_list(ErrorCode)}, {value, data_to_json(Data)}]}.
+
+data_to_json(Data) ->
+    {array, [ {struct, [{key, Key},
+                        {value, Value},
+                        {version, Version}]} ||
+               {Key, Value, _WriteLock, _ReadLock, Version} <- Data]}.
