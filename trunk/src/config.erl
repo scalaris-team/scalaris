@@ -117,7 +117,7 @@ start_link2(Options) ->
 %@private
 -spec start(Files::[file:name()], Owner::pid()) -> no_return().
 start(Files, Owner) ->
-    register(?MODULE, self()),
+    erlang:register(config, self()),
     _ = ets:new(config_ets, [set, protected, named_table]),
     _ = [ populate_db(File) || File <- Files],
     case check_config() of

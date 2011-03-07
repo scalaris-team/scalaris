@@ -218,7 +218,26 @@ stop_ring(Pid) ->
             log:set_log_level(none),
             exit(Pid, kill),
             wait_for_process_to_die(Pid),
+            % stop/wait for VM-registered processes or processes with globally
+            % registered ets tables which interfere with the creation of new
+            % rings
             stop_pid_groups(),
+            wait_for_process_to_die(comm_server),
+            wait_for_table_to_disappear(comm_server),
+            wait_for_process_to_die(comm_layer_acceptor),
+            wait_for_process_to_die(admin_server),
+            wait_for_process_to_die(bench_server),
+            wait_for_process_to_die(boot),
+            wait_for_process_to_die(config),
+            wait_for_table_to_disappear(config_ets),
+            wait_for_process_to_die(fd),
+            wait_for_table_to_disappear(fd_hbs),
+            wait_for_process_to_die(monitor_timing),
+            wait_for_table_to_disappear(monitor_timing),
+            wait_for_process_to_die(service_per_vm),
+            wait_for_table_to_disappear(tracer),
+            wait_for_table_to_disappear(tracer_perf),
+            wait_for_table_to_disappear(webhelpers_indexed_ring),
             % do not stop the randoms and inets apps since we do not know
             % whether we started them in make_ring* and whether other processes
             % still rely on it
@@ -243,6 +262,7 @@ stop_ring(Pid) ->
 stop_pid_groups() ->
     gen_component:kill(pid_groups),
     wait_for_table_to_disappear(pid_groups),
+    wait_for_table_to_disappear(pid_groups_hidden),
     catch unregister(pid_groups),
     ok.
 
@@ -257,7 +277,14 @@ wait_for(F, WaitTime) ->
                  wait_for(F)
     end.
 
--spec wait_for_process_to_die(pid()) -> ok.
+-spec wait_for_process_to_die(pid() | atom()) -> ok.
+wait_for_process_to_die(Name) when is_atom(Name) ->
+    wait_for(fun() ->
+                     case erlang:whereis(Name) of
+                         undefined -> true;
+                         Pid       -> not is_process_alive(Pid)
+                     end
+             end);
 wait_for_process_to_die(Pid) ->
     wait_for(fun() -> not is_process_alive(Pid) end).
 

@@ -74,7 +74,7 @@
 % enable native register for all processes in gen_component or disable
 % useful 4 debug (etop, appmon), but let memory usage grow over the time
 % enable:
-%-define(DEBUG_REGISTER(PROCESS,PID),register(PROCESS,PID)).
+%-define(DEBUG_REGISTER(PROCESS,PID),erlang:register(PROCESS,PID)).
 % disable:
 -define(DEBUG_REGISTER(PROCESS,PID),ok).
 

@@ -229,9 +229,9 @@ start(Module, Args, Options, Supervisor) ->
             {erlang_register, Name} ->
                 _ = case whereis(Name) of
                         undefined -> ok;
-                        _ -> catch(unregister(Name)) %% unittests may leave garbage
+                        _ -> catch(erlang:unregister(Name)) %% unittests may leave garbage
                     end,
-                catch(register(Name, self()));
+                catch(erlang:register(Name, self()));
             false ->
                 ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
                                              ++ randoms:getRandomId()), self()),
