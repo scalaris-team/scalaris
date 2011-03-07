@@ -36,4 +36,11 @@ final class CommonErlangObjects {
     static final OtpErlangAtom keyChangedAtom = new OtpErlangAtom("key_changed");
     static final OtpErlangTuple okTupleAtom = new OtpErlangTuple(okAtom);
     static final OtpErlangTuple commitTupleAtom = new OtpErlangTuple(new OtpErlangAtom("commit"));
+    
+    // JSON
+    static final OtpErlangAtom structAtom = new OtpErlangAtom("struct");
+    static final OtpErlangAtom arrayAtom = new OtpErlangAtom("array");
+    static final OtpErlangAtom trueAtom = new OtpErlangAtom("true");
+    static final OtpErlangAtom falseAtom = new OtpErlangAtom("false");
+    static final OtpErlangAtom nullAtom = new OtpErlangAtom("null");
 }
