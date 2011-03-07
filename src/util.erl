@@ -30,7 +30,7 @@
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
          logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
-         wait_for_unregister/1, get_stacktrace/0, dump/0, dump2/0, dump3/0,
+         get_stacktrace/0, dump/0, dump2/0, dump3/0,
          get_nodes/0, minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
@@ -174,15 +174,6 @@ logged_exec(Cmd) ->
             ok;
         true ->
             ok
-    end.
-
--spec wait_for_unregister(atom()) -> ok.
-wait_for_unregister(PID) ->
-    case whereis(PID) of
-        undefined ->
-            ok;
-        _ ->
-            wait_for_unregister(PID)
     end.
 
 %% @doc Gets the current stack trace. Use this method in order to get a stack

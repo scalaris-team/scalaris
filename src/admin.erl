@@ -231,7 +231,7 @@ start_link() ->
 
 -spec start() -> ok.
 start() ->
-    register(admin_server, self()),
+    erlang:register(admin_server, self()),
     loop().
 
 loop() ->

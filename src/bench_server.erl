@@ -135,7 +135,7 @@ loop() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec start() -> no_return().
 start() ->
-    register(bench_server, self()),
+    erlang:register(bench_server, self()),
     loop().
 
 %% @doc spawns a bench_server
