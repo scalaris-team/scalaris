@@ -25,7 +25,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([test/4, test_log/4]).
+-export([test/4, test_log/4, test_with_scheduler/3]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -60,6 +60,18 @@ test_log(Module, Func, Arity, Iterations) ->
     io:format(""),
     run(Module, Func, Arity, Iterations, ParseState),
     ok.
+
+test_with_scheduler(Modules, F, Options) ->
+    [tester_scheduler:instrument_module(Module, Src) || {Module, Src} <- Modules],
+    Pid = tester_scheduler:start(Options),
+    register(usscheduler, Pid),
+    Res = (catch F()),
+    %Res = (catch gen_component:start(?MODULE, [foo], [], self())),
+    ct:pal("Res: ~w", [Res]),
+    [code:delete(Module) || {Module, _} <- Modules],
+    (catch exit(Pid)),
+    (catch unregister(usscheduler)),
+    Res.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
