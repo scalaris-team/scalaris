@@ -60,7 +60,7 @@ end_per_suite(Config) ->
 
 next_hop(_Config) ->
     MyNode = node:new(self(), 0, 0),
-    pid_groups:join_as("performance_SUITE", dht_node),
+    pid_groups:join_as("rt_chord_SUITE", dht_node),
     Succ = node:new(fake_dht_node(".succ"), 1, 0),
     Pred = node:new(fake_dht_node(".pred"), 1000000, 0),
     Neighbors = nodelist:new_neighborhood(Pred, MyNode, Succ),
@@ -98,7 +98,7 @@ next_hop(_Config) ->
 
 next_hop2(_Config) ->
     MyNode = node:new(self(), 0, 0),
-    pid_groups:join_as("performance_SUITE", dht_node),
+    pid_groups:join_as("rt_chord_SUITE", dht_node),
     Succ = node:new(fake_dht_node(".succ"), 1, 0),
     SuccSucc = node:new(fake_dht_node(".succ.succ"), 2, 0),
     Pred = node:new(fake_dht_node(".pred"), 1000000, 0),
@@ -201,4 +201,4 @@ tester_get_split_key(_Config) ->
 
 fake_dht_node(Suffix) ->
     unittest_helper:start_subprocess(
-      fun() -> pid_groups:join_as("rt_chord_SUITE_group" ++ Suffix, dht_node) end).
+      fun() -> pid_groups:join_as("rt_chord_SUITE" ++ Suffix, dht_node) end).
