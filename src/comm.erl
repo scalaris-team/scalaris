@@ -51,6 +51,7 @@
 %%-export([node/1]).
 %% Message manipulation
 -export([get_msg_tag/1]).
+-export([unpack_cookie/2]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0, message_tag/0, mypid/0, erl_local_pid/0]).
