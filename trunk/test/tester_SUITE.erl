@@ -15,7 +15,7 @@
 -include_lib("unittest.hrl").
 
 all() ->
-    [tester_create_value].
+    []. %tester_create_value
 
 suite() ->
     [
