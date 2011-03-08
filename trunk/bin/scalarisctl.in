@@ -301,7 +301,7 @@ scalarisstop(){
         -name ctl_$RANDOM \
         -pa $BEAMDIR \
         -noinput \
-        -s scalaris_ctl -extra $NODE_NAME@`hostname -f` stop
+        -s scalaris cli -extra $NODE_NAME@`hostname -f` stop
     popd > /dev/null
 }
 

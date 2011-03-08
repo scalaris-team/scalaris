@@ -22,6 +22,7 @@
 %% functions called by Erlangs init module, triggered via command line
 %% (bin/scalarisctl and erl ... '-s scalaris')
 -export([start/0, stop/0]).
+-export([cli/0, process/1]).
 
 %% functions called by application:start(scalaris)
 %% triggered by ?MODULE:start/0.
@@ -59,3 +60,36 @@ start(normal, []) ->
 -spec stop(any()) -> ok.
 stop(_State) ->
     ok.
+
+%% functions called by Erlangs init module, triggered via command line
+%% (bin/scalarisctl and erl ... '-s scalaris')
+-spec cli() -> ok | {error, Reason::term()}.
+cli() ->
+    case init:get_plain_arguments() of
+        [NodeName | Args] ->
+            Node = list_to_atom(NodeName),
+            io:format("~p~n", [Node]),
+            case rpc:call(Node, ?MODULE, process, [Args]) of
+                {badrpc, Reason} ->
+                    io:format("badrpc to ~p: ~p~n", [Node, Reason]),
+                    init:stop(1),
+                    receive nothing -> ok end;
+                _ ->
+                    init:stop(0),
+                    receive nothing -> ok end
+            end;
+        _ ->
+            print_usage(),
+            init:stop(1),
+            receive nothing -> ok end
+    end.
+
+-spec print_usage() -> ok.
+print_usage() ->
+    io:format("usage info~n", []).
+
+-spec process([string()]) -> ok.
+process(["stop"]) ->
+    init:stop();
+process(Args) ->
+    io:format("got process(~p)~n", [Args]).
