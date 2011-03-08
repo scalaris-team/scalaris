@@ -152,7 +152,7 @@ docs: .make-docs
 	@touch .make-docs
 
 svn:
-	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl src/*/*/*.erl test/*.erl ebin/*.app bin/*.cfg
+	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl src/*/*/*.erl test/*.erl bin/*.cfg
 
 dialyzer: compile
 	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ src/*/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl --no_native | sed -f contrib/dialyzer-col.sed
@@ -223,7 +223,6 @@ install-java: java
 install-erlang: compile
 	install -d $(BEAMDIR)
 	install -m 644 -t $(BEAMDIR) \
-	           ebin/*.app \
 	           ebin/*.beam
 	install -d $(ETCDIR)
 	install -m 644 -t $(ETCDIR) \
@@ -268,8 +267,7 @@ install-erlang: compile
 	           contrib/yaws/include/yaws_api.hrl
 	install -d $(SCALARISDIR)/contrib/log4erl/ebin
 	install -m 644 -t $(SCALARISDIR)/contrib/log4erl/ebin \
-	           contrib/log4erl/ebin/*.beam \
-	           contrib/log4erl/ebin/*.app
+	           contrib/log4erl/ebin/*.beam
 	install -d $(LOGDIR)
 	install -d $(BINDIR)
 	install -m 755 -t $(BINDIR) \
