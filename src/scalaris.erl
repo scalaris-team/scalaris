@@ -22,6 +22,7 @@
 %% functions called by Erlangs init module, triggered via command line
 %% (bin/scalarisctl and erl ... '-s scalaris')
 -export([start/0, stop/0]).
+%% (bin/scalarisctl and erl ... '-s scalaris cli')
 -export([cli/0, process/1]).
 
 %% functions called by application:start(scalaris)
@@ -62,7 +63,7 @@ stop(_State) ->
     ok.
 
 %% functions called by Erlangs init module, triggered via command line
-%% (bin/scalarisctl and erl ... '-s scalaris')
+%% (bin/scalarisctl and erl ... '-s scalaris cli')
 -spec cli() -> ok | {error, Reason::term()}.
 cli() ->
     case init:get_plain_arguments() of
