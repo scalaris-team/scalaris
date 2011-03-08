@@ -34,6 +34,16 @@
 -define(TRACE_BP_STEPS(X,Y), ok).
 %% userdevguide-end gen_component:trace_bp_steps
 
+-ifdef(with_ct).
+-define(SPAWNED(MODULE), tester_scheduler:gen_component_spawned(MODULE)).
+-define(INITIALIZED(MODULE), tester_scheduler:gen_component_initialized(MODULE)).
+-define(CALLING_RECEIVE(MODULE), tester_scheduler:gen_component_calling_receive(MODULE)).
+-else.
+-define(SPAWNED(MODULE), ok).
+-define(INITIALIZED(MODULE), ok).
+-define(CALLING_RECEIVE(MODULE), ok).
+-endif.
+
 -export([behaviour_info/1]).
 -export([start_link/2, start_link/3,
          start/4, start/2,
@@ -216,6 +226,7 @@ start(Module, Args, Options) ->
 
 -spec start(module(), term(), list(), comm:erl_local_pid()) -> ok.
 start(Module, Args, Options, Supervisor) ->
+    %?SPAWNED(Module),
     case lists:keyfind(pid_groups_join_as, 1, Options) of
         {pid_groups_join_as, GroupId, PidName} ->
             pid_groups:join_as(GroupId, PidName),
@@ -255,6 +266,7 @@ start(Module, Args, Options, Supervisor) ->
             false -> ok;
             true -> Supervisor ! {started, self()}, ok
         end,
+        ?INITIALIZED(Module),
         loop(Module, Handler, InitialState, InitialComponentState)
     catch
         % note: if init throws up, we will not send 'started' to the supervisor
@@ -274,6 +286,7 @@ start(Module, Args, Options, Supervisor) ->
     end.
 
 loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
+    ?CALLING_RECEIVE(Module),
     receive
         %%%%%%%%%%%%%%%%%%%%
         %% Attention!:
