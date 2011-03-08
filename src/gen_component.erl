@@ -267,22 +267,24 @@ start(Module, Args, Options, Supervisor) ->
             true -> Supervisor ! {started, self()}, ok
         end,
         ?INITIALIZED(Module),
-        loop(Module, Handler, InitialState, InitialComponentState)
+        try_loop(Module, Handler, InitialState, InitialComponentState)
     catch
         % note: if init throws up, we will not send 'started' to the supervisor
         % this process will die and the supervisor will try to restart it
-        throw:Term ->
-            log:log(error,"exception in init/loop of ~p: ~.0p",
-                    [Module, Term]),
-            throw(Term);
-        exit:Reason ->
-            log:log(error,"exception in init/loop of ~p: ~.0p",
-                    [Module, Reason]),
-            throw(Reason);
-        error:Reason ->
-            log:log(error,"exception in init/loop of ~p: ~.0p",
-                    [Module, {Reason, erlang:get_stacktrace()}]),
-            throw(Reason)
+        Level:Reason ->
+            log:log(error,"Error: exception ~p:~p in init of ~p:  ~.0p",
+                    [Level, Reason, Module, erlang:get_stacktrace()]),
+            erlang:Level(Reason)
+    end.
+
+try_loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
+    try loop(Module, On, State, ComponentState)
+    catch Level:Reason ->
+              log:log(error, "Error: exception ~p:~p in loop of module ~p "
+                          "in (~.0p) with ~p - stacktrace: ~.0p",
+                      [Level, Reason, Module, State, On,
+                       erlang:get_stacktrace()]),
+              try_loop(Module, On, State, ComponentState)
     end.
 
 loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
@@ -323,22 +325,24 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                 handle_breakpoint(Message, State, ComponentState),
             %% Start = erlang:now(),
             case (try Module:On(Message, State)
-                  catch
-                      throw:Term -> {exception, Term};
-                      exit:Reason -> {exception, Reason};
-                      error:Reason -> {exception, {Reason,
-                                                   erlang:get_stacktrace()}}
+                  catch Level:Reason ->
+                            Stacktrace = erlang:get_stacktrace(),
+                            case Stacktrace of
+                                [{Module, On, [Message, State]} | _]
+                                  when Reason =:= function_clause andalso
+                                           Level =:= error ->
+                                    unknown_event;
+                                _ ->
+                                    log:log(error,
+                                            "Error: exception ~p:~p during handling "
+                                                "of ~.0p in module ~p in (~.0p) with ~p "
+                                                "- stacktrace: ~.0p",
+                                            [Level, Reason, Message, Module, State, On,
+                                             Stacktrace]),
+                                    '$exception'
+                            end
                   end) of
-                {exception, {function_clause, [{Module, On, [Message, State]} | _]}} ->
-                    % equivalent to unknown_event, but it resulted in an exception
-                    {NewState, NewComponentState} =
-                        handle_unknown_event(Message, State,
-                                             TmpComponentState, Module, On),
-                    NextComponentState = bp_step_done(Module, On, Message, NewComponentState),
-                    loop(Module, On, NewState, NextComponentState);
-                {exception, Exception} ->
-                    log:log(error,"Error: exception ~p during handling of ~.0p in module ~p in (~.0p) with ~p",
-                            [Exception, Message, Module, State, On]),
+                '$exception' ->
                     NextComponentState = bp_step_done(Module, On, Message, TmpComponentState),
                     loop(Module, On, State, NextComponentState);
                 unknown_event ->
