@@ -315,7 +315,7 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
             Pid = pid_groups:get_my(Processname),
             case Pid of
                 failed -> ok;
-                _ -> comm:send_local(Pid , Msg)
+                _      -> comm:send_local(Pid, Msg)
             end,
             loop(Module, On, State, ComponentState);
         Message ->

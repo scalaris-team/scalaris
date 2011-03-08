@@ -65,8 +65,17 @@ send(Target, Message) ->
 %% @doc returns process descriptor for the calling process
 -spec this() -> process_id().
 this() ->
-    {LocalIP, LocalPort} = comm_server:get_local_address_port(),
-    {LocalIP, LocalPort, self()}.
+    case erlang:get(comm_this) of
+        undefined ->
+            {LocalIP, LocalPort} = comm_server:get_local_address_port(),
+            This1 = {LocalIP, LocalPort, self()},
+            case LocalIP of
+                undefined -> ok;
+                _         -> erlang:put(comm_this, This1)
+            end,
+            This1;
+        This -> This
+    end.
 
 -spec is_valid(process_id() | any()) -> boolean().
 is_valid({{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid}) -> true;
