@@ -62,7 +62,7 @@ test_log(Module, Func, Arity, Iterations) ->
     ok.
 
 test_with_scheduler(Modules, F, Options) ->
-    [tester_scheduler:instrument_module(Module, Src) || {Module, Src} <- Modules],
+    [tester_scheduler:instrument_module(Module) || Module <- Modules],
     Pid = tester_scheduler:start(Options),
     register(usscheduler, Pid),
     Res = (catch F()),
