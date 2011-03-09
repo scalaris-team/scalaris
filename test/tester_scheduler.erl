@@ -236,7 +236,8 @@ pick_next_runner(Pids) ->
         [] ->
             false;
         _ ->
-            util:randomelem(Runnable)
+            %util:randomelem(Runnable)
+            seeded_randomelem(Runnable)
     end.
 
 sleep_delay() -> 100.
@@ -274,7 +275,7 @@ get_compile_flags_for_module(Module) ->
         X ->
             ct:pal("~w ~w", [Module, X]),
             erlang:sleep(1000),
-            %ct:fail(unknown_module),
+            ct:fail(unknown_module),
             ok
     end.
 
@@ -306,5 +307,14 @@ seed(Options) ->
             random:seed(A1, A2, A3),
             ok
     end.
+
+%% @doc Returns a random element from the given (non-empty!) list according to
+%%      a uniform distribution.
+-spec seeded_randomelem(List::[X,...]) -> X.
+seeded_randomelem(List)->
+    Length = length(List),
+    RandomNum = random:uniform(Length),
+    lists:nth(RandomNum, List).
+
 % @todo
 % - start_scheduling could set a new/different white_list
