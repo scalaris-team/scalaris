@@ -44,7 +44,7 @@ import de.zib.scalaris.ErlangValue;
  * @version 2.9
  * @since 2.9
  */
-class ErlangValueFastString extends ErlangValue {
+public class ErlangValueFastString extends ErlangValue {
 	/**
 	 * Identifies the tuple of the stored erlang object.
 	 */
