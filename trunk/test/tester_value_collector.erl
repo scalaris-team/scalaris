@@ -86,7 +86,7 @@ parse_expression({tuple, _, Values}, ParseState) ->
 parse_expression({remote, _, Module, Fun}, ParseState) ->
     parse_expression(Module, parse_expression(Fun, ParseState));
 parse_expression({var, _, _Variable}, ParseState) ->
-    ct:pal("~w", [_Variable]),
+    %ct:pal("~w", [_Variable]),
     ParseState;
 parse_expression({atom, _, Atom}, ParseState) ->
     tester_parse_state:add_atom(Atom, ParseState);
