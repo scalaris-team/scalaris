@@ -56,14 +56,14 @@
 
 % view() must be serializable, i.e. don't put ets-tables in here
 -record(view, {group_id :: group_types:group_id(),
-               current_paxos_version,
-               next_proposal_version,
+               current_paxos_version::integer(),
+               next_proposal_version::integer(),
                members :: group_types:group_member_list(),
                version::non_neg_integer(),
                interval::intervals:interval(),
-               acceptors,
-               learners,
-               proposals,
+               acceptors::gb_tree(),
+               learners::gb_tree(),
+               proposals::gb_tree(),
                index_in_group::non_neg_integer(),
                postponed_decisions :: gb_set()}).
 

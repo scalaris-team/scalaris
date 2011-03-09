@@ -51,7 +51,7 @@ is_first_proposal_for_this_instance(View) ->
 init_paxos(View) ->
     PaxosId = group_view:get_next_paxos_id(View),
     Learners = group_view:get_learners(View),
-    Proposer = pid_groups:get_my(paxos_proposer),
+    _Proposer = pid_groups:get_my(paxos_proposer),
     Acceptor = pid_groups:get_my(paxos_acceptor),
     ?LOG("init_paxos ~p ~p~n", [PaxosId, Learners]),
     acceptor:start_paxosid_local(Acceptor, PaxosId, Learners),

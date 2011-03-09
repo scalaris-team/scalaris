@@ -53,7 +53,7 @@ ops_request(State, {group_node_join, Pid, Acceptor, Learner}) ->
                    Proposal::proposal_type(),
                    PaxosId::group_types:paxos_id(),
                    Hint::group_types:decision_hint()) -> group_state:state().
-ops_decision(State, {group_node_join, Pid, Acceptor, Learner} = Proposal,
+ops_decision(State, {group_node_join, Pid, Acceptor, Learner} = _Proposal,
              PaxosId, _Hint) ->
     %io:format("adding ~p at ~p~n", [Pid, PaxosId]),
     View = group_state:get_view(State),

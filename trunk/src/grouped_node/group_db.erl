@@ -155,9 +155,9 @@ repair_timeout(State, UUID, Interval) ->
 
 -spec trigger_repair(list(), intervals:interval(), any(), util:global_uid()) ->
     ok.
-trigger_repair(_Members, nil, _Version, _UUID) ->
-    nil = nil2;
-trigger_repair(Members, Interval, Version, UUID) ->
+%trigger_repair(_Members, nil, _Version, _UUID) ->
+%    nil = nil2;
+trigger_repair(Members, Interval, Version, UUID) when Interval =/= nil ->
     Msg = {db_repair_request, Interval, config:read(group_repair_chunk_size),
            Version, UUID, comm:this()},
     Candidate = util:randomelem(Members),
@@ -193,7 +193,7 @@ prune_out_of_range_entries(State, Range) ->
 
 -spec delete_chunk(state(), intervals:interval(), pos_integer()) ->
     state().
-delete_chunk({is_current, DB, none} = State, Range, ChunkSize) ->
+delete_chunk({is_current, DB, none} = _State, Range, ChunkSize) ->
     {Next, DB2} = ?DB:delete_chunk(DB, Range, ChunkSize),
     case intervals:is_empty(Next) of
         true ->

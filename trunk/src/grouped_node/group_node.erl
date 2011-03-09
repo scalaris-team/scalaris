@@ -179,7 +179,7 @@ on({route, Key, Hops, Message}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % simple DB
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({quorum_read, Client, HashedKey}, State) ->
+on({quorum_read, _Client, _HashedKey}, State) ->
     % @todo
    State;
 on({paxos_read, Client, HashedKey}, State) ->
