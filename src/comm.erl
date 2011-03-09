@@ -241,6 +241,7 @@ get_msg_tag(Message)
   when is_tuple(Message) andalso is_atom(erlang:element(1, Message)) ->
     erlang:element(1, Message).
 
+-spec unpack_cookie(mypid(), message()) -> {mypid(), message()} | {mypid(), {message(), cookie()}}.
 unpack_cookie({Pid, c, Cookie}, Message) -> {Pid, {Message, Cookie}};
 unpack_cookie(Pid, Message) -> {Pid, Message}.
 

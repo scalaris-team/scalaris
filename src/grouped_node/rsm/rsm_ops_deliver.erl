@@ -44,7 +44,7 @@ ops_request(State, {deliver, Message, Proposer}) ->
                    Proposal::proposal_type(),
                    PaxosId::rsm_state:paxos_id(),
                    Hint::rsm_state:decision_hint()) -> rsm_state:state().
-ops_decision(State, {deliver, Message, Proposer} = _Proposal,
+ops_decision(State, {deliver, Message, _Proposer} = _Proposal,
              PaxosId, _Hint) ->
     %io:format("adding ~p at ~p~n", [Pid, PaxosId]),
     View = rsm_state:get_view(State),

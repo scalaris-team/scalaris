@@ -33,7 +33,7 @@
 
 -record(local_state, {successor::group_types:group_node(),
                       predecessor::group_types:group_node(),
-                      rt}).
+                      rt::none}).
 
 -opaque local_state() :: #local_state{}.
 
@@ -84,21 +84,21 @@ update_succ(NodeState, Succ, MyRange) ->
                  not intervals:is_left_of(MyRange, OldSuccRange))
                 of
                 true ->
-                    P1 = intervals:is_left_of(MyRange, SuccRange),
-                    P2 = is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion),
-                    P3 = not intervals:is_left_of(MyRange, OldSuccRange),
+                    _P1 = intervals:is_left_of(MyRange, SuccRange),
+                    _P2 = is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion),
+                    _P3 = not intervals:is_left_of(MyRange, OldSuccRange),
                     case MyRange =:= SuccRange of
                         true -> ok;
-                        false -> ?LOG("me: ~p is my succ: ~p ~p~n", [MyRange, SuccRange, {P1, P2, P3}])
+                        false -> ?LOG("me: ~p is my succ: ~p ~p~n", [MyRange, SuccRange, {_P1, _P2, _P3}])
                     end,
                     NodeState#local_state{successor=Succ};
                 false ->
-                    P1 = intervals:is_left_of(MyRange, SuccRange),
-                    P2 = is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion),
-                    P3 = not intervals:is_left_of(MyRange, OldSuccRange),
+                    _P1 = intervals:is_left_of(MyRange, SuccRange),
+                    _P2 = is_newer(OldGroupId, OldVersion, NewGroupId, NewVersion),
+                    _P3 = not intervals:is_left_of(MyRange, OldSuccRange),
                     case {OldGroupId, OldVersion} =:= {NewGroupId, NewVersion} of
                         true -> ok;
-                        false -> ?LOG("me: ~p not a succ: ~p ~p~n", [MyRange, SuccRange, {P1, P2, P3}])
+                        false -> ?LOG("me: ~p not a succ: ~p ~p~n", [MyRange, SuccRange, {_P1, _P2, _P3}])
                     end,
                     NodeState
             end
