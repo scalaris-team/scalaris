@@ -41,6 +41,8 @@
          get_join_ids(State),
          lists:sublist(get_candidates(State), erlang:min(5, length(get_candidates(State))))])).
 
+-define(VALID_PASSIVE_ALGORITHMS, [lb_psv_simple, lb_psv_split, lb_psv_gossip]).
+
 -export([join_as_first/3, join_as_other/3,
          process_join_state/2, process_join_msg/2, check_config/0]).
 
@@ -488,7 +490,14 @@ process_join_msg({join, get_candidate, Source_PID, Key, LbPsv, Conn} = _Msg, Sta
 % -> forward to the module
 process_join_msg({Msg, {join, LbPsv, LbPsvState}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    LbPsv:process_join_msg(Msg, LbPsvState, State);
+    case lists:member(LbPsv, ?VALID_PASSIVE_ALGORITHMS) of
+        true -> LbPsv:process_join_msg(Msg, LbPsvState, State);
+        _    -> MyLbPsv = config:read(join_lb_psv),
+                log:log(error, "[ Node ~.0p ] unknown passive load balancing "
+                               "algorithm requested: ~.0p - using ~.0p instead",
+                        [LbPsv, MyLbPsv]),
+                MyLbPsv:process_join_msg(Msg, LbPsvState, State)
+    end;
 
 %% userdevguide-begin dht_node_join:join_request1
 process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
