@@ -34,7 +34,7 @@
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
          get_all_children/1,
-         get_processes/0, kill_new_processes/1,
+         get_processes/0, kill_new_processes/1, kill_new_processes/2,
          init_per_suite/1, end_per_suite/1,
          get_ring_data/0, print_ring_data/0,
          macro_equals/4, macro_equals/5,
@@ -419,6 +419,10 @@ get_processes() ->
 
 -spec kill_new_processes(OldProcesses::[process_info()]) -> ok.
 kill_new_processes(OldProcesses) ->
+    kill_new_processes(OldProcesses, []).
+
+-spec kill_new_processes(OldProcesses::[process_info()], Options::list()) -> ok.
+kill_new_processes(OldProcesses, Options) ->
     NewProcesses = get_processes(),
     {_OnlyOld, _Both, OnlyNew} =
         util:split_unique(OldProcesses, NewProcesses,
@@ -442,7 +446,11 @@ kill_new_processes(OldProcesses) ->
                               CurFun =:= {test_server_sup, timetrap, 2}),
                      X =/= self(),
                      element(1, CurFun) =/= file_io_server],
-    ct:pal("Killed processes: ~.0p~n", [Killed]).
+    case lists:member(quiet, Options) of
+        false ->
+            ct:pal("Killed processes: ~.0p~n", [Killed]);
+        true -> ok
+    end.
 
 %% @doc Generic init_per_suite for all unit tests. Prints current state
 %%      information and stores information about all running processes.

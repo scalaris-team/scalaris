@@ -167,7 +167,7 @@ loop(#state{waiting_processes=Waiting, started=Started, white_list=WhiteList} = 
                             %Pid ! {gen_component_calling_receive, ack},
                             loop(schedule_next_task(State, Pid));
                         false ->
-                            ct:pal("stopped ~w in ~w", [Pid, Module]),
+                            %ct:pal("stopped ~w in ~w", [Pid, Module]),
                             %Pid ! {gen_component_calling_receive, ack},
                             loop(State#state{waiting_processes=gb_sets:add(Pid, Waiting)})
                     end
@@ -200,7 +200,7 @@ start(Options) ->
                         []
                 end,
     State = #state{waiting_processes=gb_sets:new(), started=false, white_list=WhiteList},
-    spawn_link(fun () -> loop(State) end).
+    {ok, spawn(fun () -> seed(Options), loop(State) end)}.
 
 % @doc find and schedule the next process
 -spec schedule_next_task(#state{}, pid()) -> #state{}.
@@ -295,5 +295,16 @@ fix_cwd_ebin() ->
 fix_cwd_scalaris() ->
     file:set_cwd("..").
 
+seed(Options) ->
+    case lists:keyfind(seed, 1, Options) of
+        {seed, {A1,A2,A3}} ->
+            random:seed(A1, A2, A3),
+            ok;
+        false ->
+            {A1,A2,A3} = now(),
+            ct:log("seed: ~p", [{A1,A2,A3}]),
+            random:seed(A1, A2, A3),
+            ok
+    end.
 % @todo
-% - start_scheduling could set a new white_list
+% - start_scheduling could set a new/different white_list
