@@ -25,7 +25,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([test/4, test_log/4, test_with_scheduler/3]).
+-export([test/4, test_log/4,
+         test_with_scheduler/3, test_with_scheduler/4]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -61,17 +62,30 @@ test_log(Module, Func, Arity, Iterations) ->
     run(Module, Func, Arity, Iterations, ParseState),
     ok.
 
+% @doc options are white_list and seed
 test_with_scheduler(Modules, F, Options) ->
+    test_with_scheduler(Modules, F, Options, 1).
+
+test_with_scheduler(Modules, F, Options, Repititions) ->
     [tester_scheduler:instrument_module(Module) || Module <- Modules],
-    Pid = tester_scheduler:start(Options),
-    register(usscheduler, Pid),
-    Res = (catch F()),
-    %Res = (catch gen_component:start(?MODULE, [foo], [], self())),
-    ct:pal("Res: ~w", [Res]),
+    Processes = unittest_helper:get_processes(),
+    Res = repeat(fun () ->
+                         {ok, Pid} = tester_scheduler:start(Options),
+                         (catch register(usscheduler, Pid)),
+                         Res = (catch F()),
+                         unittest_helper:kill_new_processes(Processes, [quiet]),
+                         (catch exit(Pid)),
+                         (catch unregister(usscheduler)),
+                         Res
+                 end, Repititions),
     [code:delete(Module) || {Module, _} <- Modules],
-    (catch exit(Pid)),
-    (catch unregister(usscheduler)),
     Res.
+
+repeat(F, 1) ->
+    F();
+repeat(F, Repititions) ->
+    _Res = F(),
+    repeat(F, Repititions - 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
