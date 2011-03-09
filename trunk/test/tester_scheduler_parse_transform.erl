@@ -58,8 +58,8 @@ form({attribute,Line,asm,{function,N,A,Code}}) ->
 form({attribute,Line,Attr,Val}) ->		%The general attribute.
     {attribute,Line,Attr,Val};
 % match the three comm:send* function calls
-form({function,Line,_Name0 = send, _Arity0 = 2,Clauses0}) ->
-    {Name,Arity,Clauses} = comm_send(Clauses0), %function(Name0, Arity0, Clauses0),
+form({function,Line,_Name0 = send, _Arity0 = 2, _Clauses0}) ->
+    {Name,Arity,Clauses} = comm_send(), %function(Name0, Arity0, Clauses0),
     {function,Line,Name,Arity,Clauses};
 form({function,Line,_Name0 = send_local, _Arity0 = 2,_Clauses0}) ->
     {Name,Arity,Clauses} = comm_send_local(), %function(Name0, Arity0, Clauses0),
@@ -78,8 +78,7 @@ form({error,E}) -> {error,E};
 form({warning,W}) -> {warning,W};
 form({eof,Line}) -> {eof,Line}.
 
-comm_send(Clauses0) ->
-    ct:pal("comm_send ~w", [Clauses0]),
+comm_send() ->
     Head = [{var, 100, 'Pid'}, {var, 100, 'Message'}],
     Guard = [],
     Args = [{var, 100, 'Pid'}, {var, 100, 'Message'}],

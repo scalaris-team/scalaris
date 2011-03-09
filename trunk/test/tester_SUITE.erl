@@ -15,7 +15,7 @@
 -include_lib("unittest.hrl").
 
 all() ->
-    []. %tester_create_value
+    []. %tester_scheduler_ring_1_tx, tester_scheduler_ring_1_tx]. %
 
 suite() ->
     [
@@ -34,40 +34,6 @@ end_per_suite(_Config) ->
 % tester:test/3
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec(prop_binary/1 :: (binary()) -> boolean()).
-prop_binary(X) ->
-    case X of
-        <<"42">> ->
-            true;
-        _ ->
-            false
-    end.
-
--spec(prop_integer/1 :: (integer()) -> boolean()).
-prop_integer(X) ->
-    X =/= 42.
-
--spec(prop_non_neg_integer/1 :: (non_neg_integer()) -> boolean()).
-prop_non_neg_integer(X) ->
-    is_integer(X).
-
--spec(prop_float/1 :: (float()) -> boolean()).
-prop_float(X) ->
-    case X of
-    3.14 -> true;
-       _ -> false
-    end.
-
--spec(prop_node/1 :: (node:node_type()) -> boolean()).
-prop_node(X) ->
-    case is_integer(node:id_version(X)) of
-        false ->
-            ct:pal("~w", [X]),
-            false;
-        true ->
-            true
-    end.
 
 %% @doc Creates a ring with Size rangom IDs.
 %%      Passes Options to the supervisor, e.g. to set config variables, specify
@@ -102,25 +68,49 @@ make_ring(Size, Options) ->
     unittest_helper:print_ring_data(),
     Pid.
 
-tester_create_value(_Config) ->
-    Res = tester:test_with_scheduler([
-                           {gen_component, "/home/schuett/zib/scalaris/src/gen_component.erl"},
-                           {comm, "/home/schuett/zib/scalaris/src/comm.erl"}
-                          ], fun () ->
-                                     %tester_scheduler_test:test(),
-                                     make_ring(1, []),
-                                     unittest_helper:stop_ring()
-                             end,
-                                    [{white_list, [pid_groups,
-                                                  comm_server]}]),
+tester_scheduler_ring_4(_Config) ->
+    Res = tester:test_with_scheduler([gen_component, comm],
+                                     fun () ->
+                                             make_ring(16, []),
+                                             unittest_helper:stop_ring()
+                                     end,
+                                     [{white_list, [pid_groups,
+                                                    comm_server]}]),
     ct:pal("~w", [Res]),
-    %tester:test(?MODULE, prop_integer, 1, 100).
-    %tester:test(?MODULE, prop_float, 1, 100).
-    %tester:test(?MODULE, prop_create_value, 1, 10).
     ok.
 
-tester_create_value2(_Config) ->
-    tester:test(?MODULE, prop_integer, 1, 100).
+%                           {gen_component, "/home/schuett/zib/scalaris/src/gen_component.erl"},
+%                           {comm, "/home/schuett/zib/scalaris/src/comm.erl"}
 
-is_valid(_) ->
-    true.
+tester_scheduler_ring_1_tx(_Config) ->
+    Test = fun () ->
+                   EmptyTLog = api_tx:new_tlog(),
+                   make_ring(1, []),
+                   ?equals(api_tx:read("foo"), {fail, not_found}),
+                   ?equals(api_tx:write("foo", "bar"), {ok}),
+                   ?equals(api_tx:read("foo"), {ok, "bar"}),
+                   ?equals_pattern(api_tx:req_list(EmptyTLog,
+                                                   [{read, "B"}, {read, "B"},
+                                                    {write, "A", 8}, {read, "A"}, {read, "A"},
+                                                    {read, "A"}, {write, "B", 9},
+                                                    {commit}]),
+                                   {_TLog, [{fail,not_found}, {fail,not_found},
+                                            {ok}, {ok, 8}, {ok, 8},
+                                            {ok, 8}, {ok},
+                                            {ok}]}),
+                   unittest_helper:stop_ring()
+           end,
+    _Res = tester:test_with_scheduler([gen_component, comm],
+                                      Test,
+                                      [{white_list, [pid_groups, comm_server]}]),
+    ok.
+
+get_cwd() ->
+    case file:get_cwd() of
+        {ok, CurCWD} ->
+            case string:rstr(CurCWD, "/bin") =/= (length(CurCWD) - 4 + 1) of
+                true -> file:set_cwd("../bin");
+                _    -> ok
+            end;
+        Error -> Error
+    end.
