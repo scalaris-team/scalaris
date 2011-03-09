@@ -140,7 +140,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported or the value is too big
      */
-    public long toInt() throws ClassCastException {
+    public int toInt() throws ClassCastException {
         try {
             return ((OtpErlangLong) value).intValue();
         } catch (OtpErlangRangeException e) {
