@@ -52,7 +52,8 @@
 
 -record(state, {waiting_processes::any(),
                 started::boolean(),
-               white_list::list(tuple())}).
+                scheduled_process::pid() | false,
+                white_list::list(tuple())}).
 
 comm_send(Pid, Message) ->
     {RealPid, RealMessage} = comm:unpack_cookie(Pid,Message),
@@ -146,7 +147,8 @@ instrument_module(Module) ->
     ok.
 
 % @doc main-loop of userspace scheduler
-loop(#state{waiting_processes=Waiting, started=Started, white_list=WhiteList} = State) ->
+loop(#state{waiting_processes=Waiting, started=Started, white_list=WhiteList,
+            scheduled_process=_ScheduledProcess} = State) ->
     receive
         {gen_component_spawned, Pid, _Module} ->
             %ct:pal("spawned ~w in ~w", [Pid, Module]),
@@ -165,6 +167,7 @@ loop(#state{waiting_processes=Waiting, started=Started, white_list=WhiteList} = 
                     case Started of
                         true ->
                             %Pid ! {gen_component_calling_receive, ack},
+                            %ct:pal("stopped ~w in ~w", [Pid, Module]),
                             loop(schedule_next_task(State, Pid));
                         false ->
                             %ct:pal("stopped ~w in ~w", [Pid, Module]),
@@ -199,14 +202,28 @@ start(Options) ->
                     false ->
                         []
                 end,
-    State = #state{waiting_processes=gb_sets:new(), started=false, white_list=WhiteList},
+    State = #state{waiting_processes=gb_sets:new(), started=false,
+                   white_list=WhiteList, scheduled_process=false},
     {ok, spawn(fun () -> seed(Options), loop(State) end)}.
 
-% @doc find and schedule the next process
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% the scheduling algorithm
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc find and schedule the next process, Pid called receive at this momemt
 -spec schedule_next_task(#state{}, pid()) -> #state{}.
-schedule_next_task(#state{waiting_processes=Waiting} = State, Pid) ->
+schedule_next_task(#state{waiting_processes=Waiting,
+                          scheduled_process=ScheduledProcess} = State, Pid) ->
     Waiting2 = gb_sets:add(Pid, Waiting),
-    schedule_next_task(State#state{waiting_processes=Waiting2}).
+    NextState = State#state{waiting_processes=Waiting2},
+    case is_correct_process(ScheduledProcess, Pid) of
+        true ->
+            schedule_next_task(NextState);
+        false ->
+            %ct:pal("schedule_next_task: odd process called receive", []),
+            NextState
+    end.
 
 -spec schedule_next_task(#state{}) -> #state{}.
 schedule_next_task(#state{waiting_processes=Waiting} = State) ->
@@ -215,9 +232,11 @@ schedule_next_task(#state{waiting_processes=Waiting} = State) ->
             erlang:send_after(sleep_delay(), self(), {reschedule}),
             loop(State);
         Pid ->
+            %ct:pal("picked ~w ~w", [Pid, erlang:process_info(Pid, messages)]),
             %ct:pal("picked ~w", [Pid]),
             Pid ! {gen_component_calling_receive, ack},
-            loop(State#state{waiting_processes=gb_sets:delete_any(Pid, Waiting)})
+            loop(State#state{waiting_processes=gb_sets:delete_any(Pid, Waiting),
+                             scheduled_process=Pid})
     end.
 
 % @doc find the next process
@@ -240,9 +259,11 @@ pick_next_runner(Pids) ->
             seeded_randomelem(Runnable)
     end.
 
-sleep_delay() -> 100.
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% misc. helper functions
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec get_file_for_module(module()) -> {ok, string()}.
 get_file_for_module(Module) ->
     % we have to be in $SCALARIS/ebin to find the beam file
@@ -308,6 +329,14 @@ seed(Options) ->
             ok
     end.
 
+% @doc check whether the last scheduled process is reporting to be ready
+is_correct_process(false, _Pid) ->
+    true;
+is_correct_process(ScheduledProcess, ScheduledProcess) ->
+    true;
+is_correct_process(_ScheduledProcess, _Pid) ->
+    false.
+
 %% @doc Returns a random element from the given (non-empty!) list according to
 %%      a uniform distribution.
 -spec seeded_randomelem(List::[X,...]) -> X.
@@ -315,6 +344,8 @@ seeded_randomelem(List)->
     Length = length(List),
     RandomNum = random:uniform(Length),
     lists:nth(RandomNum, List).
+
+sleep_delay() -> 100.
 
 % @todo
 % - start_scheduling could set a new/different white_list

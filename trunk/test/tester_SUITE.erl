@@ -15,7 +15,7 @@
 -include_lib("unittest.hrl").
 
 all() ->
-    []. %tester_scheduler_ring_1_tx, tester_scheduler_ring_1_tx]. %
+    []. %tester_scheduler_ring_1_tx, tester_scheduler_ring_4]. %
 
 suite() ->
     [
@@ -102,7 +102,13 @@ tester_scheduler_ring_1_tx(_Config) ->
            end,
     _Res = tester:test_with_scheduler([gen_component, comm],
                                       Test,
-                                      [{white_list, [pid_groups, comm_server]}]),
+                                      [{white_list, [pid_groups,
+                                                     %sync call on register
+                                                     boot_server,
+                                                     comm_server,
+                                                     %sync call on get_dht_nodes
+                                                     service_per_vm ]}],
+                                      4),
     ok.
 
 get_cwd() ->
