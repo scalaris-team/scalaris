@@ -369,8 +369,12 @@ public class ConnectionFactory {
 		String erlangNodeName = System.getProperty("scalaris.erlang.nodename");
 		if (erlangNodeName == null || erlangNodeName.length() == 0) {
 			try {
-				InetAddress addr = InetAddress.getLocalHost();
-				hostname = addr.getHostName();
+			    // (more) reliable hostname look-up reported by
+			    // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4341822
+                hostname = InetAddress.getLocalHost().getHostName();
+                String host = InetAddress.getByName(hostname).getHostAddress();
+                hostname = InetAddress.getByName(host).getHostName();
+				
 			} catch (UnknownHostException e) {
 			}
 		} else {
