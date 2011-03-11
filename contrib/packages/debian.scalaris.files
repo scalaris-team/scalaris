@@ -3,6 +3,7 @@
 /usr/lib/scalaris/*
 /var/log/scalaris
 /etc/scalaris/scalarisctl.conf
-/etc/scalaris/scalaris*.cfg
+/etc/scalaris/scalaris.cfg
 /etc/scalaris/scalaris.cfg.example
+/etc/scalaris/scalaris.local.cfg
 /etc/scalaris/scalaris.local.cfg.example

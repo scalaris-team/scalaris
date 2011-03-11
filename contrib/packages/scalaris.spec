@@ -126,7 +126,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris
 %{_localstatedir}/log/scalaris
 %dir %{_sysconfdir}/scalaris
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris*.cfg
+%config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
+%config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
 %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
 %config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
 
