@@ -1,4 +1,4 @@
-# Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+# Copyright 2007-2008, 2011 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 # 
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -136,11 +136,11 @@ Firewall
 ========
 
 Scalaris nodes are listening on TCP port 14195 by default. This is
-defined as an application parameter (cs_port) that can be passed to
+defined as an application parameter (port) that can be passed to
 Scalaris when it is started. For distributed deployments of Scalaris
 the firewall has to allow connections to this port from the outside.
 The port can be changed by setting the SCALARIS_ADDITIONAL_PARAMETERS
-environment variable to e.g. "-scalaris cs_port <port>" before running
+environment variable to e.g. "-scalaris port <port>" before running
 scalarisctl. <port> can be a single integer, e.g. 14195, a list of integers
 (from which Scalaris chooses a free port), e.g. [14195,14196], or a tuple
 of two integers (which define a port range), e.g. {14195,14197}. Note that

@@ -77,7 +77,9 @@ start_link(Files) ->
 -spec start_link(Files::[file:name()], Options::[tuple()]) -> {ok, pid()}.
 start_link(Files, Options) ->
     case whereis(config) of
-        Pid when is_pid(Pid) -> {ok, Pid};
+        Pid when is_pid(Pid) ->
+            %% ct:pal("There is already a Config process:~n"),
+            {ok, Pid};
         _ ->
             TheFiles = case util:app_get_env(add_config, []) of
                            []         -> Files;
@@ -169,40 +171,47 @@ process_term({Key, Value}) ->
 %% @doc Checks whether config parameters of all processes exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    log:check_config() and
-        sup_scalaris:check_config() and
-        sup_scalaris2:check_config() and
-        sup_dht_node_core:check_config() and
-        cyclon:check_config() and
-        acceptor:check_config() and
-        gossip:check_config() and
-        learner:check_config() and
-        rdht_tx:check_config() and
-        rdht_tx_read:check_config() and
-        rdht_tx_write:check_config() and
-        ?RT:check_config() and
-        rt_loop:check_config() and
-        tx_tm_rtm:check_config() and
-        vivaldi:check_config() and
-        vivaldi_latency:check_config() and
-        ?RM:check_config() and
-        fd_hbs:check_config() and
-        dht_node_move:check_config() and
-        dht_node_join:check_config() and
-        % note: need to check all passive load balancing algorithm's parameters
-        %       (another node may ask us to provide a candidate for any of them)
-        lb_psv_simple:check_config() and
-        lb_psv_split:check_config() and
-        lb_psv_gossip:check_config() and
-        comm_acceptor:check_config() and
-        monitor:check_config().
+    Checks =
+        [ case X() of
+              true -> true;
+              false ->
+                  ct:pal(error, "check_config ~p failed.~n", [X]),
+                  false
+          end || X  <- [ fun log:check_config/0,
+                         fun sup_scalaris:check_config/0,
+                         fun sup_dht_node_core:check_config/0,
+                         fun cyclon:check_config/0,
+                         fun acceptor:check_config/0,
+                         fun gossip:check_config/0,
+                         fun learner:check_config/0,
+                         fun rdht_tx:check_config/0,
+                         fun rdht_tx_read:check_config/0,
+                         fun rdht_tx_write:check_config/0,
+                         fun ?RT:check_config/0,
+                         fun rt_loop:check_config/0,
+                         fun tx_tm_rtm:check_config/0,
+                         fun vivaldi:check_config/0,
+                         fun vivaldi_latency:check_config/0,
+                         fun ?RM:check_config/0,
+                         fun fd_hbs:check_config/0,
+                         fun dht_node_move:check_config/0,
+                         fun dht_node_join:check_config/0,
+                         %% note: need to check all passive load
+                         %%       balancing algorithm's parameters
+                         %%       (another node may ask us to provide
+                         %%       a candidate for any of them)
+                         fun lb_psv_simple:check_config/0,
+                         fun lb_psv_split:check_config/0,
+                         fun lb_psv_gossip:check_config/0,
+                         fun comm_acceptor:check_config/0,
+                         fun monitor:check_config/0]],
+    lists:foldl(fun(A,B) -> A and B end, true, Checks).
 
 -spec exists(Key::atom()) -> boolean().
 exists(Key) ->
     case read(Key) of
         failed ->
-            error_logger:error_msg("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n",
-                                       [Key]),
+            error_logger:error_msg("~p not defined (see scalaris.cfg and scalaris.local.cfg)~n", [Key]),
             false;
         _X -> true
     end.

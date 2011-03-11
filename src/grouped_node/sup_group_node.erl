@@ -49,7 +49,7 @@ init(Options) ->
     db_ets = ?DB, % assert ?DB is ets
     NodeGrpName = "group_node_" ++ randoms:getRandomId(),
     pid_groups:join_as(NodeGrpName, sup_dht_node),
-    boot_server:connect(),
+    mgmt_server:connect(),
     Supervisor_AND =
         util:sup_supervisor_desc(cs_supervisor_and, sup_group_node_core, start_link,
                                  [NodeGrpName, Options]),

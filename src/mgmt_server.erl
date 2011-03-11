@@ -13,11 +13,12 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc The boot server maintains a list of scalaris nodes and checks their 
-%%      availability using a failure_detector. Its main purpose is to 
-%%      give new scalaris nodes a list of nodes already in the system.
+%% @doc The management server maintains a list of scalaris nodes and
+%%      checks their availability using a failure_detector. Its main
+%%      purpose is to give new scalaris nodes a list of nodes already
+%%      in the system.
 %% @end
--module(boot_server).
+-module(mgmt_server).
 -author('schuett@zib.de').
 -vsn('$Id$').
 
@@ -31,7 +32,7 @@
 
 -export([init/1, on/2]).
 
-% accepted messages of the boot_server process
+% accepted messages of the mgmt_server process
 -type(message() ::
     {crash, PID::comm:mypid()} |
     {get_list, Ping_PID::comm:mypid()} |
@@ -43,21 +44,21 @@
 % internal state (known nodes)
 -type(state()::Nodes::gb_set()).
 
-%% @doc trigger a message with  the number of nodes known to the boot server
+%% @doc trigger a message with  the number of nodes known to the mgmt server
 -spec number_of_nodes() -> ok.
 number_of_nodes() ->
-    comm:send(bootPid(), {get_list_length, comm:this()}),
+    comm:send(mgmtPid(), {get_list_length, comm:this()}),
     ok.
 
 -spec connect() -> ok.
 connect() ->
     % @todo we have to improve the startup process!
-    comm:send(bootPid(), {connect}).
+    comm:send(mgmtPid(), {connect}).
 
-%% @doc trigger a message with all nodes known to the boot server
+%% @doc trigger a message with all nodes known to the mgmt server
 -spec node_list() -> ok.
 node_list() ->
-    comm:send(bootPid(), {get_list, comm:this()}).
+    comm:send(mgmtPid(), {get_list, comm:this()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
@@ -74,7 +75,8 @@ on({get_list, Ping_PID}, Nodes) ->
     Nodes;
 
 on({get_list_length, Ping_PID}, Nodes) ->
-    comm:send(Ping_PID, {get_list_length_response, length(gb_sets:to_list(Nodes))}),
+    L = length(gb_sets:to_list(Nodes)),
+    comm:send(Ping_PID, {get_list_length_response, L}),
     Nodes;
 
 on({register, Ping_PID}, Nodes) ->
@@ -105,24 +107,27 @@ on({web_debug_info, Requestor}, Nodes) ->
 
 -spec init(Options::[tuple()]) -> state().
 init(_Options) ->
-    case config:read(empty_node) of
-        true ->
+    case config:read(start_dht_node) of
+        undefined ->
             % ugly hack to get a valid ip-address into the comm-layer
+            KnownHosts = config:read(known_hosts),
+            MgmtServer = config:read(mgmt_server),
+            config:write(known_hosts, [MgmtServer | KnownHosts]),
             dht_node:trigger_known_nodes();
         _ -> ok
     end,
     dn_cache:subscribe(),
     gb_sets:empty().
 
-%% @doc starts the server; called by the boot supervisor
+%% @doc starts the server; called by the mgmt supervisor
 %% @see sup_scalaris
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(ServiceGroup, Options) ->
     gen_component:start_link(?MODULE, Options,
-                             [{erlang_register, boot},
+                             [{erlang_register, mgmt_server},
                               {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
-%% @doc pid of the boot daemon
--spec bootPid() -> comm:mypid().
-bootPid() ->
-    config:read(boot_host).
+%% @doc pid of the mgmt server
+-spec mgmtPid() -> comm:mypid().
+mgmtPid() ->
+    config:read(mgmt_server).

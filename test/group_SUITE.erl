@@ -41,16 +41,17 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = scalaris2:stop(),
+    _ = scalaris:stop(),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
 init_per_testcase(_TestCase, Config) ->
     ok = unittest_helper:fix_cwd(),
-    _ = scalaris2:stop(), % if end_per_testcase failed
+    _ = scalaris:stop(), % if end_per_testcase failed
     NewOptions = unittest_helper:prepare_config([]),
     {ok, _} = pid_groups:start_link(),
-    {ok, _} = sup_scalaris2:start_link(undefined,  NewOptions),
+    application:set_env(scalaris, start_dht_node, group_node),
+    {ok, _} = sup_scalaris:start_link(undefined,  NewOptions),
     config:write(dht_node_sup, sup_group_node),
     config:write(dht_node, group_node),
     config:write(group_node_trigger, trigger_periodic),
@@ -61,7 +62,7 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
     log:set_log_level(none),
     unittest_helper:stop_pid_groups(),
-    %_ = scalaris2:stop(),
+    %_ = scalaris:stop(),
     Config.
 
 add_9(_Config) ->

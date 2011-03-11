@@ -96,7 +96,7 @@ on_active({deactivate_reregister}, TriggerState)  ->
 on_active({register}, TriggerState) ->
     RegisterMessage = {register, get_dht_node_this()},
     _ = case config:read(register_hosts) of
-            failed -> comm:send(bootPid(), RegisterMessage);
+            failed -> comm:send(mgmtServer(), RegisterMessage);
             Hosts  -> [comm:send(Host, RegisterMessage) || Host <- Hosts]
         end,
     NewTriggerState = trigger:next(TriggerState),
@@ -105,7 +105,7 @@ on_active({register}, TriggerState) ->
 on_active({web_debug_info, Requestor}, TriggerState) ->
     KeyValueList =
         case config:read(register_hosts) of
-            failed -> [{"Hosts (boot):", lists:flatten(io_lib:format("~.0p", [bootPid()]))}];
+            failed -> [{"Hosts (boot):", lists:flatten(io_lib:format("~.0p", [mgmtServer()]))}];
             Hosts  -> [{"Hosts:", ""} |
                            [{"", lists:flatten(io_lib:format("~.0p", [Host]))} || Host <- Hosts]]
         end,
@@ -124,6 +124,6 @@ get_dht_node_this() ->
     comm:make_global(pid_groups:get_my(dht_node)).
 
 %% @doc pid of the boot daemon
--spec bootPid() -> comm:mypid().
-bootPid() ->
-    config:read(boot_host).
+-spec mgmtServer() -> comm:mypid().
+mgmtServer() ->
+    config:read(mgmt_server).

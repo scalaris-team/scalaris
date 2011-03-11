@@ -14,7 +14,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc web helpers module for Bootstrap server to generated the web interface
+%% @doc web helpers module for mgmt server to generated the web interface
 %% @version $Id$
 -module(webhelpers).
 -author('schuett@zib.de').
@@ -68,7 +68,7 @@ delete_key(Key, Timeout) ->
 
 -spec getLoad() -> [{ok, Node::comm:mypid(), Load::node_details:load()} | {failed, Node::comm:mypid()}].
 getLoad() ->
-    boot_server:node_list(),
+    mgmt_server:node_list(),
     Nodes =
         receive
             {get_list_response, X} -> X
@@ -124,13 +124,13 @@ renderLoad([]) ->
 
 -spec getVivaldiMap() -> SVG::string().
 getVivaldiMap() ->
-    boot_server:node_list(),
+    mgmt_server:node_list(),
     Nodes =
         receive
             {get_list_response, X} -> X
         after 2000 ->
-            log:log(error,"[ WH ] Timeout getting node list from boot server"),
-            throw('boot_server_timeout')
+            log:log(error,"[ WH ] Timeout getting node list from mgmt server"),
+            throw('mgmt_server_timeout')
         end,
     This = self(),
     _ = [erlang:spawn(

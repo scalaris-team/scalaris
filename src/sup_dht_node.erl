@@ -48,7 +48,7 @@ start_link() ->
 init(Options) ->
     DHTNodeGroup = pid_groups:new("dht_node_"),
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
-    boot_server:connect(),
+    mgmt_server:connect(),
     
     Cyclon = util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DC_Clustering =
@@ -75,7 +75,6 @@ init(Options) ->
         util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Monitor =
         util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
-    
     %% order in the following list is the start order
     {ok, {{one_for_one, 10, 1},
           [
