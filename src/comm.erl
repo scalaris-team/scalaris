@@ -57,6 +57,8 @@
 -export_type([message/0, message_tag/0, mypid/0, erl_local_pid/0]).
 % for comm_layer
 -export_type([erl_pid_plain/0]).
+% for tester_scheduler
+-export_type([mypid_plain/0, erl_local_pid_plain/0]).
 -endif.
 
 -type cookie() :: any().
@@ -241,7 +243,10 @@ get_msg_tag(Message)
   when is_tuple(Message) andalso is_atom(erlang:element(1, Message)) ->
     erlang:element(1, Message).
 
--spec unpack_cookie(mypid(), message()) -> {mypid(), message()} | {mypid(), {message(), cookie()}}.
+% note: cannot simplify to the following spec -> this lets dialyzer crash
+%-spec unpack_cookie(mypid(), message()) -> {mypid(), message()}.
+-spec unpack_cookie(mypid(), message()) -> {mypid_plain(), message()};
+                   (erl_local_pid(), message()) -> {erl_local_pid_plain(), message()}.
 unpack_cookie({Pid, c, Cookie}, Message) -> {Pid, {Message, Cookie}};
 unpack_cookie(Pid, Message) -> {Pid, Message}.
 
