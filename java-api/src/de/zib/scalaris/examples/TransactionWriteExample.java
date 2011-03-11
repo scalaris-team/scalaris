@@ -34,117 +34,117 @@ import de.zib.scalaris.UnknownException;
  * @since 2.0
  */
 public class TransactionWriteExample {
-	/**
-	 * Writes all key/value pairs given on the command line (given as "key1
-	 * value1 key2 value2 ...") with the
-	 * {@link Transaction#write(String, String)} and
-	 * {@link Transaction#write(OtpErlangString, OtpErlangObject)} methods
-	 * in a single transaction.<br />
-	 * If no key/value pair is given, the default pairs <code>(key1, value1)</code>,
-	 * <code>(key2, value2)</code> and <code>(key3, value3)</code> are used.
-	 * 
-	 * @param args
-	 *            command line arguments (optional key/value pairs to store)
-	 */
-	public static void main(String[] args) {
-		String[] keys;
-		String[] values;
+    /**
+     * Writes all key/value pairs given on the command line (given as "key1
+     * value1 key2 value2 ...") with the
+     * {@link Transaction#write(String, String)} and
+     * {@link Transaction#write(OtpErlangString, OtpErlangObject)} methods
+     * in a single transaction.<br />
+     * If no key/value pair is given, the default pairs <code>(key1, value1)</code>,
+     * <code>(key2, value2)</code> and <code>(key3, value3)</code> are used.
+     * 
+     * @param args
+     *            command line arguments (optional key/value pairs to store)
+     */
+    public static void main(String[] args) {
+        String[] keys;
+        String[] values;
 
-		if (args.length < 2 || args.length % 2 != 0) {
-			keys = new String[] { "key1", "key2", "key3" };
-			values = new String[] { "value1", "value2", "value3" };
-		} else {
-			keys = new String[args.length / 2];
-			values = new String[args.length / 2];
-			for (int i = 0; i < args.length;) {
-				keys[i] = args[i++];
-				values[i] = args[i++];
-			}
-		}
+        if (args.length < 2 || args.length % 2 != 0) {
+            keys = new String[] { "key1", "key2", "key3" };
+            values = new String[] { "value1", "value2", "value3" };
+        } else {
+            keys = new String[args.length / 2];
+            values = new String[args.length / 2];
+            for (int i = 0; i < args.length;) {
+                keys[i] = args[i++];
+                values[i] = args[i++];
+            }
+        }
 
-		OtpErlangString[] otpKeys_temp = new OtpErlangString[keys.length];
-		for (int i = 0; i < keys.length; ++i) {
-			otpKeys_temp[i] = new OtpErlangString(keys[i]);
-		}
-		OtpErlangList otpKeys = (new OtpErlangList(otpKeys_temp));
+        OtpErlangString[] otpKeys_temp = new OtpErlangString[keys.length];
+        for (int i = 0; i < keys.length; ++i) {
+            otpKeys_temp[i] = new OtpErlangString(keys[i]);
+        }
+        OtpErlangList otpKeys = (new OtpErlangList(otpKeys_temp));
 
-		OtpErlangString[] otpValues_temp = new OtpErlangString[values.length];
-		for (int i = 0; i < values.length; ++i) {
-			otpValues_temp[i] = new OtpErlangString(values[i]);
-		}
-		OtpErlangList otpValues = (new OtpErlangList(otpValues_temp));
+        OtpErlangString[] otpValues_temp = new OtpErlangString[values.length];
+        for (int i = 0; i < values.length; ++i) {
+            otpValues_temp[i] = new OtpErlangString(values[i]);
+        }
+        OtpErlangList otpValues = (new OtpErlangList(otpValues_temp));
 
-		System.out.println("Writing values with the class `Transaction`:");
+        System.out.println("Writing values with the class `Transaction`:");
 
-		System.out.print("    Initialising Transaction object... ");
-		try {
-			Transaction transaction = new Transaction();
-			System.out.println("done");
+        System.out.print("    Initialising Transaction object... ");
+        try {
+            Transaction transaction = new Transaction();
+            System.out.println("done");
 
-			System.out.print("    Starting transaction... ");
-			System.out.println("done");
+            System.out.print("    Starting transaction... ");
+            System.out.println("done");
 
-			System.out
-					.println("    `writeObject(OtpErlangString, OtpErlangObject)`...");
-			for (int i = 0; i < otpKeys.arity(); ++i) {
-				OtpErlangString otpKey = (OtpErlangString) otpKeys.elementAt(i);
-				OtpErlangString otpValue = (OtpErlangString) otpValues
-						.elementAt(i);
-				try {
-					transaction.write(otpKey, otpValue);
-					System.out.println("      write(" + otpKey.stringValue()
-							+ ", " + otpValue.stringValue() + ") succeeded");
-				} catch (ConnectionException e) {
-					System.out.println("      write(" + otpKey.stringValue()
-							+ ", " + otpValue.stringValue() + ") failed: "
-							+ e.getMessage());
-				} catch (TimeoutException e) {
-					System.out.println("      write(" + otpKey.stringValue()
-							+ ", " + otpValue.stringValue()
-							+ ") failed with timeout: " + e.getMessage());
-				} catch (UnknownException e) {
-					System.out.println("      write(" + otpKey.stringValue()
-							+ ", " + otpValue.stringValue()
-							+ ") failed with unknown: " + e.getMessage());
-				}
-			}
+            System.out
+                    .println("    `writeObject(OtpErlangString, OtpErlangObject)`...");
+            for (int i = 0; i < otpKeys.arity(); ++i) {
+                OtpErlangString otpKey = (OtpErlangString) otpKeys.elementAt(i);
+                OtpErlangString otpValue = (OtpErlangString) otpValues
+                        .elementAt(i);
+                try {
+                    transaction.write(otpKey, otpValue);
+                    System.out.println("      write(" + otpKey.stringValue()
+                            + ", " + otpValue.stringValue() + ") succeeded");
+                } catch (ConnectionException e) {
+                    System.out.println("      write(" + otpKey.stringValue()
+                            + ", " + otpValue.stringValue() + ") failed: "
+                            + e.getMessage());
+                } catch (TimeoutException e) {
+                    System.out.println("      write(" + otpKey.stringValue()
+                            + ", " + otpValue.stringValue()
+                            + ") failed with timeout: " + e.getMessage());
+                } catch (UnknownException e) {
+                    System.out.println("      write(" + otpKey.stringValue()
+                            + ", " + otpValue.stringValue()
+                            + ") failed with unknown: " + e.getMessage());
+                }
+            }
 
-			System.out.println("    `write(String, String)`...");
-			for (int i = 0; i < keys.length; ++i) {
-				String key = keys[i];
-				String value = values[i];
-				try {
-					transaction.write(key, value);
-					System.out.println("      write(" + key + ", " + value
-							+ ") succeeded");
-				} catch (ConnectionException e) {
-					System.out.println("      write(" + key + ", " + value
-							+ ") failed: " + e.getMessage());
-				} catch (TimeoutException e) {
-					System.out.println("      write(" + key + ", " + value
-							+ ") failed with timeout: " + e.getMessage());
-				} catch (UnknownException e) {
-					System.out.println("      write(" + key + ", " + value
-							+ ") failed with unknown: " + e.getMessage());
-				}
-			}
+            System.out.println("    `write(String, String)`...");
+            for (int i = 0; i < keys.length; ++i) {
+                String key = keys[i];
+                String value = values[i];
+                try {
+                    transaction.write(key, value);
+                    System.out.println("      write(" + key + ", " + value
+                            + ") succeeded");
+                } catch (ConnectionException e) {
+                    System.out.println("      write(" + key + ", " + value
+                            + ") failed: " + e.getMessage());
+                } catch (TimeoutException e) {
+                    System.out.println("      write(" + key + ", " + value
+                            + ") failed with timeout: " + e.getMessage());
+                } catch (UnknownException e) {
+                    System.out.println("      write(" + key + ", " + value
+                            + ") failed with unknown: " + e.getMessage());
+                }
+            }
 
-			System.out.print("    Committing transaction... ");
-			transaction.commit();
-			System.out.println("done");
-		} catch (ConnectionException e) {
-			System.out.println("failed: " + e.getMessage());
-			return;
+            System.out.print("    Committing transaction... ");
+            transaction.commit();
+            System.out.println("done");
+        } catch (ConnectionException e) {
+            System.out.println("failed: " + e.getMessage());
+            return;
         } catch (TimeoutException e) {
             System.out.println("failed: " + e.getMessage());
             return;
         } catch (AbortException e) {
             System.out.println("failed: " + e.getMessage());
             return;
-		} catch (UnknownException e) {
-			System.out.println("failed: " + e.getMessage());
-			return;
+        } catch (UnknownException e) {
+            System.out.println("failed: " + e.getMessage());
+            return;
         }
-	}
+    }
 
 }

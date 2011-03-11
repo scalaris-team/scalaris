@@ -45,22 +45,22 @@ import de.zib.scalaris.ErlangValue;
  * @since 2.9
  */
 public class ErlangValueFastString extends ErlangValue {
-	/**
-	 * Identifies the tuple of the stored erlang object.
-	 */
-	private static OtpErlangAtom identifier = new OtpErlangAtom("$fs");
+    /**
+     * Identifies the tuple of the stored erlang object.
+     */
+    private static OtpErlangAtom identifier = new OtpErlangAtom("$fs");
 
-	/**
-	 * Creates an object with the given (Java) value.
-	 * 
-	 * @param value
-	 *            the value to use
-	 */
-	public ErlangValueFastString(String value) {
+    /**
+     * Creates an object with the given (Java) value.
+     * 
+     * @param value
+     *            the value to use
+     */
+    public ErlangValueFastString(String value) {
         super(new OtpErlangTuple(new OtpErlangObject[] {
                 identifier,
                 new OtpErlangBinary(value.getBytes()) }));
-	}
+    }
 
     /**
      * Creates an object with the given (erlang) value.
@@ -72,28 +72,28 @@ public class ErlangValueFastString extends ErlangValue {
         super(otpValue);
     }
 
-	/**
-	 * Creates an object with the given (erlang) value.
-	 * Provided for convenience.
-	 * 
-	 * @param value
-	 *            the value to use
-	 * 
-	 * @see ErlangValue
-	 */
-	public ErlangValueFastString(ErlangValue value) {
-		super(value.value());
-	}
+    /**
+     * Creates an object with the given (erlang) value.
+     * Provided for convenience.
+     * 
+     * @param value
+     *            the value to use
+     * 
+     * @see ErlangValue
+     */
+    public ErlangValueFastString(ErlangValue value) {
+        super(value.value());
+    }
 
-	/**
-	 * Converts the stored erlang value created by this object to a Java
-	 * {@link String}.
-	 * 
-	 * @throws ClassCastException
-	 *             if the conversion fails
-	 */
-	@Override
-	public String toString() {
+    /**
+     * Converts the stored erlang value created by this object to a Java
+     * {@link String}.
+     * 
+     * @throws ClassCastException
+     *             if the conversion fails
+     */
+    @Override
+    public String toString() {
         OtpErlangTuple otpTuple = (OtpErlangTuple) value();
         if (otpTuple.elementAt(0).equals(identifier)) {
             return new String(
@@ -102,5 +102,5 @@ public class ErlangValueFastString extends ErlangValue {
 
         throw new ClassCastException("Unexpected result type: "
                 + value().getClass());
-	}
+    }
 }

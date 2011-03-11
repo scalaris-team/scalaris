@@ -73,34 +73,34 @@ public class ReplicatedDHT {
      */
     private OtpErlangList lastDeleteResult = null;
     
-	/**
-	 * Connection to a TransactionSingleOp node.
-	 */
-	private Connection connection;
-	
-	/**
-	 * Constructor, uses the default connection returned by
-	 * {@link ConnectionFactory#createConnection()}.
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection fails
-	 */
-	public ReplicatedDHT() throws ConnectionException {
-		connection = ConnectionFactory.getInstance().createConnection();
-	}
+    /**
+     * Connection to a TransactionSingleOp node.
+     */
+    private Connection connection;
+    
+    /**
+     * Constructor, uses the default connection returned by
+     * {@link ConnectionFactory#createConnection()}.
+     * 
+     * @throws ConnectionException
+     *             if the connection fails
+     */
+    public ReplicatedDHT() throws ConnectionException {
+        connection = ConnectionFactory.getInstance().createConnection();
+    }
 
-	/**
-	 * Constructor, uses the given connection to an erlang node.
-	 * 
-	 * @param conn
-	 *            connection to use for the transaction
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection fails
-	 */
-	public ReplicatedDHT(Connection conn) throws ConnectionException {
-		connection = conn;
-	}
+    /**
+     * Constructor, uses the given connection to an erlang node.
+     * 
+     * @param conn
+     *            connection to use for the transaction
+     * 
+     * @throws ConnectionException
+     *             if the connection fails
+     */
+    public ReplicatedDHT(Connection conn) throws ConnectionException {
+        connection = conn;
+    }
     
     // /////////////////////////////
     // delete methods
@@ -302,14 +302,14 @@ public class ReplicatedDHT {
             throw new UnknownException(e, lastDeleteResult);
         }
     }
-	
-	/**
-	 * Closes the transaction's connection to a scalaris node.
-	 * 
-	 * Note: Subsequent calls to the other methods will throw
-	 * {@link ConnectionException}s!
-	 */
-	public void closeConnection() {
-		connection.close();
-	}
+    
+    /**
+     * Closes the transaction's connection to a scalaris node.
+     * 
+     * Note: Subsequent calls to the other methods will throw
+     * {@link ConnectionException}s!
+     */
+    public void closeConnection() {
+        connection.close();
+    }
 }

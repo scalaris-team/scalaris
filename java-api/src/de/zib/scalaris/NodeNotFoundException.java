@@ -27,60 +27,60 @@ import com.ericsson.otp.erlang.OtpErlangObject;
  * @since 2.2
  */
 public class NodeNotFoundException extends OtpErlangException {
-	/**
-	 * class version for serialisation
-	 */
-	private static final long serialVersionUID = 1L;
+    /**
+     * class version for serialisation
+     */
+    private static final long serialVersionUID = 1L;
 
-	/**
-	 * Creates the exception with no message.
-	 */
-	public NodeNotFoundException() {
-	}
+    /**
+     * Creates the exception with no message.
+     */
+    public NodeNotFoundException() {
+    }
 
-	/**
-	 * Creates the exception with the given message.
-	 * 
-	 * @param msg
-	 *            message of the exception
-	 */
-	public NodeNotFoundException(String msg) {
-		super(msg);
-	}
-	
-	/**
-	 * Creates an exception taking the message of the given throwable.
-	 * 
-	 * @param e the exception to "re-throw"
-	 */
-	public NodeNotFoundException(Throwable e) {
-		super(e.getMessage());
-		fillInStackTrace();
-	}
+    /**
+     * Creates the exception with the given message.
+     * 
+     * @param msg
+     *            message of the exception
+     */
+    public NodeNotFoundException(String msg) {
+        super(msg);
+    }
+    
+    /**
+     * Creates an exception taking the message of the given throwable.
+     * 
+     * @param e the exception to "re-throw"
+     */
+    public NodeNotFoundException(Throwable e) {
+        super(e.getMessage());
+        fillInStackTrace();
+    }
 
-	/**
-	 * Creates an exception including the message of the given erlang object.
-	 * 
-	 * @param erlValue
-	 *            the erlang message to include
-	 * 
-	 * @since 2.2
-	 */
-	public NodeNotFoundException(OtpErlangObject erlValue) {
-		super("Erlang message: " + erlValue.toString());
-	}
+    /**
+     * Creates an exception including the message of the given erlang object.
+     * 
+     * @param erlValue
+     *            the erlang message to include
+     * 
+     * @since 2.2
+     */
+    public NodeNotFoundException(OtpErlangObject erlValue) {
+        super("Erlang message: " + erlValue.toString());
+    }
 
-	/**
-	 * Creates an exception taking the message of the given throwable.
-	 * 
-	 * @param e
-	 *            the exception to "re-throw"
-	 * @param erlValue
-	 *            the string representation of this erlang value is included
-	 *            into the message
-	 */
-	public NodeNotFoundException(Throwable e, OtpErlangObject erlValue) {
-		super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
-		setStackTrace(e.getStackTrace());
-	}
+    /**
+     * Creates an exception taking the message of the given throwable.
+     * 
+     * @param e
+     *            the exception to "re-throw"
+     * @param erlValue
+     *            the string representation of this erlang value is included
+     *            into the message
+     */
+    public NodeNotFoundException(Throwable e, OtpErlangObject erlValue) {
+        super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
+        setStackTrace(e.getStackTrace());
+    }
 }

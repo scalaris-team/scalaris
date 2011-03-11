@@ -109,126 +109,126 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * @since 2.0
  */
 public class TransactionSingleOp {
-	/**
-	 * Connection to a TransactionSingleOp node.
-	 */
-	private Connection connection;
-	
-	/**
-	 * Constructor, uses the default connection returned by
-	 * {@link ConnectionFactory#createConnection()}.
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection fails
-	 */
-	public TransactionSingleOp() throws ConnectionException {
-		connection = ConnectionFactory.getInstance().createConnection();
-	}
+    /**
+     * Connection to a TransactionSingleOp node.
+     */
+    private Connection connection;
+    
+    /**
+     * Constructor, uses the default connection returned by
+     * {@link ConnectionFactory#createConnection()}.
+     * 
+     * @throws ConnectionException
+     *             if the connection fails
+     */
+    public TransactionSingleOp() throws ConnectionException {
+        connection = ConnectionFactory.getInstance().createConnection();
+    }
 
-	/**
-	 * Constructor, uses the given connection to an erlang node.
-	 * 
-	 * @param conn
-	 *            connection to use for the transaction
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection fails
-	 */
-	public TransactionSingleOp(Connection conn) throws ConnectionException {
-		connection = conn;
-	}
-	
-	// /////////////////////////////
-	// read methods
-	// /////////////////////////////
-	
-	/**
-	 * Gets the value stored under the given <tt>key</tt>.
-	 * 
-	 * @param key
-	 *            the key to look up
-	 * 
-	 * @return the value stored under the given <tt>key</tt>
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to fetch the value
-	 * @throws NotFoundException
-	 *             if the requested key does not exist
-	 * @throws UnknownException
-	 *             if any other error occurs
+    /**
+     * Constructor, uses the given connection to an erlang node.
+     * 
+     * @param conn
+     *            connection to use for the transaction
+     * 
+     * @throws ConnectionException
+     *             if the connection fails
+     */
+    public TransactionSingleOp(Connection conn) throws ConnectionException {
+        connection = conn;
+    }
+    
+    // /////////////////////////////
+    // read methods
+    // /////////////////////////////
+    
+    /**
+     * Gets the value stored under the given <tt>key</tt>.
+     * 
+     * @param key
+     *            the key to look up
+     * 
+     * @return the value stored under the given <tt>key</tt>
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to fetch the value
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws UnknownException
+     *             if any other error occurs
      * 
      * @since 2.9
-	 */
-	public OtpErlangObject read(OtpErlangString key)
+     */
+    public OtpErlangObject read(OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
-		OtpErlangObject received_raw = null;
-		try {
-			received_raw = connection.doRPC("api_tx", "read",
-					new OtpErlangList(key));
-			OtpErlangTuple received = (OtpErlangTuple) received_raw;
+        OtpErlangObject received_raw = null;
+        try {
+            received_raw = connection.doRPC("api_tx", "read",
+                    new OtpErlangList(key));
+            OtpErlangTuple received = (OtpErlangTuple) received_raw;
             OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
 
-			/*
-			 * possible return values:
-			 *  {ok, Value} | {fail, timeout | not_found}
-			 */
+            /*
+             * possible return values:
+             *  {ok, Value} | {fail, timeout | not_found}
+             */
             if (state.equals(CommonErlangObjects.okAtom) && received.arity() == 2) {
                 return received.elementAt(1);
             } else if (state.equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
-				OtpErlangObject reason = received.elementAt(1);
-				if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-					throw new TimeoutException(received_raw);
-				} else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
-					throw new NotFoundException(received_raw);
-				} else {
-					throw new UnknownException(received_raw);
-				}
-			} else {
+                OtpErlangObject reason = received.elementAt(1);
+                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
+                    throw new TimeoutException(received_raw);
+                } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
+                    throw new NotFoundException(received_raw);
+                } else {
+                    throw new UnknownException(received_raw);
+                }
+            } else {
                 throw new UnknownException(received_raw);
-			}
-		} catch (OtpErlangExit e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (OtpAuthException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (IOException e) {
-			// e.printStackTrace();
-			throw new ConnectionException(e);
-		} catch (ClassCastException e) {
-			// e.printStackTrace();
-			// received_raw is not null since the first class cast is after the RPC!
-			throw new UnknownException(e, received_raw);
-		}
-	}
+            }
+        } catch (OtpErlangExit e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (OtpAuthException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (IOException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (ClassCastException e) {
+            // e.printStackTrace();
+            // received_raw is not null since the first class cast is after the RPC!
+            throw new UnknownException(e, received_raw);
+        }
+    }
 
-	/**
-	 * Gets the value stored under the given <tt>key</tt>.
-	 * 
-	 * @param key
-	 *            the key to look up
-	 * 
-	 * @return the (string) value stored under the given <tt>key</tt>
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to fetch the value
-	 * @throws NotFoundException
-	 *             if the requested key does not exist
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 * 
-	 * @see #read(OtpErlangString)
+    /**
+     * Gets the value stored under the given <tt>key</tt>.
+     * 
+     * @param key
+     *            the key to look up
+     * 
+     * @return the (string) value stored under the given <tt>key</tt>
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to fetch the value
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws UnknownException
+     *             if any other error occurs
+     * 
+     * @see #read(OtpErlangString)
      * @since 2.9
-	 */
+     */
     public ErlangValue read(String key) throws ConnectionException,
             TimeoutException, NotFoundException, UnknownException {
         return new ErlangValue(read(new OtpErlangString(key)));
@@ -457,14 +457,14 @@ public class TransactionSingleOp {
                 new ErlangValue(old_value).value(),
                 new ErlangValue(new_value).value());
     }
-	
-	/**
-	 * Closes the transaction's connection to a scalaris node.
-	 * 
-	 * Note: Subsequent calls to the other methods will throw
-	 * {@link ConnectionException}s!
-	 */
-	public void closeConnection() {
-		connection.close();
-	}
+    
+    /**
+     * Closes the transaction's connection to a scalaris node.
+     * 
+     * Note: Subsequent calls to the other methods will throw
+     * {@link ConnectionException}s!
+     */
+    public void closeConnection() {
+        connection.close();
+    }
 }

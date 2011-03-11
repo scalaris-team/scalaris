@@ -32,76 +32,76 @@ import de.zib.scalaris.UnknownException;
  * @since 2.0
  */
 public class TransactionSingleOpReadExample {
-	/**
-	 * Reads a key given on the command line with the <tt>read</tt> methods of
-	 * {@link TransactionSingleOp}.<br />
-	 * If no key is given, the default key <tt>"key"</tt> is used.
-	 * 
-	 * @param args
-	 *            command line arguments (first argument can be an optional key
-	 *            to look up)
-	 */
-	public static void main(String[] args) {
-		String key;
-		String value;
+    /**
+     * Reads a key given on the command line with the <tt>read</tt> methods of
+     * {@link TransactionSingleOp}.<br />
+     * If no key is given, the default key <tt>"key"</tt> is used.
+     * 
+     * @param args
+     *            command line arguments (first argument can be an optional key
+     *            to look up)
+     */
+    public static void main(String[] args) {
+        String key;
+        String value;
 
-		if (args.length != 1) {
-			key = "key";
-		} else {
-			key = args[0];
-		}
+        if (args.length != 1) {
+            key = "key";
+        } else {
+            key = args[0];
+        }
 
-		OtpErlangString otpKey = new OtpErlangString(key);
-		OtpErlangString otpValue;
+        OtpErlangString otpKey = new OtpErlangString(key);
+        OtpErlangString otpValue;
 
-		System.out.println("Reading values with the class `TransactionSingleOp`:");
+        System.out.println("Reading values with the class `TransactionSingleOp`:");
 
-		try {
-			System.out.println("  creating object...");
-			TransactionSingleOp sc = new TransactionSingleOp();
-			System.out
-					.println("    `OtpErlangObject readObject(OtpErlangString)`...");
-			otpValue = (OtpErlangString) sc.read(otpKey);
-			System.out.println("      read(" + otpKey.stringValue() + ") == "
-					+ otpValue.stringValue());
-		} catch (ConnectionException e) {
-			System.out.println("      read(" + otpKey.stringValue()
-					+ ") failed: " + e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("      read(" + otpKey.stringValue()
-					+ ") failed with timeout: " + e.getMessage());
-		} catch (NotFoundException e) {
-			System.out.println("      read(" + otpKey.stringValue()
-					+ ") failed with not found: " + e.getMessage());
-		} catch (ClassCastException e) {
-			System.out.println("      read(" + otpKey.stringValue()
-					+ ") failed with unexpected return type: " + e.getMessage());
+        try {
+            System.out.println("  creating object...");
+            TransactionSingleOp sc = new TransactionSingleOp();
+            System.out
+                    .println("    `OtpErlangObject readObject(OtpErlangString)`...");
+            otpValue = (OtpErlangString) sc.read(otpKey);
+            System.out.println("      read(" + otpKey.stringValue() + ") == "
+                    + otpValue.stringValue());
+        } catch (ConnectionException e) {
+            System.out.println("      read(" + otpKey.stringValue()
+                    + ") failed: " + e.getMessage());
+        } catch (TimeoutException e) {
+            System.out.println("      read(" + otpKey.stringValue()
+                    + ") failed with timeout: " + e.getMessage());
+        } catch (NotFoundException e) {
+            System.out.println("      read(" + otpKey.stringValue()
+                    + ") failed with not found: " + e.getMessage());
+        } catch (ClassCastException e) {
+            System.out.println("      read(" + otpKey.stringValue()
+                    + ") failed with unexpected return type: " + e.getMessage());
         } catch (UnknownException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with unknown: " + e.getMessage());
-		}
+        }
 
-		try {
-			System.out.println("  creating object...");
-			TransactionSingleOp sc = new TransactionSingleOp();
-			System.out.println("    `String read(String)`...");
-			value = sc.read(key).toString();
-			System.out.println("      read(" + key + ") == " + value);
-		} catch (ConnectionException e) {
-			System.out.println("      read(" + key + ") failed: "
-					+ e.getMessage());
-		} catch (TimeoutException e) {
-			System.out.println("      read(" + key + ") failed with timeout: "
+        try {
+            System.out.println("  creating object...");
+            TransactionSingleOp sc = new TransactionSingleOp();
+            System.out.println("    `String read(String)`...");
+            value = sc.read(key).toString();
+            System.out.println("      read(" + key + ") == " + value);
+        } catch (ConnectionException e) {
+            System.out.println("      read(" + key + ") failed: "
+                    + e.getMessage());
+        } catch (TimeoutException e) {
+            System.out.println("      read(" + key + ") failed with timeout: "
                     + e.getMessage());
         } catch (ClassCastException e) {
             System.out.println("      read(" + key + ") failed with unexpected return type: "
                     + e.getMessage());
-		} catch (NotFoundException e) {
-			System.out.println("      read(" + key + ") failed with not found: "
-			        + e.getMessage());
+        } catch (NotFoundException e) {
+            System.out.println("      read(" + key + ") failed with not found: "
+                    + e.getMessage());
         } catch (UnknownException e) {
             System.out.println("      read(" + key + ") failed with unknown: "
                     + e.getMessage());
-		}
-	}
+        }
+    }
 }
