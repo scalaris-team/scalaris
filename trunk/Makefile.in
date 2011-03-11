@@ -245,7 +245,7 @@ install-erlang: compile
 	  install -m 644 -t $(ETCDIR) \
 	           bin/scalaris.local.cfg; \
 	else \
-	  touch $(ETCDIR)/scalaris.local.cfg
+	  touch $(ETCDIR)/scalaris.local.cfg ; \
 	fi
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/icons \
