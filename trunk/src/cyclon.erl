@@ -168,7 +168,8 @@ on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState, MonitorT
     comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),
     msg_queue:send(QueuedMessages),
-    msg_delay:send_local(monitor:proc_get_report_interval(), self(), {report_to_monitor}),
+    comm:send_local_after(monitor:proc_get_report_interval() * 1000, self(),
+                          {report_to_monitor}),
     gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2, MonitorTable},
                                  on_active);
 
@@ -263,7 +264,8 @@ on_active({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState, _Mon
 
 on_active({report_to_monitor}, {_Cache, _Node, _Cycles, _TriggerState, MonitorTable} = State) ->
     monitor:proc_report_to_my_monitor(MonitorTable),
-    msg_delay:send_local(monitor:proc_get_report_interval(), self(), {report_to_monitor}),
+    comm:send_local_after(monitor:proc_get_report_interval() * 1000, self(),
+                          {report_to_monitor}),
     State;
 
 on_active({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState, _MonitorTable} = State) ->
