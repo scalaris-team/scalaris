@@ -37,12 +37,12 @@ init(Supervisor, GroupName) ->
     erlang:register(comm_layer_acceptor, self()),
     pid_groups:join_as(GroupName, comm_acceptor),
 
-    log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), config:read(cs_port)]),
+    log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), config:read(port)]),
     LS = case config:read(listen_ip) of
              undefined ->
-                 open_listen_port(config:read(cs_port), first_ip());
+                 open_listen_port(config:read(port), first_ip());
              _ ->
-                 open_listen_port(config:read(cs_port), config:read(listen_ip))
+                 open_listen_port(config:read(port), config:read(listen_ip))
          end,
     {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
     comm_server:set_local_address(undefined, LocalPort),
@@ -115,4 +115,4 @@ first_ip() ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_port(cs_port).
+    config:is_port(port).

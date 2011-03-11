@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc Statistics Module for Bootstrap server
+%% @doc Statistics Module for mgmt server
 %% @version $Id$
 -module(statistics).
 -author('schuett@zib.de').
@@ -73,16 +73,16 @@ get_memory({failed, _}) ->
 
 %% @doc Returns a sorted list of all known nodes.
 %%      See compare_node_details/2 for a definition of the order.
-%%      Note: throws 'boot_server_timeout' if the boot server does not respond
+%%      Note: throws 'mgmt_server_timeout' if the mgmt server does not respond
 %%      within 2s.
 -spec get_ring_details() -> ring().
 get_ring_details() ->
-    boot_server:node_list(),
+    mgmt_server:node_list(),
     Nodes = receive
                 {get_list_response, N} -> N
             after 2000 ->
-                log:log(error,"[ ST ] Timeout getting node list from boot server"),
-                throw('boot_server_timeout')
+                log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
+                throw('mgmt_server_timeout')
             end,
     _ = [begin
              SourcePid = comm:this_with_cookie(Pid),

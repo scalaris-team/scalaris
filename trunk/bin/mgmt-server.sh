@@ -13,12 +13,15 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-ID=2
-NAME="node$ID"
-CSPORT=$((14195+$ID))
+# Script to start an empty Scalaris management server.
+ID=0
+NAME="mgmt_server"
+PORT=$((14195+$ID))
 YAWSPORT=$((8000+$ID))
 
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
-$DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT node start $*
+# start a mgmt_server
+MGMT_NAME_AND_PORTS="-n mgmt_server -p 14194 -y 7999 "
+$DIRNAME/scalarisctl $MGMT_NAME_AND_PORTS -m start $*

@@ -55,7 +55,7 @@ make_ring(Size, Options) ->
                     NewOptions = unittest_helper:prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
                     tester_scheduler:start_scheduling(),
-                    boot_server:connect(),
+                    mgmt_server:connect(),
                     _ = admin:add_node([{first}]),
                     _ = admin:add_nodes(Size - 1),
                     ok
@@ -104,7 +104,7 @@ tester_scheduler_ring_1_tx(_Config) ->
                                       Test,
                                       [{white_list, [pid_groups,
                                                      %sync call on register
-                                                     boot_server,
+                                                     mgmt_server,
                                                      comm_server,
                                                      %sync call on get_dht_nodes
                                                      service_per_vm ]}],

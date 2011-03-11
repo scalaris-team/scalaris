@@ -253,13 +253,13 @@ get_nodes() ->
 
 -spec get_proc_in_vms(atom()) -> [comm:mypid()].
 get_proc_in_vms(Proc) ->
-    boot_server:node_list(),
+    mgmt_server:node_list(),
     Nodes =
         receive
             {get_list_response, X} -> X
         after 2000 ->
-            log:log(error,"[ util ] Timeout getting node list from boot server"),
-            throw('boot_server_timeout')
+            log:log(error,"[ util ] Timeout getting node list from mgmt server"),
+            throw('mgmt_server_timeout')
         end,
     lists:usort([comm:get(Proc, DHTNode) || DHTNode <- Nodes]).
 

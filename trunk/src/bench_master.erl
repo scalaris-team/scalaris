@@ -66,7 +66,7 @@ wait_for_stable_ring() ->
     end.
 
 check_ring_size(Size) ->
-    boot_server:number_of_nodes(),
+    mgmt_server:number_of_nodes(),
     RSize = receive {get_list_length_response, L} -> L end,
     case (RSize =:= Size) of
         true -> ok;

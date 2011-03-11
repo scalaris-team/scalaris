@@ -105,7 +105,7 @@ del_single_node([{Key, Pid, _, _} | T], Graceful) ->
         _ -> del_single_node(T, Graceful)
     end.
 
-%% @doc Contact boot server and check that each node's successor is correct.
+%% @doc Contact mgmt server and check that each node's successor is correct.
 -spec check_ring() -> {error, string()} | ok.
 check_ring() ->
     Nodes = statistics:get_ring_details(),
@@ -132,7 +132,7 @@ check_ring_foldl({failed, _}, Previous) ->
 check_ring_foldl(_, Previous = {error, _Message}) ->
     Previous.
 
-%% @doc Contact boot server and check that each node's successor and
+%% @doc Contact mgmt server and check that each node's successor and
 %%      predecessor lists are correct.
 -spec check_ring_deep() -> ok | check_ring_deep_error().
 check_ring_deep() ->
@@ -166,7 +166,7 @@ check_ring_deep_foldl(_, Previous = {error, _Node, _Preds, _Succs}) ->
 
 -spec number_of_nodes() -> non_neg_integer() | timeout.
 number_of_nodes() ->
-    boot_server:number_of_nodes(),
+    mgmt_server:number_of_nodes(),
     receive
         {get_list_length_response, X} -> X
     after
@@ -245,10 +245,10 @@ loop() ->
             loop()
     end.
 
-% @doc contact boot server and list the known ip addresses
+% @doc contact mgmt server and list the known ip addresses
 -spec(nodes/0 :: () -> list()).
 nodes() ->
-    boot_server:node_list(),
+    mgmt_server:node_list(),
     Nodes = receive
                 {get_list_response, List} ->
                     lists:usort([IP || {IP, _, _} <- List])
@@ -261,7 +261,7 @@ nodes() ->
 
 -spec print_ages() -> ok.
 print_ages() ->
-    boot_server:node_list(),
+    mgmt_server:node_list(),
     _ = receive
             {get_list_response, List} ->
                 [ comm:send_to_group_member(Node, cyclon, {get_ages, self()}) || Node <- List ]
@@ -281,7 +281,7 @@ worker_loop() ->
 %% TODO: the message this method sends is not received anywhere - either delete or update it! 
 -spec check_routing_tables(any()) -> ok.
 check_routing_tables(Port) ->
-    boot_server:node_list(),
+    mgmt_server:node_list(),
     _ = receive
             {get_list_response, List} ->
                 [ comm:send_to_group_member(Node, routing_table, {check, Port}) || Node <- List ]

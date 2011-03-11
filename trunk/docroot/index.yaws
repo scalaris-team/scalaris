@@ -21,7 +21,7 @@
 
 <erl>
 out(Arg) ->
-    case whereis(boot) of
+    case whereis(mgmt_server) of
         undefined -> {html, ""};
         _ ->
             {html,
@@ -52,16 +52,16 @@ out(Arg) ->
       
 <erl>
 out(Arg) ->
-    case whereis(boot) of
+    case whereis(mgmt_server) of
         undefined -> {html, "<h2>Scalaris Node Info Page</h2>"};
         _ ->
-            boot_server:number_of_nodes(),
+            mgmt_server:number_of_nodes(),
             NrNodes =
                 receive {get_list_length_response, Res} -> integer_to_list(Res)
                 after 6000 -> "n/a"
                 end,
             {html, io_lib:format("
-<h2>Scalaris Boot Server Info Page</h2>
+<h2>Scalaris Management Server Info Page</h2>
 <p>Number of nodes: ~s</p>", [NrNodes])}
     end.
 </erl>

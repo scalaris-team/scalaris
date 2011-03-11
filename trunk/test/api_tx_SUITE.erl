@@ -47,7 +47,7 @@ end_per_suite(Config) ->
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
-        write_test_race_mult_rings ->
+        write_test_race_mult_rings -> %% this case creates its own ring
             Config;
         _ ->
             %% stop ring from previous test case (it may have run into a timeout

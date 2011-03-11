@@ -56,8 +56,7 @@ process_iter(Parent, Key, Count, AbortCount) ->
     end.
 
 -spec bench() -> pos_integer().
-bench() ->
-    bench_raw().
+bench() -> bench_raw().
 
 -spec bench_raw() -> pos_integer().
 bench_raw() ->
@@ -87,22 +86,12 @@ bench_cprof() ->
 
 -spec bench_fprof() -> pos_integer().
 bench_fprof() ->
-    Count = fprof:apply(bench_increment, bench_raw, [], [{procs, pid_groups:processes()}]),
+    Count = fprof:apply(bench_increment, bench_raw, [],
+                        [{procs, pid_groups:processes()}]),
     fprof:profile(),
     %fprof:analyse(),
     fprof:analyse([{cols, 140}, details, callers, totals, {dest, []}]), % , totals, no_details, no_callers, {sort, acc},
     Count.
-
--spec increment_test() -> ok.
-increment_test() ->
-    % init: i = 0
-    Key = "i",
-    {ok} = api_tx:write(Key, 0),
-
-    {Time, Value} = util:tc(bench_increment, bench, []),
-    io:format("executed ~p transactions in ~p us: ~p~n", [Value, Time, Value / Time * 1000000]),
-    %error_logger:tty(false),
-    ok.
 
 -spec wait_for_done(non_neg_integer()) -> [integer()].
 wait_for_done(0) ->

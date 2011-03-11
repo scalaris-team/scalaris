@@ -13,13 +13,11 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc    Supervisor for a boot node (the first node that
-%%         creates a Scalaris network) or "ordinary" node (nodes joining an
-%%         existing Scalaris network) that is responsible for keeping its
-%%         processes running.
+%% @doc Supervisor for a mgmt server or/and "ordinary" node that is
+%%      responsible for keeping its processes running.
 %%
-%%         If one of the supervised processes fails, only the failed process
-%%         will be re-started!
+%%      If one of the supervised processes fails, only the failed
+%%      process will be re-started!
 %% @end
 %% @version $Id$
 -module(sup_scalaris).
@@ -78,22 +76,21 @@ init({SupervisorType, Options}) ->
     {ok, {{one_for_one, 10, 1}, my_process_list(SupervisorType, ServiceGroup, Options)}}.
 
 -spec my_process_list/3 :: (supervisor_type(), pid_groups:groupname(), list(tuple())) -> [any()].
-my_process_list(SupervisorType_, ServiceGroup, Options) ->
-    SupervisorType = case SupervisorType_ of
-                         undefined -> util:app_get_env(mode, node);
-                         Mode -> Mode
-                     end,
-    EmptyNode = case config:read(empty_node) of
-                    failed -> config:write(empty_node, false),
-                              false;
-                    X -> X
-                end,
-    
+my_process_list(_SupervisorType_, ServiceGroup, Options) ->
+    StartMgmtServer = case config:read(start_mgmt_server) of
+                          failed -> false;
+                          X -> X
+                      end,
+    DHTNodeModule = case config:read(start_dht_node) of
+                          failed -> false;
+                          Y -> Y
+                      end,
+
     AdminServer = util:sup_worker_desc(admin_server, admin, start_link),
     BenchServer = util:sup_worker_desc(bench_server, bench_server, start_link),
-    BootServer = util:sup_worker_desc(boot_server, boot_server, start_link,
+    MgmtServer = util:sup_worker_desc(mgmt_server, mgmt_server, start_link,
                                       [ServiceGroup, []]),
-    BootServerDNCache =
+    MgmtServerDNCache =
         util:sup_worker_desc(deadnodecache, dn_cache, start_link,
                              [ServiceGroup]),
     CommLayer =
@@ -102,14 +99,23 @@ my_process_list(SupervisorType_, ServiceGroup, Options) ->
     ClientsDelayer =
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
-    DHTNodeFirstId = case util:app_get_env(first_id, random) of
+    DHTNodeJoinAt = case util:app_get_env(join_at, random) of
                          random -> [];
                          Id     -> [{{dht_node, id}, Id}]
                      end,
-    DHTNodeOptions = DHTNodeFirstId ++ [{first} | Options], % this is the first dht_node in this VM
+    DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNode =
-        util:sup_supervisor_desc(dht_node, sup_dht_node, start_link,
-                                 [[{my_sup_dht_node_id, dht_node} | DHTNodeOptions]]),
+        case DHTNodeModule of
+            dht_node ->
+                util:sup_supervisor_desc(dht_node, sup_dht_node, start_link,
+                                         [[{my_sup_dht_node_id, dht_node}
+                                           | DHTNodeOptions]]);
+            group_node ->
+                util:sup_supervisor_desc(group_node, sup_group_node, start_link,
+                                         [[{my_sup_dht_node_id, group_node}
+                                           | DHTNodeOptions]]);
+            _ -> []
+        end,
     FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),
     Logger = util:sup_supervisor_desc(logger, log, start_link),
@@ -130,26 +136,26 @@ my_process_list(SupervisorType_, ServiceGroup, Options) ->
                               ]),
 
     %% order in the following list is the start order
-    PreBootServer = [Config,
-                     Logger,
-                     Service,
-                     MonitorTiming,
-                     CommLayer,
-                     FailureDetector,
-                     AdminServer,
-                     ClientsDelayer],
-    %% do we want to run an empty boot-server?
-    PostBootServer = case EmptyNode of
-                         true -> [YAWS, BenchServer, Ganglia];
-                         _    -> [YAWS, BenchServer, Ganglia, DHTNode]
-                     end,
-    % check whether to start the boot server
-    case SupervisorType of
-        boot ->
-            lists:flatten([PreBootServer, BootServerDNCache, BootServer, PostBootServer]);
-        node ->
-            lists:flatten([PreBootServer, PostBootServer])
-    end.
+    BasicServers = [Config,
+                    Logger,
+                    Service,
+                    MonitorTiming,
+                    CommLayer,
+                    FailureDetector,
+                    AdminServer,
+                    ClientsDelayer],
+    Servers = [YAWS, BenchServer, Ganglia],
+    MgmtServers =
+        case StartMgmtServer orelse util:is_unittest() of
+            true -> [MgmtServerDNCache, MgmtServer];
+            false -> []
+        end,
+    DHTNodeServer =
+        case DHTNodeModule of
+            false -> []; %% no dht node requested
+            _ -> [DHTNode]
+        end,
+    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer]).
 
 -spec add_additional_nodes() -> ok.
 add_additional_nodes() ->

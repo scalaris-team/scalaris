@@ -107,13 +107,10 @@ result_to_json(Result) ->
 json_to_reqlist(JSON_ReqList) ->
     {array, TmpReqList} = JSON_ReqList,
     [ case Elem of
-          {read, Key} ->
-              {read, Key};
-          {write, {struct, [{Key, Val}]}} ->
-              {write, atom_to_list(Key), Val};
-          {commit, _} ->
-              {commit};
-          Any -> Any
+          {read, Key}                     -> {read, Key};
+          {write, {struct, [{Key, Val}]}} -> {write, atom_to_list(Key), Val};
+          {commit, _}                     -> {commit};
+          Any                             -> Any
       end || {struct, [Elem]} <- TmpReqList ].
 
 tlog_to_json(TLog) ->

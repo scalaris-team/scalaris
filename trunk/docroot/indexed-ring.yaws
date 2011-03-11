@@ -21,7 +21,7 @@
       
 <erl>
 out(Arg) ->
-    case whereis(boot) of
+    case whereis(mgmt_server) of
         undefined -> {html, ""};
         _ ->
             {html,
@@ -54,7 +54,7 @@ out(Arg) ->
 Number of nodes: 
 <erl> 
  out(Arg) ->
-    boot_server:number_of_nodes(),
+    mgmt_server:number_of_nodes(),
     receive
         {get_list_length_response,Res} ->
             ok

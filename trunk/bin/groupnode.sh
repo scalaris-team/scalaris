@@ -13,12 +13,14 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-ID=1
-NAME="node$ID"
+# Script to start a new Scalaris system with an initial, grouped node
+# (experimental).
+ID=0
+NAME="firstnode"
 CSPORT=$((14195+$ID))
 YAWSPORT=$((8000+$ID))
 
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
-$DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT node start $*
+$DIRNAME/scalarisctl -f -n $NAME -p $CSPORT -y $YAWSPORT -g start $*

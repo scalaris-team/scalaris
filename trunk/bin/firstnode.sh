@@ -13,12 +13,17 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
+# Script to start a new Scalaris system with an initial node.
 ID=0
-NAME="boot"
-CSPORT=$((14195+$ID))
+NAME="firstnode"
+PORT=$((14195+$ID))
 YAWSPORT=$((8000+$ID))
 
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
-$DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT group start $*
+# start a mgmt_server (-m)
+# start a dht node (-s)
+# start the first node (declared by -f)
+NODE_NAME_AND_PORTS="-n $NAME -p $PORT -y $YAWSPORT"
+$DIRNAME/scalarisctl -m $NODE_NAME_AND_PORTS -s -f start $*

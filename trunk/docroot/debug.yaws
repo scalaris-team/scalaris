@@ -34,7 +34,7 @@
       
 <erl>
 out(Arg) ->
-    case whereis(boot) of
+    case whereis(mgmt_server) of
         undefined -> {html, ""};
         _ ->
             {html,

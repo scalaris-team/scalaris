@@ -13,7 +13,12 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-ID=3
+# Script to start a node, that joins a running Scalaris system.
+ID=1
+
+if [ 1 == $# ]; then
+    ID=$1;
+fi
 NAME="node$ID"
 CSPORT=$((14195+$ID))
 YAWSPORT=$((8000+$ID))
@@ -21,4 +26,4 @@ YAWSPORT=$((8000+$ID))
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
-$DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT node start $*
+$DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT -s start $*

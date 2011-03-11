@@ -13,11 +13,12 @@
 ::    See the License for the specific language governing permissions and
 ::    limitations under the License.
 
+:: Script to start a node, that joins a running Scalaris system.
 set ID=1
 set NODE_NAME=node%ID%
 set /a CSPORT=14195+%ID%
 set /a YAWSPORT=8000+%ID%
-set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris cs_port %CSPORT% -scalaris yaws_port %YAWSPORT%
+set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris port %CSPORT% -scalaris yaws_port %YAWSPORT%
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: set path to erlang installation
@@ -46,6 +47,7 @@ pushd %BEAMDIR%
   -scalaris docroot "\"%NODEDOCROOTDIR%\"" ^
   -scalaris config "\"%ETCDIR%\\scalaris.cfg\"" ^
   -scalaris local_config "\"%ETCDIR%\\scalaris.local.cfg\"" ^
+  -scalaris start_dht_node dht_node ^
   -connect_all false -hidden -name %NODE_NAME% ^
   %SCALARIS_ADDITIONAL_PARAMETERS% ^
   -s scalaris %*

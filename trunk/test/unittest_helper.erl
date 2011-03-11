@@ -94,10 +94,10 @@ add_my_config(KVList) ->
     ScalarisPort = get_scalaris_port(),
     YawsPort = get_yaws_port(),
     KVList1 = [{known_hosts, [{{127,0,0,1}, ScalarisPort, service_per_vm}]},
-               {boot_host, {{127,0,0,1}, ScalarisPort, boot}},
-               {cs_port, ScalarisPort},
+               {mgmt_server, {{127,0,0,1}, ScalarisPort, mgmt_server}},
+               {port, ScalarisPort},
                {yaws_port, YawsPort} | KVList],
-    lists:append(KVList1, [{empty_node, true}]).
+    lists:append(KVList1, [{start_mgmt_server, true}]).
 
 %% @doc Adds unittest specific ports from the environment to the list of
 %%      options for the config process.
@@ -146,7 +146,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     {ok, _GroupsPid} = pid_groups:start_link(),
                     NewOptions = prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
-                    boot_server:connect(),
+                    mgmt_server:connect(),
                     Ids = IdsFun(), % config may be needed
                     _ = admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
                     _ = [admin:add_node_at_id(Id) || Id <- tl(Ids)],
@@ -187,7 +187,7 @@ make_ring(Size, Options) ->
                     {ok, _GroupsPid} = pid_groups:start_link(),
                     NewOptions = prepare_config(Options),
                     _ = sup_scalaris:start_link(boot, NewOptions),
-                    boot_server:connect(),
+                    mgmt_server:connect(),
                     _ = admin:add_node([{first}]),
                     _ = admin:add_nodes(Size - 1),
                     ok
@@ -227,7 +227,7 @@ stop_ring(Pid) ->
             wait_for_process_to_die(comm_layer_acceptor),
             wait_for_process_to_die(admin_server),
             wait_for_process_to_die(bench_server),
-            wait_for_process_to_die(boot),
+            wait_for_process_to_die(mgmt_server),
             wait_for_process_to_die(config),
             wait_for_table_to_disappear(config_ets),
             wait_for_process_to_die(fd),
@@ -314,11 +314,11 @@ check_ring_size(Size) ->
     wait_for(
       fun() ->
               % note: we use a single VM in unit tests, therefore no
-              % boot_server is needed - if one exists though, then check
+              % mgmt_server is needed - if one exists though, then check
               % the correct size
               BootSize =
                   try
-                      boot_server:number_of_nodes(),
+                      mgmt_server:number_of_nodes(),
                       receive {get_list_length_response, L} -> L end
                   catch _:_ -> Size
                   end,
