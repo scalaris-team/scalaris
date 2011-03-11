@@ -257,7 +257,7 @@ public class TransactionTest {
     }
 
     /**
-     * Test method for {@link Transaction#write(String, String)} with a closed
+     * Test method for {@link Transaction#write(String, Object)} with a closed
      * connection.
      * 
      * @throws UnknownException
@@ -280,7 +280,7 @@ public class TransactionTest {
 
     /**
      * Test method for {@link Transaction#read(String)} and
-     * {@link Transaction#write(String, String)} which should show that
+     * {@link Transaction#write(String, Object)} which should show that
      * writing a value for a key for which a previous read returned a
      * NotFoundException is possible.
      * 
@@ -310,7 +310,7 @@ public class TransactionTest {
     }
 
     /**
-     * Test method for {@link Transaction#write(String, String)} and
+     * Test method for {@link Transaction#write(String, Object)} and
      * {@link Transaction#read(String)}.
      * 
      * @throws ConnectionException

@@ -391,7 +391,7 @@ public class TransactionReadWriteExample {
 
     /**
      * Writes the given <code>key</code> and <code>value</code> with the
-     * {@link Transaction#write(String, String)} method on the given
+     * {@link Transaction#write(String, Object)} method on the given
      * <code>transaction</code> object and generates output according to the result.
      * 
      * @param transaction

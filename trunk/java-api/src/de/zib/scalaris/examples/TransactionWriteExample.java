@@ -37,7 +37,7 @@ public class TransactionWriteExample {
     /**
      * Writes all key/value pairs given on the command line (given as "key1
      * value1 key2 value2 ...") with the
-     * {@link Transaction#write(String, String)} and
+     * {@link Transaction#write(String, Object)} and
      * {@link Transaction#write(OtpErlangString, OtpErlangObject)} methods
      * in a single transaction.<br />
      * If no key/value pair is given, the default pairs <code>(key1, value1)</code>,

@@ -109,7 +109,7 @@ public class ReplicatedDHTTest {
     
     /**
      * Test method for {@link ReplicatedDHT#delete(String)} and
-     * {@link TransactionSingleOp#write(String, String)}.
+     * {@link TransactionSingleOp#write(String, Object)}.
      * Inserts some values, tries to delete them afterwards and tries the
      * delete again.
      * 
@@ -156,7 +156,7 @@ public class ReplicatedDHTTest {
     
     /**
      * Test method for {@link ReplicatedDHT#delete(String)} and
-     * {@link TransactionSingleOp#write(String, String)}.
+     * {@link TransactionSingleOp#write(String, Object)}.
      * Inserts some values, tries to delete them afterwards, inserts them again
      * and tries to delete them again (twice).
      * 
