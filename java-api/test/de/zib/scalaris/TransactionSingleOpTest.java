@@ -271,7 +271,7 @@ public class TransactionSingleOpTest {
     }
 
     /**
-     * Test method for {@link TransactionSingleOp#write(String, String)} with a
+     * Test method for {@link TransactionSingleOp#write(String, Object)} with a
      * closed connection.
      * 
      * @throws UnknownException
@@ -291,7 +291,7 @@ public class TransactionSingleOpTest {
     
     /**
      * Test method for
-     * {@link TransactionSingleOp#write(String, String)}
+     * {@link TransactionSingleOp#write(String, Object)}
      * and {@link TransactionSingleOp#read(String)}.
      * Writes strings and uses a distinct key for each value. Tries to read the data afterwards.
      * 
@@ -324,7 +324,7 @@ public class TransactionSingleOpTest {
     
     /**
      * Test method for
-     * {@link TransactionSingleOp#write(String, String)}
+     * {@link TransactionSingleOp#write(String, Object)}
      * and {@link TransactionSingleOp#read(String)}.
      * Writes strings and uses a single key for all the values. Tries to read the data afterwards.
      * 
@@ -601,7 +601,7 @@ public class TransactionSingleOpTest {
      * Test method for
      * {@link TransactionSingleOp#testAndSet(String, String, String)},
      * {@link TransactionSingleOp#read(String)}
-     * and {@link TransactionSingleOp#write(String, String)}.
+     * and {@link TransactionSingleOp#write(String, Object)}.
      * Writes a string and tries to overwrite it using test_and_set
      * knowing the correct old value. Tries to read the string afterwards.
      * 
@@ -644,7 +644,7 @@ public class TransactionSingleOpTest {
      * Test method for
      * {@link TransactionSingleOp#testAndSet(String, String, String)},
      * {@link TransactionSingleOp#read(String)}
-     * and {@link TransactionSingleOp#write(String, String)}.
+     * and {@link TransactionSingleOp#write(String, Object)}.
      * Writes a string and tries to overwrite it using test_and_set
      * knowing the wrong old value. Tries to read the string afterwards.
      * 

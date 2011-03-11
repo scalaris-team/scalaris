@@ -87,7 +87,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpValue;
  *   
  *   TransactionSingleOp sc = new TransactionSingleOp();
- *   sc.write(key, value);             // {@link #write(String, String)}
+ *   sc.write(key, value);             // {@link #write(String, Object)}
  *   sc.writeObject(otpKey, otpValue); // {@link #write(OtpErlangString, OtpErlangObject)}
  * </code>
  * </pre>
