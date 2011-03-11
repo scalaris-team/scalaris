@@ -29,60 +29,60 @@ import de.zib.scalaris.PubSub;
  * @since 2.5
  */
 public class PubSubPublishExample {
-	/**
-	 * Publishes content under a given topic, both provided on the command line,
-	 * with the <tt>publish</tt> methods of {@link PubSub}.<br />
-	 * If no content or topic is given, the default key <tt>"key"</tt> and the
-	 * default value <tt>"value"</tt> is used.
-	 * 
-	 * @param args
-	 *            command line arguments (first argument can be an optional
-	 *            topic and the second an optional content)
-	 */
-	public static void main(String[] args) {
-		String topic;
-		String content;
+    /**
+     * Publishes content under a given topic, both provided on the command line,
+     * with the <tt>publish</tt> methods of {@link PubSub}.<br />
+     * If no content or topic is given, the default key <tt>"key"</tt> and the
+     * default value <tt>"value"</tt> is used.
+     * 
+     * @param args
+     *            command line arguments (first argument can be an optional
+     *            topic and the second an optional content)
+     */
+    public static void main(String[] args) {
+        String topic;
+        String content;
 
-		if (args.length == 0) {
-			topic = "topic";
-			content = "content";
-		} else if (args.length == 1) {
-			topic = args[0];
-			content = "content";
-		} else {
-			topic = args[0];
-			content = args[1];
-		}
-		
-		OtpErlangString otpTopic = new OtpErlangString(topic);
-		OtpErlangString otpContent = new OtpErlangString(content);
+        if (args.length == 0) {
+            topic = "topic";
+            content = "content";
+        } else if (args.length == 1) {
+            topic = args[0];
+            content = "content";
+        } else {
+            topic = args[0];
+            content = args[1];
+        }
+        
+        OtpErlangString otpTopic = new OtpErlangString(topic);
+        OtpErlangString otpContent = new OtpErlangString(content);
 
-		System.out
-				.println("Publishing content under a topic with the class `PubSub`:");
+        System.out
+                .println("Publishing content under a topic with the class `PubSub`:");
 
-		try {
-			System.out.println("  creating object...");
-			PubSub sc = new PubSub();
-			System.out
-					.println("    `void publish(OtpErlangString, OtpErlangString)`...");
-			sc.publish(otpTopic, otpContent);
-			System.out.println("      publish(" + otpTopic.stringValue() + ", "
-					+ otpContent.stringValue() + ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("      publish(" + otpTopic.stringValue() + ", "
-					+ otpContent.stringValue() + ") failed: " + e.getMessage());
-		}
+        try {
+            System.out.println("  creating object...");
+            PubSub sc = new PubSub();
+            System.out
+                    .println("    `void publish(OtpErlangString, OtpErlangString)`...");
+            sc.publish(otpTopic, otpContent);
+            System.out.println("      publish(" + otpTopic.stringValue() + ", "
+                    + otpContent.stringValue() + ") succeeded");
+        } catch (ConnectionException e) {
+            System.out.println("      publish(" + otpTopic.stringValue() + ", "
+                    + otpContent.stringValue() + ") failed: " + e.getMessage());
+        }
 
-		try {
-			System.out.println("  creating object...");
-			PubSub sc = new PubSub();
-			System.out.println("    `void publish(String, String)`...");
-			sc.publish(topic, content);
-			System.out.println("      publish(" + topic + ", " + content
-					+ ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("      publish(" + topic + ", " + content
-					+ ") failed: " + e.getMessage());
-		}
-	}
+        try {
+            System.out.println("  creating object...");
+            PubSub sc = new PubSub();
+            System.out.println("    `void publish(String, String)`...");
+            sc.publish(topic, content);
+            System.out.println("      publish(" + topic + ", " + content
+                    + ") succeeded");
+        } catch (ConnectionException e) {
+            System.out.println("      publish(" + topic + ", " + content
+                    + ") failed: " + e.getMessage());
+        }
+    }
 }

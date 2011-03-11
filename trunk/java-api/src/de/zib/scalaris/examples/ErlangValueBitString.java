@@ -33,15 +33,15 @@ import de.zib.scalaris.ErlangValue;
  * @since 2.9
  */
 public class ErlangValueBitString extends ErlangValue {
-	/**
-	 * Creates an object with the given (Java) value.
-	 * 
-	 * @param value
-	 *            the value to use
-	 */
-	public ErlangValueBitString(String value) {
+    /**
+     * Creates an object with the given (Java) value.
+     * 
+     * @param value
+     *            the value to use
+     */
+    public ErlangValueBitString(String value) {
         super(new OtpErlangBitstr(value.getBytes()));
-	}
+    }
 
     /**
      * Creates an object with the given (erlang) value.
@@ -53,28 +53,28 @@ public class ErlangValueBitString extends ErlangValue {
         super(otpValue);
     }
 
-	/**
-	 * Creates an object with the given (erlang) value.
-	 * Provided for convenience.
-	 * 
-	 * @param value
-	 *            the value to use
-	 * 
-	 * @see ErlangValue
-	 */
-	public ErlangValueBitString(ErlangValue value) {
-		super(value.value());
-	}
+    /**
+     * Creates an object with the given (erlang) value.
+     * Provided for convenience.
+     * 
+     * @param value
+     *            the value to use
+     * 
+     * @see ErlangValue
+     */
+    public ErlangValueBitString(ErlangValue value) {
+        super(value.value());
+    }
 
-	/**
-	 * Converts the stored erlang value created by this object to a Java
-	 * {@link String}.
-	 * 
-	 * @throws ClassCastException
-	 *             if the conversion fails
-	 */
-	@Override
-	public String toString() {
-	    return new String(((OtpErlangBitstr) value()).binaryValue());
-	}
+    /**
+     * Converts the stored erlang value created by this object to a Java
+     * {@link String}.
+     * 
+     * @throws ClassCastException
+     *             if the conversion fails
+     */
+    @Override
+    public String toString() {
+        return new String(((OtpErlangBitstr) value()).binaryValue());
+    }
 }

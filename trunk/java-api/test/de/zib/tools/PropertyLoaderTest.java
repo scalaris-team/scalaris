@@ -33,68 +33,68 @@ import org.junit.Test;
  */
 public class PropertyLoaderTest {
 
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception {
-	}
+    /**
+     * @throws java.lang.Exception
+     */
+    @BeforeClass
+    public static void setUpBeforeClass() throws Exception {
+    }
 
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@AfterClass
-	public static void tearDownAfterClass() throws Exception {
-	}
+    /**
+     * @throws java.lang.Exception
+     */
+    @AfterClass
+    public static void tearDownAfterClass() throws Exception {
+    }
 
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@Before
-	public void setUp() throws Exception {
-	}
+    /**
+     * @throws java.lang.Exception
+     */
+    @Before
+    public void setUp() throws Exception {
+    }
 
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@After
-	public void tearDown() throws Exception {
-	}
+    /**
+     * @throws java.lang.Exception
+     */
+    @After
+    public void tearDown() throws Exception {
+    }
 
-	/**
-	 * Test method for {@link PropertyLoader#loadProperties(Properties, String)}
-	 * that tries to load a properties file using an relative file name.
-	 */
-	@Test
-	public final void testLoadProperties1() {
-		Properties properties = new Properties();
-		assertTrue(PropertyLoader.loadProperties(properties, "de/zib/tools/test.properties"));
-		assertEquals("ahz2ieSh", properties.get("cs.node"));
-		assertEquals("wooPhu8u", properties.get("cs.cookie"));
-	}
+    /**
+     * Test method for {@link PropertyLoader#loadProperties(Properties, String)}
+     * that tries to load a properties file using an relative file name.
+     */
+    @Test
+    public final void testLoadProperties1() {
+        Properties properties = new Properties();
+        assertTrue(PropertyLoader.loadProperties(properties, "de/zib/tools/test.properties"));
+        assertEquals("ahz2ieSh", properties.get("cs.node"));
+        assertEquals("wooPhu8u", properties.get("cs.cookie"));
+    }
 
-	/**
-	 * Test method for {@link PropertyLoader#loadProperties(Properties, String)}
-	 * that tries to load a properties file using an absolute file name.
-	 */
-	@Test
-	public final void testLoadProperties2() {
-		System.out.println("Working Directory = " + System.getProperty("user.dir"));
-		
-		URL url = ClassLoader.getSystemResource("de/zib/tools/test.properties");
-		Properties properties = new Properties();
-		assertTrue(PropertyLoader.loadProperties(properties, url.getPath()));
-		assertEquals("ahz2ieSh", properties.get("cs.node"));
-		assertEquals("wooPhu8u", properties.get("cs.cookie"));
-	}
-	
-	/**
-	 * Test method for {@link PropertyLoader#loadProperties(Properties, String)}.
-	 */
-	@Test
-	public final void testLoadProperties3() {
-		Properties properties = new Properties();
-		assertFalse(PropertyLoader.loadProperties(properties, "de/zib/tools/ahz2ieSh.wooPhu8u"));
-	}
+    /**
+     * Test method for {@link PropertyLoader#loadProperties(Properties, String)}
+     * that tries to load a properties file using an absolute file name.
+     */
+    @Test
+    public final void testLoadProperties2() {
+        System.out.println("Working Directory = " + System.getProperty("user.dir"));
+        
+        URL url = ClassLoader.getSystemResource("de/zib/tools/test.properties");
+        Properties properties = new Properties();
+        assertTrue(PropertyLoader.loadProperties(properties, url.getPath()));
+        assertEquals("ahz2ieSh", properties.get("cs.node"));
+        assertEquals("wooPhu8u", properties.get("cs.cookie"));
+    }
+    
+    /**
+     * Test method for {@link PropertyLoader#loadProperties(Properties, String)}.
+     */
+    @Test
+    public final void testLoadProperties3() {
+        Properties properties = new Properties();
+        assertFalse(PropertyLoader.loadProperties(properties, "de/zib/tools/ahz2ieSh.wooPhu8u"));
+    }
 
 }

@@ -32,82 +32,82 @@ import de.zib.scalaris.UnknownException;
  * @since 2.5
  */
 public class PubSubSubscribeExample {
-	/**
-	 * Subscribes a given URL to a given topic, both provided on the command
-	 * line, with the <tt>subscribe</tt> methods of {@link PubSub}.<br />
-	 * If no URL or topic is given, the default URL <tt>"url"</tt> and the
-	 * default topic <tt>"topic"</tt> is used.
-	 * 
-	 * @param args
-	 *            command line arguments (first argument can be an optional
-	 *            topic and the second an optional URL)
-	 */
-	public static void main(String[] args) {
-		String topic;
-		String URL;
+    /**
+     * Subscribes a given URL to a given topic, both provided on the command
+     * line, with the <tt>subscribe</tt> methods of {@link PubSub}.<br />
+     * If no URL or topic is given, the default URL <tt>"url"</tt> and the
+     * default topic <tt>"topic"</tt> is used.
+     * 
+     * @param args
+     *            command line arguments (first argument can be an optional
+     *            topic and the second an optional URL)
+     */
+    public static void main(String[] args) {
+        String topic;
+        String URL;
 
-		if (args.length == 0) {
-			topic = "topic";
-			URL = "url";
-		} else if (args.length == 1) {
-			topic = args[0];
-			URL = "url";
-		} else {
-			topic = args[0];
-			URL = args[1];
-		}
+        if (args.length == 0) {
+            topic = "topic";
+            URL = "url";
+        } else if (args.length == 1) {
+            topic = args[0];
+            URL = "url";
+        } else {
+            topic = args[0];
+            URL = args[1];
+        }
 
-		OtpErlangString otpTopic = new OtpErlangString(topic);
-		OtpErlangString otpURL = new OtpErlangString(URL);
+        OtpErlangString otpTopic = new OtpErlangString(topic);
+        OtpErlangString otpURL = new OtpErlangString(URL);
 
-		System.out
-				.println("Subscribing a URL to a topic with the class `PubSub`:");
-		
-		try {
-			System.out.println("  creating object...");
-			PubSub sc = new PubSub();
-			System.out
-					.println("    `void subscribe(OtpErlangString, OtpErlangString)`...");
-			sc.subscribe(otpTopic, otpURL);
-			System.out.println("      subscribe(" + otpTopic.stringValue()
-					+ ", " + otpURL.stringValue() + ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("      subscribe(" + otpTopic.stringValue()
-					+ ", " + otpURL.stringValue() + ") failed: "
-					+ e.getMessage());
+        System.out
+                .println("Subscribing a URL to a topic with the class `PubSub`:");
+        
+        try {
+            System.out.println("  creating object...");
+            PubSub sc = new PubSub();
+            System.out
+                    .println("    `void subscribe(OtpErlangString, OtpErlangString)`...");
+            sc.subscribe(otpTopic, otpURL);
+            System.out.println("      subscribe(" + otpTopic.stringValue()
+                    + ", " + otpURL.stringValue() + ") succeeded");
+        } catch (ConnectionException e) {
+            System.out.println("      subscribe(" + otpTopic.stringValue()
+                    + ", " + otpURL.stringValue() + ") failed: "
+                    + e.getMessage());
         } catch (TimeoutException e) {
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") failed with timeout: "
                     + e.getMessage());
-		} catch (AbortException e) {
-			System.out.println("      subscribe(" + otpTopic.stringValue()
-					+ ", " + otpURL.stringValue() + ") failed with abort: "
-					+ e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("      subscribe(" + otpTopic.stringValue()
-					+ ", " + otpURL.stringValue() + ") failed with unknown: "
-					+ e.getMessage());
-		}
+        } catch (AbortException e) {
+            System.out.println("      subscribe(" + otpTopic.stringValue()
+                    + ", " + otpURL.stringValue() + ") failed with abort: "
+                    + e.getMessage());
+        } catch (UnknownException e) {
+            System.out.println("      subscribe(" + otpTopic.stringValue()
+                    + ", " + otpURL.stringValue() + ") failed with unknown: "
+                    + e.getMessage());
+        }
 
-		try {
-			System.out.println("  creating object...");
-			PubSub sc = new PubSub();
-			System.out.println("    `void subscribe(String, String)`...");
-			sc.subscribe(topic, URL);
-			System.out.println("      subscribe(" + topic + ", " + URL
-					+ ") succeeded");
-		} catch (ConnectionException e) {
-			System.out.println("      subscribe(" + topic + ", " + URL
-					+ ") failed: " + e.getMessage());
+        try {
+            System.out.println("  creating object...");
+            PubSub sc = new PubSub();
+            System.out.println("    `void subscribe(String, String)`...");
+            sc.subscribe(topic, URL);
+            System.out.println("      subscribe(" + topic + ", " + URL
+                    + ") succeeded");
+        } catch (ConnectionException e) {
+            System.out.println("      subscribe(" + topic + ", " + URL
+                    + ") failed: " + e.getMessage());
         } catch (TimeoutException e) {
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") failed with timeout: " + e.getMessage());
-		} catch (AbortException e) {
-			System.out.println("      subscribe(" + topic + ", " + URL
-					+ ") failed with abort: " + e.getMessage());
-		} catch (UnknownException e) {
-			System.out.println("      subscribe(" + topic + ", " + URL
-					+ ") failed with unknown: " + e.getMessage());
-		}
-	}
+        } catch (AbortException e) {
+            System.out.println("      subscribe(" + topic + ", " + URL
+                    + ") failed with abort: " + e.getMessage());
+        } catch (UnknownException e) {
+            System.out.println("      subscribe(" + topic + ", " + URL
+                    + ") failed with unknown: " + e.getMessage());
+        }
+    }
 }

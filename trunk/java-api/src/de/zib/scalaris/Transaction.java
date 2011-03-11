@@ -105,40 +105,40 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  */
 public class Transaction {
     /**
-	 * erlang transaction log
-	 */
-	private OtpErlangObject transLog = null;
-	
-	private OtpErlangList lastResult = null;
+     * erlang transaction log
+     */
+    private OtpErlangObject transLog = null;
+    
+    private OtpErlangList lastResult = null;
 
-	/**
-	 * connection to a scalaris node
-	 */
-	private Connection connection;
-	
-	/**
-	 * Constructor, uses the default connection returned by
-	 * {@link ConnectionFactory#createConnection()}.
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection fails
-	 */
-	public Transaction() throws ConnectionException {
-		connection = ConnectionFactory.getInstance().createConnection();
-	}
+    /**
+     * connection to a scalaris node
+     */
+    private Connection connection;
+    
+    /**
+     * Constructor, uses the default connection returned by
+     * {@link ConnectionFactory#createConnection()}.
+     * 
+     * @throws ConnectionException
+     *             if the connection fails
+     */
+    public Transaction() throws ConnectionException {
+        connection = ConnectionFactory.getInstance().createConnection();
+    }
 
-	/**
-	 * Constructor, uses the given connection to an erlang node.
-	 * 
-	 * @param conn
-	 *            connection to use for the transaction
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection fails
-	 */
-	public Transaction(Connection conn) throws ConnectionException {
-		connection = conn;
-	}
+    /**
+     * Constructor, uses the given connection to an erlang node.
+     * 
+     * @param conn
+     *            connection to use for the transaction
+     * 
+     * @throws ConnectionException
+     *             if the connection fails
+     */
+    public Transaction(Connection conn) throws ConnectionException {
+        connection = conn;
+    }
 
     /**
      * Executes all requests in <code>req</code>.
@@ -232,23 +232,23 @@ public class Transaction {
         }
     }
 
-	/**
-	 * Commits the current transaction.
-	 * 
-	 * <p>
-	 * The transaction's log is reset if the commit was successful, otherwise it
-	 * still retains in the transaction which must be successfully committed,
-	 * aborted or reset in order to be (re-)used for another transaction.
-	 * </p>
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
+    /**
+     * Commits the current transaction.
+     * 
+     * <p>
+     * The transaction's log is reset if the commit was successful, otherwise it
+     * still retains in the transaction which must be successfully committed,
+     * aborted or reset in order to be (re-)used for another transaction.
+     * </p>
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
      *             if a timeout occurred while trying to commit the transaction
-	 * @throws AbortException
-	 *             if the commit failed
+     * @throws AbortException
+     *             if the commit failed
      * @throws UnknownException
      *             If the commit fails or the returned value from erlang is of
      *             an unknown type/structure, this exception is thrown. Neither
@@ -256,56 +256,56 @@ public class Transaction {
      *             emptied, so that the commit can be tried again.
      * 
      * @see #abort()
-	 */
-	public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
-		try {
-			// not_found should never be returned by a commit
-		    OtpErlangList req = new OtpErlangList(CommonErlangObjects.commitTupleAtom);
-		    req_list(req);
+     */
+    public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
+        try {
+            // not_found should never be returned by a commit
+            OtpErlangList req = new OtpErlangList(CommonErlangObjects.commitTupleAtom);
+            req_list(req);
             // transaction was successful: reset transaction log
-	        transLog = null;
-		} catch (NotFoundException e) {
-			// e.printStackTrace();
-			throw new UnknownException(e);
-		}
-	}
+            transLog = null;
+        } catch (NotFoundException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e);
+        }
+    }
 
-	/**
-	 * Cancels the current transaction.
-	 * 
-	 * <p>
-	 * For a transaction to be cancelled, only the {@link #transLog} needs to be
-	 * reset. Nothing else needs to be done since the data was not modified
-	 * until the transaction was committed.
-	 * </p>
-	 *
-	 * @see #commit()
-	 */
-	public void abort() {
+    /**
+     * Cancels the current transaction.
+     * 
+     * <p>
+     * For a transaction to be cancelled, only the {@link #transLog} needs to be
+     * reset. Nothing else needs to be done since the data was not modified
+     * until the transaction was committed.
+     * </p>
+     *
+     * @see #commit()
+     */
+    public void abort() {
         transLog = null;
-	}
+    }
 
-	/**
-	 * Gets the value stored under the given <code>key</code>.
-	 * 
-	 * @param key
-	 *            the key to look up
-	 *
-	 * @return the value stored under the given <code>key</code> as a raw erlang type
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to fetch the value
-	 * @throws NotFoundException
-	 *             if the requested key does not exist
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 * 
+    /**
+     * Gets the value stored under the given <code>key</code>.
+     * 
+     * @param key
+     *            the key to look up
+     *
+     * @return the value stored under the given <code>key</code> as a raw erlang type
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to fetch the value
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws UnknownException
+     *             if any other error occurs
+     * 
      * @since 2.9
-	 */
+     */
     public OtpErlangObject read(OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
@@ -321,56 +321,56 @@ public class Transaction {
             // e.printStackTrace();
             throw new UnknownException(e);
         }
-	}
+    }
 
-	/**
-	 * Gets the value stored under the given <code>key</code>.
-	 * 
-	 * @param key
-	 *            the key to look up
-	 *
-	 * @return the (string) value stored under the given <code>key</code>
-	 * 
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to fetch the value
-	 * @throws NotFoundException
-	 *             if the requested key does not exist
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 * 
-	 * @see #read(OtpErlangString)
+    /**
+     * Gets the value stored under the given <code>key</code>.
+     * 
+     * @param key
+     *            the key to look up
+     *
+     * @return the (string) value stored under the given <code>key</code>
+     * 
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to fetch the value
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws UnknownException
+     *             if any other error occurs
+     * 
+     * @see #read(OtpErlangString)
      * @since 2.9
-	 */
-	public ErlangValue read(String key) throws ConnectionException,
-			TimeoutException, NotFoundException, UnknownException {
+     */
+    public ErlangValue read(String key) throws ConnectionException,
+            TimeoutException, NotFoundException, UnknownException {
         return new ErlangValue(read(new OtpErlangString(key)));
-	}
+    }
 
-	/**
-	 * Stores the given <code>key</code>/<code>value</code> pair.
-	 * 
-	 * @param key
-	 *            the key to store the value for
-	 * @param value
-	 *            the value to store
-	 *
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to write the value
-	 * @throws UnknownException
-	 *             if any other error occurs
+    /**
+     * Stores the given <code>key</code>/<code>value</code> pair.
+     * 
+     * @param key
+     *            the key to store the value for
+     * @param value
+     *            the value to store
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws UnknownException
+     *             if any other error occurs
      * 
      * @since 2.9
-	 */
-	public void write(OtpErlangString key, OtpErlangObject value)
-			throws ConnectionException, TimeoutException, UnknownException {
+     */
+    public void write(OtpErlangString key, OtpErlangObject value)
+            throws ConnectionException, TimeoutException, UnknownException {
         try {
             // abort and not_found should never be returned by a write
             OtpErlangList req =
@@ -385,34 +385,34 @@ public class Transaction {
             // e.printStackTrace();
             throw new UnknownException(e);
         }
-	}
+    }
 
-	/**
-	 * Stores the given <code>key</code>/<code>value</code> pair.
-	 * 
+    /**
+     * Stores the given <code>key</code>/<code>value</code> pair.
+     * 
      * @param <T>
      *            the type of the <tt>value</tt>
-	 * @param key
-	 *            the key to store the value for
-	 * @param value
-	 *            the value to store
-	 *
-	 * @throws ConnectionException
-	 *             if the connection is not active or a communication error
-	 *             occurs or an exit signal was received or the remote node
-	 *             sends a message containing an invalid cookie
-	 * @throws TimeoutException
-	 *             if a timeout occurred while trying to write the value
-	 * @throws UnknownException
-	 *             if any other error occurs
-	 *
-	 * @see #write(OtpErlangString, OtpErlangObject)
+     * @param key
+     *            the key to store the value for
+     * @param value
+     *            the value to store
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #write(OtpErlangString, OtpErlangObject)
      * @since 2.9
-	 */
-	public <T> void write(String key, T value) throws ConnectionException,
-			TimeoutException, UnknownException {
-		write(new OtpErlangString(key), new ErlangValue(value).value());
-	}
+     */
+    public <T> void write(String key, T value) throws ConnectionException,
+            TimeoutException, UnknownException {
+        write(new OtpErlangString(key), new ErlangValue(value).value());
+    }
 
     /**
      * Gets the raw result list of the last request list send to erlang.
@@ -425,14 +425,14 @@ public class Transaction {
     public OtpErlangList getLastResult() {
         return lastResult;
     }
-	
-	/**
-	 * Closes the transaction's connection to a scalaris node.
-	 * 
-	 * Note: Subsequent calls to the other methods will throw
-	 * {@link ConnectionException}s!
-	 */
-	public void closeConnection() {
-		connection.close();
-	}
+    
+    /**
+     * Closes the transaction's connection to a scalaris node.
+     * 
+     * Note: Subsequent calls to the other methods will throw
+     * {@link ConnectionException}s!
+     */
+    public void closeConnection() {
+        connection.close();
+    }
 }
