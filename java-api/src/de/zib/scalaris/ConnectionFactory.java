@@ -46,7 +46,7 @@ import de.zib.tools.PropertyLoader;
  * {@link #setProperties(Properties)} but must provide the following values
  * (default values as shown)
  * <ul>
- * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+ * <li><tt>scalaris.node = "node1@localhost"</tt></li>
  * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
  * <li><tt>scalaris.client.name = "java_client"</tt></li>
  * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
@@ -146,7 +146,7 @@ public class ConnectionFactory {
      * 
      * Default values are:
      * <ul>
-     * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+     * <li><tt>scalaris.node = "node1@localhost"</tt></li>
      * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
      * <li><tt>scalaris.client.name = "java_client"</tt></li>
      * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
@@ -187,7 +187,7 @@ public class ConnectionFactory {
      * The {@link Properties} object should provide the following values
      * (default values as shown):
      * <ul>
-     * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+     * <li><tt>scalaris.node = "node1@localhost"</tt></li>
      * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
      * <li><tt>scalaris.client.name = "java_client"</tt></li>
      * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
@@ -206,7 +206,7 @@ public class ConnectionFactory {
      * The {@link Properties} object should provide the following values
      * (default values as shown):
      * <ul>
-     * <li><tt>scalaris.node = "boot@localhost"</tt></li>
+     * <li><tt>scalaris.node = "node1@localhost"</tt></li>
      * <li><tt>scalaris.cookie = "chocolate chip cookie"</tt></li>
      * <li><tt>scalaris.client.name = "java_client"</tt></li>
      * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
@@ -218,7 +218,7 @@ public class ConnectionFactory {
      *            the object to get the connection parameters from
      */
     public void setProperties(Properties properties) {
-        String[] nodesTemp = properties.getProperty("scalaris.node", "boot@localhost").split("[\\s,;]");
+        String[] nodesTemp = properties.getProperty("scalaris.node", "node1@localhost").split("[\\s,;]");
         nodes.clear();
         
         for (int i = 0; i < nodesTemp.length; ++i) {
