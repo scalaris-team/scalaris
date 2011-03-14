@@ -51,7 +51,7 @@
 -export([kill/1, sleep/2, runnable/1,
          get_state/1, get_state/2,
          get_component_state/1, get_component_state/2,
-         change_handler/2]).
+         change_handler/2, post_op/2]).
 -export([bp_set/3, bp_set_cond/3, bp_del/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
@@ -150,6 +150,12 @@ get_component_state(Pid, Timeout) ->
         -> {'$gen_component', [{on_handler, Handler::atom()}], State}.
 change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
+
+%% @doc perform a post op, i.e. handle a message directly after another
+-spec post_op(State, Message::comm:message())
+        -> {'$gen_component', [{post_op, Message::comm:message()}], State}.
+post_op(State, Message) ->
+    {'$gen_component', [{post_op, Message}], State}.
 
 %% requests regarding breakpoint processing
 -spec bp_set(Pid::comm:erl_local_pid(), MsgTag::comm:message_tag(), BPName::any()) -> ok.
@@ -289,7 +295,11 @@ try_loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
 
 loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     ?CALLING_RECEIVE(Module),
-    receive
+    receive Msg -> loop(Module, On, Msg, State, ComponentState)
+    end.
+    
+loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentState) ->
+    case ReceivedMsg of
         %%%%%%%%%%%%%%%%%%%%
         %% Attention!:
         %%   we actually manage two queues here:
@@ -355,11 +365,23 @@ loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
                     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
                             [self(), Module, On]),
                     ok;
-                {'$gen_component', Config, NewState} ->
-                    {on_handler, NewHandler} =
-                        lists:keyfind(on_handler, 1, Config),
+                {'$gen_component', Commands, NewState} ->
                     %% This is not counted as a bp_step
-                    loop(Module, NewHandler, NewState, TmpComponentState);
+                    case lists:keyfind(on_handler, 1, Commands) of
+                        {on_handler, NewHandler} ->
+                            loop(Module, NewHandler, NewState, TmpComponentState);
+                        false ->
+                            case lists:keyfind(post_op, 1, Commands) of
+                                {post_op, Msg1} ->
+                                    loop(Module, On, Msg1, NewState, TmpComponentState);
+                                false ->
+                                    % let's fail since the Config list was either
+                                    % empty or contained an invalid entry
+                                    log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
+                                            [Commands]),
+                                    erlang:throw('unknown gen_component command')
+                            end
+                    end;
                 NewState ->
                     %%Stop = erlang:now(),
                     %%Span = timer:now_diff(Stop, Start),
