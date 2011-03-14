@@ -32,10 +32,10 @@
 
 -include("scalaris.hrl").
 
--type(process_id() :: {inet:ip_address(), non_neg_integer(), comm:erl_pid_plain()}).
+-type process_id() :: {inet:ip_address(), comm_server:tcp_port(), comm:erl_pid_plain()}.
 
 %% @doc send message via tcp, if target is not in same Erlang VM.
--spec send(process_id(), term()) -> ok.
+-spec send(process_id(), comm:message()) -> ok.
 send(Target, Message) ->
     IsLocal = is_local(Target),
     case is_valid(Target) of
@@ -95,5 +95,5 @@ make_local({_IP, _Port, Pid}) ->
 get_ip({IP, _Port, _Pid}) -> IP.
 
 %% @doc Gets the port of the given process id.
--spec get_port(process_id()) -> non_neg_integer().
+-spec get_port(process_id()) -> comm_server:tcp_port().
 get_port({_IP, Port, _Pid}) -> Port.

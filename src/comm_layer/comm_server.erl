@@ -25,10 +25,21 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([tcp_port/0]).
+-endif.
+
 -export([start_link/1, init/1, on/2]).
 -export([send/2, tcp_options/0]).
 -export([unregister_connection/2, register_connection/4,
         set_local_address/2, get_local_address_port/0]).
+
+-type tcp_port() :: 0..65535.
+-type message() ::
+    {comm_server_create_connection, Address::inet:ip_address(), Port::tcp_port(), ClientPid::pid()} | 
+    {unregister_conn, Address::inet:ip_address(), Port::tcp_port(), Client::pid()} | 
+    {register_conn, Address::inet:ip_address(), Port::tcp_port(), Pid::pid(), Socket::inet:socket(), Client::pid()} | 
+    {set_local_address, Address::inet:ip_address(), Port::tcp_port(), Client::pid()}.
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
@@ -40,7 +51,7 @@ start_link(CommLayerGroup) ->
                              ]).
 
 %% @doc initialize: return initial state.
--spec init([]) -> any().
+-spec init([]) -> null.
 init([]) ->
     _ = ets:new(?MODULE, [set, protected, named_table]),
     _State = null.
@@ -56,7 +67,7 @@ tcp_options() ->
      {send_timeout, config:read(tcp_send_timeout)}
 ].
 
--spec send({inet:ip_address(), integer(), pid()}, term()) -> ok.
+-spec send({inet:ip_address(), tcp_port(), pid()}, term()) -> ok.
 send({Address, Port, Pid}, Message) ->
     ConnPid =
         case ets:lookup(?MODULE, {Address, Port}) of
@@ -71,26 +82,26 @@ send({Address, Port, Pid}, Message) ->
     ConnPid ! {send, Pid, Message},
     ok.
 
--spec unregister_connection(inet:ip_address(), integer()) -> ok.
+-spec unregister_connection(inet:ip_address(), tcp_port()) -> ok.
 unregister_connection(Adress, Port) ->
     ?MODULE ! {unregister_conn, Adress, Port, self()},
     receive {unregister_conn_done} ->  ok end.
 
--spec register_connection(inet:ip_address(), integer(),
+-spec register_connection(inet:ip_address(), tcp_port(),
                           pid(), inet:socket()) -> ok.
 register_connection(Adress, Port, Pid, Socket) ->
     ?MODULE ! {register_conn, Adress, Port, Pid, Socket, self()},
     receive {register_conn_done} -> ok end.
 
--spec set_local_address(inet:ip_address() | undefined, integer()) -> ok.
+-spec set_local_address(inet:ip_address() | undefined, tcp_port()) -> ok.
 set_local_address(Address, Port) ->
     ?MODULE ! {set_local_address, Address, Port, self()},
     receive {set_local_address_done} -> ok end.
 
 %% @doc returns the local ip address and port
--spec(get_local_address_port() -> {inet:ip_address(),integer()}
+-spec(get_local_address_port() -> {inet:ip_address(), tcp_port()}
                                       | undefined
-                                      | {undefined, integer()}).
+                                      | {undefined, tcp_port()}).
 get_local_address_port() ->
     case erlang:get(local_address_port) of
         undefined ->
@@ -107,7 +118,7 @@ get_local_address_port() ->
     end.
 
 %% @doc message handler
--spec on(term(), term()) -> term().
+-spec on(message(), State::null) -> null.
 on({comm_server_create_connection, Address, Port, ClientPid}, State) ->
     case ets:lookup(?MODULE, {Address, Port}) of
         [] ->
