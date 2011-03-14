@@ -26,42 +26,35 @@
 
 -behaviour(supervisor).
 
--export([start_link/0, start_link/2, init/1, check_config/0]).
-
--ifdef(with_export_type_support).
--export_type([supervisor_type/0]).
--endif.
-
--type supervisor_type() :: boot | node | undefined.
+-export([start_link/0, start_link/1, init/1, check_config/0]).
 
 -spec start_link()
         -> {ok, Pid::pid()} | ignore |
            {error, Error::{already_started, Pid::pid()} | term()}.
-start_link() ->
-    start_link(undefined, []).
+start_link() -> start_link([]).
 
--spec start_link(supervisor_type(), list(tuple()))
+-spec start_link(list(tuple()))
         -> {ok, Pid::pid()} | ignore |
            {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
-start_link(SupervisorType, Options) ->
-    Link = supervisor:start_link({local, main_sup}, ?MODULE, {SupervisorType, Options}),
+start_link(Options) ->
+    Link = supervisor:start_link({local, main_sup}, ?MODULE, Options),
     case Link of
         {ok, _Pid} ->
             ok;
         ignore ->
             error_logger:error_msg("error in starting scalaris ~p supervisor: supervisor should not return ignore~n",
-                      [SupervisorType]);
+                      []);
         {error, Error} ->
             error_logger:error_msg("error in starting scalaris ~p supervisor: ~p~n",
-                      [SupervisorType, Error])
+                      [Error])
     end,
     add_additional_nodes(),
     Link.
 
--spec init({supervisor_type(), [tuple()]})
+-spec init([tuple()])
         -> {ok, {{one_for_one, MaxRetries::pos_integer(),
                   PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
-init({SupervisorType, Options}) ->
+init(Options) ->
     randoms:start(),
     _ = config:start_link2(Options),
     ServiceGroup = pid_groups:new("basic_services_"),
@@ -73,10 +66,10 @@ init({SupervisorType, Options}) ->
                                                   [ErrorLoggerFile, Reason])
     end,
     _ = inets:start(),
-    {ok, {{one_for_one, 10, 1}, my_process_list(SupervisorType, ServiceGroup, Options)}}.
+    {ok, {{one_for_one, 10, 1}, my_process_list(ServiceGroup, Options)}}.
 
--spec my_process_list/3 :: (supervisor_type(), pid_groups:groupname(), list(tuple())) -> [any()].
-my_process_list(_SupervisorType_, ServiceGroup, Options) ->
+-spec my_process_list(pid_groups:groupname(), list(tuple())) -> [any()].
+my_process_list(ServiceGroup, Options) ->
     StartMgmtServer = case config:read(start_mgmt_server) of
                           failed -> false;
                           X -> X

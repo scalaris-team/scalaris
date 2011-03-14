@@ -34,15 +34,15 @@
 %% (bin/scalarisctl and erl ... '-s scalaris')
 -spec start() -> ok | {error, Reason::term()}.
 start() ->
-    application:load(
-      {application, scalaris,
-       [{description, "scalaris"},
-        {vsn, "0.2"},
-        {mod, {scalaris, []}},
-        {registered, []},
-        {applications, [kernel, stdlib]},
-        {env, []}
-       ]}),
+    _ = application:load(
+          {application, scalaris,
+           [{description, "scalaris"},
+            {vsn, "0.2"},
+            {mod, {scalaris, []}},
+            {registered, []},
+            {applications, [kernel, stdlib]},
+            {env, []}
+           ]}),
     application:start(scalaris).
 
 -spec stop() -> ok | {error, Reason::term()}.
@@ -64,7 +64,7 @@ stop(_State) ->
 
 %% functions called by Erlangs init module, triggered via command line
 %% (bin/scalarisctl and erl ... '-s scalaris cli')
--spec cli() -> ok | {error, Reason::term()}.
+-spec cli() -> ok.
 cli() ->
     case init:get_plain_arguments() of
         [NodeName | Args] ->
