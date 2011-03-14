@@ -493,10 +493,12 @@ get_ring_data() ->
            comm:send_local(DhtNode,
                            {unittest_get_bounds_and_data, comm:this()}),
            receive
-               {unittest_get_bounds_and_data_response, Bounds, Data} ->
-                   {DhtNode, Bounds, Data, ok}
+               {unittest_get_bounds_and_data_response, Bounds, Data, Pred, Succ} ->
+                   {DhtNode, Bounds, Data,
+                    {pred, comm:make_local(node:pidX(Pred))},
+                    {succ, comm:make_local(node:pidX(Succ))}, ok}
            % note: no timeout possible - can not leave messages in queue!
-%%            after 500 -> {DhtNode, empty, [], timeout}
+%%            after 500 -> {DhtNode, empty, [], null, null, timeout}
            end
        end || DhtNode <- DHTNodes]).
 

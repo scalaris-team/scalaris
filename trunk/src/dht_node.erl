@@ -344,7 +344,9 @@ on({unittest_get_bounds_and_data, SourcePid}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     MyBounds = intervals:get_bounds(MyRange),
     Data = ?DB:get_data(dht_node_state:get(State, db)),
-    comm:send(SourcePid, {unittest_get_bounds_and_data_response, MyBounds, Data}),
+    Pred = dht_node_state:get(State, pred),
+    Succ = dht_node_state:get(State, succ),
+    comm:send(SourcePid, {unittest_get_bounds_and_data_response, MyBounds, Data, Pred, Succ}),
     State;
 
 on({get_dht_nodes_response, _KnownHosts}, State) ->
