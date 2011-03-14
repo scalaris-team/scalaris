@@ -388,7 +388,7 @@
 			<formatter type="brief" usefile="false" />
 			<classpath refid="scalaris.test.classpath" />
 			<batchtest>
-				<fileset dir="${scalaris.classes.dirname}" includes="de/zib/scalaris**/*Test.class" />
+				<fileset dir="${scalaris.classes.dirname}" includes="de/zib/scalaris**/*Test.class" excludes="de/zib/scalaris**/InterOpTest.class" />
 			</batchtest>
 		</junit>
 	</target>
