@@ -51,7 +51,7 @@ init_per_testcase(_TestCase, Config) ->
     NewOptions = unittest_helper:prepare_config([]),
     {ok, _} = pid_groups:start_link(),
     application:set_env(scalaris, start_dht_node, group_node),
-    {ok, _} = sup_scalaris:start_link(undefined,  NewOptions),
+    {ok, _} = sup_scalaris:start_link(NewOptions),
     config:write(dht_node_sup, sup_group_node),
     config:write(dht_node, group_node),
     config:write(group_node_trigger, trigger_periodic),
