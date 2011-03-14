@@ -188,7 +188,7 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
     case FwdList of
         []    ->
             case dht_node_state:is_db_responsible(Key, State) of
-                true -> on(Msg, State);
+                true -> gen_component:post_op(State, Msg);
                 false ->
                     % it is possible that we received the message due to a
                     % forward while sliding and before the other node removed

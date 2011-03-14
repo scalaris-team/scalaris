@@ -84,15 +84,17 @@ init({DHTNodeGroup, Options}) ->
 
 -spec module_state_to_my_state(module_state(), state()) -> state().
 module_state_to_my_state(ModuleState, {state, Module, OldHandler, _, NewMatchSpecs}) ->
-    Handler = case ModuleState of
-                  {'$gen_component', Config, ModuleRealState} ->
-                      {on_handler, NewHandler} =
-                          lists:keyfind(on_handler, 1, Config),
-                      NewHandler;
-                  ModuleRealState ->
-                      OldHandler
-              end,
-    {state, Module, Handler, ModuleRealState, NewMatchSpecs}.
+    case ModuleState of
+        {'$gen_component', Commands, ModuleRealState} ->
+            case lists:keyfind(on_handler, 1, Commands) of
+                {on_handler, NewHandler} ->
+                    {state, Module, NewHandler, ModuleRealState, NewMatchSpecs};
+                false ->
+                    {'$gen_component', Commands,
+                     {state, Module, OldHandler, ModuleRealState, NewMatchSpecs}}
+            end;
+        _ -> {state, Module, OldHandler, ModuleState, NewMatchSpecs}
+    end.
 
 -spec is_alive(Pid::pid()) -> boolean().
 is_alive(Pid) ->
