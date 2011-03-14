@@ -65,7 +65,8 @@ public class ErlangValue {
      *  <li>{@link String} - {@link OtpErlangString}</li>
      *  <li><tt>byte[]</tt> - {@link OtpErlangBinary}</li>
      *  <li>{@link List} with one of the supported types - {@link OtpErlangList}</li>
-     *  <li>{@link OtpErlangObject}</li>
+     *  <li>{@link Map}<String, Object> representing a JSON object - {@link OtpErlangTuple}</li>
+     *  <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
      *  <li>{@link ErlangValue}</li>
      *  </ul>
      * 
@@ -94,10 +95,10 @@ public class ErlangValue {
      */
     private static <T> OtpErlangObject convertToErlang(T value)
             throws ClassCastException {
-        if (value instanceof Long) {
-            return new OtpErlangLong((Long) value);
-        } else if (value instanceof Integer) {
+        if (value instanceof Integer) {
             return new OtpErlangLong((Integer) value);
+        } else if (value instanceof Long) {
+            return new OtpErlangLong((Long) value);
         } else if (value instanceof BigInteger) {
             return new OtpErlangLong((BigInteger) value);
         } else if (value instanceof Double) {
@@ -127,7 +128,7 @@ public class ErlangValue {
         } else if (value instanceof OtpErlangObject) {
             return (OtpErlangObject) value;
         } else {
-            throw new ClassCastException("Unsupported type");
+            throw new ClassCastException("Unsupported type (value: " + value.toString() + ")");
         }
     }
 
@@ -202,7 +203,17 @@ public class ErlangValue {
      *                is not supported
      */
     public String toString() throws ClassCastException {
-        return ((OtpErlangString) value).stringValue();
+        // note: need special handling for empty strings:
+        if (value instanceof OtpErlangList) {
+            OtpErlangList value_list = (OtpErlangList) value;
+            if (value_list.arity() == 0) {
+                return "";
+            } else {
+                throw new ClassCastException("com.ericsson.otp.erlang.OtpErlangList cannot be cast to com.ericsson.otp.erlang.OtpErlangString");
+            }
+        } else {
+            return ((OtpErlangString) value).stringValue();
+        }
     }
 
     /**
@@ -328,7 +339,7 @@ public class ErlangValue {
          */
         OtpErlangTuple value_tpl = (OtpErlangTuple) value;
         if (value_tpl.arity() == 2
-                && value_tpl.elementAt(0) == CommonErlangObjects.structAtom) {
+                && value_tpl.elementAt(0).equals(CommonErlangObjects.structAtom)) {
             return convertScalarisJSONtoJava_object((OtpErlangList) value_tpl.elementAt(1));
         } else {
             throw new ClassCastException("wrong tuple arity");
@@ -360,18 +371,28 @@ public class ErlangValue {
                     return value_int.bigIntegerValue();
                 }
             }
+        } else if (value instanceof OtpErlangDouble) {
+            return ((OtpErlangDouble) value).doubleValue();
         } else if (value instanceof OtpErlangString) {
             return ((OtpErlangString) value).stringValue();
         } else if (value instanceof OtpErlangTuple) {
             OtpErlangTuple value_tpl = (OtpErlangTuple) value;
             if (value_tpl.arity() == 2) {
                 OtpErlangObject tag = value_tpl.elementAt(0);
-                if (tag == CommonErlangObjects.structAtom) {
+                if (tag.equals(CommonErlangObjects.structAtom)) {
                     return convertScalarisJSONtoJava_object((OtpErlangList) value_tpl
                             .elementAt(1));
-                } else if (tag == CommonErlangObjects.arrayAtom) {
-                    return convertScalarisJSONtoJava_array((OtpErlangList) value_tpl
-                            .elementAt(1));
+                } else if (tag.equals(CommonErlangObjects.arrayAtom)) {
+                    // need special handling if OTP thought that the value is a string
+                    OtpErlangObject value_tpl_1 = value_tpl.elementAt(1);
+                    OtpErlangList value_tpl_1_list;
+                    if (value_tpl_1 instanceof OtpErlangString) {
+                        OtpErlangString value_tpl_1_string = (OtpErlangString) value_tpl_1;
+                        value_tpl_1_list = new OtpErlangList(value_tpl_1_string.stringValue());
+                    } else {
+                        value_tpl_1_list = (OtpErlangList) value_tpl_1;
+                    }
+                    return convertScalarisJSONtoJava_array(value_tpl_1_list);
                 } else {
                     throw new ClassCastException("unknown JSON tag");
                 }
@@ -385,7 +406,7 @@ public class ErlangValue {
         } else if (value.equals(CommonErlangObjects.nullAtom)) {
             return null;
         } else {
-            throw new ClassCastException("Unsupported JSON type");
+            throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
         }
     }
 
@@ -411,22 +432,24 @@ public class ErlangValue {
             return new OtpErlangLong((Long) value);
         } else if (value instanceof BigInteger) {
             return new OtpErlangLong((BigInteger) value);
+        } else if (value instanceof Double) {
+            return new OtpErlangDouble((Double) value);
         } else if (value instanceof String) {
             return new OtpErlangString((String) value);
-        } else if (value instanceof Map<?, ?>) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> map = (Map<String, Object>) value;
-            return convertJavaToScalarisJSON_object(map);
         } else if (value instanceof List<?>) {
             @SuppressWarnings("unchecked")
             List<Object> list = (List<Object>) value;
             return convertJavaToScalarisJSON_array(list);
+        } else if (value instanceof Map<?, ?>) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) value;
+            return convertJavaToScalarisJSON_object(map);
         } else if (value.equals(true)) {
             return CommonErlangObjects.trueAtom;
         } else if (value.equals(false)) {
             return CommonErlangObjects.falseAtom;
         } else {
-            throw new ClassCastException("Unsupported JSON type");
+            throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
         }
     }
 
@@ -457,12 +480,12 @@ public class ErlangValue {
                 } else if (key_erl instanceof OtpErlangString) {
                     key = ((OtpErlangString) key_erl).stringValue();
                 } else {
-                    throw new ClassCastException("Unsupported JSON type");
+                    throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
                 }
                 result.put(key,
                         convertScalarisJSONtoJava_value(iter_tpl.elementAt(1)));
             } else {
-                throw new ClassCastException("Unsupported JSON type");
+                throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
             }
         }
         return result;
