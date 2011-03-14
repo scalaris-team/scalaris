@@ -53,7 +53,7 @@ make_ring(Size, Options) ->
                     randoms:start(),
                     {ok, _GroupsPid} = pid_groups:start_link(),
                     NewOptions = unittest_helper:prepare_config(Options),
-                    _ = sup_scalaris:start_link(boot, NewOptions),
+                    _ = sup_scalaris:start_link(NewOptions),
                     tester_scheduler:start_scheduling(),
                     mgmt_server:connect(),
                     _ = admin:add_node([{first}]),
