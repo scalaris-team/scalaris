@@ -188,7 +188,7 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
     case FwdList of
         []    ->
             case dht_node_state:is_db_responsible(Key, State) of
-                true -> comm:send_local(self(), Msg);
+                true -> on(Msg, State);
                 false ->
                     % it is possible that we received the message due to a
                     % forward while sliding and before the other node removed
@@ -219,11 +219,12 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
                                     [self(), intervals:get_bounds(nodelist:node_range(Neighbors)),
                                      DBRange2, MsgFwd, Key])
                     end,
-                    dht_node_lookup:lookup_aux(State, Key, Hops, Msg)
+                    dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
+                    State
             end;
-        [Pid] -> comm:send(Pid, CompleteMsg)
-    end,
-    State;
+        [Pid] -> comm:send(Pid, CompleteMsg),
+                 State
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Database
