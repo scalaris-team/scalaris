@@ -111,7 +111,7 @@ get_name_({{_DB, FileName}, _CKInt, _CKDB}) ->
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
 get_entry2_({{DB, _FileName}, _CKInt, _CKDB}, Key) ->
-    case toke_drv:get(DB, erlang:term_to_binary(Key)) of
+    case toke_drv:get(DB, erlang:term_to_binary(Key, [{minor_version, 1}])) of
         not_found -> {false, db_entry:new(Key)};
         Entry     -> {true, erlang:binary_to_term(Entry)}
     end.
@@ -123,8 +123,8 @@ set_entry_(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
         false -> ok;
         _     -> ?CKETS:insert(CKDB, {Key})
     end,
-    ok = toke_drv:insert(DB, erlang:term_to_binary(Key),
-                         erlang:term_to_binary(Entry)),
+    ok = toke_drv:insert(DB, erlang:term_to_binary(Key, [{minor_version, 1}]),
+                         erlang:term_to_binary(Entry, [{minor_version, 1}])),
     State.
 
 %% @doc Updates an existing (!) entry in the DB.
@@ -138,7 +138,7 @@ delete_entry_(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
         false -> ok;
         _     -> ?CKETS:insert(CKDB, {Key})
     end,
-    toke_drv:delete(DB, erlang:term_to_binary(Key)),
+    toke_drv:delete(DB, erlang:term_to_binary(Key, [{minor_version, 1}])),
     State.
 
 %% @doc Returns the number of stored keys.
@@ -176,8 +176,8 @@ add_data_(State = {{DB, _FileName}, CKInt, CKDB}, Data) ->
     lists:foldl(
       fun(DBEntry, _) ->
               ok = toke_drv:insert(DB,
-                                   erlang:term_to_binary(db_entry:get_key(DBEntry)),
-                                   erlang:term_to_binary(DBEntry))
+                                   erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}]),
+                                   erlang:term_to_binary(DBEntry, [{minor_version, 1}]))
       end, null, Data),
     State.
 
@@ -199,7 +199,7 @@ split_data_(State = {{DB, _FileName}, _CKInt, CKDB}, MyNewInterval) ->
     HisListFilt =
         lists:foldl(
           fun(DBEntry, L) ->
-                  toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(DBEntry))),
+                  toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}])),
                   ?CKETS:delete(CKDB, db_entry:get_key(DBEntry)),
                   case db_entry:is_empty(DBEntry) of
                       false -> [DBEntry | L];

@@ -374,7 +374,7 @@ get_pids_uid() ->
 -spec get_global_uid() -> global_uid().
 get_global_uid() ->
     _Result = {get_pids_uid(), comm:this()}
-    %% , term_to_binary(_Result)
+    %% , term_to_binary(_Result, [{minor_version, 1}])
     .
 
 %% @doc Checks whether the given GUID is an old incarnation of a GUID from

@@ -114,7 +114,7 @@ json_to_reqlist(JSON_ReqList) ->
       end || {struct, [Elem]} <- TmpReqList ].
 
 tlog_to_json(TLog) ->
-    base64:encode_to_string(term_to_binary(TLog, [compressed])).
+    base64:encode_to_string(term_to_binary(TLog, [compressed, {minor_version, 1}])).
 
 json_to_tlog(JsonTLog) ->
     binary_to_term(base64:decode(JsonTLog)).
