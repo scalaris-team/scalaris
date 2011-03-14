@@ -328,7 +328,7 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    private final static void printException(String description, ParseException e, boolean verbose) {
+    final static void printException(String description, ParseException e, boolean verbose) {
         printException(description, e, verbose, 1);
     }
     
@@ -340,7 +340,7 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    private final static void printException(String description, ConnectionException e, boolean verbose) {
+    final static void printException(String description, ConnectionException e, boolean verbose) {
         printException(description, e, verbose, 2);
     }
     
@@ -352,7 +352,7 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    private final static void printException(String description, TimeoutException e, boolean verbose) {
+    final static void printException(String description, TimeoutException e, boolean verbose) {
         printException(description, e, verbose, 3);
     }
     
@@ -364,7 +364,7 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    private final static void printException(String description, NotFoundException e, boolean verbose) {
+    final static void printException(String description, NotFoundException e, boolean verbose) {
         printException(description, e, verbose, 4);
     }
     
@@ -376,7 +376,7 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    private final static void printException(String description, UnknownException e, boolean verbose) {
+    final static void printException(String description, UnknownException e, boolean verbose) {
         printException(description, e, verbose, 5);
     }
     
@@ -388,7 +388,7 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    private final static void printException(String description, NodeNotFoundException e, boolean verbose) {
+    final static void printException(String description, NodeNotFoundException e, boolean verbose) {
         printException(description, e, verbose, 6);
     }
     
@@ -400,7 +400,7 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    private final static void printException(String description, AbortException e, boolean verbose) {
+    final static void printException(String description, AbortException e, boolean verbose) {
         printException(description, e, verbose, 7);
     }
     
@@ -413,7 +413,7 @@ public class Main {
      * @param verbose      specifies whether to include the stack trace or not
      * @param exitStatus   the status code the JVM exits with 
      */
-    private final static void printException(String description, Exception e, boolean verbose, int exitStatus) {
+    final static void printException(String description, Exception e, boolean verbose, int exitStatus) {
         System.err.print(description + ": ");
         if (verbose) {
             System.err.println();
@@ -433,7 +433,7 @@ public class Main {
      * @param options        the available command line options
      * @param currentOption  the short name of the current option being parsed
      */
-    private final static void checkArguments(String optionValue,
+    final static void checkArguments(String optionValue,
             Options options, String currentOption) {
         if (optionValue == null) {
             printException("Parsing failed", new ParseException(
@@ -454,7 +454,7 @@ public class Main {
      * @param options        the available command line options
      * @param currentOption  the short name of the current option being parsed
      */
-    private final static void checkArguments(String[] optionValues,
+    final static void checkArguments(String[] optionValues,
             int required, Options options, String currentOption) {
         if (optionValues == null || optionValues.length < required) {
             printException("Parsing failed", new ParseException(

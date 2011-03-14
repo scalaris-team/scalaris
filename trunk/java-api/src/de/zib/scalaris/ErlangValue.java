@@ -38,6 +38,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 3.0
+ * @since 3.0
  */
 public class ErlangValue {
     /**
