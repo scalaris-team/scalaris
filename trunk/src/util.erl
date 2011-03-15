@@ -31,7 +31,7 @@
          logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
          get_stacktrace/0, dump/0, dump2/0, dump3/0,
-         get_nodes/0, minus/2,
+         minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5,
@@ -246,10 +246,6 @@ minus([], _ExcludeList) ->
 minus([_|_] = L, ExcludeList) ->
     ExcludeSet = ordsets:from_list(ExcludeList),
     [E || E <- L, not ordsets:is_element(E, ExcludeSet)].
-
--spec get_nodes() -> [comm:mypid()].
-get_nodes() ->
-    get_proc_in_vms(bench_server).
 
 -spec get_proc_in_vms(atom()) -> [comm:mypid()].
 get_proc_in_vms(Proc) ->

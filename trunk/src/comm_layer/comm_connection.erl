@@ -39,16 +39,17 @@
 -export([]).% send/3 , open_new/4, new/3, open_new_async/4]).
 
 -type state() ::
-    {DestIP            :: inet:ip_address(),
-     DestPort          :: comm_server:tcp_port(),
-     LocalListenPort   :: comm_server:tcp_port(),
-     Socket            :: inet:socket() | notconnected,
-     StartTime         :: util:time(),
-     SentMsgCount      :: non_neg_integer(),
-     ReceivedMsgCount  :: non_neg_integer(),
-     MsgQueue          :: [{DestPid::pid(), Message::comm:message()}],
-     MsgQueueLen       :: non_neg_integer(),
-     DesiredBundleSize :: non_neg_integer()}.
+    {DestIP               :: inet:ip_address(),
+     DestPort             :: comm_server:tcp_port(),
+     LocalListenPort      :: comm_server:tcp_port(),
+     Socket               :: inet:socket() | notconnected,
+     StartTime            :: util:time(),
+     SentMsgCount         :: non_neg_integer(),
+     ReceivedMsgCount     :: non_neg_integer(),
+     MsgQueue             :: [{DestPid::pid(), Message::comm:message()}],
+     MsgQueueLen          :: non_neg_integer(),
+     DesiredBundleSize    :: non_neg_integer(),
+     MsgsSinceBundleStart :: non_neg_integer()}.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
