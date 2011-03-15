@@ -104,15 +104,14 @@ on({send, DestPid, Message}, State) ->
             %%reconnect
             set_socket(State, notconnected);
         _ ->
-            {_, MQL} = process_info(self(), message_queue_len),
-            QL = msg_queue_len(State),
-            case QL of
+            case msg_queue_len(State) of
                 0 ->
-                    if MQL > 4 ->
+                    {_, MQL} = process_info(self(), message_queue_len),
+                    if MQL > 5 ->
                             %% start message bundle for sending
                             %% io:format("MQL ~p~n", [MQL]),
                             T1 = set_msg_queue(State, [{DestPid, Message}]),
-                            T2 = set_msg_queue_len(T1, QL + 1),
+                            T2 = set_msg_queue_len(T1, 1),
                             set_desired_bundle_size(T2, util:min(MQL,200));
                        true ->
                             NewSocket =
@@ -121,17 +120,21 @@ on({send, DestPid, Message}, State) ->
                             T1 = set_socket(State, NewSocket),
                             inc_s_msg_count(T1)
                     end;
-                _ ->
-                    case QL >= desired_bundle_size(State) orelse 0 =:= MQL of
+                QL ->
+                    DBS = desired_bundle_size(State),
+                    MSBS = msgs_since_bundle_start(State),
+                    case (QL + MSBS) >= DBS of
                         true ->
                             MQueue = [{DestPid, Message} | msg_queue(State)],
+%%                            io:format("Bundle Size: ~p~n", [length(MQueue)]),
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},
                                      unpack_msg_bundle, MQueue),
                             T1State = set_socket(State, NewSocket),
                             T2State = inc_s_msg_count(T1State),
                             T3State = set_msg_queue(T2State, []),
-                            _T4State = set_msg_queue_len(T3State, 0);
+                            T4State = set_msg_queue_len(T3State, 0),
+                            _T5State = set_msgs_since_bundle_start(T4State,0);
                         false ->
                             %% add to message bundle
                             T1 = set_msg_queue(State, [{DestPid, Message}
@@ -176,7 +179,7 @@ on({tcp, Socket, Data}, State) ->
                 ok = inet:setopts(Socket, [{active, once}]),
                 State
     end,
-    NewState;
+    send_bundle_if_ready(NewState);
 
 on({tcp_closed, Socket}, State) ->
     log:log(warn,"[ CC ] tcp closed info", []),
@@ -202,7 +205,12 @@ on({web_debug_info, Requestor}, State) ->
           lists:flatten(io_lib:format("~p", [r_msg_count(State) / Runtime]))}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
-    State.
+    send_bundle_if_ready(State);
+
+on(UnknownMessage, State) ->
+    %% we want to count messages, so we need this default handler.
+    log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,?MODULE,on,State]),
+    send_bundle_if_ready(State).
 
 -spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message()) ->
                    notconnected | inet:socket();
@@ -273,6 +281,30 @@ new_connection(Address, Port, MyPort) ->
             fail
     end.
 
+send_bundle_if_ready(InState) ->
+    QL = msg_queue_len(InState),
+    case QL of
+        0 -> InState;
+        _ ->
+            State = inc_msgs_since_bundle_start(InState),
+            DBS = desired_bundle_size(State),
+            MSBS = msgs_since_bundle_start(State),
+            case (QL + MSBS) >= DBS of
+                true ->
+                    Socket = socket(State),
+                    %% io:format("Sending packet with ~p msgs~n", [length(msg_queue(State))]),
+                    NewSocket =
+                        send({dest_ip(State), dest_port(State), Socket},
+                             unpack_msg_bundle, msg_queue(State)),
+                    T1State = set_socket(State, NewSocket),
+                    T2State = inc_s_msg_count(T1State),
+                    T3State = set_msg_queue(T2State, []),
+                    T4State = set_msg_queue_len(T3State, 0),
+                    _T5State = set_msgs_since_bundle_start(T4State, 0);
+                false -> State
+            end
+    end.
+
 -spec state_new(DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
                 LocalListenPort::comm_server:tcp_port(),
                 Socket::inet:socket() | notconnected) -> state().
@@ -280,7 +312,7 @@ state_new(DestIP, DestPort, LocalListenPort, Socket) ->
     {DestIP, DestPort, LocalListenPort, Socket,
      _StartTime = erlang:now(), _SentMsgCount = 0,
      _ReceivedMsgCount = 0, _MsgQueue = [], _Len = 0,
-    _DesiredBundleSize = 0}.
+    _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0}.
 
 dest_ip(State)                -> element(1, State).
 dest_port(State)              -> element(2, State).
@@ -298,6 +330,12 @@ msg_queue_len(State)          -> element(9, State).
 set_msg_queue_len(State, Val) -> setelement(9, State, Val).
 desired_bundle_size(State)    -> element(10, State).
 set_desired_bundle_size(State, Val) -> setelement(10, State, Val).
+msgs_since_bundle_start(State) ->
+    element(11, State).
+inc_msgs_since_bundle_start(State) ->
+    setelement(11, State, msgs_since_bundle_start(State) + 1).
+set_msgs_since_bundle_start(State, Val) ->
+    setelement(11, State, Val).
 
 status(State) ->
      case socket(State) of
