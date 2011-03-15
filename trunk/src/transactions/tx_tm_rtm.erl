@@ -33,6 +33,7 @@
 %% public interface for transaction validation using Paxos-Commit.
 -export([commit/4]).
 -export([msg_commit_reply/3]).
+-export([rm_send_update/4]).
 
 %% functions for gen_component module, supervisor callbacks and config
 -export([start_link/2]).
@@ -58,6 +59,18 @@ msg_commit_reply(Client, ClientsID, Result) ->
 commit(TM, Client, ClientsID, TLog) ->
     Msg = {tx_tm_rtm_commit, Client, ClientsID, TLog},
     comm:send_local(TM, Msg).
+
+%% @doc Notifies the tx_tm_rtm of a changed node ID.
+-spec rm_send_update(Subscriber::pid(), Tag::?MODULE,
+                     OldNeighbors::nodelist:neighborhood(),
+                     NewNeighbors::nodelist:neighborhood()) -> ok.
+rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors) ->
+    OldId = node:id(nodelist:node(OldNeighbors)),
+    NewId = node:id(nodelist:node(NewNeighbors)),
+    case OldId =/= NewId of
+        true  -> comm:send_local(Pid, {new_node_id, NewId});
+        false -> ok
+    end.
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname(), any()) -> {ok, pid()}.
@@ -98,13 +111,16 @@ init([]) ->
     %% TableName = pdb:new(?MODULE, [set, private]),
     LAcceptor = get_my(Role, acceptor),
     GLLearner = comm:make_global(get_my(Role, learner)),
-
     %% start getting rtms and maintain them.
     case Role of
         tx_tm ->
             comm:send_local(pid_groups:get_my(dht_node),
                             {get_node_details, comm:this(), [node]}),
             State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner, msg_queue:new()},
+            %% subscribe to id changes
+            rm_loop:subscribe(self(), ?MODULE,
+                              fun rm_loop:subscribe_dneighbor_change_filter/2,
+                              fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, on_init);
         _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner}
     end.
@@ -497,6 +513,10 @@ on({crash, _Pid, _Cookie},
     %%                        end, State, listwithalltids),
     State;
 
+on({new_node_id, Id}, {RTMs, TableName, tx_tm, LAcceptor, GLLearner}) ->
+    IDs = ?RT:get_replica_keys(Id),
+    NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
+    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner};
 %% periodic RTM update
 on({update_RTMs},
    {RTMs, _TableName, tx_tm, _LAcceptor, _GLLearner} = State) ->
@@ -549,6 +569,11 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor},
               {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner}, on);
         _ -> {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages}
     end;
+
+on_init({new_node_id, Id}, {RTMs, TableName, tx_tm, LAcceptor, GLLearner, Queue}) ->
+    IDs = ?RT:get_replica_keys(Id),
+    NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
+    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner, Queue};
 
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg,
         {RTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages} = _State) ->
@@ -713,6 +738,7 @@ rtms_of_same_dht_node(InRTMs) ->
 
 rtm_entry_new(Key, RTMPid, Nth, AccPid) -> {Key, RTMPid, Nth, AccPid}.
 get_rtmkey(RTMEntry) -> element(1, RTMEntry).
+set_rtmkey(RTMEntry, Val) -> setelement(1, RTMEntry, Val).
 get_rtmpid(RTMEntry) -> element(2, RTMEntry).
 get_nth(RTMEntry)    -> element(3, RTMEntry).
 get_accpid(RTMEntry) -> element(4, RTMEntry).
