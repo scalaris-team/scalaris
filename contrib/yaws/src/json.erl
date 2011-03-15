@@ -59,7 +59,6 @@
 %%% syntactically valid JSON floating-point numbers could silently
 %%% lose precision or noisily cause an overflow.  However, most
 %%% other JSON libraries are likely to behave in the same way.
-%%% The encoding precision defaults to 6 digits.
 %%%
 %%% Strings: If we represented JSON string data as Erlang binaries,
 %%% we would have to choose a particular unicode format.  Instead,
@@ -103,7 +102,7 @@ encode(null) -> "null";
 encode(undefined) -> "null";
 encode(B) when is_binary(B) -> encode_string(B);
 encode(I) when is_integer(I) -> integer_to_list(I);
-encode(F) when is_float(F) -> io_lib:format("~g", [F]);
+encode(F) when is_float(F) -> erlang:float_to_list(F);
 encode(L) when is_list(L) ->
     case is_string(L) of
 	yes -> encode_string(L);
