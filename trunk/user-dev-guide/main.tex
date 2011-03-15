@@ -428,12 +428,11 @@ sample file is provided as \code{bin/scalaris.local.cfg.example}. To run
 
 \codefile{scalaris.local.cfg}{../bin/scalaris.local.cfg.example}
 
-\scalaris{} currently distinguishes two different kinds of nodes: (a)
-the boot-server and (b) regular nodes. For the moment, we limit the
-number of boot-servers to exactly one. The remaining nodes are regular
-nodes. The boot-server is contacted to join the system. On all servers,
-the \code{boot_host} option defines the server where the boot server
-is running. In the example, it is an IP address plus a TCP port.
+A \scalaris{} deployment can have a management server and several nodes. The
+management-server is optional and provides a global view on a \scalaris{}
+deployment. On all servers, the \code{mgmt_server} configuration setting
+defines the location of the management server. In the example, it is
+an IP address plus a TCP port and its Erlang internal process name.
 
 \section{Build}
 
@@ -470,9 +469,9 @@ nodes. It seems to work but we make no guarantees.
 \item check that there were no errors during the compilation;
        warnings are fine
 \item go to the bin sub-directory
-\item adapt the path to your Erlang installation in \code{boot.bat},
-       \code{cs_local.bat}, \code{cs_local2.bat} and \code{cs_local3.bat}
-\item run \code{boot.bat} or one of the other start scripts in the cmd window
+\item adapt the path to your Erlang installation in \code{firstnode.bat},
+       \code{joining_node.bat}
+\item run \code{firstnode.bat} or one of the other start scripts in the cmd window
 \end{itemize}
 
 \code{build.bat} will generate a \code{Emakefile} if there is none yet.
@@ -506,43 +505,41 @@ the overlay network. Optionally, the documentation can be build:
 
 \section{Running \scalaris{}}
 
-As mentioned above, in \scalaris{} there are two kinds of nodes:
+As mentioned above, \scalaris{} consists of:
 \begin{itemize}
 \setlength{\itemsep}{0pt}
 \setlength{\parskip}{0pt}
-\item boot servers
+\item management servers and
 \item regular nodes
 \end{itemize}
 
-In every \scalaris{}, at least one boot server is required. It will
-maintain a list of nodes taking part in the system and allows other
-nodes to join the ring. For redundancy, it is also possible to have
-several boot servers. In the future, we want to eliminate this
-distinction, so any node is also a boot-server.
+The management server will maintain a list of nodes taking part in the
+system. A regular node is either the first node in a system or joins an
+existing system deployment.
 
 \subsection{Running on a local machine}
 \label{sec.boot}
 
 Open at least two shells. In the first, inside the \scalaris{} directory,
-start the boot script (\code{boot.bat} on Windows):
+start the first node (\code{firstnode.bat} on Windows):
 \begin{lstlisting}[language=sh]
-%> ./bin/boot.sh
+%> ./bin/firstnode.sh
 \end{lstlisting}
 
-This will start the boot server. On success \url{http://localhost:8000}
-should point to the management interface page of the boot server. The main
-page will show you the number of nodes currently in the system. After a
-couple of seconds a first \scalaris{} should have started in the boot server
-and the number should increase to one. The main page will also allow you to
-store and retrieve key-value pairs but should not be used by applications
-to access \scalaris{}. See Chapter~\sieheref{chapter.apis} for application
-APIs.
+This will start a new \scalaris{} deployment with a single node, including a
+management server. On success \url{http://localhost:8000} should point to
+the management interface page of the management server. The main page will
+show you the number of nodes currently in the system. After a couple of
+seconds a first \scalaris{} should have started and the number should
+increase to one. The main page will also allow you to store and retrieve
+key-value pairs but should not be used by applications to access
+\scalaris{}. See Chapter~\sieheref{chapter.apis} for application APIs.
 
-%The boot server should show output similar to the following, when
+%The management server should show output similar to the following, when
 %starting the first \scalaris{} nodes. The first line is printed when
 %the \scalaris{} is spawned. Afterwards it will try to connect the
-%boot server. When the third line is printed, it managed to contact the
-%boot server and joined the ring. In this case, it was the first node
+%management server. When the third line is printed, it managed to contact the
+%management server and joined the ring. In this case, it was the first node
 %in the ring.
 %\begin{lstlisting}
 %[ I | Node   | <0.97.0> ] joining "23947834870"
@@ -553,53 +550,54 @@ APIs.
 In a second shell, you can now start a second \scalaris{} node. This
 will be a `regular server':
 \begin{lstlisting}[language=sh]
-%> ./bin/cs_local.sh
+%> ./bin/joining_node.sh
 \end{lstlisting}
 
-The second node will read the configuration file and use this
-information to contact the boot server and join the ring. The
-number of nodes on the web page should have increased to two by now.
+The second node will read the configuration file and use this information to
+contact the management server and will join the ring by contacting the known
+hosts. The number of nodes on the web page should have increased to two by
+now.
 
 Optionally, a third and fourth node can be started on the same
 machine. In a third shell:
 \begin{lstlisting}[language=sh]
-%> ./bin/cs_local2.sh
+%> ./bin/joining_node.sh 2
 \end{lstlisting}
 
 
 In a fourth shell:
 \begin{lstlisting}[language=sh]
-%> ./bin/cs_local3.sh
+%> ./bin/joining_node.sh 3
 \end{lstlisting}
 
+This will add two further nodes to the deployment. The number passed to the
+\code{./bin/joining_node.sh} script is the local id of the started node. The
+web pages at \url{http://localhost:8000} should show the additional nodes.
 
-This will add 3 nodes to the network. The web pages at
-\url{http://localhost:8000} should show the additional nodes.
-
-On linux you can also use the \code{scalarisctl} script to start boot and
-`regular' nodes.
+On linux you can also use the \code{scalarisctl} script to start a
+management server and `regular' nodes directly.
 
 \subsection{Running distributed}
 
 \scalaris{} can be installed on other machines in the same way as
 described in Section~\ref{sec:install}. In the default configuration,
-nodes will look for the boot server on \code{localhost} on port 14195. You
+nodes will look for the management server on \code{localhost} on port 14195. You
 should create a \code{scalaris.local.cfg} pointing to the node running
-the boot server.
+the management server.
 
 \begin{lstlisting}[language=erlang]
 % Insert the appropriate IP-addresses for your setup
 % as comma separated integers:
-% IP Address, Port, and label of the boot server
-{boot_host, {{127,0,0,1},14195,boot}}.
+% IP Address, Port, and label of the management server
+{mgmt_server, {{127,0,0,1},14195,mgmt_server}}.
 \end{lstlisting}
 
-If you are using the default configuration on the boot server it will
+If you are using the default configuration on the management server it will
 listen on port 14195 and you only have to change the IP address in the
-configuration file. Otherwise the other nodes will not find the boot
+configuration file. Otherwise the other nodes will not find the management
 server. On the remote nodes, you only need to call
-\code{./cs_local.sh} and they will automatically contact the
-configured boot server.
+\code{./bin/joining_node.sh} and they will automatically contact the
+configured management server.
 
 %\subsection{Running on PlanetLab}
 
@@ -610,11 +608,11 @@ configured boot server.
 \section{Installation}
 \label{sec:install}
 
-For simple tests, you do not need to install \scalaris{}. You can run
-it directly from the source directory. Note: \code{make install} will
-install scalaris into \code{/usr/local} and place \code{scalarisctl}
-into \code{/usr/local/bin}. But is more convenient to build an RPM and
-install it.
+For simple tests, you do not need to install \scalaris{}. You can run it
+directly from the source directory. Note: \code{make install} will install
+scalaris into \code{/usr/local} and place \code{scalarisctl} into
+\code{/usr/local/bin}, by default. But it is more convenient to build an RPM
+and install it.
 
 \begin{lstlisting}{language=sh}
 svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
@@ -623,7 +621,7 @@ cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
 rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
 \end{lstlisting}
 
-Your source and binary RPM will be generated in
+Your source and binary RPMs will be generated in
 \code{/usr/src/packages/SRPMS} and \code{RPMS}. We build RPMs and Debs
 using checkouts from svn and provide them using the openSUSE BuildService at
 \url{http://download.opensuse.org/repositories/home:/tschuett/}. Packages
@@ -632,7 +630,7 @@ are available for
 \begin{itemize}
 \item Fedora 9, 10, 11, 12, 13,
 \item Mandriva 2008, 2009, 2009.1, 2010,
-\item openSUSE 11.0, 11.1, 11.2, 11.3, Factory,
+\item openSUSE 11.0, 11.1, 11.2, 11.3, 11.4, Factory,
 \item SLE 10, 11,
 \item CentOS 5.4,
 \item RHEL 5,
@@ -640,8 +638,8 @@ are available for
 \item Ubuntu 9.04, 9.10, 10.04.
 \end{itemize}
 
-Inside those repositories you will also find an erlang package - you don't
-need this if you already have a recent enough erlang version!
+Inside those repositories you will also find an Erlang package - you don't
+need this if you already have a recent enough Erlang version!
 
 \section{Logging}
 \label{sec:logging}
@@ -926,9 +924,9 @@ write(foo, bar)
 read(foo) == bar
 \end{lstlisting}
 
-Per default, the \code{scalaris} script tries to connect to a boot server
-at \code{localhost}. You can change the node it connects to (and further
-connection properties) by adapting the values defined in
+Per default, the \code{scalaris} script tries to connect to a management
+server at \code{localhost}. You can change the node it connects to (and
+further connection properties) by adapting the values defined in
 \code{java-api/scalaris.properties}.
 
 \section{Java API}
@@ -981,9 +979,9 @@ finishes, it will present statistics on failed and successful tests.
 not use UDP at the moment.
 
 \begin{tabular}{ll}
-8000 & HTTP Server on the boot node\\
+8000 & HTTP Server on the first node\\
 8001 & HTTP Server on the other nodes\\
-14195 & Port for inter-node communication (boot server)\\
+14195 & Port for inter-node communication (management server)\\
 14196 & Port for inter-node communication (other nodes)\\
 \end{tabular}
 
@@ -1015,7 +1013,7 @@ firewalls.
 \item Run the testsuites using \code{make test}
 \item Run the java api test using \code{make java-test}
       (\scalaris{} output will be printed if a test fails; if you want to see
-      it during the tests, start a \code{bin/boot.sh} and run the tests by
+      it during the tests, start a \code{bin/firstnode.sh} and run the tests by
       \code{cd java; ant test})
 \item Run the Ruby client by starting Scalaris and running
       \code{cd contrib; ./jsonrpc.rb}
@@ -1040,7 +1038,7 @@ firewalls.
 \item Use etop and look at the total memory size and atoms generated
 \item send processes sleep or kill messages to test certain behaviour (see
   gen\_component.erl
-\item use \code{boot_server:number_of_nodes(). flush().}
+\item use \code{mgmt_server:number_of_nodes(). flush().}
 \item use \code{admin_checkring(). flush().}
 \end{itemize}
 
@@ -1490,18 +1488,18 @@ Introduces transaction processing on top of a Overlay
 \label{chapter.join}
 \svnrev{r1370}
 
-After booting a new \scalaris{}-System as described in
+After starting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
-by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the boot
-process opened~\footnote{Increase the log level to {\tt info} to get
+by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the management
+server opened~\footnote{Increase the log level to {\tt info} to get
 more detailed startup logs. See Section~\sieheref{sec:logging}}.
 
 
 \lstset{language=erlang}
 \begin{lstlisting}
-scalaris> ./bin/boot.sh 
+scalaris> ./bin/firstnode.sh 
 [...]
-(boot@csr-pc9)1> admin:add_nodes(10)
+(firstnode@csr-pc9)1> admin:add_nodes(10)
 \end{lstlisting}
 
 In the following we will trace what this function does in order to add
@@ -1887,7 +1885,7 @@ The directory tree of \scalaris{} is structured as follows:
 \vspace*{1em}
 \begin{tabular}{|r|p{11.5cm}|}
  \hline
- \code{bin} & contains shell scripts needed to work with \scalaris{} (e.g.\ start the boot services, start a node, \dots)\\
+ \code{bin} & contains shell scripts needed to work with \scalaris{} (e.g.\ start the management server, start a node, \dots)\\
  \code{contrib} & necessary third party packages (yaws and log4erl) \\
  \code{doc} & generated Erlang documentation \\
  \code{docroot} & root directory of the node's webserver \\
