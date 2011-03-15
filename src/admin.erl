@@ -177,13 +177,14 @@ number_of_nodes() ->
 %% comm_logger functions
 %%===============================================================================
 get_dump() ->
-    _ = [comm:send(comm:get(admin_server, Server), {get_comm_layer_dump, comm:this()})
-        || Server <- util:get_nodes()],
+    Servers = util:get_proc_in_vms(admin_server),
+    _ = [comm:send(Server, {get_comm_layer_dump, comm:this()})
+         || Server <- Servers],
     %% list({Map, StartTime})
     Dumps = [receive
                  {get_comm_layer_dump_response, Dump} ->
                      Dump
-             end || _ <- util:get_nodes()],
+             end || _ <- Servers],
     StartTime = lists:min([Start || {_, Start} <- Dumps]),
     Keys = lists:usort(lists:flatten([gb_trees:keys(Map) || {Map, _} <- Dumps])),
     {lists:foldl(fun (Tag, Map) ->
