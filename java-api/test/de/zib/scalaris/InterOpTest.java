@@ -40,9 +40,6 @@ import com.ericsson.otp.erlang.OtpErlangObject;
  * @since 3.1
  */
 public class InterOpTest {
-    private static Object lastValue;
-    private static String lastKey;
-    
     private enum Mode { READ, WRITE };
     
     /**
@@ -86,132 +83,113 @@ public class InterOpTest {
             verbose = true;
             ConnectionFactory.getInstance().printProperties();
         }
-        
+
+        String basekey;
+        Mode mode;
         if (line.hasOption("r")) { // read
-            String basekey = line.getOptionValue("read");
-            Main.checkArguments(basekey, options, "r");
-            basekey += "_java";
-            lastKey = null;
-            lastValue = null;
-            try {
-                TransactionSingleOp sc = new TransactionSingleOp();
-                int failed = 0;
-                
-                Mode mode = Mode.READ;
-                failed += read_write_integer(basekey, sc, mode);
-                failed += read_write_long(basekey, sc, mode);
-                failed += read_write_biginteger(basekey, sc, mode);
-                failed += read_write_double(basekey, sc, mode);
-                failed += read_write_string(basekey, sc, mode);
-                failed += read_write_binary(basekey, sc, mode);
-                failed += read_write_list(basekey, sc, mode);
-                failed += read_write_map(basekey, sc, mode);
-                
-                sc.closeConnection();
-                if (failed > 0) {
-                    System.out.println(failed + " number of reads failed.");
-                    System.exit(-1);
-                }
-            } catch (ConnectionException e) {
-                Main.printException("read(" + lastKey + ") failed with connection error", e, verbose);
-            } catch (TimeoutException e) {
-                Main.printException("read(" + lastKey + ") failed with timeout", e, verbose);
-            } catch (NotFoundException e) {
-                Main.printException("read(" + lastKey + ") failed with not found", e, verbose);
-            } catch (UnknownException e) {
-                Main.printException("read(" + lastKey + ") failed with unknown", e, verbose);
-            } catch (AbortException e) {
-                Main.printException("read(" + lastKey + ") failed with abort", e, verbose);
-            }
+            mode = Mode.READ;
+            String[] optionValues = line.getOptionValues("read");
+            Main.checkArguments(optionValues, 2, options, "r");
+            basekey = optionValues[0];
+            String language = optionValues[1];
+            basekey += "_" + language;
         } else if (line.hasOption("w")) { // write
-            String basekey = line.getOptionValue("write");
+            mode = Mode.WRITE;
+            basekey = line.getOptionValue("write");
             Main.checkArguments(basekey, options, "w");
             basekey += "_java";
-            lastKey = null;
-            lastValue = null;
-            try {
-                TransactionSingleOp sc = new TransactionSingleOp();
-                int failed = 0;
-                
-                Mode mode = Mode.WRITE;
-                failed += read_write_integer(basekey, sc, mode);
-                failed += read_write_long(basekey, sc, mode);
-                failed += read_write_biginteger(basekey, sc, mode);
-                failed += read_write_double(basekey, sc, mode);
-                failed += read_write_string(basekey, sc, mode);
-                failed += read_write_binary(basekey, sc, mode);
-                failed += read_write_list(basekey, sc, mode);
-                failed += read_write_map(basekey, sc, mode);
-                
-                sc.closeConnection();
-                if (failed > 0) {
-                    System.out.println(failed + " number of reads failed.");
-                    System.exit(-1);
-                }
-            } catch (ConnectionException e) {
-                Main.printException("write(" + lastKey + ", " + lastValue + ") failed with connection error", e, verbose);
-            } catch (TimeoutException e) {
-                Main.printException("write(" + lastKey + ", " + lastValue + ") failed with timeout", e, verbose);
-            } catch (AbortException e) {
-                Main.printException("write(" + lastKey + ", " + lastValue + ") failed with abort", e, verbose);
-            } catch (UnknownException e) {
-                Main.printException("write(" + lastKey + ", " + lastValue + ") failed with unknown", e, verbose);
-            } catch (NotFoundException e) {
-                Main.printException("write(" + lastKey + ", " + lastValue + ") failed with not_found", e, verbose);
-            }
         } else if (line.hasOption("lh")) { // get local host name
             System.out.println(ConnectionFactory.getLocalhostName());
+            return;
         } else {
             // print help if no other option was given
 //        if (line.hasOption("help")) {
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("scalaris [Options]", getOptions());
+            return;
+        }
+        try {
+            TransactionSingleOp sc = new TransactionSingleOp();
+            int failed = 0;
+            
+            failed += read_write_integer(basekey, sc, mode);
+            failed += read_write_long(basekey, sc, mode);
+            failed += read_write_biginteger(basekey, sc, mode);
+            failed += read_write_double(basekey, sc, mode);
+            failed += read_write_string(basekey, sc, mode);
+            failed += read_write_binary(basekey, sc, mode);
+            failed += read_write_list(basekey, sc, mode);
+            failed += read_write_map(basekey, sc, mode);
+            
+            sc.closeConnection();
+            if (failed > 0) {
+                System.out.println(failed + " number of writes failed.");
+                System.exit(1);
+            }
+        } catch (ConnectionException e) {
+            Main.printException("failed with connection error", e, verbose);
+        } catch (UnknownException e) {
+            Main.printException("failed with unknown", e, verbose);
         }
     }
     
-    private static int read_or_write(TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
-        switch (mode) {
-            case READ:
-                System.out.println("read(" + lastKey + ")");
-                ErlangValue result = sc.read(lastKey);
-                System.out.println("  expected: " + valueToStr(lastValue));
-                System.out.println("  read raw: " + result.value().toString());
-                
-                Object jresult = null;
-                if (lastValue instanceof Integer) {
-                    jresult = result.toInt();
-                } else if (lastValue instanceof Long) {
-                    jresult = result.toLong();
-                } else if (lastValue instanceof BigInteger) {
-                    jresult = result.toBigInt();
-                } else if (lastValue instanceof Double) {
-                    jresult = result.toDouble();
-                } else if (lastValue instanceof String) {
-                    jresult = result.toString();
-                } else if (lastValue instanceof byte[]) {
-                    jresult = result.toBinary();
-                } else if (lastValue instanceof List<?>) {
-                    jresult = result.toList();
-                } else if (lastValue instanceof Map<?, ?>) {
-                    jresult = result.toJSON();
-                }
-                
-                System.out.println(" read java: " + valueToStr(jresult));
-                OtpErlangObject result_exp = new ErlangValue(lastValue).value();
-                OtpErlangObject jresult2 = new ErlangValue(jresult).value();
-                if (jresult2.equals(result_exp) && compare(jresult, lastValue)) {
-                    System.out.println("ok");
+    private static int read_or_write(TransactionSingleOp sc, String key, Object value, Mode mode) {
+        try {
+            switch (mode) {
+                case READ:
+                    System.out.println("read(" + key + ")");
+                    ErlangValue result = sc.read(key);
+                    System.out.println("  expected: " + valueToStr(value));
+                    System.out.println("  read raw: " + result.value().toString());
+
+                    Object jresult = null;
+                    if (value instanceof Integer) {
+                        jresult = result.toInt();
+                    } else if (value instanceof Long) {
+                        jresult = result.toLong();
+                    } else if (value instanceof BigInteger) {
+                        jresult = result.toBigInt();
+                    } else if (value instanceof Double) {
+                        jresult = result.toDouble();
+                    } else if (value instanceof String) {
+                        jresult = result.toString();
+                    } else if (value instanceof byte[]) {
+                        jresult = result.toBinary();
+                    } else if (value instanceof List<?>) {
+                        jresult = result.toList();
+                    } else if (value instanceof Map<?, ?>) {
+                        jresult = result.toJSON();
+                    }
+
+                    System.out.println(" read java: " + valueToStr(jresult));
+                    OtpErlangObject result_exp = new ErlangValue(value).value();
+                    OtpErlangObject jresult2 = new ErlangValue(jresult).value();
+                    if (jresult2.equals(result_exp) && compare(jresult, value)) {
+                        System.out.println("ok");
+                        return 0;
+                    } else {
+                        System.out.println("fail " + jresult2.toString() + " != " + result_exp.toString());
+                        return 1;
+                    }
+                case WRITE:
+                    System.out.println("write(" + key + ", " + valueToStr(value) + ")");
+                    sc.write(key, value);
                     return 0;
-                } else {
-                    System.out.println("fail " + jresult2.toString() + " != " + result_exp.toString());
-                    return 1;
-                }
-            case WRITE:
-                System.out.println("write(" + lastKey + ", " + valueToStr(lastValue) + ")");
-                sc.write(lastKey, lastValue);
-                return 0;
+            }
+        } catch (ConnectionException e) {
+            System.out.println("failed with connection error");
+        } catch (TimeoutException e) {
+            System.out.println("failed with timeout");
+        } catch (AbortException e) {
+            System.out.println("failed with abort");
+        } catch (NotFoundException e) {
+            System.out.println("failed with not_found");
+        } catch (UnknownException e) {
+            System.out.println("failed with unknown");
+            e.printStackTrace();
+        } catch (ClassCastException e) {
+            System.out.println("failed with ClassCastException");
+            e.printStackTrace();
         }
         return 1;
     }
@@ -375,180 +353,210 @@ public class InterOpTest {
         return value_str;
     }
     
-    private static int read_write_integer(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_integer(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_int_0"; lastValue = 0;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_int_0"; value = 0;
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_int_1"; lastValue = 1;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_int_1"; value = 1;
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_int_min"; lastValue = Integer.MIN_VALUE;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_int_max"; lastValue = Integer.MAX_VALUE;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_int_max_div_2"; lastValue = Integer.MAX_VALUE / 2;
-        failed += read_or_write(sc, mode);
+//        lastKey = basekey + "_int_min"; lastValue = Integer.MIN_VALUE;
+        key = basekey + "_int_min"; value = -2147483648;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_int_max"; lastValue = Integer.MAX_VALUE;
+        key = basekey + "_int_max"; value = 2147483647;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_int_max_div_2"; lastValue = Integer.MAX_VALUE / 2;
+        key = basekey + "_int_max_div_2"; value = 2147483647 / 2;
+        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
     
-    private static int read_write_long(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_long(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_long_0"; lastValue = 0l;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_long_0"; value = 0l;
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_long_1"; lastValue = 1l;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_long_min"; lastValue = Long.MIN_VALUE;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_long_max"; lastValue = Long.MAX_VALUE;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_long_max_div_2"; lastValue = Long.MAX_VALUE / 2l;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_long_1"; value = 1l;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_long_min"; lastValue = Long.MIN_VALUE;
+        key = basekey + "_long_min"; value = -9223372036854775808l;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_long_max"; lastValue = Long.MAX_VALUE;
+        key = basekey + "_long_max"; value = 9223372036854775807l;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_long_max_div_2"; lastValue = Long.MAX_VALUE / 2l;
+        key = basekey + "_long_max_div_2"; value = 9223372036854775807l / 2l;
+        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
     
-    private static int read_write_biginteger(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_biginteger(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_bigint_0"; lastValue = new BigInteger("0");
-        failed += read_or_write(sc, mode);
+        key = basekey + "_bigint_0"; value = new BigInteger("0");
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_bigint_1"; lastValue = new BigInteger("1");
-        failed += read_or_write(sc, mode);
+        key = basekey + "_bigint_1"; value = new BigInteger("1");
+        failed += read_or_write(sc, key, value, mode);
+
+        key = basekey + "_bigint_min"; value = new BigInteger("-100000000000000000000");
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_bigint_min"; lastValue = new BigInteger("-100000000000000000000");
-        failed += read_or_write(sc, mode);
+        key = basekey + "_bigint_max"; value = new BigInteger("100000000000000000000");
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_bigint_max"; lastValue = new BigInteger("100000000000000000000");
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_bigint_max_div_2"; lastValue = new BigInteger("-100000000000000000000").divide(new BigInteger("2"));
-        failed += read_or_write(sc, mode);
+        key = basekey + "_bigint_max_div_2"; value = new BigInteger("100000000000000000000").divide(new BigInteger("2"));
+        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
     
-    private static int read_write_double(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_double(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_float_0.0"; lastValue = 0.0;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_float_0.0"; value = 0.0;
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_float_1.5"; lastValue = 1.5;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_float_1.5"; value = 1.5;
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_float_-1.5"; lastValue = -1.5;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_float_min"; lastValue = Double.MIN_VALUE;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_float_max"; lastValue = Double.MAX_VALUE;
-        failed += read_or_write(sc, mode);
-        
-        lastKey = basekey + "_float_max_div_2"; lastValue = Double.MAX_VALUE / 2.0;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_float_-1.5"; value = -1.5;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_float_min"; lastValue = Double.MIN_VALUE;
+        key = basekey + "_float_min"; value = 4.9E-324;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_float_max"; lastValue = Double.MAX_VALUE;
+        key = basekey + "_float_max"; value = 1.7976931348623157E308;
+        failed += read_or_write(sc, key, value, mode);
+
+//        lastKey = basekey + "_float_max_div_2"; lastValue = Double.MAX_VALUE / 2.0;
+        key = basekey + "_float_max_div_2"; value = 1.7976931348623157E308 / 2.0;
+        failed += read_or_write(sc, key, value, mode);
         
         // not supported by OTP:
 //        key = basekey + "_float_neg_inf"; value = Double.NEGATIVE_INFINITY;
-//        sc.write(key, value);
+//        failed += read_or_write(sc, key, value, mode);
 //        key = basekey + "_float_pos_inf"; value = Double.POSITIVE_INFINITY;
-//        sc.write(key, value);
+//        failed += read_or_write(sc, key, value, mode);
 //        key = basekey + "_float_nan"; value = Double.NaN;
-//        sc.write(key, value);
+//        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
     
-    private static int read_write_string(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_string(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_string_empty"; lastValue = "";
-        failed += read_or_write(sc, mode);
+        key = basekey + "_string_empty"; value = "";
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_string_foobar"; lastValue = "foobar";
-        failed += read_or_write(sc, mode);
+        key = basekey + "_string_foobar"; value = "foobar";
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_string_foo\\nbar"; lastValue = "foo\nbar";
-        failed += read_or_write(sc, mode);
+        key = basekey + "_string_foo\\nbar"; value = "foo\nbar";
+        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
     
-    private static int read_write_binary(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_binary(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_byte_empty"; lastValue = new byte[0];
-        failed += read_or_write(sc, mode);
+        key = basekey + "_byte_empty"; value = new byte[0];
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_byte_0"; lastValue = new byte[] {0};
-        failed += read_or_write(sc, mode);
+        key = basekey + "_byte_0"; value = new byte[] {0};
+        failed += read_or_write(sc, key, value, mode);
         
-        lastKey = basekey + "_byte_0123"; lastValue = new byte[] {0, 1, 2, 3};
-        failed += read_or_write(sc, mode);
+        key = basekey + "_byte_0123"; value = new byte[] {0, 1, 2, 3};
+        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
     
-    private static int read_write_list(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_list(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_list_empty"; lastValue = new ArrayList<Object>();
-        failed += read_or_write(sc, mode);
+        key = basekey + "_list_empty"; value = new ArrayList<Object>();
+        failed += read_or_write(sc, key, value, mode);
         
         ArrayList<Integer> list1 = new ArrayList<Integer>();
         list1.add(0); list1.add(1); list1.add(2); list1.add(3);
-        lastKey = basekey + "_list_0_1_2_3"; lastValue = list1;
-        ArrayList<Object> list2 = new ArrayList<Object>();
-        list2.add(0);
-        list2.add("foo");
-        list2.add(1.5);
-        list2.add(new byte[] {0, 1, 2, 3});
-        lastKey = basekey + "_list_0_foo_1.5_<<0123>>"; lastValue = list2;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_list_0_1_2_3"; value = list1;
+        failed += read_or_write(sc, key, value, mode);
+        
+        ArrayList<Integer> list2 = new ArrayList<Integer>();
+        list2.add(0); list2.add(123); list2.add(456); list2.add(65000);
+        key = basekey + "_list_0_123_456_65000"; value = list2;
+        failed += read_or_write(sc, key, value, mode);
+        
+        ArrayList<Integer> list3 = new ArrayList<Integer>();
+        list3.add(0); list3.add(123); list3.add(456); list3.add(0x10ffff);
+        key = basekey + "_list_0_123_456_0x10ffff"; value = list3;
+        failed += read_or_write(sc, key, value, mode);
+        
+        ArrayList<Object> list4 = new ArrayList<Object>();
+        list4.add(0);
+        list4.add("foo");
+        list4.add(1.5);
+        key = basekey + "_list_0_foo_1.5"; value = list4;
+        failed += read_or_write(sc, key, value, mode);
+        
+        ArrayList<Object> list5 = new ArrayList<Object>();
+        list5.add(0);
+        list5.add("foo");
+        list5.add(1.5);
+        list5.add(new byte[] {0, 1, 2, 3});
+        key = basekey + "_list_0_foo_1.5_<<0123>>"; value = list5;
+        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
 
     // Map/JSON:
-    private static int read_write_map(String basekey, TransactionSingleOp sc, Mode mode)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, NotFoundException {
+    private static int read_write_map(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
+        String key;
+        Object value;
         
-        lastKey = basekey + "_map_empty";
-        lastValue = new LinkedHashMap<String, Object>();
-        failed += read_or_write(sc, mode);
+        key = basekey + "_map_empty";
+        value = new LinkedHashMap<String, Object>();
+        failed += read_or_write(sc, key, value, mode);
         
         LinkedHashMap<String, Integer> map1 = new LinkedHashMap<String, Integer>();
         map1.put("x", 0);
         map1.put("y", 1);
-        lastKey = basekey + "_map_x0_y1";
-        lastValue = map1;
+        key = basekey + "_map_x0_y1";
+        value = map1;
+        failed += read_or_write(sc, key, value, mode);
+        
         LinkedHashMap<String, Object> map2 = new LinkedHashMap<String, Object>();
         map2.put("a", 0);
         map2.put("b", "foo");
@@ -561,9 +569,9 @@ public class InterOpTest {
         list1.add(3);
         map2.put("e", list1);
         map2.put("f", map1);
-        lastKey = basekey + "_map_a0_bfoo_c1.5_dfoo<nl>bar_elist0123_fmapx0y1";
-        lastValue = map2;
-        failed += read_or_write(sc, mode);
+        key = basekey + "_map_a0_bfoo_c1.5_dfoo<nl>bar_elist0123_fmapx0y1";
+        value = map2;
+        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
@@ -589,8 +597,8 @@ public class InterOpTest {
         options.addOption(new Option("v", "verbose", false, "print verbose information, e.g. the properties read"));
 
         Option read = new Option("r", "read", true, "read an item");
-        read.setArgName("basekey");
-        read.setArgs(1);
+        read.setArgName("basekey> <language");
+        read.setArgs(2);
         read.setOptionalArg(true);
         group.addOption(read);
 
