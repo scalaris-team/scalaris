@@ -231,6 +231,30 @@ public class ErlangValue {
     }
 
     /**
+     * Converts an {@link OtpErlangObject} to a {@link OtpErlangList} taking
+     * special care if the OTP library converted a list to an
+     * {@link OtpErlangString}.
+     * 
+     * @param value
+     *            the value to convert
+     * 
+     * @return the value as a OtpErlangList
+     * 
+     * @throws ClassCastException
+     *             if the conversion fails
+     */
+    private static OtpErlangList otpObjectToOtpList(OtpErlangObject value)
+            throws ClassCastException {
+        // need special handling if OTP thought that the value is a string
+        if (value instanceof OtpErlangString) {
+            OtpErlangString value_string = (OtpErlangString) value;
+            return new OtpErlangList(value_string.stringValue());
+        } else {
+            return (OtpErlangList) value;
+        }
+    }
+
+    /**
      * Returns a list of mixed Java values (wrapped in {@link ErlangValue}
      * objects) of the wrapped erlang value.
      * 
@@ -241,7 +265,7 @@ public class ErlangValue {
      *                is not supported
      */
     public List<ErlangValue> toList() throws ClassCastException {
-        OtpErlangList list = (OtpErlangList) value;
+        OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<ErlangValue> result = new ArrayList<ErlangValue>(list.arity());
         for (OtpErlangObject i : list) {
             result.add(new ErlangValue(i));
@@ -259,7 +283,7 @@ public class ErlangValue {
      *                is not supported
      */
     public List<Long> toLongList() throws ClassCastException {
-        OtpErlangList list = (OtpErlangList) value;
+        OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<Long> result = new ArrayList<Long>(list.arity());
         for (OtpErlangObject i : list) {
             result.add(((OtpErlangLong) i).longValue());
@@ -277,7 +301,7 @@ public class ErlangValue {
      *                is not supported
      */
     public List<Double> toDoubleList() throws ClassCastException {
-        OtpErlangList list = (OtpErlangList) value;
+        OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<Double> result = new ArrayList<Double>(list.arity());
         for (OtpErlangObject i : list) {
             result.add(((OtpErlangDouble) i).doubleValue());
@@ -295,7 +319,7 @@ public class ErlangValue {
      *                is not supported
      */
     public List<String> toStringList() throws ClassCastException {
-        OtpErlangList list = (OtpErlangList) value;
+        OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<String> result = new ArrayList<String>(list.arity());
         for (OtpErlangObject i : list) {
             result.add(((OtpErlangString) i).stringValue());
@@ -313,7 +337,7 @@ public class ErlangValue {
      *                is not supported
      */
     public List<byte[]> toBinaryList() throws ClassCastException {
-        OtpErlangList list = (OtpErlangList) value;
+        OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<byte[]> result = new ArrayList<byte[]>(list.arity());
         for (OtpErlangObject i : list) {
             result.add(((OtpErlangBinary) i).binaryValue());
@@ -384,16 +408,8 @@ public class ErlangValue {
                     return convertScalarisJSONtoJava_object((OtpErlangList) value_tpl
                             .elementAt(1));
                 } else if (tag.equals(CommonErlangObjects.arrayAtom)) {
-                    // need special handling if OTP thought that the value is a string
-                    OtpErlangObject value_tpl_1 = value_tpl.elementAt(1);
-                    OtpErlangList value_tpl_1_list;
-                    if (value_tpl_1 instanceof OtpErlangString) {
-                        OtpErlangString value_tpl_1_string = (OtpErlangString) value_tpl_1;
-                        value_tpl_1_list = new OtpErlangList(value_tpl_1_string.stringValue());
-                    } else {
-                        value_tpl_1_list = (OtpErlangList) value_tpl_1;
-                    }
-                    return convertScalarisJSONtoJava_array(value_tpl_1_list);
+                    return convertScalarisJSONtoJava_array(
+                            otpObjectToOtpList(value_tpl.elementAt(1)));
                 } else {
                     throw new ClassCastException("unknown JSON tag");
                 }
