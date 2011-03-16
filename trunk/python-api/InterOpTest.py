@@ -14,7 +14,7 @@
 #    limitations under the License.
 
 import Scalaris
-import os
+import os,  sys
 
 def read_or_write(sc,  key,  value,  mode):
     if (mode == 'read'):
@@ -141,7 +141,6 @@ def read_write_map(basekey, sc, mode):
     return failed
 
 if __name__ == "__main__":
-    import sys
     if (sys.argv[1] == "read"):
         basekey = sys.argv[2]
         language = sys.argv[3]
