@@ -91,11 +91,13 @@ public class InterOpTest {
             basekey = optionValues[0];
             String language = optionValues[1];
             basekey += "_" + language;
+            System.out.println("Java-API: reading from " + language);
         } else if (line.hasOption("w")) { // write
             mode = Mode.WRITE;
             basekey = line.getOptionValue("write");
             Main.checkArguments(basekey, options, "w");
             basekey += "_java";
+            System.out.println("Java-API: writing values");
         } else if (line.hasOption("lh")) { // get local host name
             System.out.println(ConnectionFactory.getLocalhostName());
             return;
@@ -118,6 +120,7 @@ public class InterOpTest {
             failed += read_write_binary(basekey, sc, mode);
             failed += read_write_list(basekey, sc, mode);
             failed += read_write_map(basekey, sc, mode);
+            System.out.println();
             
             sc.closeConnection();
             if (failed > 0) {
@@ -126,6 +129,7 @@ public class InterOpTest {
                 } else {
                     System.out.println(failed + " number of reads failed.");
                 }
+                System.out.println();
                 System.exit(1);
             }
         } catch (ConnectionException e) {
