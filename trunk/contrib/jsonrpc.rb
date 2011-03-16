@@ -1,4 +1,17 @@
 #!/usr/bin/ruby
+# Copyright 2008-2011 Zuse Institute Berlin
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
 
 require 'rubygems'
 require 'json'
@@ -21,20 +34,50 @@ def json_call(function, params)
   JSON.parse(res.body)['result']
 end
 
+def _json_encode_value(value)
+  # TODO: encode to base64 if binary
+  return { :type => 'as_is',
+           :value => value }
+end
+
+def _json_decode_value(value)
+  if value['type'] == 'as_bin':
+    # TODO: decode from base64 if binary
+    return value['value']
+  else
+    return value['value']
+  end
+end
+
+def _json_replace_value_in_result(result)
+  if result.has_key?('value')
+    result['value'] = _json_decode_value(result['value'])
+  end
+  return result
+end
+
+def _json_replace_value_in_results(results)
+  results.each do |result|
+    _json_replace_value_in_result(result)
+  end
+end
+
 def test_and_set(key, oldvalue, newvalue)
-  json_call('test_and_set', [key, oldvalue, newvalue])
+  result = json_call('test_and_set', [key, _json_encode_value(oldvalue), _json_encode_value(newvalue)])
+  _json_replace_value_in_result(result)
 end
 
 def read(key)
-  json_call('read', [key])
+  result = json_call('read', [key])
+  _json_replace_value_in_result(result)
 end
 
 def write(key, value)
-  json_call('write', [key, value])
+  json_call('write', [key, _json_encode_value(value)])
 end
 
 def nop(value)
-  json_call('nop', [value])
+  json_call('nop', [_json_encode_value(value)])
 end
 
 def req_list()
@@ -43,12 +86,12 @@ def req_list()
   # first transaction sets two keys and commits
   puts "  Write keyA, KeyB and commit."
   rlist = []
-  rlist[0] = { :write => {'keyA' => 'valueA'} }
-  rlist[1] = { :write => {'keyB' => 'valueB'} }
+  rlist[0] = { :write => {'keyA' => _json_encode_value('valueA')} }
+  rlist[1] = { :write => {'keyB' => _json_encode_value('valueB')} }
   rlist[2] = { :commit => 'commit' }
 
   result = json_call('req_list', [rlist])
-  values = result['results']
+  values = _json_replace_value_in_results(result['results'])
   puts "  Commit was: #{values[2]['value']}."
 
   # second transaction reads two keys and then modifies one of them
@@ -58,17 +101,17 @@ def req_list()
   result = json_call('req_list', [rlist2])
 
   translog = result['tlog']
-  values = result['results']
+  values = _json_replace_value_in_results(result['results'])
 
   puts "  Read key #{values[0]['key']} as: #{values[0]['value']}"
   puts "  Read key #{values[1]['key']} as: #{values[1]['value']}"
 
   puts "  Modify keyA and commit."
   rlist3 = []
-  rlist3[0] = { :write => {'keyA' => 'valueA2'} }
+  rlist3[0] = { :write => {'keyA' => _json_encode_value('valueA2')} }
   rlist3[1] = { :commit => 'commit' }
   result = json_call('req_list', [translog, rlist3])
-  values = result['results']
+  values = _json_replace_value_in_results(result['results'])
 
   puts "  Commit was: #{values[1]['value']}#{values[1]['fail']}, write request was #{values[0]['value']}."
    result = json_call('delete', ["keyA"])
@@ -79,12 +122,12 @@ end
 def req_list2()
   # first transaction sets two keys and commits
   rlist = []
-  rlist[0] = { :write => {'keyA' => 'valueA'} }
-  rlist[1] = { :write => {'keyB' => 'valueB'} }
+  rlist[0] = { :write => {'keyA' => _json_encode_value('valueA')} }
+  rlist[1] = { :write => {'keyB' => _json_encode_value('valueB')} }
   rlist[2] = { :commit => 'commit' }
 
   result = json_call('req_list', [rlist])
-  values = result['results']
+  values = _json_replace_value_in_results(result['results'])
 
   # second transaction reads two keys and then modifies one of them
   rlist2 = []
@@ -93,13 +136,13 @@ def req_list2()
   result = json_call('req_list', [rlist2])
 
   translog = result['tlog']
-  values = result['results']
+  values = _json_replace_value_in_results(result['results'])
 
   rlist3 = []
-  rlist3[0] = { :write => {'keyA' => 'valueA2'} }
+  rlist3[0] = { :write => {'keyA' => _json_encode_value('valueA2')} }
   rlist3[1] = { :commit => 'commit' }
   result = json_call('req_list', [translog, rlist3])
-  values = result['results']
+  values = _json_replace_value_in_results(result['results'])
 
   result = json_call('delete', ["keyA"])
 end

@@ -34,14 +34,17 @@
 
 %% interface for api_tx calls
 % Public Interface
+-type json_value() :: {struct, [{type, string()} %% "as_is", "as_bin"
+                                | {value, client_value()}]}.
+
 -type request() :: {read, client_key()}
-                 | {write, client_key(), client_value()}
+                 | {write, client_key(), json_value()}
                  | {commit}.
 
 -type read_result() ::
         {struct, [{status, string()}       %% "ok", "fail"
                   | {reason, string()}     %% "timeout", "not_found"
-                  | {value, any()} ]}.
+                  | json_value() ]}.
 -type write_result() ::
         {struct, [{status, string()}       %% "ok", "fail"
                   | {reason, string()} ]}. %% "timeout"
@@ -73,15 +76,23 @@ tx_read(Key) ->
     Res = api_tx:read(Key),
     result_to_json(Res).
 
--spec tx_write(client_key(), client_value()) -> commit_result().
+-spec tx_write(client_key(),
+               json_value()) -> commit_result().
 tx_write(Key, Value) ->
-    Res = api_tx:write(Key, Value),
+    Res = api_tx:write(Key, json_to_value(Value)),
     result_to_json(Res).
 
--spec tx_test_and_set(client_key(), client_value(), client_value())
-                     -> commit_result().
+-spec tx_test_and_set(client_key(),
+                      OldValue::json_value(),
+                      NewValue::json_value())
+                     -> commit_result() |
+                        {struct, [{status, string()}  %% "fail"
+                                 | {reason, string()} %% "key_changed", "not_found"
+                                 | json_value() ]}.
 tx_test_and_set(Key, OldValue, NewValue) ->
-    Res = api_tx:test_and_set(Key, OldValue, NewValue),
+    OldRealValue = json_to_value(OldValue),
+    NewRealValue = json_to_value(NewValue),
+    Res = api_tx:test_and_set(Key, OldRealValue, NewRealValue),
     result_to_json(Res).
 
 results_to_json(Results) ->
@@ -93,14 +104,12 @@ result_to_json(Result) ->
      case Result of
          {ok}                       -> [{status, "ok"}];
          {ok, Val}                  -> [{status, "ok"},
-                                        {value, Val}];
+                                        value_to_json(Val)];
          {fail, {key_changed, Val}} -> [{status, "fail"},
                                         {reason, "key_changed"},
-                                        {value,  lists:flatten(
-                                                   io_lib:format("~s", [Val])
-                                                  )}];
-         {fail, Reason}              -> [{status, "fail"},
-                                         {reason, atom_to_list(Reason)}]
+                                        value_to_json(Val)];
+         {fail, Reason}             -> [{status, "fail"},
+                                        {reason, atom_to_list(Reason)}]
      end
     }.
 
@@ -108,7 +117,7 @@ json_to_reqlist(JSON_ReqList) ->
     {array, TmpReqList} = JSON_ReqList,
     [ case Elem of
           {read, Key}                     -> {read, Key};
-          {write, {struct, [{Key, Val}]}} -> {write, atom_to_list(Key), Val};
+          {write, {struct, [{Key, Val}]}} -> {write, atom_to_list(Key), json_to_value(Val)};
           {commit, _}                     -> {commit};
           Any                             -> Any
       end || {struct, [Elem]} <- TmpReqList ].
@@ -118,6 +127,18 @@ tlog_to_json(TLog) ->
 
 json_to_tlog(JsonTLog) ->
     binary_to_term(base64:decode(JsonTLog)).
+
+value_to_json(Value) when is_binary(Value) ->
+    {value, {struct, [{type, "as_bin"}, {value, base64:encode_to_string(Value)}]}};
+value_to_json(Value) ->
+    {value, {struct, [{type, "as_is"}, {value, Value}]}}.
+
+json_to_value({struct, [{type, "as_bin"}, {value, Value}]}) ->
+    base64:decode(Value);
+json_to_value({struct, [{type, "as_is"}, {value, {array, List}}]}) ->
+    List;
+json_to_value({struct, [{type, "as_is"}, {value, Value}]}) ->
+    Value.
 
 %% interface for api_pubsub calls
 -spec pubsub_publish(string(), string()) -> commit_result().
@@ -165,6 +186,6 @@ dht_raw_range_read(From, To) ->
 
 data_to_json(Data) ->
     {array, [ {struct, [{key, Key},
-                        {value, Value},
+                        value_to_json(Value),
                         {version, Version}]} ||
-               {Key, Value, _WriteLock, _ReadLock, Version} <- Data]}.
+              {Key, Value, _WriteLock, _ReadLock, Version} <- Data]}.
