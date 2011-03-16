@@ -74,7 +74,7 @@ class TransactionSingleOp(object):
     # results: {'status': 'ok'} or
     #              {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'} or
     #              {'status': 'fail', 'reason': 'key_changed', 'value': xxx}
-    def test_and_set(self,  key, oldvalue, newvalue):
+    def testAndSet(self,  key, oldvalue, newvalue):
         oldvalue = _json_encode_value(oldvalue)
         newvalue = _json_encode_value(newvalue)
         result = _json_call(self.conn,  self.uri, 'test_and_set', [key, oldvalue, newvalue])
@@ -97,7 +97,7 @@ class TransactionSingleOp(object):
         value = _json_encode_value(value)
         return _json_call(self.conn,  self.uri, 'nop', [value])
     
-    def close_connection(self):
+    def closeConnection(self):
         self.conn.close()
     
     def __del__ (self):
