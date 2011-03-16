@@ -457,13 +457,12 @@ public class Benchmark {
                         transaction.closeConnection();
                     }
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -508,13 +507,12 @@ public class Benchmark {
                     }
                     connection.close();
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -556,13 +554,12 @@ public class Benchmark {
                     }
                     transaction.closeConnection();
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -605,13 +602,12 @@ public class Benchmark {
                         transaction.closeConnection();
                     }
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -656,13 +652,12 @@ public class Benchmark {
                     }
                     connection.close();
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -705,13 +700,12 @@ public class Benchmark {
                     }
                     transaction.closeConnection();
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -754,13 +748,12 @@ public class Benchmark {
                         transaction.closeConnection();
                     }
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -806,13 +799,12 @@ public class Benchmark {
                     }
                     connection.close();
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
@@ -855,13 +847,12 @@ public class Benchmark {
                     }
                     transaction.closeConnection();
                     results[i] = testEnd(transactionsPerTestRun);
-                    if (retry == 2) {
-                        return -1;
-                    } else {
-                        break;
-                    }
+                    break;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    if (retry == 2) {
+                        return -1;
+                    }
                 }
             }
         }
