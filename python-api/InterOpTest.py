@@ -14,6 +14,7 @@
 #    limitations under the License.
 
 import Scalaris
+import os
 
 def read_or_write(sc,  key,  value,  mode):
     if (mode == 'read'):
@@ -146,15 +147,21 @@ if __name__ == "__main__":
         language = sys.argv[3]
         basekey += '_' + language
         mode = 'read'
+        print 'Python-JSON-API: reading from ' + language
     elif (sys.argv[1] == "write"):
         basekey = sys.argv[2]
         basekey += '_json_python'
         mode = 'write'
+        print 'Python-JSON-API: writing values'
     else:
         print 'unknown commands: ' + str(sys.argv)
         sys.exit(1)
     
-    sc = Scalaris.TransactionSingleOp()
+    if 'SCALARIS_JSON_URL' in os.environ:
+        sc = Scalaris.TransactionSingleOp(url = os.environ['SCALARIS_JSON_URL'])
+    else:
+        sc = Scalaris.TransactionSingleOp()
+    
     failed = 0
     failed += read_write_integer(basekey, sc,  mode)
     failed += read_write_long(basekey, sc,  mode)
@@ -164,7 +171,9 @@ if __name__ == "__main__":
     failed += read_write_binary(basekey, sc,  mode)
     failed += read_write_list(basekey, sc,  mode)
     failed += read_write_map(basekey, sc,  mode)
+    print ''
     
     if (failed > 0):
         print str(failed) + ' number of ' + mode + 's failed.'
+        print ''
         sys.exit(1)
