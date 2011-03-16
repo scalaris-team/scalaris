@@ -15,6 +15,8 @@
  */
 package de.zib.scalaris.examples;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.ericsson.otp.erlang.OtpErlangBinary;
@@ -51,11 +53,23 @@ public class FastStringBenchmark extends Benchmark {
      */
     public static void main(String[] args) {
         int testruns = 100;
-        int benchmarks = -1;
-        if (args != null && args.length == 2) {
+        HashSet<Integer> benchmarks = new HashSet<Integer>(10);
+        if (args != null && args.length >= 2) {
             testruns = Integer.parseInt(args[0]);
-            String benchmarks_str = args[1];
-            benchmarks = benchmarks_str.equals("all") ? -1 : Integer.parseInt(benchmarks_str);
+            for (int i = 1; i < Math.min(10, args.length); ++i) {
+                String benchmarks_str = args[i];
+                if (benchmarks_str.equals("all")) {
+                    for (int j = 1; j <= 9; ++j) {
+                        benchmarks.add(j);
+                    }
+                } else {
+                    benchmarks.add(Integer.parseInt(benchmarks_str));
+                }
+            }
+        } else {
+            for (int i = 1; i <= 9; ++i) {
+                benchmarks.add(i);
+            }
         }
         minibench(testruns, benchmarks);
     }
@@ -83,7 +97,7 @@ public class FastStringBenchmark extends Benchmark {
      * @param benchmarks
      *            the benchmarks to run (1-9 or -1 for all benchmarks)
      */
-    public static void minibench(int testruns, int benchmarks) {
+    public static void minibench(int testruns, Set<Integer> benchmarks) {
         long[][] results = getResultArray(3, 3);
         String[] columns;
         String[] rows;
@@ -91,7 +105,7 @@ public class FastStringBenchmark extends Benchmark {
         System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
 
         try {
-            if (benchmarks == -1 || benchmarks == 1) {
+            if (benchmarks.contains(1)) {
                 results[0][0] = 
                     transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -100,7 +114,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 2) {
+            if (benchmarks.contains(2)) {
                 results[1][0] = 
                     transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -109,7 +123,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 3) {
+            if (benchmarks.contains(3)) {
                 results[2][0] = 
                     transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -118,7 +132,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 4) {
+            if (benchmarks.contains(4)) {
                 results[0][1] = 
                     transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transsinglebench_EVBS_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -127,7 +141,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 5) {
+            if (benchmarks.contains(5)) {
                 results[1][1] = 
                     transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transsinglebench_EVBS_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -136,7 +150,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 6) {
+            if (benchmarks.contains(6)) {
                 results[2][1] = 
                     transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transsinglebench_EVBS_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -145,7 +159,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 7) {
+            if (benchmarks.contains(7)) {
                 results[0][2] = 
                     transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transsinglebench_EVFS_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -154,7 +168,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 8) {
+            if (benchmarks.contains(8)) {
                 results[1][2] = 
                     transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transsinglebench_EVFS_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -163,7 +177,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 9) {
+            if (benchmarks.contains(9)) {
                 results[2][2] = 
                     transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transsinglebench_EVFS_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -188,7 +202,7 @@ public class FastStringBenchmark extends Benchmark {
         System.out.println("Benchmark of de.zib.scalaris.Transaction:");
 
         try {
-            if (benchmarks == -1 || benchmarks == 1) {
+            if (benchmarks.contains(1)) {
                 results[0][0] = 
                     transBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -197,7 +211,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 2) {
+            if (benchmarks.contains(2)) {
                 results[1][0] = 
                     transBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -206,7 +220,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 3) {
+            if (benchmarks.contains(3)) {
                 results[2][0] = 
                     transBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -215,7 +229,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 4) {
+            if (benchmarks.contains(4)) {
                 results[0][1] = 
                     transBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transbench_EVBS_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -224,7 +238,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 5) {
+            if (benchmarks.contains(5)) {
                 results[1][1] = 
                     transBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transbench_EVBS_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -233,7 +247,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 6) {
+            if (benchmarks.contains(6)) {
                 results[2][1] = 
                     transBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transbench_EVBS_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -242,7 +256,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 7) {
+            if (benchmarks.contains(7)) {
                 results[0][2] = 
                     transBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transbench_EVFS_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -251,7 +265,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 8) {
+            if (benchmarks.contains(8)) {
                 results[1][2] = 
                     transBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transbench_EVFS_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -260,7 +274,7 @@ public class FastStringBenchmark extends Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 9) {
+            if (benchmarks.contains(9)) {
                 results[2][2] = 
                     transBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transbench_EVFS_3");
                 TimeUnit.SECONDS.sleep(1);
