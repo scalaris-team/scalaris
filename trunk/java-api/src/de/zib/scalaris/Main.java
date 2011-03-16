@@ -16,6 +16,7 @@
 package de.zib.scalaris;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -91,12 +92,24 @@ public class Main {
         if (line.hasOption("minibench")) {
             String[] optionValues = line.getOptionValues("minibench");
             int testruns = 100;
-            int benchmarks = -1;
+            HashSet<Integer> benchmarks = new HashSet<Integer>(10);
             if (optionValues != null) {
                 checkArguments(optionValues, 2, options, "b");
                 testruns = Integer.parseInt(optionValues[0]);
-                String benchmarks_str = optionValues[1];
-                benchmarks = benchmarks_str.equals("all") ? -1 : Integer.parseInt(benchmarks_str);
+                for (int i = 1; i < Math.min(10, optionValues.length); ++i) {
+                    String benchmarks_str = optionValues[i];
+                    if (benchmarks_str.equals("all")) {
+                        for (int j = 1; j <= 9; ++j) {
+                            benchmarks.add(j);
+                        }
+                    } else {
+                        benchmarks.add(Integer.parseInt(benchmarks_str));
+                    }
+                }
+            } else {
+                for (int i = 1; i <= 9; ++i) {
+                    benchmarks.add(i);
+                }
             }
             Benchmark.minibench(testruns, benchmarks);
         } else if (line.hasOption("r")) { // read
@@ -307,9 +320,9 @@ public class Main {
         delete.setOptionalArg(true);
         group.addOption(delete);
 
-        Option bench = new Option("b", "minibench", true, "run selected mini benchmark [1|...|9|all] (default: all benchmarks, 100 test runs)");
-        bench.setArgName("runs> <benchmark");
-        bench.setArgs(2);
+        Option bench = new Option("b", "minibench", true, "run selected mini benchmark(s) [1|...|9|all] (default: all benchmarks, 100 test runs)");
+        bench.setArgName("runs> <benchmarks");
+        bench.setArgs(10);
         bench.setOptionalArg(true);
         group.addOption(bench);
 

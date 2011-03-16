@@ -18,6 +18,7 @@ package de.zib.scalaris;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.ericsson.otp.erlang.OtpErlangBinary;
@@ -80,9 +81,9 @@ public class Benchmark {
      * @param testruns
      *            the number of test runs to execute
      * @param benchmarks
-     *            the benchmarks to run (1-9 or -1 for all benchmarks)
+     *            the benchmarks to run
      */
-    public static void minibench(int testruns, int benchmarks) {
+    public static void minibench(int testruns, Set<Integer> benchmarks) {
         long[][] results = getResultArray(3, 2);
         String[] columns;
         String[] rows;
@@ -90,7 +91,7 @@ public class Benchmark {
         System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
 
         try {
-            if (benchmarks == -1 || benchmarks == 1) {
+            if (benchmarks.contains(1)) {
                 results[0][0] = 
                     transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -99,7 +100,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 2) {
+            if (benchmarks.contains(2)) {
                 results[1][0] = 
                     transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -108,7 +109,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 3) {
+            if (benchmarks.contains(3)) {
                 results[2][0] = 
                     transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -117,7 +118,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 4) {
+            if (benchmarks.contains(4)) {
                 results[0][1] = 
                     transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -126,7 +127,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 5) {
+            if (benchmarks.contains(5)) {
                 results[1][1] = 
                     transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -135,7 +136,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 6) {
+            if (benchmarks.contains(6)) {
                 results[2][1] = 
                     transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -159,7 +160,7 @@ public class Benchmark {
         System.out.println("Benchmark of de.zib.scalaris.Transaction:");
 
         try {
-            if (benchmarks == -1 || benchmarks == 1) {
+            if (benchmarks.contains(1)) {
                 results[0][0] = 
                     transBench1(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -168,7 +169,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 2) {
+            if (benchmarks.contains(2)) {
                 results[1][0] = 
                     transBench2(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -177,7 +178,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 3) {
+            if (benchmarks.contains(3)) {
                 results[2][0] = 
                     transBench3(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -186,7 +187,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 4) {
+            if (benchmarks.contains(4)) {
                 results[0][1] = 
                     transBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -195,7 +196,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 5) {
+            if (benchmarks.contains(5)) {
                 results[1][1] = 
                     transBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -204,7 +205,7 @@ public class Benchmark {
             e.printStackTrace();
         }
         try {
-            if (benchmarks == -1 || benchmarks == 6) {
+            if (benchmarks.contains(6)) {
                 results[2][1] = 
                     transBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_3");
                 TimeUnit.SECONDS.sleep(1);
@@ -227,7 +228,7 @@ public class Benchmark {
         System.out.println("-----");
         System.out.println("Benchmark incrementing an integer key (read+write):");
 
-        if (benchmarks == -1 || benchmarks == 7) {
+        if (benchmarks.contains(7)) {
             try {
                 results[0][0] = transIncrementBench1(testruns, "transbench_inc_1");
                 TimeUnit.SECONDS.sleep(1);
@@ -235,7 +236,7 @@ public class Benchmark {
                 e.printStackTrace();
             }
         }
-        if (benchmarks == -1 || benchmarks == 8) {
+        if (benchmarks.contains(8)) {
             try {
                 results[1][0] = transIncrementBench2(testruns, "transbench_inc_2");
                 TimeUnit.SECONDS.sleep(1);
@@ -243,7 +244,7 @@ public class Benchmark {
                 e.printStackTrace();
             }
         }
-        if (benchmarks == -1 || benchmarks == 9) {
+        if (benchmarks.contains(9)) {
             try {
                 results[2][0] = transIncrementBench3(testruns, "transbench_inc_3");
             } catch (Exception e) {
