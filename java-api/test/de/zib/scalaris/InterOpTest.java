@@ -30,8 +30,6 @@ import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
-import com.ericsson.otp.erlang.OtpErlangObject;
-
 /**
  * Class to test interoperability between the different Scalaris APIs.
  * 
@@ -123,7 +121,11 @@ public class InterOpTest {
             
             sc.closeConnection();
             if (failed > 0) {
-                System.out.println(failed + " number of writes failed.");
+                if (mode == Mode.WRITE) {
+                    System.out.println(failed + " number of writes failed.");
+                } else {
+                    System.out.println(failed + " number of reads failed.");
+                }
                 System.exit(1);
             }
         } catch (ConnectionException e) {
@@ -162,13 +164,11 @@ public class InterOpTest {
                     }
 
                     System.out.println(" read java: " + valueToStr(jresult));
-                    OtpErlangObject result_exp = new ErlangValue(value).value();
-                    OtpErlangObject jresult2 = new ErlangValue(jresult).value();
-                    if (jresult2.equals(result_exp) && compare(jresult, value)) {
+                    if (compare(jresult, value)) {
                         System.out.println("ok");
                         return 0;
                     } else {
-                        System.out.println("fail " + jresult2.toString() + " != " + result_exp.toString());
+                        System.out.println("fail");
                         return 1;
                     }
                 case WRITE:
@@ -529,13 +529,16 @@ public class InterOpTest {
         key = basekey + "_list_0_foo_1.5"; value = list4;
         failed += read_or_write(sc, key, value, mode);
         
-        ArrayList<Object> list5 = new ArrayList<Object>();
-        list5.add(0);
-        list5.add("foo");
-        list5.add(1.5);
-        list5.add(new byte[] {0, 1, 2, 3});
-        key = basekey + "_list_0_foo_1.5_<<0123>>"; value = list5;
-        failed += read_or_write(sc, key, value, mode);
+        // note: we do not support binaries in lists anymore because JSON would
+        // need special handling for each list element which introduces too
+        // much overhead
+//        ArrayList<Object> list5 = new ArrayList<Object>();
+//        list5.add(0);
+//        list5.add("foo");
+//        list5.add(1.5);
+//        list5.add(new byte[] {0, 1, 2, 3});
+//        key = basekey + "_list_0_foo_1.5_<<0123>>"; value = list5;
+//        failed += read_or_write(sc, key, value, mode);
         
         return failed;
     }
