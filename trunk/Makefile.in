@@ -117,6 +117,53 @@ java-test: compile java
 	  true ; \
 	fi
 
+java-bench: compile java
+# replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 0 -n "jbench_boot" \
+	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 85070591730234615865843651857942052864 -n "jbench_node1" \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 170141183460469231731687303715884105728 -n "jbench_node2" \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 255211775190703847597530955573826158592 -n "jbench_node3" \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
+	sleep 5s ; \
+	SCALARIS_JAPI_NODE="jbench_boot@localhost" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
+	./bin/scalarisctl -n "jbench_boot" stop ; \
+	./bin/scalarisctl -n "jbench_node1" stop ; \
+	./bin/scalarisctl -n "jbench_node2" stop ; \
+	./bin/scalarisctl -n "jbench_node3" stop ; \
+	true
+
+java-%:
+	ant -buildfile java-api/build.xml $*
+
+python-bench: compile
+# replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 0 -n "pbench_boot" \
+	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 85070591730234615865843651857942052864 -n "pbench_node1" \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 170141183460469231731687303715884105728 -n "pbench_node2" \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d -k 255211775190703847597530955573826158592 -n "pbench_node3" \
+	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
+	sleep 5s ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)/jsonrpc.yaws" python-api/Benchmark.py $(SCALARIS_BENCHMARKS); \
+	./bin/scalarisctl -n "pbench_boot" stop ; \
+	./bin/scalarisctl -n "pbench_node1" stop ; \
+	./bin/scalarisctl -n "pbench_node2" stop ; \
+	./bin/scalarisctl -n "pbench_node3" stop ; \
+	true
+
 interop-test: compile java java-scalaris.test.compile
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d \
@@ -151,31 +198,6 @@ interop-test: compile java java-scalaris.test.compile
 	  echo "all tests successful" ; \
 	  true ; \
 	fi
-
-java-bench: compile java
-# replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k 0 -n "jbench_boot" \
-	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k 85070591730234615865843651857942052864 -n "jbench_node1" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k 170141183460469231731687303715884105728 -n "jbench_node2" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
-	./bin/scalarisctl -d -k 255211775190703847597530955573826158592 -n "jbench_node3" \
-	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
-	sleep 5s ; \
-	SCALARIS_JAPI_NODE="jbench_boot@localhost" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
-	./bin/scalarisctl -n "jbench_boot" stop ; \
-	./bin/scalarisctl -n "jbench_node1" stop ; \
-	./bin/scalarisctl -n "jbench_node2" stop ; \
-	./bin/scalarisctl -n "jbench_node3" stop ; \
-	true
-
-java-%:
-	ant -buildfile java-api/build.xml $*
 
 clean:
 	-rm -f .make-docs
