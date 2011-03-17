@@ -19,7 +19,7 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown when a delete operation on a scalaris ring fails
+ * Exception that is thrown if a delete operation on a scalaris ring fails
  * because no scalaris node was found.
  * 
  * @author Nico Kruber, kruber@zib.de

@@ -18,9 +18,8 @@ package de.zib.scalaris;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Generic exception that is thrown during read or write operations on a
- * scalaris ring. The reason is anything else but a timeout or not_found. They
- * are handled in {@link TimeoutException} and {@link NotFoundException}.
+ * Generic exception that is thrown during operations on a scalaris ring, e.g.
+ * if an unknown result has been returned.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.2

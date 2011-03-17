@@ -19,8 +19,8 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown when a read operation on a scalaris ring fails
- * because the key did not exist before.
+ * Exception that is thrown if a the commit of a write operation on a
+ * scalaris ring fails.
  * 
  * @author Nico Kruber, kruber@zib.de
  * @version 2.5
