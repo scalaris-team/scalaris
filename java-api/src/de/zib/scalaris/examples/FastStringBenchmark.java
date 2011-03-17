@@ -111,7 +111,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(2)) {
@@ -120,7 +120,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(3)) {
@@ -129,7 +129,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(4)) {
@@ -138,7 +138,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(5)) {
@@ -147,7 +147,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(6)) {
@@ -156,7 +156,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(7)) {
@@ -165,7 +165,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(8)) {
@@ -174,7 +174,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(9)) {
@@ -183,7 +183,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
 
         columns = new String[] {
@@ -208,7 +208,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(2)) {
@@ -217,7 +217,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(3)) {
@@ -226,7 +226,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(4)) {
@@ -235,7 +235,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(5)) {
@@ -244,7 +244,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(6)) {
@@ -253,7 +253,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(7)) {
@@ -262,7 +262,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(8)) {
@@ -271,7 +271,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(9)) {
@@ -280,7 +280,7 @@ public class FastStringBenchmark extends Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
 
         columns = new String[] {

@@ -102,7 +102,8 @@ def minibench(testruns, benchmarks):
                 _transSingleOpBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transsinglebench_B_1")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 2 in benchmarks:
@@ -110,7 +111,8 @@ def minibench(testruns, benchmarks):
                 _transSingleOpBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transsinglebench_B_2")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 3 in benchmarks:
@@ -118,7 +120,8 @@ def minibench(testruns, benchmarks):
                 _transSingleOpBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transsinglebench_B_3")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 4 in benchmarks:
@@ -126,7 +129,8 @@ def minibench(testruns, benchmarks):
                 _transSingleOpBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transsinglebench_S_1")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 5 in benchmarks:
@@ -134,7 +138,8 @@ def minibench(testruns, benchmarks):
                 _transSingleOpBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transsinglebench_S_2")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 6 in benchmarks:
@@ -142,7 +147,8 @@ def minibench(testruns, benchmarks):
                 _transSingleOpBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transsinglebench_S_3")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     _printResults(columns,  rows,  results,  testruns)
     
@@ -158,7 +164,8 @@ def minibench(testruns, benchmarks):
                 _transBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transbench_B_1")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 2 in benchmarks:
@@ -166,7 +173,8 @@ def minibench(testruns, benchmarks):
                 _transBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transbench_B_2")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 3 in benchmarks:
@@ -174,7 +182,8 @@ def minibench(testruns, benchmarks):
                 _transBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transbench_B_3")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 4 in benchmarks:
@@ -182,7 +191,8 @@ def minibench(testruns, benchmarks):
                 _transBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transbench_S_1")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 5 in benchmarks:
@@ -190,7 +200,8 @@ def minibench(testruns, benchmarks):
                 _transBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transbench_S_2")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 6 in benchmarks:
@@ -198,7 +209,8 @@ def minibench(testruns, benchmarks):
                 _transBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transbench_S_3")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     _printResults(columns,  rows,  results,  testruns)
     
@@ -216,7 +228,8 @@ def minibench(testruns, benchmarks):
                 _transIncrementBench1(testruns, "transbench_inc_1")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 8 in benchmarks:
@@ -224,7 +237,8 @@ def minibench(testruns, benchmarks):
                 _transIncrementBench2(testruns, "transbench_inc_2")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     try:
         if 9 in benchmarks:
@@ -232,7 +246,8 @@ def minibench(testruns, benchmarks):
                 _transIncrementBench3(testruns, "transbench_inc_3")
             time.sleep(1)
     except:
-        _printException()
+        # _printException()
+        pass
     
     _printResults(columns,  rows,  results,  testruns)
 
@@ -287,7 +302,7 @@ def _transSingleOpBench1(testruns, value, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -313,7 +328,7 @@ def _transSingleOpBench2(testruns, value, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -338,7 +353,7 @@ def _transSingleOpBench3(testruns, value, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -363,7 +378,7 @@ def _transBench1(testruns, value, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -390,7 +405,7 @@ def _transBench2(testruns, value, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -416,7 +431,7 @@ def _transBench3(testruns, value, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -448,7 +463,7 @@ def _transIncrementBench1(testruns, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -482,7 +497,7 @@ def _transIncrementBench2(testruns, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
@@ -514,7 +529,7 @@ def _transIncrementBench3(testruns, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
-                _printException()
+                # _printException()
                 if (retry == 2):
                     return -1
     return _getAvgSpeed(results)
