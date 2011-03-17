@@ -49,20 +49,20 @@ def _getRandom(size,  type):
         return bytearray(random.randrange(0, 256) for x in range(size))
 
 # Prints a result table.
-def _printResults(results,  testruns):
+def _printResults(columns,  rows,  results,  testruns):
     print 'Test runs: ' + str(testruns) + ', each using ' + str(_transactionsPerTestRun) + ' transactions'
     colLen = 25
     emptyFirstColumn = ''.join([' ']*colLen)
     print emptyFirstColumn + '\tspeed (transactions / second)'
     print emptyFirstColumn, 
     i = 1
-    for chead in results[results.keys()[0]]:
+    for column in columns:
         print '\t(' + str(i) + ')', 
         i += 1
     print ''
-    for row in results.keys():
+    for row in rows:
         print row + ''.join([' ']*(colLen - len(row))),
-        for column in results[row].keys():
+        for column in columns:
             value = results[row][column]
             if (value == -1):
                 print '\tn/a', 
@@ -71,8 +71,8 @@ def _printResults(results,  testruns):
         print ''
     
     i = 1
-    for chead in results[results.keys()[0]]:
-        print '(' + str(i) + ') ' + chead 
+    for column in columns:
+        print '(' + str(i) + ') ' + column 
         i += 1
 
 def _printException():
@@ -87,11 +87,12 @@ def _printException():
 # 2) writing string objects (random data, size = _BENCH_DATA_SIZE)
 # each <testruns> times
 # * first using a new Transaction or TransactionSingleOp for each test,
-# * then using a new Transaction or TransactionSingleOp but re-using a single Connection,
+# * then using a new Transaction or TransactionSingleOp but re-using a single connection,
 # * and finally re-using a single Transaction or TransactionSingleOp object.
 def minibench(testruns, benchmarks):
-    results = _getResultArray(['separate connection',  're-use connection',  're-use object'], 
-                              ['string',  'binary'])
+    rows = ['separate connection',  're-use connection',  're-use object']
+    columns = ['binary', 'string']
+    results = _getResultArray(rows, columns)
     
     print 'Benchmark of TransactionSingleOp:'
     
@@ -143,14 +144,13 @@ def minibench(testruns, benchmarks):
     except:
         _printException()
     
-    _printResults(results,  testruns)
+    _printResults(columns,  rows,  results,  testruns)
     
     
-    results = _getResultArray(['separate connection',  're-use connection',  're-use object'], 
-                              ['string',  'binary'])
+    results = _getResultArray(rows, columns)
     
     print '-----'
-    print 'Benchmark of de.zib.scalaris.Transaction:'
+    print 'Benchmark of Transaction:'
     
     try:
         if 1 in benchmarks:
@@ -200,17 +200,18 @@ def minibench(testruns, benchmarks):
     except:
         _printException()
     
-    _printResults(results,  testruns)
+    _printResults(columns,  rows,  results,  testruns)
     
     
-    results = _getResultArray(['separate connection',  're-use connection',  're-use object'], 
-                              ['read+write'])
+    rows = ['separate connection',  're-use connection',  're-use object']
+    columns = ['read+write']
+    results = _getResultArray(rows, columns)
     
     print '-----'
     print 'Benchmark incrementing an integer key (read+write):'
     
     try:
-        if 1 in benchmarks:
+        if 7 in benchmarks:
             results['separate connection']['read+write'] = \
                 _transIncrementBench1(testruns, "transbench_inc_1")
             time.sleep(1)
@@ -218,7 +219,7 @@ def minibench(testruns, benchmarks):
         _printException()
     
     try:
-        if 2 in benchmarks:
+        if 8 in benchmarks:
             results['re-use connection']['read+write'] = \
                 _transIncrementBench2(testruns, "transbench_inc_2")
             time.sleep(1)
@@ -226,14 +227,14 @@ def minibench(testruns, benchmarks):
         _printException()
     
     try:
-        if 3 in benchmarks:
+        if 9 in benchmarks:
             results['re-use object']['read+write'] = \
                 _transIncrementBench3(testruns, "transbench_inc_3")
             time.sleep(1)
     except:
         _printException()
     
-    _printResults(results,  testruns)
+    _printResults(columns,  rows,  results,  testruns)
 
 # Call this method when a benchmark is started.
 # Sets the time the benchmark was started.
@@ -268,7 +269,7 @@ def _getAvgSpeed(results):
     return avgSpeed
 
 # Performs a benchmark writing objects using a new TransactionSingleOp object for each test.
-# Returns the number of achieved transactions per second
+# Returns the number of achieved transactions per second.
 def _transSingleOpBench1(testruns, value, name):
     key = str(_benchTime) + name
     results = []
@@ -286,409 +287,237 @@ def _transSingleOpBench1(testruns, value, name):
                 results.append(_testEnd(_transactionsPerTestRun))
                 break
             except:
+                _printException()
                 if (retry == 2):
                     return -1
-                _printException()
     return _getAvgSpeed(results)
 
-## Performs a benchmark writing objects using a new
-## {@link TransactionSingleOp} but re-using a single {@link Connection} for
-## each test.
-## 
-## @param <T>
-##            type of the value to write
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static <T> long transSingleOpBench2(int testRuns, T value, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    testBegin();
-#                    Connection connection = ConnectionFactory.getInstance()
-#                    .createConnection();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        TransactionSingleOp transaction = new TransactionSingleOp(connection);
-#                        if (value instanceof OtpErlangObject) {
-#                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
-#                        } else {
-#                            transaction.write(key + i + j, value);
-#                        }
-#                    }
-#                    connection.close();
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#
-#    /**
-## Performs a benchmark writing objects using a single
-## {@link TransactionSingleOp} object for all tests.
-## 
-## @param <T>
-##            type of the value to write
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static <T> long transSingleOpBench3(int testRuns, T value, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    testBegin();
-#                    TransactionSingleOp transaction = new TransactionSingleOp();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        if (value instanceof OtpErlangObject) {
-#                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
-#                        } else {
-#                            transaction.write(key + i + j, value);
-#                        }
-#                    }
-#                    transaction.closeConnection();
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#
-#    /**
-## Performs a benchmark writing objects using a new {@link Transaction} for
-## each test.
-## 
-## @param <T>
-##            type of the value to write
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static <T> long transBench1(int testRuns, T value, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    testBegin();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        Transaction transaction = new Transaction();
-#                        if (value instanceof OtpErlangObject) {
-#                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
-#                        } else {
-#                            transaction.write(key + i + j, value);
-#                        }
-#                        transaction.commit();
-#                        transaction.closeConnection();
-#                    }
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#
-#    /**
-## Performs a benchmark writing objects using a new {@link Transaction} but
-## re-using a single {@link Connection} for each test.
-## 
-## @param <T>
-##            type of the value to write
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static <T> long transBench2(int testRuns, T value, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    testBegin();
-#                    Connection connection = ConnectionFactory.getInstance()
-#                    .createConnection();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        Transaction transaction = new Transaction(connection);
-#                        if (value instanceof OtpErlangObject) {
-#                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
-#                        } else {
-#                            transaction.write(key + i + j, value);
-#                        }
-#                        transaction.commit();
-#                    }
-#                    connection.close();
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#
-#    /**
-## Performs a benchmark writing objects using a single {@link Transaction}
-## object for all tests.
-## 
-## @param <T>
-##            type of the value to write
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static <T> long transBench3(int testRuns, T value, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    testBegin();
-#                    Transaction transaction = new Transaction();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        if (value instanceof OtpErlangObject) {
-#                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
-#                        } else {
-#                            transaction.write(key + i + j, value);
-#                        }
-#                        transaction.commit();
-#                    }
-#                    transaction.closeConnection();
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#
-#    /**
-## Performs a benchmark writing {@link Integer} numbers on a single key and
-## increasing them using a new {@link Transaction} for each test.
-## 
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static long transIncrementBench1(int testRuns, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    String key_i = key + i;
-#                    Transaction tx_init = new Transaction();
-#                    tx_init.write(key_i, 0);
-#                    tx_init.commit();
-#                    tx_init.closeConnection();
-#                    testBegin();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        Transaction transaction = new Transaction();
-#                        int value_old = transaction.read(key_i).toInt();
-#                        transaction.write(key_i, value_old + 1);
-#                        transaction.commit();
-#                        transaction.closeConnection();
-#                    }
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#
-#    /**
-## Performs a benchmark writing {@link Integer} numbers on a single key and
-## increasing them using a new {@link Transaction} but re-using a single
-## {@link Connection} for each test.
-## 
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static long transIncrementBench2(int testRuns, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    String key_i = key + i;
-#                    Transaction tx_init = new Transaction();
-#                    tx_init.write(key_i, 0);
-#                    tx_init.commit();
-#                    tx_init.closeConnection();
-#                    testBegin();
-#                    Connection connection = ConnectionFactory.getInstance()
-#                    .createConnection();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        Transaction transaction = new Transaction(connection);
-#                        int value_old = transaction.read(key_i).toInt();
-#                        transaction.write(key_i, value_old + 1);
-#                        transaction.commit();
-#                    }
-#                    connection.close();
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#
-#    /**
-## Performs a benchmark writing objects using a single {@link Transaction}
-## object for all tests.
-## 
-## @param testRuns
-##            the number of times to write the value
-## @param value
-##            the value to write
-## @param name
-##            the name of the benchmark (will be used as part of the key and
-##            must therefore be unique)
-## 
-## @return the number of achieved transactions per second
-##/
-#    protected static long transIncrementBench3(int testRuns, String name) {
-#        String key = benchTime + name;
-#        long[] results = new long[testRuns];
-#
-#        for (int i = 0; i < testRuns; ++i) {
-#            for (int retry = 0; retry < 3; ++retry) {
-#                try {
-#                    String key_i = key + i;
-#                    Transaction tx_init = new Transaction();
-#                    tx_init.write(key_i, 0);
-#                    tx_init.commit();
-#                    tx_init.closeConnection();
-#                    testBegin();
-#                    Transaction transaction = new Transaction();
-#                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-#                        int value_old = transaction.read(key_i).toInt();
-#                        transaction.write(key_i, value_old + 1);
-#                        transaction.commit();
-#                    }
-#                    transaction.closeConnection();
-#                    results[i] = testEnd(transactionsPerTestRun);
-#                    if (retry == 2) {
-#                        return -1;
-#                    } else {
-#                        break;
-#                    }
-#                } catch (Exception e) {
-#                    e.printStackTrace();
-#                }
-#            }
-#        }
-#
-#        return getAvgSpeed(results);
-#    }
-#}
+# Performs a benchmark writing objects using a new TransactionSingleOp but
+# re-using a single connection for each test.
+# Returns the number of achieved transactions per second.
+def _transSingleOpBench2(testruns, value, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                _testBegin()
+                conn = Scalaris.getConnection(Scalaris.default_url)
+                
+                for j in range(_transactionsPerTestRun):
+                    tx = Scalaris.TransactionSingleOp(Scalaris.default_url,  conn)
+                    tx.write(key + str(i) + str(j),  value)
+                
+                conn.close()
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
 
+# Performs a benchmark writing objects using a single TransactionSingleOp
+# object for all tests.
+# Returns the number of achieved transactions per second.
+def _transSingleOpBench3(testruns, value, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                _testBegin()
+                tx = Scalaris.TransactionSingleOp()
+                
+                for j in range(_transactionsPerTestRun):
+                    tx.write(key + str(i) + str(j),  value)
+                
+                tx.closeConnection()
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
+
+# Performs a benchmark writing objects using a new Transaction for each test.
+# Returns the number of achieved transactions per second.
+def _transBench1(testruns, value, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                _testBegin()
+                
+                for j in range(_transactionsPerTestRun):
+                    tx = Scalaris.Transaction()
+                    tx.write(key + str(i) + str(j),  value)
+                    tx.commit()
+                    tx.closeConnection()
+                
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
+
+# Performs a benchmark writing objects using a new Transaction but re-using a
+# single connection for each test.
+# Returns the number of achieved transactions per second.
+def _transBench2(testruns, value, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                _testBegin()
+                conn = Scalaris.getConnection(Scalaris.default_url)
+                
+                for j in range(_transactionsPerTestRun):
+                    tx = Scalaris.Transaction(Scalaris.default_url,  conn)
+                    tx.write(key + str(i) + str(j),  value)
+                    tx.commit()
+                
+                conn.close()
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
+
+# Performs a benchmark writing objects using a single Transaction object
+# for all tests.
+# Returns the number of achieved transactions per second.
+def _transBench3(testruns, value, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                _testBegin()
+                tx = Scalaris.Transaction()
+                
+                for j in range(_transactionsPerTestRun):
+                    tx.write(key + str(i) + str(j),  value)
+                    tx.commit()
+                
+                tx.closeConnection()
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
+
+# Performs a benchmark writing integer numbers on a single key and
+# increasing them using a new Transaction for each test.
+# Returns the number of achieved transactions per second.
+def _transIncrementBench1(testruns, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                key_i = key + str(i)
+                tx_init = Scalaris.Transaction()
+                tx_init.write(key_i, 0);
+                tx_init.commit();
+                tx_init.closeConnection();
+                _testBegin()
+                
+                for j in range(_transactionsPerTestRun):
+                    tx = Scalaris.Transaction()
+                    value_old = tx.read(key_i)
+                    tx.write(key_i, value_old + 1)
+                    tx.commit();
+                    tx.closeConnection();
+                
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
+
+# Performs a benchmark writing integer numbers on a single key and
+# increasing them using a new Transaction but re-using a single
+# connection for each test.
+# Returns the number of achieved transactions per second.
+def _transIncrementBench2(testruns, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                key_i = key + str(i)
+                tx_init = Scalaris.Transaction()
+                tx_init.write(key_i, 0);
+                tx_init.commit();
+                tx_init.closeConnection();
+                _testBegin()
+                conn = Scalaris.getConnection(Scalaris.default_url)
+                
+                for j in range(_transactionsPerTestRun):
+                    tx = Scalaris.Transaction(Scalaris.default_url,  conn)
+                    value_old = tx.read(key_i)
+                    tx.write(key_i, value_old + 1)
+                    tx.commit();
+                
+                conn.close()
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
+
+# Performs a benchmark writing objects using a single Transaction
+# object for all tests.
+# Returns the number of achieved transactions per second.
+def _transIncrementBench3(testruns, name):
+    key = str(_benchTime) + name
+    results = []
+    
+    for i in range(testruns):
+        for retry in range(3):
+            try:
+                key_i = key + str(i)
+                tx_init = Scalaris.Transaction()
+                tx_init.write(key_i, 0);
+                tx_init.commit();
+                tx_init.closeConnection();
+                _testBegin()
+                tx = Scalaris.Transaction()
+                
+                for j in range(_transactionsPerTestRun):
+                    value_old = tx.read(key_i)
+                    tx.write(key_i, value_old + 1)
+                    tx.commit();
+                    
+                tx.closeConnection();
+                results.append(_testEnd(_transactionsPerTestRun))
+                break
+            except:
+                _printException()
+                if (retry == 2):
+                    return -1
+    return _getAvgSpeed(results)
 
 if __name__ == "__main__":
     if (len(sys.argv) == 1):

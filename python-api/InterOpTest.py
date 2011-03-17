@@ -17,22 +17,20 @@ import Scalaris
 import os,  sys
 
 def read_or_write(sc,  key,  value,  mode):
-    if (mode == 'read'):
-        print 'read(' + key + ')'
-        print '  expected: ' + repr(value)
-        res = sc.read(key)
-        if (res['status'] == 'ok'):
-            print '  read raw: ' + repr(res['value'])
+    try:
+        if (mode == 'read'):
+            print 'read(' + key + ')'
+            print '  expected: ' + repr(value)
+            actual = sc.read(key)
+            print '  read raw: ' + repr(actual)
             # if the expected value is a list, the returned value could by (mistakenly) a string if it is a list of integers
             # -> convert such a string to a list
             if (type(value).__name__=='list'):
                 try:
-                    actual = Scalaris.str_to_list(res['value'])
+                    actual = Scalaris.str_to_list(actual)
                 except:
                     print 'fail'
                     return 1
-            else:
-                 actual = res['value']
             print '   read py: ' + repr(actual)
             if (actual == value):
                 print 'ok'
@@ -40,13 +38,28 @@ def read_or_write(sc,  key,  value,  mode):
             else:
                 print 'fail'
                 return 1
-        else:
-            print 'read(' + key + ') failed with ' + res['reason']
-            return 1
-    elif (mode == 'write'):
-        print 'write(' + key + ', ' + repr(value)+ ')'
-        sc.write(key,  value)
-        return 0
+        elif (mode == 'write'):
+            print 'write(' + key + ', ' + repr(value)+ ')'
+            sc.write(key,  value)
+            return 0
+    except Scalaris.ConnectionException,  (instance):
+        print 'failed with connection error'
+        return 1
+    except Scalaris.TimeoutException,  (instance):
+        print 'failed with timeout'
+        return 1
+    except Scalaris.AbortException,  (instance):
+        print 'failed with abort'
+        return 1
+    except Scalaris.NotFoundException,  (instance):
+        print 'failed with not_found'
+        return 1
+    except Scalaris.UnknownException,  (instance):
+        print 'failed with unknown: ' + str(instance)
+        return 1
+    except Exception,  (instance):
+        print 'failed with ' + str(instance)
+        return 1
 
 def read_write_integer(basekey, sc, mode):
     failed = 0;
