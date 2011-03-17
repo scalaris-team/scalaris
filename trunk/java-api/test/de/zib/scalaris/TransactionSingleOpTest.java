@@ -83,6 +83,19 @@ public class TransactionSingleOpTest {
         TransactionSingleOp conn = new TransactionSingleOp(ConnectionFactory.getInstance().createConnection("test"));
         conn.closeConnection();
     }
+    
+    /**
+     * Test method for {@link TransactionSingleOp#closeConnection()} trying to
+     * close the connection twice.
+     * 
+     * @throws UnknownException
+     * @throws ConnectionException
+     */
+    public void testDoubleClose() throws ConnectionException {
+        TransactionSingleOp conn = new TransactionSingleOp();
+        conn.closeConnection();
+        conn.closeConnection();
+    }
 
     /**
      * Test method for {@link TransactionSingleOp#read(String)}.
