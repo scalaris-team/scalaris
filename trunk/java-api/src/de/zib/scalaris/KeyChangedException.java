@@ -19,7 +19,7 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown when a test_and_set operation on a scalaris ring
+ * Exception that is thrown if a test_and_set operation on a scalaris ring
  * fails because the old value did not match the expected value.
  * 
  * Contains the old value stored in scalaris.

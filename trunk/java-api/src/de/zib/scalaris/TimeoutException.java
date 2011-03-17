@@ -19,7 +19,7 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown when a read or write operation on a scalaris ring
+ * Exception that is thrown if a read or write operation on a scalaris ring
  * fails due to a timeout.
  * 
  * @author Nico Kruber, kruber@zib.de

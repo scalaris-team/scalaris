@@ -19,8 +19,8 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown when a read operation on a scalaris ring fails
- * because the connection is not active or a communication error occurred or an
+ * Exception that is thrown if an operation on a scalaris ring fails
+ * because the connection is not active, a communication error occurred, an
  * exit signal was received or the remote node sent a message containing an
  * invalid cookie.
  * 
