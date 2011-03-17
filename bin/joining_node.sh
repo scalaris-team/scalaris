@@ -17,7 +17,8 @@
 ID=1
 
 if [ 1 == $# ]; then
-    ID=$1;
+    ID=$1
+    shift;
 fi
 NAME="node$ID"
 CSPORT=$((14195+$ID))
