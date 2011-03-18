@@ -40,21 +40,21 @@
 new(TableName, _Params) ->
     TableName.
 
--spec get(term(), atom()) -> tuple() | undefined.
+-spec get(term(), tableid()) -> tuple() | undefined.
 get(Key, _TableName) ->
     erlang:get(Key).
 
--spec set(tuple(), atom()) -> ok.
+-spec set(tuple(), tableid()) -> ok.
 set(NewTuple, _TableName) ->
     erlang:put(element(1, NewTuple), NewTuple),
     ok.
 
--spec delete(term(), atom()) -> ok.
+-spec delete(term(), tableid()) -> ok.
 delete(Key, _TableName) ->
     erlang:erase(Key),
     ok.
 
--spec tab2list(atom()) -> [term()].
+-spec tab2list(tableid()) -> [term()].
 tab2list(_TableName) ->
     [ X || {_,X} <- erlang:get()].
 
