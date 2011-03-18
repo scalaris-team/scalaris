@@ -31,14 +31,14 @@
 
 -export([start_link/1, init/1, on/2]).
 -export([send/2, tcp_options/0]).
--export([unregister_connection/2, register_connection/4,
+-export([unregister_connection/3, register_connection/5,
         set_local_address/2, get_local_address_port/0]).
 
 -type tcp_port() :: 0..65535.
 -type message() ::
     {comm_server_create_connection, Address::inet:ip_address(), Port::tcp_port(), ClientPid::pid()} | 
-    {unregister_conn, Address::inet:ip_address(), Port::tcp_port(), Client::pid()} | 
-    {register_conn, Address::inet:ip_address(), Port::tcp_port(), Pid::pid(), Socket::inet:socket(), Client::pid()} | 
+    {unregister_conn, Address::inet:ip_address(), Port::tcp_port(), Type::'send' | 'rcv', Client::pid()} | 
+    {register_conn, Address::inet:ip_address(), Port::tcp_port(), Type::'send' | 'rcv', Pid::pid(), Socket::inet:socket(), Client::pid()} | 
     {set_local_address, Address::inet:ip_address(), Port::tcp_port(), Client::pid()}.
 
 %% be startable via supervisor, use gen_component
@@ -70,8 +70,8 @@ tcp_options() ->
 -spec send({inet:ip_address(), tcp_port(), pid()}, term()) -> ok.
 send({Address, Port, Pid}, Message) ->
     ConnPid =
-        case ets:lookup(?MODULE, {Address, Port}) of
-            [{{Address, Port}, X}] -> X;
+        case ets:lookup(?MODULE, {Address, Port, 'send'}) of
+            [{{Address, Port, 'send'}, X}] -> X;
             [] ->
                 %% start Erlang process responsible for the connection
                 ?MODULE ! {comm_server_create_connection,
@@ -82,15 +82,15 @@ send({Address, Port, Pid}, Message) ->
     ConnPid ! {send, Pid, Message},
     ok.
 
--spec unregister_connection(inet:ip_address(), tcp_port()) -> ok.
-unregister_connection(Adress, Port) ->
-    ?MODULE ! {unregister_conn, Adress, Port, self()},
+-spec unregister_connection(inet:ip_address(), tcp_port(), Type::'send' | 'rcv') -> ok.
+unregister_connection(Adress, Port, Type) ->
+    ?MODULE ! {unregister_conn, Adress, Port, Type, self()},
     receive {unregister_conn_done} ->  ok end.
 
--spec register_connection(inet:ip_address(), tcp_port(),
+-spec register_connection(inet:ip_address(), tcp_port(), Type::'send' | 'rcv',
                           pid(), inet:socket()) -> ok.
-register_connection(Adress, Port, Pid, Socket) ->
-    ?MODULE ! {register_conn, Adress, Port, Pid, Socket, self()},
+register_connection(Adress, Port, Type, Pid, Socket) ->
+    ?MODULE ! {register_conn, Adress, Port, Type, Pid, Socket, self()},
     receive {register_conn_done} -> ok end.
 
 -spec set_local_address(inet:ip_address() | undefined, tcp_port()) -> ok.
@@ -120,24 +120,24 @@ get_local_address_port() ->
 %% @doc message handler
 -spec on(message(), State::null) -> null.
 on({comm_server_create_connection, Address, Port, ClientPid}, State) ->
-    case ets:lookup(?MODULE, {Address, Port}) of
+    case ets:lookup(?MODULE, {Address, Port, 'send'}) of
         [] ->
             {ok, Pid} = comm_connection:start_link(pid_groups:my_groupname(),
                                                    Address, Port),
-            ets:insert(?MODULE, {{Address, Port}, Pid});
+            ets:insert(?MODULE, {{Address, Port, 'send'}, Pid});
         [{_, Pid}] -> ok
     end,
     ClientPid ! {comm_server_create_connection_done, Pid},
     State;
 
-on({unregister_conn, Address, Port, Client}, State) ->
-    ets:delete(?MODULE, {Address, Port}),
+on({unregister_conn, Address, Port, Type, Client}, State) ->
+    ets:delete(?MODULE, {Address, Port, Type}),
     Client ! {unregister_conn_done},
     State;
 
-on({register_conn, Address, Port, Pid, _Socket, Client}, State) ->
-    case ets:lookup(?MODULE, {Address, Port}) of
-        [] -> ets:insert(?MODULE, {{Address, Port}, Pid});
+on({register_conn, Address, Port, Type, Pid, _Socket, Client}, State) ->
+    case ets:lookup(?MODULE, {Address, Port, Type}) of
+        [] -> ets:insert(?MODULE, {{Address, Port, Type}, Pid});
         _ -> ok
     end,
     Client ! {register_conn_done},
