@@ -36,7 +36,7 @@
 
 -type tcp_port() :: 0..65535.
 -type message() ::
-    {comm_server_create_connection, Address::inet:ip_address(), Port::tcp_port(), ClientPid::pid()} | 
+    {send, Address::inet:ip_address(), Port::tcp_port(), Pid::pid(), Message::comm:message()} |
     {unregister_conn, Address::inet:ip_address(), Port::tcp_port(), Type::'send' | 'rcv', Client::pid()} | 
     {register_conn, Address::inet:ip_address(), Port::tcp_port(), Type::'send' | 'rcv', Pid::pid(), Socket::inet:socket(), Client::pid()} | 
     {set_local_address, Address::inet:ip_address(), Port::tcp_port(), Client::pid()}.
@@ -69,17 +69,7 @@ tcp_options() ->
 
 -spec send({inet:ip_address(), tcp_port(), pid()}, term()) -> ok.
 send({Address, Port, Pid}, Message) ->
-    ConnPid =
-        case ets:lookup(?MODULE, {Address, Port, 'send'}) of
-            [{{Address, Port, 'send'}, X}] -> X;
-            [] ->
-                %% start Erlang process responsible for the connection
-                ?MODULE ! {comm_server_create_connection,
-                           Address, Port, self()},
-                receive {comm_server_create_connection_done, X} -> ok end,
-                X
-    end,
-    ConnPid ! {send, Pid, Message},
+    ?MODULE ! {send, Address, Port, Pid, Message},
     ok.
 
 -spec unregister_connection(inet:ip_address(), tcp_port(), Type::'send' | 'rcv') -> ok.
@@ -119,25 +109,27 @@ get_local_address_port() ->
 
 %% @doc message handler
 -spec on(message(), State::null) -> null.
-on({comm_server_create_connection, Address, Port, ClientPid}, State) ->
-    case ets:lookup(?MODULE, {Address, Port, 'send'}) of
-        [] ->
-            {ok, Pid} = comm_connection:start_link(pid_groups:my_groupname(),
-                                                   Address, Port),
-            ets:insert(?MODULE, {{Address, Port, 'send'}, Pid});
-        [{_, Pid}] -> ok
+on({send, Address, Port, Pid, Message}, State) ->
+    case erlang:get({Address, Port, 'send'}) of
+        undefined ->
+            %% start Erlang process responsible for the connection
+            {ok, ConnPid} = comm_connection:start_link(
+                              pid_groups:my_groupname(), Address, Port),
+            erlang:put({Address, Port, 'send'}, ConnPid),
+            Pid;
+        ConnPid -> ok
     end,
-    ClientPid ! {comm_server_create_connection_done, Pid},
+    ConnPid ! {send, Pid, Message},
     State;
 
 on({unregister_conn, Address, Port, Type, Client}, State) ->
-    ets:delete(?MODULE, {Address, Port, Type}),
+    erlang:erase({Address, Port, Type}),
     Client ! {unregister_conn_done},
     State;
 
 on({register_conn, Address, Port, Type, Pid, _Socket, Client}, State) ->
-    case ets:lookup(?MODULE, {Address, Port, Type}) of
-        [] -> ets:insert(?MODULE, {{Address, Port, Type}, Pid});
+    case erlang:get({Address, Port, Type}) of
+        undefined -> erlang:put({Address, Port, Type}, Pid);
         _ -> ok
     end,
     Client ! {register_conn_done},
