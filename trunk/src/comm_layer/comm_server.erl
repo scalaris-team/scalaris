@@ -31,14 +31,11 @@
 
 -export([start_link/1, init/1, on/2]).
 -export([send/2, tcp_options/0]).
--export([unregister_connection/3, register_connection/5,
-        set_local_address/2, get_local_address_port/0]).
+-export([set_local_address/2, get_local_address_port/0]).
 
 -type tcp_port() :: 0..65535.
 -type message() ::
-    {send, Address::inet:ip_address(), Port::tcp_port(), Pid::pid(), Message::comm:message()} |
-    {unregister_conn, Address::inet:ip_address(), Port::tcp_port(), Type::'send' | 'rcv', Client::pid()} | 
-    {register_conn, Address::inet:ip_address(), Port::tcp_port(), Type::'send' | 'rcv', Pid::pid(), Socket::inet:socket(), Client::pid()} | 
+    {send, Address::inet:ip_address(), Port::tcp_port(), Pid::pid(), Message::comm:message()} | 
     {set_local_address, Address::inet:ip_address(), Port::tcp_port(), Client::pid()}.
 
 %% be startable via supervisor, use gen_component
@@ -72,17 +69,6 @@ send({Address, Port, Pid}, Message) ->
     ?MODULE ! {send, Address, Port, Pid, Message},
     ok.
 
--spec unregister_connection(inet:ip_address(), tcp_port(), Type::'send' | 'rcv') -> ok.
-unregister_connection(Adress, Port, Type) ->
-    ?MODULE ! {unregister_conn, Adress, Port, Type, self()},
-    receive {unregister_conn_done} ->  ok end.
-
--spec register_connection(inet:ip_address(), tcp_port(), Type::'send' | 'rcv',
-                          pid(), inet:socket()) -> ok.
-register_connection(Adress, Port, Type, Pid, Socket) ->
-    ?MODULE ! {register_conn, Adress, Port, Type, Pid, Socket, self()},
-    receive {register_conn_done} -> ok end.
-
 -spec set_local_address(inet:ip_address() | undefined, tcp_port()) -> ok.
 set_local_address(Address, Port) ->
     ?MODULE ! {set_local_address, Address, Port, self()},
@@ -110,29 +96,16 @@ get_local_address_port() ->
 %% @doc message handler
 -spec on(message(), State::null) -> null.
 on({send, Address, Port, Pid, Message}, State) ->
-    case erlang:get({Address, Port, 'send'}) of
+    case erlang:get({Address, Port}) of
         undefined ->
             %% start Erlang process responsible for the connection
-            {ok, ConnPid} = comm_connection:start_link(
+            {ok, ConnPid} = comm_conn_send:start_link(
                               pid_groups:my_groupname(), Address, Port),
-            erlang:put({Address, Port, 'send'}, ConnPid),
+            erlang:put({Address, Port}, ConnPid),
             Pid;
         ConnPid -> ok
     end,
     ConnPid ! {send, Pid, Message},
-    State;
-
-on({unregister_conn, Address, Port, Type, Client}, State) ->
-    erlang:erase({Address, Port, Type}),
-    Client ! {unregister_conn_done},
-    State;
-
-on({register_conn, Address, Port, Type, Pid, _Socket, Client}, State) ->
-    case erlang:get({Address, Port, Type}) of
-        undefined -> erlang:put({Address, Port, Type}, Pid);
-        _ -> ok
-    end,
-    Client ! {register_conn_done},
     State;
 
 on({set_local_address, Address, Port, Client}, State) ->
