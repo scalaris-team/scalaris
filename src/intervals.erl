@@ -54,7 +54,7 @@
 -type right_bracket() :: ')' | ']'.
 -type key() :: ?RT:key() | ?MINUS_INFINITY | ?PLUS_INFINITY.
 -type simple_interval() :: {element, key()} | {interval, left_bracket(), key(), key(), right_bracket()} | all.
--opaque interval() :: [simple_interval()]. %todo: make opaque (gives wrong dialyzer warnings with erlang =< R14B)
+-opaque interval() :: [simple_interval()]. %todo: make opaque (gives wrong dialyzer warnings with erlang =&lt; R14B)
 
 % @type interval() = [simple_interval()].
 % [] -> empty interval
