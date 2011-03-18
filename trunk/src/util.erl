@@ -361,7 +361,11 @@ tc(M, F, A) ->
 -spec get_pids_uid() -> pos_integer().
 get_pids_uid() ->
     Result = case erlang:get(pids_uid_counter) of
-                 undefined -> 1;
+                 undefined ->
+                     %% Same pid may be reused in the same VM, so we
+                     %% get a VM unique offset to start
+                     %% It is not completely safe, but safe enough
+                     element(1, erlang:statistics(reductions));
                  Any -> Any + 1
              end,
     erlang:put(pids_uid_counter, Result),
