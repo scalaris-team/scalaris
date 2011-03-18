@@ -51,8 +51,8 @@
 %%%   InitialRound (optional): start with paxos round number (default 1)
 %%%     if InitialRound is 0, a Fast-Paxos is executed
 %%%     InitialRound must be unique for all proposers of a paxosid:
-%%%       1 <= initialRound <= MaxProposers for normal paxos
-%%%       0 <= initialRound < MaxProposers if 1 proposer uses fast paxos
+%%%       1 &lt;= initialRound &lt;= MaxProposers for normal paxos
+%%%       0 &lt;= initialRound &lt; MaxProposers if 1 proposer uses fast paxos
 
 msg_prepare(Dest, ReplyTo, PaxosID, Round) ->
     ?TRACE("Sending proposer_prepare: ~p, ~p~n", [PaxosID, Round]),
