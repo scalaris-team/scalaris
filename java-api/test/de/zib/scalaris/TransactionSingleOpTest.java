@@ -398,7 +398,7 @@ public class TransactionSingleOpTest {
      * Test method for
      * {@link TransactionSingleOp#write(String, List)}
      * and {@link TransactionSingleOp#read(String)}.
-     * Writes strings and uses a distinct key for each value. Tries to read the data afterwards.
+     * Writes lists and uses a distinct key for each value. Tries to read the data afterwards.
      * 
      * @throws UnknownException
      * @throws TimeoutException
@@ -441,7 +441,7 @@ public class TransactionSingleOpTest {
      * Test method for
      * {@link TransactionSingleOp#write(String, List)}
      * and {@link TransactionSingleOp#read(String)}.
-     * Writes strings and uses a single key for all the values. Tries to read the data afterwards.
+     * Writes lists and uses a single key for all the values. Tries to read the data afterwards.
      * 
      * @throws UnknownException
      * @throws TimeoutException
