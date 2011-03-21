@@ -42,22 +42,22 @@ def read_or_write(sc,  key,  value,  mode):
             print 'write(' + key + ', ' + repr(value)+ ')'
             sc.write(key,  value)
             return 0
-    except Scalaris.ConnectionException,  (instance):
+    except Scalaris.ConnectionException as instance:
         print 'failed with connection error'
         return 1
-    except Scalaris.TimeoutException,  (instance):
+    except Scalaris.TimeoutException as instance:
         print 'failed with timeout'
         return 1
-    except Scalaris.AbortException,  (instance):
+    except Scalaris.AbortException as instance:
         print 'failed with abort'
         return 1
-    except Scalaris.NotFoundException,  (instance):
+    except Scalaris.NotFoundException as instance:
         print 'failed with not_found'
         return 1
-    except Scalaris.UnknownException,  (instance):
+    except Scalaris.UnknownException as instance:
         print 'failed with unknown: ' + str(instance)
         return 1
-    except Exception,  (instance):
+    except Exception as instance:
         print 'failed with ' + str(instance)
         return 1
 
@@ -68,7 +68,7 @@ def read_write_integer(basekey, sc, mode):
     failed += read_or_write(sc,  basekey + "_int_1", 1,  mode)
     failed += read_or_write(sc,  basekey + "_int_min",  -2147483648,  mode)
     failed += read_or_write(sc,  basekey + "_int_max", 2147483647,  mode)
-    failed += read_or_write(sc,  basekey + "_int_max_div_2", 2147483647 / 2,  mode)
+    failed += read_or_write(sc,  basekey + "_int_max_div_2", 2147483647 // 2,  mode)
     
     return failed
 
@@ -79,7 +79,7 @@ def read_write_long(basekey, sc, mode):
     failed += read_or_write(sc,  basekey + "_long_1", 1l,  mode)
     failed += read_or_write(sc,  basekey + "_long_min",  -9223372036854775808l,  mode)
     failed += read_or_write(sc,  basekey + "_long_max", 9223372036854775807l,  mode)
-    failed += read_or_write(sc,  basekey + "_long_max_div_2", 9223372036854775807l / 2l,  mode)
+    failed += read_or_write(sc,  basekey + "_long_max_div_2", 9223372036854775807l // 2l,  mode)
     
     return failed
 
@@ -90,7 +90,7 @@ def read_write_biginteger(basekey, sc, mode):
     failed += read_or_write(sc,  basekey + "_bigint_1", 1,  mode)
     failed += read_or_write(sc,  basekey + "_bigint_min",  -100000000000000000000,  mode)
     failed += read_or_write(sc,  basekey + "_bigint_max", 100000000000000000000,  mode)
-    failed += read_or_write(sc,  basekey + "_bigint_max_div_2", 100000000000000000000 / 2,  mode)
+    failed += read_or_write(sc,  basekey + "_bigint_max_div_2", 100000000000000000000 // 2,  mode)
     
     return failed
 
@@ -102,7 +102,7 @@ def read_write_double(basekey, sc, mode):
     failed += read_or_write(sc,  basekey + "_float_-1.5",  -1.5,  mode)
     failed += read_or_write(sc,  basekey + "_float_min", 4.9E-324,  mode)
     failed += read_or_write(sc,  basekey + "_float_max", 1.7976931348623157E308,  mode)
-    failed += read_or_write(sc,  basekey + "_float_max_div_2", 1.7976931348623157E308 / 2,  mode)
+    failed += read_or_write(sc,  basekey + "_float_max_div_2", 1.7976931348623157E308 / 2.0,  mode)
     
     # not supported by erlang:
     #failed += read_or_write(sc,  basekey + "_float_neg_inf", float('-inf'),  mode)

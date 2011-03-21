@@ -39,7 +39,7 @@ def _json_call(conn,  uri,  function, params):
         if (response.status < 200 or response.status >= 300):
             raise ConnectionException(response)
         data = response.read()
-    except socket.timeout,  (instance):
+    except socket.timeout as instance:
         raise ConnectionException(instance)
     #print data
     response_json = json.loads(data)
@@ -157,7 +157,7 @@ class TransactionSingleOp(object):
         if (conn == None):
             try:
                 self._conn = httplib.HTTPConnection(self._uri.hostname,  self._uri.port,  timeout = timeout)
-            except Exception,  (instance):
+            except Exception as instance:
                 raise ConnectionException(instance)
         else:
             self._conn = conn
@@ -202,7 +202,7 @@ class Transaction(object):
         if (conn == None):
             try:
                 self._conn = httplib.HTTPConnection(self._uri.hostname,  self._uri.port,  timeout = timeout)
-            except Exception,  (instance):
+            except Exception as instance:
                 raise ConnectionException(instance)
         else:
             self._conn = conn
@@ -289,7 +289,7 @@ class PubSub(object):
         if (conn == None):
             try:
                 self._conn = httplib.HTTPConnection(self._uri.hostname,  self._uri.port,  timeout = timeout)
-            except Exception,  (instance):
+            except Exception as instance:
                 raise ConnectionException(instance)
         else:
             self._conn = conn
@@ -345,17 +345,17 @@ if __name__ == "__main__":
         key = sys.argv[2]
         try:
             value = sc.read(key)
-            print 'read(' + key + ') = ' + rep(value)
-        except ConnectionException,  (instance):
+            print 'read(' + key + ') = ' + repr(value)
+        except ConnectionException as instance:
             print 'read(' + key + ') failed with connection error'
             sys.exit(1)
-        except TimeoutException,  (instance):
+        except TimeoutException as instance:
             print 'read(' + key + ') failed with timeout'
             sys.exit(1)
-        except NotFoundException,  (instance):
+        except NotFoundException as instance:
             print 'read(' + key + ') failed with not_found'
             sys.exit(1)
-        except UnknownException,  (instance):
+        except UnknownException as instance:
             print 'read(' + key + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (sys.argv[1] == "write"):
@@ -364,15 +364,15 @@ if __name__ == "__main__":
         try:
             sc.write(key,  value)
             print 'write(' + key + ', ' + value + '): ok'
-        except ConnectionException,  (instance):
+        except ConnectionException as instance:
             print 'write(' + key + ', ' + value + ') failed with connection error'
             sys.exit(1)
-        except TimeoutException,  (instance):
+        except TimeoutException as instance:
             print 'write(' + key + ', ' + value + ') failed with timeout'
             sys.exit(1)
-        except AbortException,  (instance):
+        except AbortException as instance:
             print 'write(' + key + ', ' + value + ') failed with abort'
             sys.exit(1)
-        except UnknownException,  (instance):
+        except UnknownException as instance:
             print 'write(' + key + ', ' + value + ') failed with unknown: ' + str(instance)
             sys.exit(1)
