@@ -102,7 +102,7 @@ public class TransactionReadExample {
             for (int i = 0; i < keys.length; ++i) {
                 String key = keys[i];
                 try {
-                    value = transaction.read(key).toString();
+                    value = transaction.read(key).stringValue();
                     System.out.println("      read(" + key + ") == " + value);
                 } catch (ConnectionException e) {
                     System.out.println("      read(" + key + ") failed: "

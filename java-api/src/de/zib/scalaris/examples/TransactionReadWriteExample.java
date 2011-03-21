@@ -513,7 +513,7 @@ public class TransactionReadWriteExample {
         System.out.println("    `String read(String)`...");
         String value;
         try {
-            value = transaction.read(key).toString();
+            value = transaction.read(key).stringValue();
             System.out.println("      read(" + key + ") == " + value);
             return value;
         } catch (ConnectionException e) {

@@ -70,8 +70,8 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpKey;
  *   
  *   TransactionSingleOp sc = new TransactionSingleOp();
- *   String value             = sc.read(key).toString(); // {@link #read(String)}
- *   OtpErlangObject optValue = sc.read(otpKey);         // {@link #read(OtpErlangString)}
+ *   String value             = sc.read(key).stringValue(); // {@link #read(String)}
+ *   OtpErlangObject optValue = sc.read(otpKey);            // {@link #read(OtpErlangString)}
  * </code>
  * </pre>
  * 

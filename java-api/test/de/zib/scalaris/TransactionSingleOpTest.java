@@ -331,7 +331,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             for (int i = 0; i < testData.length; ++i) {
-                String actual = conn.read(testTime + key + i).toString();
+                String actual = conn.read(testTime + key + i).stringValue();
                 assertEquals(testData[i], actual);
             }
         } finally {
@@ -363,7 +363,7 @@ public class TransactionSingleOpTest {
             }
             
             // now try to read the data:
-            String actual = conn.read(testTime + key).toString();
+            String actual = conn.read(testTime + key).stringValue();
             assertEquals(testData[testData.length - 1], actual);
         } finally {
             conn.closeConnection();
@@ -428,7 +428,7 @@ public class TransactionSingleOpTest {
                 ArrayList<String> expected = new ArrayList<String>();
                 expected.add(testData[i]);
                 expected.add(testData[i + 1]);
-                List<String> actual = conn.read(testTime + key + i).toStringList();
+                List<String> actual = conn.read(testTime + key + i).stringListValue();
                 
                 assertEquals(expected, actual);
             }
@@ -468,7 +468,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             
-            List<String> actual = conn.read(testTime + key).toStringList();
+            List<String> actual = conn.read(testTime + key).stringListValue();
             List<String> expected = list;
             
             assertEquals(expected, actual);
@@ -754,7 +754,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             for (int i = 0; i < testData.length - 1; i += 2) {
-                assertEquals(testData[i + 1], conn.read(testTime + key + i).toString());
+                assertEquals(testData[i + 1], conn.read(testTime + key + i).stringValue());
             }
         } finally {
             conn.closeConnection();
@@ -803,7 +803,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             for (int i = 0; i < testData.length - 1; i += 2) {
-                assertEquals(testData[i], conn.read(testTime + key + i).toString());
+                assertEquals(testData[i], conn.read(testTime + key + i).stringValue());
             }
         } finally {
             conn.closeConnection();
@@ -911,7 +911,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             for (int i = 0; i < testData.length - 1; i += 2) {
-                List<String> actual = conn.read(testTime + key + i).toStringList();
+                List<String> actual = conn.read(testTime + key + i).stringListValue();
                 ArrayList<String> expected = new ArrayList<String>();
                 expected.add(testData[i + 1]);
                 expected.add(testData[i]);
@@ -971,7 +971,7 @@ public class TransactionSingleOpTest {
             
             // now try to read the data:
             for (int i = 0; i < testData.length - 1; i += 2) {
-                List<String> actual = conn.read(testTime + key + i).toStringList();
+                List<String> actual = conn.read(testTime + key + i).stringListValue();
                 ArrayList<String> expected = new ArrayList<String>();
                 expected.add(testData[i]);
                 expected.add(testData[i + 1]);

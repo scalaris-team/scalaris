@@ -253,7 +253,7 @@ public class Benchmark {
         }
 
         columns = new String[] {
-                "Transaction.read(String).toInt() + Transaction.write(String, Integer)" };
+                "Transaction.read(String).intValue() + Transaction.write(String, Integer)" };
         rows = new String[] {
                 "separate connection",
                 "re-use connection",
@@ -742,7 +742,7 @@ public class Benchmark {
                     testBegin();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
                         Transaction transaction = new Transaction();
-                        int value_old = transaction.read(key_i).toInt();
+                        int value_old = transaction.read(key_i).intValue();
                         transaction.write(key_i, value_old + 1);
                         transaction.commit();
                         transaction.closeConnection();
@@ -793,7 +793,7 @@ public class Benchmark {
                     .createConnection();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
                         Transaction transaction = new Transaction(connection);
-                        int value_old = transaction.read(key_i).toInt();
+                        int value_old = transaction.read(key_i).intValue();
                         transaction.write(key_i, value_old + 1);
                         transaction.commit();
                     }
@@ -841,7 +841,7 @@ public class Benchmark {
                     testBegin();
                     Transaction transaction = new Transaction();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        int value_old = transaction.read(key_i).toInt();
+                        int value_old = transaction.read(key_i).intValue();
                         transaction.write(key_i, value_old + 1);
                         transaction.commit();
                     }
