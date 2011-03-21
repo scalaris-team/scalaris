@@ -18,18 +18,21 @@ package de.zib.scalaris;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.Test;
 
 import com.ericsson.otp.erlang.OtpErlangAtom;
+import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
-import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
  * Unit test for the {@link TransactionSingleOp} class.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.7
+ * @version 3.2
  * @since 2.0
  */
 public class TransactionSingleOpTest {
@@ -91,6 +94,7 @@ public class TransactionSingleOpTest {
      * @throws UnknownException
      * @throws ConnectionException
      */
+    @Test
     public void testDoubleClose() throws ConnectionException {
         TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
@@ -184,9 +188,9 @@ public class TransactionSingleOpTest {
      * @throws AbortException 
      */
     @Test(expected=ConnectionException.class)
-    public void testWriteOtp_NotConnected() throws ConnectionException,
+    public void testWriteOtpList_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_WriteOtp_NotConnected";
+        String key = "_WriteOtpList_NotConnected";
         TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
         OtpErlangObject[] data = new OtpErlangObject[] {
@@ -194,14 +198,14 @@ public class TransactionSingleOpTest {
                 new OtpErlangString(testData[1]) };
         conn.write(
                 new OtpErlangString(testTime + key),
-                new OtpErlangTuple(data) );
+                new OtpErlangList(data) );
     }
     
     /**
      * Test method for
      * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}
      * and {@link TransactionSingleOp#read(OtpErlangString)}.
-     * Writes erlang tuples and uses a distinct key for each value. Tries to read the data afterwards.
+     * Writes erlang lists and uses a distinct key for each value. Tries to read the data afterwards.
      * 
      * @throws UnknownException
      * @throws TimeoutException
@@ -210,9 +214,9 @@ public class TransactionSingleOpTest {
      * @throws AbortException 
      */
     @Test
-    public void testWriteOtp1() throws ConnectionException,
+    public void testWriteOtpList1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_WriteOtp1_";
+        String key = "_WriteOtpList1_";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -222,7 +226,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i + 1]) };
                 conn.write(
                         new OtpErlangString(testTime + key + i),
-                        new OtpErlangTuple(data) );
+                        new OtpErlangList(data) );
             }
             
             // now try to read the data:
@@ -233,7 +237,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i + 1]) };
                 OtpErlangObject actual = conn.read(
                         new OtpErlangString(testTime + key + i));
-                OtpErlangTuple expected = new OtpErlangTuple(data);
+                OtpErlangList expected = new OtpErlangList(data);
                 
                 assertEquals(expected, actual);
             }
@@ -246,7 +250,7 @@ public class TransactionSingleOpTest {
      * Test method for
      * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}
      * and {@link TransactionSingleOp#read(OtpErlangString)}.
-     * Writes erlang tuples and uses a single key for all the values. Tries to read the data afterwards.
+     * Writes erlang lists and uses a single key for all the values. Tries to read the data afterwards.
      * 
      * @throws UnknownException
      * @throws TimeoutException
@@ -255,9 +259,9 @@ public class TransactionSingleOpTest {
      * @throws AbortException 
      */
     @Test
-    public void testWriteOtp2() throws ConnectionException,
+    public void testWriteOtpList2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_WriteOtp2";
+        String key = "_WriteOtpList2";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -268,14 +272,14 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i + 1]) };
                 conn.write(
                         new OtpErlangString(testTime + key),
-                        new OtpErlangTuple(data));
+                        new OtpErlangList(data));
             }
             
             // now try to read the data:
             
             OtpErlangObject actual = conn.read(
                     new OtpErlangString(testTime + key));
-            OtpErlangTuple expected = new OtpErlangTuple(data);
+            OtpErlangList expected = new OtpErlangList(data);
             
             assertEquals(expected, actual);
         } finally {
@@ -284,7 +288,7 @@ public class TransactionSingleOpTest {
     }
 
     /**
-     * Test method for {@link TransactionSingleOp#write(String, Object)} with a
+     * Test method for {@link TransactionSingleOp#write(String, String)} with a
      * closed connection.
      * 
      * @throws UnknownException
@@ -294,9 +298,9 @@ public class TransactionSingleOpTest {
      * @throws AbortException 
      */
     @Test(expected=ConnectionException.class)
-    public void testWrite_NotConnected() throws ConnectionException,
+    public void testWriteString_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_Write_NotConnected";
+        String key = "_WriteString_NotConnected";
         TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
         conn.write(testTime + key, testData[0]);
@@ -304,7 +308,7 @@ public class TransactionSingleOpTest {
     
     /**
      * Test method for
-     * {@link TransactionSingleOp#write(String, Object)}
+     * {@link TransactionSingleOp#write(String, String)}
      * and {@link TransactionSingleOp#read(String)}.
      * Writes strings and uses a distinct key for each value. Tries to read the data afterwards.
      * 
@@ -315,9 +319,9 @@ public class TransactionSingleOpTest {
      * @throws AbortException 
      */
     @Test
-    public void testWrite1() throws ConnectionException,
+    public void testWriteString1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_Write1_";
+        String key = "_WriteString1_";
         TransactionSingleOp conn = new TransactionSingleOp();
         
         try {
@@ -337,7 +341,7 @@ public class TransactionSingleOpTest {
     
     /**
      * Test method for
-     * {@link TransactionSingleOp#write(String, Object)}
+     * {@link TransactionSingleOp#write(String, String)}
      * and {@link TransactionSingleOp#read(String)}.
      * Writes strings and uses a single key for all the values. Tries to read the data afterwards.
      * 
@@ -348,9 +352,9 @@ public class TransactionSingleOpTest {
      * @throws AbortException 
      */
     @Test
-    public void testWrite2() throws ConnectionException,
+    public void testWriteString2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_Write2";
+        String key = "_WriteString2";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -361,6 +365,113 @@ public class TransactionSingleOpTest {
             // now try to read the data:
             String actual = conn.read(testTime + key).toString();
             assertEquals(testData[testData.length - 1], actual);
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for {@link TransactionSingleOp#write(String, List)} with a
+     * closed connection.
+     * 
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException 
+     * 
+     * @since 3.2
+     */
+    @Test(expected=ConnectionException.class)
+    public void testWriteList_NotConnected() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        String key = "_WriteList_NotConnected";
+        TransactionSingleOp conn = new TransactionSingleOp();
+        conn.closeConnection();
+        ArrayList<String> list = new ArrayList<String>();
+        list.add(testData[0]);
+        list.add(testData[1]);
+        conn.write(testTime + key, list);
+    }
+    
+    /**
+     * Test method for
+     * {@link TransactionSingleOp#write(String, List)}
+     * and {@link TransactionSingleOp#read(String)}.
+     * Writes strings and uses a distinct key for each value. Tries to read the data afterwards.
+     * 
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException 
+     * @throws AbortException  
+     * 
+     * @since 3.2
+     */
+    @Test
+    public void testWriteList1() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        String key = "_WriteList1_";
+        TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                ArrayList<String> list = new ArrayList<String>();
+                list.add(testData[i]);
+                list.add(testData[i + 1]);
+                conn.write(testTime + key + i, list);
+            }
+            
+            // now try to read the data:
+            
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                ArrayList<String> expected = new ArrayList<String>();
+                expected.add(testData[i]);
+                expected.add(testData[i + 1]);
+                List<String> actual = conn.read(testTime + key + i).toStringList();
+                
+                assertEquals(expected, actual);
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+    
+    /**
+     * Test method for
+     * {@link TransactionSingleOp#write(String, List)}
+     * and {@link TransactionSingleOp#read(String)}.
+     * Writes strings and uses a single key for all the values. Tries to read the data afterwards.
+     * 
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException 
+     * @throws AbortException  
+     * 
+     * @since 3.2
+     */
+    @Test
+    public void testWriteList2() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        String key = "_WriteList2";
+        TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            List<String> list = new ArrayList<String>();
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                list.clear();
+                list.add(testData[i]);
+                list.add(testData[i + 1]);
+                conn.write(testTime + key, list);
+            }
+            
+            // now try to read the data:
+            
+            List<String> actual = conn.read(testTime + key).toStringList();
+            List<String> expected = list;
+            
+            assertEquals(expected, actual);
         } finally {
             conn.closeConnection();
         }
@@ -381,9 +492,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test(expected=ConnectionException.class)
-    public void testTestAndSetOtp_NotConnected() throws ConnectionException,
+    public void testTestAndSetOtpList_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSetOtp_NotConnected";
+        String key = "_TestAndSetOtpList_NotConnected";
         TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
         OtpErlangObject[] data = new OtpErlangObject[] {
@@ -391,8 +502,8 @@ public class TransactionSingleOpTest {
                 new OtpErlangString(testData[1]) };
         conn.testAndSet(
                 new OtpErlangString(testTime + key),
-                new OtpErlangAtom("ok"),
-                new OtpErlangTuple(data) );
+                new OtpErlangAtom("fail"),
+                new OtpErlangList(data) );
     }
     
     /**
@@ -410,9 +521,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test(expected=NotFoundException.class)
-    public void testTestAndSetOtp_NotFound() throws ConnectionException,
+    public void testTestAndSetOtpList_NotFound() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSetOtp_NotFound";
+        String key = "_TestAndSetOtpList_NotFound";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -421,8 +532,8 @@ public class TransactionSingleOpTest {
                     new OtpErlangString(testData[1]) };
             conn.testAndSet(
                     new OtpErlangString(testTime + key),
-                    new OtpErlangAtom("ok"),
-                    new OtpErlangTuple(data) );
+                    new OtpErlangAtom("fail"),
+                    new OtpErlangList(data) );
         } finally {
             conn.closeConnection();
         }
@@ -433,7 +544,7 @@ public class TransactionSingleOpTest {
      * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
      * {@link TransactionSingleOp#read(OtpErlangString)}
      * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
-     * Writes an erlang tuple and tries to overwrite it using test_and_set
+     * Writes an erlang list and tries to overwrite it using test_and_set
      * knowing the correct old value. Tries to read the data afterwards.
      * 
      * @throws UnknownException
@@ -446,9 +557,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test
-    public void testTestAndSetOtp1() throws ConnectionException,
+    public void testTestAndSetOtpList1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSetOtp1";
+        String key = "_TestAndSetOtpList1";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -459,7 +570,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i + 1]) };
                 conn.write(
                         new OtpErlangString(testTime + key + i),
-                        new OtpErlangTuple(data));
+                        new OtpErlangList(data));
             }
             
             // now try to overwrite them using test_and_set:
@@ -472,8 +583,8 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i]) };
                 conn.testAndSet(
                         new OtpErlangString(testTime + key + i),
-                        new OtpErlangTuple(old_data),
-                        new OtpErlangTuple(new_data));
+                        new OtpErlangList(old_data),
+                        new OtpErlangList(new_data));
             }
             
             // now try to read the data:
@@ -483,7 +594,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i]) };
                 OtpErlangObject actual = conn.read(
                         new OtpErlangString(testTime + key + i));
-                OtpErlangTuple expected = new OtpErlangTuple(data);
+                OtpErlangList expected = new OtpErlangList(data);
                 assertEquals(expected, actual);
             }
         } finally {
@@ -496,7 +607,7 @@ public class TransactionSingleOpTest {
      * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
      * {@link TransactionSingleOp#read(OtpErlangString)}
      * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
-     * Writes an erlang tuple and tries to overwrite it using test_and_set
+     * Writes an erlang list and tries to overwrite it using test_and_set
      * knowing the wrong old value. Tries to read the data afterwards.
      * 
      * @throws UnknownException
@@ -508,9 +619,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test
-    public void testTestAndSetOtp2() throws ConnectionException,
+    public void testTestAndSetOtpList2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_TestAndSetOtp2";
+        String key = "_TestAndSetOtpList2";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -521,26 +632,23 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i + 1]) };
                 conn.write(
                         new OtpErlangString(testTime + key + i),
-                        new OtpErlangTuple(data));
+                        new OtpErlangList(data));
             }
             
             // now try to overwrite them using test_and_set:
             for (int i = 0; i < testData.length - 1; i += 2) {
-                OtpErlangObject[] old_data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i]) };
                 OtpErlangObject new_value = CommonErlangObjects.failAtom;
                 try {
                     conn.testAndSet(
                             new OtpErlangString(testTime + key + i),
-                            new OtpErlangTuple(old_data), new_value);
+                            new OtpErlangString("fail"), new_value);
                     // a key changed exception must be thrown
                     assertTrue(false);
                 } catch (KeyChangedException e) {
                     OtpErlangObject[] data = new OtpErlangObject[] {
                             new OtpErlangString(testData[i]),
                             new OtpErlangString(testData[i + 1]) };
-                    OtpErlangTuple expected = new OtpErlangTuple(data);
+                    OtpErlangList expected = new OtpErlangList(data);
                     assertEquals(expected, e.getOldValue());
                 }
             }
@@ -552,7 +660,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i + 1]) };
                 OtpErlangObject actual = conn.read(
                         new OtpErlangString(testTime + key + i));
-                OtpErlangTuple expected = new OtpErlangTuple(data);
+                OtpErlangList expected = new OtpErlangList(data);
                 assertEquals(expected, actual);
             }
         } finally {
@@ -575,9 +683,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test(expected=ConnectionException.class)
-    public void testTestAndSet_NotConnected() throws ConnectionException,
+    public void testTestAndSetString_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSet_NotConnected";
+        String key = "_TestAndSetString_NotConnected";
         TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
         conn.testAndSet(testTime + key, testData[0], testData[1]);
@@ -598,9 +706,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test(expected=NotFoundException.class)
-    public void testTestAndSet_NotFound() throws ConnectionException,
+    public void testTestAndSetString_NotFound() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSet_NotFound";
+        String key = "_TestAndSetString_NotFound";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -628,9 +736,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test
-    public void testTestAndSet1() throws ConnectionException,
+    public void testTestAndSetString1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        String key = "_TestAndSet1";
+        String key = "_TestAndSetString1";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -670,9 +778,9 @@ public class TransactionSingleOpTest {
      * @since 2.7
      */
     @Test
-    public void testTestAndSet2() throws ConnectionException,
+    public void testTestAndSetString2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String key = "_TestAndSet2";
+        String key = "_TestAndSetString2";
         TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
@@ -696,6 +804,178 @@ public class TransactionSingleOpTest {
             // now try to read the data:
             for (int i = 0; i < testData.length - 1; i += 2) {
                 assertEquals(testData[i], conn.read(testTime + key + i).toString());
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link TransactionSingleOp#testAndSet(String, String, List)}
+     * with a closed connection.
+     * 
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException 
+     * @throws KeyChangedException  
+     * 
+     * @since 3.2
+     */
+    @Test(expected=ConnectionException.class)
+    public void testTestAndSetList_NotConnected() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        String key = "_TestAndSetList_NotConnected";
+        TransactionSingleOp conn = new TransactionSingleOp();
+        conn.closeConnection();
+        ArrayList<String> list = new ArrayList<String>();
+        list.add(testData[0]);
+        list.add(testData[1]);
+        conn.testAndSet(testTime + key, "fail", list);
+    }
+    
+    /**
+     * Test method for
+     * {@link TransactionSingleOp#testAndSet(String, String, List)}.
+     * Tries test_and_set with a non-existing key.
+     * 
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException 
+     * @throws AbortException 
+     * @throws KeyChangedException  
+     * 
+     * @since 3.2
+     */
+    @Test(expected=NotFoundException.class)
+    public void testTestAndSetList_NotFound() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        String key = "_TestAndSetList_NotFound";
+        TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            ArrayList<String> list = new ArrayList<String>();
+            list.add(testData[0]);
+            list.add(testData[1]);
+            conn.testAndSet(testTime + key, "fail", list);
+        } finally {
+            conn.closeConnection();
+        }
+    }
+    
+    /**
+     * Test method for
+     * {@link TransactionSingleOp#testAndSet(String, List, List)},
+     * {@link TransactionSingleOp#read(String)}
+     * and {@link TransactionSingleOp#write(String, List)}.
+     * Writes a list and tries to overwrite it using test_and_set
+     * knowing the correct old value. Tries to read the data afterwards.
+     * 
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException 
+     * @throws AbortException 
+     * @throws KeyChangedException  
+     * 
+     * @since 3.2
+     */
+    @Test
+    public void testTestAndSetList1() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        String key = "_TestAndSetList1";
+        TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                ArrayList<String> list = new ArrayList<String>();
+                list.add(testData[i]);
+                list.add(testData[i + 1]);
+                conn.write(testTime + key + i, list);
+            }
+            
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                ArrayList<String> old_list = new ArrayList<String>();
+                old_list.add(testData[i]);
+                old_list.add(testData[i + 1]);
+                ArrayList<String> new_list = new ArrayList<String>();
+                new_list.add(testData[i + 1]);
+                new_list.add(testData[i]);
+                conn.testAndSet(testTime + key + i, old_list, new_list);
+            }
+            
+            // now try to read the data:
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                List<String> actual = conn.read(testTime + key + i).toStringList();
+                ArrayList<String> expected = new ArrayList<String>();
+                expected.add(testData[i + 1]);
+                expected.add(testData[i]);
+                assertEquals(expected, actual);
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+    
+    /**
+     * Test method for
+     * {@link TransactionSingleOp#testAndSet(String, OtpErlangObject, OtpErlangObject)},
+     * {@link TransactionSingleOp#read(OtpErlangString)}
+     * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
+     * Writes a list and tries to overwrite it using test_and_set
+     * knowing the wrong old value. Tries to read the data afterwards.
+     * 
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException 
+     * @throws AbortException  
+     * 
+     * @since 3.2
+     */
+    @Test
+    public void testTestAndSetList2() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        String key = "_TestAndSetList2";
+        TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                ArrayList<String> list = new ArrayList<String>();
+                list.add(testData[i]);
+                list.add(testData[i + 1]);
+                conn.write(testTime + key + i, list);
+            }
+            
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                int new_value = 1;
+                try {
+                    conn.testAndSet(testTime + key + i, "fail", new_value);
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (KeyChangedException e) {
+                    OtpErlangObject[] data = new OtpErlangObject[] {
+                            new OtpErlangString(testData[i]),
+                            new OtpErlangString(testData[i + 1]) };
+                    OtpErlangList expected = new OtpErlangList(data);
+                    assertEquals(expected, e.getOldValue());
+                }
+            }
+            
+            // now try to read the data:
+            for (int i = 0; i < testData.length - 1; i += 2) {
+                List<String> actual = conn.read(testTime + key + i).toStringList();
+                ArrayList<String> expected = new ArrayList<String>();
+                expected.add(testData[i]);
+                expected.add(testData[i + 1]);
+                assertEquals(expected, actual);
             }
         } finally {
             conn.closeConnection();

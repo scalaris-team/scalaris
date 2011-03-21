@@ -422,8 +422,11 @@ public class TransactionSingleOp {
      * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
      * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
      * 
-     * @param <T>
-     *            the type of the value to store.
+     * @param <OldT>
+     *            the type of the stored (old) value.
+     *            See {@link ErlangValue} for a list of supported types.
+     * @param <NewT>
+     *            the type of the (new) value to store.
      *            See {@link ErlangValue} for a list of supported types.
      * @param key
      *            the key to store the value for
@@ -450,7 +453,7 @@ public class TransactionSingleOp {
      * @see #testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)
      * @since 2.9
      */
-    public <T> void testAndSet(String key, T old_value, T new_value)
+    public <OldT, NewT> void testAndSet(String key, OldT old_value, NewT new_value)
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
         testAndSet(new OtpErlangString(key),
