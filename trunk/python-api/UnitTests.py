@@ -14,8 +14,9 @@
 #    limitations under the License.
 
 import unittest
-import TransactionSingleOpTest
+import TransactionSingleOpTest, TransactionTest
 
 if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(TransactionSingleOpTest.TestTransactionSingleOp)
+    suite = unittest.TestLoader().loadTestsFromNames(['TransactionSingleOpTest.TestTransactionSingleOp',
+                                                      'TransactionTest.TestTransaction'])
     unittest.TextTestRunner(verbosity=2).run(suite)
