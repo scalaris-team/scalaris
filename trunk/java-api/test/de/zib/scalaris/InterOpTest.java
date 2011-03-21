@@ -111,7 +111,8 @@ public class InterOpTest {
         try {
             TransactionSingleOp sc = new TransactionSingleOp();
             int failed = 0;
-            
+
+            failed += read_write_boolean(basekey, sc, mode);
             failed += read_write_integer(basekey, sc, mode);
             failed += read_write_long(basekey, sc, mode);
             failed += read_write_biginteger(basekey, sc, mode);
@@ -149,7 +150,9 @@ public class InterOpTest {
                     System.out.println("  read raw: " + result.value().toString());
 
                     Object jresult = null;
-                    if (value instanceof Integer) {
+                    if (value instanceof Boolean) {
+                        jresult = result.boolValue();
+                    } else if (value instanceof Integer) {
                         jresult = result.intValue();
                     } else if (value instanceof Long) {
                         jresult = result.longValue();
@@ -274,7 +277,13 @@ public class InterOpTest {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> actual_map = (Map<String, Object>) actual;
                     return compare(actual_map, expected);
-                }   
+                }
+            } else if (expected instanceof Boolean) {
+                if (actual instanceof ErlangValue) {
+                    return expected.equals(((ErlangValue) actual).boolValue());
+                } else {
+                    return expected.equals(actual);
+                }
             } else if (expected instanceof Integer) {
                 if (actual instanceof ErlangValue) {
                     return expected.equals(((ErlangValue) actual).intValue());
@@ -355,6 +364,20 @@ public class InterOpTest {
             value_str = value.toString();
         }
         return value_str;
+    }
+    
+    private static int read_write_boolean(String basekey, TransactionSingleOp sc, Mode mode) {
+        int failed = 0;
+        String key;
+        Object value;
+        
+        key = basekey + "_bool_false"; value = false;
+        failed += read_or_write(sc, key, value, mode);
+        
+        key = basekey + "_bool_true"; value = true;
+        failed += read_or_write(sc, key, value, mode);
+        
+        return failed;
     }
     
     private static int read_write_integer(String basekey, TransactionSingleOp sc, Mode mode) {
@@ -530,7 +553,8 @@ public class InterOpTest {
         list4.add(0);
         list4.add("foo");
         list4.add(1.5);
-        key = basekey + "_list_0_foo_1.5"; value = list4;
+        list4.add(false);
+        key = basekey + "_list_0_foo_1.5_false"; value = list4;
         failed += read_or_write(sc, key, value, mode);
         
         // note: we do not support binaries in lists anymore because JSON would
