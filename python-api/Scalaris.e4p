@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Project SYSTEM "Project-4.6.dtd">
 <!-- eric4 project file for project Scalaris -->
-<!-- Saved: 2011-03-16, 19:38:56 -->
+<!-- Saved: 2011-03-21, 12:50:31 -->
 <!-- Copyright (C) 2011 Nico Kruber, kruber@zib.de -->
 <Project version="4.6">
   <Language>en</Language>
@@ -15,6 +15,8 @@
     <Source>InterOpTest.py</Source>
     <Source>Scalaris.py</Source>
     <Source>Benchmark.py</Source>
+    <Source>TransactionSingleOpTest.py</Source>
+    <Source>UnitTests.py</Source>
   </Sources>
   <Forms>
   </Forms>

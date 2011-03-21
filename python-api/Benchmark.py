@@ -23,7 +23,7 @@ import sys,  traceback
 _BENCH_DATA_SIZE = 1000
 # The time when the (whole) benchmark suite was started.
 _now = datetime.now()
-#This is used to create different erlang keys for each run.
+# This is used to create different erlang keys for each run.
 _benchTime = int(time.mktime(_now.timetuple()) * 1000 + (_now.microsecond / 1000.0))
 # The time at the start of a single benchmark.
 _timeAtStart = 0
