@@ -1454,8 +1454,9 @@ public class PubSubTest {
             conn.unsubscribe(topic2, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
             
             int topic1_elements = 0;
+            // note: topic2 is unsubscribed
+//            int topic2_elements = 0;
             int topic3_elements = 0;
-            int topic2_elements = 0;
             for (int i = 0; i < testData.length; ++i) {
                 if (i % 2 == 0) {
                     conn.publish(topic1, testData[i]);
@@ -1463,7 +1464,7 @@ public class PubSubTest {
                 }
                 if (i % 3 == 0) {
                     conn.publish(topic2, testData[i]);
-                    ++topic2_elements;
+//                    ++topic2_elements;
                 }
                 if (i % 5 == 0) {
                     conn.publish(topic3, testData[i]);
@@ -1481,6 +1482,8 @@ public class PubSubTest {
             for (int i = 0; i < notifications_timeout
                     && (notifications_server1.get(topic1) == null || 
                         notifications_server1.get(topic1).size() < topic1_elements ||
+//                        notifications_server3.get(topic2) == null ||
+//                        notifications_server3.get(topic2).size() < topic2_elements ||
                         notifications_server3.get(topic3) == null ||
                         notifications_server3.get(topic3).size() < topic3_elements); ++i) {
                 TimeUnit.SECONDS.sleep(1);
