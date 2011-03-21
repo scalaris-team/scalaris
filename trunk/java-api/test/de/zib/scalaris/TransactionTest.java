@@ -87,6 +87,7 @@ public class TransactionTest {
      * @throws UnknownException
      * @throws ConnectionException
      */
+    @Test
     public void testDoubleClose() throws ConnectionException {
         Transaction t = new Transaction(ConnectionFactory.getInstance().createConnection("test"));
         t.closeConnection();
