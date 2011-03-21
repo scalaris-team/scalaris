@@ -18,5 +18,6 @@ import TransactionSingleOpTest, TransactionTest
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromNames(['TransactionSingleOpTest.TestTransactionSingleOp',
-                                                      'TransactionTest.TestTransaction'])
+                                                      'TransactionTest.TestTransaction',
+                                                      'ReplicatedDHTTest.TestReplicatedDHT'])
     unittest.TextTestRunner(verbosity=2).run(suite)

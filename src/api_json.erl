@@ -25,7 +25,7 @@
 -export([pubsub_publish/2, pubsub_subscribe/2, pubsub_unsubscribe/2,
          pubsub_get_subscribers/1]).
 
--export([rdht_delete/1]).
+-export([rdht_delete/1, rdht_delete/2]).
 
 -export([dht_raw_range_read/2]).
 
@@ -168,7 +168,14 @@ pubsub_get_subscribers(Topic) ->
                                          | {ok, non_neg_integer()}
                                          | {results, {array, [string()]}}]}.
 rdht_delete(Key) ->
-    case api_rdht:delete(Key) of
+    rdht_delete(Key, 2000).
+
+-spec rdht_delete(client_key(), Timeout::pos_integer())
+        -> {struct, [{failure, string()} |
+                     {ok, non_neg_integer()} |
+                     {results, {array, [string()]}}]}.
+rdht_delete(Key, Timeout) ->
+    case api_rdht:delete(Key, Timeout) of
         {fail, Reason, NumOK, StateList} ->
             {struct, [{failure, atom_to_list(Reason)},
                       {ok, NumOK},
