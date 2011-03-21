@@ -85,7 +85,7 @@ public class TransactionSingleOpReadExample {
             System.out.println("  creating object...");
             TransactionSingleOp sc = new TransactionSingleOp();
             System.out.println("    `String read(String)`...");
-            value = sc.read(key).toString();
+            value = sc.read(key).stringValue();
             System.out.println("      read(" + key + ") == " + value);
         } catch (ConnectionException e) {
             System.out.println("      read(" + key + ") failed: "

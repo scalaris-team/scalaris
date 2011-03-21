@@ -29,7 +29,7 @@
  * <code style="white-space:pre;">
  *   try {
  *     TransactionSingleOp sc = new TransactionSingleOp();
- *     String value = sc.read("key").toString();
+ *     String value = sc.read("key").stringValue();
  *   } catch (ConnectionException e) {
  *     System.err.println("read failed: " + e.getMessage());
  *   } catch (TimeoutException e) {

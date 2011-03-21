@@ -74,7 +74,7 @@ public class ErlangValueBitString extends ErlangValue {
      *             if the conversion fails
      */
     @Override
-    public String toString() {
+    public String stringValue() {
         return new String(((OtpErlangBitstr) value()).binaryValue());
     }
 }

@@ -93,7 +93,7 @@ public class ErlangValueFastString extends ErlangValue {
      *             if the conversion fails
      */
     @Override
-    public String toString() {
+    public String stringValue() {
         OtpErlangTuple otpTuple = (OtpErlangTuple) value();
         if (otpTuple.elementAt(0).equals(identifier)) {
             return new String(

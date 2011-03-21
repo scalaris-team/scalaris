@@ -317,7 +317,7 @@ public class TransactionTest {
             assertTrue(notFound);
             t.write(testTime + key, testData[0]);
             
-            assertEquals(testData[0], t.read(testTime + key).toString());
+            assertEquals(testData[0], t.read(testTime + key).stringValue());
         } finally {
             t.closeConnection();
         }
@@ -344,7 +344,7 @@ public class TransactionTest {
             // now try to read the data:
             
             for (int i = 0; i < testData.length; ++i) {
-                String actual = t.read(testTime + "_testWriteString1_" + i).toString();
+                String actual = t.read(testTime + "_testWriteString1_" + i).stringValue();
                 assertEquals(testData[i], actual);
             }
             
@@ -353,7 +353,7 @@ public class TransactionTest {
             t.commit();
             t = new Transaction();
             for (int i = 0; i < testData.length; ++i) {
-                String actual = t.read(testTime + "_testWriteString1_" + i).toString();
+                String actual = t.read(testTime + "_testWriteString1_" + i).stringValue();
                 assertEquals(testData[i], actual);
             }
         } finally {
@@ -413,7 +413,7 @@ public class TransactionTest {
                     new OtpErlangString(testTime + key),
                     new OtpErlangString(testData[0]));
             
-            assertEquals(testData[0], t.read(testTime + key).toString());
+            assertEquals(testData[0], t.read(testTime + key).stringValue());
         } finally {
             t.closeConnection();
         }

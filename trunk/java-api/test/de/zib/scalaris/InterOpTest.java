@@ -150,21 +150,21 @@ public class InterOpTest {
 
                     Object jresult = null;
                     if (value instanceof Integer) {
-                        jresult = result.toInt();
+                        jresult = result.intValue();
                     } else if (value instanceof Long) {
-                        jresult = result.toLong();
+                        jresult = result.longValue();
                     } else if (value instanceof BigInteger) {
-                        jresult = result.toBigInt();
+                        jresult = result.bigIntValue();
                     } else if (value instanceof Double) {
-                        jresult = result.toDouble();
+                        jresult = result.doubleValue();
                     } else if (value instanceof String) {
-                        jresult = result.toString();
+                        jresult = result.stringValue();
                     } else if (value instanceof byte[]) {
-                        jresult = result.toBinary();
+                        jresult = result.binaryValue();
                     } else if (value instanceof List<?>) {
-                        jresult = result.toList();
+                        jresult = result.listValue();
                     } else if (value instanceof Map<?, ?>) {
-                        jresult = result.toJSON();
+                        jresult = result.jsonValue();
                     }
 
                     System.out.println(" read java: " + valueToStr(jresult));
@@ -255,13 +255,13 @@ public class InterOpTest {
         try {
             if (expected instanceof byte[]) {
                 if (actual instanceof ErlangValue) {
-                    return compare(((ErlangValue) actual).toBinary(), expected);
+                    return compare(((ErlangValue) actual).binaryValue(), expected);
                 } else {
                     return compare((byte[]) actual, expected);
                 } 
             } else if (expected instanceof List<?>) {
                 if (actual instanceof ErlangValue) {
-                    return compare(((ErlangValue) actual).toList(), expected);
+                    return compare(((ErlangValue) actual).listValue(), expected);
                 } else {
                     @SuppressWarnings("unchecked")
                     List<Object> actual_list = (List<Object>) actual;
@@ -269,7 +269,7 @@ public class InterOpTest {
                 }  
             } else if (expected instanceof Map<?, ?>) {
                 if (actual instanceof ErlangValue) {
-                    return compare(((ErlangValue) actual).toJSON(), expected);
+                    return compare(((ErlangValue) actual).jsonValue(), expected);
                 } else {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> actual_map = (Map<String, Object>) actual;
@@ -277,31 +277,31 @@ public class InterOpTest {
                 }   
             } else if (expected instanceof Integer) {
                 if (actual instanceof ErlangValue) {
-                    return expected.equals(((ErlangValue) actual).toInt());
+                    return expected.equals(((ErlangValue) actual).intValue());
                 } else {
                     return expected.equals(actual);
                 }
             } else if (expected instanceof Long) {
                 if (actual instanceof ErlangValue) {
-                    return expected.equals(((ErlangValue) actual).toLong());
+                    return expected.equals(((ErlangValue) actual).longValue());
                 } else {
                     return expected.equals(actual);
                 }
             } else if (expected instanceof BigInteger) {
                 if (actual instanceof ErlangValue) {
-                    return expected.equals(((ErlangValue) actual).toBigInt());
+                    return expected.equals(((ErlangValue) actual).bigIntValue());
                 } else {
                     return expected.equals(actual);
                 }
             } else if (expected instanceof Double) {
                 if (actual instanceof ErlangValue) {
-                    return expected.equals(((ErlangValue) actual).toDouble());
+                    return expected.equals(((ErlangValue) actual).doubleValue());
                 } else {
                     return expected.equals(actual);
                 }
             } else if (expected instanceof String) {
                 if (actual instanceof ErlangValue) {
-                    return expected.equals(((ErlangValue) actual).toString());
+                    return expected.equals(((ErlangValue) actual).stringValue());
                 } else {
                     return expected.equals(actual);
                 }

@@ -71,13 +71,13 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   String value;
  *   String result;
  *   
- *   Transaction t1 = new Transaction(); // {@link #Transaction()}
+ *   Transaction t1 = new Transaction();  // {@link #Transaction()}
  *   
- *   t1.write(key, value);               // {@link #write(String, Object)}
- *   t1.write(otpKey, otpValue);         // {@link #write(OtpErlangString, OtpErlangObject)}
+ *   t1.write(key, value);                // {@link #write(String, Object)}
+ *   t1.write(otpKey, otpValue);          // {@link #write(OtpErlangString, OtpErlangObject)}
  *   
- *   result = t1.read(key).toString();   //{@link #read(String)}
- *   otpResult = t1.readObject(otpKey);  //{@link #read(OtpErlangString)}
+ *   result = t1.read(key).stringValue(); //{@link #read(String)}
+ *   otpResult = t1.readObject(otpKey);   //{@link #read(OtpErlangString)}
  *   
  *   transaction.commit(); // {@link #commit()}
  * </code>

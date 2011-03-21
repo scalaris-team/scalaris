@@ -142,11 +142,11 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported or the value is too big
      */
-    public int toInt() throws ClassCastException {
+    public int intValue() throws ClassCastException {
         try {
             return ((OtpErlangLong) value).intValue();
         } catch (OtpErlangRangeException e) {
-            throw new ClassCastException("Cannot cast to int - value is too big (use toLong() or toBigInt() instead).");
+            throw new ClassCastException("Cannot cast to int - value is too big (use longValue() or bigIntValue() instead).");
         }
     }
 
@@ -159,12 +159,12 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported or the value is too big
      */
-    public long toLong() throws ClassCastException {
+    public long longValue() throws ClassCastException {
         OtpErlangLong longValue = (OtpErlangLong) value;
         if (longValue.isLong()) {
             return longValue.longValue();
         } else {
-            throw new ClassCastException("Cannot cast to long - value is too big (use toBigInt() instead).");
+            throw new ClassCastException("Cannot cast to long - value is too big (use bigIntValue() instead).");
         }
     }
 
@@ -177,7 +177,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public BigInteger toBigInt() throws ClassCastException {
+    public BigInteger bigIntValue() throws ClassCastException {
         return ((OtpErlangLong) value).bigIntegerValue();
     }
 
@@ -190,7 +190,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public double toDouble() throws ClassCastException {
+    public double doubleValue() throws ClassCastException {
         return ((OtpErlangDouble) value).doubleValue();
     }
 
@@ -203,7 +203,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public String toString() throws ClassCastException {
+    public String stringValue() throws ClassCastException {
         // note: need special handling for empty strings:
         if (value instanceof OtpErlangList) {
             OtpErlangList value_list = (OtpErlangList) value;
@@ -226,7 +226,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public byte[] toBinary() throws ClassCastException {
+    public byte[] binaryValue() throws ClassCastException {
         return ((OtpErlangBinary) value).binaryValue();
     }
 
@@ -264,7 +264,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public List<ErlangValue> toList() throws ClassCastException {
+    public List<ErlangValue> listValue() throws ClassCastException {
         OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<ErlangValue> result = new ArrayList<ErlangValue>(list.arity());
         for (OtpErlangObject i : list) {
@@ -282,7 +282,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public List<Long> toLongList() throws ClassCastException {
+    public List<Long> longListValue() throws ClassCastException {
         OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<Long> result = new ArrayList<Long>(list.arity());
         for (OtpErlangObject i : list) {
@@ -300,7 +300,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public List<Double> toDoubleList() throws ClassCastException {
+    public List<Double> doubleListValue() throws ClassCastException {
         OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<Double> result = new ArrayList<Double>(list.arity());
         for (OtpErlangObject i : list) {
@@ -318,7 +318,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public List<String> toStringList() throws ClassCastException {
+    public List<String> stringListValue() throws ClassCastException {
         OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<String> result = new ArrayList<String>(list.arity());
         for (OtpErlangObject i : list) {
@@ -336,7 +336,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public List<byte[]> toBinaryList() throws ClassCastException {
+    public List<byte[]> binaryListValue() throws ClassCastException {
         OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<byte[]> result = new ArrayList<byte[]>(list.arity());
         for (OtpErlangObject i : list) {
@@ -354,7 +354,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    public Map<String, Object> toJSON() throws ClassCastException {
+    public Map<String, Object> jsonValue() throws ClassCastException {
         /*
          * object(): {struct, [{key::string() | atom(), value()}]}
          * array():  {array, [value()]}
