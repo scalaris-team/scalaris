@@ -63,8 +63,8 @@ public class ReplicatedDHTTest {
      */
     @Test
     public void testReplicatedDHT1() throws ConnectionException {
-        ReplicatedDHT conn = new ReplicatedDHT();
-        conn.closeConnection();
+        ReplicatedDHT rdht = new ReplicatedDHT();
+        rdht.closeConnection();
     }
     
     /**
@@ -74,8 +74,22 @@ public class ReplicatedDHTTest {
      */
     @Test
     public void testReplicatedDHT2() throws ConnectionException {
-        ReplicatedDHT conn = new ReplicatedDHT(ConnectionFactory.getInstance().createConnection("test"));
-        conn.closeConnection();
+        ReplicatedDHT rdht = new ReplicatedDHT(ConnectionFactory.getInstance().createConnection("test"));
+        rdht.closeConnection();
+    }
+    
+    /**
+     * Test method for {@link TransactionSingleOp#closeConnection()} trying to
+     * close the connection twice.
+     * 
+     * @throws UnknownException
+     * @throws ConnectionException
+     */
+    @Test
+    public void testDoubleClose() throws ConnectionException {
+        TransactionSingleOp rdht = new TransactionSingleOp();
+        rdht.closeConnection();
+        rdht.closeConnection();
     }
     
     /**
@@ -91,19 +105,19 @@ public class ReplicatedDHTTest {
     public void testDelete_notExistingKey() throws ConnectionException,
             TimeoutException, UnknownException, NodeNotFoundException {
         String key = "_Delete_NotExistingKey";
-        ReplicatedDHT conn = new ReplicatedDHT();
+        ReplicatedDHT rdht = new ReplicatedDHT();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
-                long deleted = conn.delete(testTime + key + i);
-                DeleteResult result = conn.getLastDeleteResult();
+                long deleted = rdht.delete(testTime + key + i);
+                DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(0, deleted);
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(4, result.undef);
             }
         } finally {
-            conn.closeConnection();
+            rdht.closeConnection();
         }
     }
     
