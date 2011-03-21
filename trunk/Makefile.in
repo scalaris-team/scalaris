@@ -142,6 +142,27 @@ java-bench: compile java
 java-%:
 	ant -buildfile java-api/build.xml $*
 
+python-test: compile
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	./bin/scalarisctl -d \
+	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
+	-p $(SCALARIS_UNITTEST_PORT) \
+	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
+	sleep 5s ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)/jsonrpc.yaws" python-api/UnitTests.py ; \
+	FAILED=$$? ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
+	if [ $$FAILED -ne 0 ]; then \
+	  echo "####################" ; \
+	  echo "Erlang messages (last 50 per log file):" ; \
+	  echo "####################" ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
+	  echo "####################" ; \
+	  false ; \
+	else \
+	  true ; \
+	fi
+
 python-bench: compile
 # replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
