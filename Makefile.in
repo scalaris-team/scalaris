@@ -22,7 +22,7 @@ MAKE = make
 VERSION=0.0.1
 OTP_ERLANG_VERSION=1.5.3.1
 
-.PHONY: all compile test test-vts java java-test java-bench java-* clean docs svn dialyzer rrd-init install install-erlang install-java install-docs test-clean %_SUITE %_SUITE-dialyzer
+.PHONY: all compile test test-vts java java-test java-bench java-* python python-test python-bench interop-test clean docs svn dialyzer dialyzer-all rrd-init install install-erlang install-java install-docs test-clean %_SUITE %_SUITE-dialyzer
 
 YAWS_PATH= /usr/local/lib/yaws
 
