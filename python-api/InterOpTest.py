@@ -61,6 +61,14 @@ def read_or_write(sc,  key,  value,  mode):
         print 'failed with ' + str(instance)
         return 1
 
+def read_write_boolean(basekey, sc, mode):
+    failed = 0;
+    
+    failed += read_or_write(sc,  basekey + "_bool_false", False,  mode)
+    failed += read_or_write(sc,  basekey + "_bool_true", True,  mode)
+    
+    return failed
+
 def read_write_integer(basekey, sc, mode):
     failed = 0;
     
@@ -137,7 +145,7 @@ def read_write_list(basekey, sc, mode):
     failed += read_or_write(sc,  basekey + "_list_0_1_2_3", [0,  1,  2,  3],   mode)
     failed += read_or_write(sc,  basekey + "_list_0_123_456_65000", [0,  123,  456,  65000],   mode)
     failed += read_or_write(sc,  basekey + "_list_0_123_456_0x10ffff", [0,  123,  456,  0x10ffff],   mode)
-    failed += read_or_write(sc,  basekey + "_list_0_foo_1.5",  [0,  'foo',  1.5],  mode)
+    failed += read_or_write(sc,  basekey + "_list_0_foo_1.5_false",  [0,  'foo',  1.5, False],  mode)
     # note: binary not supported in lists
     #failed += read_or_write(sc,  basekey + "_list_0_foo_1.5_<<0123>>",  [0,  'foo',  1.5,  bytearray([0,  1,  2,  3])],  mode)
     
@@ -175,6 +183,7 @@ if __name__ == "__main__":
         sc = Scalaris.TransactionSingleOp()
     
     failed = 0
+    failed += read_write_boolean(basekey, sc,  mode)
     failed += read_write_integer(basekey, sc,  mode)
     failed += read_write_long(basekey, sc,  mode)
     failed += read_write_biginteger(basekey, sc,  mode)

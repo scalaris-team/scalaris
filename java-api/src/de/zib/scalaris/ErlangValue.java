@@ -23,6 +23,7 @@ import java.util.Map;
 
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangBinary;
+import com.ericsson.otp.erlang.OtpErlangBoolean;
 import com.ericsson.otp.erlang.OtpErlangDouble;
 import com.ericsson.otp.erlang.OtpErlangInt;
 import com.ericsson.otp.erlang.OtpErlangList;
@@ -37,7 +38,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * See {@link #ErlangValue(Object)} for a list of compatible types.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 3.0
+ * @version 3.3
  * @since 3.0
  */
 public class ErlangValue {
@@ -96,7 +97,9 @@ public class ErlangValue {
      */
     private static <T> OtpErlangObject convertToErlang(T value)
             throws ClassCastException {
-        if (value instanceof Integer) {
+        if (value instanceof Boolean) {
+            return new OtpErlangBoolean((Boolean) value);
+        } else if (value instanceof Integer) {
             return new OtpErlangLong((Integer) value);
         } else if (value instanceof Long) {
             return new OtpErlangLong((Long) value);
@@ -130,6 +133,27 @@ public class ErlangValue {
             return (OtpErlangObject) value;
         } else {
             throw new ClassCastException("Unsupported type (value: " + value.toString() + ")");
+        }
+    }
+
+    /**
+     * Returns the Java int value of the wrapped erlang value.
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported or the value is too big
+     * 
+     * @since 3.3
+     */
+    public boolean boolValue() throws ClassCastException {
+        if (value.equals(CommonErlangObjects.falseAtom)) {
+            return false;
+        } else if (value.equals(CommonErlangObjects.trueAtom)) {
+            return true;
+        } else {
+            throw new ClassCastException("No boolean.");
         }
     }
 
