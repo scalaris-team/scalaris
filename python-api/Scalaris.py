@@ -63,6 +63,32 @@ def _json_decode_value(value):
 def getConnection(url,  timeout = default_timeout):
     uri = urlparse.urlparse(url)
     return httplib.HTTPConnection(uri.hostname,  uri.port, timeout = timeout)
+    
+# result: {'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+#         {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found}
+# op: 'read' or 'write' or 'commit', 'test_and_set' or 'any'
+def _process_result(result,  op):
+    if isinstance(result,  dict) and 'status' in result:
+        if result['status'] == 'ok':
+            if 'value' in result:
+                return _json_decode_value(result['value'])
+            elif op == 'read':
+                raise UnknownException((result,  op))
+        elif result['status'] == 'fail' and 'reason' in result:
+            if result['reason'] == 'timeout':
+                raise TimeoutException(result)
+            elif result['reason'] == 'not_found' and op not in ['commit',  'write']:
+                raise NotFoundException(result)
+            elif result['reason'] == 'abort' and op not in ['read',  'write']:
+                raise AbortException(result)
+            elif result['reason'] == 'key_changed' and op == 'test_and_set' and 'value' in result:
+                raise KeyChangedException(result,  _json_decode_value(result['value']))
+            else:
+                raise UnknownException(result)
+        else:
+            raise UnknownException(result)
+    else:
+        raise UnknownException(result)
 
 # Exception that is thrown if a the commit of a write operation on a
 # scalaris ring fails.
@@ -140,40 +166,14 @@ class TransactionSingleOp(object):
         result = _json_call(self._conn,  self._uri, 'read', [key])
         # results: {'status': 'ok', 'value', xxx} or
         #          {'status': 'fail', 'reason': 'timeout' or 'not_found'}
-        if isinstance(result,  dict) and 'status' in result:
-            if result['status'] == 'ok' and 'value' in result:
-                return _json_decode_value(result['value'])
-            elif result['status'] == 'fail' and 'reason' in result:
-                if result['reason'] == 'timeout':
-                    raise TimeoutException(result)
-                elif result['reason'] == 'not_found':
-                    raise NotFoundException(result)
-                else:
-                    raise UnknownException(result)
-            else:
-                raise UnknownException(result)
-        else:
-            raise UnknownException(result)
+        return _process_result(result,  'read')
 
     def write(self,  key, value):
         value = _json_encode_value(value)
         result = _json_call(self._conn,  self._uri, 'write', [key, value])
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
-        if isinstance(result,  dict) and 'status' in result:
-            if result['status'] == 'ok':
-                return None
-            elif result['status'] == 'fail' and 'reason' in result:
-                if result['reason'] == 'timeout':
-                    raise TimeoutException(result)
-                elif result['reason'] == 'abort':
-                    raise AbortException(result)
-                else:
-                    raise UnknownException(result)
-            else:
-                raise UnknownException(result)
-        else:
-            raise UnknownException(result)
+        _process_result(result,  'commit')
     
     def testAndSet(self,  key, oldvalue, newvalue):
         oldvalue = _json_encode_value(oldvalue)
@@ -182,24 +182,7 @@ class TransactionSingleOp(object):
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'} or
         #          {'status': 'fail', 'reason': 'key_changed', 'value': xxx}
-        if isinstance(result,  dict) and 'status' in result:
-            if result['status'] == 'ok':
-                return None
-            elif result['status'] == 'fail' and 'reason' in result:
-                if result['reason'] == 'timeout':
-                    raise TimeoutException(result)
-                elif result['reason'] == 'abort':
-                    raise AbortException(result)
-                elif result['reason'] == 'not_found':
-                    raise NotFoundException(result)
-                elif result['reason'] == 'key_changed' and 'value' in result:
-                    raise KeyChangedException(result,  _json_decode_value(result['value']))
-                else:
-                    raise UnknownException(result)
-            else:
-                raise UnknownException(result)
-        else:
-            raise UnknownException(result)
+        _process_result(result,  'test_and_set')
 
     def nop(self,  value):
         value = _json_encode_value(value)
@@ -243,25 +226,7 @@ class Transaction(object):
     #         {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found}
     # op: 'read' or 'write' or 'commit' or 'any'
     def process_result(self,  result,  op):
-        if isinstance(result,  dict) and 'status' in result:
-            if result['status'] == 'ok':
-                if 'value' in result:
-                    return _json_decode_value(result['value'])
-                elif op == 'read':
-                    raise UnknownException((result,  op))
-            elif result['status'] == 'fail' and 'reason' in result:
-                if result['reason'] == 'timeout':
-                    raise TimeoutException(result)
-                elif result['reason'] == 'not_found' and op not in ['commit',  'write']:
-                    raise NotFoundException(result)
-                elif result['reason'] == 'abort' and op not in ['read',  'write']:
-                    raise AbortException(result)
-                else:
-                    raise UnknownException(result)
-            else:
-                raise UnknownException(result)
-        else:
-            raise UnknownException(result)
+        return _process_result(result,  op)
     
     # results: {'status': 'ok'} or
     #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
@@ -279,7 +244,7 @@ class Transaction(object):
     #              {'status': 'fail', 'reason': 'timeout' or 'not_found'}
     def read(self,  key):
         result = self.req_list(ReqList().addRead(key))[0]
-        return self.process_result(result,  'commit')
+        return self.process_result(result,  'read')
     
     # results: {'status': 'ok'} or
     #              {'status': 'fail', 'reason': 'timeout' or 'abort'}
@@ -313,6 +278,56 @@ class ReqList(object):
     
     def getJSONRequests(self):
         return self.requests
+
+class PubSub(object):
+    def __init__(self, url = None,  conn = None,  timeout = default_timeout):
+        if (url == None):
+            self._uri = urlparse.urlparse(default_url)
+        else:
+            self._uri = urlparse.urlparse(url)
+        
+        if (conn == None):
+            try:
+                self._conn = httplib.HTTPConnection(self._uri.hostname,  self._uri.port,  timeout = timeout)
+            except Exception,  (instance):
+                raise ConnectionException(instance)
+        else:
+            self._conn = conn
+
+    def publish(self,  topic,  content):
+        content = _json_encode_value(content)
+        result = _json_call(self._conn,  self._uri, 'publish', [topic,  content])
+        # results: {'status': 'ok'} or
+        #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
+        _process_result(result,  'commit')
+
+    def subscribe(self,  topic,  url):
+        url = _json_encode_value(url)
+        result = _json_call(self._conn,  self._uri, 'subscribe', [topic,  url])
+        # results: {'status': 'ok'} or
+        #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
+        _process_result(result,  'commit')
+
+    def unsubscribe(self,  topic,  url):
+        url = _json_encode_value(url)
+        result = _json_call(self._conn,  self._uri, 'unsubscribe', [topic,  url])
+        # results: {'status': 'ok'} or
+        #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
+        _process_result(result,  'commit')
+
+    def getSubscribers(self,  topic):
+        result = _json_call(self._conn,  self._uri, 'get_subscribers', [topic])
+        # results: {'status': 'ok', 'value', xxx} or
+        #          {'status': 'fail', 'reason': 'timeout' or 'not_found'}
+        return _process_result(result,  'read')
+
+    def nop(self,  value):
+        value = _json_encode_value(value)
+        _json_call(self._conn,  self._uri, 'nop', [value])
+        # results: 'ok'
+    
+    def closeConnection(self):
+        self._conn.close()
     
 # if the expected value is a list, the returned value could by (mistakenly) a string if it is a list of integers
 # -> provide a method for converting such a string to a list
