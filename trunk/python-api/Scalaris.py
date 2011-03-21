@@ -48,7 +48,7 @@ def _json_call(conn,  uri,  function, params):
 
 def _json_encode_value(value):
     if isinstance(value,  bytearray):
-        return {'type': 'as_bin',  'value': base64.b64encode(value)}
+        return {'type': 'as_bin',  'value': base64.b64encode(buffer(value))}
     else:
         return {'type': 'as_is',  'value': value}
 
