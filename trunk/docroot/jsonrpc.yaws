@@ -19,6 +19,7 @@ handler(nop, [Value]) -> "ok";
 
 handler(range_read, [From, To])    -> api_json:dht_raw_range_read(From, To);
 handler(delete, [Key])             -> api_json:rdht_delete(Key);
+handler(delete, [Key, Timeout])    -> api_json:rdht_delete(Key, Timeout);
 handler(req_list, [Param])         -> api_json:tx_req_list(Param);
 handler(req_list, [TLog, ReqList]) -> api_json:tx_req_list(TLog, ReqList);
 handler(read, [Key])               -> api_json:tx_read(Key);

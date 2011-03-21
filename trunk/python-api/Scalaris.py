@@ -328,6 +328,42 @@ class PubSub(object):
     
     def closeConnection(self):
         self._conn.close()
+
+class ReplicatedDHT(object):
+    def __init__(self, url = None,  conn = None,  timeout = default_timeout):
+        if (url == None):
+            self._uri = urlparse.urlparse(default_url)
+        else:
+            self._uri = urlparse.urlparse(url)
+        
+        if (conn == None):
+            try:
+                self._conn = httplib.HTTPConnection(self._uri.hostname,  self._uri.port,  timeout = timeout)
+            except Exception as instance:
+                raise ConnectionException(instance)
+        else:
+            self._conn = conn
+
+    # returns: (Success::boolean(), ok::integer(), results:[ok | locks_set | undef])
+    def delete(self,  key, timeout = 2000):
+        result = _json_call(self._conn,  self._uri, 'delete', [key, timeout])
+        # results: {'ok': xxx, 'results': [ok | locks_set | undef]} or
+        #          {'failure': 'timeout', 'ok': xxx, 'results': [ok | locks_set | undef]}
+        if isinstance(result,  dict) and 'ok' in result and 'results' in result:
+            if 'failure' not in result:
+                return (True, result['ok'], result['results'])
+            else:
+                return (False, result['ok'], result['results'])
+        else:
+            raise UnknownException(result)
+
+    def nop(self,  value):
+        value = _json_encode_value(value)
+        _json_call(self._conn,  self._uri, 'nop', [value])
+        # results: 'ok'
+    
+    def closeConnection(self):
+        self._conn.close()
     
 # if the expected value is a list, the returned value could by (mistakenly) a string if it is a list of integers
 # -> provide a method for converting such a string to a list
@@ -340,8 +376,8 @@ def str_to_list(value):
 
 if __name__ == "__main__":
     import sys
-    sc = TransactionSingleOp()
     if (sys.argv[1] == "read"):
+        sc = TransactionSingleOp()
         key = sys.argv[2]
         try:
             value = sc.read(key)
@@ -359,6 +395,7 @@ if __name__ == "__main__":
             print 'read(' + key + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (sys.argv[1] == "write"):
+        sc = TransactionSingleOp()
         key = sys.argv[2]
         value = sys.argv[3]
         try:
@@ -375,4 +412,21 @@ if __name__ == "__main__":
             sys.exit(1)
         except UnknownException as instance:
             print 'write(' + key + ', ' + value + ') failed with unknown: ' + str(instance)
+            sys.exit(1)
+    elif (sys.argv[1] == "delete"):
+        sc = ReplicatedDHT()
+        key = sys.argv[2]
+        if len(sys.argv) >= 4:
+            timeout = sys.argv[3]
+        else:
+            timeout = 2000
+        
+        try:
+            (success, ok, results) = sc.delete(key)
+            if (success):
+                print 'delete(' + key + ', ' + str(timeout) + '): ok, deleted: ' + str(ok) + ' (' + repr(results) + ')'
+            else:
+                print 'delete(' + key + ', ' + str(timeout) + '): failed, deleted: ' + str(ok) + ' (' + repr(results) + ')'
+        except UnknownException as instance:
+            print 'delete(' + key + ') failed with unknown: ' + str(instance)
             sys.exit(1)

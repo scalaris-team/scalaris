@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Project SYSTEM "Project-4.6.dtd">
 <!-- eric4 project file for project Scalaris -->
-<!-- Saved: 2011-03-21, 17:09:30 -->
+<!-- Saved: 2011-03-21, 17:10:30 -->
 <!-- Copyright (C) 2011 Nico Kruber, kruber@zib.de -->
 <Project version="4.6">
   <Language>en</Language>
@@ -18,6 +18,7 @@
     <Source>TransactionSingleOpTest.py</Source>
     <Source>UnitTests.py</Source>
     <Source>TransactionTest.py</Source>
+    <Source>ReplicatedDHTTest.py</Source>
   </Sources>
   <Forms>
   </Forms>
@@ -39,4 +40,113 @@
     <FiletypeAssociation pattern="*.py" type="SOURCES" />
     <FiletypeAssociation pattern="*.ptl" type="SOURCES" />
   </FiletypeAssociations>
+  <Checkers>
+    <CheckersParams>
+      <dict>
+        <key>
+          <string>PYLINT</string>
+        </key>
+        <value>
+          <dict>
+            <key>
+              <string>dialogReport</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableBasic</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableClasses</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableDesign</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableExceptions</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableFormat</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableImports</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableMetrics</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableMiscellaneous</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableNewstyle</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableRPython</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableSimilarities</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableTypecheck</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>enableVariables</string>
+            </key>
+            <value>
+              <bool>True</bool>
+            </value>
+            <key>
+              <string>htmlReport</string>
+            </key>
+            <value>
+              <bool>False</bool>
+            </value>
+            <key>
+              <string>txtReport</string>
+            </key>
+            <value>
+              <bool>False</bool>
+            </value>
+          </dict>
+        </value>
+      </dict>
+    </CheckersParams>
+  </Checkers>
 </Project>
