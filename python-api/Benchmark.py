@@ -24,7 +24,7 @@ _BENCH_DATA_SIZE = 1000
 # The time when the (whole) benchmark suite was started.
 _now = datetime.now()
 # This is used to create different erlang keys for each run.
-_benchTime = int(time.mktime(_now.timetuple()) * 1000 + (_now.microsecond / 1000.0))
+_benchTime = int(time.mktime(_now.timetuple()) * 1000 + (_now.microsecond // 1000.0))
 # The time at the start of a single benchmark.
 _timeAtStart = 0
 # Cut 5% off of both ends of the result list.
@@ -44,9 +44,9 @@ def _getResultArray(rows,  columns):
 # Creates an random string or binary object from <size> random characters/bytes.
 def _getRandom(size,  type):
     if type == 'string':
-        return ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(size))
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(size))
     elif type == 'binary':
-        return bytearray(random.randrange(0, 256) for x in range(size))
+        return bytearray(random.randrange(0, 256) for x in xrange(size))
 
 # Prints a result table.
 def _printResults(columns,  rows,  results,  testruns):
@@ -256,7 +256,7 @@ def minibench(testruns, benchmarks):
 def _testBegin():
     global _timeAtStart
     now = datetime.now()
-    _timeAtStart = int(time.mktime(now.timetuple())) * 1000 + (now.microsecond / 1000)
+    _timeAtStart = int(time.mktime(now.timetuple())) * 1000 + (now.microsecond // 1000)
 
 # Call this method when a benchmark is finished.
 # Calculates the time the benchmark took and the number of transactions
@@ -265,8 +265,8 @@ def _testBegin():
 def _testEnd(testruns):
     global _timeAtStart
     now = datetime.now()
-    timeTaken = int(time.mktime(now.timetuple())) * 1000 + (now.microsecond / 1000) - _timeAtStart
-    speed = (testruns * 1000) / timeTaken
+    timeTaken = int(time.mktime(now.timetuple())) * 1000 + (now.microsecond // 1000) - _timeAtStart
+    speed = (testruns * 1000) // timeTaken
     return speed
 
 # Calculates the average number of transactions per second from the results
@@ -275,9 +275,9 @@ def _testEnd(testruns):
 # Returns the average number of transactions per second.
 def _getAvgSpeed(results):
     results.sort()
-    toRemove = int((len(results) * _percentToRemove) / 100);
+    toRemove = int((len(results) * _percentToRemove) // 100);
     avgSpeed = 0;
-    for i in range(toRemove,  (len(results) - toRemove)):
+    for i in xrange(toRemove,  (len(results) - toRemove)):
         avgSpeed += results[i]
     
     avgSpeed /= len(results) - 2 * toRemove
@@ -289,12 +289,12 @@ def _transSingleOpBench1(testruns, value, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 _testBegin()
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.TransactionSingleOp()
                     tx.write(key + str(i) + str(j),  value)
                     tx.closeConnection()
@@ -314,13 +314,13 @@ def _transSingleOpBench2(testruns, value, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 _testBegin()
                 conn = Scalaris.getConnection(Scalaris.default_url)
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.TransactionSingleOp(Scalaris.default_url,  conn)
                     tx.write(key + str(i) + str(j),  value)
                 
@@ -340,13 +340,13 @@ def _transSingleOpBench3(testruns, value, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 _testBegin()
                 tx = Scalaris.TransactionSingleOp()
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx.write(key + str(i) + str(j),  value)
                 
                 tx.closeConnection()
@@ -364,12 +364,12 @@ def _transBench1(testruns, value, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 _testBegin()
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.Transaction()
                     tx.write(key + str(i) + str(j),  value)
                     tx.commit()
@@ -390,13 +390,13 @@ def _transBench2(testruns, value, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 _testBegin()
                 conn = Scalaris.getConnection(Scalaris.default_url)
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.Transaction(Scalaris.default_url,  conn)
                     tx.write(key + str(i) + str(j),  value)
                     tx.commit()
@@ -417,13 +417,13 @@ def _transBench3(testruns, value, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 _testBegin()
                 tx = Scalaris.Transaction()
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx.write(key + str(i) + str(j),  value)
                     tx.commit()
                 
@@ -443,8 +443,8 @@ def _transIncrementBench1(testruns, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 key_i = key + str(i)
                 tx_init = Scalaris.Transaction()
@@ -453,7 +453,7 @@ def _transIncrementBench1(testruns, name):
                 tx_init.closeConnection();
                 _testBegin()
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.Transaction()
                     value_old = tx.read(key_i)
                     tx.write(key_i, value_old + 1)
@@ -476,8 +476,8 @@ def _transIncrementBench2(testruns, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 key_i = key + str(i)
                 tx_init = Scalaris.Transaction()
@@ -487,7 +487,7 @@ def _transIncrementBench2(testruns, name):
                 _testBegin()
                 conn = Scalaris.getConnection(Scalaris.default_url)
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.Transaction(Scalaris.default_url,  conn)
                     value_old = tx.read(key_i)
                     tx.write(key_i, value_old + 1)
@@ -509,8 +509,8 @@ def _transIncrementBench3(testruns, name):
     key = str(_benchTime) + name
     results = []
     
-    for i in range(testruns):
-        for retry in range(3):
+    for i in xrange(testruns):
+        for retry in xrange(3):
             try:
                 key_i = key + str(i)
                 tx_init = Scalaris.Transaction()
@@ -520,7 +520,7 @@ def _transIncrementBench3(testruns, name):
                 _testBegin()
                 tx = Scalaris.Transaction()
                 
-                for j in range(_transactionsPerTestRun):
+                for j in xrange(_transactionsPerTestRun):
                     value_old = tx.read(key_i)
                     tx.write(key_i, value_old + 1)
                     tx.commit();
@@ -536,13 +536,13 @@ def _transIncrementBench3(testruns, name):
 
 if __name__ == "__main__":
     if (len(sys.argv) == 1):
-        minibench(100,  range(1,  10,  1))
+        minibench(100,  xrange(1,  10,  1))
     elif (len(sys.argv) >= 3):
         testruns = int(sys.argv[1])
         benchmarks = []
-        for i in range(2,  min(11,  len(sys.argv))):
+        for i in xrange(2,  min(11,  len(sys.argv))):
             if sys.argv[i] == 'all':
-                benchmarks = range(1,  10,  1)
+                benchmarks = xrange(1,  10,  1)
             else:
                 benchmarks.append(int(sys.argv[i]))
         minibench(testruns,  benchmarks)

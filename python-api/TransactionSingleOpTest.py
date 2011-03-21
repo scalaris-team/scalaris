@@ -96,11 +96,11 @@ class TestTransactionSingleOp(unittest.TestCase):
         key = "_WriteString1_"
         conn = TransactionSingleOp()
         
-        for i in range(len(_testData)):
+        for i in xrange(len(_testData)):
             conn.write(str(_testTime) + key + str(i), _testData[i])
         
         # now try to read the data:
-        for i in range(len(_testData)):
+        for i in xrange(len(_testData)):
             actual = conn.read(str(_testTime) + key + str(i))
             self.assertEqual(actual, _testData[i])
         
@@ -112,7 +112,7 @@ class TestTransactionSingleOp(unittest.TestCase):
         key = "_WriteString2"
         conn = TransactionSingleOp()
         
-        for i in range(len(_testData)):
+        for i in xrange(len(_testData)):
             conn.write(str(_testTime) + key, _testData[i])
         
         # now try to read the data:
@@ -135,11 +135,11 @@ class TestTransactionSingleOp(unittest.TestCase):
         key = "_WriteList1_"
         conn = TransactionSingleOp()
         
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             conn.write(str(_testTime) + key + str(i), [_testData[i], _testData[i + 1]])
         
         # now try to read the data:
-        for i in range(0, len(_testData), 2):
+        for i in xrange(0, len(_testData), 2):
             actual = conn.read(str(_testTime) + key + str(i))
             self.assertEqual(actual, [_testData[i], _testData[i + 1]])
         
@@ -152,7 +152,7 @@ class TestTransactionSingleOp(unittest.TestCase):
         conn = TransactionSingleOp()
         
         list = []
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             list = [_testData[i], _testData[i + 1]]
             conn.write(str(_testTime) + key, list)
         
@@ -187,15 +187,15 @@ class TestTransactionSingleOp(unittest.TestCase):
         conn = TransactionSingleOp()
         
         # first write all values:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             conn.write(str(_testTime) + key + str(i), _testData[i])
         
         # now try to overwrite them using test_and_set:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             conn.testAndSet(str(_testTime) + key + str(i), _testData[i], _testData[i + 1])
         
         # now try to read the data:
-        for i in range(0, len(_testData), 2):
+        for i in xrange(0, len(_testData), 2):
             actual = conn.read(str(_testTime) + key + str(i))
             self.assertEqual(actual, _testData[i + 1])
         
@@ -210,17 +210,17 @@ class TestTransactionSingleOp(unittest.TestCase):
         conn = TransactionSingleOp()
         
         # first write all values:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             conn.write(str(_testTime) + key + str(i), _testData[i])
         
         # now try to overwrite them using test_and_set:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             with self.assertRaises(Scalaris.KeyChangedException) as cm:
                 conn.testAndSet(str(_testTime) + key + str(i), _testData[i + 1], "fail")
             self.assertEqual(cm.exception.old_value, _testData[i])
         
         # now try to read the data:
-        for i in range(0, len(_testData), 2):
+        for i in xrange(0, len(_testData), 2):
             actual = conn.read(str(_testTime) + key + str(i))
             self.assertEqual(actual, _testData[i])
         
@@ -252,15 +252,15 @@ class TestTransactionSingleOp(unittest.TestCase):
         conn = TransactionSingleOp()
         
         # first write all values:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             conn.write(str(_testTime) + key + str(i), [_testData[i], _testData[i + 1]])
         
         # now try to overwrite them using test_and_set:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             conn.testAndSet(str(_testTime) + key + str(i), [_testData[i], _testData[i + 1]], [_testData[i + 1], _testData[i]])
         
         # now try to read the data:
-        for i in range(0, len(_testData), 2):
+        for i in xrange(0, len(_testData), 2):
             actual = conn.read(str(_testTime) + key + str(i))
             self.assertEqual(actual, [_testData[i + 1], _testData[i]])
         
@@ -275,17 +275,17 @@ class TestTransactionSingleOp(unittest.TestCase):
         conn = TransactionSingleOp()
         
         # first write all values:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             conn.write(str(_testTime) + key + str(i), [_testData[i], _testData[i + 1]])
         
         # now try to overwrite them using test_and_set:
-        for i in range(0, len(_testData) - 1, 2):
+        for i in xrange(0, len(_testData) - 1, 2):
             with self.assertRaises(Scalaris.KeyChangedException) as cm:
                 conn.testAndSet(str(_testTime) + key + str(i), "fail", 1)
             self.assertEqual(cm.exception.old_value, [_testData[i], _testData[i + 1]])
         
         # now try to read the data:
-        for i in range(0, len(_testData), 2):
+        for i in xrange(0, len(_testData), 2):
             actual = conn.read(str(_testTime) + key + str(i))
             self.assertEqual(actual, [_testData[i], _testData[i + 1]])
         
