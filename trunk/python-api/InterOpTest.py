@@ -177,10 +177,7 @@ if __name__ == "__main__":
         print 'unknown commands: ' + str(sys.argv)
         sys.exit(1)
     
-    if 'SCALARIS_JSON_URL' in os.environ:
-        sc = Scalaris.TransactionSingleOp(url = os.environ['SCALARIS_JSON_URL'])
-    else:
-        sc = Scalaris.TransactionSingleOp()
+    sc = Scalaris.TransactionSingleOp()
     
     failed = 0
     failed += read_write_boolean(basekey, sc,  mode)

@@ -14,10 +14,13 @@
 #    limitations under the License.
 
 import json, httplib, urlparse, socket
-import sys
+import sys, os
 import base64
 
-default_url = 'http://localhost:8000'
+if 'SCALARIS_JSON_URL' in os.environ:
+    default_url = os.environ['SCALARIS_JSON_URL']
+else:
+    default_url = 'http://localhost:8000'
 default_timeout = 5 # socket timeout in seconds
 default_path = '/jsonrpc.yaws'
 
