@@ -17,10 +17,11 @@ import json, httplib, urlparse, socket
 import sys
 import base64
 
-default_url = 'http://localhost:8000/jsonrpc.yaws'
+default_url = 'http://localhost:8000'
 default_timeout = 5 # socket timeout in seconds
+default_path = '/jsonrpc.yaws'
 
-def _json_call(conn, uri, function, params):
+def _json_call(conn, function, params):
     params = {'version': '1.1',
               'method': function,
               'params': params,
@@ -32,8 +33,8 @@ def _json_call(conn, uri, function, params):
     # no need to quote - we already encode to json:
     headers = {"Content-type": "application/json"}
     try:
-        #conn.request("POST", uri.path, urllib.quote(params_json), headers)
-        conn.request("POST", uri.path, params_json, headers)
+        #conn.request("POST", default_path, urllib.quote(params_json), headers)
+        conn.request("POST", default_path, params_json, headers)
         response = conn.getresponse()
         #print response.status, response.reason
         if (response.status < 200 or response.status >= 300):
@@ -61,8 +62,11 @@ def _json_decode_value(value):
         return value['value']
 
 def getConnection(url, timeout = default_timeout):
-    uri = urlparse.urlparse(url)
-    return httplib.HTTPConnection(uri.hostname, uri.port, timeout = timeout)
+    try:
+        uri = urlparse.urlparse(url)
+        return httplib.HTTPConnection(uri.hostname, uri.port, timeout = timeout)
+    except Exception as instance:
+        raise ConnectionException(instance)
     
 # result: {'status': 'ok', 'value': xxx} or
 #         {'status': 'fail', 'reason': 'timeout' or 'not_found'}
@@ -159,29 +163,21 @@ class UnknownException(Exception):
        return repr(self.raw_result)
 
 class TransactionSingleOp(object):
-    def __init__(self, url = None, conn = None, timeout = default_timeout):
-        if (url == None):
-            self._uri = urlparse.urlparse(default_url)
-        else:
-            self._uri = urlparse.urlparse(url)
-        
+    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
         if (conn == None):
-            try:
-                self._conn = httplib.HTTPConnection(self._uri.hostname, self._uri.port, timeout = timeout)
-            except Exception as instance:
-                raise ConnectionException(instance)
+            self._conn = getConnection(url, timeout)
         else:
             self._conn = conn
 
     def read(self, key):
-        result = _json_call(self._conn, self._uri, 'read', [key])
+        result = _json_call(self._conn, 'read', [key])
         # results: {'status': 'ok', 'value', xxx} or
         #          {'status': 'fail', 'reason': 'timeout' or 'not_found'}
         return _process_result_read(result)
 
     def write(self, key, value):
         value = _json_encode_value(value)
-        result = _json_call(self._conn, self._uri, 'write', [key, value])
+        result = _json_call(self._conn, 'write', [key, value])
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
         _process_result_commit(result)
@@ -189,7 +185,7 @@ class TransactionSingleOp(object):
     def testAndSet(self, key, oldvalue, newvalue):
         oldvalue = _json_encode_value(oldvalue)
         newvalue = _json_encode_value(newvalue)
-        result = _json_call(self._conn, self._uri, 'test_and_set', [key, oldvalue, newvalue])
+        result = _json_call(self._conn, 'test_and_set', [key, oldvalue, newvalue])
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'} or
         #          {'status': 'fail', 'reason': 'key_changed', 'value': xxx}
@@ -210,24 +206,16 @@ class TransactionSingleOp(object):
 
     def nop(self, value):
         value = _json_encode_value(value)
-        _json_call(self._conn, self._uri, 'nop', [value])
+        _json_call(self._conn, 'nop', [value])
         # results: 'ok'
     
     def closeConnection(self):
         self._conn.close()
 
 class Transaction(object):
-    def __init__(self, url = None, conn = None, timeout = default_timeout):
-        if (url == None):
-            self._uri = urlparse.urlparse(default_url )
-        else:
-            self._uri = urlparse.urlparse(url)
-        
+    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
         if (conn == None):
-            try:
-                self._conn = httplib.HTTPConnection(self._uri.hostname, self._uri.port, timeout = timeout)
-            except Exception as instance:
-                raise ConnectionException(instance)
+            self._conn = getConnection(url, timeout)
         else:
             self._conn = conn
         
@@ -238,9 +226,9 @@ class Transaction(object):
     # (the elements of this list can be processed with Transaction.process_result_*(result))
     def req_list(self, reqlist):
         if self._tlog == None:
-            result = _json_call(self._conn, self._uri, 'req_list', [reqlist.getJSONRequests()])
+            result = _json_call(self._conn, 'req_list', [reqlist.getJSONRequests()])
         else:
-            result = _json_call(self._conn, self._uri, 'req_list', [self._tlog, reqlist.getJSONRequests()])
+            result = _json_call(self._conn, 'req_list', [self._tlog, reqlist.getJSONRequests()])
         # results: {'tlog': xxx,
         #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
         #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found}]}
@@ -284,7 +272,7 @@ class Transaction(object):
 
     def nop(self, value):
         value = _json_encode_value(value)
-        _json_call(self._conn, self._uri, 'nop', [value])
+        _json_call(self._conn, 'nop', [value])
         # results: 'ok'
     
     def closeConnection(self):
@@ -310,23 +298,15 @@ class ReqList(object):
         return self.requests
 
 class PubSub(object):
-    def __init__(self, url = None, conn = None, timeout = default_timeout):
-        if (url == None):
-            self._uri = urlparse.urlparse(default_url)
-        else:
-            self._uri = urlparse.urlparse(url)
-        
+    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
         if (conn == None):
-            try:
-                self._conn = httplib.HTTPConnection(self._uri.hostname, self._uri.port, timeout = timeout)
-            except Exception as instance:
-                raise ConnectionException(instance)
+            self._conn = getConnection(url, timeout)
         else:
             self._conn = conn
 
     def publish(self, topic, content):
         content = _json_encode_value(content)
-        result = _json_call(self._conn, self._uri, 'publish', [topic, content])
+        result = _json_call(self._conn, 'publish', [topic, content])
         # results: {'status': 'ok'}
         if result == {'status': 'ok'}:
             return None
@@ -334,14 +314,14 @@ class PubSub(object):
 
     def subscribe(self, topic, url):
         url = _json_encode_value(url)
-        result = _json_call(self._conn, self._uri, 'subscribe', [topic, url])
+        result = _json_call(self._conn, 'subscribe', [topic, url])
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
         _process_result_commit(result)
 
     def unsubscribe(self, topic, url):
         url = _json_encode_value(url)
-        result = _json_call(self._conn, self._uri, 'unsubscribe', [topic, url])
+        result = _json_call(self._conn, 'unsubscribe', [topic, url])
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}
         if isinstance(result, dict) and 'status' in result:
@@ -357,7 +337,7 @@ class PubSub(object):
         raise UnknownException(result)
 
     def getSubscribers(self, topic):
-        result = _json_call(self._conn, self._uri, 'get_subscribers', [topic])
+        result = _json_call(self._conn, 'get_subscribers', [topic])
         # results: [urls=str()]
         if isinstance(result, list):
             return result
@@ -366,30 +346,22 @@ class PubSub(object):
 
     def nop(self, value):
         value = _json_encode_value(value)
-        _json_call(self._conn, self._uri, 'nop', [value])
+        _json_call(self._conn, 'nop', [value])
         # results: 'ok'
     
     def closeConnection(self):
         self._conn.close()
 
 class ReplicatedDHT(object):
-    def __init__(self, url = None, conn = None, timeout = default_timeout):
-        if (url == None):
-            self._uri = urlparse.urlparse(default_url)
-        else:
-            self._uri = urlparse.urlparse(url)
-        
+    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
         if (conn == None):
-            try:
-                self._conn = httplib.HTTPConnection(self._uri.hostname, self._uri.port, timeout = timeout)
-            except Exception as instance:
-                raise ConnectionException(instance)
+            self._conn = getConnection(url, timeout)
         else:
             self._conn = conn
 
     # returns: (Success::boolean(), ok::integer(), results:[ok | locks_set | undef])
     def delete(self, key, timeout = 2000):
-        result = _json_call(self._conn, self._uri, 'delete', [key, timeout])
+        result = _json_call(self._conn, 'delete', [key, timeout])
         # results: {'ok': xxx, 'results': [ok | locks_set | undef]} or
         #          {'failure': 'timeout', 'ok': xxx, 'results': [ok | locks_set | undef]}
         if isinstance(result, dict) and 'ok' in result and 'results' in result:
@@ -402,7 +374,7 @@ class ReplicatedDHT(object):
 
     def nop(self, value):
         value = _json_encode_value(value)
-        _json_call(self._conn, self._uri, 'nop', [value])
+        _json_call(self._conn, 'nop', [value])
         # results: 'ok'
     
     def closeConnection(self):

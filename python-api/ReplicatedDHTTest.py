@@ -84,8 +84,8 @@ class TestReplicatedDHT(unittest.TestCase):
     def testDelete1(self):
         key = "_Delete1"
         c = Scalaris.getConnection(Scalaris.default_url)
-        rdht = ReplicatedDHT(Scalaris.default_url, c)
-        sc = Scalaris.TransactionSingleOp(Scalaris.default_url, c)
+        rdht = ReplicatedDHT(conn = c)
+        sc = Scalaris.TransactionSingleOp(conn = c)
         
         for i in xrange(len(_testData)):
             sc.write(str(_testTime) + key + str(i), _testData[i])
@@ -110,8 +110,8 @@ class TestReplicatedDHT(unittest.TestCase):
     def testDelete2(self):
         key = "_Delete2"
         c = Scalaris.getConnection(Scalaris.default_url)
-        rdht = ReplicatedDHT(Scalaris.default_url, c)
-        sc = Scalaris.TransactionSingleOp(Scalaris.default_url, c)
+        rdht = ReplicatedDHT(conn = c)
+        sc = Scalaris.TransactionSingleOp(conn = c)
         
         for i in xrange(len(_testData)):
             sc.write(str(_testTime) + key + str(i), _testData[i])
