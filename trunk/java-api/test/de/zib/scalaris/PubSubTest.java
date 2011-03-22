@@ -371,7 +371,8 @@ public class PubSubTest {
         PubSub conn = new PubSub();
 
         try {
-            conn.getSubscribers(new OtpErlangString(testTime + topic));
+            OtpErlangList subscribers = (OtpErlangList) conn.getSubscribers(new OtpErlangString(testTime + topic)).value();
+            assertTrue(subscribers.arity() == 0);
         } finally {
             conn.closeConnection();
         }
@@ -413,7 +414,8 @@ public class PubSubTest {
         PubSub conn = new PubSub();
         
         try {
-            conn.getSubscribers(testTime + topic);
+            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
+            assertTrue(subscribers.isEmpty());
         } finally {
             conn.closeConnection();
         }
@@ -470,12 +472,11 @@ public class PubSubTest {
             }
             
             // check if the subscribers were successfully saved:
-            
             for (int i = 0; i < testData.length; ++i) {
                 String topic1 = topic + i;
-                OtpErlangList subscribers = conn
+                OtpErlangList subscribers = (OtpErlangList) conn
                         .getSubscribers(new OtpErlangString(testTime
-                                + topic1));
+                                + topic1)).value();
                 assertTrue("Subscriber \"" + testData[i]
                         + "\" does not exist for topic \"" + topic1 + "\"", checkSubscribers(
                         subscribers, testData[i]));
@@ -516,8 +517,8 @@ public class PubSubTest {
             
             // check if the subscribers were successfully saved:
             
-            OtpErlangList subscribers = conn
-                    .getSubscribers(new OtpErlangString(testTime + topic));
+            OtpErlangList subscribers = (OtpErlangList) conn
+                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
             for (int i = 0; i < testData.length; ++i) {
                 assertTrue("Subscriber \"" + testData[i]
                         + "\" does not exist for topic \"" + topic + "\"", checkSubscribers(
@@ -579,7 +580,7 @@ public class PubSubTest {
             for (int i = 0; i < testData.length; ++i) {
                 String topic1 = topic + i;
                 List<String> subscribers = conn.getSubscribers(testTime
-                        + topic1);
+                        + topic1).stringListValue();
                 assertTrue("Subscriber \"" + testData[i]
                         + "\" does not exist for \"topic " + topic1 + "\"", checkSubscribers(
                         subscribers, testData[i]));
@@ -621,7 +622,7 @@ public class PubSubTest {
             // check if the subscribers were successfully saved:
             
             List<String> subscribers = conn
-                    .getSubscribers(testTime + topic);
+                    .getSubscribers(testTime + topic).stringListValue();
             for (int i = 0; i < testData.length; ++i) {
                 assertTrue("Subscriber " + testData[i]
                         + " does not exist for topic " + topic, checkSubscribers(
@@ -687,8 +688,8 @@ public class PubSubTest {
                     new OtpErlangString(testData[0]) );
             
             // check whether the unsubscribed urls were unsubscribed:
-            OtpErlangList subscribers = conn
-                    .getSubscribers(new OtpErlangString(testTime + topic));
+            OtpErlangList subscribers = (OtpErlangList) conn
+                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
             assertFalse("Subscriber \"" + testData[0]
                     + "\" should have been unsubscribed from topic \"" + topic
                     + "\"", checkSubscribers(subscribers, testData[0]));
@@ -732,8 +733,8 @@ public class PubSubTest {
             conn.unsubscribe(new OtpErlangString(testTime + topic),
                     new OtpErlangString(testData[2]));
 
-            OtpErlangList subscribers = conn
-                    .getSubscribers(new OtpErlangString(testTime + topic));
+            OtpErlangList subscribers = (OtpErlangList) conn
+                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
 
             // check whether the subscribers were successfully saved:
             
@@ -797,8 +798,8 @@ public class PubSubTest {
             // check whether the subscribers were successfully saved:
             for (int i = 1; i < testData.length; i += 2) {
                 String topic1 = topic + i;
-                OtpErlangList subscribers = conn
-                        .getSubscribers(new OtpErlangString(testTime + topic1));
+                OtpErlangList subscribers = (OtpErlangList) conn
+                        .getSubscribers(new OtpErlangString(testTime + topic1)).value();
                 assertTrue("Subscriber \"" + testData[i]
                         + "\" does not exist for topic \"" + topic1 + "\"",
                         checkSubscribers(subscribers, testData[i]));
@@ -810,8 +811,8 @@ public class PubSubTest {
             // check whether the unsubscribed urls were unsubscribed:
             for (int i = 0; i < testData.length; i += 2) {
                 String topic1 = topic + i;
-                OtpErlangList subscribers = conn
-                        .getSubscribers(new OtpErlangString(testTime + topic1));
+                OtpErlangList subscribers = (OtpErlangList) conn
+                        .getSubscribers(new OtpErlangString(testTime + topic1)).value();
                 assertFalse("Subscriber \"" + testData[i]
                         + "\" should have been unsubscribed from topic \"" + topic1
                         + "\"", checkSubscribers(subscribers, testData[i]));
@@ -861,8 +862,8 @@ public class PubSubTest {
                         new OtpErlangString(testData[i]) );
             }
             
-            OtpErlangList subscribers = conn
-                    .getSubscribers(new OtpErlangString(testTime + topic));
+            OtpErlangList subscribers = (OtpErlangList) conn
+                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
             String[] subscribers_expected = new String[testData.length / 2];
             // check if the subscribers were successfully saved:
             for (int i = 1; i < testData.length; i += 2) {
@@ -932,7 +933,7 @@ public class PubSubTest {
             conn.unsubscribe(testTime + topic, testData[0]);
             
             // check whether the unsubscribed urls were unsubscribed:
-            List<String> subscribers = conn.getSubscribers(testTime + topic);
+            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
             assertFalse("Subscriber \"" + testData[0]
                     + "\" should have been unsubscribed from topic \"" + topic
                     + "\"", checkSubscribers(subscribers, testData[0]));
@@ -976,7 +977,7 @@ public class PubSubTest {
             // then unsubscribe another "url":
             conn.unsubscribe(testTime + topic, testData[2]);
 
-            List<String> subscribers = conn.getSubscribers(testTime + topic);
+            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
 
             // check whether the subscribers were successfully saved:
             
@@ -1040,7 +1041,7 @@ public class PubSubTest {
             // check whether the subscribers were successfully saved:
             for (int i = 1; i < testData.length; i += 2) {
                 String topic1 = topic + i;
-                List<String> subscribers = conn.getSubscribers(testTime + topic1);
+                List<String> subscribers = conn.getSubscribers(testTime + topic1).stringListValue();
                 assertTrue("Subscriber \"" + testData[i]
                           + "\" does not exist for \"topic " + topic1 + "\"", checkSubscribers(
                           subscribers, testData[i]));
@@ -1053,7 +1054,7 @@ public class PubSubTest {
             for (int i = 0; i < testData.length; i += 2) {
                 String topic1 = topic + i;
                 List<String> subscribers = conn.getSubscribers(testTime
-                        + topic1);
+                        + topic1).stringListValue();
                 assertFalse("Subscriber \"" + testData[i]
                         + "\" should have been unsubscribed from topic \"" + topic1 + "\"", checkSubscribers(
                         subscribers, testData[i]));
@@ -1103,7 +1104,7 @@ public class PubSubTest {
                         testData[i]);
             }
             
-            List<String> subscribers = conn.getSubscribers(testTime + topic);
+            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
             String[] subscribers_expected = new String[testData.length / 2];
             // check if the subscribers were successfully saved:
             for (int i = 1; i < testData.length; i += 2) {

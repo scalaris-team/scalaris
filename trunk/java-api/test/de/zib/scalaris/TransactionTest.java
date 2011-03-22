@@ -487,7 +487,7 @@ public class TransactionTest {
                         new OtpErlangString(testData[i]),
                         new OtpErlangString(testData[i + 1]) };
                 OtpErlangObject actual = t.read(
-                        new OtpErlangString(testTime + key + i));
+                        new OtpErlangString(testTime + key + i)).value();
                 OtpErlangList expected = new OtpErlangList(data);
 
                 assertEquals(expected, actual);
@@ -501,7 +501,7 @@ public class TransactionTest {
                         new OtpErlangString(testData[i]),
                         new OtpErlangString(testData[i + 1]) };
                 OtpErlangObject actual = t.read(
-                        new OtpErlangString(testTime + key + i));
+                        new OtpErlangString(testTime + key + i)).value();
                 OtpErlangList expected = new OtpErlangList(data);
 
                 assertEquals(expected, actual);

@@ -61,7 +61,7 @@ public class TransactionSingleOpReadExample {
             TransactionSingleOp sc = new TransactionSingleOp();
             System.out
                     .println("    `OtpErlangObject readObject(OtpErlangString)`...");
-            otpValue = (OtpErlangString) sc.read(otpKey);
+            otpValue = (OtpErlangString) sc.read(otpKey).value();
             System.out.println("      read(" + otpKey.stringValue() + ") == "
                     + otpValue.stringValue());
         } catch (ConnectionException e) {

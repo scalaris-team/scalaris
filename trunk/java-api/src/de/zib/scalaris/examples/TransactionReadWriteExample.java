@@ -459,7 +459,7 @@ public class TransactionReadWriteExample {
         OtpErlangString otpKey = new OtpErlangString(key);
         OtpErlangString otpValue;
         try {
-            otpValue = (OtpErlangString) transaction.read(otpKey);
+            otpValue = (OtpErlangString) transaction.read(otpKey).value();
             System.out.println("      read(" + otpKey.stringValue() + ") == "
                     + otpValue.stringValue());
             return otpValue.stringValue();

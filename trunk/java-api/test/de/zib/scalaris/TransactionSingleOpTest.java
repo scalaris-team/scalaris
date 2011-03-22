@@ -236,7 +236,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i]),
                         new OtpErlangString(testData[i + 1]) };
                 OtpErlangObject actual = conn.read(
-                        new OtpErlangString(testTime + key + i));
+                        new OtpErlangString(testTime + key + i)).value();
                 OtpErlangList expected = new OtpErlangList(data);
                 
                 assertEquals(expected, actual);
@@ -278,7 +278,7 @@ public class TransactionSingleOpTest {
             // now try to read the data:
             
             OtpErlangObject actual = conn.read(
-                    new OtpErlangString(testTime + key));
+                    new OtpErlangString(testTime + key)).value();
             OtpErlangList expected = new OtpErlangList(data);
             
             assertEquals(expected, actual);
@@ -593,7 +593,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i + 1]),
                         new OtpErlangString(testData[i]) };
                 OtpErlangObject actual = conn.read(
-                        new OtpErlangString(testTime + key + i));
+                        new OtpErlangString(testTime + key + i)).value();
                 OtpErlangList expected = new OtpErlangList(data);
                 assertEquals(expected, actual);
             }
@@ -659,7 +659,7 @@ public class TransactionSingleOpTest {
                         new OtpErlangString(testData[i]),
                         new OtpErlangString(testData[i + 1]) };
                 OtpErlangObject actual = conn.read(
-                        new OtpErlangString(testTime + key + i));
+                        new OtpErlangString(testTime + key + i)).value();
                 OtpErlangList expected = new OtpErlangList(data);
                 assertEquals(expected, actual);
             }

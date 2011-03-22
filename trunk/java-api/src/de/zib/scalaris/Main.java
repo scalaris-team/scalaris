@@ -15,8 +15,8 @@
  */
 package de.zib.scalaris;
 
-import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -161,6 +161,8 @@ public class Main {
                 System.out.println("publish(" + topic + ", " + content + "): ok");
             } catch (ConnectionException e) {
                 printException("publish failed with connection error", e, verbose);
+            } catch (UnknownException e) {
+                printException("publish failed with unknown", e, verbose);
             }
         } else if (line.hasOption("s")) { // subscribe
             String[] optionValues = line.getOptionValues("subscribe");
@@ -205,7 +207,7 @@ public class Main {
             checkArguments(topic, options, "g");
             try {
                 PubSub sc = new PubSub();
-                ArrayList<String> subscribers = sc.getSubscribers(topic);
+                List<String> subscribers = sc.getSubscribers(topic).stringListValue();
                 System.out.println("getSubscribers(" + topic + ") == "
                         + subscribers);
             } catch (ConnectionException e) {

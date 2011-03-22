@@ -15,11 +15,6 @@
  */
 package de.zib.scalaris;
 
-import java.io.IOException;
-
-import com.ericsson.otp.erlang.OtpAuthException;
-import com.ericsson.otp.erlang.OtpErlangAtom;
-import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
@@ -71,7 +66,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   
  *   TransactionSingleOp sc = new TransactionSingleOp();
  *   String value             = sc.read(key).stringValue(); // {@link #read(String)}
- *   OtpErlangObject optValue = sc.read(otpKey);            // {@link #read(OtpErlangString)}
+ *   OtpErlangObject optValue = sc.read(otpKey).value();    // {@link #read(OtpErlangString)}
  * </code>
  * </pre>
  * 
@@ -105,7 +100,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * state. The number of automatic retries is adjustable (default: 3).
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.8
+ * @version 3.4
  * @since 2.0
  */
 public class TransactionSingleOp {
@@ -163,48 +158,12 @@ public class TransactionSingleOp {
      * 
      * @since 2.9
      */
-    public OtpErlangObject read(OtpErlangString key)
+    public ErlangValue read(OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
-        OtpErlangObject received_raw = null;
-        try {
-            received_raw = connection.doRPC("api_tx", "read",
-                    new OtpErlangList(key));
-            OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
-
-            /*
-             * possible return values:
-             *  {ok, Value} | {fail, timeout | not_found}
-             */
-            if (state.equals(CommonErlangObjects.okAtom) && received.arity() == 2) {
-                return received.elementAt(1);
-            } else if (state.equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
-                OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
-                    throw new NotFoundException(received_raw);
-                } else {
-                    throw new UnknownException(received_raw);
-                }
-            } else {
-                throw new UnknownException(received_raw);
-            }
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (ClassCastException e) {
-            // e.printStackTrace();
-            // received_raw is not null since the first class cast is after the RPC!
-            throw new UnknownException(e, received_raw);
-        }
+        OtpErlangObject received_raw = connection.doRPC("api_tx", "read",
+                new OtpErlangList(key));
+        return new ErlangValue(CommonErlangObjects.processResult_read(received_raw));
     }
 
     /**
@@ -213,7 +172,7 @@ public class TransactionSingleOp {
      * @param key
      *            the key to look up
      * 
-     * @return the (string) value stored under the given <tt>key</tt>
+     * @return the value stored under the given <tt>key</tt>
      * 
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -231,7 +190,7 @@ public class TransactionSingleOp {
      */
     public ErlangValue read(String key) throws ConnectionException,
             TimeoutException, NotFoundException, UnknownException {
-        return new ErlangValue(read(new OtpErlangString(key)));
+        return read(new OtpErlangString(key));
     }
 
     // /////////////////////////////
@@ -261,45 +220,9 @@ public class TransactionSingleOp {
      */
     public void write(OtpErlangString key, OtpErlangObject value)
             throws ConnectionException, TimeoutException, AbortException, UnknownException {
-        OtpErlangObject received_raw = null;
-        try {
-            received_raw = connection.doRPC("api_tx", "write",
-                    new OtpErlangList(new OtpErlangObject[] { key, value }));
-            OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
-
-            /*
-             * possible return values:
-             *  {ok} | {fail, timeout | abort}
-             */
-            if (received.equals(CommonErlangObjects.okTupleAtom)) {
-                return;
-            } else if (state.equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
-                OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.abortAtom)) {
-                    throw new AbortException(received_raw);
-                } else {
-                    throw new UnknownException(received_raw);
-                }
-            } else {
-                throw new UnknownException(received_raw);
-            }
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (ClassCastException e) {
-            // e.printStackTrace();
-            // received_raw is not null since the first class cast is after the RPC!
-            throw new UnknownException(e, received_raw);
-        }
+        OtpErlangObject received_raw = connection.doRPC("api_tx", "write",
+                new OtpErlangObject[] { key, value });
+        CommonErlangObjects.processResult_commit(received_raw);
     }
 
     /**
@@ -329,7 +252,7 @@ public class TransactionSingleOp {
      */
     public <T> void write(String key, T value) throws ConnectionException,
             TimeoutException, AbortException, UnknownException {
-        write(new OtpErlangString(key), new ErlangValue(value).value());
+        write(new OtpErlangString(key), ErlangValue.convertToErlang(value));
     }
 
     // /////////////////////////////
@@ -368,20 +291,17 @@ public class TransactionSingleOp {
             OtpErlangObject old_value, OtpErlangObject new_value)
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
-        OtpErlangObject received_raw = null;
+        OtpErlangObject received_raw = connection.doRPC("api_tx", "test_and_set",
+                new OtpErlangObject[] { key, old_value, new_value });
+        /*
+         * possible return values:
+         *  {ok} | {fail, timeout | abort | not_found | {key_changed, RealOldValue}
+         */
         try {
-            received_raw = connection.doRPC("api_tx", "test_and_set",
-                    new OtpErlangList(new OtpErlangObject[] { key, old_value, new_value }));
             OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
-
-            /*
-             * possible return values:
-             *  {ok} | {fail, timeout | abort | not_found | {key_changed, RealOldValue}
-             */
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
-            } else if (state.equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
+            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
                 OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
                     throw new TimeoutException(received_raw);
@@ -395,25 +315,12 @@ public class TransactionSingleOp {
                             CommonErlangObjects.keyChangedAtom)
                             && reason_tpl.arity() == 2) {
                         throw new KeyChangedException(reason_tpl.elementAt(1));
-                    } else {
-                        throw new UnknownException(received_raw);
                     }
                 }
-            } else {
-                throw new UnknownException(received_raw);
             }
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
+            throw new UnknownException(received_raw);
         } catch (ClassCastException e) {
             // e.printStackTrace();
-            // received_raw is not null since the first class cast is after the RPC!
             throw new UnknownException(e, received_raw);
         }
     }
@@ -457,8 +364,8 @@ public class TransactionSingleOp {
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
         testAndSet(new OtpErlangString(key),
-                new ErlangValue(old_value).value(),
-                new ErlangValue(new_value).value());
+                ErlangValue.convertToErlang(old_value),
+                ErlangValue.convertToErlang(new_value));
     }
     
     /**

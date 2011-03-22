@@ -61,7 +61,7 @@
  * <code style="white-space:pre;">
  *   try {
  *     Transaction transaction = new Transaction();
- *     String value = transaction.read("key");
+ *     String value = transaction.read("key").stringValue();
  *     transaction.write("key", "value");
  *     transaction.commit();
  *   } catch (ConnectionException e) {

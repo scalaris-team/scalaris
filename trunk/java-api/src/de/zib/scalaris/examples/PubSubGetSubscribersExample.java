@@ -65,7 +65,7 @@ public class PubSubGetSubscribersExample {
             PubSub sc = new PubSub();
             System.out
                     .println("    `OtpErlangList getSubscribers(OtpErlangString)`...");
-            otpSubscribers = sc.getSubscribers(otpTopic);
+            otpSubscribers = (OtpErlangList) sc.getSubscribers(otpTopic).value();
             System.out.println("      getSubscribers(" + otpTopic.stringValue()
                     + ") == " + getSubscribers(otpSubscribers));
         } catch (ConnectionException e) {
@@ -80,8 +80,8 @@ public class PubSubGetSubscribersExample {
             System.out.println("  creating object...");
             PubSub sc = new PubSub();
             System.out
-                    .println("    `Vector<String> getSubscribers(String)`...");
-            subscribers = sc.getSubscribers(topic);
+                    .println("    `List<String> getSubscribers(String)`...");
+            subscribers = sc.getSubscribers(topic).stringListValue();
             System.out.println("      getSubscribers(" + topic + ") == "
                     + getSubscribers(subscribers));
         } catch (ConnectionException e) {
