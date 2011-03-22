@@ -109,7 +109,7 @@ public class ReplicatedDHTTest {
 
         try {
             for (int i = 0; i < testData.length; ++i) {
-                long deleted = rdht.delete(testTime + key + i);
+                int deleted = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(0, deleted);
                 assertEquals(0, result.ok);
@@ -148,7 +148,7 @@ public class ReplicatedDHTTest {
             
             // now try to delete the data:
             for (int i = 0; i < testData.length; ++i) {
-                long deleted = rdht.delete(testTime + key + i);
+                int deleted = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(4, deleted);
                 assertEquals(4, result.ok);
@@ -195,7 +195,7 @@ public class ReplicatedDHTTest {
             
             // now try to delete the data:
             for (int i = 0; i < testData.length; ++i) {
-                long deleted = rdht.delete(testTime + key + i);
+                int deleted = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(4, deleted);
                 assertEquals(4, result.ok);
@@ -209,7 +209,7 @@ public class ReplicatedDHTTest {
             
             // now try to delete the data:
             for (int i = 0; i < testData.length; ++i) {
-                long deleted = rdht.delete(testTime + key + i);
+                int deleted = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
                 assertEquals(4, deleted);
                 assertEquals(4, result.ok);

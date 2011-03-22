@@ -38,7 +38,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * See {@link #ErlangValue(Object)} for a list of compatible types.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 3.3
+ * @version 3.4
  * @since 3.0
  */
 public class ErlangValue {
@@ -59,15 +59,25 @@ public class ErlangValue {
     /**
      * Creates a new object from a given set of Java types.
      * The following types are supported:
+     * native types:
      * <ul>
+     *  <li>{@link Boolean} - {@link OtpErlangBoolean}</li>
      *  <li>{@link Long} - {@link OtpErlangLong}</li>
      *  <li>{@link Integer} - {@link OtpErlangLong}</li>
      *  <li>{@link BigInteger} - {@link OtpErlangLong}</li>
      *  <li>{@link Double} - {@link OtpErlangDouble}</li>
      *  <li>{@link String} - {@link OtpErlangString}</li>
      *  <li><tt>byte[]</tt> - {@link OtpErlangBinary}</li>
-     *  <li>{@link List} with one of the supported types - {@link OtpErlangList}</li>
+     *  </ul>
+     * composite types:
+     * <ul>
+     *  <li>{@link List} with one of the native types - {@link OtpErlangList}</li>
      *  <li>{@link Map}<String, Object> representing a JSON object - {@link OtpErlangTuple}</li>
+     *  <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
+     *  <li>{@link ErlangValue}</li>
+     *  </ul>
+     * custom types:
+     * <ul>
      *  <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
      *  <li>{@link ErlangValue}</li>
      *  </ul>
@@ -95,7 +105,7 @@ public class ErlangValue {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    private static <T> OtpErlangObject convertToErlang(T value)
+    public static <T> OtpErlangObject convertToErlang(T value)
             throws ClassCastException {
         if (value instanceof Boolean) {
             return new OtpErlangBoolean((Boolean) value);
@@ -219,16 +229,21 @@ public class ErlangValue {
     }
 
     /**
-     * Returns the Java {@link String} value of the wrapped erlang value.
+     * Converts an {@link OtpErlangObject} to a {@link String} taking
+     * special care of empty lists which can not be converted to strings using
+     * the OTP library .
      * 
-     * @return the converted value
+     * @param value
+     *            the value to convert
+     * 
+     * @return the value as a String
      * 
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if the conversion fails
      */
-    public String stringValue() throws ClassCastException {
-        // note: need special handling for empty strings:
+    private static String otpObjectToString(OtpErlangObject value)
+            throws ClassCastException {
+        // need special handling if OTP returned an empty list
         if (value instanceof OtpErlangList) {
             OtpErlangList value_list = (OtpErlangList) value;
             if (value_list.arity() == 0) {
@@ -239,6 +254,19 @@ public class ErlangValue {
         } else {
             return ((OtpErlangString) value).stringValue();
         }
+    }
+
+    /**
+     * Returns the Java {@link String} value of the wrapped erlang value.
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     */
+    public String stringValue() throws ClassCastException {
+        return otpObjectToString(value);
     }
 
     /**
@@ -346,7 +374,7 @@ public class ErlangValue {
         OtpErlangList list = otpObjectToOtpList(value);
         ArrayList<String> result = new ArrayList<String>(list.arity());
         for (OtpErlangObject i : list) {
-            result.add(((OtpErlangString) i).stringValue());
+            result.add(otpObjectToString(i));
         }
         return result;
     }
@@ -424,6 +452,8 @@ public class ErlangValue {
             return ((OtpErlangDouble) value).doubleValue();
         } else if (value instanceof OtpErlangString) {
             return ((OtpErlangString) value).stringValue();
+        } else if (value instanceof OtpErlangList && ((OtpErlangList) value).arity() == 0) {
+            return "";
         } else if (value instanceof OtpErlangTuple) {
             OtpErlangTuple value_tpl = (OtpErlangTuple) value;
             if (value_tpl.arity() == 2) {

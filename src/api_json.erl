@@ -44,7 +44,7 @@
 -type read_result() ::
         {struct, [{status, string()}       %% "ok", "fail"
                   | {reason, string()}     %% "timeout", "not_found"
-                  | json_value() ]}.
+                  | {value, json_value()} ]}.
 -type write_result() ::
         {struct, [{status, string()}       %% "ok", "fail"
                   | {reason, string()} ]}. %% "timeout"
@@ -88,7 +88,7 @@ tx_write(Key, Value) ->
                      -> commit_result() |
                         {struct, [{status, string()}  %% "fail"
                                  | {reason, string()} %% "key_changed", "not_found"
-                                 | json_value() ]}.
+                                 | {value, json_value()} ]}.
 tx_test_and_set(Key, OldValue, NewValue) ->
     OldRealValue = json_to_value(OldValue),
     NewRealValue = json_to_value(NewValue),
@@ -141,7 +141,7 @@ json_to_value({struct, [{type, "as_is"}, {value, Value}]}) ->
     Value.
 
 %% interface for api_pubsub calls
--spec pubsub_publish(string(), string()) -> commit_result().
+-spec pubsub_publish(string(), string()) -> {struct, [{status, string()}]}. %status: "ok"
 pubsub_publish(Topic, Content) ->
     Res = api_pubsub:publish(Topic, Content),
     result_to_json(Res).
@@ -151,7 +151,7 @@ pubsub_subscribe(Topic, URL) ->
     Res = api_pubsub:subscribe(Topic, URL),
     result_to_json(Res).
 
--spec pubsub_unsubscribe(string(), string()) -> commit_result().
+-spec pubsub_unsubscribe(string(), string()) -> commit_result(). %note: reason may also be "not_found"
 pubsub_unsubscribe(Topic, URL) ->
     Res = api_pubsub:unsubscribe(Topic, URL),
     result_to_json(Res).

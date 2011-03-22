@@ -77,7 +77,7 @@ public class TransactionReadExample {
             for (int i = 0; i < otpKeys.arity(); ++i) {
                 OtpErlangString otpKey = (OtpErlangString) otpKeys.elementAt(i);
                 try {
-                    otpValue = (OtpErlangString) transaction.read(otpKey);
+                    otpValue = (OtpErlangString) transaction.read(otpKey).value();
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") == " + otpValue.stringValue());
                 } catch (ConnectionException e) {

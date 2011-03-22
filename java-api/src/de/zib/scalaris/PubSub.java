@@ -15,12 +15,6 @@
  */
 package de.zib.scalaris;
 
-import java.io.IOException;
-import java.util.ArrayList;
-
-import com.ericsson.otp.erlang.OtpAuthException;
-import com.ericsson.otp.erlang.OtpErlangAtom;
-import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
@@ -44,7 +38,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpTopic;
  *   OtpErlangString otpContent;
  *   
- *   TransactionSingleOp sc = new TransactionSingleOp();
+ *   TransactionSingleOp sc = new PubSub();
  *   sc.publish(topic, content);       // {@link #publish(String, String)}
  *   sc.publish(otpTopic, otpContent); // {@link #publish(OtpErlangString, OtpErlangString)}
  * </code>
@@ -60,7 +54,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpTopic;
  *   OtpErlangString otpURL;
  *   
- *   TransactionSingleOp sc = new TransactionSingleOp();
+ *   TransactionSingleOp sc = new PubSub();
  *   sc.subscribe(topic, URL);       // {@link #subscribe(String, String)}
  *   sc.subscribe(otpTopic, otpURL); // {@link #subscribe(OtpErlangString, OtpErlangString)}
  * </code>
@@ -81,7 +75,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   OtpErlangString otpTopic;
  *   OtpErlangString otpURL;
  *   
- *   TransactionSingleOp sc = new TransactionSingleOp();
+ *   TransactionSingleOp sc = new PubSub();
  *   sc.unsubscribe(topic, URL);       // {@link #unsubscribe(String, String)}
  *   sc.unsubscribe(otpTopic, otpURL); // {@link #unsubscribe(OtpErlangString, OtpErlangString)}
  * </code>
@@ -93,13 +87,13 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   String topic;
  *   OtpErlangString otpTopic;
  *   
- *   Vector&lt;String&gt; subscribers;
+ *   List&lt;String&gt; subscribers;
  *   OtpErlangList otpSubscribers;
  *   
  *   // non-static:
- *   TransactionSingleOp sc = new TransactionSingleOp();
- *   subscribers = sc.getSubscribers(topic);             // {@link #getSubscribers(String)}
- *   otpSubscribers = sc.singleGetSubscribers(otpTopic); // {@link #getSubscribers(OtpErlangString)}
+ *   TransactionSingleOp sc = new PubSub();
+ *   subscribers = sc.getSubscribers(topic).stringListValue();             // {@link #getSubscribers(String)}
+ *   otpSubscribers = (OtpErlangList) sc.getSubscribers(otpTopic).value(); // {@link #getSubscribers(OtpErlangString)}
  * </code>
  * </pre>
  * 
@@ -115,7 +109,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * number of automatic retries is adjustable (default: 3).
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.5
+ * @version 3.4
  * @since 2.5
  */
 public class PubSub {
@@ -164,27 +158,19 @@ public class PubSub {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
+     * @throws UnknownException
+     *             if any other error occurs
      */
     public void publish(OtpErlangString topic, OtpErlangString content)
-            throws ConnectionException {
-        try {
-            /**
-             * The specification of <tt>api_pubsub:publish/2</tt> states
-             * that the only returned value is <tt>ok</tt>, so no further evaluation is
-             * necessary.
-             */
-            connection
-                    .doRPC("api_pubsub", "publish", new OtpErlangList(
-                            new OtpErlangObject[] { topic, content }));
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
+            throws ConnectionException, UnknownException {
+        /*
+         * possible return values:
+         *  {ok}
+         */
+        OtpErlangObject received_raw = connection.doRPC("api_pubsub", "publish",
+                new OtpErlangObject[] { topic, content });
+        if (!received_raw.equals(CommonErlangObjects.okTupleAtom)) {
+            throw new UnknownException(received_raw);
         }
     }
     
@@ -200,9 +186,11 @@ public class PubSub {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
+     * @throws UnknownException
+     *             if any other error occurs
      */
     public void publish(String topic, String content)
-            throws ConnectionException {
+            throws ConnectionException, UnknownException {
         publish(new OtpErlangString(topic), new OtpErlangString(content));
     }
 
@@ -232,45 +220,9 @@ public class PubSub {
      */
     public void subscribe(OtpErlangString topic, OtpErlangString url) throws ConnectionException,
             TimeoutException, AbortException, UnknownException {
-        OtpErlangObject received_raw = null;
-        try {
-            received_raw = connection.doRPC("api_pubsub", "subscribe",
-                    new OtpErlangList(new OtpErlangObject[] { topic, url }));
-            OtpErlangObject received = received_raw;
-
-            /*
-             * possible return values:
-             *   {ok} | {fail, abort | timeout}.
-             */
-            if (received.equals(CommonErlangObjects.okTupleAtom)) {
-                return;
-            } else {
-                // {fail, Reason}
-                OtpErlangTuple returnValue = (OtpErlangTuple) received;
-                OtpErlangAtom failReason = (OtpErlangAtom) returnValue.elementAt(1);
-
-                if (failReason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (failReason.equals(CommonErlangObjects.abortAtom)) {
-                    throw new AbortException(received_raw);
-                } else {
-                    throw new UnknownException(received_raw);
-                }
-            }
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (ClassCastException e) {
-            // e.printStackTrace();
-            // received_raw is not null since the first class cast is after the RPC!
-            throw new UnknownException(e, received_raw);
-        }
+        OtpErlangObject received_raw = connection.doRPC("api_pubsub", "subscribe",
+                new OtpErlangObject[] { topic, url });
+        CommonErlangObjects.processResult_commit(received_raw);
     }
     
     /**
@@ -327,45 +279,30 @@ public class PubSub {
     public void unsubscribe(OtpErlangString topic, OtpErlangString url)
             throws ConnectionException, TimeoutException, NotFoundException,
             AbortException, UnknownException {
-        OtpErlangObject received_raw = null;
+        OtpErlangObject received_raw = connection.doRPC("api_pubsub", "unsubscribe",
+                new OtpErlangObject[] { topic, url });
         try {
-            received_raw = connection.doRPC("api_pubsub", "unsubscribe",
-                    new OtpErlangList(new OtpErlangObject[] { topic, url }));
-            OtpErlangObject received = received_raw;
-
             /*
              * possible return values:
              *   {ok} | {fail, abort | timeout | not_found}.
              */
+            OtpErlangTuple received = (OtpErlangTuple) received_raw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
-            } else {
+            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
                 // {fail, Reason}
-                OtpErlangTuple returnValue = (OtpErlangTuple) received;
-                OtpErlangAtom failReason = (OtpErlangAtom) returnValue.elementAt(1);
-
+                OtpErlangObject failReason = received.elementAt(1);
                 if (failReason.equals(CommonErlangObjects.timeoutAtom)) {
                     throw new TimeoutException(received_raw);
                 } else if (failReason.equals(CommonErlangObjects.abortAtom)) {
                     throw new AbortException(received_raw);
                 } else if (failReason.equals(CommonErlangObjects.notFoundAtom)) {
                     throw new NotFoundException(received_raw);
-                } else {
-                    throw new UnknownException(received_raw);
                 }
             }
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
+            throw new UnknownException(received_raw);
         } catch (ClassCastException e) {
             // e.printStackTrace();
-            // received_raw is not null since the first class cast is after the RPC!
             throw new UnknownException(e, received_raw);
         }
     }
@@ -399,22 +336,6 @@ public class PubSub {
     }
 
     // /////////////////////////////
-    // utility methods
-    // /////////////////////////////
-    
-    /**
-     * Converts the given erlang <tt>list</tt> of erlang strings to a Java {@link ArrayList}.
-     */
-    private static ArrayList<String> erlStrListToStrArrayList(OtpErlangList list) {
-        ArrayList<String> result = new ArrayList<String>(list.arity());
-        for (int i = 0; i < list.arity(); ++i) {
-            OtpErlangString elem = (OtpErlangString) list.elementAt(i);
-            result.add(elem.stringValue());
-        }
-        return result;
-    }
-
-    // /////////////////////////////
     // get subscribers methods
     // /////////////////////////////
     
@@ -434,27 +355,16 @@ public class PubSub {
      *             is thrown if the return type of the erlang method does not
      *             match the expected one
      */
-    public OtpErlangList getSubscribers(
+    public ErlangValue getSubscribers(
             OtpErlangString topic) throws ConnectionException, UnknownException {
-        OtpErlangObject received_raw = null;
+        OtpErlangObject received_raw = connection.doRPC("api_pubsub", "get_subscribers",
+                new OtpErlangList(topic));
         try {
             // return value: [string()]
-            received_raw = connection.doRPC("api_pubsub", "get_subscribers",
-                    new OtpErlangList(topic));
             OtpErlangList received = (OtpErlangList) received_raw;
-            return received;
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
+            return new ErlangValue(received);
         } catch (ClassCastException e) {
             // e.printStackTrace();
-            // received_raw is not null since the first class cast is after the RPC!
             throw new UnknownException(e, received_raw);
         }
     }
@@ -475,9 +385,9 @@ public class PubSub {
      *             is thrown if the return type of the erlang method does not
      *             match the expected one
      */
-    public ArrayList<String> getSubscribers(
+    public ErlangValue getSubscribers(
             String topic) throws ConnectionException, UnknownException {
-        return erlStrListToStrArrayList(getSubscribers(new OtpErlangString(topic)));
+        return getSubscribers(new OtpErlangString(topic));
     }
     
     /**

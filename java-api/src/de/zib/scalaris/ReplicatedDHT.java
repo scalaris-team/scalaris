@@ -15,15 +15,12 @@
  */
 package de.zib.scalaris;
 
-import java.io.IOException;
-
-import com.ericsson.otp.erlang.OtpAuthException;
 import com.ericsson.otp.erlang.OtpErlangAtom;
-import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangInt;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
+import com.ericsson.otp.erlang.OtpErlangRangeException;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
@@ -45,7 +42,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   int timeout;
  *   DeleteResult result;
  *   
- *   TransactionSingleOp sc = new TransactionSingleOp();
+ *   TransactionSingleOp sc = new ReplicatedDHT();
  *   sc.delete(key);                    // {@link #delete(String)}
  *   sc.delete(key, timeout);           // {@link #delete(String, int)}
  *   result = sc.getLastDeleteResult(); // {@link #getLastDeleteResult()}
@@ -62,7 +59,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * number of automatic retries is adjustable (default: 3).
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 2.8
+ * @version 3.4
  * @since 2.6
  */
 public class ReplicatedDHT {
@@ -129,7 +126,7 @@ public class ReplicatedDHT {
      * 
      * @see #delete(OtpErlangString, int)
      */
-    public long delete(OtpErlangString key) throws ConnectionException,
+    public int delete(OtpErlangString key) throws ConnectionException,
     TimeoutException, NodeNotFoundException, UnknownException {
         return delete(key, 2000);
     }
@@ -161,15 +158,12 @@ public class ReplicatedDHT {
      * 
      * @since 2.8
      */
-    public long delete(OtpErlangString key, int timeout) throws ConnectionException,
+    public int delete(OtpErlangString key, int timeout) throws ConnectionException,
     TimeoutException, NodeNotFoundException, UnknownException {
-        OtpErlangObject received_raw = null;
         lastDeleteResult = null;
-        try {
-            received_raw = connection.doRPC("api_rdht", "delete",
-                    new OtpErlangList( new OtpErlangObject[] {
-                            key,
-                            new OtpErlangInt(timeout) }));
+        OtpErlangObject received_raw = connection.doRPC("api_rdht", "delete",
+                new OtpErlangObject[] { key, new OtpErlangInt(timeout) });
+        try { 
             OtpErlangTuple received = (OtpErlangTuple) received_raw;
             OtpErlangAtom state = (OtpErlangAtom) received.elementAt(0);
 
@@ -182,7 +176,7 @@ public class ReplicatedDHT {
              */
             if (state.equals(CommonErlangObjects.okAtom) && received.arity() == 3) {
                 lastDeleteResult = (OtpErlangList) received.elementAt(2);
-                long succeeded = ((OtpErlangLong) received.elementAt(1)).longValue();
+                int succeeded = ((OtpErlangLong) received.elementAt(1)).intValue();
                 return succeeded;
             } else if (state.equals(CommonErlangObjects.failAtom) && received.arity() >= 2) {
                 OtpErlangObject reason = received.elementAt(1);
@@ -192,29 +186,18 @@ public class ReplicatedDHT {
                         throw new TimeoutException(received_raw);
                     } else if(received.arity() == 2) {
                         throw new TimeoutException(received_raw);
-                    } else {
-                        throw new UnknownException(received_raw);
                     }
                 } else if (reason.equals(CommonErlangObjects.nodeNotFoundAtom)) {
                     throw new NodeNotFoundException(received_raw);
-                } else {
-                    throw new UnknownException(received_raw);
                 }
-            } else {
-                throw new UnknownException(received_raw);
             }
-        } catch (OtpErlangExit e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (OtpAuthException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
-        } catch (IOException e) {
-            // e.printStackTrace();
-            throw new ConnectionException(e);
+            throw new UnknownException(received_raw);
         } catch (ClassCastException e) {
             // e.printStackTrace();
-            // received_raw is not null since the first class cast is after the RPC!
+            throw new UnknownException(e, received_raw);
+        } catch (OtpErlangRangeException e) {
+            // there should not this many replicates that do not fit into an integer!
+            // e.printStackTrace();
             throw new UnknownException(e, received_raw);
         }
     }
@@ -242,7 +225,7 @@ public class ReplicatedDHT {
      * 
      * @see #delete(String, int)
      */
-    public long delete(String key) throws ConnectionException,
+    public int delete(String key) throws ConnectionException,
     TimeoutException, NodeNotFoundException, UnknownException {
         return delete(key, 2000);
     }
@@ -276,7 +259,7 @@ public class ReplicatedDHT {
      * 
      * @see #delete(OtpErlangString, int)
      */
-    public long delete(String key, int timeout) throws ConnectionException,
+    public int delete(String key, int timeout) throws ConnectionException,
     TimeoutException, NodeNotFoundException, UnknownException {
         return delete(new OtpErlangString(key), timeout);
     }

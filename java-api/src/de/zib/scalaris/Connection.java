@@ -30,7 +30,7 @@ import com.ericsson.otp.erlang.OtpSelf;
  * 
  * @author Nico Kruber, kruber@zib.de
  * 
- * @version 2.3
+ * @version 3.4
  * @since 2.3
  */
 public class Connection {
@@ -160,47 +160,55 @@ public class Connection {
      * 
      * @return the result of the call
      * 
-     * @throws IOException
-     *             if the connection is not active or a communication error
-     *             occurs
-     * @throws OtpErlangExit
-     *             if an exit signal is received from a process on the peer node
-     * @throws OtpAuthException
-     *             if the remote node sends a message containing an invalid
-     *             cookie
+     * @throws ConnectionException 
+     *             if the connection is not active, a communication error
+     *             occurs, an exit signal is received from a process on the
+     *             peer node or the remote node sends a message containing an
+     *             invalid cookie
      */
     public OtpErlangObject doRPC(String mod, String fun, OtpErlangList args)
-            throws IOException, OtpErlangExit, OtpAuthException {
-        boolean success = false;
-        while(!success) {
-            try {
-                connection.sendRPC(mod, fun, args);
-                OtpErlangObject result = connection.receiveRPC();
-                success = true;
-                return result;
-            } catch (OtpErlangExit e) {
-                connectionPolicy.nodeFailed(remote);
-                // first re-try (connection was the first contact)
-                remote = connectionPolicy.selectNode(1, remote, e);
-                // reconnect (and then re-try the operation) if no exception was thrown:
-                reconnect();
-            } catch (OtpAuthException e) {
-                connectionPolicy.nodeFailed(remote);
-                // first re-try (connection was the first contact)
-                remote = connectionPolicy.selectNode(1, remote, e);
-                // reconnect (and then re-try the operation) if no exception was thrown:
-                reconnect();
-            } catch (IOException e) {
-                connectionPolicy.nodeFailed(remote);
-                // first re-try (connection was the first contact)
-                remote = connectionPolicy.selectNode(1, remote, e);
-                // reconnect (and then re-try the operation) if no exception was thrown:
-                reconnect();
+            throws ConnectionException {
+        try {
+            boolean success = false;
+            while(!success) {
+                try {
+                    connection.sendRPC(mod, fun, args);
+                    OtpErlangObject result = connection.receiveRPC();
+                    success = true;
+                    return result;
+                } catch (OtpErlangExit e) {
+                    connectionPolicy.nodeFailed(remote);
+                    // first re-try (connection was the first contact)
+                    remote = connectionPolicy.selectNode(1, remote, e);
+                    // reconnect (and then re-try the operation) if no exception was thrown:
+                    reconnect();
+                } catch (OtpAuthException e) {
+                    connectionPolicy.nodeFailed(remote);
+                    // first re-try (connection was the first contact)
+                    remote = connectionPolicy.selectNode(1, remote, e);
+                    // reconnect (and then re-try the operation) if no exception was thrown:
+                    reconnect();
+                } catch (IOException e) {
+                    connectionPolicy.nodeFailed(remote);
+                    // first re-try (connection was the first contact)
+                    remote = connectionPolicy.selectNode(1, remote, e);
+                    // reconnect (and then re-try the operation) if no exception was thrown:
+                    reconnect();
+                }
             }
+            // this should not happen as there is only one way out of the while
+            // without throwing an exception
+            throw new InternalError();
+        } catch (OtpErlangExit e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (OtpAuthException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (IOException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
         }
-        // this should not happen as there is only one way out of the while
-        // without throwing an exception
-        throw new InternalError();
     }
 
     /**
@@ -217,17 +225,14 @@ public class Connection {
      * 
      * @return the result of the call
      * 
-     * @throws IOException
-     *             if the connection is not active or a communication error
-     *             occurs
-     * @throws OtpErlangExit
-     *             if an exit signal is received from a process on the peer node
-     * @throws OtpAuthException
-     *             if the remote node sends a message containing an invalid
-     *             cookie
+     * @throws ConnectionException 
+     *             if the connection is not active, a communication error
+     *             occurs, an exit signal is received from a process on the
+     *             peer node or the remote node sends a message containing an
+     *             invalid cookie
      */
     public OtpErlangObject doRPC(String mod, String fun, OtpErlangObject[] args)
-            throws IOException, OtpErlangExit, OtpAuthException {
+            throws ConnectionException {
         return doRPC(mod, fun, new OtpErlangList(args));
     }
 
