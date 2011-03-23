@@ -21,6 +21,7 @@ import unittest
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import json
 import threading
+import sys
 
 # The time when the (whole) test suite was started.
 _now = datetime.now()
@@ -543,4 +544,5 @@ class SubscriptionHandler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestPubSub)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful():
+        sys.exit(1)
