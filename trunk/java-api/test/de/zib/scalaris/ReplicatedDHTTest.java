@@ -16,6 +16,7 @@
 package de.zib.scalaris;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -93,6 +94,30 @@ public class ReplicatedDHTTest {
     }
     
     /**
+     * Tries to read the value at the given <tt>key</tt> and fails if this does
+     * not fail with a {@link NotFoundException}.
+     * 
+     * @param key the key to look up
+     * 
+     * @throws ConnectionException
+     * @throws TimeoutException
+     * @throws UnknownException
+     */
+    private void checkKeyDoesNotExist(String key) throws ConnectionException,
+            TimeoutException, UnknownException {
+        TransactionSingleOp conn = new TransactionSingleOp();
+        try {
+            conn.read(key);
+            // a not found exception must be thrown
+            assertTrue(false);
+        } catch (NotFoundException e) {
+            // nothing to do here
+        } finally {
+            conn.closeConnection();
+        }
+    }
+    
+    /**
      * Test method for {@link ReplicatedDHT#delete(String)}.
      * Tries to delete some not existing keys.
      * 
@@ -115,6 +140,9 @@ public class ReplicatedDHTTest {
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(4, result.undef);
+                
+                // make sure the key does not exist afterwards:
+                checkKeyDoesNotExist(testTime + key + i);
             }
         } finally {
             rdht.closeConnection();
@@ -155,6 +183,9 @@ public class ReplicatedDHTTest {
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
                 
+                // make sure the key does not exist afterwards:
+                checkKeyDoesNotExist(testTime + key + i);
+                
                 // try again (should be successful with 0 deletes)
                 deleted = rdht.delete(testTime + key + i);
                 result = rdht.getLastDeleteResult();
@@ -162,6 +193,9 @@ public class ReplicatedDHTTest {
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(4, result.undef);
+                
+                // make sure the key does not exist afterwards:
+                checkKeyDoesNotExist(testTime + key + i);
             }
         } finally {
             c.close();
@@ -201,6 +235,9 @@ public class ReplicatedDHTTest {
                 assertEquals(4, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
+                
+                // make sure the key does not exist afterwards:
+                checkKeyDoesNotExist(testTime + key + i);
             }
             
             for (int i = 0; i < testData.length; ++i) {
@@ -216,6 +253,9 @@ public class ReplicatedDHTTest {
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
                 
+                // make sure the key does not exist afterwards:
+                checkKeyDoesNotExist(testTime + key + i);
+                
                 // try again (should be successful with 0 deletes)
                 deleted = rdht.delete(testTime + key + i);
                 result = rdht.getLastDeleteResult();
@@ -223,6 +263,9 @@ public class ReplicatedDHTTest {
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(4, result.undef);
+                
+                // make sure the key does not exist afterwards:
+                checkKeyDoesNotExist(testTime + key + i);
             }
         } finally {
             c.close();
