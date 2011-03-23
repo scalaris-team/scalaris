@@ -308,7 +308,9 @@ class PubSub(object):
             self._conn = conn
 
     def publish(self, topic, content):
-        content = _json_encode_value(content)
+        # note: do NOT encode the content, this is not decoded on the erlang side!
+        # (only strings are allowed anyway)
+        # content = _json_encode_value(content)
         result = _json_call(self._conn, 'publish', [topic, content])
         # results: {'status': 'ok'}
         if result == {'status': 'ok'}:

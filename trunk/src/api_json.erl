@@ -76,8 +76,7 @@ tx_read(Key) ->
     Res = api_tx:read(Key),
     result_to_json(Res).
 
--spec tx_write(client_key(),
-               json_value()) -> commit_result().
+-spec tx_write(client_key(), json_value()) -> commit_result().
 tx_write(Key, Value) ->
     Res = api_tx:write(Key, json_to_value(Value)),
     result_to_json(Res).
@@ -143,7 +142,7 @@ json_to_value({struct, [{type, "as_is"}, {value, Value}]}) ->
 %% interface for api_pubsub calls
 -spec pubsub_publish(string(), string()) -> {struct, [{status, string()}]}. %status: "ok"
 pubsub_publish(Topic, Content) ->
-    Res = api_pubsub:publish(Topic, json_to_value(Content)),
+    Res = api_pubsub:publish(Topic, Content),
     result_to_json(Res).
 
 -spec pubsub_subscribe(string(), string()) -> commit_result().
