@@ -70,6 +70,18 @@ class TestReplicatedDHT(unittest.TestCase):
         rdht = ReplicatedDHT()
         rdht.closeConnection()
         rdht.closeConnection()
+    
+    # Tries to read the value at the given key and fails if this does
+    # not fail with a NotFoundException.
+    def _checkKeyDoesNotExist(self, key):
+        conn = Scalaris.TransactionSingleOp()
+        try:
+            conn.read(key)
+            self.fail('the value at ' + key + ' should not exist anymore')
+        except Scalaris.NotFoundException:
+            # nothing to do here
+            pass
+        conn.closeConnection()
 
     # Test method for ReplicatedDHT.delete(key).
     # Tries to delete some not existing keys.
@@ -80,6 +92,7 @@ class TestReplicatedDHT(unittest.TestCase):
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
             self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
+            self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         rdht.closeConnection()
 
@@ -98,10 +111,12 @@ class TestReplicatedDHT(unittest.TestCase):
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
             self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
+            self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
             
             # try again (should be successful with 0 deletes)
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
             self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
+            self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         c.close()
 
@@ -120,6 +135,7 @@ class TestReplicatedDHT(unittest.TestCase):
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
             self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
+            self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         for i in xrange(len(_testData)):
             sc.write(str(_testTime) + key + str(i), _testData[i])
@@ -128,10 +144,12 @@ class TestReplicatedDHT(unittest.TestCase):
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
             self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
+            self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
             
             # try again (should be successful with 0 deletes)
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
             self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
+            self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         c.close()
 
