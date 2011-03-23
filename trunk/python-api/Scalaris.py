@@ -374,10 +374,9 @@ class ReplicatedDHT(object):
         if isinstance(result, dict) and 'ok' in result and 'results' in result:
             if 'failure' not in result:
                 return (True, result['ok'], result['results'])
-            else:
+            elif result['failure'] == 'timeout':
                 return (False, result['ok'], result['results'])
-        else:
-            raise UnknownException(result)
+        raise UnknownException(result)
 
     def nop(self, value):
         value = _json_encode_value(value)
