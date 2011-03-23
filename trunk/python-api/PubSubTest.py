@@ -28,7 +28,7 @@ _now = datetime.now()
 # This is used to create different erlang keys for each run.
 _testTime = int(time.mktime(_now.timetuple()) * 1000 + (_now.microsecond / 1000.0))
 # wait that long for notifications to arrive
-_notifications_timeout = 10;
+_notifications_timeout = 60;
 _testData = [
              "ahz2ieSh", "wooPhu8u", "quai9ooK", "Oquae4ee", "Airier1a", "Boh3ohv5", "ahD3Saog", "EM5ooc4i", 
              "Epahrai8", "laVahta7", "phoo6Ahj", "Igh9eepa", "aCh4Lah6", "ooT0ath5", "uuzau4Ie", "Iup6mae6", 
