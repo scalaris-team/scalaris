@@ -316,14 +316,18 @@ class PubSub(object):
         raise UnknownException(result)
 
     def subscribe(self, topic, url):
-        url = _json_encode_value(url)
+        # note: do NOT encode the URL, this is not decoded on the erlang side!
+        # (only strings are allowed anyway)
+        # url = _json_encode_value(url)
         result = _json_call(self._conn, 'subscribe', [topic, url])
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
         _process_result_commit(result)
 
     def unsubscribe(self, topic, url):
-        url = _json_encode_value(url)
+        # note: do NOT encode the URL, this is not decoded on the erlang side!
+        # (only strings are allowed anyway)
+        # url = _json_encode_value(url)
         result = _json_call(self._conn, 'unsubscribe', [topic, url])
         # results: {'status': 'ok'} or
         #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}

@@ -54,9 +54,14 @@ class TestTransaction(unittest.TestCase):
         t = Transaction()
         t.closeConnection()
 
-    # Test method for Transaction(url, conn)
+    # Test method for Transaction(url)
     def testTransaction2(self):
-        t = Transaction(Scalaris.default_url, Scalaris.getConnection(Scalaris.default_url))
+        t = Transaction(url = Scalaris.default_url)
+        t.closeConnection()
+
+    # Test method for Transaction(conn)
+    def testTransaction3(self):
+        t = Transaction(conn = Scalaris.getConnection(Scalaris.default_url))
         t.closeConnection()
 
     # Test method for Transaction.closeConnection() trying to close the connection twice.
