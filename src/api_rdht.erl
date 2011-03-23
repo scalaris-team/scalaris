@@ -38,31 +38,40 @@ delete(Key) -> delete(Key, 2000).
 %%      inconsistencies for api_tx functions.
 -spec delete(client_key(), Timeout::pos_integer()) -> delete_result().
 delete(Key, Timeout) ->
+    ClientsId = {delete_client_id, util:get_global_uid()},
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     _ = [ api_dht_raw:unreliable_lookup(
-            Replica, {delete_key, comm:this(), Replica})
+            Replica, {delete_key, comm:this(), ClientsId, Replica})
           || Replica <- ReplicaKeys],
-    erlang:send_after(Timeout, self(), {timeout}),
-    delete_collect_results(ReplicaKeys, []).
+    msg_delay:send_local_as_client(Timeout div 1000, self(),
+                                   {timeout, ClientsId}),
+    delete_collect_results(ReplicaKeys, ClientsId, []).
 
 %% @doc collect the response for the delete requests
 -spec delete_collect_results(ReplicaKeys::[?RT:key()],
+                             ClientsId::{delete_client_id, util:global_uid()},
                              Results::[ok | locks_set | undef])
                             -> delete_result().
-delete_collect_results([], Results) ->
+delete_collect_results([], _ClientsId, Results) ->
     OKs = length([ok || R <- Results, R =:= ok]),
     {ok, OKs, Results};
-delete_collect_results(ReplicaKeys, Results) ->
+delete_collect_results(ReplicaKeys, ClientsId, Results) ->
     receive
-        {delete_key_response, Key, Result} ->
+        {delete_key_response, ClientsId, Key, Result} ->
             case lists:member(Key, ReplicaKeys) of
                 true ->
                     delete_collect_results(lists:delete(Key, ReplicaKeys),
-                                           [Result | Results]);
+                                           ClientsId, [Result | Results]);
                 false ->
-                    delete_collect_results(ReplicaKeys, Results)
+                    delete_collect_results(ReplicaKeys, ClientsId, Results)
             end;
-        {timeout} ->
+        {timeout, ClientsId} ->
             OKs = length([ok || R <- Results, R =:= ok]),
-            {fail, timeout, OKs, Results}
+            {fail, timeout, OKs, Results};
+        {delete_key_response, _, _, _} ->
+            %% probably an outdated message: drop it.
+            delete_collect_results(ReplicaKeys, ClientsId, Results);
+        {timeout, _} ->
+            %% probably an outdated message: drop it.
+            delete_collect_results(ReplicaKeys, ClientsId, Results)
     end.
