@@ -32,7 +32,7 @@
 	<!-- version of the servlet api jar file to bundle and compile the tests against (servlet-api-<version>.jar) -->
 	<property name="jetty.servletapi.version" value="2.5" />
 	<!-- version of the junit jar file to bundle and compile the tests against (junit-<version>.jar) -->
-	<property name="junit.version" value="4.4" />
+	<property name="junit.version" value="4.8.2" />
 	<!-- ########## Build configuration (end) ########## -->
 
 	<property environment="env"/>
