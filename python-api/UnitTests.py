@@ -15,10 +15,12 @@
 
 import unittest
 import TransactionSingleOpTest, TransactionTest
+import sys
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromNames(['TransactionSingleOpTest.TestTransactionSingleOp',
                                                       'TransactionTest.TestTransaction',
                                                       'ReplicatedDHTTest.TestReplicatedDHT',
                                                       'PubSubTest.TestPubSub'])
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful():
+        sys.exit(1)

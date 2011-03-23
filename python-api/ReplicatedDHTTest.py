@@ -18,6 +18,7 @@ import Scalaris
 from datetime import datetime
 import time
 import unittest
+import sys
 
 # The time when the (whole) test suite was started.
 _now = datetime.now()
@@ -148,4 +149,5 @@ class TestReplicatedDHT(unittest.TestCase):
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestReplicatedDHT)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful():
+        sys.exit(1)
