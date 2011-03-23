@@ -39,8 +39,7 @@
 -type(database_message() ::
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
-      {delete_key, Source_PID::comm:mypid(), Key::?RT:key()} |
-      {delete_key, Source_PID::comm:mypid(), Key::?RT:key()} |
+      {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, util:global_uid()}, Key::?RT:key()} |
       {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
 
 -type(lookup_message() ::
@@ -252,9 +251,9 @@ on({set_key_entry, Source_PID, Entry}, State) ->
     comm:send(Source_PID, {set_key_entry_reply, Entry}),
     dht_node_state:set_db(State, NewDB);
 
-on({delete_key, Source_PID, HashedKey}, State) ->
+on({delete_key, Source_PID, ClientsId, HashedKey}, State) ->
     {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), HashedKey),
-    comm:send(Source_PID, {delete_key_response, HashedKey, Result}),
+    comm:send(Source_PID, {delete_key_response, ClientsId, HashedKey, Result}),
     dht_node_state:set_db(State, DB2);
 
 on({drop_data, Data, Sender}, State) ->
