@@ -221,9 +221,11 @@ class TestTransactionSingleOp(unittest.TestCase):
         
         # now try to overwrite them using test_and_set:
         for i in xrange(0, len(_testData) - 1, 2):
-            with self.assertRaises(Scalaris.KeyChangedException) as cm:
+            try:
                 conn.testAndSet(str(_testTime) + key + str(i), _testData[i + 1], "fail")
-            self.assertEqual(cm.exception.old_value, _testData[i])
+                self.fail('expected a KeyChangedException')
+            except Scalaris.KeyChangedException as exception:
+                self.assertEqual(exception.old_value, _testData[i])
         
         # now try to read the data:
         for i in xrange(0, len(_testData), 2):
@@ -286,9 +288,11 @@ class TestTransactionSingleOp(unittest.TestCase):
         
         # now try to overwrite them using test_and_set:
         for i in xrange(0, len(_testData) - 1, 2):
-            with self.assertRaises(Scalaris.KeyChangedException) as cm:
+            try:
                 conn.testAndSet(str(_testTime) + key + str(i), "fail", 1)
-            self.assertEqual(cm.exception.old_value, [_testData[i], _testData[i + 1]])
+                self.fail('expected a KeyChangedException')
+            except Scalaris.KeyChangedException as exception:
+                self.assertEqual(exception.old_value, [_testData[i], _testData[i + 1]])
         
         # now try to read the data:
         for i in xrange(0, len(_testData), 2):
