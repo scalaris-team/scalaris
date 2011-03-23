@@ -79,9 +79,7 @@ class TestReplicatedDHT(unittest.TestCase):
         
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertTrue(success)
-            self.assertEqual(ok, 0)
-            self.assertEqual(results, ['undef']*4)
+            self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
         
         rdht.closeConnection()
 
@@ -99,15 +97,11 @@ class TestReplicatedDHT(unittest.TestCase):
         # now try to delete the data:
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertTrue(success)
-            self.assertEqual(ok, 4)
-            self.assertEqual(results, ['ok']*4)
+            self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
             
             # try again (should be successful with 0 deletes)
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertTrue(success)
-            self.assertEqual(ok, 0)
-            self.assertEqual(results, ['undef']*4)
+            self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
         
         c.close()
 
@@ -125,9 +119,7 @@ class TestReplicatedDHT(unittest.TestCase):
         # now try to delete the data:
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertTrue(success)
-            self.assertEqual(ok, 4)
-            self.assertEqual(results, ['ok']*4)
+            self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
         
         for i in xrange(len(_testData)):
             sc.write(str(_testTime) + key + str(i), _testData[i])
@@ -135,15 +127,11 @@ class TestReplicatedDHT(unittest.TestCase):
         # now try to delete the data:
         for i in xrange(len(_testData)):
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertTrue(success)
-            self.assertEqual(ok, 4)
-            self.assertEqual(results, ['ok']*4)
+            self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
             
             # try again (should be successful with 0 deletes)
             (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertTrue(success)
-            self.assertEqual(ok, 0)
-            self.assertEqual(results, ['undef']*4)
+            self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
         
         c.close()
 
