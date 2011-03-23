@@ -54,9 +54,14 @@ class TestReplicatedDHT(unittest.TestCase):
         rdht = ReplicatedDHT()
         rdht.closeConnection()
 
-    # Test method for ReplicatedDHT(url, conn)
+    # Test method for ReplicatedDHT(url)
     def testReplicatedDHT2(self):
-        rdht = ReplicatedDHT(Scalaris.default_url, Scalaris.getConnection(Scalaris.default_url))
+        rdht = ReplicatedDHT(url = Scalaris.default_url)
+        rdht.closeConnection()
+
+    # Test method for ReplicatedDHT(conn)
+    def testReplicatedDHT3(self):
+        rdht = ReplicatedDHT(conn = Scalaris.getConnection(Scalaris.default_url))
         rdht.closeConnection()
 
     # Test method for ReplicatedDHT.closeConnection() trying to close the connection twice.

@@ -23,13 +23,12 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
-import java.net.Inet4Address;
-import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletException;
@@ -54,12 +53,12 @@ import com.ericsson.otp.erlang.OtpErlangString;
  * @since 2.5
  */
 public class PubSubTest {
-    /**
-     * First port to try to use for jetty servers (subsequent servers will use
-     * subsequent port numbers).
-     */
-    private final static int startPort = 8081;
     private final static long testTime = System.currentTimeMillis();
+    
+    /**
+     * wait that long for notifications to arrive
+     */
+    private static final int notifications_timeout = 60;
     
     private final static String[] testData = {
         "ahz2ieSh", "wooPhu8u", "quai9ooK", "Oquae4ee", "Airier1a", "Boh3ohv5", "ahD3Saog", "EM5ooc4i", 
@@ -82,11 +81,6 @@ public class PubSubTest {
         "sai2aiTa", "ohKi9rie", "ei2ioChu", "aaNgah9y", "ooJai1Ie", "shoh0oH9", "Ool4Ahya", "poh0IeYa", 
         "Uquoo0Il", "eiGh4Oop", "ooMa0ufe", "zee6Zooc", "ohhao4Ah", "Uweekek5", "aePoos9I", "eiJ9noor", 
         "phoong1E", "ianieL2h", "An7ohs4T", "Eiwoeku3", "sheiS3ao", "nei5Thiw", "uL5iewai", "ohFoh9Ae"};
-    
-    /**
-     * wait that long for notifications to arrive
-     */
-    private static final int notifications_timeout = 60;
     
     static {
         // set not to automatically try reconnects (auto-retries prevent ConnectionException tests from working): 
@@ -112,6 +106,20 @@ public class PubSubTest {
     @Test
     public void testPubSub2() throws ConnectionException {
         PubSub conn = new PubSub(ConnectionFactory.getInstance().createConnection("test"));
+        conn.closeConnection();
+    }
+    
+    /**
+     * Test method for {@link TransactionSingleOp#closeConnection()} trying to
+     * close the connection twice.
+     * 
+     * @throws UnknownException
+     * @throws ConnectionException
+     */
+    @Test
+    public void testDoubleClose() throws ConnectionException {
+        TransactionSingleOp conn = new TransactionSingleOp();
+        conn.closeConnection();
         conn.closeConnection();
     }
 
@@ -261,77 +269,6 @@ public class PubSubTest {
             conn.closeConnection();
         }
     }
-
-    /**
-     * checks if the given subscriber exists in the given list
-     * 
-     * @param list
-     *            list of subscribers
-     * @param subscriber
-     *            subscriber to search for
-     * @return true if the subscriber was found in the list
-     */
-    private boolean checkSubscribers(OtpErlangList list, String subscriber) {
-        for (int i = 0; i < list.arity(); ++i) {
-            if (((OtpErlangString) list.elementAt(i)).stringValue().equals(
-                    subscriber)) {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    /**
-     * checks if the given subscriber exists in the given list
-     * 
-     * @param list
-     *            list of subscribers
-     * @param subscriber
-     *            subscriber to search for
-     * @return true if the subscriber was found in the list
-     */
-    private boolean checkSubscribers(List<String> list, String subscriber) {
-        return list.contains(subscriber);
-    }
-    
-    /**
-     * checks if there are more elements in {@code list} than in
-     * {@code expectedElements} and returns one of those elements
-     * 
-     * @param list
-     * @param expectedElements
-     * @return
-     */
-    private String getDiffElement(OtpErlangList list, String[] expectedElements) {
-        Vector<String> expectedElements2 = new Vector<String>(Arrays.asList(expectedElements));
-        for (int i = 0; i < list.arity(); ++i) {
-            String element = ((OtpErlangString)list.elementAt(i)).stringValue();
-            if (!expectedElements2.contains(element)) {
-                return element;
-            }
-            expectedElements2.remove(element);
-        }
-        return null;
-    }
-    
-    /**
-     * checks if there are more elements in {@code list} than in
-     * {@code expectedElements} and returns one of those elements
-     * 
-     * @param list
-     * @param expectedElements
-     * @return
-     */
-    private String getDiffElement(List<String> list, String[] expectedElements) {
-        List<String> expectedElements2 = new Vector<String>(Arrays.asList(expectedElements));
-        list.removeAll(expectedElements2);
-        
-        if (list.size() > 0) {
-            return list.get(0);
-        } else {
-            return null;
-        }
-    }
     
     // getSubscribers() test methods for not existing topics begin
     
@@ -425,6 +362,77 @@ public class PubSubTest {
     // subscribe() test methods begin
 
     /**
+     * checks if the given subscriber exists in the given list
+     * 
+     * @param list
+     *            list of subscribers
+     * @param subscriber
+     *            subscriber to search for
+     * @return true if the subscriber was found in the list
+     */
+    private boolean checkSubscribers(OtpErlangList list, String subscriber) {
+        for (int i = 0; i < list.arity(); ++i) {
+            if (((OtpErlangString) list.elementAt(i)).stringValue().equals(
+                    subscriber)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * checks if the given subscriber exists in the given list
+     * 
+     * @param list
+     *            list of subscribers
+     * @param subscriber
+     *            subscriber to search for
+     * @return true if the subscriber was found in the list
+     */
+    private boolean checkSubscribers(List<String> list, String subscriber) {
+        return list.contains(subscriber);
+    }
+    
+    /**
+     * checks if there are more elements in {@code list} than in
+     * {@code expectedElements} and returns one of those elements
+     * 
+     * @param list
+     * @param expectedElements
+     * @return
+     */
+    private String getDiffElement(OtpErlangList list, String[] expectedElements) {
+        Vector<String> expectedElements2 = new Vector<String>(Arrays.asList(expectedElements));
+        for (int i = 0; i < list.arity(); ++i) {
+            String element = ((OtpErlangString)list.elementAt(i)).stringValue();
+            if (!expectedElements2.contains(element)) {
+                return element;
+            }
+            expectedElements2.remove(element);
+        }
+        return null;
+    }
+    
+    /**
+     * checks if there are more elements in {@code list} than in
+     * {@code expectedElements} and returns one of those elements
+     * 
+     * @param list
+     * @param expectedElements
+     * @return
+     */
+    private String getDiffElement(List<String> list, String[] expectedElements) {
+        List<String> expectedElements2 = new Vector<String>(Arrays.asList(expectedElements));
+        list.removeAll(expectedElements2);
+        
+        if (list.size() > 0) {
+            return list.get(0);
+        } else {
+            return null;
+        }
+    }
+
+    /**
      * Test method for
      * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)} with a
      * closed connection.
@@ -450,7 +458,7 @@ public class PubSubTest {
      * Test method for
      * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)} and
      * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some "random" URLs to "random" topics and uses a distinct topic for each URL.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a distinct topic for each URL.
      * 
      * @throws UnknownException
      * @throws TimeoutException
@@ -494,7 +502,7 @@ public class PubSubTest {
      * Test method for
      * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)} and
      * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some "random" URLs to "random" topics and uses a single topic for all URLs.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a single topic for all URLs.
      * 
      * @throws UnknownException
      * @throws TimeoutException
@@ -516,7 +524,6 @@ public class PubSubTest {
             }
             
             // check if the subscribers were successfully saved:
-            
             OtpErlangList subscribers = (OtpErlangList) conn
                     .getSubscribers(new OtpErlangString(testTime + topic)).value();
             for (int i = 0; i < testData.length; ++i) {
@@ -525,9 +532,7 @@ public class PubSubTest {
                         subscribers, testData[i]));
             }
             
-            if (subscribers.arity() > testData.length) {
-                fail("\"" + getDiffElement(subscribers, testData) + " should not be a subscriber of " + topic);
-            }
+            assertEquals("unexpected subscriber of topic \"" + topic + "\"", null, getDiffElement(subscribers, testData));
         } finally {
             conn.closeConnection();
         }
@@ -556,7 +561,7 @@ public class PubSubTest {
      * Test method for
      * {@link PubSub#subscribe(String, String)} and
      * {@link PubSub#getSubscribers(String)}.
-     * Subscribes some "random" URLs to "random" topics and uses a distinct topic for each URL.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a distinct topic for each URL.
      * 
      * @throws UnknownException
      * @throws TimeoutException
@@ -576,13 +581,12 @@ public class PubSubTest {
             }
             
             // check if the subscribers were successfully saved:
-            
             for (int i = 0; i < testData.length; ++i) {
                 String topic1 = topic + i;
                 List<String> subscribers = conn.getSubscribers(testTime
                         + topic1).stringListValue();
                 assertTrue("Subscriber \"" + testData[i]
-                        + "\" does not exist for \"topic " + topic1 + "\"", checkSubscribers(
+                        + "\" does not exist for topic \"" + topic1 + "\"", checkSubscribers(
                         subscribers, testData[i]));
                 
                 assertEquals("Subscribers of topic (" + topic1
@@ -598,7 +602,7 @@ public class PubSubTest {
      * Test method for
      * {@link PubSub#subscribe(String, String)} and
      * {@link PubSub#getSubscribers(String)}.
-     * Subscribes some "random" URLs to "random" topics and uses a single topic for all URLs.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a single topic for all URLs.
      * 
      * @throws UnknownException
      * @throws TimeoutException
@@ -620,7 +624,6 @@ public class PubSubTest {
             }
             
             // check if the subscribers were successfully saved:
-            
             List<String> subscribers = conn
                     .getSubscribers(testTime + topic).stringListValue();
             for (int i = 0; i < testData.length; ++i) {
@@ -629,9 +632,7 @@ public class PubSubTest {
                         subscribers, testData[i]));
             }
             
-            if (subscribers.size() > testData.length) {
-                fail("\"" + getDiffElement(subscribers, testData) + "\" should not be a subscriber of " + topic);
-            }
+            assertEquals("unexpected subscriber of topic \"" + topic + "\"", null, getDiffElement(subscribers, testData));
         } finally {
             conn.closeConnection();
         }
@@ -695,7 +696,7 @@ public class PubSubTest {
                     + "\"", checkSubscribers(subscribers, testData[0]));
             
             assertEquals("Subscribers of topic (" + topic
-                    + ") should only be [\"\"], but is: "
+                    + ") should only be [], but is: "
                     + subscribers.toString(), 0, subscribers.arity());
         } finally {
             conn.closeConnection();
@@ -737,7 +738,6 @@ public class PubSubTest {
                     .getSubscribers(new OtpErlangString(testTime + topic)).value();
 
             // check whether the subscribers were successfully saved:
-            
             assertTrue("Subscriber \"" + testData[0]
                     + "\" does not exist for topic \"" + topic + "\"",
                     checkSubscribers(subscribers, testData[0]));
@@ -752,7 +752,7 @@ public class PubSubTest {
                     + "\"", checkSubscribers(subscribers, testData[2]));
 
             assertEquals("Subscribers of topic (" + topic + ") should only be [\""
-                    + testData[0] + ", " + testData[1] + "\"], but is: "
+                    + testData[0] + "\", \"" + testData[1] + "\"], but is: "
                     + subscribers.toString(), 2, subscribers.arity());
         } finally {
             conn.closeConnection();
@@ -764,7 +764,7 @@ public class PubSubTest {
      * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)},
      * {@link PubSub#unsubscribe(OtpErlangString, OtpErlangString)} and
      * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some "random" URLs to "random" topics and uses a distinct topic for each URL.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a distinct topic for each URL.
      * Unsubscribes every second subscribed URL.
      * 
      * @see #testSubscribeOtp1()
@@ -818,7 +818,7 @@ public class PubSubTest {
                         + "\"", checkSubscribers(subscribers, testData[i]));
                 
                 assertEquals("Subscribers of topic (" + topic1
-                        + ") should only be [\"\"], but is: "
+                        + ") should only be [], but is: "
                         + subscribers.toString(), 0, subscribers.arity());
             }
         } finally {
@@ -831,7 +831,7 @@ public class PubSubTest {
      * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)},
      * {@link PubSub#unsubscribe(OtpErlangString, OtpErlangString)} and
      * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some "random" URLs to "random" topics and uses a single topic for all URLs.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a single topic for all URLs.
      * Unsubscribes every second subscribed URL.
      * 
      * @see #testSubscribeOtp2()
@@ -862,10 +862,10 @@ public class PubSubTest {
                         new OtpErlangString(testData[i]) );
             }
             
+            // check if the subscribers were successfully saved:
             OtpErlangList subscribers = (OtpErlangList) conn
                     .getSubscribers(new OtpErlangString(testTime + topic)).value();
             String[] subscribers_expected = new String[testData.length / 2];
-            // check if the subscribers were successfully saved:
             for (int i = 1; i < testData.length; i += 2) {
                 subscribers_expected[i / 2] = testData[i];
                 assertTrue("Subscriber \"" + testData[i]
@@ -879,10 +879,7 @@ public class PubSubTest {
                         + "\"", checkSubscribers(subscribers, testData[i]));
             }
 
-            if (subscribers.arity() > testData.length) {
-                fail("\"" + getDiffElement(subscribers, subscribers_expected)
-                        + " should not be a subscriber of " + topic);
-            }
+            assertEquals("unexpected subscriber of topic \"" + topic + "\"", null, getDiffElement(subscribers, subscribers_expected));
         } finally {
             conn.closeConnection();
         }
@@ -939,7 +936,7 @@ public class PubSubTest {
                     + "\"", checkSubscribers(subscribers, testData[0]));
             
             assertEquals("Subscribers of topic (" + topic
-                    + ") should only be [\"\"], but is: "
+                    + ") should only be [], but is: "
                     + subscribers.toString(), 0, subscribers.size());
         } finally {
             conn.closeConnection();
@@ -977,10 +974,9 @@ public class PubSubTest {
             // then unsubscribe another "url":
             conn.unsubscribe(testTime + topic, testData[2]);
 
-            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
 
             // check whether the subscribers were successfully saved:
-            
+            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
             assertTrue("Subscriber \"" + testData[0]
                     + "\" does not exist for topic \"" + topic + "\"",
                     checkSubscribers(subscribers, testData[0]));
@@ -995,7 +991,7 @@ public class PubSubTest {
                     + "\"", checkSubscribers(subscribers, testData[2]));
 
             assertEquals("Subscribers of topic (" + topic + ") should only be [\""
-                    + testData[0] + ", " + testData[1] + "\"], but is: "
+                    + testData[0] + "\", \"" + testData[1] + "\"], but is: "
                     + subscribers.toString(), 2, subscribers.size());
         } finally {
             conn.closeConnection();
@@ -1007,7 +1003,7 @@ public class PubSubTest {
      * {@link PubSub#subscribe(String, String)},
      * {@link PubSub#unsubscribe(String, String)} and
      * {@link PubSub#getSubscribers(String)}.
-     * Subscribes some "random" URLs to "random" topics and uses a distinct topic for each URL.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a distinct topic for each URL.
      * Unsubscribes every second subscribed URL.
      * 
      * @see #testSubscribe1()
@@ -1021,7 +1017,7 @@ public class PubSubTest {
     @Test
     public void testUnsubscribe1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_SingleUnsubscribeString1_";
+        String topic = "_UnsubscribeString1_";
         PubSub conn = new PubSub();
 
         try {
@@ -1043,11 +1039,11 @@ public class PubSubTest {
                 String topic1 = topic + i;
                 List<String> subscribers = conn.getSubscribers(testTime + topic1).stringListValue();
                 assertTrue("Subscriber \"" + testData[i]
-                          + "\" does not exist for \"topic " + topic1 + "\"", checkSubscribers(
+                          + "\" does not exist for topic \"" + topic1 + "\"", checkSubscribers(
                           subscribers, testData[i]));
                 
                 assertEquals("Subscribers of topic (" + topic1
-                        + ") should only be [" + testData[i] + "], but is: "
+                        + ") should only be [\"" + testData[i] + "\"], but is: "
                         + subscribers.toString(), 1, subscribers.size());
             }
             // check whether the unsubscribed urls were unsubscribed:
@@ -1060,7 +1056,7 @@ public class PubSubTest {
                         subscribers, testData[i]));
                 
                 assertEquals("Subscribers of topic (" + topic1
-                        + ") should only be [\"\"], but is: "
+                        + ") should only be [], but is: "
                         + subscribers.toString(), 0, subscribers.size());
             }
         } finally {
@@ -1073,7 +1069,7 @@ public class PubSubTest {
      * {@link PubSub#subscribe(String, String)},
      * {@link PubSub#unsubscribe(String, String)} and
      * {@link PubSub#getSubscribers(String)}.
-     * Subscribes some "random" URLs to "random" topics and uses a single topic for all URLs.
+     * Subscribes some arbitrary URLs to arbitrary topics and uses a single topic for all URLs.
      * Unsubscribes every second subscribed URL.
      * 
      * @see #testSubscribe2()
@@ -1104,9 +1100,9 @@ public class PubSubTest {
                         testData[i]);
             }
             
+            // check if the subscribers were successfully saved:
             List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
             String[] subscribers_expected = new String[testData.length / 2];
-            // check if the subscribers were successfully saved:
             for (int i = 1; i < testData.length; i += 2) {
                 subscribers_expected[i / 2] = testData[i];
                 assertTrue("Subscriber \"" + testData[i]
@@ -1120,10 +1116,7 @@ public class PubSubTest {
                         + "\"", checkSubscribers(subscribers, testData[i]));
             }
 
-            if (subscribers.size() > testData.length) {
-                fail("\"" + getDiffElement(subscribers, subscribers_expected)
-                        + " should not be a subscriber of " + topic);
-            }
+            assertEquals("unexpected subscriber of topic \"" + topic + "\"", null, getDiffElement(subscribers, subscribers_expected));
         } finally {
             conn.closeConnection();
         }
@@ -1132,57 +1125,50 @@ public class PubSubTest {
     // unsubscribe() test methods end
     
     /**
-     * Finds the first available port starting at startPort.
-     * 
-     * @param startPort  the first port to try
-     */
-    private int firstAvailablePort(int startPort) {
-        do {
-            ServerSocket socket = null;
-            try {
-                socket = new ServerSocket(startPort, 0,
-                        Inet4Address.getByAddress(
-                                "localhost", new byte[] { 127, 0, 0, 1 }));
-                socket.setReuseAddress(true);
-                return startPort;
-            } catch (IOException e) {
-            } finally {
-                if (socket != null) {
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        /* should not be thrown */
-                    }
-                }
-            }
-            ++startPort;
-        } while (true);
-    }
-    
-    /**
      * Creates a new subscription server and tries to start it at {@link #startPort}.
-     * 
-     * @param startPort  the first port to try
      */
-    private Server newSubscriptionServer(int startPort)
+    private static Server newSubscriptionServer()
             throws Exception {
         do {
             Server server = new Server();
             SelectChannelConnector connector = new SelectChannelConnector();
             connector.setHost("127.0.0.1");
-            // note: checking for available ports here eliminates unnecessary warnings by jetty
-            connector.setPort(firstAvailablePort(startPort));
             server.addConnector(connector);
             server.setHandler(new SubscriptionHandler());
-            try {
-                server.start();
-                return server;
-            } catch (java.net.BindException e) {
-                // although we already checked for port availability, it may
-                // now be inavailable again -> try the next port
-                ++startPort;
-            }
+            server.start();
+            return server;
         } while (true);
+    }
+    
+    private void checkNotifications(Map<String, Vector<String>> notifications, Map<String, Vector<String>> expected) {
+        for (Entry<String, Vector<String>> expected_element : expected.entrySet()) {
+            String topic = expected_element.getKey();
+            Vector<String> notifications_topic = notifications.get(topic);
+            for (String content : expected_element.getValue()) {
+                assertTrue("subscription (" + topic + ", " + content
+                        + ") not received by server)",
+                        notifications_topic != null
+                                && notifications_topic.contains(content));
+                notifications_topic.remove(content);
+            }
+            if (notifications_topic != null && notifications_topic.size() > 0) {
+                fail("Received element (" + topic + ", "
+                        + notifications_topic.get(0)
+                        + ") which is not part of the subscription.");
+            }
+            notifications.remove(topic);
+        }
+        
+        // is there another (unexpected) topic we received content for?
+        if (notifications.size() > 0) {
+            for (Entry<String, Vector<String>> element : notifications.entrySet()) {
+                if (element.getValue().size() > 0) {
+                    fail("Received notification for topic (" + element.getKey() + ", "
+                            + element.getValue().get(0)
+                            + ") which is not part of the subscription.");
+                }
+            }
+        }
     }
     
     /**
@@ -1195,13 +1181,16 @@ public class PubSubTest {
     public void testSubscription1() throws Exception {
         String topic = testTime + "_Subscription1";
         PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer(startPort);
+        Server server1 = newSubscriptionServer();
+        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        notifications_server1_expected.put(topic, new Vector<String>());
 
         try {
-            conn.subscribe(topic, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
+            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
             
             for (int i = 0; i < testData.length; ++i) {
                 conn.publish(topic, testData[i]);
+                notifications_server1_expected.get(topic).add(testData[i]);
             }
             
             // wait max 'notifications_timeout' seconds for notifications:
@@ -1209,24 +1198,14 @@ public class PubSubTest {
                 ((SubscriptionHandler) server1.getHandler()).notifications;
             for (int i = 0; i < notifications_timeout
                     && (notifications_server1.get(topic) == null ||
-                        notifications_server1.get(topic).size() < testData.length); ++i) {
+                        notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size()); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
             
-            Vector<String> notifications1_succ = notifications_server1.get(topic);
-            for (int i = 0; i < testData.length; ++i) {
-                assertTrue("subscription (" + topic + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications1_succ != null
-                                && notifications1_succ.contains(testData[i]));
-                notifications1_succ.remove(testData[i]);
-            }
-            if (notifications1_succ.size() > 0) {
-                fail("Received element (" + topic + ", "
-                        + notifications1_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
+            server1.stop();
             
+            // check that every notification arrived:
+            checkNotifications(notifications_server1, notifications_server1_expected);
         } finally {
             server1.stop();
             conn.closeConnection();
@@ -1243,17 +1222,26 @@ public class PubSubTest {
     public void testSubscription2() throws Exception {
         String topic = testTime + "_Subscription2";
         PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer(startPort);
-        Server server2 = newSubscriptionServer(startPort + 1);
-        Server server3 = newSubscriptionServer(startPort + 2);
+        Server server1 = newSubscriptionServer();
+        Server server2 = newSubscriptionServer();
+        Server server3 = newSubscriptionServer();
+        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        notifications_server1_expected.put(topic, new Vector<String>());
+        Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
+        notifications_server2_expected.put(topic, new Vector<String>());
+        Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
+        notifications_server3_expected.put(topic, new Vector<String>());
 
         try {
-            conn.subscribe(topic, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
-            conn.subscribe(topic, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
-            conn.subscribe(topic, "http://127.0.0.1:" + server3.getConnectors()[0].getPort());
+            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server3.getConnectors()[0].getLocalPort());
             
             for (int i = 0; i < testData.length; ++i) {
                 conn.publish(topic, testData[i]);
+                notifications_server1_expected.get(topic).add(testData[i]);
+                notifications_server2_expected.get(topic).add(testData[i]);
+                notifications_server3_expected.get(topic).add(testData[i]);
             }
             
             // wait max 'notifications_timeout' seconds for notifications:
@@ -1265,56 +1253,22 @@ public class PubSubTest {
                 ((SubscriptionHandler) server3.getHandler()).notifications;
             for (int i = 0; i < notifications_timeout
                     && (notifications_server1.get(topic) == null || 
-                        notifications_server1.get(topic).size() < testData.length ||
+                        notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size()||
                         notifications_server2.get(topic) == null ||
-                        notifications_server2.get(topic).size() < testData.length ||
+                        notifications_server2.get(topic).size() < notifications_server2_expected.get(topic).size() ||
                         notifications_server3.get(topic) == null ||
-                        notifications_server3.get(topic).size() < testData.length); ++i) {
+                        notifications_server3.get(topic).size() < notifications_server3_expected.get(topic).size()); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
             
-            Vector<String> notifications1_succ = notifications_server1.get(topic);
-            for (int i = 0; i < testData.length; ++i) {
-                assertTrue("subscription (" + topic + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications1_succ != null
-                                && notifications1_succ.contains(testData[i]));
-                notifications1_succ.remove(testData[i]);
-            }
-            if (notifications1_succ.size() > 0) {
-                fail("Received element (" + topic + ", "
-                        + notifications1_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
-            
-            Vector<String> notifications2_succ = notifications_server2.get(topic);
-            for (int i = 0; i < testData.length; ++i) {
-                assertTrue("subscription (" + topic + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications2_succ != null
-                                && notifications2_succ.contains(testData[i]));
-                notifications2_succ.remove(testData[i]);
-            }
-            if (notifications2_succ.size() > 0) {
-                fail("Received element (" + topic + ", "
-                        + notifications2_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
-            
-            Vector<String> notifications3_succ = notifications_server3.get(topic);
-            for (int i = 0; i < testData.length; ++i) {
-                assertTrue("subscription (" + topic + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications3_succ != null
-                                && notifications3_succ.contains(testData[i]));
-                notifications3_succ.remove(testData[i]);
-            }
-            if (notifications3_succ.size() > 0) {
-                fail("Received element (" + topic + ", "
-                        + notifications3_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
-            
+            server1.stop();
+            server2.stop();
+            server3.stop();
+
+            // check that every notification arrived:
+            checkNotifications(notifications_server1, notifications_server1_expected);
+            checkNotifications(notifications_server2, notifications_server2_expected);
+            checkNotifications(notifications_server3, notifications_server3_expected);
         } finally {
             server1.stop();
             server2.stop();
@@ -1336,30 +1290,33 @@ public class PubSubTest {
         String topic2 = testTime + "_Subscription3_2";
         String topic3 = testTime + "_Subscription3_3";
         PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer(startPort);
-        Server server2 = newSubscriptionServer(startPort + 1);
-        Server server3 = newSubscriptionServer(startPort + 2);
+        Server server1 = newSubscriptionServer();
+        Server server2 = newSubscriptionServer();
+        Server server3 = newSubscriptionServer();
+        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        notifications_server1_expected.put(topic1, new Vector<String>());
+        Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
+        notifications_server2_expected.put(topic2, new Vector<String>());
+        Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
+        notifications_server3_expected.put(topic3, new Vector<String>());
 
         try {
-            conn.subscribe(topic1, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
-            conn.subscribe(topic2, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
-            conn.subscribe(topic3, "http://127.0.0.1:" + server3.getConnectors()[0].getPort());
+            conn.subscribe(topic1, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic2, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic3, "http://" + server1.getConnectors()[0].getHost() + ":" + server3.getConnectors()[0].getLocalPort());
             
-            int topic1_elements = 0;
-            int topic3_elements = 0;
-            int topic2_elements = 0;
             for (int i = 0; i < testData.length; ++i) {
                 if (i % 2 == 0) {
                     conn.publish(topic1, testData[i]);
-                    ++topic1_elements;
+                    notifications_server1_expected.get(topic1).add(testData[i]);
                 }
                 if (i % 3 == 0) {
                     conn.publish(topic2, testData[i]);
-                    ++topic2_elements;
+                    notifications_server2_expected.get(topic2).add(testData[i]);
                 }
                 if (i % 5 == 0) {
                     conn.publish(topic3, testData[i]);
-                    ++topic3_elements;
+                    notifications_server3_expected.get(topic3).add(testData[i]);
                 }
             }
             
@@ -1372,57 +1329,22 @@ public class PubSubTest {
                 ((SubscriptionHandler) server3.getHandler()).notifications;
             for (int i = 0; i < notifications_timeout
                     && (notifications_server1.get(topic1) == null || 
-                        notifications_server1.get(topic1).size() < topic1_elements ||
+                        notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size() ||
                         notifications_server2.get(topic2) == null ||
-                        notifications_server2.get(topic2).size() < topic2_elements ||
+                        notifications_server2.get(topic2).size() < notifications_server2_expected.get(topic2).size() ||
                         notifications_server3.get(topic3) == null ||
-                        notifications_server3.get(topic3).size() < topic3_elements); ++i) {
+                        notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size()); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
             
-            Vector<String> notifications1_succ = notifications_server1.get(topic1);
-            for (int i = 0; i < testData.length; i += 2) {
-                assertTrue("subscription (" + topic1 + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications1_succ != null
-                                && notifications1_succ.contains(testData[i]));
-                notifications1_succ.remove(testData[i]);
-            }
-            if (notifications1_succ.size() > 0) {
-                fail("Received element (" + topic1 + ", "
-                        + notifications1_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
-            
-            Vector<String> notifications2_succ = notifications_server2.get(topic2);
-            for (int i = 0; i < testData.length; i += 3) {
-                assertTrue("subscription (" + topic2 + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications2_succ != null
-                                && notifications2_succ.contains(testData[i]));
-                notifications2_succ.remove(testData[i]);
-            }
-            if (notifications2_succ.size() > 0) {
-                fail("Received element (" + topic2 + ", "
-                        + notifications2_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
-            
-            
-            Vector<String> notifications3_succ = notifications_server3.get(topic3);
-            for (int i = 0; i < testData.length; i += 5) {
-                assertTrue("subscription (" + topic3 + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications3_succ != null
-                                && notifications3_succ.contains(testData[i]));
-                notifications3_succ.remove(testData[i]);
-            }
+            server1.stop();
+            server2.stop();
+            server3.stop();
 
-            if (notifications3_succ.size() > 0) {
-                fail("Received element (" + topic3 + ", "
-                        + notifications3_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
+            // check that every notification arrived:
+            checkNotifications(notifications_server1, notifications_server1_expected);
+            checkNotifications(notifications_server2, notifications_server2_expected);
+            checkNotifications(notifications_server3, notifications_server3_expected);
         } finally {
             server1.stop();
             server2.stop();
@@ -1444,32 +1366,35 @@ public class PubSubTest {
         String topic2 = testTime + "_Subscription4_2";
         String topic3 = testTime + "_Subscription4_3";
         PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer(startPort);
-        Server server2 = newSubscriptionServer(startPort + 1);
-        Server server3 = newSubscriptionServer(startPort + 2);
+        Server server1 = newSubscriptionServer();
+        Server server2 = newSubscriptionServer();
+        Server server3 = newSubscriptionServer();
+        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        notifications_server1_expected.put(topic1, new Vector<String>());
+        Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
+        notifications_server2_expected.put(topic2, new Vector<String>());
+        Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
+        notifications_server3_expected.put(topic3, new Vector<String>());
 
         try {
-            conn.subscribe(topic1, "http://127.0.0.1:" + server1.getConnectors()[0].getPort());
-            conn.subscribe(topic2, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
-            conn.subscribe(topic3, "http://127.0.0.1:" + server3.getConnectors()[0].getPort());
-            conn.unsubscribe(topic2, "http://127.0.0.1:" + server2.getConnectors()[0].getPort());
+            conn.subscribe(topic1, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic2, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic3, "http://" + server1.getConnectors()[0].getHost() + ":" + server3.getConnectors()[0].getLocalPort());
+            conn.unsubscribe(topic2, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
             
-            int topic1_elements = 0;
-            // note: topic2 is unsubscribed
-//            int topic2_elements = 0;
-            int topic3_elements = 0;
             for (int i = 0; i < testData.length; ++i) {
                 if (i % 2 == 0) {
                     conn.publish(topic1, testData[i]);
-                    ++topic1_elements;
+                    notifications_server1_expected.get(topic1).add(testData[i]);
                 }
                 if (i % 3 == 0) {
                     conn.publish(topic2, testData[i]);
-//                    ++topic2_elements;
+                    // note: topic2 is unsubscribed
+//                    notifications_server2_expected.get(topic2).add(testData[i]);
                 }
                 if (i % 5 == 0) {
                     conn.publish(topic3, testData[i]);
-                    ++topic3_elements;
+                    notifications_server3_expected.get(topic3).add(testData[i]);
                 }
             }
             
@@ -1482,50 +1407,22 @@ public class PubSubTest {
                 ((SubscriptionHandler) server3.getHandler()).notifications;
             for (int i = 0; i < notifications_timeout
                     && (notifications_server1.get(topic1) == null || 
-                        notifications_server1.get(topic1).size() < topic1_elements ||
+                        notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size() ||
 //                        notifications_server3.get(topic2) == null ||
-//                        notifications_server3.get(topic2).size() < topic2_elements ||
+//                        notifications_server3.get(topic2).size() < notifications_server2_expected.get(topic2).size() ||
                         notifications_server3.get(topic3) == null ||
-                        notifications_server3.get(topic3).size() < topic3_elements); ++i) {
+                        notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size()); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
             
-            Vector<String> notifications1_succ = notifications_server1.get(topic1);
-            for (int i = 0; i < testData.length; i += 2) {
-                assertTrue("subscription (" + topic1 + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications1_succ != null
-                                && notifications1_succ.contains(testData[i]));
-                notifications1_succ.remove(testData[i]);
-            }
-            if (notifications1_succ.size() > 0) {
-                fail("Received element (" + topic1 + ", "
-                        + notifications1_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
-            
-            Vector<String> notifications2_succ = notifications_server2.get(topic2);
-            if (notifications2_succ != null && notifications2_succ.size() > 0) {
-                fail("Received element (" + topic2 + ", "
-                        + notifications2_succ.get(0)
-                        + ") although the server was unsubscribed.");
-            }
-            
-            Vector<String> notifications3_succ = notifications_server3.get(topic3);
-            for (int i = 0; i < testData.length; i += 5) {
-                assertTrue("subscription (" + topic3 + ", " + testData[i]
-                        + ") not received by server)",
-                        notifications3_succ != null
-                                && notifications3_succ.contains(testData[i]));
-                notifications3_succ.remove(testData[i]);
-            }
+            server1.stop();
+            server2.stop();
+            server3.stop();
 
-            if (notifications3_succ.size() > 0) {
-                fail("Received element (" + topic3 + ", "
-                        + notifications3_succ.get(0)
-                        + ") which is not part of the subscription.");
-            }
-            
+            // check that every notification arrived:
+            checkNotifications(notifications_server1, notifications_server1_expected);
+            checkNotifications(notifications_server2, notifications_server2_expected);
+            checkNotifications(notifications_server3, notifications_server3_expected);
         } finally {
             server1.stop();
             server2.stop();
