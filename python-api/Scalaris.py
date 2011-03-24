@@ -225,7 +225,7 @@ class Transaction(object):
         self._tlog = None
     
     # returns: [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-    #           {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found}]
+    #           {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]
     # (the elements of this list can be processed with Transaction.process_result_*(result))
     def req_list(self, reqlist):
         if self._tlog == None:
@@ -234,7 +234,7 @@ class Transaction(object):
             result = _json_call(self._conn, 'req_list', [self._tlog, reqlist.getJSONRequests()])
         # results: {'tlog': xxx,
         #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-        #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found}]}
+        #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
         if 'tlog' not in result or 'results' not in result or not isinstance(result['results'], list) or len(result['results']) < 1:
             raise UnknownException(result)
         self._tlog = result['tlog']
@@ -368,11 +368,11 @@ class ReplicatedDHT(object):
         else:
             self._conn = conn
 
-    # returns: (Success::boolean(), ok::integer(), results:[ok | locks_set | undef])
+    # returns: (Success::boolean(), ok::integer(), results:['ok' or 'locks_set' or 'undef'])
     def delete(self, key, timeout = 2000):
         result = _json_call(self._conn, 'delete', [key, timeout])
-        # results: {'ok': xxx, 'results': [ok | locks_set | undef]} or
-        #          {'failure': 'timeout', 'ok': xxx, 'results': [ok | locks_set | undef]}
+        # results: {'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']} or
+        #          {'failure': 'timeout', 'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']}
         if isinstance(result, dict) and 'ok' in result and 'results' in result:
             if 'failure' not in result:
                 return (True, result['ok'], result['results'])

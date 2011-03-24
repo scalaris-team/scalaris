@@ -71,10 +71,8 @@ public class ErlangValue {
      *  </ul>
      * composite types:
      * <ul>
-     *  <li>{@link List} with one of the native types - {@link OtpErlangList}</li>
+     *  <li>{@link List}<Object> with one of the native types - {@link OtpErlangList}</li>
      *  <li>{@link Map}<String, Object> representing a JSON object - {@link OtpErlangTuple}</li>
-     *  <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
-     *  <li>{@link ErlangValue}</li>
      *  </ul>
      * custom types:
      * <ul>
