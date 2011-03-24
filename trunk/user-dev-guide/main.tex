@@ -11,6 +11,18 @@
 % WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 % See the License for the specific language governing permissions and
 % limitations under the License.
+\newcommand{\doctitle}{Scalaris: Users and Developers Guide}
+\newcommand{\docauthor}{Zuse Institute Berlin, onScale solutions}
+\newcommand{\docsubject}{Scalaris}
+\newcommand{\doccreator}{LaTeX2e and pdfLaTeX with hyperref-package}
+\newcommand{\docproducer}{}
+\newcommand{\dockeywords}{Scalaris, P2P, DHT, Manual}
+\newcommand{\doccopyright}{Copyright 2007-2011 Zuse Institute Berlin and onScale solutions}
+\newcommand{\doclicenseurl}{http://www.apache.org/licenses/LICENSE-2.0}
+\newcommand{\docversion}{0.3.0 draft}
+
+\title{\doctitle}
+
 \documentclass[a4paper]{scrreprt}
 \usepackage{typearea}
 \areaset[1cm]{165mm}{240mm}
@@ -34,13 +46,9 @@
 \usepackage{lastpage}
 \usepackage{relsize}
 \usepackage{xcolor}
-\usepackage[pdftex,
-        colorlinks=true,
-        urlcolor=rltblue,       % \href{...}{...} external (URL)
-        filecolor=rltblue,     % \href{...} local file
-        linkcolor=rltblue,      % \ref{...} and \pageref{...}
-%        pagebackref=true,
-        pdfborder={0 0 0}]{hyperref}
+
+\input{pdfoptions}        
+        
 \usepackage{listings}
 \usepackage{etextools}
 \usepackage{tikz}
@@ -237,18 +245,17 @@
  \mdseries Users and Developers Guide
 
 \bigskip\medskip
-\LARGE Version 0.2.0 draft \hfill \today\\
+\LARGE Version \docversion{} \hfill \today\\
 \end{tabular}
 \vfill
 {\scriptsize
-Copyright 2007-2011 Zuse Institute Berlin
-and onScale solutions.
+\doccopyright{}.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-\url{http://www.apache.org/licenses/LICENSE-2.0}
+\url{\doclicenseurl}
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
