@@ -47,18 +47,29 @@
 %% @doc trigger a message with  the number of nodes known to the mgmt server
 -spec number_of_nodes() -> ok.
 number_of_nodes() ->
-    comm:send(mgmtPid(), {get_list_length, comm:this()}),
-    ok.
+    Pid = mgmtPid(),
+    case comm:is_valid(Pid) of
+        true -> comm:send(Pid, {get_list_length, comm:this()});
+        _    -> comm:send_local(self(), {get_list_length_response, 0})
+    end.
 
 -spec connect() -> ok.
 connect() ->
     % @todo we have to improve the startup process!
-    comm:send(mgmtPid(), {connect}).
+    Pid = mgmtPid(),
+    case comm:is_valid(Pid) of
+        true -> comm:send(Pid, {connect});
+        _    -> ok
+    end.
 
 %% @doc trigger a message with all nodes known to the mgmt server
 -spec node_list() -> ok.
 node_list() ->
-    comm:send(mgmtPid(), {get_list, comm:this()}).
+    Pid = mgmtPid(),
+    case comm:is_valid(Pid) of
+        true -> comm:send(Pid, {get_list, comm:this()});
+        _    -> comm:send_local(self(), {get_list_response, []})
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Implementation
@@ -127,7 +138,7 @@ start_link(ServiceGroup, Options) ->
                              [{erlang_register, mgmt_server},
                               {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
-%% @doc pid of the mgmt server
--spec mgmtPid() -> comm:mypid().
+%% @doc pid of the mgmt server (may be invalid)
+-spec mgmtPid() -> comm:mypid() | any().
 mgmtPid() ->
     config:read(mgmt_server).
