@@ -9,6 +9,7 @@
 % Settings for TCP mode.
 % (see scalaris.hrl to switch)
 
+%% userdevguide-begin local_cfg:distributed
 % Insert the appropriate IP-addresses for your setup
 % as comma separated integers:
 % IP Address, Port, and label of the boot server
@@ -16,6 +17,7 @@
 
 % IP Address, Port, and label of a node which is already in the system
 {known_hosts, [{{127,0,0,1}, 14195, service_per_vm}]}.
+%% userdevguide-end local_cfg:distributed
 
 
 

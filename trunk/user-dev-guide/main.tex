@@ -11,12 +11,13 @@
 % WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 % See the License for the specific language governing permissions and
 % limitations under the License.
-\newcommand{\doctitle}{Scalaris: Users and Developers Guide}
+\newcommand{\scalaris}{Scalaris}
+\newcommand{\doctitle}{\scalaris{}: Users and Developers Guide}
 \newcommand{\docauthor}{Zuse Institute Berlin, onScale solutions}
-\newcommand{\docsubject}{Scalaris}
+\newcommand{\docsubject}{\scalaris{}}
 \newcommand{\doccreator}{LaTeX2e and pdfLaTeX with hyperref-package}
 \newcommand{\docproducer}{}
-\newcommand{\dockeywords}{Scalaris, P2P, DHT, Manual}
+\newcommand{\dockeywords}{\scalaris{}, P2P, DHT, Manual}
 \newcommand{\doccopyright}{Copyright 2007-2011 Zuse Institute Berlin and onScale solutions}
 \newcommand{\doclicenseurl}{http://www.apache.org/licenses/LICENSE-2.0}
 \newcommand{\docversion}{0.3.0 draft}
@@ -46,6 +47,7 @@
 \usepackage{lastpage}
 \usepackage{relsize}
 \usepackage{xcolor}
+\usepackage{threeparttable}
 
 \input{pdfoptions}        
         
@@ -176,7 +178,6 @@
 \newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
 \newcommand{\code}[1]{\lstinline[basicstyle=\ttfamily]!#1!}
 \newcommand{\filetitle}[1]{\hbox to \linewidth{~~File \code{#1:}\hfill}}
-\newcommand{\scalaris}{Scalaris}
 \newcommand{\todo}[1]{{\color{red}{\em TODO: #1}}}
 \newcommand{\svnrev}[1]
 {\hfill\emph{Description is based on SVN revision #1.}\medskip}
@@ -239,7 +240,7 @@
 %\vspace*{-5cm}\includegraphics[width=5cm]{scalaris-layers}
 \parbox{4cm}{\includegraphics[width=4cm]{scalaris-layers}}
 & &\sffamily\bfseries\Huge
-  \bigskip {\textcolor{rltblue}{Scalaris:}}
+  \bigskip {\textcolor{rltblue}{\scalaris{}:}}
 
 \medskip
  \mdseries Users and Developers Guide
@@ -270,9 +271,9 @@ limitations under the License.
 
 \chapter{Introduction}
 
-Scalaris is a scalable, transactional, distributed key-value store based on
+\scalaris{} is a scalable, transactional, distributed key-value store based on
 the peer-to-peer principle. It can be used to build scalable Web 2.0
-services. The concept of Scalaris is quite simple: Its architecture consists
+services. The concept of \scalaris{} is quite simple: Its architecture consists
 of three layers.
 
 It provides self-management and scalability by replicating services and data
@@ -284,7 +285,7 @@ service downtime.
 \includegraphics[width=0.7\linewidth]{layers}
 \end{center}
 
-Scalaris takes care of:
+\scalaris{} takes care of:
 
 \begin{itemize}
 \item Fail-over
@@ -294,7 +295,7 @@ Scalaris takes care of:
 \item Transactions
 \end{itemize}
 
-The Scalaris project was initiated by Zuse Institute Berlin and onScale
+The \scalaris{} project was initiated by Zuse Institute Berlin and onScale
 solutions and was partly funded by the EU projects Selfman and
 XtreemOS. Additional information (papers, videos) can be found at
 \url{http://www.zib.de/CSR/Projects/scalaris} and
@@ -334,7 +335,7 @@ key-value stores tend to sacrifice consistency.
 
 \section{Scientific Background}
 
-{\bf Basics.} The general structure of Scalaris is modelled after
+{\bf Basics.} The general structure of \scalaris{} is modelled after
 Chord. The Chord paper~\cite{chord-sigcomm} describes the ring
 structure, the routing algorithms, and basic ring maintenance.
 
@@ -353,7 +354,7 @@ the transaction algorithms itself in \code{src/transactions} (see also
 Chap.~\ref{chapter.transactions}).
 
 {\bf Ring Maintenance.} We changed the ring maintenance algorithm in
-Scalaris. It is not the standard Chord one, but a variation of
+\scalaris{}. It is not the standard Chord one, but a variation of
 T-Man~\cite{t-man}. It is supposed to fix the ring structure
 faster. In some situations, the standard Chord algorithm is not able
 to fix the ring structure while T-Man can still fix it. For node sampling,
@@ -379,19 +380,21 @@ The implementation can be found in \code{src/gossip.erl}.
 \chapter{Download and Installation}
 
 \section{Requirements}
+\label{sec.requirements}
 
-For building and running \scalaris{}, some third-party modules are
-required which are not included in the \scalaris{} sources:
+For building and running \scalaris{}, some third-party software is
+required which is not included in the \scalaris{} sources:
 
 \begin{itemize}
 \setlength{\itemsep}{0pt}
 \setlength{\parskip}{0pt}
 \item Erlang R13B01 or newer
-\item GNU-like Make
+\item OpenSSL (required by Erlang's crypto module)
+\item GNU-like Make and autoconf (not required on Windows)
 \end{itemize}
 
-To build the Java API (and the command-line client) the following
-modules are required additionally:
+To build the Java API (and its command-line client) the following
+programs are also required:
 
 \begin{itemize}
 \setlength{\itemsep}{0pt}
@@ -404,11 +407,21 @@ Before building the Java API, make sure that \code{JAVA\_HOME} and
 \code{ANT\_HOME} are set. \code{JAVA\_HOME} has to point to a JDK
 installation, and \code{ANT\_HOME} has to point to an Ant installation.
 
+To build the Python API (and its command-line client) the following
+programs are also required:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item Python >= 2.6
+\end{itemize}
+
 \section{Download}
 
 The sources can be obtained from
-\url{http://code.google.com/p/scalaris}. RPMs and DEBs are available from
-\url{http://download.opensuse.org/repositories/home:/tschuett/}.
+\url{http://code.google.com/p/scalaris}. RPM and DEB packages are available
+from \url{http://download.opensuse.org/repositories/home:/tschuett/} for
+various Linux distributions.
 
 \subsection{Development Branch}
 
@@ -422,24 +435,6 @@ svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-read-only
 
 Releases can be found under the 'Download' tab on the web-page.
 
-
-\section{Configuration}
-
-\scalaris{} reads two configuration files from the working directory:
-\code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
-(optional). The former defines default settings and is included in the
-release. The latter can be created by the user to alter settings.  A
-sample file is provided as \code{bin/scalaris.local.cfg.example}. To run
-\scalaris{} distributed over several nodes, each node requires a
-\code{bin/scalaris.local.cfg}:
-
-\codefile{scalaris.local.cfg}{../bin/scalaris.local.cfg.example}
-
-A \scalaris{} deployment can have a management server and several nodes. The
-management-server is optional and provides a global view on a \scalaris{}
-deployment. On all servers, the \code{mgmt_server} configuration setting
-defines the location of the management server. In the example, it is
-an IP address plus a TCP port and its Erlang internal process name.
 
 \section{Build}
 
@@ -460,7 +455,7 @@ directory.
 \subsection{Windows}
 
 We are currently not supporting \scalaris{} on Windows. However, we
-have two small {\tt bat} files for building and running scalaris
+have two small {\tt .bat} files for building and running \scalaris{}
 nodes. It seems to work but we make no guarantees.
 
 \begin{itemize}
@@ -468,10 +463,10 @@ nodes. It seems to work but we make no guarantees.
        \url{http://www.erlang.org/download.html}
 \item Install OpenSSL (for crypto module)\\
        \url{http://www.slproweb.com/products/Win32OpenSSL.html}
-\item Checkout scalaris code from SVN
+\item Checkout \scalaris{} code from SVN
 \item adapt the path to your Erlang installation in \code{build.bat}
 \item start a \code{cmd.exe}
-\item go to the scalaris directory
+\item go to the \scalaris{} directory
 \item run \code{build.bat} in the cmd window
 \item check that there were no errors during the compilation;
        warnings are fine
@@ -502,122 +497,24 @@ The following commands will build the Java API for \scalaris{}:
 %> make java
 \end{lstlisting}
 
-This will build scalaris.jar, which is the library for accessing
+This will build {\tt scalaris.jar}, which is the library for accessing
 the overlay network. Optionally, the documentation can be build:
 \begin{lstlisting}[language=sh]
 %> cd java-api
 %> ant doc
 \end{lstlisting}
 
+\subsection{Python-API}
 
-\section{Running \scalaris{}}
-
-As mentioned above, \scalaris{} consists of:
-\begin{itemize}
-\setlength{\itemsep}{0pt}
-\setlength{\parskip}{0pt}
-\item management servers and
-\item regular nodes
-\end{itemize}
-
-The management server will maintain a list of nodes taking part in the
-system. A regular node is either the first node in a system or joins an
-existing system deployment.
-
-\subsection{Running on a local machine}
-\label{sec.boot}
-
-Open at least two shells. In the first, inside the \scalaris{} directory,
-start the first node (\code{firstnode.bat} on Windows):
-\begin{lstlisting}[language=sh]
-%> ./bin/firstnode.sh
-\end{lstlisting}
-
-This will start a new \scalaris{} deployment with a single node, including a
-management server. On success \url{http://localhost:8000} should point to
-the management interface page of the management server. The main page will
-show you the number of nodes currently in the system. After a couple of
-seconds a first \scalaris{} should have started and the number should
-increase to one. The main page will also allow you to store and retrieve
-key-value pairs but should not be used by applications to access
-\scalaris{}. See Chapter~\sieheref{chapter.apis} for application APIs.
-
-%The management server should show output similar to the following, when
-%starting the first \scalaris{} nodes. The first line is printed when
-%the \scalaris{} is spawned. Afterwards it will try to connect the
-%management server. When the third line is printed, it managed to contact the
-%management server and joined the ring. In this case, it was the first node
-%in the ring.
-%\begin{lstlisting}
-%[ I | Node   | <0.97.0> ] joining "23947834870"
-%[ I | Node   | <0.97.0> ] join as first [50,51,57,52,55,56,51,52,56,55,48]
-%[ I | Node   | <0.97.0> ] joined
-%\end{lstlisting}
-
-In a second shell, you can now start a second \scalaris{} node. This
-will be a `regular server':
-\begin{lstlisting}[language=sh]
-%> ./bin/joining_node.sh
-\end{lstlisting}
-
-The second node will read the configuration file and use this information to
-contact the management server and will join the ring by contacting the known
-hosts. The number of nodes on the web page should have increased to two by
-now.
-
-Optionally, a third and fourth node can be started on the same
-machine. In a third shell:
-\begin{lstlisting}[language=sh]
-%> ./bin/joining_node.sh 2
-\end{lstlisting}
-
-
-In a fourth shell:
-\begin{lstlisting}[language=sh]
-%> ./bin/joining_node.sh 3
-\end{lstlisting}
-
-This will add two further nodes to the deployment. The number passed to the
-\code{./bin/joining_node.sh} script is the local id of the started node. The
-web pages at \url{http://localhost:8000} should show the additional nodes.
-
-On linux you can also use the \code{scalarisctl} script to start a
-management server and `regular' nodes directly.
-
-\subsection{Running distributed}
-
-\scalaris{} can be installed on other machines in the same way as
-described in Section~\ref{sec:install}. In the default configuration,
-nodes will look for the management server on \code{localhost} on port 14195. You
-should create a \code{scalaris.local.cfg} pointing to the node running
-the management server.
-
-\begin{lstlisting}[language=erlang]
-% Insert the appropriate IP-addresses for your setup
-% as comma separated integers:
-% IP Address, Port, and label of the management server
-{mgmt_server, {{127,0,0,1},14195,mgmt_server}}.
-\end{lstlisting}
-
-If you are using the default configuration on the management server it will
-listen on port 14195 and you only have to change the IP address in the
-configuration file. Otherwise the other nodes will not find the management
-server. On the remote nodes, you only need to call
-\code{./bin/joining_node.sh} and they will automatically contact the
-configured management server.
-
-%\subsection{Running on PlanetLab}
-
-%\subsection{Replication Degree}
-
-%\subsection{Routing Scheme}
+Python will compile required modules on demand when executing the scripts for
+the first time.
 
 \section{Installation}
 \label{sec:install}
 
 For simple tests, you do not need to install \scalaris{}. You can run it
 directly from the source directory. Note: \code{make install} will install
-scalaris into \code{/usr/local} and place \code{scalarisctl} into
+\scalaris{} into \code{/usr/local} and place \code{scalarisctl} into
 \code{/usr/local/bin}, by default. But it is more convenient to build an RPM
 and install it.
 
@@ -629,28 +526,58 @@ rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
 \end{lstlisting}
 
 Your source and binary RPMs will be generated in
-\code{/usr/src/packages/SRPMS} and \code{RPMS}. We build RPMs and Debs
+\code{/usr/src/packages/SRPMS} and \code{RPMS}. We build RPM and DEB packages
 using checkouts from svn and provide them using the openSUSE BuildService at
 \url{http://download.opensuse.org/repositories/home:/tschuett/}. Packages
 are available for
 
 \begin{itemize}
-\item Fedora 9, 10, 11, 12, 13,
-\item Mandriva 2008, 2009, 2009.1, 2010,
-\item openSUSE 11.0, 11.1, 11.2, 11.3, 11.4, Factory,
-\item SLE 10, 11,
-\item CentOS 5.4,
-\item RHEL 5,
-\item Debian 5.0 and
-\item Ubuntu 9.04, 9.10, 10.04.
+\item Fedora 12, 13, 14,
+\item Mandriva 2009.1, 2010, 2010.1,
+\item openSUSE 11.2, 11.3, 11.4, Factory, Tumbleweed
+\item SLE 10, 11, 11SP1,
+\item CentOS 5.5,
+\item RHEL 5.5, 6,
+\item Debian 5.0, 6.0 and
+\item Ubuntu 9.04, 9.10, 10.04, 10.10.
 \end{itemize}
 
-Inside those repositories you will also find an Erlang package - you don't
-need this if you already have a recent enough Erlang version!
+An up-to-date list of available repositories can be found at
+\url{https://code.google.com/p/scalaris/wiki/FAQ#Prebuild_packages}.
 
-\section{Logging}
+Inside those repositories you will also find an Erlang package - you don't
+need this if you already have a recent enough Erlang version
+(ref. Section~\ref{sec.requirements})!
+
+
+\chapter{Setting up \scalaris{}}
+\label{chapter.runscalaris}
+\svnrev{r1606}
+
+\section{Runtime Configuration}
+
+\scalaris{} reads two configuration files from the working directory:
+\code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
+(optional). The former defines default settings and is included in the
+release. The latter can be created by the user to alter settings.  A
+sample file is provided as \code{bin/scalaris.local.cfg.example}. To run
+\scalaris{} distributed over several nodes, each node requires a
+\code{bin/scalaris.local.cfg}:
+
+\codefile{scalaris.local.cfg}{../bin/scalaris.local.cfg.example}
+
+A \scalaris{} deployment can have a management server and several nodes. The
+management-server is optional and provides a global view on all nodes of a
+\scalaris{} deployment which contact this server, i.e. have its address
+specified in the \code{mgmt_server} configuration setting.
+
+In this example, the \code{mgmt_server}'s location is defined as
+an IP address plus a TCP port and its Erlang-internal process name.
+If the deployment should not use a management server, replace the setting with
+an invalid address, e.g. \code{'null'}.
+
+\subsection{Logging}
 \label{sec:logging}
-\svnrev{r1083}
 
 \scalaris{} uses the log4erl library (see \code{contrib/log4erl}) for
 logging status information and error messages. The log level can be
@@ -675,10 +602,228 @@ detail, here the {\tt info} level provides more detailed information.
 {log_level_file, info}.
 \end{lstlisting}
 
+
+\section{Running \scalaris{}}
+
+As mentioned above, \scalaris{} consists of:
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item management servers and
+\item regular nodes
+\end{itemize}
+
+The management server will maintain a list of nodes participating in the
+system. A regular node is either the first node in a system or joins an
+existing system deployment.
+
+\subsection{Running on a local machine}
+\label{sec.boot}
+
+Open at least two shells. In the first, inside the \scalaris{} directory,
+start the first node (\code{firstnode.bat} on Windows):
+\begin{lstlisting}[language=sh]
+%> ./bin/firstnode.sh
+\end{lstlisting}
+
+This will start a new \scalaris{} deployment with a single node, including a
+management server. On success \url{http://localhost:8000} should point to
+the management interface page of the management server. The main page will
+show you the number of nodes currently in the system.
+A first \scalaris{} node should have started and the number should
+show 1 node. The main page will also allow you to store and retrieve
+key-value pairs but should not be used by applications to access
+\scalaris{}. See Chapter~\sieheref{chapter.apis} for application APIs.
+
+In a second shell, you can now start a second \scalaris{} node. This
+will be a `regular node':
+\begin{lstlisting}[language=sh]
+%> ./bin/joining_node.sh
+\end{lstlisting}
+
+The second node will read the configuration file and use this information to
+contact a number of known nodes (set by the \code{known_hosts} configuration
+setting) and join the ring. It will also register itself with the management
+server.
+The number of nodes on the web page should have increased to two by now.
+
+Optionally, a third and fourth node can be started on the same
+machine. In a third shell:
+\begin{lstlisting}[language=sh]
+%> ./bin/joining_node.sh 2
+\end{lstlisting}
+
+In a fourth shell:
+\begin{lstlisting}[language=sh]
+%> ./bin/joining_node.sh 3
+\end{lstlisting}
+
+This will add two further nodes to the deployment. The
+\code{./bin/joining_node.sh} script accepts a number as its parameter which
+will be added to the started node's name, i.e. \code{1} will lead to a node
+named \code{node1}.
+The web pages at \url{http://localhost:8000} should show the additional nodes.
+
+\subsection{Running distributed}
+
+\scalaris{} can be installed on other machines in the same way as
+described in Section~\ref{sec:install}. In the default configuration,
+nodes will look for the management server on \code{127.0.0.1} on port 14195. You
+should create a \code{scalaris.local.cfg} pointing to the node running
+the management server. You should also add a list of known nodes.
+
+\codesnippet{scalaris.local.cfg}{local_cfg:distributed}{../bin/scalaris.local.cfg.example}
+
+If you are starting the management server using \code{firstnode.sh}, it will
+listen on port 14195 and you have to change the port and the IP address in the
+configuration file. Otherwise the other nodes will not find the management
+server. Calling \code{./bin/joining_node.sh} on a remote machine will start the
+node and automatically contact the configured management server.
+
+%\subsection{Running on PlanetLab}
+
+%\subsection{Replication Degree}
+
+%\subsection{Routing Scheme}
+
+\section{Custom startup using \code{scalarisctl}}
+
+On linux you can also use the \code{scalarisctl} script to start a
+management server and `regular' nodes directly. See
+\begin{lstlisting}[language=sh]
+%> ./bin/scalarisctl -h
+\end{lstlisting}
+for a list of options accepted by \code{scalarisctl}.
+
 \chapter{Using the system}
 \label{chapter.apis}
+\svnrev{r1606}
 
-\section{JSON API}
+\scalaris{} can be used with one of the provided command line interfaces or
+by using one of the APIs in a custom program. The following sections will
+describe the APIs in general, each API in more detail and the use of our
+command line interfaces.
+
+\section{Application Programming Interfaces (APIs)}
+
+Currently we offer the following APIs:
+\begin{itemize}
+  \item an \emph{Erlang API} running on the node \scalaris{} is run\\
+        (functions can be called using remote connections with distributed
+        Erlang)
+  \item a \emph{Java API} using Erlang's \code{JInterface} library\\
+        (connections are established using distributed Erlang)
+  \item a generic \emph{JSON API}\\
+        (offered by an integrated HTTP server running on each \scalaris{} node)
+  \item a \emph{Python API} using JSON to talk to \scalaris{}. 
+\end{itemize}
+
+Each API contains methods for accessing functions from the three layers
+\scalaris{} is composed of.
+Table~\ref{api.layers} shows the modules and classes of Erlang, Java and Python
+and their mapping to these layers. The appropriate JSON calls
+are shown in Section~\ref{sec.api.json}.
+
+Special care needs to be taken when trying to delete keys (no matter which API
+is used). This can only be done outside the transaction layer and is thus not
+absolutely safe. Refer to the following thread on the mailing list:
+\url{http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799}.
+
+\begin{table}
+  \centering
+    \begin{tabular}{lllll}
+    \toprule
+                      & Erlang                 & Java                         & Python                     \\
+                      & \footnotesize{module}  & \footnotesize{class in \code{de.zib.scalaris}}%
+                                                                              & \footnotesize{class in module \code{Scalaris}} \\
+    \midrule
+    Transaction Layer & \code{api_tx.erl}      & \code{Transaction},          & \code{Transaction},        \\
+                      &                        & \code{TransactionSingleOp}  & \code{TransactionSingleOp} \\
+    %\cmidrule(lr){2-4}
+                      & \code{api_pubsub.erl}  & \code{PubSub}                & \code{PubSub}              \\
+    \cmidrule(lr){1-4}
+    Replication Layer & \code{api_rdht.erl}    & \code{ReplicatedDHT}         & \code{ReplicatedDHT}       \\
+    \cmidrule(lr){1-4}
+    P2P Layer         & \code{api_dht.erl}     &                              &                            \\
+    %\cmidrule(lr){2-4}
+                      & \code{api_dht_raw.erl} &                              &                            \\
+    \bottomrule
+    \end{tabular}
+    \caption{Layered API structure}
+    \label{api.layers}
+\end{table}
+
+\subsection{Supported Types}
+
+Different programming languages have different types. In order for our APIs
+to be compatible with each other, only a subset of the available types is
+officially supported.
+
+\emph{Keys} are always strings. In order to avoid problems with different
+encodings on different systems, we suggest to only use ASCII characters.
+
+For \emph{values} we distinguish between \emph{native}, \emph{composite}
+and \emph{custom} types.
+
+\emph{Native} types are
+\begin{itemize}
+  \item boolean values
+  \item integer numbers
+  \item floating point numbers
+  \item strings and
+  \item binary objects (a number of bytes).
+\end{itemize}
+
+\emph{Composite} types are
+\begin{itemize}
+  \item lists of native types (except binary objects)
+  \item JavaScript Object Notation (JSON)\footnote{see \url{http://json.org/}}
+\end{itemize}
+
+\emph{Custom} types include any Erlang term not covered by the previous types.
+Special care needs to be taken using custom types as they may not be accessible
+through every API or may be misinterpreted by an API. The use of them is
+discouraged.
+
+Table~\ref{api.supported_types} shows the mapping of supported types to the
+language-specific types of each API.
+
+\begin{table}
+  \centering
+  \begin{threeparttable}[b]
+    \begin{tabular}{lllll}
+    \toprule
+               & Erlang            & Java                         & JSON                            & Python                    \\
+    \midrule
+    boolean    & \code{boolean()}  & \code{bool}, \code{Boolean}  & \code{true}, \code{false}       & \code{True}, \code{False} \\
+    integer    & \code{integer()}  & \code{int}, \code{Integer}   & \code{int}                      & \code{int}                \\
+               &                   & \code{long}, \code{Long}     &                                 &                           \\
+               &                   & \code{BigInteger}            &                                 &                           \\
+    float      & \code{float()}    & \code{double}, \code{Double} & \code{int frac}                 & \code{float}              \\
+               &                   &                              & \code{int exp}                  &                           \\
+               &                   &                              & \code{int frac exp}             &                           \\
+    string     & \code{string()}   & \code{String}                & \code{string}                   & \code{str}                \\
+    binary     & \code{binary()}   & \code{byte[]}                & \code{string} (base64-encoded)  & \code{bytearray}          \\
+    list(type) & \code{[type()]}   & \code{List<Object>}          & \code{array}                    & \code{list}               \\
+    JSON       & \code{json_obj()}\tnote{a}%
+                                   & \code{Map<String, Object>}   & \code{object}                   & \code{dict}               \\
+    custom     & \code{any()}      & \code{OtpErlangObject}       & \emph{<unsupported>}            & \emph{<unsupported>}      \\
+    \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+      \item[a] ~\vspace{-1.5em}%
+\begin{lstlisting}[language=erlang]
+json_obj() :: {struct, [Key::atom() | string(), Value::json_val()]}
+json_val() :: string() | number() | json_obj() | {array, [any()]} | true | false | null
+\end{lstlisting}
+    \end{tablenotes}
+    \caption{Types supported by the \scalaris{} APIs}
+    \label{api.supported_types}
+  \end{threeparttable}
+\end{table}
+
+\subsection{JSON API}
+\label{sec.api.json}
 
 \scalaris{} supports a JSON API for transactions. To minimize the necessary
 round trips between a client and \scalaris{}, it uses request lists, which
@@ -693,230 +838,336 @@ processing.
 
 The JSON-API can be accessed via the \scalaris{}-Web-Server running on port
 8000 by default and the page \code{jsonrpc.yaws} (For example at:
-\url{http://localhost:8000/jsonrpc.yaws}).  The following example
-illustrates the message flow:
+\url{http://localhost:8000/jsonrpc.yaws}).
+Requests are issued by sending a JSON object to this URL. The result will then
+be returned as a JSON object. The following table shows how they both look
+like:
 
-\begin{longtable}{p{0.45\textwidth}cp{0.45\textwidth}}
-\bf Client & & \bf \scalaris{} node \\
-Make a transaction, that sets two keys:
+\begin{tabular}{p{0.45\textwidth}cp{0.45\textwidth}}
+\bf Request & & \bf Result \\
 \begin{lstlisting}[language=java]
 {
-  "method":"req_list",
-  "version":"1.1",
-  "params":
-    [
-      [
-        { "write":{"keyA":"valueA"} },
-        { "write":{"keyB":"valueB"} },
-        { "commit":"commit" }
-      ]
-    ],
-  "id":0
+  "version": "1.1",
+  "method" : "<method>",
+  "params" : [<params>],
+  "id"     : <number>
 }
 \end{lstlisting}
-& $\to$
-& \\
-
-& $\leftarrow$ &
-\scalaris{} sends results back
-\begin{lstlisting}[language=java]
-{ "result":
-  { "results":
-      [
-        { "op":"commit",
-          "value":"ok",
-          "key":"ok" },
-        { "op":"write",
-          "value":"valueB",
-          "key":"keyB" },
-        { "op":"write",
-          "value":"valueA",
-          "key":"keyA" }
-      ],
-    "translog":
-     [...]
-  },
-  "id" : 0
-}
-\end{lstlisting}
-\\
-
-In a second transaction: Read the two keys
+& &
 \begin{lstlisting}[language=java]
 {
-  "method":"req_list",
-  "version":"1.1",
-  "params":
-    [
-      [
-        { "read":"keyA" },
-        { "read":"keyB" }
-      ]
-    ]
-  "id":0
+  "result" : <result_object>,
+  "id"     : <number>
 }
 \end{lstlisting}
-& $\to$ & \\
+\end{tabular}
 
-& $\leftarrow$ &
-\scalaris{} sends results back
+The \code{id} in the request can be an arbitrary number which identifies the
+request and is returned in the result.
+The following operations (shown as \code{<method>(<params>)}) are currently
+supported (the given result is the \code{<result_object>} mentioned above):
+\begin{itemize}
+  \item \code{nop(Value)} - no operation, result:
 \begin{lstlisting}[language=java]
-{ "result":
-  {"results":
-    [
-      { "op":"read",
-        "value":"valueB",
-        "key":"keyB" },
-      { "op":"read",
-        "value":"valueA",
-        "key":"keyA" }
-    ],
-   "translog":
-    [...] // this list is the translog
-          // for further operations!
-          // We name it TLOG here.
-  },
-  "id" : 0
-}
-\end{lstlisting}\\
-
-Calculate something with the read values and make further requests, here a
-write and the commit for the whole transaction. Also include the latest
-translog we got from \scalaris{} (named \code{TLOG} here).
-
-\begin{lstlisting}[language=java]
-{
-  "method":"req_list",
-  "version":"1.1",
-  "params":
-    [
-      TLOG, // translog from prev. result
-      [
-        { "write":{"keyA":"valueA2"} },
-        { "commit":"commit" }
-      ]
-    ],
-  "id" : 0
-}
+"ok"
 \end{lstlisting}
-& $\to$ & \\
-
-& $\leftarrow$ &
-\scalaris{} sends results back
+  \item[] \hspace{-1.7em}single read/write:
+  \item \code{read(Key)} - read the value at \code{Key}, result:
 \begin{lstlisting}[language=java]
-{ "result":
-  { "results":
-    [ { "op":"commit",
-        "value":"ok",
-        "key":"ok" },
-      { "op":"write",
-        "value":"valueA2",
-        "key":"keyA" }
-    ],
-    "translog":
-    [...]
-  },
-  "id" : 0
-}
-\end{lstlisting}\\
-\end{longtable}
-
-A sample usage of the JSON API using Ruby can be found in \code{contrib/jsonrpc.rb}.
-
-A single request list must not contain a key more than once!
-
-The allowed requests are:
+{"status": "ok", "value", <json_value>} or
+{"status": "fail", "reason": "timeout" or "not_found"}
+\end{lstlisting}
+  \item \code{write(Key, Value)} - write \code{Value} to \code{Key}, result:
 \begin{lstlisting}[language=java]
-{ "read":"any_key" }
+{"status": "ok"} or
+{"status": "fail", "reason": "timeout" or "abort"}
+\end{lstlisting}
+  \item \code{test_and_set(Key, OldValue, NewValue)} - atomic test-and-set (write \code{NewValue} to \code{Key} if the current value is \code{OldValue}), result:
+\begin{lstlisting}[language=java]
+{"status": "ok"} or
+{"status": "fail", "reason": "timeout" or "abort" or "not_found"} or
+{"status": "fail", "reason": "key_changed", "value": <json_value>}
+\end{lstlisting}
+  \item[] \hspace{-1.7em}transactions:
+  \item \code{req_list(ReqList)} - process a list of requests, result:
+\begin{lstlisting}[language=java]
+[{"status": "ok"} or {"status": "ok", "value": <json_value>} or
+ {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]
+\end{lstlisting}
+  \item \code{req_list(TLog, ReqList)} - process a list of requests with a previous translog, result:
+\begin{lstlisting}[language=java]
+[{"status": "ok"} or {"status": "ok", "value": <json_value>} or
+ {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]
+\end{lstlisting}
+  \item[] \hspace{-1.7em}replication layer functions:
+  \item \code{delete(Key)} - delete the value at \code{Key}, default timeout 2s, result:
+\begin{lstlisting}[language=java]
+{"ok": <number>, "results": ["ok" or "locks_set" or "undef"]} or
+{"failure": "timeout", "ok": <number>, "results": ["ok" or "locks_set" or "undef"]}
+\end{lstlisting}
+  \item \code{delete(Key, Timeout)} - delete the value at \code{Key} with a timeout of \code{Timeout} Milliseconds, result:
+\begin{lstlisting}[language=java]
+{"ok": <number>, "results": ["ok" or "locks_set" or "undef"]} or
+{"failure": "timeout", "ok": <number>, "results": ["ok" or "locks_set" or "undef"]}
+\end{lstlisting}
+  \item[] \hspace{-1.7em}raw DHT functions:
+  \item \code{range_read(From, To)} - read a range of (raw) keys, result:
+\begin{lstlisting}[language=java]
+{"status": "ok" or "timeout",
+ "value": [{"key": <key>, "value": <json_value>, "version": <version>}]}
+\end{lstlisting}
+  \item[] \hspace{-1.7em}publish/subscribe:
+  \item \code{publish(Topic, Content)} - publish \code{Content} to \code{Topic}, result:
+\begin{lstlisting}[language=java]
+{"status": "ok"}
+\end{lstlisting}
+  \item \code{subscribe(Topic, URL)} - subscribe \code{URL} to \code{Topic}, result:
+\begin{lstlisting}[language=java]
+{"status": "ok"} or
+{"status": "fail", "reason": "timeout" or "abort"}
+\end{lstlisting}
+  \item \code{unsubscribe(Topic, URL)} - unsubscribe \code{URL} from \code{Topic}, result:
+\begin{lstlisting}[language=java]
+{"status": "ok"} or
+{"status": "fail", "reason": "timeout" or "abort" or "not_found"}
+\end{lstlisting}
+  \item \code{get_subscribers(Topic)} - get subscribers of \code{Topic}, result:
+\begin{lstlisting}[language=java]
+[<urls>]
+\end{lstlisting}
+%  \item \code{notify(Topic, Value)} - process a notify which came from a publish, result:
+% \begin{lstlisting}[language=java]
+% "ok"
+% \end{lstlisting}
+\end{itemize}
 
-{ "write":{"any_key":"any_value"} }
+Note:
+\begin{lstlisting}[language=java]
+<json_value> = {"type": "as_is" or "as_bin", "value": <value>}
+\end{lstlisting}
+The \code{<value>} inside \code{<json_value>} is either a base64-encoded
+string representing a binary object (if type = \code{"as_bin"}) or the value
+itself (otherwise).
 
-{ "commit":"commit" }
+% The following example illustrates the message flow:
+% 
+% \begin{longtable}{p{0.45\textwidth}cp{0.45\textwidth}}
+% \bf Client & & \bf \scalaris{} node \\
+% Make a transaction, that sets two keys:
+% \begin{lstlisting}[language=java]
+% {
+%   "method":"req_list",
+%   "version":"1.1",
+%   "params":
+%     [
+%       [
+%         { "write":{"keyA":"valueA"} },
+%         { "write":{"keyB":"valueB"} },
+%         { "commit":"commit" }
+%       ]
+%     ],
+%   "id":0
+% }
+% \end{lstlisting}
+% & $\to$
+% & \\
+% 
+% & $\leftarrow$ &
+% \scalaris{} sends results back
+% \begin{lstlisting}[language=java]
+% { "result":
+%   { "results":
+%       [
+%         { "op":"commit",
+%           "value":"ok",
+%           "key":"ok" },
+%         { "op":"write",
+%           "value":"valueB",
+%           "key":"keyB" },
+%         { "op":"write",
+%           "value":"valueA",
+%           "key":"keyA" }
+%       ],
+%     "translog":
+%      [...]
+%   },
+%   "id" : 0
+% }
+% \end{lstlisting}
+% \\
+% 
+% In a second transaction: Read the two keys
+% \begin{lstlisting}[language=java]
+% {
+%   "method":"req_list",
+%   "version":"1.1",
+%   "params":
+%     [
+%       [
+%         { "read":"keyA" },
+%         { "read":"keyB" }
+%       ]
+%     ]
+%   "id":0
+% }
+% \end{lstlisting}
+% & $\to$ & \\
+% 
+% & $\leftarrow$ &
+% \scalaris{} sends results back
+% \begin{lstlisting}[language=java]
+% { "result":
+%   {"results":
+%     [
+%       { "op":"read",
+%         "value":"valueB",
+%         "key":"keyB" },
+%       { "op":"read",
+%         "value":"valueA",
+%         "key":"keyA" }
+%     ],
+%    "translog":
+%     [...] // this list is the translog
+%           // for further operations!
+%           // We name it TLOG here.
+%   },
+%   "id" : 0
+% }
+% \end{lstlisting}\\
+% 
+% Calculate something with the read values and make further requests, here a
+% write and the commit for the whole transaction. Also include the latest
+% translog we got from \scalaris{} (named \code{TLOG} here).
+% 
+% \begin{lstlisting}[language=java]
+% {
+%   "method":"req_list",
+%   "version":"1.1",
+%   "params":
+%     [
+%       TLOG, // translog from prev. result
+%       [
+%         { "write":{"keyA":"valueA2"} },
+%         { "commit":"commit" }
+%       ]
+%     ],
+%   "id" : 0
+% }
+% \end{lstlisting}
+% & $\to$ & \\
+% 
+% & $\leftarrow$ &
+% \scalaris{} sends results back
+% \begin{lstlisting}[language=java]
+% { "result":
+%   { "results":
+%     [ { "op":"commit",
+%         "value":"ok",
+%         "key":"ok" },
+%       { "op":"write",
+%         "value":"valueA2",
+%         "key":"keyA" }
+%     ],
+%     "translog":
+%     [...]
+%   },
+%   "id" : 0
+% }
+% \end{lstlisting}\\
+% \end{longtable}
+% 
+% A sample usage of the JSON API using Ruby can be found in \code{contrib/jsonrpc.rb}.
+% 
+% A single request list must not contain a key more than once!
+% 
+% The allowed requests are:
+% \begin{lstlisting}[language=java]
+% { "read":"any_key" }
+% 
+% { "write":{"any_key":"any_value"} }
+% 
+% { "commit":"commit" }
+% \end{lstlisting}
+% 
+% The possible results are:
+% \begin{lstlisting}[language=java]
+% { "op":"read", "key":"any_key", "value":"any_value" }
+% { "op":"read", "key":"any_value", "fail":"reason" } // 'not_found' or 'timeout'
+% 
+% { "op":"write",  "key":"any_key", "value":"any_value" }
+% { "op":"read", "key":"any_key", "fail":"reason" }
+% 
+% { "op":"commit", "value":"ok", "key":"ok" }
+% { "op":"commit", "value":"fail", "fail":"reason" }
+% \end{lstlisting}
+
+
+%\subsection{Erlang}
+
+\subsection{Java API}
+
+The \code{scalaris.jar} provides a Java command line client as well as a
+library for Java programs to access \scalaris{}. The library provides two
+classes:
+
+\begin{itemize}
+\item \code{Scalaris} provides a high-level API similar to the command line
+       client.
+\item \code{Transaction} provides a low-level API to the transaction
+       mechanism.
+\end{itemize}
+
+For details regarding the API we refer the reader to the Javadoc:
+
+\begin{lstlisting}[language=sh]
+%> cd java-api
+%> ant doc
+%> firefox doc/index.html
 \end{lstlisting}
 
-The possible results are:
-\begin{lstlisting}[language=java]
-{ "op":"read", "key":"any_key", "value":"any_value" }
-{ "op":"read", "key":"any_value", "fail":"reason" } // 'not_found' or 'timeout'
+\section{Command Line Interfaces}
 
-{ "op":"write",  "key":"any_key", "value":"any_value" }
-{ "op":"read", "key":"any_key", "fail":"reason" }
+\subsection{Java command line interface}
 
-{ "op":"commit", "value":"ok", "key":"ok" }
-{ "op":"commit", "value":"fail", "fail":"reason" }
-\end{lstlisting}
-
-\subsection{Deleting a key}
-
-Outside transactions keys can also be deleted, but it has to be done with
-care, as explained in the following thread on the mailing list:
-\url{http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799}.
-
-\begin{lstlisting}[language=java]
-{
-  "method":"delete",
-  "version":"1.1",
-  "params":
-    [
-      { "key":"any_key" }
-    ],
-  "id" : 0
-}
-\end{lstlisting}
-
-Two sample results
-
-\begin{lstlisting}[language=java]
-{ "result":
-  { "ok":2, // how many replicas were deleted successsfully
-    "results": [ "ok", "ok", "locks_set", "undef" ]
-  }
-}
-\end{lstlisting}
-
-\begin{lstlisting}[language=java]
-{ "result":
-  { "failure":"reason" }
-}
-\end{lstlisting}
-
-
-%\section{Erlang}
-
-\section{Java command line interface}
-
-The jar file contains a small command line interface client. For
+As mentioned above, the \code{scalaris.jar} file contains a small command line
+interface client. For
 convenience, we provide a wrapper script called \code{scalaris} which
 sets up the Java environment:
 
-\begin{lstlisting}[language=]
-%> ./java-api/scalaris -help
+\begin{lstlisting}[language=sh]
+%> ./java-api/scalaris --help
+./java-api/scalaris [script options] [options]
 Script Options:
-  --help, --h            print this message and scalaris help
-  --noconfig             suppress sourcing of /etc/scalaris/scalaris-java.conf
-                         and $HOME/.scalaris/scalaris-java.conf config files
+  --help, -h             print this message and scalaris help
+  --noconfig             suppress sourcing of config files in $HOME/.scalaris/
+                         and ${prefix}/etc/scalaris/
   --execdebug            print scalaris exec line generated by this
                          launch script
+  --noerl                do not ask erlang for its (local) host name
   
 usage: scalaris [Options]
- -b,--minibench                   run mini benchmark
- -d,--delete <key> <[timeout]>    delete an item (default timeout: 2000ms)
-                                  WARNING: This function can lead to inconsistent data
-                                  (e.g. deleted items can re-appear). Also when
-                                  re-creating an item the version before the delete can
-                                  re-appear.
- -g,--getsubscribers <topic>      get subscribers of a topic
- -h,--help                        print this message
- -lh,--localhost                  gets the local host's name as known to
-                                  Java (for debugging purposes)
- -p,--publish <topic> <message>   publish a new message for the given
-                                  topic
- -r,--read <key>                  read an item
- -s,--subscribe <topic> <url>     subscribe to a topic
- -u,--unsubscribe <topic> <url>   unsubscribe from a topic
- -v,--verbose                     print verbose information, e.g. the
-                                  properties read
- -w,--write <key> <value>         write an item
+ -b,--minibench <runs> <benchmarks>   run selected mini benchmark(s)
+                                      [1|...|9|all] (default: all
+                                      benchmarks, 100 test runs)
+ -d,--delete <key> <[timeout]>        delete an item (default timeout:
+                                      2000ms)
+                                      WARNING: This function can lead to
+                                      inconsistent data (e.g. deleted
+                                      items can re-appear). Also when
+                                      re-creating an item the version
+                                      before the delete can re-appear.
+ -g,--getsubscribers <topic>          get subscribers of a topic
+ -h,--help                            print this message
+ -lh,--localhost                      gets the local host's name as known
+                                      to Java (for debugging purposes)
+ -p,--publish <topic> <message>       publish a new message for the given
+                                      topic
+ -r,--read <key>                      read an item
+ -s,--subscribe <topic> <url>         subscribe to a topic
+ -u,--unsubscribe <topic> <url>       unsubscribe from a topic
+ -v,--verbose                         print verbose information, e.g. the
+                                      properties read
+ -w,--write <key> <value>             write an item
 \end{lstlisting}
 
 \code{read}, \code{write} and \code{delete} can be used to read, write
@@ -936,25 +1187,26 @@ server at \code{localhost}. You can change the node it connects to (and
 further connection properties) by adapting the values defined in
 \code{java-api/scalaris.properties}.
 
-\section{Java API}
-
-The \code{scalaris.jar} provides the command line client as well as a
-library for Java programs to access \scalaris{}. The library provides two
-classes:
-
-\begin{itemize}
-\item \code{Scalaris} provides a high-level API similar to the command line
-       client.
-\item \code{Transaction} provides a low-level API to the transaction
-       mechanism.
-\end{itemize}
-
-For details we refer the reader to the Javadoc:
+\subsection{Python command line interface}
 
 \begin{lstlisting}[language=sh]
-%> cd java-api
-%> ant doc
-%> firefox doc/index.html
+%> ./python-api/Scalaris.py --help
+usage: Scalaris.py [Options]
+ -r,--read <key>                      read an item
+ -w,--write <key> <value>             write an item
+ -d,--delete <key> [<timeout>]        delete an item (default timeout:
+                                      2000ms)
+                                      WARNING: This function can lead to
+                                      inconsistent data (e.g. deleted
+                                      items can re-appear). Also when
+                                      re-creating an item the version
+                                      before the delete can re-appear.
+ -p,--publish <topic> <message>       publish a new message for the given
+ -s,--subscribe <topic> <url>         subscribe to a topic
+ -g,--getsubscribers <topic>          get subscribers of a topic
+ -u,--unsubscribe <topic> <url>       unsubscribe from a topic
+ -h,--help                            print this message
+                                      topic
 \end{lstlisting}
 
 \chapter{Testing the system}
@@ -1022,7 +1274,7 @@ firewalls.
       (\scalaris{} output will be printed if a test fails; if you want to see
       it during the tests, start a \code{bin/firstnode.sh} and run the tests by
       \code{cd java; ant test})
-\item Run the Ruby client by starting Scalaris and running
+\item Run the Ruby client by starting \scalaris{} and running
       \code{cd contrib; ./jsonrpc.rb}
 \end{itemize}
 
@@ -1528,7 +1780,7 @@ online documentation at
 
 \section{Supervisor-tree of a \scalaris{} node}
 
-When a new Erlang VM with a Scalaris node is started, a
+When a new Erlang VM with a \scalaris{} node is started, a
 \erlmodule{sup\_scalaris} supervisor is started that creates further
 workers and supervisors according to the following scheme
 (processes starting order: left to right, top to bottom):
@@ -1597,7 +1849,7 @@ calls its \erlfun[]{sup\_dht\_node\_core}{init}{/1} function:
 It defines five processes, that have to be observed using a
 \code{one_for_all}-supervisor, which means, that if one fails, all have to
 be restarted. The \erlmodule{dht\_node} module implements the main
-component of a full Scalaris node which glues together all the other
+component of a full \scalaris{} node which glues together all the other
 processes. Its
 \erlfun[]{dht\_node}{start\_link}{/2} function will get
 the following parameters: (a) the processes' group that is used with the \erlmodule{pid\_groups}
