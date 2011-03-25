@@ -117,6 +117,7 @@ start_scheduling() ->
 % @doc we assume the standard scalaris layout, i.e. we are currently
 % in a ct_run... directory underneath a scalaris checkout. The ebin
 % directory should be in ../ebin
+-spec instrument_module(module()) -> ok.
 instrument_module(Module) ->
     code:delete(Module),
     code:purge(Module),
@@ -129,7 +130,7 @@ instrument_module(Module) ->
                  binary],
     %ct:pal("~p", [Options]),
     {ok, CurCWD} = file:get_cwd(),
-    fix_cwd_scalaris(),
+    ok = fix_cwd_scalaris(),
     case compile:file(Src, lists:append(MyOptions, Options)) of
         {ok,_ModuleName,Binary} ->
             ct:pal("Load binary: ~w", [code:load_binary(Module, Src, Binary)]),
@@ -143,10 +144,11 @@ instrument_module(Module) ->
             ct:pal("1: ~p", [X]),
             ok
     end,
-    file:set_cwd(CurCWD),
+    ok = file:set_cwd(CurCWD),
     ok.
 
 % @doc main-loop of userspace scheduler
+-spec loop(#state{}) -> #state{}.
 loop(#state{waiting_processes=Waiting, started=Started, white_list=WhiteList,
             scheduled_process=_ScheduledProcess} = State) ->
     receive
@@ -230,13 +232,13 @@ schedule_next_task(#state{waiting_processes=Waiting} = State) ->
     case pick_next_runner(Waiting) of
         false ->
             erlang:send_after(sleep_delay(), self(), {reschedule}),
-            loop(State);
+            State;
         Pid ->
             %ct:pal("picked ~w ~w", [Pid, erlang:process_info(Pid, messages)]),
             %ct:pal("picked ~w", [Pid]),
             Pid ! {gen_component_calling_receive, ack},
-            loop(State#state{waiting_processes=gb_sets:delete_any(Pid, Waiting),
-                             scheduled_process=Pid})
+            State#state{waiting_processes=gb_sets:delete_any(Pid, Waiting),
+                             scheduled_process=Pid}
     end.
 
 % @doc find the next process
@@ -264,13 +266,13 @@ pick_next_runner(Pids) ->
 % misc. helper functions
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec get_file_for_module(module()) -> {ok, string()}.
+-spec get_file_for_module(module()) -> string().
 get_file_for_module(Module) ->
     % we have to be in $SCALARIS/ebin to find the beam file
     {ok, CurCWD} = file:get_cwd(),
-    fix_cwd_ebin(),
+    ok = fix_cwd_ebin(),
     Res = beam_lib:chunks(Module, [compile_info]),
-    file:set_cwd(CurCWD),
+    ok = file:set_cwd(CurCWD),
     case Res of
         {ok, {Module, [{compile_info, Options}]}} ->
             {source, Filename} = lists:keyfind(source, 1, Options),
@@ -278,26 +280,26 @@ get_file_for_module(Module) ->
         X ->
             ct:pal("~w ~p", [Module, X]),
             ct:pal("~p", [file:get_cwd()]),
-            erlang:sleep(1000),
+            timer:sleep(1000),
             ct:fail(unknown_module)
     end.
 
--spec get_compile_flags_for_module(module()) -> {ok, list()}.
+-spec get_compile_flags_for_module(module()) -> list().
 get_compile_flags_for_module(Module) ->
     % we have to be in $SCALARIS/ebin to find the beam file
     {ok, CurCWD} = file:get_cwd(),
-    fix_cwd_ebin(),
+    ok = fix_cwd_ebin(),
     Res = beam_lib:chunks(Module, [compile_info]),
-    file:set_cwd(CurCWD),
+    ok = file:set_cwd(CurCWD),
     case Res of
         {ok, {Module, [{compile_info, Options}]}} ->
             {options, Opts} = lists:keyfind(options, 1, Options),
             Opts;
         X ->
             ct:pal("~w ~w", [Module, X]),
-            erlang:sleep(1000),
+            timer:sleep(1000),
             ct:fail(unknown_module),
-            ok
+            []
     end.
 
 % @doc set cwd to $SCALARIS/ebin
@@ -320,12 +322,12 @@ fix_cwd_scalaris() ->
 seed(Options) ->
     case lists:keyfind(seed, 1, Options) of
         {seed, {A1,A2,A3}} ->
-            random:seed(A1, A2, A3),
+            _OldSeed = random:seed(A1, A2, A3),
             ok;
         false ->
             {A1,A2,A3} = now(),
             ct:log("seed: ~p", [{A1,A2,A3}]),
-            random:seed(A1, A2, A3),
+            _OldSeed = random:seed(A1, A2, A3),
             ok
     end.
 
