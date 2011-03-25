@@ -22,7 +22,7 @@
 
 -export([ops_request/2, ops_decision/4, rejected_proposal/3]).
 
--type(proposal_type()::{deliver, Message::any()}).
+-type(proposal_type()::{deliver, Message::any(), Proposer::comm:mypid()}).
 
 % @doc we got a request to deliver a message to this group
 -spec ops_request(State::rsm_state:state(),
@@ -57,7 +57,7 @@ ops_decision(State, {deliver, Message, _Proposer} = _Proposal,
 -spec rejected_proposal(rsm_state:state(), proposal_type(),
                         rsm_state:paxos_id()) ->
     rsm_state:state().
-rejected_proposal(State, {add_node, Pid, _Acceptor, _Learner},
+rejected_proposal(State, {deliver, Message, Proposer},
                   _PaxosId) ->
-    comm:send(Pid, {add_node_response, retry, different_proposal_accepted}),
+    comm:send(Proposer, {deliver_response, retry, Message}),
     State.

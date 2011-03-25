@@ -27,11 +27,11 @@
     rsm_state:state().
 report_rejection(State, PaxosId, Proposal) ->
     case Proposal of
-        {add_node, _Pid} ->
+        {add_node, _Pid, _Acceptor, _Learner} ->
             rsm_ops_add_node:rejected_proposal(State, Proposal, PaxosId);
         {remove_node, _Pid} ->
             rsm_ops_remove_node:rejected_proposal(State, Proposal, PaxosId);
-        {deliver_message, _} ->
+        {deliver, _Message, _Proposer} ->
             rsm_ops_deliver:rejected_proposal(State, Proposal, PaxosId)
     end.
 

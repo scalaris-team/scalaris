@@ -74,7 +74,7 @@ deliver_current_decision(PaxosId, Proposal, OldState) ->
 % @doc postpone a future decision and trigger decision on intermediate paxos'
 -spec postpone_future_decision(rsm_state:paxos_id(), rsm_state:proposal(),
                                rsm_state:state()) ->
-    group_state:state().
+    rsm_state:state().
 postpone_future_decision({GroupId, Version} = PaxosId, Proposal,
                          State) ->
     View = rsm_state:get_view(State),
