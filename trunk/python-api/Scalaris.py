@@ -21,8 +21,11 @@ if 'SCALARIS_JSON_URL' in os.environ:
     default_url = os.environ['SCALARIS_JSON_URL']
 else:
     default_url = 'http://localhost:8000'
-default_timeout = 5 # socket timeout in seconds
+"""default URL and port to a scalaris node"""
+default_timeout = 5
+"""socket timeout in seconds"""
 default_path = '/jsonrpc.yaws'
+"""path to the json rpc page"""
 
 class JSONConnection(object):
     """
@@ -30,6 +33,9 @@ class JSONConnection(object):
     """
     
     def __init__(self, url = default_url, timeout = default_timeout):
+        """
+        Creates a JSON connection to the given URL using the given TCP timeout
+        """
         try:
             uri = urlparse.urlparse(url)
             self._conn = httplib.HTTPConnection(uri.hostname, uri.port,
@@ -94,8 +100,9 @@ class JSONConnection(object):
     @staticmethod
     def process_result_read(result):
         """
-        Processes the result of a read operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a read operation.
+        Returns the read value on success.
+        Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'status' in result and len(result) == 2:
             if result['status'] == 'ok' and 'value' in result:
@@ -113,8 +120,8 @@ class JSONConnection(object):
     @staticmethod
     def process_result_write(result, op):
         """
-        Processes the result of a write operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a write operation.
+        Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict):
             if result == {'status': 'ok'}:
@@ -128,8 +135,8 @@ class JSONConnection(object):
     @staticmethod
     def process_result_commit(result):
         """
-        Processes the result of a commit operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a commit operation.
+        Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'status' in result:
             if result == {'status': 'ok'}:
@@ -147,8 +154,8 @@ class JSONConnection(object):
     @staticmethod
     def process_result_testAndSet(result):
         """
-        Processes the result of a testAndSet operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a testAndSet operation.
+        Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'status' in result:
             if result['status'] == 'ok' and len(result) == 1:
@@ -169,8 +176,8 @@ class JSONConnection(object):
     @staticmethod
     def process_result_publish(result):
         """
-        Processes the result of a publish operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a publish operation.
+        Raises the appropriate exception if the operation failed.
         """
         if result == {'status': 'ok'}:
             return None
@@ -181,8 +188,8 @@ class JSONConnection(object):
     @staticmethod
     def process_result_subscribe(result):
         """
-        Processes the result of a subscribe operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a subscribe operation.
+        Raises the appropriate exception if the operation failed.
         """
         JSONConnection.process_result_commit(result)
     
@@ -191,8 +198,8 @@ class JSONConnection(object):
     @staticmethod
     def process_result_unsubscribe(result):
         """
-        Processes the result of a unsubscribe operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a unsubscribe operation.
+        Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'status' in result:
             if result == {'status': 'ok'}:
@@ -210,8 +217,9 @@ class JSONConnection(object):
     @staticmethod
     def process_result_getSubscribers(result):
         """
-        Processes the result of a getSubscribers operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a getSubscribers operation.
+        Returns the list of subscribers on success.
+        Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, list):
             return result
@@ -222,8 +230,10 @@ class JSONConnection(object):
     @staticmethod
     def process_result_delete(result):
         """
-        Processes the result of a delete operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a delete operation.
+        Returns the tuple
+        (<success>, <number of deleted items>, <detailed results>) on success.
+        Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'ok' in result and 'results' in result:
             if 'failure' not in result:
@@ -231,13 +241,28 @@ class JSONConnection(object):
             elif result['failure'] == 'timeout':
                 return (False, result['ok'], result['results'])
         raise UnknownException(result)
+
+    # results: {'tlog': xxx,
+    #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+    #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
+    @staticmethod
+    def process_result_req_list(result):
+        """
+        Processes the result of a req_list operation.
+        Returns the tuple (<tlog>, <result>) on success.
+        Raises the appropriate exception if the operation failed.
+        """
+        if 'tlog' not in result or 'results' not in result or \
+            not isinstance(result['results'], list) or len(result['results']) < 1:
+            raise UnknownException(result)
+        return (result['tlog'], result['results'])
     
     # result: 'ok'
     @staticmethod
     def process_result_nop(result):
         """
-        Processes the result of a nop operation and throws the appropriate
-        exception if the operation failed
+        Processes the result of a nop operation.
+        Raises the appropriate exception if the operation failed.
         """
         if result != {'ok'}:
             raise UnknownException(result)
@@ -329,29 +354,49 @@ class TransactionSingleOp(object):
     """
     
     def __init__(self, conn = JSONConnection()):
+        """
+        Create a new object using the given connection
+        """
         self._conn = conn
 
     def read(self, key):
+        """
+        Read the value at key
+        """
         result = self._conn.call('read', [key])
         return self._conn.process_result_read(result)
 
     def write(self, key, value):
+        """
+        Write the value to key
+        """
         value = self._conn.encode_value(value)
         result = self._conn.call('write', [key, value])
         self._conn.process_result_commit(result)
     
     def testAndSet(self, key, oldvalue, newvalue):
+        """
+        Atomic test and set, i.e. if the old value at key is oldvalue, then
+        write newvalue.
+        """
         oldvalue = self._conn.encode_value(oldvalue)
         newvalue = self._conn.encode_value(newvalue)
         result = self._conn.call('test_and_set', [key, oldvalue, newvalue])
         self._conn.process_result_testAndSet(result)
 
     def nop(self, value):
+        """
+        No operation (may be used for measuring the JSON overhead)
+        """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
         self._conn.process_result_nop(result)
     
     def closeConnection(self):
+        """
+        Close the connection to Scalaris
+        (it will automatically be re-opened on the next request)
+        """
         self._conn.close()
 
 class Transaction(object):
@@ -360,60 +405,110 @@ class Transaction(object):
     """
     
     def __init__(self, conn = JSONConnection()):
+        """
+        Create a new object using the given connection
+        """
         self._conn = conn
         self._tlog = None
     
     def newReqList(self):
+        """
+        Returns a new ReqList object allowing multiple parallel requests.
+        """
         return _ReqList(self._conn)
     
-    # returns: [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-    #           {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]
-    # (the elements of this list can be processed with Transaction.process_result_*(result))
+    
     def req_list(self, reqlist):
+        """
+        Issues multiple parallel requests to Scalaris.
+        Request lists can be created using newReqList().
+        The returned list has the following form:
+        [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+        {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}].
+        The elements of this list can be processed with process_result_read(),
+        process_result_write() and process_result_commit().
+        """
         if self._tlog == None:
             result = self._conn.call('req_list', [reqlist.getJSONRequests()])
         else:
             result = self._conn.call('req_list', [self._tlog, reqlist.getJSONRequests()])
-        # results: {'tlog': xxx,
-        #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-        #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
-        if 'tlog' not in result or 'results' not in result or not isinstance(result['results'], list) or len(result['results']) < 1:
-            raise UnknownException(result)
-        self._tlog = result['tlog']
-        return result['results']
+        (tlog, result) = self._conn.process_result_req_list(result)
+        self._tlog = tlog
+        return result
     
     def process_result_read(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a read operation.
+        Returns the read value on success.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
         return self._conn.process_result_read(result)
 
     def process_result_write(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a write operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation
+        """
         return self._conn.process_result_write(result)
 
     def process_result_commit(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a commit operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation
+        """
         return self._conn.process_result_commit(result)
     
     def commit(self):
+        """
+        Issues a commit operation to Scalaris validating the previously
+        created operations inside the transaction.
+        """
         result = self.req_list(self.newReqList().addCommit())[0]
         self.process_result_commit(result)
         # reset tlog (minor optimization which is not done in req_list):
         self._tlog = None
     
     def abort(self):
+        """
+        Aborts all previously created operations inside the transaction.
+        """
         self._tlog = None
     
     def read(self, key):
+        """
+        Issues a read operation to Scalaris and adds it to the current
+        transaction.
+        """
         result = self.req_list(self.newReqList().addRead(key))[0]
         return self.process_result_read(result)
     
     def write(self, key, value):
+        """
+        Issues a write operation to Scalaris and adds it to the current
+        transaction.
+        """
         result = self.req_list(self.newReqList().addWrite(key, value))[0]
         self.process_result_commit(result)
 
     def nop(self, value):
+        """
+        No operation (may be used for measuring the JSON overhead)
+        """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
         self._conn.process_result_nop(result)
     
     def closeConnection(self):
+        """
+        Close the connection to Scalaris
+        (it will automatically be re-opened on the next request)
+        """
         self._conn.close()
 
 class _ReqList(object):
@@ -422,22 +517,39 @@ class _ReqList(object):
     """
     
     def __init__(self, conn):
+        """
+        Create a new object using the given connection.
+        Note: The connection object is needed in order to encode values for
+        write operations.
+        """
         self.requests = []
         self._conn = conn
     
     def addRead(self, key):
+        """
+        Adds a read operation to the request list.
+        """
         self.requests.append({'read': key})
         return self
     
     def addWrite(self, key, value):
+        """
+        Adds a write operation to the request list.
+        """
         self.requests.append({'write': {key: self._conn.encode_value(value)}})
         return self
     
     def addCommit(self):
+        """
+        Adds a commit operation to the request list.
+        """
         self.requests.append({'commit': 'commit'})
         return self
     
     def getJSONRequests(self):
+        """
+        Gets the collected requests.
+        """
         return self.requests
 
 class PubSub(object):
@@ -446,9 +558,15 @@ class PubSub(object):
     """
     
     def __init__(self, conn = JSONConnection()):
+        """
+        Create a new object using the given connection
+        """
         self._conn = conn
 
     def publish(self, topic, content):
+        """
+        Publishes content under topic.
+        """
         # note: do NOT encode the content, this is not decoded on the erlang side!
         # (only strings are allowed anyway)
         # content = self._conn.encode_value(content)
@@ -456,6 +574,9 @@ class PubSub(object):
         self._conn.process_result_publish(result)
 
     def subscribe(self, topic, url):
+        """
+        Subscribes url for topic.
+        """
         # note: do NOT encode the URL, this is not decoded on the erlang side!
         # (only strings are allowed anyway)
         # url = self._conn.encode_value(url)
@@ -463,6 +584,9 @@ class PubSub(object):
         self._conn.process_result_subscribe(result)
 
     def unsubscribe(self, topic, url):
+        """
+        Unsubscribes url from topic.
+        """
         # note: do NOT encode the URL, this is not decoded on the erlang side!
         # (only strings are allowed anyway)
         # url = self._conn.encode_value(url)
@@ -470,15 +594,25 @@ class PubSub(object):
         self._conn.process_result_unsubscribe(result)
 
     def getSubscribers(self, topic):
+        """
+        Gets the list of all subscribers to topic.
+        """
         result = self._conn.call('get_subscribers', [topic])
         return self._conn.process_result_getSubscribers(result)
 
     def nop(self, value):
+        """
+        No operation (may be used for measuring the JSON overhead)
+        """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
         self._conn.process_result_nop(result)
     
     def closeConnection(self):
+        """
+        Close the connection to Scalaris
+        (it will automatically be re-opened on the next request)
+        """
         self._conn.close()
 
 class ReplicatedDHT(object):
@@ -487,19 +621,36 @@ class ReplicatedDHT(object):
     """
     
     def __init__(self, conn = JSONConnection()):
+        """
+        Create a new object using the given connection
+        """
         self._conn = conn
 
     # returns: (Success::boolean(), ok::integer(), results:['ok' or 'locks_set' or 'undef'])
     def delete(self, key, timeout = 2000):
+        """
+        Tries to delete the value at the given key.
+        
+        WARNING: This function can lead to inconsistent data (e.g. deleted items
+        can re-appear). Also when re-creating an item the version before the
+        delete can re-appear.
+        """
         result = self._conn.call('delete', [key, timeout])
         return self._conn.process_result_delete(result)
 
     def nop(self, value):
+        """
+        No operation (may be used for measuring the JSON overhead)
+        """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
         self._conn.process_result_nop(result)
     
     def closeConnection(self):
+        """
+        Close the connection to Scalaris
+        (it will automatically be re-opened on the next request)
+        """
         self._conn.close()
 
 def str_to_list(value):
