@@ -106,6 +106,10 @@ public class ReplicatedDHT {
     /**
      * Tries to delete all replicas of the given <tt>key</tt> in 2000ms.
      * 
+     * WARNING: This function can lead to inconsistent data (e.g. deleted items
+     * can re-appear). Also when re-creating an item the version before the
+     * delete can re-appear.
+     * 
      * @param key
      *            the key to delete
      * 
