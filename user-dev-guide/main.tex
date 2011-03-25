@@ -839,9 +839,10 @@ processing.
 The JSON-API can be accessed via the \scalaris{}-Web-Server running on port
 8000 by default and the page \code{jsonrpc.yaws} (For example at:
 \url{http://localhost:8000/jsonrpc.yaws}).
-Requests are issued by sending a JSON object to this URL. The result will then
-be returned as a JSON object. The following table shows how they both look
-like:
+Requests are issued by sending a JSON object with header
+\code{"Content-type"="application/json"} to this URL.
+The result will then be returned as a JSON object with the same content type.
+The following table shows how both objects look like:
 
 \begin{tabular}{p{0.45\textwidth}cp{0.45\textwidth}}
 \bf Request & & \bf Result \\
@@ -891,13 +892,15 @@ supported (the given result is the \code{<result_object>} mentioned above):
   \item[] \hspace{-1.7em}transactions:
   \item \code{req_list(ReqList)} - process a list of requests, result:
 \begin{lstlisting}[language=java]
-[{"status": "ok"} or {"status": "ok", "value": <json_value>} or
- {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]
+{"tlog": <tlog>,
+ "results": [{"status": "ok"} or {"status": "ok", "value": <json_value>} or
+             {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
 \end{lstlisting}
   \item \code{req_list(TLog, ReqList)} - process a list of requests with a previous translog, result:
 \begin{lstlisting}[language=java]
-[{"status": "ok"} or {"status": "ok", "value": <json_value>} or
- {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]
+{"tlog": <tlog>,
+ "results": [{"status": "ok"} or {"status": "ok", "value": <json_value>} or
+             {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
 \end{lstlisting}
   \item[] \hspace{-1.7em}replication layer functions:
   \item \code{delete(Key)} - delete the value at \code{Key}, default timeout 2s, result:
@@ -949,158 +952,157 @@ The \code{<value>} inside \code{<json_value>} is either a base64-encoded
 string representing a binary object (if type = \code{"as_bin"}) or the value
 itself (otherwise).
 
-% The following example illustrates the message flow:
-% 
-% \begin{longtable}{p{0.45\textwidth}cp{0.45\textwidth}}
-% \bf Client & & \bf \scalaris{} node \\
-% Make a transaction, that sets two keys:
-% \begin{lstlisting}[language=java]
-% {
-%   "method":"req_list",
-%   "version":"1.1",
-%   "params":
-%     [
-%       [
-%         { "write":{"keyA":"valueA"} },
-%         { "write":{"keyB":"valueB"} },
-%         { "commit":"commit" }
-%       ]
-%     ],
-%   "id":0
-% }
-% \end{lstlisting}
-% & $\to$
-% & \\
-% 
-% & $\leftarrow$ &
-% \scalaris{} sends results back
-% \begin{lstlisting}[language=java]
-% { "result":
-%   { "results":
-%       [
-%         { "op":"commit",
-%           "value":"ok",
-%           "key":"ok" },
-%         { "op":"write",
-%           "value":"valueB",
-%           "key":"keyB" },
-%         { "op":"write",
-%           "value":"valueA",
-%           "key":"keyA" }
-%       ],
-%     "translog":
-%      [...]
-%   },
-%   "id" : 0
-% }
-% \end{lstlisting}
-% \\
-% 
-% In a second transaction: Read the two keys
-% \begin{lstlisting}[language=java]
-% {
-%   "method":"req_list",
-%   "version":"1.1",
-%   "params":
-%     [
-%       [
-%         { "read":"keyA" },
-%         { "read":"keyB" }
-%       ]
-%     ]
-%   "id":0
-% }
-% \end{lstlisting}
-% & $\to$ & \\
-% 
-% & $\leftarrow$ &
-% \scalaris{} sends results back
-% \begin{lstlisting}[language=java]
-% { "result":
-%   {"results":
-%     [
-%       { "op":"read",
-%         "value":"valueB",
-%         "key":"keyB" },
-%       { "op":"read",
-%         "value":"valueA",
-%         "key":"keyA" }
-%     ],
-%    "translog":
-%     [...] // this list is the translog
-%           // for further operations!
-%           // We name it TLOG here.
-%   },
-%   "id" : 0
-% }
-% \end{lstlisting}\\
-% 
-% Calculate something with the read values and make further requests, here a
-% write and the commit for the whole transaction. Also include the latest
-% translog we got from \scalaris{} (named \code{TLOG} here).
-% 
-% \begin{lstlisting}[language=java]
-% {
-%   "method":"req_list",
-%   "version":"1.1",
-%   "params":
-%     [
-%       TLOG, // translog from prev. result
-%       [
-%         { "write":{"keyA":"valueA2"} },
-%         { "commit":"commit" }
-%       ]
-%     ],
-%   "id" : 0
-% }
-% \end{lstlisting}
-% & $\to$ & \\
-% 
-% & $\leftarrow$ &
-% \scalaris{} sends results back
-% \begin{lstlisting}[language=java]
-% { "result":
-%   { "results":
-%     [ { "op":"commit",
-%         "value":"ok",
-%         "key":"ok" },
-%       { "op":"write",
-%         "value":"valueA2",
-%         "key":"keyA" }
-%     ],
-%     "translog":
-%     [...]
-%   },
-%   "id" : 0
-% }
-% \end{lstlisting}\\
-% \end{longtable}
-% 
-% A sample usage of the JSON API using Ruby can be found in \code{contrib/jsonrpc.rb}.
-% 
-% A single request list must not contain a key more than once!
-% 
-% The allowed requests are:
-% \begin{lstlisting}[language=java]
-% { "read":"any_key" }
-% 
-% { "write":{"any_key":"any_value"} }
-% 
-% { "commit":"commit" }
-% \end{lstlisting}
-% 
-% The possible results are:
-% \begin{lstlisting}[language=java]
-% { "op":"read", "key":"any_key", "value":"any_value" }
-% { "op":"read", "key":"any_value", "fail":"reason" } // 'not_found' or 'timeout'
-% 
-% { "op":"write",  "key":"any_key", "value":"any_value" }
-% { "op":"read", "key":"any_key", "fail":"reason" }
-% 
-% { "op":"commit", "value":"ok", "key":"ok" }
-% { "op":"commit", "value":"fail", "fail":"reason" }
-% \end{lstlisting}
+\subsubsection{JSON-Example}
 
+The following example illustrates the message flow:
+
+%note: use tables inside tables instead of multicol for easier listings handling
+\begin{longtable}{p{0.97\textwidth}}
+\begin{tabular}{p{0.43\textwidth}cp{0.43\textwidth}}
+\bf Client & & \hfill\bf \scalaris{} node \\
+\end{tabular} \\
+%
+% request:
+\begin{tabular}{p{0.43\textwidth}cp{0.43\textwidth}}
+Make a transaction, that sets two keys & $\to$ & \\
+\end{tabular}\vspace{-1.5em} \\
+%
+\begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
+\vspace{-1.5em}%
+\begin{lstlisting}[language=java]
+{"version": "1.1",
+ "params": [
+  [
+   { "write": { "keyA": {"type": "as_is", "value": "valueA"} } },
+   { "write": { "keyB": {"type": "as_is", "value": "valueB"} } },
+   { "commit": "commit" }
+  ]
+ ],
+ "method": "req_list",
+ "id": 0
+}
+\end{lstlisting}
+& \\
+\end{tabular}\vspace{-1em} \\
+%
+% result:
+\begin{tabular}{p{0.43\textwidth}cp{0.43\textwidth}}
+ & $\leftarrow$ & \hfill{}\scalaris{} sends results back \\
+\end{tabular}\vspace{-1.5em} \\
+
+\begin{tabular}{p{0.14\textwidth}p{0.77\textwidth}}
+& 
+\vspace{-1.5em}%
+\begin{lstlisting}[language=java]
+{"error": null,
+ "result": {
+  "results": [
+   {"status": "ok"},
+   {"status": "ok"},
+   {"status": "ok"}
+  ],
+  "tlog": <TLOG> // this list is the translog
+                 // for further operations!
+ },
+ "id": 0
+}
+\end{lstlisting} \\
+\end{tabular}\vspace{-1em} \\
+%
+% request:
+\begin{tabular}{p{0.43\textwidth}cp{0.43\textwidth}}
+In a second transaction: Read the two keys & $\to$ & \\
+\end{tabular}\vspace{-1.5em} \\
+%
+\begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
+\vspace{-1.5em}%
+\begin{lstlisting}[language=java]
+{"version": "1.1",
+ "params": [
+  [
+   { "read": "keyA" },
+   { "read": "keyB" }
+  ]
+ ],
+ "method": "req_list",
+ "id": 0
+}
+\end{lstlisting}
+& \\
+\end{tabular}\vspace{-1em} \\
+%
+% result:
+\begin{tabular}{p{0.43\textwidth}cp{0.43\textwidth}}
+ & $\leftarrow$ & \hfill{}\scalaris{} sends results back \\
+\end{tabular}\vspace{-1.5em} \\
+
+\begin{tabular}{p{0.14\textwidth}p{0.77\textwidth}}
+& 
+\vspace{-1.5em}%
+\begin{lstlisting}[language=java]
+{"error": null,
+ "result": {
+  "results": [
+   { "status": "ok", "value": {"type": "as_is", "value": "valueA"} },
+   { "status": "ok", "value": {"type": "as_is", "value": "valueB"} }
+  ],
+  "tlog": <TLOG>
+ },
+ "id": 0
+}
+\end{lstlisting} \\
+\end{tabular} \\
+%
+% request:
+\begin{tabular}{p{0.43\textwidth}cp{0.43\textwidth}}
+Calculate something with the read values and make further requests, here a
+write and the commit for the whole transaction. Also include the latest
+translog we got from \scalaris{} (named \code{<TLOG>} here). & $\to$ & \\
+\end{tabular}\vspace{-1.5em} \\
+%
+\begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
+\vspace{-1.5em}%
+\begin{lstlisting}[language=java]
+{"version": "1.1",
+ "params": [
+  <TLOG>,
+  [
+   { "write": { "keyA": {"type": "as_is", "value": "valueA2"} } },
+   { "commit": "commit" }
+  ]
+ ],
+ "method": "req_list",
+ "id": 0
+}
+\end{lstlisting}
+& \\
+\end{tabular}\vspace{-1em} \\
+%
+% result:
+\begin{tabular}{p{0.43\textwidth}cp{0.43\textwidth}}
+ & $\leftarrow$ & \hfill{}\scalaris{} sends results back \\
+\end{tabular}\vspace{-1.5em} \\
+
+\begin{tabular}{p{0.14\textwidth}p{0.77\textwidth}}
+& 
+\vspace{-1.5em}%
+\begin{lstlisting}[language=java]
+{"error": null,
+ "result": {
+  "results": [ {"status": "ok"}, {"status": "ok"} ],
+  "tlog": <TLOG>
+ },
+ "id": 0
+}
+\end{lstlisting} \\
+\end{tabular} \\
+\end{longtable}
+
+A sample usage of the JSON API using Ruby can be found in
+\code{contrib/jsonrpc.rb}.
+
+Another example of how to use the JSON API is the Python API which uses JSON
+to communicate with \scalaris{}.
 
 %\subsection{Erlang}
 
