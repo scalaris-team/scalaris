@@ -318,7 +318,7 @@ def _transSingleOpBench2(testruns, value, name):
         for retry in xrange(3):
             try:
                 _testBegin()
-                conn = Scalaris.getConnection(Scalaris.default_url)
+                conn = Scalaris.JSONConnection(url = Scalaris.default_url)
                 
                 for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.TransactionSingleOp(conn = conn)
@@ -394,7 +394,7 @@ def _transBench2(testruns, value, name):
         for retry in xrange(3):
             try:
                 _testBegin()
-                conn = Scalaris.getConnection(Scalaris.default_url)
+                conn = Scalaris.JSONConnection(url = Scalaris.default_url)
                 
                 for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.Transaction(conn = conn)
@@ -485,7 +485,7 @@ def _transIncrementBench2(testruns, name):
                 tx_init.commit();
                 tx_init.closeConnection();
                 _testBegin()
-                conn = Scalaris.getConnection(Scalaris.default_url)
+                conn = Scalaris.JSONConnection(url = Scalaris.default_url)
                 
                 for j in xrange(_transactionsPerTestRun):
                     tx = Scalaris.Transaction(conn = conn)

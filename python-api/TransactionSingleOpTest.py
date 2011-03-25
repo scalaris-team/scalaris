@@ -55,14 +55,9 @@ class TestTransactionSingleOp(unittest.TestCase):
         conn = TransactionSingleOp()
         conn.closeConnection()
 
-    # Test method for TransactionSingleOp(url)
-    def testTransactionSingleOp2(self):
-        conn = TransactionSingleOp(url = Scalaris.default_url)
-        conn.closeConnection()
-
     # Test method for TransactionSingleOp(conn)
-    def testTransactionSingleOp3(self):
-        conn = TransactionSingleOp(conn = Scalaris.getConnection(Scalaris.default_url))
+    def testTransactionSingleOp2(self):
+        conn = TransactionSingleOp(conn = Scalaris.JSONConnection(url = Scalaris.default_url))
         conn.closeConnection()
 
     # Test method for TransactionSingleOp.closeConnection() trying to close the connection twice.

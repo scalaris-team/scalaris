@@ -55,14 +55,9 @@ class TestReplicatedDHT(unittest.TestCase):
         rdht = ReplicatedDHT()
         rdht.closeConnection()
 
-    # Test method for ReplicatedDHT(url)
-    def testReplicatedDHT2(self):
-        rdht = ReplicatedDHT(url = Scalaris.default_url)
-        rdht.closeConnection()
-
     # Test method for ReplicatedDHT(conn)
-    def testReplicatedDHT3(self):
-        rdht = ReplicatedDHT(conn = Scalaris.getConnection(Scalaris.default_url))
+    def testReplicatedDHT2(self):
+        rdht = ReplicatedDHT(conn = Scalaris.JSONConnection(url = Scalaris.default_url))
         rdht.closeConnection()
 
     # Test method for ReplicatedDHT.closeConnection() trying to close the connection twice.
@@ -100,7 +95,7 @@ class TestReplicatedDHT(unittest.TestCase):
     # Inserts some values, tries to delete them afterwards and tries the delete again.
     def testDelete1(self):
         key = "_Delete1"
-        c = Scalaris.getConnection(Scalaris.default_url)
+        c = Scalaris.JSONConnection(url = Scalaris.default_url)
         rdht = ReplicatedDHT(conn = c)
         sc = Scalaris.TransactionSingleOp(conn = c)
         
@@ -124,7 +119,7 @@ class TestReplicatedDHT(unittest.TestCase):
     # Inserts some values, tries to delete them afterwards, inserts them again and tries to delete them again (twice).
     def testDelete2(self):
         key = "_Delete2"
-        c = Scalaris.getConnection(Scalaris.default_url)
+        c = Scalaris.JSONConnection(url = Scalaris.default_url)
         rdht = ReplicatedDHT(conn = c)
         sc = Scalaris.TransactionSingleOp(conn = c)
         
