@@ -32,6 +32,8 @@
 
 -type(message() :: any()).
 
+-type(start_option() :: {join, rsm_state:rsm_pid_type()} | first).
+
 %% @doc message handler for join protocol
 -spec on_joining(message(), rsm_state:state()) -> rsm_state:state().
 
@@ -49,7 +51,7 @@ on_joining({rsm_join_response, retry, _Reason}, State) ->
     comm:send_local_after(500, self(), {join_timeout}),
     RSMPid = rsm_state:get_rsm_pid(State),
     send_all(RSMPid, {join_request, comm:this()}),
-    group_state:set_mode(State, joining);
+    rsm_state:set_mode(State, joining);
 on_joining({rsm_join_response,is_already_member}, State) ->
     %io:format("got is_already_member on joining~n", []),
     %@todo ?
@@ -132,7 +134,7 @@ on({rsm_get_single_state, Pid}, State) ->
     State.
 
 %% @doc joins this node in the rsm and calls the main loop
--spec init({list(), module()}) -> rsm_state:state() | {'$gen_component', list(), rsm_state:state()}.
+-spec init({start_option(), module()}) -> rsm_state:state() | {'$gen_component', list(), rsm_state:state()}.
 init({Option, AppModule}) ->
     case Option of
         first ->
@@ -149,7 +151,7 @@ init({Option, AppModule}) ->
             gen_component:change_handler(rsm_state:new_replica(AppModule, RSMPid), on_joining)
     end.
 
--spec start_link(pid_groups:groupname(), list(), module()) -> {ok, pid()}.
+-spec start_link(pid_groups:groupname(), start_option(), module()) -> {ok, pid()}.
 start_link(GroupName, Options, AppModule) ->
     gen_component:start_link(?MODULE, {Options, AppModule},
                              [{pid_groups_join_as, GroupName, rsm_node},
@@ -168,5 +170,5 @@ is_alive_no_join(Pid) ->
 
 -spec send_all(rsm_state:rsm_pid_type(), any()) -> ok.
 send_all(RSMPid, Msg) when is_list(RSMPid) ->
-   [comm:send(P, Msg) || P <- RSMPid],
+   _Res = [comm:send(P, Msg) || P <- RSMPid],
     ok.

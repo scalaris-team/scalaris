@@ -33,7 +33,7 @@ start_link(GroupName, Options, AppModule) ->
     supervisor:start_link(?MODULE, [GroupName, Options, AppModule]).
 
 %% userdevguide-begin sup_rsm_node:init
--spec init([pid_groups:groupname() | [any()]]) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
+-spec init(list()) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
                                                PeriodInSeconds::pos_integer()},
                                               [ProcessDescr::any()]}}.
 init([GroupName, Options, AppModule]) ->

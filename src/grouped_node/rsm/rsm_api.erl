@@ -28,9 +28,10 @@
 
 -type(start_option() :: {join, rsm_state:rsm_pid_type()} | first).
 
--spec start_link(pid_groups:groupname(), start_option(), module()) -> {ok, pid()}.
-start_link(GroupName, Options, AppModule) ->
-    sup_rsm_node:start_link(GroupName, Options, AppModule).
+-spec start_link(pid_groups:groupname(), start_option(), module()) ->
+    ignore | {error, any()} | {ok, pid()}.
+start_link(GroupName, Option, AppModule) ->
+    sup_rsm_node:start_link(GroupName, Option, AppModule).
 
 %% @doc send a message to one node of a group and ask him to deliver
 %% the message to the rsm. Note, that the rsm node could be dead. In
