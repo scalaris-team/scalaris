@@ -272,7 +272,10 @@ parse_type({remote_type, _Line, [{atom, _Line2, TypeModule}, {atom, _line3, Type
         false ->
             {{typedef, TypeModule, TypeName}, tester_parse_state:add_unknown_type(TypeModule, TypeName, ParseState)}
     end;
+% why is this here? function() is no official type
 parse_type({type, _Line, 'function', []}, _Module, ParseState) ->
+    {{'function'}, ParseState};
+parse_type({type, _Line, 'fun', []}, _Module, ParseState) ->
     {{'function'}, ParseState};
 parse_type({type, _Line, TypeName, []}, Module, ParseState) ->
     %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
