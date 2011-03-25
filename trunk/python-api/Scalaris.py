@@ -24,174 +24,132 @@ else:
 default_timeout = 5 # socket timeout in seconds
 default_path = '/jsonrpc.yaws'
 
-def _json_call(conn, function, params):
-    params = {'version': '1.1',
-              'method': function,
-              'params': params,
-              'id': 0}
-    #print params
-    # use compact JSON encoding:
-    params_json = json.dumps(params, separators=(',',':'))
-    #print params_json
-    # no need to quote - we already encode to json:
-    headers = {"Content-type": "application/json"}
-    try:
-        #conn.request("POST", default_path, urllib.quote(params_json), headers)
-        conn.request("POST", default_path, params_json, headers)
-        response = conn.getresponse()
-        #print response.status, response.reason
-        if (response.status < 200 or response.status >= 300):
-            raise ConnectionException(response)
-        data = response.read()
-    except socket.timeout as instance:
-        raise ConnectionException(instance)
-    #print data
-    response_json = json.loads(data)
-    #print response_json
-    return response_json['result']
-
-def _json_encode_value(value):
-    if isinstance(value, bytearray):
-        return {'type': 'as_bin', 'value': base64.b64encode(buffer(value))}
-    else:
-        return {'type': 'as_is', 'value': value}
-
-def _json_decode_value(value):
-    if ('type' not in value) or ('value' not in value):
-        raise UnknownException(value)
-    if value['type'] == 'as_bin':
-        return bytearray(base64.b64decode(value['value']), 'base64')
-    else:
-        return value['value']
-
-def getConnection(url, timeout = default_timeout):
-    try:
-        uri = urlparse.urlparse(url)
-        return httplib.HTTPConnection(uri.hostname, uri.port, timeout = timeout)
-    except Exception as instance:
-        raise ConnectionException(instance)
+class JSONConnection(object):
+    """
+    Abstracts connections to Scalaris using JSON
+    """
     
-# result: {'status': 'ok', 'value': xxx} or
-#         {'status': 'fail', 'reason': 'timeout' or 'not_found'}
-def _process_result_read(result):
-    if isinstance(result, dict) and 'status' in result and len(result) == 2:
-        if result['status'] == 'ok' and 'value' in result:
-            return _json_decode_value(result['value'])
-        elif result['status'] == 'fail' and 'reason' in result:
-            if result['reason'] == 'timeout':
-                raise TimeoutException(result)
-            elif result['reason'] == 'not_found':
-                raise NotFoundException(result)
-    raise UnknownException(result)
-    
-# result: {'status': 'ok'} or
-#         {'status': 'fail', 'reason': 'timeout'}
-# op: 'read' or 'write' or 'commit', 'test_and_set'
-def _process_result_write(result, op):
-    if isinstance(result, dict):
-        if result == {'status': 'ok'}:
-            return None
-        elif result == {'status': 'fail', 'reason': 'timeout'}:
-            raise TimeoutException(result)
-    raise UnknownException(result)
-    
-# result: {'status': 'ok'} or
-#         {'status': 'fail', 'reason': 'timeout' or 'abort'}
-def _process_result_commit(result):
-    if isinstance(result, dict) and 'status' in result:
-        if result == {'status': 'ok'}:
-            return None
-        elif result['status'] == 'fail' and 'reason' in result and len(result) == 2:
-            if result['reason'] == 'timeout':
-                raise TimeoutException(result)
-            elif result['reason'] == 'abort':
-                raise AbortException(result)
-    raise UnknownException(result)
+    def __init__(self, url = default_url, timeout = default_timeout):
+        try:
+            uri = urlparse.urlparse(url)
+            self._conn = httplib.HTTPConnection(uri.hostname, uri.port,
+                                                timeout = timeout)
+        except Exception as instance:
+            raise ConnectionException(instance)
 
-# Exception that is thrown if a the commit of a write operation on a
-# scalaris ring fails.
-class AbortException(Exception):
-   def __init__(self, raw_result):
-       self.raw_result = raw_result
-   def __str__(self):
-       return repr(self.raw_result)
+    def call(self, function, params):
+        """
+        Calls the given function with the given parameters via the JSON
+        interface of Scalaris.
+        """
+        params = {'version': '1.1',
+                  'method': function,
+                  'params': params,
+                  'id': 0}
+        #print params
+        # use compact JSON encoding:
+        params_json = json.dumps(params, separators=(',',':'))
+        #print params_json
+        headers = {"Content-type": "application/json"}
+        try:
+            # no need to quote - we already encode to json:
+            #self._conn.request("POST", default_path, urllib.quote(params_json), headers)
+            self._conn.request("POST", default_path, params_json, headers)
+            response = self._conn.getresponse()
+            #print response.status, response.reason
+            if (response.status < 200 or response.status >= 300):
+                raise ConnectionException(response)
+            data = response.read()
+        except Exception as instance:
+            raise ConnectionException(instance)
+        #print data
+        response_json = json.loads(data)
+        #print response_json
+        return response_json['result']
 
-# Exception that is thrown if an operation on a scalaris ring fails because
-# a connection does not exist or has been disconnected.
-class ConnectionException(Exception):
-   def __init__(self, raw_result):
-       self.raw_result = raw_result
-   def __str__(self):
-       return repr(self.raw_result)
-
-# Exception that is thrown if a test_and_set operation on a scalaris ring
-# fails because the old value did not match the expected value.
-class KeyChangedException(Exception):
-   def __init__(self, raw_result, old_value):
-       self.raw_result = raw_result
-       self.old_value = old_value
-   def __str__(self):
-       return repr(self.raw_result) + ', old value: ' + repr(self.old_value)
-
-# Exception that is thrown if a delete operation on a scalaris ring fails
-# because no scalaris node was found.
-class NodeNotFoundException(Exception):
-   def __init__(self, raw_result):
-       self.raw_result = raw_result
-   def __str__(self):
-       return repr(self.raw_result)
-
-# Exception that is thrown if a read operation on a scalaris ring fails
-# because the key did not exist before.
-class NotFoundException(Exception):
-   def __init__(self, raw_result):
-       self.raw_result = raw_result
-   def __str__(self):
-       return repr(self.raw_result)
-
-# Exception that is thrown if a read or write operation on a scalaris ring
-#fails due to a timeout.
-class TimeoutException(Exception):
-   def __init__(self, raw_result):
-       self.raw_result = raw_result
-   def __str__(self):
-       return repr(self.raw_result)
-
-# Generic exception that is thrown during operations on a scalaris ring, e.g.
-# if an unknown result has been returned.
-class UnknownException(Exception):
-   def __init__(self, raw_result):
-       self.raw_result = raw_result
-   def __str__(self):
-       return repr(self.raw_result)
-
-class TransactionSingleOp(object):
-    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
-        if (conn == None):
-            self._conn = getConnection(url, timeout)
+    @staticmethod
+    def encode_value(value):
+        """
+        Encodes the value to the form required by the Scalaris JSON API
+        """
+        if isinstance(value, bytearray):
+            return {'type': 'as_bin', 'value': base64.b64encode(buffer(value))}
         else:
-            self._conn = conn
+            return {'type': 'as_is', 'value': value}
 
-    def read(self, key):
-        result = _json_call(self._conn, 'read', [key])
-        # results: {'status': 'ok', 'value', xxx} or
-        #          {'status': 'fail', 'reason': 'timeout' or 'not_found'}
-        return _process_result_read(result)
-
-    def write(self, key, value):
-        value = _json_encode_value(value)
-        result = _json_call(self._conn, 'write', [key, value])
-        # results: {'status': 'ok'} or
-        #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
-        _process_result_commit(result)
+    @staticmethod
+    def decode_value(value):
+        """
+        Decodes the value from the Scalaris JSON API form to a native type
+        """
+        if ('type' not in value) or ('value' not in value):
+            raise UnknownException(value)
+        if value['type'] == 'as_bin':
+            return bytearray(base64.b64decode(value['value']), 'base64')
+        else:
+            return value['value']
     
-    def testAndSet(self, key, oldvalue, newvalue):
-        oldvalue = _json_encode_value(oldvalue)
-        newvalue = _json_encode_value(newvalue)
-        result = _json_call(self._conn, 'test_and_set', [key, oldvalue, newvalue])
-        # results: {'status': 'ok'} or
-        #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'} or
-        #          {'status': 'fail', 'reason': 'key_changed', 'value': xxx}
+    # result: {'status': 'ok', 'value': xxx} or
+    #         {'status': 'fail', 'reason': 'timeout' or 'not_found'}
+    @staticmethod
+    def process_result_read(result):
+        """
+        Processes the result of a read operation and throws the appropriate
+        exception if the operation failed
+        """
+        if isinstance(result, dict) and 'status' in result and len(result) == 2:
+            if result['status'] == 'ok' and 'value' in result:
+                return JSONConnection.decode_value(result['value'])
+            elif result['status'] == 'fail' and 'reason' in result:
+                if result['reason'] == 'timeout':
+                    raise TimeoutException(result)
+                elif result['reason'] == 'not_found':
+                    raise NotFoundException(result)
+        raise UnknownException(result)
+        
+    # result: {'status': 'ok'} or
+    #         {'status': 'fail', 'reason': 'timeout'}
+    # op: 'read' or 'write' or 'commit', 'test_and_set'
+    @staticmethod
+    def process_result_write(result, op):
+        """
+        Processes the result of a write operation and throws the appropriate
+        exception if the operation failed
+        """
+        if isinstance(result, dict):
+            if result == {'status': 'ok'}:
+                return None
+            elif result == {'status': 'fail', 'reason': 'timeout'}:
+                raise TimeoutException(result)
+        raise UnknownException(result)
+        
+    # result: {'status': 'ok'} or
+    #         {'status': 'fail', 'reason': 'timeout' or 'abort'}
+    @staticmethod
+    def process_result_commit(result):
+        """
+        Processes the result of a commit operation and throws the appropriate
+        exception if the operation failed
+        """
+        if isinstance(result, dict) and 'status' in result:
+            if result == {'status': 'ok'}:
+                return None
+            elif result['status'] == 'fail' and 'reason' in result and len(result) == 2:
+                if result['reason'] == 'timeout':
+                    raise TimeoutException(result)
+                elif result['reason'] == 'abort':
+                    raise AbortException(result)
+        raise UnknownException(result)
+        
+    # results: {'status': 'ok'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'} or
+    #          {'status': 'fail', 'reason': 'key_changed', 'value': xxx}
+    @staticmethod
+    def process_result_testAndSet(result):
+        """
+        Processes the result of a testAndSet operation and throws the appropriate
+        exception if the operation failed
+        """
         if isinstance(result, dict) and 'status' in result:
             if result['status'] == 'ok' and len(result) == 1:
                 return None
@@ -204,135 +162,38 @@ class TransactionSingleOp(object):
                     elif result['reason'] == 'not_found':
                         raise NotFoundException(result)
                 elif result['reason'] == 'key_changed' and 'value' in result and len(result) == 3:
-                    raise KeyChangedException(result, _json_decode_value(result['value']))
+                    raise KeyChangedException(result, JSONConnection.decode_value(result['value']))
         raise UnknownException(result)
-
-    def nop(self, value):
-        value = _json_encode_value(value)
-        _json_call(self._conn, 'nop', [value])
-        # results: 'ok'
     
-    def closeConnection(self):
-        self._conn.close()
-
-class Transaction(object):
-    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
-        if (conn == None):
-            self._conn = getConnection(url, timeout)
-        else:
-            self._conn = conn
-        
-        self._tlog = None
-    
-    # returns: [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-    #           {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]
-    # (the elements of this list can be processed with Transaction.process_result_*(result))
-    def req_list(self, reqlist):
-        if self._tlog == None:
-            result = _json_call(self._conn, 'req_list', [reqlist.getJSONRequests()])
-        else:
-            result = _json_call(self._conn, 'req_list', [self._tlog, reqlist.getJSONRequests()])
-        # results: {'tlog': xxx,
-        #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-        #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
-        if 'tlog' not in result or 'results' not in result or not isinstance(result['results'], list) or len(result['results']) < 1:
-            raise UnknownException(result)
-        self._tlog = result['tlog']
-        return result['results']
-    
-    def process_result_read(self, result):
-        return _process_result_read(result)
-
-    def process_result_write(self, result):
-        return _process_result_write(result)
-
-    def process_result_commit(self, result):
-        return _process_result_commit(result)
-    
-    # results: {'status': 'ok'} or
-    #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
-    def commit(self):
-        result = self.req_list(ReqList().addCommit())[0]
-        self.process_result_commit(result)
-        # reset tlog (minor optimization which is not done in req_list):
-        self._tlog = None
-    
-    # results: None
-    def abort(self):
-        self._tlog = None
-    
-    # results: {'status': 'ok', 'value', xxx} or
-    #              {'status': 'fail', 'reason': 'timeout' or 'not_found'}
-    def read(self, key):
-        result = self.req_list(ReqList().addRead(key))[0]
-        return self.process_result_read(result)
-    
-    # results: {'status': 'ok'} or
-    #              {'status': 'fail', 'reason': 'timeout' or 'abort'}
-    def write(self, key, value):
-        result = self.req_list(ReqList().addWrite(key, value))[0]
-        self.process_result_commit(result)
-
-    def nop(self, value):
-        value = _json_encode_value(value)
-        _json_call(self._conn, 'nop', [value])
-        # results: 'ok'
-    
-    def closeConnection(self):
-        self._conn.close()
-
-class ReqList(object):
-    def __init__(self):
-        self.requests = []
-    
-    def addRead(self, key):
-        self.requests.append({'read': key})
-        return self
-    
-    def addWrite(self, key, value):
-        self.requests.append({'write': {key: _json_encode_value(value)}})
-        return self
-    
-    def addCommit(self):
-        self.requests.append({'commit': 'commit'})
-        return self
-    
-    def getJSONRequests(self):
-        return self.requests
-
-class PubSub(object):
-    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
-        if (conn == None):
-            self._conn = getConnection(url, timeout)
-        else:
-            self._conn = conn
-
-    def publish(self, topic, content):
-        # note: do NOT encode the content, this is not decoded on the erlang side!
-        # (only strings are allowed anyway)
-        # content = _json_encode_value(content)
-        result = _json_call(self._conn, 'publish', [topic, content])
-        # results: {'status': 'ok'}
+    # results: {'status': 'ok'}
+    @staticmethod
+    def process_result_publish(result):
+        """
+        Processes the result of a publish operation and throws the appropriate
+        exception if the operation failed
+        """
         if result == {'status': 'ok'}:
             return None
         raise UnknownException(result)
-
-    def subscribe(self, topic, url):
-        # note: do NOT encode the URL, this is not decoded on the erlang side!
-        # (only strings are allowed anyway)
-        # url = _json_encode_value(url)
-        result = _json_call(self._conn, 'subscribe', [topic, url])
-        # results: {'status': 'ok'} or
-        #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
-        _process_result_commit(result)
-
-    def unsubscribe(self, topic, url):
-        # note: do NOT encode the URL, this is not decoded on the erlang side!
-        # (only strings are allowed anyway)
-        # url = _json_encode_value(url)
-        result = _json_call(self._conn, 'unsubscribe', [topic, url])
-        # results: {'status': 'ok'} or
-        #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}
+    
+    # results: {'status': 'ok'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
+    @staticmethod
+    def process_result_subscribe(result):
+        """
+        Processes the result of a subscribe operation and throws the appropriate
+        exception if the operation failed
+        """
+        JSONConnection.process_result_commit(result)
+    
+    # results: {'status': 'ok'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}
+    @staticmethod
+    def process_result_unsubscribe(result):
+        """
+        Processes the result of a unsubscribe operation and throws the appropriate
+        exception if the operation failed
+        """
         if isinstance(result, dict) and 'status' in result:
             if result == {'status': 'ok'}:
                 return None
@@ -344,53 +205,310 @@ class PubSub(object):
                 elif result['reason'] == 'not_found':
                     raise NotFoundException(result)
         raise UnknownException(result)
-
-    def getSubscribers(self, topic):
-        result = _json_call(self._conn, 'get_subscribers', [topic])
-        # results: [urls=str()]
+    
+    # results: [urls=str()]
+    @staticmethod
+    def process_result_getSubscribers(result):
+        """
+        Processes the result of a getSubscribers operation and throws the appropriate
+        exception if the operation failed
+        """
         if isinstance(result, list):
             return result
-        else:
-            raise UnknownException(result)
+        raise UnknownException(result)
 
-    def nop(self, value):
-        value = _json_encode_value(value)
-        _json_call(self._conn, 'nop', [value])
-        # results: 'ok'
-    
-    def closeConnection(self):
-        self._conn.close()
-
-class ReplicatedDHT(object):
-    def __init__(self, url = default_url, conn = None, timeout = default_timeout):
-        if (conn == None):
-            self._conn = getConnection(url, timeout)
-        else:
-            self._conn = conn
-
-    # returns: (Success::boolean(), ok::integer(), results:['ok' or 'locks_set' or 'undef'])
-    def delete(self, key, timeout = 2000):
-        result = _json_call(self._conn, 'delete', [key, timeout])
-        # results: {'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']} or
-        #          {'failure': 'timeout', 'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']}
+    # results: {'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']} or
+    #          {'failure': 'timeout', 'ok': xxx, 'results': ['ok' or 'locks_set' or 'undef']}
+    @staticmethod
+    def process_result_delete(result):
+        """
+        Processes the result of a delete operation and throws the appropriate
+        exception if the operation failed
+        """
         if isinstance(result, dict) and 'ok' in result and 'results' in result:
             if 'failure' not in result:
                 return (True, result['ok'], result['results'])
             elif result['failure'] == 'timeout':
                 return (False, result['ok'], result['results'])
         raise UnknownException(result)
+    
+    # result: 'ok'
+    @staticmethod
+    def process_result_nop(result):
+        """
+        Processes the result of a nop operation and throws the appropriate
+        exception if the operation failed
+        """
+        if result != {'ok'}:
+            raise UnknownException(result)
+    
+    def close(self):
+        self._conn.close()
+
+class AbortException(Exception):
+    """
+    Exception that is thrown if a the commit of a write operation on a Scalaris
+    ring fails.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class ConnectionException(Exception):
+    """
+    Exception that is thrown if an operation on a Scalaris ring fails because
+    a connection does not exist or has been disconnected.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class KeyChangedException(Exception):
+    """
+    Exception that is thrown if a test_and_set operation on a Scalaris ring
+    fails because the old value did not match the expected value.
+    """
+    
+    def __init__(self, raw_result, old_value):
+        self.raw_result = raw_result
+        self.old_value = old_value
+    def __str__(self):
+        return repr(self.raw_result) + ', old value: ' + repr(self.old_value)
+
+class NodeNotFoundException(Exception):
+    """
+    Exception that is thrown if a delete operation on a Scalaris ring fails
+    because no Scalaris node was found.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class NotFoundException(Exception):
+    """
+    Exception that is thrown if a read operation on a Scalaris ring fails
+    because the key did not exist before.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class TimeoutException(Exception):
+    """
+    Exception that is thrown if a read or write operation on a Scalaris ring
+    fails due to a timeout.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class UnknownException(Exception):
+    """
+    Generic exception that is thrown during operations on a Scalaris ring, e.g.
+    if an unknown result has been returned.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class TransactionSingleOp(object):
+    """
+    Single write or read operations on Scalaris.
+    """
+    
+    def __init__(self, conn = JSONConnection()):
+        self._conn = conn
+
+    def read(self, key):
+        result = self._conn.call('read', [key])
+        return self._conn.process_result_read(result)
+
+    def write(self, key, value):
+        value = self._conn.encode_value(value)
+        result = self._conn.call('write', [key, value])
+        self._conn.process_result_commit(result)
+    
+    def testAndSet(self, key, oldvalue, newvalue):
+        oldvalue = self._conn.encode_value(oldvalue)
+        newvalue = self._conn.encode_value(newvalue)
+        result = self._conn.call('test_and_set', [key, oldvalue, newvalue])
+        self._conn.process_result_testAndSet(result)
 
     def nop(self, value):
-        value = _json_encode_value(value)
-        _json_call(self._conn, 'nop', [value])
-        # results: 'ok'
+        value = self._conn.encode_value(value)
+        result = self._conn.call('nop', [value])
+        self._conn.process_result_nop(result)
     
     def closeConnection(self):
         self._conn.close()
+
+class Transaction(object):
+    """
+    Write or read operations on Scalaris inside a transaction.
+    """
     
-# if the expected value is a list, the returned value could by (mistakenly) a string if it is a list of integers
-# -> provide a method for converting such a string to a list
+    def __init__(self, conn = JSONConnection()):
+        self._conn = conn
+        self._tlog = None
+    
+    def newReqList(self):
+        return _ReqList(self._conn)
+    
+    # returns: [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+    #           {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]
+    # (the elements of this list can be processed with Transaction.process_result_*(result))
+    def req_list(self, reqlist):
+        if self._tlog == None:
+            result = self._conn.call('req_list', [reqlist.getJSONRequests()])
+        else:
+            result = self._conn.call('req_list', [self._tlog, reqlist.getJSONRequests()])
+        # results: {'tlog': xxx,
+        #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+        #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
+        if 'tlog' not in result or 'results' not in result or not isinstance(result['results'], list) or len(result['results']) < 1:
+            raise UnknownException(result)
+        self._tlog = result['tlog']
+        return result['results']
+    
+    def process_result_read(self, result):
+        return self._conn.process_result_read(result)
+
+    def process_result_write(self, result):
+        return self._conn.process_result_write(result)
+
+    def process_result_commit(self, result):
+        return self._conn.process_result_commit(result)
+    
+    def commit(self):
+        result = self.req_list(self.newReqList().addCommit())[0]
+        self.process_result_commit(result)
+        # reset tlog (minor optimization which is not done in req_list):
+        self._tlog = None
+    
+    def abort(self):
+        self._tlog = None
+    
+    def read(self, key):
+        result = self.req_list(self.newReqList().addRead(key))[0]
+        return self.process_result_read(result)
+    
+    def write(self, key, value):
+        result = self.req_list(self.newReqList().addWrite(key, value))[0]
+        self.process_result_commit(result)
+
+    def nop(self, value):
+        value = self._conn.encode_value(value)
+        result = self._conn.call('nop', [value])
+        self._conn.process_result_nop(result)
+    
+    def closeConnection(self):
+        self._conn.close()
+
+class _ReqList(object):
+    """
+    Request list for use with Transaction.req_list()
+    """
+    
+    def __init__(self, conn):
+        self.requests = []
+        self._conn = conn
+    
+    def addRead(self, key):
+        self.requests.append({'read': key})
+        return self
+    
+    def addWrite(self, key, value):
+        self.requests.append({'write': {key: self._conn.encode_value(value)}})
+        return self
+    
+    def addCommit(self):
+        self.requests.append({'commit': 'commit'})
+        return self
+    
+    def getJSONRequests(self):
+        return self.requests
+
+class PubSub(object):
+    """
+    Publish and subscribe methods accessing Scalaris' pubsub system
+    """
+    
+    def __init__(self, conn = JSONConnection()):
+        self._conn = conn
+
+    def publish(self, topic, content):
+        # note: do NOT encode the content, this is not decoded on the erlang side!
+        # (only strings are allowed anyway)
+        # content = self._conn.encode_value(content)
+        result = self._conn.call('publish', [topic, content])
+        self._conn.process_result_publish(result)
+
+    def subscribe(self, topic, url):
+        # note: do NOT encode the URL, this is not decoded on the erlang side!
+        # (only strings are allowed anyway)
+        # url = self._conn.encode_value(url)
+        result = self._conn.call('subscribe', [topic, url])
+        self._conn.process_result_subscribe(result)
+
+    def unsubscribe(self, topic, url):
+        # note: do NOT encode the URL, this is not decoded on the erlang side!
+        # (only strings are allowed anyway)
+        # url = self._conn.encode_value(url)
+        result = self._conn.call('unsubscribe', [topic, url])
+        self._conn.process_result_unsubscribe(result)
+
+    def getSubscribers(self, topic):
+        result = self._conn.call('get_subscribers', [topic])
+        return self._conn.process_result_getSubscribers(result)
+
+    def nop(self, value):
+        value = self._conn.encode_value(value)
+        result = self._conn.call('nop', [value])
+        self._conn.process_result_nop(result)
+    
+    def closeConnection(self):
+        self._conn.close()
+
+class ReplicatedDHT(object):
+    """
+    Non-transactional operations on the replicated DHT of Scalaris
+    """
+    
+    def __init__(self, conn = JSONConnection()):
+        self._conn = conn
+
+    # returns: (Success::boolean(), ok::integer(), results:['ok' or 'locks_set' or 'undef'])
+    def delete(self, key, timeout = 2000):
+        result = self._conn.call('delete', [key, timeout])
+        return self._conn.process_result_delete(result)
+
+    def nop(self, value):
+        value = self._conn.encode_value(value)
+        result = self._conn.call('nop', [value])
+        self._conn.process_result_nop(result)
+    
+    def closeConnection(self):
+        self._conn.close()
+
 def str_to_list(value):
+    """
+    Converts a string to a list of integers.
+    If the expected value of a read operation is a list, the returned value
+    could be (mistakenly) a string if it is a list of integers.
+    """
+    
     if (isinstance(value, str) or isinstance(value, unicode)):
         chars = list(value)
         return [ord(char) for char in chars]

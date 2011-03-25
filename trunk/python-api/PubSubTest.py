@@ -70,14 +70,9 @@ class TestPubSub(unittest.TestCase):
         conn = PubSub()
         conn.closeConnection()
 
-    # Test method for PubSub(url)
-    def testPubSub2(self):
-        conn = PubSub(url = Scalaris.default_url)
-        conn.closeConnection()
-
     # Test method for PubSub(conn)
-    def testPubSub3(self):
-        conn = PubSub(conn = Scalaris.getConnection(Scalaris.default_url))
+    def testPubSub2(self):
+        conn = PubSub(conn = Scalaris.JSONConnection(url = Scalaris.default_url))
         conn.closeConnection()
 
     # Test method for PubSub.closeConnection() trying to close the connection twice.
