@@ -264,7 +264,7 @@ class JSONConnection(object):
         Processes the result of a nop operation.
         Raises the appropriate exception if the operation failed.
         """
-        if result != {'ok'}:
+        if result != 'ok':
             raise UnknownException(result)
     
     def close(self):
