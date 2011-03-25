@@ -2,14 +2,14 @@
 
 = 0.3.0 Rhinechis Scalaris (planned) =
 
-  * clarify cs_api_v2 (return types) issue 64
-  * switch Java API to new cs_api_v2
-  * switch web-interface to cs_api_v2
-  * updated JSON API
   * tx_tm_rtm handle more failure scenarios
-  * make APIs interoperable (Erlang, Java, JSON) for some datatypes issue 43
-  * remove transstore, cs_api_v1
-  * graceful join/leave protocol with data handover
-  * passive load balancing
-  * updated client examples (ruby, java)
-  * updated user-dev-guide
+  * update user-dev-guide
+  * clarify cs_api_v2 (return types) (done) issue 64
+  * switch Java API to new cs_api_v2 (done)
+  * switch web-interface to cs_api_v2 (done)
+  * update JSON API (done)
+  * make APIs interoperable (Erlang, Java, JSON) for some datatypes (done) issue 43
+  * remove transstore, cs_api_v1 (done)
+  * graceful join/leave protocol with data handover (done)
+  * passive load balancing (done)
+  * update client examples (ruby, java) (done)
