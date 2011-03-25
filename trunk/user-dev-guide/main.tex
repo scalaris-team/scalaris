@@ -341,8 +341,8 @@ structure, the routing algorithms, and basic ring maintenance.
 
 The main routines of our Chord node are in \code{src/dht\_node.erl} and
 the join protocol is implemented in \code{src/dht\_node\_join.erl} (see
-also Chap.~\ref{chapter.join}). Our implementation of the routing
-algorithms is described in more detail in Sect.~\ref{chapter.routing}
+also Chap.~\sieheref{chapter.join}). Our implementation of the routing
+algorithms is described in more detail in Sect.~\sieheref{chapter.routing}
 and the actual implementation is in \code{src/rt\_chord.erl}.
 
 {\bf Transactions.} The most interesting part is probably the
@@ -351,7 +351,7 @@ and background is in \cite{enhanced-paxos}.
 
 The implementation consists of the paxos algorithm in \code{src/paxos} and
 the transaction algorithms itself in \code{src/transactions} (see also
-Chap.~\ref{chapter.transactions}).
+Chap.~\sieheref{chapter.transactions}).
 
 {\bf Ring Maintenance.} We changed the ring maintenance algorithm in
 \scalaris{}. It is not the standard Chord one, but a variation of
@@ -547,7 +547,7 @@ An up-to-date list of available repositories can be found at
 
 Inside those repositories you will also find an Erlang package - you don't
 need this if you already have a recent enough Erlang version
-(ref. Section~\ref{sec.requirements})!
+(ref. Section~\sieheref{sec.requirements})!
 
 
 \chapter{Setting up \scalaris{}}
@@ -633,7 +633,7 @@ show you the number of nodes currently in the system.
 A first \scalaris{} node should have started and the number should
 show 1 node. The main page will also allow you to store and retrieve
 key-value pairs but should not be used by applications to access
-\scalaris{}. See Chapter~\sieheref{chapter.apis} for application APIs.
+\scalaris{}. See Section~\sieheref{chapter.systemuse.apis} for application APIs.
 
 In a second shell, you can now start a second \scalaris{} node. This
 will be a `regular node':
@@ -667,7 +667,7 @@ The web pages at \url{http://localhost:8000} should show the additional nodes.
 \subsection{Running distributed}
 
 \scalaris{} can be installed on other machines in the same way as
-described in Section~\ref{sec:install}. In the default configuration,
+described in Section~\sieheref{sec:install}. In the default configuration,
 nodes will look for the management server on \code{127.0.0.1} on port 14195. You
 should create a \code{scalaris.local.cfg} pointing to the node running
 the management server. You should also add a list of known nodes.
@@ -696,7 +696,7 @@ management server and `regular' nodes directly. See
 for a list of options accepted by \code{scalarisctl}.
 
 \chapter{Using the system}
-\label{chapter.apis}
+\label{chapter.systemuse}
 \svnrev{r1606}
 
 \scalaris{} can be used with one of the provided command line interfaces or
@@ -705,6 +705,7 @@ describe the APIs in general, each API in more detail and the use of our
 command line interfaces.
 
 \section{Application Programming Interfaces (APIs)}
+\label{chapter.systemuse.apis}
 
 Currently we offer the following APIs:
 \begin{itemize}
@@ -722,7 +723,7 @@ Each API contains methods for accessing functions from the three layers
 \scalaris{} is composed of.
 Table~\ref{api.layers} shows the modules and classes of Erlang, Java and Python
 and their mapping to these layers. The appropriate JSON calls
-are shown in Section~\ref{sec.api.json}.
+are shown in Section~\sieheref{sec.api.json}.
 
 Special care needs to be taken when trying to delete keys (no matter which API
 is used). This can only be done outside the transaction layer and is thus not
@@ -1394,6 +1395,22 @@ Ran 58 tests in 12.317s
 
 OK
 'jtest_boot@csr-pc9.zib.de'
+\end{lstlisting}
+
+\section{Interoperability Tests}
+In order to check whether the common types described in
+Section~\sieheref{chapter.systemuse.apis} are fully supported by the APIs
+and yield to the appropriate types in another API, we implemented some
+interoperability tests. They can be run by executing \code{make interop-test}
+in the main directory.
+This will start a Scalaris node with the default ports, write test data using
+both the Java and the Python APIs and let each API read the data it wrote
+itself as well as the data the other API read. On success it will print
+
+\begin{lstlisting}[language=sh]
+%> make interop-test
+[...]
+all tests successful
 \end{lstlisting}
 
 \chapter{Troubleshooting}
