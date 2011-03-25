@@ -63,11 +63,13 @@ test_log(Module, Func, Arity, Iterations) ->
     ok.
 
 % @doc options are white_list and seed
+-spec test_with_scheduler(list(module()), fun(), list()) -> any().
 test_with_scheduler(Modules, F, Options) ->
     test_with_scheduler(Modules, F, Options, 1).
 
+-spec test_with_scheduler(list(module()), fun(), list(), number()) -> any().
 test_with_scheduler(Modules, F, Options, Repititions) ->
-    [tester_scheduler:instrument_module(Module) || Module <- Modules],
+    _InstrumentRes = [tester_scheduler:instrument_module(Module) || Module <- Modules],
     Processes = unittest_helper:get_processes(),
     Res = repeat(fun () ->
                          {ok, Pid} = tester_scheduler:start(Options),
@@ -78,7 +80,7 @@ test_with_scheduler(Modules, F, Options, Repititions) ->
                          (catch unregister(usscheduler)),
                          Res
                  end, Repititions),
-    [code:delete(Module) || {Module, _} <- Modules],
+    _DeleteRes = [code:delete(Module) || Module <- Modules],
     Res.
 
 repeat(F, 1) ->
