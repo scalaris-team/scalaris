@@ -1213,8 +1213,9 @@ usage: Scalaris.py [Options]
 
 \chapter{Testing the system}
 
-\section{Running the unit tests}
-There are some unit tests in the \code{test} directory. You can call them
+\section{Erlang unit tests}
+There are some unit tests in the \code{test} directory which test Scalaris
+itself (the Erlang code). You can call them
 by running \code{make test} in the main directory. The results are stored
 in a local \code{index.html} file. 
 
@@ -1229,8 +1230,171 @@ Note: for the unit tests, we are setting up and shutting down several
 overlay networks. During the shut down phase, the runtime environment
 will print extensive error messages. These error messages do not
 indicate that tests failed! Running the complete test suite takes
-about 3 minutes, depending on your machine. Only if the complete suite
-finishes, it will present statistics on failed and successful tests.
+about 10-20 minutes, depending on your machine.
+
+If the test suite is interrupted before finishing, the results may not have
+been linked into the \code{index.html} file. They are however stored in the
+\code{ct_run.ct@...} directory.
+
+\section{Java unit tests}
+The Java unit tests can be run by executing \code{make java-test} in the main
+directory. This will start a Scalaris node with the default ports and test
+all Java functions part of the Java API. A typical run will look like the
+following:
+
+\begin{lstlisting}[language=sh]
+%> make java-test
+[...]
+tools.test:
+    [junit] Running de.zib.tools.PropertyLoaderTest
+    [junit] Testsuite: de.zib.tools.PropertyLoaderTest
+    [junit] Tests run: 3, Failures: 0, Errors: 0, Time elapsed: 0.113 sec
+    [junit] Tests run: 3, Failures: 0, Errors: 0, Time elapsed: 0.113 sec
+    [junit] 
+    [junit] ------------- Standard Output ---------------
+    [junit] Working Directory = <scalarisdir>/java-api/classes
+    [junit] ------------- ---------------- ---------------
+[...]
+scalaris.test:
+    [junit] Running de.zib.scalaris.ConnectionTest
+    [junit] Testsuite: de.zib.scalaris.ConnectionTest
+    [junit] Tests run: 7, Failures: 0, Errors: 0, Time elapsed: 0.366 sec
+    [junit] Tests run: 7, Failures: 0, Errors: 0, Time elapsed: 0.366 sec
+    [junit] 
+    [junit] Running de.zib.scalaris.DefaultConnectionPolicyTest
+    [junit] Testsuite: de.zib.scalaris.DefaultConnectionPolicyTest
+    [junit] Tests run: 12, Failures: 0, Errors: 0, Time elapsed: 0.314 sec
+    [junit] Tests run: 12, Failures: 0, Errors: 0, Time elapsed: 0.314 sec
+    [junit] 
+    [junit] Running de.zib.scalaris.PeerNodeTest
+    [junit] Testsuite: de.zib.scalaris.PeerNodeTest
+    [junit] Tests run: 5, Failures: 0, Errors: 0, Time elapsed: 0.077 sec
+    [junit] Tests run: 5, Failures: 0, Errors: 0, Time elapsed: 0.077 sec
+    [junit] 
+    [junit] Running de.zib.scalaris.PubSubTest
+    [junit] Testsuite: de.zib.scalaris.PubSubTest
+    [junit] Tests run: 33, Failures: 0, Errors: 0, Time elapsed: 4.105 sec
+    [junit] Tests run: 33, Failures: 0, Errors: 0, Time elapsed: 4.105 sec
+    [junit] 
+    [junit] ------------- Standard Error -----------------
+    [junit] 2011-03-25 15:07:04.412:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:04.558:INFO::Started SelectChannelConnector@127.0.0.1:59235
+    [junit] 2011-03-25 15:07:05.632:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:05.635:INFO::Started SelectChannelConnector@127.0.0.1:41335
+    [junit] 2011-03-25 15:07:05.635:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:05.643:INFO::Started SelectChannelConnector@127.0.0.1:38552
+    [junit] 2011-03-25 15:07:05.643:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:05.646:INFO::Started SelectChannelConnector@127.0.0.1:34704
+    [junit] 2011-03-25 15:07:06.864:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:06.864:INFO::Started SelectChannelConnector@127.0.0.1:57898
+    [junit] 2011-03-25 15:07:06.864:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:06.865:INFO::Started SelectChannelConnector@127.0.0.1:47949
+    [junit] 2011-03-25 15:07:06.865:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:06.866:INFO::Started SelectChannelConnector@127.0.0.1:53886
+    [junit] 2011-03-25 15:07:07.090:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:07.093:INFO::Started SelectChannelConnector@127.0.0.1:33141
+    [junit] 2011-03-25 15:07:07.094:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:07.096:INFO::Started SelectChannelConnector@127.0.0.1:39119
+    [junit] 2011-03-25 15:07:07.096:INFO::jetty-7.3.0.v20110203
+    [junit] 2011-03-25 15:07:07.097:INFO::Started SelectChannelConnector@127.0.0.1:41603
+    [junit] ------------- ---------------- ---------------
+    [junit] Running de.zib.scalaris.ReplicatedDHTTest
+    [junit] Testsuite: de.zib.scalaris.ReplicatedDHTTest
+    [junit] Tests run: 6, Failures: 0, Errors: 0, Time elapsed: 0.732 sec
+    [junit] Tests run: 6, Failures: 0, Errors: 0, Time elapsed: 0.732 sec
+    [junit] 
+    [junit] Running de.zib.scalaris.TransactionSingleOpTest
+    [junit] Testsuite: de.zib.scalaris.TransactionSingleOpTest
+    [junit] Tests run: 28, Failures: 0, Errors: 0, Time elapsed: 0.632 sec
+    [junit] Tests run: 28, Failures: 0, Errors: 0, Time elapsed: 0.632 sec
+    [junit] 
+    [junit] Running de.zib.scalaris.TransactionTest
+    [junit] Testsuite: de.zib.scalaris.TransactionTest
+    [junit] Tests run: 18, Failures: 0, Errors: 0, Time elapsed: 0.782 sec
+    [junit] Tests run: 18, Failures: 0, Errors: 0, Time elapsed: 0.782 sec
+    [junit] 
+
+test:
+
+BUILD SUCCESSFUL
+Total time: 10 seconds
+'jtest_boot@csr-pc9.zib.de'
+\end{lstlisting}
+
+\section{Python unit tests}
+The Python unit tests can be run by executing \code{make python-test} in the
+main directory. This will start a Scalaris node with the default ports and test
+all Python functions part of the Python API. A typical run will look like the
+following:
+
+\begin{lstlisting}[language=sh]
+%> make python-test
+[...]
+testDoubleClose (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testRead_NotConnected (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testRead_NotFound (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetList1 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetList2 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetList_NotConnected (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetList_NotFound (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetString1 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetString2 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetString_NotConnected (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTestAndSetString_NotFound (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTransactionSingleOp1 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testTransactionSingleOp2 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testWriteList1 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testWriteList2 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testWriteList_NotConnected (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testWriteString1 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testWriteString2 (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testWriteString_NotConnected (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
+testAbort_Empty (TransactionTest.TestTransaction) ... ok
+testAbort_NotConnected (TransactionTest.TestTransaction) ... ok
+testCommit_Empty (TransactionTest.TestTransaction) ... ok
+testCommit_NotConnected (TransactionTest.TestTransaction) ... ok
+testDoubleClose (TransactionTest.TestTransaction) ... ok
+testRead_NotConnected (TransactionTest.TestTransaction) ... ok
+testRead_NotFound (TransactionTest.TestTransaction) ... ok
+testTransaction1 (TransactionTest.TestTransaction) ... ok
+testTransaction3 (TransactionTest.TestTransaction) ... ok
+testWriteList1 (TransactionTest.TestTransaction) ... ok
+testWriteString (TransactionTest.TestTransaction) ... ok
+testWriteString_NotConnected (TransactionTest.TestTransaction) ... ok
+testWriteString_NotFound (TransactionTest.TestTransaction) ... ok
+testDelete1 (ReplicatedDHTTest.TestReplicatedDHT) ... ok
+testDelete2 (ReplicatedDHTTest.TestReplicatedDHT) ... ok
+testDelete_notExistingKey (ReplicatedDHTTest.TestReplicatedDHT) ... ok
+testDoubleClose (ReplicatedDHTTest.TestReplicatedDHT) ... ok
+testReplicatedDHT1 (ReplicatedDHTTest.TestReplicatedDHT) ... ok
+testReplicatedDHT2 (ReplicatedDHTTest.TestReplicatedDHT) ... ok
+testDoubleClose (PubSubTest.TestPubSub) ... ok
+testGetSubscribersOtp_NotConnected (PubSubTest.TestPubSub) ... ok
+testGetSubscribers_NotExistingTopic (PubSubTest.TestPubSub) ... ok
+testPubSub1 (PubSubTest.TestPubSub) ... ok
+testPubSub2 (PubSubTest.TestPubSub) ... ok
+testPublish1 (PubSubTest.TestPubSub) ... ok
+testPublish2 (PubSubTest.TestPubSub) ... ok
+testPublish_NotConnected (PubSubTest.TestPubSub) ... ok
+testSubscribe1 (PubSubTest.TestPubSub) ... ok
+testSubscribe2 (PubSubTest.TestPubSub) ... ok
+testSubscribe_NotConnected (PubSubTest.TestPubSub) ... ok
+testSubscription1 (PubSubTest.TestPubSub) ... ok
+testSubscription2 (PubSubTest.TestPubSub) ... ok
+testSubscription3 (PubSubTest.TestPubSub) ... ok
+testSubscription4 (PubSubTest.TestPubSub) ... ok
+testUnsubscribe1 (PubSubTest.TestPubSub) ... ok
+testUnsubscribe2 (PubSubTest.TestPubSub) ... ok
+testUnsubscribe_NotConnected (PubSubTest.TestPubSub) ... ok
+testUnsubscribe_NotExistingTopic (PubSubTest.TestPubSub) ... ok
+testUnsubscribe_NotExistingUrl (PubSubTest.TestPubSub) ... ok
+
+----------------------------------------------------------------------
+Ran 58 tests in 12.317s
+
+OK
+'jtest_boot@csr-pc9.zib.de'
+\end{lstlisting}
 
 \chapter{Troubleshooting}
 
@@ -1248,6 +1412,12 @@ not use UDP at the moment.
 
 Please make sure that at least 14195 and 14196 are not blocked by
 firewalls.
+
+\section{Miscellaneous}
+For up-to-date information about frequently asked questions and
+troubleshooting, please refer to our FAQs at
+\url{https://code.google.com/p/scalaris/wiki/FAQ} and our mailing list at
+\url{http://groups.google.com/group/scalaris}.
 
 
 \part{Developers Guide}
