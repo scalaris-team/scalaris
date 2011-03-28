@@ -33,8 +33,6 @@
 -export([get_name/1]).
 -export([get_entry/2, get_entry2/2, set_entry/2, update_entry/2, delete_entry/2]).
 -export([read/2, write/4, delete/2]).
--export([set_write_lock/2, unset_write_lock/2,
-         set_read_lock/2, unset_read_lock/2]).
 -export([get_entries/2, get_entries/3]).
 -export([update_entries/4]).
 -export([delete_entries/2]).
@@ -93,15 +91,6 @@ delete_entry(DB, Entry) -> delete_entry_(DB, Entry).
 
 -spec delete(DB::db(), Key::?RT:key()) ->
          {NewDB::db(), Status::ok | locks_set | undef}.
-
--spec set_write_lock(DB::db(), Key::?RT:key()) ->
-         {NewDB::db(), Status::ok | failed}.
--spec unset_write_lock(DB::db(), Key::?RT:key()) ->
-         {NewDB::db(), Status::ok | failed}.
--spec set_read_lock(DB::db(), Key::?RT:key()) ->
-         {NewDB::db(), Status::ok | failed}.
--spec unset_read_lock(DB::db(), Key::?RT:key()) ->
-         {NewDB::db(), Status::ok | failed}.
 
 % operations on / with multiple DB entries:
 -spec get_entries(DB::db(), Range::intervals:interval()) -> db_as_list().
