@@ -72,6 +72,8 @@ all: compile
 compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
+test-all: test java-test python-test interop-test db_verify_use_SUITE performance_SUITE benchmark_SUITE java-bench python-bench
+
 test: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg | tee ct.log ; \
 	grep " 0 failed" ct.log
