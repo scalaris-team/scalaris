@@ -240,7 +240,7 @@ docs: .make-docs
 
 .make-docs: $(SOURCEPATHS_ERL) $(SOURCEPATHS_JAVA)
 	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
-	'"."' '[{def,{vsn,"$(VSN)"}}]'
+	'"."' '[{def,{vsn,"$(VSN)"}},no_packages]'
 	ant -buildfile java-api/build.xml doc
 	@touch .make-docs
 
