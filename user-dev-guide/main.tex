@@ -50,7 +50,7 @@
 \usepackage{threeparttable}
 
 \input{pdfoptions}
-        
+
 \usepackage{listings}
 \usepackage{etextools}
 \usepackage{tikz}
@@ -1552,6 +1552,18 @@ calls itself using tail-recursion in each branch. The loop works on a
 \begin{itemize}
 \item How to use it and how to switch from erlang:put/set to ets and implied
   limitations.
+\end{itemize}
+
+\section{Failure Detectors (\texttt{fd})}
+\erlmoduleindex{fd}
+
+\begin{itemize}
+\item uses Erlang monitors locally
+\item is independent of component load
+\item uses heartbeats between Erlang virtual machines
+\item uses a single proxy heartbeat server per Erlang virtual machine, which
+  itself uses Erlang monitors to monitor locally
+\item uses dynamic timeouts to implement an eventually perfect failure detector.
 \end{itemize}
 
 \section{Writing Unittests}
