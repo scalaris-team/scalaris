@@ -1,7 +1,7 @@
 \section{\texorpdfstring{The \erlmodule{gen\_component}}
          {The gen\_component}}
 \erlmoduleindex{gen\_component}
-\svnrev{r993}
+\svnrev{r1620}
 
 The generic component model implemented by
 \erlmodule[noindex]{gen\_component} allows to add some common functionality
@@ -18,7 +18,7 @@ to all the components that build up the \scalaris{} system. It supports:
   execution can be steered via breakpoints, step-wise execution and
   continuation based on arriving events and user defined component state
   conditions.
-\item[basic profiling],
+\item[basic profiling,]
 \item[state dependent message handlers:] depending on its state, different
   message handlers can be used and switched during runtime. Thereby a kind
   of state-machine based message handling is supported.
@@ -205,6 +205,31 @@ state as usual and call \erlfun{gen\_component}{change\_handler}{State,
 \erlfun{gen\_component}{change\_handler}{/2} to return \code{State} itself,
 so this will work properly.
 
+\subsection{Handling several messages atomically}
+
+The message handler is called for each message separately. Such a single
+call is atomic, i.e. the component does not perform any other action until
+the called message handler finishes. Sometimes, it is necessary to execute
+two or more calls to the message handler atomically (without other
+interleaving messages). For example if a message \code{A} contains another
+message \code{B} as payload, it may be necessary to handle \code{A} and
+\code{B} directly one after the other without interference of other
+messages. So, after handling \code{A} you want to call your message handler
+with \code{B}.
+
+In most cases, you could just do so by calculating the new state as result
+of handling message \code{A} first and then calling the message handler with
+message \code{B} and the new state by yourself.
+
+It is safer to use \erlfun{gen\_component}{post\_op}{2} in such cases: When
+$B$ contains a special message, which is usually handled by the
+\erlmodule{gen\_component} module itself (like
+\code{send\_to\_group\_member}, \code{kill}, \code{sleep}), the direct call
+to the message handler would not achieve the expected result. By calling
+\erlfun{gen\_component}{post\_op}{NewState, B} to return the new state after
+handling message \code{A}, message \code{B} will be handled directly after
+the current message \code{A}.
+
 \subsection{\texorpdfstring{Halting and pausing a \erlmodule{gen\_component}}
 {Halting and pausing a gen\_component}}
 
@@ -213,9 +238,9 @@ Using \erlfun{gen\_component}{kill}{Pid} and
 paused.
 
 \subsection{\texorpdfstring{Integration with \erlmodule{pid\_groups}:
-  Redirecting events / messages  to other \erlmodule{gen\_component}s}
+  Redirecting messages  to other \erlmodule{gen\_component}s}
   {Integration with pid\_groups:
-  Redirecting events / messages  to other gen\_components}}
+  Redirecting messages  to other gen\_components}}
 
 Each \erlmodule{gen\_component} by itself is prepared to support
 \erlfun{comm}{send\_to\_group\_member}{/3} which forwards messages inside a
