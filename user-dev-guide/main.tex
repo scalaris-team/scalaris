@@ -49,7 +49,7 @@
 \usepackage{xcolor}
 \usepackage{threeparttable}
 
-\input{pdfoptions}        
+\input{pdfoptions}
         
 \usepackage{listings}
 \usepackage{etextools}
@@ -552,7 +552,7 @@ need this if you already have a recent enough Erlang version
 
 \chapter{Setting up \scalaris{}}
 \label{chapter.runscalaris}
-\svnrev{r1606}
+\svnrev{r1618}
 
 \section{Runtime Configuration}
 
@@ -697,7 +697,7 @@ for a list of options accepted by \code{scalarisctl}.
 
 \chapter{Using the system}
 \label{chapter.systemuse}
-\svnrev{r1606}
+\svnrev{r1618}
 
 \scalaris{} can be used with one of the provided command line interfaces or
 by using one of the APIs in a custom program. The following sections will
@@ -1213,6 +1213,7 @@ usage: Scalaris.py [Options]
 \end{lstlisting}
 
 \chapter{Testing the system}
+\svnrev{r1618}
 
 \section{Erlang unit tests}
 There are some unit tests in the \code{test} directory which test Scalaris
@@ -1414,21 +1415,30 @@ all tests successful
 \end{lstlisting}
 
 \chapter{Troubleshooting}
+\svnrev{r1618}
 
 \section{Network}
 
 \scalaris{} uses a couple of TCP ports for communication. It does
 not use UDP at the moment.
 
-\begin{tabular}{ll}
-8000 & HTTP Server on the first node\\
-8001 & HTTP Server on the other nodes\\
-14195 & Port for inter-node communication (management server)\\
-14196 & Port for inter-node communication (other nodes)\\
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+ & HTTP Server & Inter-node communication \\
+\midrule
+default (see \code{bin/scalaris.cfg})                 & $8000$    & $14195$--$14198$ \\
+first node (\code{bin/firstnode.sh})                  & $8000$    & $14195$          \\
+joining node 1 (\code{bin/joining_node.sh})           & $8001$    & $14196$          \\
+other joining nodes (\code{bin/joining_node.sh <ID>}) & $8000+\texttt{<ID>}$ & $14195+\texttt{<ID>}$ \\
+standalone mgmt server (\code{bin/mgmt-server.sh})    & $7999$    & $14194$          \\
+\bottomrule
 \end{tabular}
+\end{center}
 
 Please make sure that at least 14195 and 14196 are not blocked by
-firewalls.
+firewalls in order to be able to start at least one first and one joining node
+on each machine..
 
 \section{Miscellaneous}
 For up-to-date information about frequently asked questions and
