@@ -30,10 +30,6 @@ behaviour_info(callbacks) ->
      {get_name, 1},
      % close, delete?
      {close, 1},
-     % write locks
-     {set_write_lock, 2}, {unset_write_lock, 2},
-     % read locks
-     {set_read_lock, 2}, {unset_read_lock, 2},
      % standard calls
      {read, 2}, {write, 4},
      {get_entry, 2}, {get_entry2, 2}, {set_entry, 2}, {update_entry, 2},

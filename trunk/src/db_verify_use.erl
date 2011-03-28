@@ -212,30 +212,6 @@ get_changes_({DB, Counter} = _DB_, Interval) ->
     verify_counter(Counter),
     ?BASE_DB:get_changes(DB, Interval).
 
-set_write_lock({DB, Counter} = _DB_, Key) ->
-    ?TRACE2(set_write_lock, _DB_, Key),
-    verify_counter(Counter),
-    {NewDB, Status} = ?BASE_DB:set_write_lock(DB, Key),
-    {{NewDB, update_counter(Counter)}, Status}.
-
-unset_write_lock({DB, Counter} = _DB_, Key) ->
-    ?TRACE2(unset_write_lock, _DB_, Key),
-    verify_counter(Counter),
-    {NewDB, Status} = ?BASE_DB:unset_write_lock(DB, Key),
-    {{NewDB, update_counter(Counter)}, Status}.
-
-set_read_lock({DB, Counter} = _DB_, Key) ->
-    ?TRACE2(set_read_lock, _DB_, Key),
-    verify_counter(Counter),
-    {NewDB, Status} = ?BASE_DB:set_read_lock(DB, Key),
-    {{NewDB, update_counter(Counter)}, Status}.
-
-unset_read_lock({DB, Counter} = _DB_, Key) ->
-    ?TRACE2(unset_read_lock, _DB_, Key),
-    verify_counter(Counter),
-    {NewDB, Status} = ?BASE_DB:unset_read_lock(DB, Key),
-    {{NewDB, update_counter(Counter)}, Status}.
-
 read({DB, Counter} = _DB_, Key) ->
     ?TRACE2(read, _DB_, Key),
     verify_counter(Counter),
