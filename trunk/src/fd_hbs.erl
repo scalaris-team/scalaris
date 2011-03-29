@@ -106,11 +106,11 @@ on({stop}, _State) ->
     ?TRACE("fd_hbs stop~n", []),
     kill;
 
-on({pong_via_fd, _Subscriber}, State) ->
+on({pong_via_fd, RemHBSSubscriber}, State) ->
     ?TRACEPONG("fd_hbs pong via fd~n", []),
-    comm:send(state_get_rem_hbs(State),
-              {update_remote_hbs_to, comm:this()}),
-    on({pong, _Subscriber}, State);
+    comm:send(RemHBSSubscriber, {update_remote_hbs_to, comm:this()}),
+    NewState = state_set_rem_hbs(State, RemHBSSubscriber),
+    on({pong, RemHBSSubscriber}, NewState);
 
 on({pong, _Subscriber}, State) ->
     ?TRACEPONG("Pinger pong for ~p~n", [_Subscriber]),
@@ -283,7 +283,11 @@ state_add_watched_pid(State, WatchedPid) ->
     case lists:keyfind(WatchedPid, 1, RemPids) of
         false ->
             %% add to remote site
-            comm:send(state_get_rem_hbs(State), {add_watching_of, WatchedPid}),
+            RemHBS = state_get_rem_hbs(State),
+            case comm:make_local(RemHBS) of
+                fd -> comm:send(RemHBS, {add_watching_of_via_fd, comm:this(), WatchedPid});
+                _ -> comm:send(RemHBS, {add_watching_of, WatchedPid})
+            end,
             %% add to list
             state_set_rem_pids(State, [{WatchedPid, 1} | RemPids]);
         Entry ->
@@ -304,8 +308,11 @@ state_del_watched_pid(State, WatchedPid) ->
             NewRemPids =
                 case element(2, NewEntry) of
                     0 ->
-                        comm:send(state_get_rem_hbs(State),
-                                  {del_watching_of, WatchedPid}),
+                        RemHBS = state_get_rem_hbs(State),
+                        case comm:make_local(RemHBS) of
+                            fd -> comm:send(RemHBS, {del_watching_of_via_fd, comm:this(), WatchedPid});
+                            _ -> comm:send(RemHBS, {del_watching_of, WatchedPid})
+                        end,
                         lists:delete(WatchedPid, RemPids);
                     _ -> lists:keyreplace(WatchedPid, 1, RemPids, NewEntry)
                 end,

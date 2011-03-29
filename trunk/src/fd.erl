@@ -107,6 +107,8 @@ on({hbs_finished, RemoteWatchedPid}, State) ->
     State;
 
 on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
+    %% we establish the back-direction here, so we subscribe to the
+    %% subscriber and add the TargetPid to the local monitoring.
     ?TRACE("FD: subscribe_heartbeats~n", []),
     HBPid =
         case ets:lookup(fd_hbs, comm:get(fd, Subscriber)) of
@@ -118,24 +120,19 @@ on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
     comm:send(Subscriber, {update_remote_hbs_to, comm:make_global(HBPid)}),
     State;
 
-on({pong, Subscriber}, State) ->
-    ?TRACE("FD: pong, ~p~n", [Subscriber]),
-    forward_to_hbs(Subscriber, {pong_via_fd, Subscriber}),
+on({pong, RemHBSSubscriber}, State) ->
+    ?TRACE("FD: pong, ~p~n", [RemHBSSubscriber]),
+    forward_to_hbs(RemHBSSubscriber, {pong_via_fd, RemHBSSubscriber}),
     State;
 
-on({update_remote_hbs_to, Pid}, State) ->
-    ?TRACE("FD: update_remote_hbs_to p~n", [Pid]),
-    forward_to_hbs(Pid, {update_remote_hbs_to, Pid}),
-    State;
-
-on({add_watching_of, Pid}, State) ->
+on({add_watching_of_via_fd, Subscriber, Pid}, State) ->
     ?TRACE("FD: add_watching_of ~p~n", [Pid]),
-    forward_to_hbs(Pid, {add_watching_of, Pid}),
+    forward_to_hbs(Subscriber, {add_watching_of, Pid}),
     State;
 
-on({del_watching_of, Pid}, State) ->
+on({del_watching_of_via_fd, Subscriber, Pid}, State) ->
     ?TRACE("FD: del_watching_of ~p~n", [Pid]),
-    forward_to_hbs(Pid, {del_watching_of, Pid}),
+    forward_to_hbs(Subscriber, {del_watching_of, Pid}),
     State;
 
 on({unittest_report_down, Pid}, State) ->
@@ -181,6 +178,7 @@ my_fd_pid() ->
         PID -> PID
     end.
 
+%@doc get hbs process in the context of a client process
 -spec get_hbs(comm:mypid()) -> pid().
 get_hbs(Pid) ->
     %% normalize for the table entry (just distinguish nodes)
@@ -192,6 +190,7 @@ get_hbs(Pid) ->
         [Res] -> element(2, Res)
     end.
 
+%@doc start a new hbs process inside the fd process context (ets owner)
 -spec start_and_register_hbs(comm:mypid()) -> pid().
 start_and_register_hbs(Pid) ->
     FDPid = comm:get(fd, Pid),
@@ -206,7 +205,9 @@ start_and_register_hbs(Pid) ->
 -spec forward_to_hbs(comm:mypid(), comm:message()) -> ok.
 forward_to_hbs(Pid, Msg) ->
     case ets:lookup(fd_hbs, comm:get(fd,Pid)) of
-        %% [] -> thats_crazy; %% let gen_component report it
+        %% [] -> hbs not yet started. This should not happen, as all
+        %% execution paths before this call should invoke the hbs
+        %% synchronously. Let gen_component report the error.
         [Entry] ->
             HBSPid = element(2, Entry),
             comm:send_local(HBSPid, Msg)
