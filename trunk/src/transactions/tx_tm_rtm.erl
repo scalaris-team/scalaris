@@ -254,7 +254,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
             AllPaxIds =
                 [ begin
                   {ok, ItemState} = my_get_item_entry(ItemId, State),
-                  [ {PaxId, Role} || {PaxId, _RTlog, _TP}
+                  [ PaxId || {PaxId, _RTlog, _TP}
                     <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
               end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
 %%            msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, LAcceptor,
