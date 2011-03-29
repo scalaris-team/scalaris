@@ -270,12 +270,9 @@ rrd-init:
 
 install-docs: docs
 	install -d $(DOCDIR)/erlang
-	install -d $(DOCDIR)/erlang/comm_layer
 	install -m 644 -t $(DOCDIR)/erlang \
 	           doc/*.html \
 	           doc/*.png
-	install -m 644 -t $(DOCDIR)/erlang/comm_layer \
-	           doc/comm_layer/*.html
 	install -d $(DOCDIR)/java-api
 	install -d $(DOCDIR)/java-api/index-files
 	install -d $(DOCDIR)/java-api/resources
