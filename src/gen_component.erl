@@ -238,7 +238,19 @@ start(Module, Args, Options, Supervisor) ->
             pid_groups:join_as(GroupId, PidName),
             log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
             ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
-                                         ++ randoms:getRandomId()), self());
+                                         ++ randoms:getRandomId()), self()),
+            case lists:keyfind(erlang_register, 1, Options) of
+                false when is_atom(PidName) ->
+                    %% we can give this process a better name for
+                    %% debugging, for example for etop.
+                    EName = list_to_atom(GroupId ++ "-"
+                                         ++ atom_to_list(PidName)),
+                    catch(erlang:register(EName, self()));
+                false ->
+                    EName = list_to_atom(GroupId ++ "-" ++ PidName),
+                    catch(erlang:register(EName, self()));
+                _ -> ok
+            end;
         false ->
             log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module])
     end,
