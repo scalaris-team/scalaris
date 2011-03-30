@@ -54,7 +54,10 @@ all() ->
      comm_local,
      erlang_send_after,
      erlang_spawn,
-     erlang_now].
+     erlang_now,
+     term_to_binary1,
+     unicode_chars_to_binary1
+    ].
 
 suite() ->
     [
@@ -360,6 +363,20 @@ pid_groups_lookup_by_pid(_Config) ->
     error_logger:tty(false),
     log:set_log_level(none),
     unittest_helper:stop_pid_groups(),
+    ok.
+
+term_to_binary1(_Config) ->
+    String = "qwertzuiopasdfghjklyxcvbnm" ++ [246,252,228,87,224,103,114,97,105,110,32,40,87,229,103,114,335,227,41],
+    iter(count(), fun() ->
+                          erlang:term_to_binary(String)
+                  end, "erlang:term_to_binary/1"),
+    ok.
+
+unicode_chars_to_binary1(_Config) ->
+    String = "qwertzuiopasdfghjklyxcvbnm" ++ [246,252,228,87,224,103,114,97,105,110,32,40,87,229,103,114,335,227,41],
+    iter(count(), fun() ->
+                          unicode:characters_to_binary(String)
+                  end, "unicode:characters_to_binary/1"),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
