@@ -86,7 +86,7 @@ db_repair(_Config) ->
     % check db
     unittest_helper:wait_for((check_dbs([{is_current, 0}], 2)), 500),
     % write one kv-pair
-    group_api:paxos_write(1,2),
+    group_api:paxos_write("1",2),
     % add one node
     _ = admin:add_nodes(1),
     % check group_state
@@ -116,10 +116,10 @@ group_split_with_data(_Config) ->
     unittest_helper:wait_for((check_versions([{1, 11}], 10)), 500),
     % check db
     unittest_helper:wait_for((check_dbs([{is_current, 0}], 10)), 500),
-    group_api:paxos_write(1                      , 2),
-    group_api:paxos_write(1 + rt_simple:n() div 2, 2),
-    group_api:paxos_write(2                      , 2),
-    group_api:paxos_write(2 + rt_simple:n() div 2, 2),
+    group_api:paxos_write("1"                      , 2),
+    group_api:paxos_write(erlang:integer_to_list(1 + rt_simple:n() div 2), 2),
+    group_api:paxos_write("2"                      , 2),
+    group_api:paxos_write(erlang:integer_to_list(2 + rt_simple:n() div 2), 2),
     unittest_helper:wait_for((check_dbs([{is_current, 4}], 10)), 500),
     pid_groups:find_a(group_node) ! {trigger},
     timer:sleep(1000),
@@ -193,15 +193,15 @@ build_ring_with_routing(_Config) ->
                        false
                end
       end, 500),
-    ?equals(group_api:paxos_write(1, 1), {paxos_write_response,{ok,0}}),
-    ?equals(group_api:paxos_write(2, 2), {paxos_write_response,{ok,0}}),
-    ?equals(group_api:paxos_write(3, 3), {paxos_write_response,{ok,0}}),
-    ?equals(group_api:paxos_write(4, 4), {paxos_write_response,{ok,0}}),
+    ?equals(group_api:paxos_write("1", 1), {paxos_write_response,{ok,0}}),
+    ?equals(group_api:paxos_write("2", 2), {paxos_write_response,{ok,0}}),
+    ?equals(group_api:paxos_write("3", 3), {paxos_write_response,{ok,0}}),
+    ?equals(group_api:paxos_write("4", 4), {paxos_write_response,{ok,0}}),
 
-    ?equals(group_api:paxos_read(1), {value,1,0}),
-    ?equals(group_api:paxos_read(2), {value,2,0}),
-    ?equals(group_api:paxos_read(3), {value,3,0}),
-    ?equals(group_api:paxos_read(4), {value,4,0}),
+    ?equals(group_api:paxos_read("1"), {value,1,0}),
+    ?equals(group_api:paxos_read("2"), {value,2,0}),
+    ?equals(group_api:paxos_read("3"), {value,3,0}),
+    ?equals(group_api:paxos_read("4"), {value,4,0}),
     ok.
 
 check_versions(ExpectedVersions, Length) ->

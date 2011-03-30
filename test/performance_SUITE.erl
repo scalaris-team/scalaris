@@ -29,7 +29,6 @@
 
 all() ->
     [empty,
-     get_keys_for_replica_int,
      get_keys_for_replica_string,
      md5,
      {group, with_config},
@@ -287,12 +286,6 @@ get_keys_for_replica_string(_Config) ->
                           rt_chord:get_replica_keys(rt_chord:hash_key("42"))
                end, "get_keys_for_replica_string"),
     ok.
-
-get_keys_for_replica_int(_Config) ->
-      iter(count(), fun () ->
-                            rt_chord:get_replica_keys(rt_chord:hash_key(42))
-                 end, "get_keys_for_replica_int"),
-      ok.
 
 md5(_Config) ->
     iter(count(), fun () ->

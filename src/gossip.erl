@@ -33,7 +33,7 @@
 %%  
 %%  New rounds are started by the leader which is identified as the node for
 %%  which
-%%  intervals:in(?RT:hash_key(0), node_details:get(NodeDetails, my_range))
+%%  intervals:in(?RT:hash_key("0"), node_details:get(NodeDetails, my_range))
 %%  is true. It will propagate its round with its state so that gossip
 %%  processes of other nodes can join this round. Several parameters (added
 %%  to scalaris.cfg) influence the decision about when to start a new round:
@@ -649,7 +649,7 @@ enter_round(OldPreviousState, OldState, OtherValues, MyRange) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether a new round should be started and starts a new round
-%%      if ?RT:hash_key(0) is in the interval between our predecessor and our
+%%      if ?RT:hash_key("0") is in the interval between our predecessor and our
 %%      node.
 -spec check_round(PreviousState::state(), State::state(), MyRange::intervals:interval())
         -> {NewPreviousState::state(), NewState::state()}.
@@ -729,7 +729,7 @@ calc_initial_avg_kr(MyRange) ->
 %% @doc Checks whether the node is the current leader.
 -spec is_leader(MyRange::intervals:interval()) -> boolean().
 is_leader(MyRange) ->
-    intervals:in(?RT:hash_key(0), MyRange).
+    intervals:in(?RT:hash_key("0"), MyRange).
 
 %% @doc Checks whether the node's range has changed, i.e. either the node
 %%      itself or its pred changed.

@@ -302,7 +302,7 @@ write_test(Config) ->
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
     Self = self(),
     BenchPid1 = erlang:spawn(fun() ->
-                                     {Time, _} = util:tc(api_tx, write, [1, 1]),
+                                     {Time, _} = util:tc(api_tx, write, ["1", 1]),
                                      comm:send_local(Self, {time, Time}),
                                      ct:pal("~.0pus~n", [Time])
                              end),
@@ -310,7 +310,7 @@ write_test(Config) ->
     end,
     unittest_helper:wait_for_process_to_die(BenchPid1),
     BenchPid2 = erlang:spawn(fun() ->
-                                     {Time, _} = util:tc(api_tx, write, [2, 2]),
+                                     {Time, _} = util:tc(api_tx, write, ["2", 2]),
                                      comm:send_local(Self, {time, Time}),
                                      ct:pal("~.0pus~n", [Time])
                              end),
