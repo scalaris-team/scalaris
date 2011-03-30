@@ -34,8 +34,12 @@
 -endif.
 
 -type req_id() :: {rdht_req_id, util:global_uid()}.
--type request() :: {rdht_tx_read, client_key()} | {rdht_tx_write, client_key(), client_value()} | {commit}.
--type result_entry() :: any(). %% TODO: specify more strict.
+-type request() :: {rdht_tx_read, client_key()} | {rdht_tx_write, client_key(), ?DB:value()} | {commit}.
+
+-type result_entry_read() :: {ok, ?DB:value()} | {fail, timeout | not_found}.
+-type result_entry_write() :: {ok} | {fail, timeout}.
+-type result_entry_commit() :: {ok} | {fail, abort | timeout}.
+-type result_entry() :: result_entry_read() | result_entry_write() | result_entry_commit().
 -type result() :: [ result_entry() ].
 
 -spec req_list(tx_tlog:tlog(), [request()]) ->
