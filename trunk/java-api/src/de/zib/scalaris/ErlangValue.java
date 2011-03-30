@@ -25,6 +25,7 @@ import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangBoolean;
 import com.ericsson.otp.erlang.OtpErlangDouble;
+import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangInt;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangLong;
@@ -243,11 +244,10 @@ public class ErlangValue {
             throws ClassCastException {
         // need special handling if OTP returned an empty list
         if (value instanceof OtpErlangList) {
-            OtpErlangList value_list = (OtpErlangList) value;
-            if (value_list.arity() == 0) {
-                return "";
-            } else {
-                throw new ClassCastException("com.ericsson.otp.erlang.OtpErlangList cannot be cast to com.ericsson.otp.erlang.OtpErlangString");
+            try {
+                return new OtpErlangString((OtpErlangList) value).stringValue();
+            } catch (OtpErlangException e) {
+                throw new ClassCastException("com.ericsson.otp.erlang.OtpErlangList cannot be cast to com.ericsson.otp.erlang.OtpErlangString: " + e.getMessage());
             }
         } else {
             return ((OtpErlangString) value).stringValue();

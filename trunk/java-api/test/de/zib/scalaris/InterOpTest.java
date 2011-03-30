@@ -506,6 +506,11 @@ public class InterOpTest {
         key = basekey + "_string_foo\\nbar"; value = "foo\nbar";
         failed += read_or_write(sc, key, value, mode);
         
+        // some (arbitrary) unicode characters
+        // (please don't be offended if they actually mean something)
+        key = basekey + "_string_unicode"; value = "foo\u0180\u01E3\u11E5";
+        failed += read_or_write(sc, key, value, mode);
+        
         return failed;
     }
     
