@@ -118,6 +118,9 @@ on({halt}, _State) ->
     util:sleep_for_ever();
 
 on({die}, _State) ->
+    SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+    ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
+    ok = supervisor:delete_child(main_sup, SupDhtNodeId),
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
