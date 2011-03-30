@@ -68,14 +68,15 @@ req_list(TLog, ReqList) ->
     %% better round robin.
     %% replace operations by corresponding module names in ReqList
     %% number requests in ReqList to keep ordering more easily
-    RDHT_ReqList = [ case element(1, Entry) of
-                         read -> setelement(1, Entry, rdht_tx_read);
-                         write -> setelement(1, Entry, rdht_tx_write);
-                         commit -> Entry
+    RDHT_ReqList = [ case Entry of
+                         {read, Key} -> {rdht_tx_read, Key};
+                         {write, Key, Value} -> {rdht_tx_write, Key, encode_value(Value)};
+                         {commit} -> {commit}
                      end || Entry <- ReqList ],
     %% sanity checks on ReqList:
     %% @TODO Scan for fail in TransLog, then return immediately?
-    rdht_tx:req_list(TLog, RDHT_ReqList).
+    {NewTLog, Results} = rdht_tx:req_list(TLog, RDHT_ReqList),
+    {NewTLog, [decode_rdht_result(Result) || Result <- Results]}.
 
 %% @doc Perform a read inside a transaction.
 -spec read(tx_tlog:tlog(), client_key())
@@ -101,14 +102,14 @@ commit(TLog) ->
 -spec read(client_key()) -> read_result().
 read(Key) ->
     ReqList = [{read, Key}],
-    {_TLog, [Res]} = api_tx:req_list(tx_tlog:empty(), ReqList),
+    {_TLog, [Res]} = req_list(tx_tlog:empty(), ReqList),
     Res.
 
 %% @doc Atomically write and commit a single key (not as part of a transaction).
 -spec write(client_key(), client_value()) -> commit_result().
 write(Key, Value) ->
     ReqList = [{write, Key, Value}, {commit}],
-    {_TLog, [_Res1, Res2]} = api_tx:req_list(tx_tlog:empty(), ReqList),
+    {_TLog, [_Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
     Res2.
 
 %% @doc Atomically compare and set a value for a key (not as part of a transaction).
@@ -127,3 +128,23 @@ test_and_set(Key, OldValue, NewValue) ->
                           Res2;
         {ok, RealOldValue} -> {fail, {key_changed, RealOldValue}}
     end.
+
+-spec encode_value(client_value()) -> ?DB:value().
+encode_value(Value) when is_atom(Value) orelse is_boolean(Value) orelse
+                             is_number(Value) ->
+    Value;
+encode_value(Value) when is_binary(Value) ->
+    % do not compress a binary
+    erlang:term_to_binary(Value, [{minor_version, 1}]);
+encode_value(Value) ->
+    erlang:term_to_binary(Value, [{compressed, 6}, {minor_version, 1}]).
+
+-spec decode_value(?DB:value()) -> client_value().
+decode_value(Value) when is_binary(Value) ->
+    erlang:binary_to_term(Value);
+decode_value(Value) ->
+    Value.
+
+-spec decode_rdht_result(rdht_tx:result_entry()) -> result().
+decode_rdht_result({ok, Value}) -> {ok, decode_value(Value)};
+decode_rdht_result(X) -> X.

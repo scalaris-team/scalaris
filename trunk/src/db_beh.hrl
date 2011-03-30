@@ -17,7 +17,7 @@
 %% @end
 %% @version $Id$
 
--type value() :: any().
+-type value() :: atom() | boolean() | number() | binary().
 -type version() :: non_neg_integer().
 -type kvv_list() :: [{Key::?RT:key(), Value::value(), Version::version()}].
 -type db_as_list() :: [db_entry:entry()].

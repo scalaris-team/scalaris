@@ -18,5 +18,5 @@
 %% @version $Id$
 
 -type client_key() :: string(). % see ?RT:hash_key/1
--type client_value() :: ?DB:value().
+-type client_value() :: any().
 -type client_version() :: ?DB:version().
