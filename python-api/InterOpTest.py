@@ -125,6 +125,7 @@ def read_write_string(basekey, sc, mode):
     failed += read_or_write(sc,  basekey + "_string_empty", '',  mode)
     failed += read_or_write(sc,  basekey + "_string_foobar", 'foobar',   mode)
     failed += read_or_write(sc,  basekey + "_string_foo\\nbar",  'foo\nbar',  mode)
+    failed += read_or_write(sc,  basekey + "_string_unicode",  u'foo\u0180\u01E3\u11E5',  mode)
     
     return failed
 
