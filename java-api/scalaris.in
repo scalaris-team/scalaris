@@ -16,7 +16,7 @@
 
 # inspired by the start script of ant
 
-OTP_VERSION=1.5.3.1
+OTP_VERSION=1.5.4
 JAKARTA_COMMONS_VERSION=1.2
 ERL=@ERL@
 
