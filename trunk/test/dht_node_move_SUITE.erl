@@ -77,7 +77,7 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring_with_ids(
-      fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end,
+      fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end,
       [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}]}]),
     % wait for all nodes to finish their join before writing data
     unittest_helper:check_ring_size_fully_joined(4),
@@ -87,7 +87,7 @@ init_per_testcase(_TestCase, Config) ->
     set_move_config_parameters(),
     %% write some data (use a function because left-over tx_timeout messages can disturb the tests):
     Pid = erlang:spawn(fun() ->
-                               _ = [api_tx:write(X, X) || X <- lists:seq(1, 100)]
+                               _ = [api_tx:write(erlang:integer_to_list(X), X) || X <- lists:seq(1, 100)]
                        end),
     unittest_helper:wait_for_process_to_die(Pid),
     timer:sleep(500), % wait a bit for the rm-processes to settle

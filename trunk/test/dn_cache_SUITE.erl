@@ -77,7 +77,7 @@ dn_detection(Config) ->
     config:write(zombieDetectorInterval, 10),
     NodePid = fake_node(),
     NodePidG = comm:make_global(NodePid),
-    Node = node:new(NodePidG, ?RT:hash_key(0), 0),
+    Node = node:new(NodePidG, ?RT:hash_key("0"), 0),
     {ok, _DNCachePid} = dn_cache:start_link("dn_cache_group"),
     
     dn_cache:subscribe(),

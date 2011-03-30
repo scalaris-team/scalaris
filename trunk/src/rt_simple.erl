@@ -50,11 +50,8 @@ hash_key(Key) -> hash_key_(Key).
 %%      use in e.g. get_random_node_id without dialyzer complaining about the
 %%      opaque key type).
 -spec hash_key_(client_key()) -> key_t().
-hash_key_(Key) when is_integer(Key) ->
-    <<N:128>> = erlang:md5(erlang:term_to_binary(Key)),
-    N;
 hash_key_(Key) ->
-    <<N:128>> = erlang:md5(Key),
+    <<N:128>> = erlang:md5(unicode:characters_to_binary(Key)),
     N.
 %% userdevguide-end rt_simple:hash_key
 

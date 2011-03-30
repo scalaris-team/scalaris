@@ -38,7 +38,7 @@ suite() -> [{timetrap, {seconds, 120}}].
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
-    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key(0)) end, [{config, [{log_path, PrivDir}]}]),
+    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end, [{config, [{log_path, PrivDir}]}]),
     Config2.
 
 end_per_suite(Config) ->
