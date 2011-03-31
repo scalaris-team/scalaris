@@ -1,10 +1,12 @@
 1) download new version
 2) extract somewhere else
 3) copy ebin/, include/, src/, LICENSE, vsn.mk to <scalaris>/contrib/yaws
-4) call '(cd contrib; patch -p0 < yaws_json_encode_lists_patch.diff; cd -)'
-5) call '(cd contrib; patch -p2 < yaws_json_encode_floats.diff; cd -)'
-6) configure && make in the extracted yaws dir
-7) copy src/mime_types.erl and src/yaws_generated.erl to their respective folders in <scalaris>/contrib/yaws
-8) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
+4) patch the several errors in the json encoding:
+4a) call '(cd contrib; patch -p0 < yaws_json_encode_lists_patch.diff; cd -)'
+4b) call '(cd contrib; patch -p2 < yaws_json_encode_floats.diff; cd -)'
+4c) call '(cd contrib; patch -p2 < yaws_json_encode_unicode_keys.diff; cd -)'
+5) configure && make in the extracted yaws dir
+6) copy src/mime_types.erl and src/yaws_generated.erl to their respective folders in <scalaris>/contrib/yaws
+7) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
 %-define(HAVE_SENDFILE, true).
-9) that's it, go back to <scalaris>/ and run ./configure && make
+8) that's it, go back to <scalaris>/ and run ./configure && make
