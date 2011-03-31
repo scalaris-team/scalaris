@@ -19,8 +19,12 @@
 -module(api_tx_SUITE).
 -author('schintke@zib.de').
 -vsn('$Id$').
+
 -compile(export_all).
+
+-include("scalaris.hrl").
 -include("unittest.hrl").
+-include("client_types.hrl").
 
 all()   -> [new_tlog_0,
             req_list_2,
@@ -34,7 +38,8 @@ all()   -> [new_tlog_0,
             conflicting_tx2,
             write2_read2,
             multi_write,
-            write_test_race_mult_rings
+            write_test_race_mult_rings,
+            tester_encode_decode
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -48,6 +53,8 @@ end_per_suite(Config) ->
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         write_test_race_mult_rings -> %% this case creates its own ring
+            Config;
+        tester_encode_decode -> %% this case does not need a ring
             Config;
         _ ->
             %% stop ring from previous test case (it may have run into a timeout
@@ -327,3 +334,10 @@ write_test(Config) ->
     ct:pal("NewReg: ~.0p~n", [OnlyNewReg]),
     ?equals_pattern(FirstWriteTime, X when X =< 1000000),
     ?equals_pattern(SecondWriteTime, X when X =< 1000000).
+
+-spec prop_encode_decode(Value::client_value()) -> boolean().
+prop_encode_decode(Value) ->
+    Value =:= api_tx:decode_value(api_tx:encode_value(Value)).
+
+tester_encode_decode(_Config) ->
+    tester:test(?MODULE, prop_encode_decode, 1, 10000).
