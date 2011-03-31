@@ -589,7 +589,7 @@ public class InterOpTest {
         LinkedHashMap<String, Integer> map1 = new LinkedHashMap<String, Integer>();
         map1.put("x", 0);
         map1.put("y", 1);
-        key = basekey + "_map_x0_y1";
+        key = basekey + "_map_x=0_y=1";
         value = map1;
         failed += read_or_write(sc, key, value, mode);
         
@@ -605,8 +605,32 @@ public class InterOpTest {
         list1.add(3);
         map2.put("e", list1);
         map2.put("f", map1);
-        key = basekey + "_map_a0_bfoo_c1.5_dfoo<nl>bar_elist0123_fmapx0y1";
+        key = basekey + "_map_a=0_b=foo_c=1.5_d=foo<nl>bar_e=list0123_f=mapx0y1";
         value = map2;
+        failed += read_or_write(sc, key, value, mode);
+        
+        LinkedHashMap<String, Integer> map3 = new LinkedHashMap<String, Integer>();
+        map3.put("", 0);
+        key = basekey + "_map_=0";
+        value = map3;
+        failed += read_or_write(sc, key, value, mode);
+        
+        LinkedHashMap<String, Object> map4 = new LinkedHashMap<String, Object>();
+        // some (arbitrary) unicode characters
+        // (please don't be offended if they actually mean something)
+        map4.put("x", 0);
+        map4.put("y", "foo\u0180\u01E3\u11E5");
+        key = basekey + "_map_x=0_y=foo\u0180\u01E3\u11E5";
+        value = map4;
+        failed += read_or_write(sc, key, value, mode);
+        
+        LinkedHashMap<String, Integer> map5 = new LinkedHashMap<String, Integer>();
+        // some (arbitrary) unicode characters
+        // (please don't be offended if they actually mean something)
+        map5.put("x", 0);
+        map5.put("foo\u0180\u01E3\u11E5", 1);
+        key = basekey + "_map_x=0_foo\u0180\u01E3\u11E5=1";
+        value = map5;
         failed += read_or_write(sc, key, value, mode);
         
         return failed;

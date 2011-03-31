@@ -156,9 +156,12 @@ def read_write_map(basekey, sc, mode):
     failed = 0;
     
     failed += read_or_write(sc,  basekey + "_map_empty", {},  mode)
-    failed += read_or_write(sc,  basekey + "_map_x0_y1", {'x': 0,  'y': 1},   mode)
-    failed += read_or_write(sc,  basekey + "_map_a0_bfoo_c1.5_dfoo<nl>bar_elist0123_fmapx0y1",
+    failed += read_or_write(sc,  basekey + "_map_x=0_y=1", {'x': 0,  'y': 1},   mode)
+    failed += read_or_write(sc,  basekey + "_map_a=0_b=foo_c=1.5_d=foo<nl>bar_e=list0123_f=mapx0y1",
                             {'a': 0,  'b': 'foo',  'c': 1.5,  'd': 'foo\nbar',  'e': [0,  1,  2,  3],  'f': {'x': 0,  'y': 1}},  mode)
+    failed += read_or_write(sc,  basekey + "_map_=0", {'': 0},   mode)
+    failed += read_or_write(sc,  basekey + u"_map_x=0_y=foo\u0180\u01E3\u11E5", {'x': 0,  'y': u'foo\u0180\u01E3\u11E5'},   mode)
+    failed += read_or_write(sc,  basekey + u"_map_x=0_foo\u0180\u01E3\u11E5=1", {'x': 0,  u'foo\u0180\u01E3\u11E5': 1},   mode)
     
     return failed
 
