@@ -450,8 +450,12 @@ public class ErlangValue {
             return ((OtpErlangDouble) value).doubleValue();
         } else if (value instanceof OtpErlangString) {
             return ((OtpErlangString) value).stringValue();
-        } else if (value instanceof OtpErlangList && ((OtpErlangList) value).arity() == 0) {
-            return "";
+        } else if (value instanceof OtpErlangList) {
+            try {
+                return otpObjectToString(value);
+            } catch (ClassCastException e) {
+                throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
+            }
         } else if (value instanceof OtpErlangTuple) {
             OtpErlangTuple value_tpl = (OtpErlangTuple) value;
             if (value_tpl.arity() == 2) {
@@ -546,10 +550,12 @@ public class ErlangValue {
                 String key;
                 if (key_erl instanceof OtpErlangAtom) {
                     key = ((OtpErlangAtom) key_erl).atomValue();
-                } else if (key_erl instanceof OtpErlangString) {
-                    key = ((OtpErlangString) key_erl).stringValue();
                 } else {
-                    throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
+                    try {
+                        key = otpObjectToString(key_erl);
+                    } catch (ClassCastException e) {
+                        throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
+                    }
                 }
                 result.put(key,
                         convertScalarisJSONtoJava_value(iter_tpl.elementAt(1)));
