@@ -92,12 +92,11 @@ create_value({integer, Value}, _Size, _ParseState) ->
     Value;
 create_value({atom, Value}, _Size, _ParseState) ->
     Value;
-create_value(binary, _Size, ParseState) ->
-    {Length, Binaries} = tester_parse_state:get_binaries(ParseState),
-    case Length of
-        0 -> ?ct_fail("error: cannot create binaries~n", []);
-        _ -> lists:nth(crypto:rand_uniform(1, Length + 1), Binaries)
-    end;
+create_value(binary, Size, ParseState) ->
+    create_val_50rand_50coll(
+      ParseState, fun tester_parse_state:get_binaries/1,
+      list_to_binary(create_value({list, {range, {integer, 0}, {integer, 16#ff}}}, Size, ParseState))
+      );
 create_value(bool, _Size, _ParseState) ->
     case crypto:rand_uniform(0, 2) of
         0 -> false;
