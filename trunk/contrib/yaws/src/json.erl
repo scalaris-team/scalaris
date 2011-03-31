@@ -147,7 +147,12 @@ encode_object({struct, _Props} = Obj) ->
     M = obj_fold(fun({Key, Value}, Acc) ->
 	S = case Key of
             B when is_binary(B) -> encode_string(B);    
-	    L when is_list(L) -> encode_string(L);
+	    L when is_list(L) ->
+            case is_string(L) of
+                yes -> encode_string(L);
+                unicode -> encode_string(xmerl_ucs:to_utf8(L));
+                no -> exit({json_encode, {bad_key, Key}})
+            end;
 	    A when is_atom(A) -> encode_string(atom_to_list(A));
             _ -> exit({json_encode, {bad_key, Key}})
 	end,
@@ -552,7 +557,9 @@ obj_is_key(Key, {struct, Props}) ->
 %% Store a new member in an object.  Returns a new object.
 
 obj_store(KeyList, Value, {struct, Props}) when is_list(Props) ->
-	Key = list_to_atom(KeyList),
+	Key = try list_to_atom(KeyList)
+          catch error:badarg -> KeyList
+          end,
     {struct, [{Key, Value} | proplists:delete(Key, Props)]}.
 
 %% Create an object from a list of Key/Value pairs.
