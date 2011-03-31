@@ -273,7 +273,6 @@ my_make_tlog_entry(Entry) ->
     tx_tlog:new_entry(?MODULE, Key, Status, Val, Vers).
 
 my_make_result_entry(Entry) ->
-    Key = rdht_tx_read_state:get_key(Entry),
     {Val, _Vers} = rdht_tx_read_state:get_result(Entry),
     case rdht_tx_read_state:get_decided(Entry) of
         value -> {ok, Val};
