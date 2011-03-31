@@ -199,7 +199,7 @@ public class Transaction {
          * 
          * @return this {@link RequestList} object
          */
-        public RequestList addWrite(String key, String value) {
+        public <T>  RequestList addWrite(String key, T value) {
             return addWrite(new OtpErlangString(key), ErlangValue.convertToErlang(value));
         }
 
