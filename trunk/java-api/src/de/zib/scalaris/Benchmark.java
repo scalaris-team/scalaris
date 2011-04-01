@@ -719,8 +719,6 @@ public class Benchmark {
      * 
      * @param testRuns
      *            the number of times to write the value
-     * @param value
-     *            the value to write
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
@@ -768,8 +766,6 @@ public class Benchmark {
      * 
      * @param testRuns
      *            the number of times to write the value
-     * @param value
-     *            the value to write
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
@@ -818,8 +814,6 @@ public class Benchmark {
      * 
      * @param testRuns
      *            the number of times to write the value
-     * @param value
-     *            the value to write
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)

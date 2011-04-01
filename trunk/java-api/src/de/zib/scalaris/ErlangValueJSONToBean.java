@@ -41,8 +41,8 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *  <li>{@link BigInteger}</li>
  *  <li>double, {@link Double}</li>
  *  <li>{@link String}</li>
- *  <li>{@link List} of primitive types (any other element will be converted to {@link Map}<String, Object>)</li>
- *  <li>{@link Map} with string keys and primitive-typed values (any other value will be converted to {@link Map}<String, Object>)</li>
+ *  <li>{@link List} of primitive types (any other element will be converted to {@link Map}&lt;String, Object&gt;)</li>
+ *  <li>{@link Map} with string keys and primitive-typed values (any other value will be converted to {@link Map}&lt;String, Object&gt;)</li>
  *  <li>such a Bean
  * </ul>
  * 

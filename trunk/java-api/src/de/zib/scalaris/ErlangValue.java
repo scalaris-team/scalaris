@@ -69,8 +69,8 @@ public class ErlangValue {
      *  </ul>
      * composite types:
      * <ul>
-     *  <li>{@link List}<Object> with one of the native types - {@link OtpErlangList}</li>
-     *  <li>{@link Map}<String, Object> representing a JSON object - {@link OtpErlangTuple}</li>
+     *  <li>{@link List}&lt;Object&gt; with one of the native types - {@link OtpErlangList}</li>
+     *  <li>{@link Map}&lt;String, Object&gt; representing a JSON object - {@link OtpErlangTuple}</li>
      *  </ul>
      * custom types:
      * <ul>
@@ -398,7 +398,7 @@ public class ErlangValue {
     }
 
     /**
-     * Returns a JSON object (as {@link Map}<String, Object>) of the wrapped
+     * Returns a JSON object (as {@link Map}&lt;String, Object&gt;) of the wrapped
      * erlang value.
      * 
      * @return the converted value
