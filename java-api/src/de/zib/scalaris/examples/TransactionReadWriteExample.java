@@ -343,7 +343,7 @@ public class TransactionReadWriteExample {
 
     /**
      * Writes the given <code>key</code> and <code>value</code> with the
-     * {@link Transaction#writeObject(OtpErlangString, OtpErlangObject)} method on the
+     * {@link Transaction#write(OtpErlangString, OtpErlangObject)} method on the
      * given <code>transaction</code> object and generates output according to the
      * result.
      * 
@@ -433,7 +433,7 @@ public class TransactionReadWriteExample {
 
     /**
      * Reads the given <code>key</code> with the
-     * {@link Transaction#readObject(OtpErlangString)} method on the given
+     * {@link Transaction#read(OtpErlangString)} method on the given
      * <code>transaction</code> object and generates output according to the result.
      * 
      * @param transaction

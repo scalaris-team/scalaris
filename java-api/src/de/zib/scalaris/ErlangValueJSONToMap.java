@@ -25,7 +25,7 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
- * Converts Scalaris-JSON to {@link Map}<String, Object> and such maps to
+ * Converts Scalaris-JSON to {@link Map}&lt;String, Object&gt; and such maps to
  * Scalaris-JSON.
  * 
  * @author Nico Kruber, kruber@zib.de
