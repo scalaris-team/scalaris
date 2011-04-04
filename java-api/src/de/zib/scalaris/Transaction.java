@@ -144,6 +144,7 @@ public class Transaction {
      */
     public static class RequestList {
         private List<OtpErlangObject> requests = new ArrayList<OtpErlangObject>(10);
+        private boolean isCommit = false;
         
         /**
          * Default constructor.
@@ -159,6 +160,9 @@ public class Transaction {
          * @return this {@link RequestList} object
          */
         public RequestList addRead(OtpErlangObject key) {
+            if (isCommit) {
+                throw new UnsupportedOperationException("No further request supported after a commit!");
+            }
             OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
                     CommonErlangObjects.readAtom, key });
             requests.add(req);
@@ -185,6 +189,9 @@ public class Transaction {
          * @return this {@link RequestList} object
          */
         public RequestList addWrite(OtpErlangObject key, OtpErlangObject value) {
+            if (isCommit) {
+                throw new UnsupportedOperationException("No further request supported after a commit!");
+            }
             OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
                     CommonErlangObjects.writeAtom, key, value });
             requests.add(req);
@@ -209,8 +216,12 @@ public class Transaction {
          * @return this {@link RequestList} object
          */
         public RequestList addCommit() {
+            if (isCommit) {
+                throw new UnsupportedOperationException("Only one commit per request list allowed!");
+            }
             OtpErlangTuple req = CommonErlangObjects.commitTupleAtom;
             requests.add(req);
+            isCommit = true;
             return this;
         }
 
@@ -222,6 +233,16 @@ public class Transaction {
          */
         OtpErlangList getErlangReqList() {
             return new OtpErlangList(requests.toArray(new OtpErlangObject[0]));
+        }
+        
+        /**
+         * Returns whether the transactions contains a commit or not.
+         * 
+         * @return <tt>true</tt> if the operation contains a commit,
+         *         <tt>false</tt> otherwise
+         */
+        boolean isCommit() {
+            return isCommit;
         }
     }
     
@@ -307,7 +328,7 @@ public class Transaction {
          * @throws UnknownException
          *             if any other error occurs
          */
-        public void processCommitAt(int pos) throws TimeoutException,
+        void processCommitAt(int pos) throws TimeoutException,
                 AbortException, UnknownException {
             CommonErlangObjects.processResult_commit(results.elementAt(pos));
         }
@@ -326,22 +347,32 @@ public class Transaction {
     /**
      * Executes all requests in <code>req</code>.
      * 
-     * @param req
-     *            the request to issue
+     * <p>
+     * The transaction's log is reset if a commit in the request list was
+     * successful, otherwise it still retains in the transaction which must be
+     * successfully committed, aborted or reset in order to be (re-)used for
+     * another request.
+     * </p>
      * 
-     * @return
-     *            results of read requests in the same order as they appear in
-     *            <code>req</code>
+     * @param req
+     *            the requests to issue
+     * 
+     * @return results of all requests in the same order as they appear in
+     *         <code>req</code>
      * 
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if the commit failed
      * @throws UnknownException
      *             if any other error occurs
      */
     public ResultList req_list(RequestList req)
-            throws ConnectionException, UnknownException {
+            throws ConnectionException, TimeoutException, AbortException, UnknownException {
         OtpErlangObject received_raw = null;
         if (transLog == null) {
             received_raw = connection.doRPC("api_tx", "req_list",
@@ -358,7 +389,17 @@ public class Transaction {
             OtpErlangTuple received = (OtpErlangTuple) received_raw;
             transLog = received.elementAt(0);
             if (received.arity() == 2) {
-                return new ResultList((OtpErlangList) received.elementAt(1));
+                ResultList result = new ResultList((OtpErlangList) received.elementAt(1));
+                if (req.isCommit()) {
+                    if (result.size() >= 1) {
+                        result.processCommitAt(result.size() - 1);
+                        // transaction was successful: reset transaction log
+                        transLog = null;
+                    } else {
+                        throw new UnknownException(result.getResults());
+                    }
+                }
+                return result;
             }
             throw new UnknownException(received_raw);
         } catch (ClassCastException e) {
@@ -373,7 +414,7 @@ public class Transaction {
      * <p>
      * The transaction's log is reset if the commit was successful, otherwise it
      * still retains in the transaction which must be successfully committed,
-     * aborted or reset in order to be (re-)used for another transaction.
+     * aborted or reset in order to be (re-)used for another request.
      * </p>
      * 
      * @throws ConnectionException
@@ -393,14 +434,7 @@ public class Transaction {
      * @see #abort()
      */
     public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
-        ResultList result = req_list(new RequestList().addCommit());
-        if (result.size() == 1) {
-            result.processCommitAt(0);
-            // transaction was successful: reset transaction log
-            transLog = null;
-        } else {
-            throw new UnknownException(result.getResults());
-        }
+        req_list(new RequestList().addCommit());
     }
 
     /**
@@ -442,11 +476,15 @@ public class Transaction {
     public ErlangValue read(OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
-        ResultList result = req_list(new RequestList().addRead(key));
-        if (result.size() == 1) {
-            return result.processReadAt(0);
+        try {
+            ResultList result = req_list(new RequestList().addRead(key));
+            if (result.size() == 1) {
+                return result.processReadAt(0);
+            }
+            throw new UnknownException(result.getResults());
+        } catch (AbortException e) {
+            throw new UnknownException(e);
         }
-        throw new UnknownException(result.getResults());
     }
 
     /**
@@ -497,11 +535,15 @@ public class Transaction {
      */
     public void write(OtpErlangString key, OtpErlangObject value)
             throws ConnectionException, TimeoutException, UnknownException {
-        ResultList result = req_list(new RequestList().addWrite(key, value));
-        if (result.size() == 1) {
-            result.processWriteAt(0);
-        } else {
-            throw new UnknownException(result.getResults());
+        try {
+            ResultList result = req_list(new RequestList().addWrite(key, value));
+            if (result.size() == 1) {
+                result.processWriteAt(0);
+            } else {
+                throw new UnknownException(result.getResults());
+            }
+        } catch (AbortException e) {
+            throw new UnknownException(e);
         }
     }
 
