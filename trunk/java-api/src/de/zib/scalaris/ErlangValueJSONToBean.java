@@ -49,6 +49,9 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * Note: regarding lists and maps: it is not possible to get type information
  * from their elements (type erasure).
  * 
+ * Setter methods must be of the form setKey(xxx),
+ * getter methods of the form getKey() or isKey().
+ * 
  * @param <T> the Bean to convert to/from
  * 
  * @author Nico Kruber, kruber@zib.de
@@ -94,7 +97,8 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
     /**
      * Uses introspection to get the setter method for the given key of class
      * {@link #c}.
-     * Setter methods must be of the form setKey(xxx).
+     * Setter methods must be of the form setKey(xxx),
+     * getter methods of the form getKey() or isKey().
      * 
      * @param key
      *            the key to get the setter for
@@ -106,9 +110,8 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
      */
     private Method getSetterFor(String key) {
         String key1 = capFirst(key);
-        String getMethod = "get" + key1;
         String setMethod = "set" + key1;
-        Class<?> type = getTypeOf2(getMethod);
+        Class<?> type = getTypeOf2(key1);
         try {
             return c.getMethod(setMethod, type);
         } catch (Exception e) {
@@ -150,7 +153,7 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
     
     /**
      * Uses introspection to get the type of the given key of class {@link #c}.
-     * Assumes there is a getter of the form getKey().
+     * Assumes there is a getter of the form getKey() or isKey().
      * 
      * @param key
      *            the key to get the type for
@@ -161,15 +164,16 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
      *             if there is no public getter method for <tt>key</tt>
      */
     private Class<?> getTypeOf(String key) throws ClassCastException {
-        String getMethod = "get" + capFirst(key);
-        return getTypeOf2(getMethod);
+        return getTypeOf2(capFirst(key));
     }
 
     /**
      * Uses introspection to get the return type of the given method of class
      * {@link #c}.
+     * Assumes there is a getter of the form getKey() or isKey().
      * 
-     * @param getMethod
+     * 
+     * @param keyCap1st
      *            the method
      * 
      * @return the {@link Class} of the method's return type.
@@ -177,11 +181,15 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
      * @throws ClassCastException
      *             if there is no public getter method for <tt>key</tt>
      */
-    private Class<?> getTypeOf2(String getMethod) throws ClassCastException {
+    private Class<?> getTypeOf2(String keyCap1st) throws ClassCastException {
         try {
-            return c.getMethod(getMethod).getReturnType();
+            try {
+                return c.getMethod("get" + keyCap1st).getReturnType();
+            } catch (NoSuchMethodException e) {
+                return c.getMethod("is" + keyCap1st).getReturnType();
+            }
         } catch (Exception e) {
-            throw new ClassCastException("no getter " + getMethod + ": " + e.getMessage());
+            throw new ClassCastException("no getter [get|is]" + keyCap1st + ": " + e.getMessage());
         }
     }
     
@@ -247,7 +255,7 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
         }
     }
     
-    private Pattern getMatcher = java.util.regex.Pattern.compile("get");
+    private Pattern getMatcher = java.util.regex.Pattern.compile("^get|is");
 
     /**
      * Converts a Java Map to a JSON object as expected by Scalaris.
@@ -284,7 +292,7 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
 
                 for (int j = 0; j < methods.length; ++j) {
                     String methodName = methods[j].getName();
-                    if (methodName.startsWith("get")) {
+                    if (getMatcher.matcher(methodName).find()) {
                         String key_j = decapFirst(getMatcher.matcher(methodName).replaceFirst(""));
                         currentKey = key_j;
                         try {
