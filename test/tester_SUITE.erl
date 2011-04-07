@@ -24,9 +24,11 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
+    crypto:start(),
     Config.
 
 end_per_suite(_Config) ->
+    %crypto:stop(), ???
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
