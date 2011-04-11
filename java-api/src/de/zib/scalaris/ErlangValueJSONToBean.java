@@ -17,7 +17,12 @@ package de.zib.scalaris;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -56,12 +61,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
-    /**
-     * Current key of the JSON object.
-     */
-    String currentKey = null;
-    
+class ErlangValueJSONToBean<T> extends ErlangValueJSONBase implements ErlangValueJSONInterface<T> {
     /**
      * The class to convert the object to.
      */
@@ -92,31 +92,34 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
     public static <U> ErlangValueJSONToBean<U> getInstance(Class<U> c) {
         return new ErlangValueJSONToBean<U>(c);
     }
-
     
     /**
-     * Uses introspection to get the setter method for the given key of class
-     * {@link #c}.
-     * Setter methods must be of the form setKey(xxx),
-     * getter methods of the form getKey() or isKey().
+     * Gets an {@link ErlangValueJSONToBean} instance using the given
+     * {@link Type}.
      * 
-     * @param key
-     *            the key to get the setter for
+     * @param t
+     *            the type
      * 
-     * @return the setter method
-     * 
-     * @throws ClassCastException
-     *             if there is no public setter method for <tt>key</tt>
+     * @return an {@link ErlangValueJSONToBean}<U>
      */
-    private Method getSetterFor(String key) {
-        String key1 = capFirst(key);
-        String setMethod = "set" + key1;
-        Class<?> type = getTypeOf2(key1);
-        try {
-            return c.getMethod(setMethod, type);
-        } catch (Exception e) {
-            throw new ClassCastException("no setter " + setMethod + "(" + type.getSimpleName() + "): " + e.getMessage());
-        }
+    public static ErlangValueJSONToBean<?> getInstance(Type t) {
+        ErlangValueJSONToBean<?> json_converter = getInstance(getRawType(t));
+        return json_converter;
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.ErlangValueJSON#toScalarisJSON(T)
+     */
+    public OtpErlangTuple toScalarisJSON(T value) throws ClassCastException {
+        return convertJavaToScalarisJSON_object2(value);
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.ErlangValueJSON#toJava(com.ericsson.otp.erlang.OtpErlangList)
+     */
+    @SuppressWarnings("unchecked")
+    public T toJava(OtpErlangList value) throws ClassCastException {
+        return (T) convertScalarisJSONtoJava_object2(value, null);
     }
     
     /**
@@ -150,6 +153,46 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
         }
         return "";
     }
+
+    /**
+     * Gets the class of the raw type of the given type.
+     * 
+     * @param type the type object
+     * 
+     * @return the class behind the type
+     */
+    private static Class<?> getRawType(Type type) {
+        if (type instanceof ParameterizedType) {
+            return (Class<?>) ((ParameterizedType) type).getRawType();
+        } else {
+            return (Class<?>) type;
+        }
+    }
+    
+    /**
+     * Uses introspection to get the setter method for the given key of class
+     * {@link #c}.
+     * Setter methods must be of the form setKey(xxx),
+     * getter methods of the form getKey() or isKey().
+     * 
+     * @param key
+     *            the key to get the setter for
+     * 
+     * @return the setter method
+     * 
+     * @throws ClassCastException
+     *             if there is no public setter method for <tt>key</tt>
+     */
+    private Method getSetterFor(String key, Type type) {
+        String keyCap1st = capFirst(key);
+        String setMethod = "set" + keyCap1st;
+        Class<?> class_ = getRawType(type);
+        try {
+            return c.getMethod(setMethod, class_);
+        } catch (Exception e) {
+            throw new ClassCastException("no setter " + setMethod + "(" + class_.getSimpleName() + "): " + e.getMessage());
+        }
+    }
     
     /**
      * Uses introspection to get the type of the given key of class {@link #c}.
@@ -163,33 +206,103 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
      * @throws ClassCastException
      *             if there is no public getter method for <tt>key</tt>
      */
-    private Class<?> getTypeOf(String key) throws ClassCastException {
-        return getTypeOf2(capFirst(key));
-    }
-
-    /**
-     * Uses introspection to get the return type of the given method of class
-     * {@link #c}.
-     * Assumes there is a getter of the form getKey() or isKey().
-     * 
-     * 
-     * @param keyCap1st
-     *            the method
-     * 
-     * @return the {@link Class} of the method's return type.
-     * 
-     * @throws ClassCastException
-     *             if there is no public getter method for <tt>key</tt>
-     */
-    private Class<?> getTypeOf2(String keyCap1st) throws ClassCastException {
+    private Type getTypeOf(String key) throws ClassCastException {
+        String keyCap1st = capFirst(key);
         try {
             try {
-                return c.getMethod("get" + keyCap1st).getReturnType();
+                return c.getMethod("get" + keyCap1st).getGenericReturnType();
             } catch (NoSuchMethodException e) {
-                return c.getMethod("is" + keyCap1st).getReturnType();
+                return c.getMethod("is" + keyCap1st).getGenericReturnType();
             }
         } catch (Exception e) {
             throw new ClassCastException("no getter [get|is]" + keyCap1st + ": " + e.getMessage());
+        }
+    }
+    
+    private Pattern getMatcher = java.util.regex.Pattern.compile("^get|is");
+
+    /**
+     * Converts a Java Map to a JSON object as expected by Scalaris.
+     * 
+     * @param value_
+     *            a Java Map with String-keys and supported JSON types as values
+     * 
+     * @return a JSON object representing the value
+     * 
+     * @throws ClassCastException
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
+     */
+    @Override
+    protected OtpErlangTuple convertJavaToScalarisJSON_object(
+            Object value) throws ClassCastException {
+        ErlangValueJSONToBean<?> json_converter = getInstance(value.getClass());
+        return json_converter.convertJavaToScalarisJSON_object2(value);
+    }
+
+    /**
+     * Converts a Java Map to a JSON object as expected by Scalaris.
+     * 
+     * @param value_
+     *            a Java Map with String-keys and supported JSON types as values
+     * 
+     * @return a JSON object representing the value
+     * 
+     * @throws ClassCastException
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
+     */
+    protected OtpErlangTuple convertJavaToScalarisJSON_object2(
+            Object value_) throws ClassCastException {
+        try {
+            if (value_ instanceof Map<?, ?>) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> value = (Map<String, Object>) value_;
+                OtpErlangTuple[] resultList = new OtpErlangTuple[value.size()];
+                int i = 0;
+
+                for (Map.Entry<String, Object> entry : value.entrySet()) {
+                    resultList[i] = new OtpErlangTuple(new OtpErlangObject[] {
+                            new OtpErlangString(entry.getKey()),
+                            convertJavaToScalarisJSON_value(entry.getValue()) });
+                    ++i;
+                }
+                OtpErlangTuple resultTpl = new OtpErlangTuple(new OtpErlangObject[] {
+                        CommonErlangObjects.structAtom, new OtpErlangList(resultList) });
+                return resultTpl;
+            } else {
+                @SuppressWarnings("unchecked")
+                T value = (T) value_;
+
+                // get all getters:
+                Method[] methods = c.getDeclaredMethods();
+                List<OtpErlangObject> resultList = new LinkedList<OtpErlangObject>();
+
+                for (int j = 0; j < methods.length; ++j) {
+                    String methodName = methods[j].getName();
+                    if (getMatcher.matcher(methodName).lookingAt()) {
+                        String key_j = decapFirst(getMatcher.matcher(methodName).replaceFirst(""));
+                        try {
+                            OtpErlangObject value_j = convertJavaToScalarisJSON_value(methods[j].invoke(value));
+                            resultList.add(new OtpErlangTuple(new OtpErlangObject[] {new OtpErlangString(key_j), value_j}));
+                        } catch (IllegalArgumentException e) {
+                            e.printStackTrace();
+                            throw new ClassCastException("cannot access getter " + methodName + "() of class " + c.getSimpleName() + ": " + e.getMessage());
+                        } catch (IllegalAccessException e) {
+                            throw new ClassCastException("cannot access getter " + methodName + "() of class " + c.getSimpleName() + ": " + e.getMessage());
+                        } catch (InvocationTargetException e) {
+                            throw new ClassCastException("cannot access getter " + methodName + "() of class " + c.getSimpleName() + ": " + e.getMessage());
+                        }
+                    }
+                }
+                OtpErlangTuple resultTpl = new OtpErlangTuple(new OtpErlangObject[] {
+                        CommonErlangObjects.structAtom,
+                        new OtpErlangList(resultList.toArray(new OtpErlangObject[0])) });
+                return resultTpl;
+            }
+        } catch (ClassCastException e) {
+            e.printStackTrace();
+            throw new ClassCastException("Unsupported JSON type (value: " + value_ + ")");
         }
     }
     
@@ -206,19 +319,36 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
      */
-    @Override
-    protected Object convertScalarisJSONtoJava_object(
-            OtpErlangList value) throws ClassCastException {
-        if (currentKey != null) {
-            Class<?> keyType = getTypeOf(currentKey);
-            if (keyType.equals(Map.class)) {
-                ErlangValueJSONToMap json_converter = new ErlangValueJSONToMap();
-                return json_converter.convertScalarisJSONtoJava_object(value);
-            } else {
-                ErlangValueJSONToBean<?> json_converter = getInstance(keyType);
-                return json_converter.convertScalarisJSONtoJava_object(value);
+    protected Object convertScalarisJSONtoJava_object2(
+            OtpErlangList value, Type type_) throws ClassCastException {
+        if (c.equals(Map.class) || Arrays.asList(c.getInterfaces()).contains(Map.class)) {
+            // target type is a map:
+            Type elementType = Object.class;
+            
+            // we might have some more details about its value's type:
+            if (type_ != null && type_ instanceof ParameterizedType) {
+                ParameterizedType type = (ParameterizedType) type_;
+                Type[] typeArguments = type.getActualTypeArguments();
+                if (typeArguments.length == 2) {
+                    elementType = typeArguments[1];
+                }
             }
+            
+            Map<String, Object> result = new LinkedHashMap<String, Object>(
+                    value.arity());
+            for (OtpErlangObject iter : value) {
+                OtpErlangTuple iter_tpl = (OtpErlangTuple) iter;
+                if (iter_tpl.arity() == 2) {
+                    String key = convertScalarisJSONtoJava_key(iter_tpl.elementAt(0));
+                    result.put(key,
+                            convertScalarisJSONtoJava_value2(iter_tpl.elementAt(1), elementType));
+                } else {
+                    throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
+                }
+            }
+            return result;
         } else {
+            // target type is a bean:
             T result;
             try {
                 result = c.getConstructor().newInstance();
@@ -239,9 +369,9 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
                             throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
                         }
                     }
-                    currentKey = key;
-                    Method setter = getSetterFor(key);
-                    Object myValue = convertScalarisJSONtoJava_value(iter_tpl.elementAt(1));
+                    Type elementType = getTypeOf(key);
+                    Method setter = getSetterFor(key, elementType);
+                    Object myValue = convertScalarisJSONtoJava_value2(iter_tpl.elementAt(1), elementType);
                     try {
                         setter.invoke(result, myValue);
                     } catch (Exception e) {
@@ -254,66 +384,79 @@ class ErlangValueJSONToBean<T> extends ErlangValueJSONBase<T> {
             return result;
         }
     }
-    
-    private Pattern getMatcher = java.util.regex.Pattern.compile("^get|is");
 
     /**
-     * Converts a Java Map to a JSON object as expected by Scalaris.
+     * Converts a JSON array value (a list of values) to a Java List.
      * 
-     * @param value_
-     *            a Java Map with String-keys and supported JSON types as values
+     * @param value
+     *            a list of JSON values as stored by Scalaris' JSON API
+     * @param type_
+     *            the (complete) type of the list, including parameters
      * 
-     * @return a JSON object representing the value
+     * @return a Java object representing the value
      * 
      * @throws ClassCastException
-     *             if thrown if a conversion is not possible, i.e. the type is
-     *             not supported
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
      */
-    @Override
-    protected OtpErlangTuple convertJavaToScalarisJSON_object(
-            Object value_) throws ClassCastException {
-        if (currentKey != null) {
-            Class<?> keyType = getTypeOf(currentKey);
-            if (keyType.equals(Map.class)) {
-                ErlangValueJSONToMap json_converter = new ErlangValueJSONToMap();
-                return json_converter.convertJavaToScalarisJSON_object(value_);
+    protected List<Object> convertScalarisJSONtoJava_array2(OtpErlangList value, Type type_)
+            throws ClassCastException {
+        List<Object> result = new ArrayList<Object>(value.arity());
+        for (OtpErlangObject iter : value) {
+            if (type_ instanceof ParameterizedType) {
+                ParameterizedType type = (ParameterizedType) type_;
+                Type[] typeArguments = type.getActualTypeArguments();
+                if (typeArguments.length == 1) {
+                    result.add(convertScalarisJSONtoJava_value2(iter, typeArguments[0]));
+                    continue;
+                }
             } else {
-                ErlangValueJSONToBean<?> json_converter = getInstance(keyType);
-                return json_converter.convertJavaToScalarisJSON_object(value_);
+                // note: list type could be Object if encapsulated in another type
+                result.add(convertScalarisJSONtoJava_value2(iter, Object.class));
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Converts an unknown JSON value to a Java object.
+     * 
+     * @param value
+     *            a JSON value as stored by Scalaris' JSON API
+     * @param type
+     *            the (supposed) type of the returned value
+     *            (hint for container types)
+     * 
+     * @return a Java object representing the value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     */
+    protected Object convertScalarisJSONtoJava_value2(OtpErlangObject value, Type type)
+            throws ClassCastException {
+        if (value instanceof OtpErlangTuple) {
+            OtpErlangTuple value_tpl = (OtpErlangTuple) value;
+            if (value_tpl.arity() == 2) {
+                OtpErlangObject tag = value_tpl.elementAt(0);
+                if (tag.equals(CommonErlangObjects.structAtom)) {
+                    // converting an object
+                    OtpErlangList value_obj = (OtpErlangList) value_tpl.elementAt(1);
+                    Type type1 = type.equals(Object.class) ? Map.class : type;
+                    ErlangValueJSONToBean<?> json_converter = getInstance(type1);
+                    return json_converter.convertScalarisJSONtoJava_object2(value_obj, type1);
+                } else if (tag.equals(CommonErlangObjects.arrayAtom)) {
+                    // converting a list
+                    OtpErlangList value_list = ErlangValue.otpObjectToOtpList(value_tpl.elementAt(1));
+                    return convertScalarisJSONtoJava_array2(value_list, type);
+                } else {
+                    throw new ClassCastException("unknown JSON tag");
+                }
+            } else {
+                throw new ClassCastException("wrong tuple arity");
             }
         } else {
-            try {
-                @SuppressWarnings("unchecked")
-                T value = (T) value_;
-
-                // get all getters:
-                Method[] methods = c.getDeclaredMethods();
-                List<OtpErlangObject> resultList = new LinkedList<OtpErlangObject>();
-
-                for (int j = 0; j < methods.length; ++j) {
-                    String methodName = methods[j].getName();
-                    if (getMatcher.matcher(methodName).find()) {
-                        String key_j = decapFirst(getMatcher.matcher(methodName).replaceFirst(""));
-                        currentKey = key_j;
-                        try {
-                            OtpErlangObject value_j = convertJavaToScalarisJSON_value(methods[j].invoke(value));
-                            resultList.add(new OtpErlangTuple(new OtpErlangObject[] {new OtpErlangString(key_j), value_j}));
-                        } catch (IllegalArgumentException e) {
-                            throw new ClassCastException("cannot access getter " + methodName + "on class " + c.getSimpleName() + e.getMessage());
-                        } catch (IllegalAccessException e) {
-                            throw new ClassCastException("cannot access getter " + methodName + "on class " + c.getSimpleName() + e.getMessage());
-                        } catch (InvocationTargetException e) {
-                            throw new ClassCastException("cannot access getter " + methodName + "on class " + c.getSimpleName() + e.getMessage());
-                        }
-                    }
-                }
-                OtpErlangTuple resultTpl = new OtpErlangTuple(new OtpErlangObject[] {
-                        CommonErlangObjects.structAtom,
-                        new OtpErlangList(resultList.toArray(new OtpErlangObject[0])) });
-                return resultTpl;
-            } catch (ClassCastException e) {
-                throw new ClassCastException("Unsupported JSON type (value: " + value_.toString() + ")");
-            }
+            return super.convertScalarisJSONtoJava_value_simple(value);
         }
     }
 }

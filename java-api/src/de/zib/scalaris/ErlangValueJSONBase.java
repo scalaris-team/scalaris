@@ -16,9 +16,9 @@
 package de.zib.scalaris;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.List;
 
+import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangDouble;
 import com.ericsson.otp.erlang.OtpErlangInt;
 import com.ericsson.otp.erlang.OtpErlangList;
@@ -31,45 +31,11 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 /**
  * Base class for Scalaris-JSON to Java and Java to Scalaris-JSON converters.
  * 
- * @param <T> the class to convert to/from
+ * Provides common methods for sub-classes.
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-abstract class ErlangValueJSONBase<T> {
-
-    /**
-     * Converts a Java Map to a JSON object as expected by Scalaris.
-     * 
-     * @param value
-     *            a Java Map with String-keys and supported JSON types as values
-     * 
-     * @return a JSON object representing the value
-     * 
-     * @throws ClassCastException
-     *             if thrown if a conversion is not possible, i.e. the type is
-     *             not supported
-     */
-    public OtpErlangTuple toScalarisJSON(T value) throws ClassCastException {
-        return convertJavaToScalarisJSON_object(value);
-    }
-
-    /**
-     * Converts a JSON object value (a list of key/value pairs) to a Java Map.
-     * 
-     * @param value
-     *            a list of key/value pairs with JSON values and string keys as
-     *            stored by Scalaris' JSON API
-     * 
-     * @return a Java object representing the value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    @SuppressWarnings("unchecked")
-    public T toJava(OtpErlangList value) throws ClassCastException {
-        return (T) convertScalarisJSONtoJava_object(value);
-    }
+abstract class ErlangValueJSONBase {
 
     /**
      * Converts a Java Map to a JSON object as expected by Scalaris.
@@ -85,84 +51,6 @@ abstract class ErlangValueJSONBase<T> {
      */
     protected abstract OtpErlangTuple convertJavaToScalarisJSON_object(
             Object value) throws ClassCastException;
-
-    /**
-     * Converts a JSON object value (a list of key/value pairs) to a Java Map.
-     * 
-     * @param value
-     *            a list of key/value pairs with JSON values and string keys as
-     *            stored by Scalaris' JSON API
-     * 
-     * @return a Java object representing the value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    protected abstract Object convertScalarisJSONtoJava_object(
-            OtpErlangList value) throws ClassCastException;
-    
-    /**
-     * Converts an unknown JSON value to a Java object.
-     * 
-     * @param value
-     *            a JSON value as stored by Scalaris' JSON API
-     * 
-     * @return a Java object representing the value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    protected Object convertScalarisJSONtoJava_value(OtpErlangObject value)
-            throws ClassCastException {
-        if (value instanceof OtpErlangLong) {
-            OtpErlangLong value_int = (OtpErlangLong) value;
-            try {
-                return value_int.intValue();
-            } catch (OtpErlangRangeException e) {
-                if (value_int.isLong()) {
-                    return value_int.longValue();
-                } else {
-                    return value_int.bigIntegerValue();
-                }
-            }
-        } else if (value instanceof OtpErlangDouble) {
-            return ((OtpErlangDouble) value).doubleValue();
-        } else if (value instanceof OtpErlangString) {
-            return ((OtpErlangString) value).stringValue();
-        } else if (value instanceof OtpErlangList) {
-            try {
-                return ErlangValue.otpObjectToString(value);
-            } catch (ClassCastException e) {
-                throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
-            }
-        } else if (value instanceof OtpErlangTuple) {
-            OtpErlangTuple value_tpl = (OtpErlangTuple) value;
-            if (value_tpl.arity() == 2) {
-                OtpErlangObject tag = value_tpl.elementAt(0);
-                if (tag.equals(CommonErlangObjects.structAtom)) {
-                    return convertScalarisJSONtoJava_object((OtpErlangList) value_tpl
-                            .elementAt(1));
-                } else if (tag.equals(CommonErlangObjects.arrayAtom)) {
-                    return convertScalarisJSONtoJava_array(
-                            ErlangValue.otpObjectToOtpList(value_tpl.elementAt(1)));
-                } else {
-                    throw new ClassCastException("unknown JSON tag");
-                }
-            } else {
-                throw new ClassCastException("wrong tuple arity");
-            }
-        } else if (value.equals(CommonErlangObjects.trueAtom)) {
-            return true;
-        } else if (value.equals(CommonErlangObjects.falseAtom)) {
-            return false;
-        } else if (value.equals(CommonErlangObjects.nullAtom)) {
-            return null;
-        } else {
-            throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
-        }
-    }
 
     /**
      * Converts a Java object to a JSON value as expected by Scalaris.
@@ -205,27 +93,6 @@ abstract class ErlangValueJSONBase<T> {
     }
 
     /**
-     * Converts a JSON array value (a list of values) to a Java List.
-     * 
-     * @param value
-     *            a list of JSON values as stored by Scalaris' JSON API
-     * 
-     * @return a Java object representing the value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    protected List<Object> convertScalarisJSONtoJava_array(
-            OtpErlangList value) throws ClassCastException {
-        List<Object> result = new ArrayList<Object>(value.arity());
-        for (OtpErlangObject iter : value) {
-            result.add(convertScalarisJSONtoJava_value(iter));
-        }
-        return result;
-    }
-
-    /**
      * Converts a list of Java Objects to a JSON array value as expected by
      * Scalaris.
      * 
@@ -249,5 +116,76 @@ abstract class ErlangValueJSONBase<T> {
         OtpErlangTuple resultTpl = new OtpErlangTuple(new OtpErlangObject[] {
                 CommonErlangObjects.arrayAtom, new OtpErlangList(resultList) });
         return resultTpl;
+    }
+    
+    /**
+     * Converts an unknown JSON value to a Java object (no composite types!).
+     * 
+     * @param value
+     *            a non-composite JSON value as stored by Scalaris' JSON API,
+     *            i.e. string, number, true, false, null
+     * 
+     * @return a Java object representing the value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     */
+    protected Object convertScalarisJSONtoJava_value_simple(OtpErlangObject value)
+            throws ClassCastException {
+        if (value instanceof OtpErlangLong) {
+            OtpErlangLong value_int = (OtpErlangLong) value;
+            try {
+                return value_int.intValue();
+            } catch (OtpErlangRangeException e) {
+                if (value_int.isLong()) {
+                    return value_int.longValue();
+                } else {
+                    return value_int.bigIntegerValue();
+                }
+            }
+        } else if (value instanceof OtpErlangDouble) {
+            return ((OtpErlangDouble) value).doubleValue();
+        } else if (value instanceof OtpErlangString) {
+            return ((OtpErlangString) value).stringValue();
+        } else if (value instanceof OtpErlangList) {
+            try {
+                return ErlangValue.otpObjectToString(value);
+            } catch (ClassCastException e) {
+                throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
+            }
+        } else if (value.equals(CommonErlangObjects.trueAtom)) {
+            return true;
+        } else if (value.equals(CommonErlangObjects.falseAtom)) {
+            return false;
+        } else if (value.equals(CommonErlangObjects.nullAtom)) {
+            return null;
+        } else {
+            throw new ClassCastException("Unsupported JSON type (value: " + value.toString() + ")");
+        }
+    }
+    
+    /**
+     * Converts the given Scalaris erlang object (as part of an object's key) to
+     * a string.
+     * 
+     * @param key_erl
+     *            the erlang object containing the key
+     * 
+     * @return the key
+     * 
+     * @throws ClassCastException
+     *             if the key is not a valid key object
+     */
+    protected String convertScalarisJSONtoJava_key(OtpErlangObject key_erl) throws ClassCastException {
+        if (key_erl instanceof OtpErlangAtom) {
+            return ((OtpErlangAtom) key_erl).atomValue();
+        } else {
+            try {
+                return ErlangValue.otpObjectToString(key_erl);
+            } catch (ClassCastException e) {
+                throw new ClassCastException("Unsupported JSON key (" + key_erl.toString() + "): " + e.getMessage());
+            }
+        }
     }
 }

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.LinkedList;
 
 import org.junit.Test;
 
@@ -648,18 +649,19 @@ public class ErlangValueTest {
     }
     
     /**
-     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}.
+     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
+     * writing a {@link Map} and reading a {@link JSONBeanTest1}.
      * 
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
      */
     @Test
-    public final void testJsonValueBean1() throws Exception {
+    public final void testJsonValueBean1a() throws Exception {
         Random random = new Random();
 
         for (int i = 0; i < 5000; ++i) {
-            Map<String, Object> map = new LinkedHashMap<String, Object>();
+            Map<String, Object> map = new LinkedHashMap<String, Object>(6);
             map.put("a", random.nextBoolean());
             map.put("b", random.nextInt());
             map.put("c", random.nextLong());
@@ -675,6 +677,38 @@ public class ErlangValueTest {
             assertEquals(map.get("d"), actual.getD());
             assertEquals(map.get("e"), actual.getE());
             assertEquals(map.get("f"), actual.getF());
+        }
+    }
+    
+    /**
+     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
+     * writing a {@link JSONBeanTest1} and reading a {@link JSONBeanTest1}.
+     * 
+     * @throws Exception
+     *             if a test with a random list of mixed objects (bool, int,
+     *             long, BigInteger, double, String) failed
+     */
+    @Test
+    public final void testJsonValueBean1b() throws Exception {
+        Random random = new Random();
+
+        for (int i = 0; i < 5000; ++i) {
+            JSONBeanTest1 bean1 = new JSONBeanTest1();
+            bean1.setA(random.nextBoolean());
+            bean1.setB(random.nextInt());
+            bean1.setC(random.nextLong());
+            bean1.setD(getRandomBigInt(random));
+            bean1.setE(random.nextDouble());
+            bean1.setF(getRandomString(random, random.nextInt(100), false));
+            ErlangValue value = new ErlangValue(bean1);
+
+            JSONBeanTest1 actual = value.jsonValue(JSONBeanTest1.class);
+            assertEquals(bean1.getA(), actual.getA());
+            assertEquals(bean1.getB(), actual.getB());
+            assertEquals(bean1.getC(), actual.getC());
+            assertEquals(bean1.getD(), actual.getD());
+            assertEquals(bean1.getE(), actual.getE(), 0.0);
+            assertEquals(bean1.getF(), actual.getF());
         }
     }
 
@@ -713,7 +747,8 @@ public class ErlangValueTest {
     }
     
     /**
-     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}.
+     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
+     * writing a {@link Map} and reading a {@link JSONBeanTest2}.
      * 
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
@@ -732,7 +767,7 @@ public class ErlangValueTest {
             map.put("e2", random.nextDouble());
             map.put("f2", getRandomString(random, random.nextInt(100), false));
             map.put("g2", getRandomList(random, 100));
-            Map<String, Object> bean1 = new LinkedHashMap<String, Object>(5);
+            Map<String, Object> bean1 = new LinkedHashMap<String, Object>(6);
             bean1.put("a", random.nextBoolean());
             bean1.put("b", random.nextInt());
             bean1.put("c", random.nextLong());
@@ -764,7 +799,8 @@ public class ErlangValueTest {
     }
     
     /**
-     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}.
+     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
+     * writing a {@link JSONBeanTest2} and reading a {@link JSONBeanTest2}.
      * 
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
@@ -814,4 +850,141 @@ public class ErlangValueTest {
         }
     }
 
+
+    private static class JSONBeanTest3 {
+        private List<JSONBeanTest1> a3 = new ArrayList<JSONBeanTest1>();
+        private Map<String, JSONBeanTest1> b3 = new LinkedHashMap<String, JSONBeanTest1>();
+        
+        public JSONBeanTest3() {}
+        
+        public List<JSONBeanTest1> getA3() { return a3; }
+        public Map<String, JSONBeanTest1> getB3() { return b3; }
+        
+        public void setA3(List<JSONBeanTest1> a_) { this.a3 = a_; }
+        public void setB3(Map<String, JSONBeanTest1> b_) { this.b3 = b_; }
+    }
+    
+    /**
+     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
+     * writing a {@link Map} and reading a {@link JSONBeanTest3}.
+     * 
+     * @throws Exception
+     *             if a test with a random list of mixed objects (bool, int,
+     *             long, BigInteger, double, String) failed
+     */
+    @Test
+    public final void testJsonValueBean3a() throws Exception {
+        Random random = new Random();
+
+        for (int i = 0; i < 10000; ++i) {
+            Map<String, Object> map = new LinkedHashMap<String, Object>(7);
+            Map<String, Object> bean1a = new LinkedHashMap<String, Object>(6);
+            bean1a.put("a", random.nextBoolean());
+            bean1a.put("b", random.nextInt());
+            bean1a.put("c", random.nextLong());
+            bean1a.put("d", getRandomBigInt(random));
+            bean1a.put("e", random.nextDouble());
+            bean1a.put("f", getRandomString(random, 10, false));
+            Map<String, Object> bean1b = new LinkedHashMap<String, Object>(6);
+            bean1b.put("a", random.nextBoolean());
+            bean1b.put("b", random.nextInt());
+            bean1b.put("c", random.nextLong());
+            bean1b.put("d", getRandomBigInt(random));
+            bean1b.put("e", random.nextDouble());
+            bean1b.put("f", getRandomString(random, 10, false));
+            List<Map<String, Object>> list1 = new LinkedList<Map<String,Object>>();
+            list1.add(bean1a);
+            list1.add(bean1b);
+            map.put("a3", list1);
+            Map<String, Map<String, Object>> map1 = new LinkedHashMap<String, Map<String,Object>>();
+            map1.put("a4", bean1a);
+            map1.put("b4", bean1b);
+            map.put("b3", map1);
+            ErlangValue value = new ErlangValue(map);
+
+            JSONBeanTest3 actual = value.jsonValue(JSONBeanTest3.class);
+            List<JSONBeanTest1> actual_a3 = actual.getA3();
+            assertEquals(list1.size(), actual_a3.size());
+            for (int j = 0; j < list1.size(); ++j) {
+                assertEquals(list1.get(j).get("a"), actual_a3.get(j).getA());
+                assertEquals(list1.get(j).get("b"), actual_a3.get(j).getB());
+                assertEquals(list1.get(j).get("c"), actual_a3.get(j).getC());
+                assertEquals(list1.get(j).get("d"), actual_a3.get(j).getD());
+                assertEquals(list1.get(j).get("e"), actual_a3.get(j).getE());
+                assertEquals(list1.get(j).get("f"), actual_a3.get(j).getF());
+            }
+            Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
+            assertEquals(map1.size(), actual_b3.size());
+            for (String key : map1.keySet()) {
+                assertEquals(map1.get(key).get("a"), actual_b3.get(key).getA());
+                assertEquals(map1.get(key).get("b"), actual_b3.get(key).getB());
+                assertEquals(map1.get(key).get("c"), actual_b3.get(key).getC());
+                assertEquals(map1.get(key).get("d"), actual_b3.get(key).getD());
+                assertEquals(map1.get(key).get("e"), actual_b3.get(key).getE());
+                assertEquals(map1.get(key).get("f"), actual_b3.get(key).getF());
+            }
+        }
+    }
+    
+    /**
+     * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
+     * writing a {@link JSONBeanTest2} and reading a {@link JSONBeanTest2}.
+     * 
+     * @throws Exception
+     *             if a test with a random list of mixed objects (bool, int,
+     *             long, BigInteger, double, String) failed
+     */
+    @Test
+    public final void testJsonValueBean3b() throws Exception {
+        Random random = new Random();
+
+        for (int i = 0; i < 10000; ++i) {
+            JSONBeanTest3 bean3 = new JSONBeanTest3();
+            JSONBeanTest1 bean1a = new JSONBeanTest1();
+            bean1a.setA(random.nextBoolean());
+            bean1a.setB(random.nextInt());
+            bean1a.setC(random.nextLong());
+            bean1a.setD(getRandomBigInt(random));
+            bean1a.setE(random.nextDouble());
+            bean1a.setF(getRandomString(random, 10, false));
+            JSONBeanTest1 bean1b = new JSONBeanTest1();
+            bean1b.setA(random.nextBoolean());
+            bean1b.setB(random.nextInt());
+            bean1b.setC(random.nextLong());
+            bean1b.setD(getRandomBigInt(random));
+            bean1b.setE(random.nextDouble());
+            bean1b.setF(getRandomString(random, 10, false));
+            List<JSONBeanTest1> list1 = new LinkedList<JSONBeanTest1>();
+            list1.add(bean1a);
+            list1.add(bean1b);
+            bean3.setA3(list1);
+            Map<String, JSONBeanTest1> map1 = new LinkedHashMap<String, JSONBeanTest1>();
+            map1.put("a4", bean1a);
+            map1.put("b4", bean1b);
+            bean3.setB3(map1);
+            ErlangValue value = new ErlangValue(bean3);
+
+            JSONBeanTest3 actual = value.jsonValue(JSONBeanTest3.class);
+            List<JSONBeanTest1> actual_a3 = actual.getA3();
+            assertEquals(list1.size(), actual_a3.size());
+            for (int j = 0; j < list1.size(); ++j) {
+                assertEquals(list1.get(j).getA(), actual_a3.get(j).getA());
+                assertEquals(list1.get(j).getB(), actual_a3.get(j).getB());
+                assertEquals(list1.get(j).getC(), actual_a3.get(j).getC());
+                assertEquals(list1.get(j).getD(), actual_a3.get(j).getD());
+                assertEquals(list1.get(j).getE(), actual_a3.get(j).getE(), 0.0);
+                assertEquals(list1.get(j).getF(), actual_a3.get(j).getF());
+            }
+            Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
+            assertEquals(map1.size(), actual_b3.size());
+            for (String key : map1.keySet()) {
+                assertEquals(map1.get(key).getA(), actual_b3.get(key).getA());
+                assertEquals(map1.get(key).getB(), actual_b3.get(key).getB());
+                assertEquals(map1.get(key).getC(), actual_b3.get(key).getC());
+                assertEquals(map1.get(key).getD(), actual_b3.get(key).getD());
+                assertEquals(map1.get(key).getE(), actual_b3.get(key).getE(), 0.0);
+                assertEquals(map1.get(key).getF(), actual_b3.get(key).getF());
+            }
+        }
+    }
 }
