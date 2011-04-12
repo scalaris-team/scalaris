@@ -79,7 +79,8 @@ start_link(DHTNodeGroup, Role) ->
                              [],
                              [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
--type rtms() :: [{?RT:key(), comm:mypid(), non_neg_integer(), comm:mypid()}].
+-type rtms() :: [{?RT:key(), comm:mypid() | unknown,
+                  non_neg_integer(), comm:mypid()}].
 
 -type state() ::
     {RTMs           :: rtms(),
@@ -631,7 +632,7 @@ my_init_TPs(TxState, ItemStates) ->
           %% ItemState = lists:keyfind(ItemId, 1, ItemStates),
           ItemId = tx_item_state:get_itemid(ItemState),
           [ begin
-                Key = element(2, RTLog),
+                Key = tx_tlog:get_entry_key(RTLog),
                 Msg1 = {init_TP, {Tid, CleanRTMs, Accs, TM, RTLog, ItemId, PaxId}},
                 %% delivers message to a dht_node process, which has
                 %% also the role of a TP
@@ -764,7 +765,7 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
       end || Entry <- RTMs ].
 
 
--spec get_nth_rtm_name(pos_integer()) -> pid_groups:pidname().
+-spec get_nth_rtm_name(pos_integer()) -> atom(). %% pid_groups:pidname().
 get_nth_rtm_name(Nth) ->
     list_to_existing_atom("tx_rtm" ++ integer_to_list(Nth)).
 
