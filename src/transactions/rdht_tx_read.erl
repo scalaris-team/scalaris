@@ -54,13 +54,15 @@ tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 -spec work_phase(tx_tlog:tlog_entry(),
                  {non_neg_integer(),
                   rdht_tx:request()}) ->
-                        {tx_tlog:tlog_entry(), {non_neg_integer(), any()}}.
+                        {tx_tlog:tlog_entry(),
+                         {pos_integer(), rdht_tx:result_entry()}}.
 work_phase(TLogEntry, {Num, Request}) ->
     ?TRACE("rdht_tx_read:work_phase~n", []),
     %% PRE no failed entries in TLog
-    Status = apply(element(1, TLogEntry), tlogentry_get_status, [TLogEntry]),
-    Value = apply(element(1, TLogEntry), tlogentry_get_value, [TLogEntry]),
-    Version = apply(element(1, TLogEntry), tlogentry_get_version, [TLogEntry]),
+    Module = tx_tlog:get_entry_operation(TLogEntry),
+    Status = apply(Module, tlogentry_get_status, [TLogEntry]),
+    Value = apply(Module, tlogentry_get_value, [TLogEntry]),
+    Version = apply(Module, tlogentry_get_version, [TLogEntry]),
     NewTLogEntry =
         tx_tlog:new_entry(?MODULE, element(2, Request), Status, Value, Version),
     Result =
@@ -99,16 +101,16 @@ quorum_read(CollectorPid, ReqId, Request) ->
                                 [tx_tlog:tlog_entry()].
 validate_prefilter(TLogEntry) ->
     ?TRACE("rdht_tx_read:validate_prefilter(~p)~n", [TLogEntry]),
-    Key = erlang:element(2, TLogEntry),
+    Key = tx_tlog:get_entry_key(TLogEntry),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    [ setelement(2, TLogEntry, X) || X <- RKeys ].
+    [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
 -spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
 validate(DB, RTLogEntry) ->
     ?TRACE("rdht_tx_read:validate)~n", []),
     %% contact DB to check entry
-    DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+    DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
     VersionOK =
         (tx_tlog:get_entry_version(RTLogEntry)
          >= db_entry:get_version(DBEntry)),
@@ -130,7 +132,7 @@ commit(DB, RTLogEntry, OwnProposalWas) ->
     %% release locks
     case OwnProposalWas of
         prepared ->
-            DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+            DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
             DBVers = db_entry:get_version(DBEntry),
             case RTLogVers of

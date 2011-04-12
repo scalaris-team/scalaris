@@ -70,10 +70,13 @@ new(ItemId) ->
     {ItemId, tx_item_state, undefined_tx_id, empty_tlog_entry,
      quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
      false, 0, 0, _no_paxIds = [], uninitialized, _HoldBack = []}.
--spec new(tx_item_id(), tx_state:tx_id(), any()) -> tx_item_state().
+
+-spec new(tx_item_id(), tx_state:tx_id(), tx_tlog:tlog_entry())
+         -> tx_item_state().
 new(ItemId, TxId, TLogEntry) ->
     %% expand TransLogEntry to replicated translog entries
-    RTLogEntries = apply(element(1, TLogEntry), validate_prefilter, [TLogEntry]),
+    Module = tx_tlog:get_entry_operation(TLogEntry),
+    RTLogEntries = apply(Module, validate_prefilter, [TLogEntry]),
 %%    PaxosIds = [ {paxos_id, util:get_global_uid()} || _ <- RTLogEntries ],
     PaxosIds = [ {util:get_global_uid()} || _ <- RTLogEntries ],
     TPs = [ unknown || _ <- PaxosIds ],

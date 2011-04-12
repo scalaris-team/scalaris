@@ -59,7 +59,8 @@ tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 
 -spec work_phase(tx_tlog:tlog_entry(), {non_neg_integer(),
                                         rdht_tx:request()}) ->
-                        {tx_tlog:tlog_entry(), {non_neg_integer(), any()}}.
+                        {tx_tlog:tlog_entry(),
+                         {pos_integer(), rdht_tx:result_entry()}}.
 work_phase(TLogEntry, {Num, Request}) ->
     {NewTLogEntry, Result} = my_make_tlog_result_entry(TLogEntry, Request),
     {NewTLogEntry, {Num, Result}}.
@@ -84,16 +85,16 @@ work_phase(ClientPid, ReqId, Request) ->
                                 [tx_tlog:tlog_entry()].
 validate_prefilter(TLogEntry) ->
     ?TRACE("rdht_tx_write:validate_prefilter(~p)~n", [TLog]),
-    Key = erlang:element(2, TLogEntry),
+    Key = tx_tlog:get_entry_key(TLogEntry),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    [ setelement(2, TLogEntry, X) || X <- RKeys ].
+    [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
 -spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
 validate(DB, RTLogEntry) ->
     %% contact DB to check entry
     %% set locks on DB
-    DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+    DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
 
     RTVers = tx_tlog:get_entry_version(RTLogEntry),
     DBVers = db_entry:get_version(DBEntry),
@@ -126,7 +127,7 @@ validate(DB, RTLogEntry) ->
 -spec commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
 commit(DB, RTLogEntry, _OwnProposalWas) ->
     ?TRACE("rdht_tx_write:commit)~n", []),
-    DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+    DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
     %% perform op
     RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
     DBVers = db_entry:get_version(DBEntry),
@@ -149,7 +150,7 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
     %% release locks?
     case OwnProposalWas of
         prepared ->
-            DBEntry = ?DB:get_entry(DB, element(2, RTLogEntry)),
+            DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
             DBVers = db_entry:get_version(DBEntry),
             case RTLogVers of
@@ -181,7 +182,7 @@ init([]) ->
 -spec on(comm:message(), null) -> null.
 on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
    State) ->
-    Key = element(2, TLogEntry),
+    Key = tx_tlog:get_entry_key(TLogEntry),
     Request = {?MODULE, Key, WriteValue},
     {NewTLogEntry, NewResultEntry} =
         my_make_tlog_result_entry(TLogEntry, Request),
@@ -192,9 +193,10 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
 -spec my_make_tlog_result_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
         {tx_tlog:tlog_entry(), rdht_tx:result_entry()}.
 my_make_tlog_result_entry(TLogEntry, Request) ->
-    Status = apply(element(1, TLogEntry), tlogentry_get_status, [TLogEntry]),
-    Version = apply(element(1, TLogEntry), tlogentry_get_version, [TLogEntry]),
-    Key = element(2, TLogEntry),
+    Module = tx_tlog:get_entry_operation(TLogEntry),
+    Key = tx_tlog:get_entry_key(TLogEntry),
+    Status = apply(Module, tlogentry_get_status, [TLogEntry]),
+    Version = apply(Module, tlogentry_get_version, [TLogEntry]),
     WriteValue = element(3, Request),
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.

@@ -1,4 +1,4 @@
-% @copyright 2009, 2010 onScale solutions GmbH
+% @copyright 2009-2011 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,26 +12,28 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-% @author Florian Schintke <schintke@onscale.de>
+% @author Florian Schintke <schintke@zib.de>
 % @doc operations on the end user transaction log
 % @version $Id$
 -module(tx_tlog).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 %% Operations on TransLogs
 -export([empty/0]).
 -export([add_entry/2]).
 -export([filter_by_key/2]).
 -export([filter_by_status/2]).
--export([update_entry/4]).
+%%-export([update_entry/4]).
 
 %% Operations on entries of TransLogs
 -export([new_entry/5]).
 -export([get_entry_operation/1]).
 -export([get_entry_key/1]).
+-export([set_entry_key/2]).
 -export([get_entry_status/1]).
 -export([get_entry_value/1]).
 -export([get_entry_version/1]).
@@ -44,18 +46,17 @@
 -export_type([tx_status/0]).
 -endif.
 
--type tx_status() :: {fail, atom()} | value | not_found.
--type tx_op() :: read | write | rdht_tx_read | rdht_tx_write.
--type tlog_entry() ::
-        { tx_op(),     %% operation
-          ?RT:key(),   %% key
-          tx_status(), %% status
-          any(),       %% value
-          integer()    %% version
-        }.
+-type tx_status()    :: {fail, atom()} | value | not_found.
+-type tx_op()        :: rdht_tx_read | rdht_tx_write.
+-opaque tlog_entry() ::
+          { tx_op(),                  %% operation
+            client_key() | ?RT:key(), %% key | hashed and replicated key
+            tx_status(),              %% status
+            any(),                    %% value
+            integer()                 %% version
+          }.
 
--type tlog_t() :: [tlog_entry()].
--opaque tlog() :: tlog_t().
+-type tlog() :: [tlog_entry()].
 
 %% Public tlog methods:
 
@@ -64,63 +65,29 @@
 empty() -> [].
 
 -spec add_entry(tlog(), tlog_entry()) -> tlog().
-add_entry(TransLog, Entry) ->
-    add_entry_(TransLog, Entry).
+add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 
--spec filter_by_key(tlog(), ?RT:key()) -> tlog().
+-spec filter_by_key(tlog(), client_key() | ?RT:key()) -> tlog().
 filter_by_key(TransLog, Key) ->
-    filter_by_key_(TransLog, Key).
+    [ X || X <- TransLog, Key =:= get_entry_key(X) ].
 
 -spec filter_by_status(tlog(), tx_status()) -> tlog().
 filter_by_status(TransLog, Status) ->
-    filter_by_status_(TransLog, Status).
-
--spec update_entry(tlog(), ?RT:key() | tlog_entry(), tx_op(), any()) -> tlog().
-update_entry(TransLog, Element, Op, Value) ->
-    update_entry_(TransLog, Element, Op, Value).
-
-%% Private tlog methods / implementations of public tlog methods:
-
--spec add_entry_(tlog_t(), tlog_entry()) -> tlog_t().
-add_entry_(TransLog, Entry) ->
-    [ Entry | TransLog ].
-
--spec filter_by_key_(tlog_t(), ?RT:key()) -> tlog_t().
-filter_by_key_(TransLog, Key) ->
-    [ X || X <- TransLog, Key =:= get_entry_key(X) ].
-
--spec filter_by_status_(tlog_t(), tx_status()) -> tlog_t().
-filter_by_status_(TransLog, Status) ->
     [ X || X <- TransLog, Status =:= get_entry_status(X) ].
 
--spec update_entry_(tlog_t(), ?RT:key() | tlog_entry(), tx_op(), any()) -> tlog_t().
-update_entry_(TransLog, {read,LogKey,LogSuccess,_,LogVers} = Element,
-             write, Value) ->
-    UnchangedPart = lists:delete(Element, TransLog),
-    add_entry_(UnchangedPart,
-              new_entry(write, LogKey, LogSuccess, Value, LogVers + 1));
-
-update_entry_(TransLog, {write,LogKey,LogSuccess,_,LogVers} = Element,
-             write, Value) ->
-    UnchangedPart = lists:delete(Element, TransLog),
-    add_entry_(UnchangedPart,
-              new_entry(write, LogKey, LogSuccess, Value, LogVers));
-
-update_entry_(TransLog, Key, write, Value) ->
-    [Element] = filter_by_key_(TransLog, Key),
-    update_entry_(TransLog, Element, write, Value).
-
-
 %% Operations on Elements of TransLogs (public)
--spec new_entry(tx_op(), ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
+-spec new_entry(tx_op(), client_key() | ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
 new_entry(Op, Key, Status, Val, Vers) ->
 %    #tlog_entry{op = Op, key = Key, status = Status, val = Val, vers = Vers}.
     {Op, Key, Status, Val, Vers}.
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
 
--spec get_entry_key(tlog_entry()) -> ?RT:key().
+-spec get_entry_key(tlog_entry()) -> client_key() | ?RT:key().
 get_entry_key(Element)       -> element(2, Element).
+
+-spec set_entry_key(tlog_entry(), client_key() | ?RT:key()) -> tlog_entry().
+set_entry_key(Entry, Val)    -> setelement(2, Entry, Val).
 
 -spec get_entry_status(tlog_entry()) -> tx_status().
 get_entry_status(Element)    -> element(3, Element).
