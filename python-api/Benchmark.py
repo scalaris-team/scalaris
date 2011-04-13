@@ -280,7 +280,7 @@ def _getAvgSpeed(results):
     for i in xrange(toRemove, (len(results) - toRemove)):
         avgSpeed += results[i]
     
-    avgSpeed /= len(results) - 2 * toRemove
+    avgSpeed //= len(results) - 2 * toRemove
     return avgSpeed
 
 # Performs a benchmark writing objects using a new TransactionSingleOp object for each test.
