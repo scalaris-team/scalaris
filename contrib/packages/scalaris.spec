@@ -5,7 +5,7 @@ Name:           scalaris
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
-License:        ASL 2.0 
+License:        ASL 2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
@@ -16,16 +16,19 @@ BuildRequires:  erlang >= R13B01
 Requires:       erlang >= R13B01
 BuildArch:      noarch
 
-##########################################################################################  
-## Fedora, RHEL or CentOS  
-########################################################################################## 
+%{!?ruby_sitelib: %global ruby_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
+
+##########################################################################################
+## Fedora, RHEL or CentOS
+##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  pkgconfig
-%endif 
+BuildRequires: ruby(abi) >= 1.8
+%endif
 
-##########################################################################################  
-## Mandrake, Mandriva  
-##########################################################################################  
+##########################################################################################
+## Mandrake, Mandriva
+##########################################################################################
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 BuildRequires:  pkgconfig
 %if 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
@@ -45,7 +48,7 @@ BuildRequires:  pkg-config
 Suggests:       %{name}-client, %{name}-doc
 %endif
 
-%description 
+%description
 Scalaris is a scalable, transactional, distributed key-value store. It
 can be used for building scalable services. Scalaris uses a structured
 overlay with a non-blocking Paxos commit protocol for transaction
@@ -83,6 +86,15 @@ Requires:   %{name}-java = %{version}-%{release}
 %description client
 Command line client for scalaris using the Java interface
 
+%package ruby
+Summary:    Ruby API for scalaris and ruby client
+Group:      Productivity/Databases/Clients
+Requires:   ruby(abi) >= 1.8
+Requires:   rubygem-json
+
+%description ruby
+Ruby bindings and ruby client
+
 %prep
 %setup -q -n %{name}-%{version}
 
@@ -101,7 +113,7 @@ Command line client for scalaris using the Java interface
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
     --docdir=%{_docdir}/scalaris \
-    --with-ruby-sitelibdir=%{ruby_sitelibdir}
+    --with-ruby-sitelibdir=%{ruby_sitelib}
 make all
 make java
 make docs
@@ -147,6 +159,11 @@ rm -rf $RPM_BUILD_ROOT
 %files client
 %defattr(-,root,root)
 %{_bindir}/scalaris
+
+%files ruby
+%defattr(-,root,root)
+%{_bindir}/scalaris-ruby
+%{ruby_sitelib}/scalaris.rb
 
 %changelog
 * Thu Mar 19 2009 Nico Kruber <nico.laus.2001@gmx.de>

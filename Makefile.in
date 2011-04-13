@@ -368,6 +368,7 @@ install-erlang: compile
 	           bin/scalarisctl
 
 install-ruby:
+	install -d $(RUBYSITELIBDIR)
 	install -m 644 -t $(RUBYSITELIBDIR) ruby-api/scalaris.rb
 	install -m 755  ruby-api/scalarisclient.rb $(BINDIR)/scalaris-ruby
 
