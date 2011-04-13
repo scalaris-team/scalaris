@@ -51,7 +51,7 @@ JAVADIR=$(DESTDIR)@datarootdir@/java
 # /var/log/scalaris
 LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
 # /usr/lib/ruby/site_ruby/1.8
-RUBYSITELIBDIR=@RUBYSITELIBDIR@
+RUBYSITELIBDIR=$(DESTDIR)@RUBYSITELIBDIR@
 
 # paths of source files for make doc
 SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
