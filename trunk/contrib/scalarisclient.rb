@@ -23,9 +23,9 @@ require 'scalaris'
 
 $url = 'http://localhost:8000/jsonrpc.yaws'
 
-def write(key_value_list)
+def write(sc, key_value_list)
   key, value = key_value_list
-  Scalaris::write(key, value)
+  sc.write(key, value)
 end
 
 options = {}
@@ -39,7 +39,7 @@ optparse = OptionParser.new do |opts|
     options[:help] = false
   end
 
-  options[:read] = nil
+  options[:write] = nil
   opts.on('-w', '--write KEY,VALUE', Array, 'write key KEY to VALUE' ) do |list|
     raise OptionParser::InvalidOption.new(list) unless list.size == 2
     options[:write] = list
@@ -59,6 +59,8 @@ rescue OptionParser::ParseError
   exit
 end
 
-pp Scalaris::read(options[:read]) unless options[:read] == nil
-pp write(options[:write]) unless options[:write] == nil
+sc = Scalaris.new $url
+
+pp sc.read(options[:read]) unless options[:read] == nil
+pp write(sc, options[:write]) unless options[:write] == nil
 puts optparse if options[:help]

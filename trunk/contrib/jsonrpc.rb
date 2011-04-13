@@ -21,150 +21,152 @@ require 'scalaris'
 
 $url = 'http://localhost:8000/jsonrpc.yaws'
 
-def req_list()
+def req_list(sc)
   puts "Start sample request list run..."
 
   # first transaction sets two keys and commits
   puts "  Write keyA, KeyB and commit."
   rlist = []
-  rlist[0] = { :write => {'keyA' => Scalaris::_json_encode_value('valueA')} }
-  rlist[1] = { :write => {'keyB' => Scalaris::_json_encode_value('valueB')} }
+  rlist[0] = { :write => {'keyA' => sc._json_encode_value('valueA')} }
+  rlist[1] = { :write => {'keyB' => sc._json_encode_value('valueB')} }
   rlist[2] = { :commit => 'commit' }
 
-  result = Scalaris::json_call('req_list', [rlist])
-  values = Scalaris::_json_replace_value_in_results(result['results'])
+  result = sc.json_call('req_list', [rlist])
+  values = sc._json_replace_value_in_results(result['results'])
   puts "  Commit was: #{values[2]['value']}."
 
   # second transaction reads two keys and then modifies one of them
   rlist2 = []
   rlist2[0] = { :read => 'keyA' }
   rlist2[1] = { :read => 'keyB' }
-  result = Scalaris::json_call('req_list', [rlist2])
+  result = sc.json_call('req_list', [rlist2])
 
   translog = result['tlog']
-  values = Scalaris::_json_replace_value_in_results(result['results'])
+  values = sc._json_replace_value_in_results(result['results'])
 
   puts "  Read key #{values[0]['key']} as: #{values[0]['value']}"
   puts "  Read key #{values[1]['key']} as: #{values[1]['value']}"
 
   puts "  Modify keyA and commit."
   rlist3 = []
-  rlist3[0] = { :write => {'keyA' => Scalaris::_json_encode_value('valueA2')} }
+  rlist3[0] = { :write => {'keyA' => sc._json_encode_value('valueA2')} }
   rlist3[1] = { :commit => 'commit' }
-  result = Scalaris::json_call('req_list', [translog, rlist3])
-  values = Scalaris::_json_replace_value_in_results(result['results'])
+  result = sc.json_call('req_list', [translog, rlist3])
+  values = sc._json_replace_value_in_results(result['results'])
 
   puts "  Commit was: #{values[1]['value']}#{values[1]['fail']}, write request was #{values[0]['value']}."
-   result = Scalaris::json_call('delete', ["keyA"])
+   result = sc.json_call('delete', ["keyA"])
    puts "  Delete keyA: #{result['ok']} replicas deleted. Report: #{result['results'].to_json}."
   puts
 end
 
-def req_list2()
+def req_list2(sc)
   # first transaction sets two keys and commits
   rlist = []
-  rlist[0] = { :write => {'keyA' => Scalaris::_json_encode_value('valueA')} }
-  rlist[1] = { :write => {'keyB' => Scalaris::_json_encode_value('valueB')} }
+  rlist[0] = { :write => {'keyA' => sc._json_encode_value('valueA')} }
+  rlist[1] = { :write => {'keyB' => sc._json_encode_value('valueB')} }
   rlist[2] = { :commit => 'commit' }
 
-  result = Scalaris::json_call('req_list', [rlist])
-  values = Scalaris::_json_replace_value_in_results(result['results'])
+  result = sc.json_call('req_list', [rlist])
+  values = sc._json_replace_value_in_results(result['results'])
 
   # second transaction reads two keys and then modifies one of them
   rlist2 = []
   rlist2[0] = { :read => 'keyA' }
   rlist2[1] = { :read => 'keyB' }
-  result = Scalaris::json_call('req_list', [rlist2])
+  result = sc.json_call('req_list', [rlist2])
 
   translog = result['tlog']
-  values = Scalaris::_json_replace_value_in_results(result['results'])
+  values = sc._json_replace_value_in_results(result['results'])
 
   rlist3 = []
-  rlist3[0] = { :write => {'keyA' => Scalaris::_json_encode_value('valueA2')} }
+  rlist3[0] = { :write => {'keyA' => sc._json_encode_value('valueA2')} }
   rlist3[1] = { :commit => 'commit' }
-  result = Scalaris::json_call('req_list', [translog, rlist3])
-  values = Scalaris::_json_replace_value_in_results(result['results'])
+  result = sc.json_call('req_list', [translog, rlist3])
+  values = sc._json_replace_value_in_results(result['results'])
 
-  result = Scalaris::json_call('delete', ["keyA"])
+  result = sc.json_call('delete', ["keyA"])
 end
 
-def range_query()
-  result = Scalaris::json_call('range_read',
+def range_query(sc)
+  result = sc.json_call('range_read',
                      [0, 0x40000000000000000000000000000000])
   puts result.to_json
-  Scalaris::write("keyA", "valueA")
-  Scalaris::write("keyB", "valueB")
-  Scalaris::write("keyC", "valueC")
-  result = Scalaris::json_call('range_read',
+  sc.write("keyA", "valueA")
+  sc.write("keyB", "valueB")
+  sc.write("keyC", "valueC")
+  result = sc.json_call('range_read',
                      [0, 0x40000000000000000000000000000000])
   puts result.to_json
 end
+
+def pubsub(sc)
+  subs = sc.get_subscribers("Topic")
+  printf("subscribers: %s\n", subs.to_json)
+  # register scalaris boot server itself as subscriber
+  # (prints a message on the console then)
+  sc.subscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
+  sc.subscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
+  subs = sc.get_subscribers("Topic")
+  printf("subscribers: %s\n", subs.to_json)
+  sc.publish("Topic", "Value")
+  sc.unsubscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
+  subs = sc.get_subscribers("Topic")
+  printf("subscribers: %s\n", subs.to_json)
+end
+
+sc = Scalaris.new $url
 
 n = 100
 
 puts "testing request lists ..."
-req_list()
+req_list(sc)
 
 puts "testing range queries ..."
-range_query()
+range_query(sc)
 
 puts "benchmarking ..."
 
 puts " nops ..."
 nop = Benchmark.realtime {
   n.times do
-    Scalaris::nop("key")
+    sc.nop("key")
   end
 }
 
 puts " read ..."
 read = Benchmark.realtime {
   n.times do
-    Scalaris::read("key")
+    sc.read("key")
   end
 }
 
 puts " write ..."
 write = Benchmark.realtime {
   n.times do
-    Scalaris::write("key", "value")
+    sc.write("key", "value")
   end
 }
 
 puts " test and set ..."
 test_and_set = Benchmark.realtime {
   n.times do
-    Scalaris::test_and_set("key", "value", "value")
+    sc.test_and_set("key", "value", "value")
   end
 }
 
 puts " request list processing ..."
 reql = Benchmark.realtime {
   n.times do
-    req_list2()
+    req_list2(sc)
   end
 }
 
 puts "testing pub sub once more ..."
-def pubsub()
-  subs = Scalaris::get_subscribers("Topic")
-  printf("subscribers: %s\n", subs.to_json)
-  # register scalaris boot server itself as subscriber
-  # (prints a message on the console then)
-  Scalaris::subscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
-  Scalaris::subscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
-  subs = Scalaris::get_subscribers("Topic")
-  printf("subscribers: %s\n", subs.to_json)
-  Scalaris::publish("Topic", "Value")
-  Scalaris::unsubscribe("Topic", "http://localhost:8000/jsonrpc.yaws")
-  subs = Scalaris::get_subscribers("Topic")
-  printf("subscribers: %s\n", subs.to_json)
-end
-
-pubsub()
+pubsub(sc)
 
 puts "testing range read once more (with pubsub data in the ring -- lists as values) ..."
-range_query()
+range_query(sc)
 
 printf("              time[s]\t1/s\n")
 printf("nop          : %0.02f     %0.02f\n", nop, n/nop)
