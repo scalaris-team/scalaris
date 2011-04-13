@@ -56,7 +56,7 @@ class JSONConnection(object):
         # use compact JSON encoding:
         params_json = json.dumps(params, separators=(',',':'))
         #print params_json
-        headers = {"Content-type": "application/json"}
+        headers = {"Content-type": "application/json; charset=utf-8"}
         try:
             # no need to quote - we already encode to json:
             #self._conn.request("POST", default_path, urllib.quote(params_json), headers)
@@ -65,7 +65,12 @@ class JSONConnection(object):
             #print response.status, response.reason
             if (response.status < 200 or response.status >= 300):
                 raise ConnectionException(response)
-            data = response.read()
+            charset = response.getheader('Content-type', default='utf-8').split('charset=')
+            if (len(charset) > 1):
+                encoding = charset[-1]
+            else:
+                encoding = 'utf-8'
+            data = response.read().decode(encoding)
         except Exception as instance:
             raise ConnectionException(instance)
         #print data
@@ -79,7 +84,7 @@ class JSONConnection(object):
         Encodes the value to the form required by the Scalaris JSON API
         """
         if isinstance(value, bytearray):
-            return {'type': 'as_bin', 'value': base64.b64encode(buffer(value))}
+            return {'type': 'as_bin', 'value': (base64.b64encode(value)).decode('ascii')}
         else:
             return {'type': 'as_is', 'value': value}
 
@@ -91,7 +96,7 @@ class JSONConnection(object):
         if ('type' not in value) or ('value' not in value):
             raise UnknownException(value)
         if value['type'] == 'as_bin':
-            return bytearray(base64.b64decode(value['value']), 'base64')
+            return bytearray(base64.b64decode(value['value'].encode('ascii')))
         else:
             return value['value']
     

@@ -509,9 +509,14 @@ class SubscriptionServer(HTTPServer):
 
 class SubscriptionHandler(BaseHTTPRequestHandler):
     def do_POST(self):
-        if 'content-length' in self.headers:
+        if 'content-length' in self.headers and 'content-type' in self.headers:
             length = int(self.headers['content-length'])
-            data = self.rfile.read(length)
+            charset = self.headers['content-type'].split('charset=')
+            if (len(charset) > 1):
+                encoding = charset[-1]
+            else:
+                encoding = 'utf-8'
+            data = self.rfile.read(length).decode(encoding)
             response_json = json.loads(data)
             # {"method":"notify","params":["1209386211287_SubscribeTest","content"],"id":482975}
             if 'method' in response_json and response_json['method'] == 'notify' \
@@ -526,9 +531,9 @@ class SubscriptionHandler(BaseHTTPRequestHandler):
         else:
             pass
         
-        response = '{}'
+        response = '{}'.encode('utf-8')
         self.send_response(200)
-        self.send_header("Content-type", "text/html")
+        self.send_header("Content-type", "text/html; charset=utf-8")
         self.send_header("Content-length", str(len(response)))
         self.end_headers()
         self.wfile.write(response)
