@@ -247,6 +247,24 @@ AS_IF([test ! -x "$BUILDCLASSPATH"],
 
 ###########################################################
 #
+# check ruby
+#
+###########################################################
+ENABLERUBYINSTALL=
+RUBYSITELIBDIR=
+AC_ARG_WITH([ruby-sitelibdir],
+            [AS_HELP_STRING([--with-ruby-sitelibdir=SITELIBDIR],
+            [where to install ruby libraries])],
+            [if test -n "$withval"; then
+               RUBYSITELIBDIR="$withval"
+               ENABLERUBYINSTALL="install-ruby"
+             fi],
+            [])
+AC_SUBST(ENABLERUBYINSTALL)
+AC_SUBST(RUBYSITELIBDIR)
+
+###########################################################
+#
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
