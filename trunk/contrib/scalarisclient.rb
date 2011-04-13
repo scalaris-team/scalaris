@@ -31,15 +31,19 @@ end
 options = {}
 
 optparse = OptionParser.new do |opts|
+  options[:help] = true
+
   options[:read] = nil
   opts.on('-r', '--read KEY', 'read key KEY' ) do |key|
     options[:read] = key
+    options[:help] = false
   end
 
   options[:read] = nil
   opts.on('-w', '--write KEY,VALUE', Array, 'write key KEY to VALUE' ) do |list|
     raise OptionParser::InvalidOption.new(list) unless list.size == 2
     options[:write] = list
+    options[:help] = false
   end
 
   opts.on_tail("-h", "--help", "Show this message") do
@@ -57,3 +61,4 @@ end
 
 pp Scalaris::read(options[:read]) unless options[:read] == nil
 pp write(options[:write]) unless options[:write] == nil
+puts optparse if options[:help]
