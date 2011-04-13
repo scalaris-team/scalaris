@@ -100,7 +100,8 @@ Command line client for scalaris using the Java interface
     --sharedstatedir=%{_sharedstatedir} \
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
-    --docdir=%{_docdir}/scalaris
+    --docdir=%{_docdir}/scalaris \
+    --with-ruby-sitelibdir=%{ruby_sitelibdir}
 make all
 make java
 make docs
