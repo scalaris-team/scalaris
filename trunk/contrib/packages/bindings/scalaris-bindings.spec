@@ -1,7 +1,7 @@
 # norootforbuild
 
 %define pkg_version 0.0.1
-Name:           scalaris
+Name:           scalaris-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
