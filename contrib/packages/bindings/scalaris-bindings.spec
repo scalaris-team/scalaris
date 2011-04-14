@@ -27,7 +27,7 @@ BuildRequires:  ruby(abi) >= 1.8
 %endif
 %if 0%{?fedora_version} >= 13
 %define with_python3 1
-BuildRequires:  python3-setuptools
+BuildRequires:  python3-setuptools python-tools
 %endif
 %endif
 
