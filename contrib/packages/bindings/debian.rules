@@ -35,8 +35,8 @@ build-stamp:
 #    --mandir=%{_mandir} \
 #    --infodir=%{_infodir} \
 #    --docdir=%{_docdir}/scalaris
-	make all
-	make doc
+	make java
+	make java-doc
 
 	touch build-stamp
 
@@ -58,21 +58,31 @@ install: build
 	dh_installdirs
 
 	# Add here commands to install the package into debian/gentoo.
-	make install DESTDIR=$(BUILD_DIR)
-	make install-doc DESTDIR=$(BUILD_DIR)
-	
-	# copy docs:
-	cp -t $(BUILD_DIR)/usr/share/doc/scalaris/ AUTHORS README LICENSE
-	cp user-dev-guide/main.pdf $(BUILD_DIR)/usr/share/doc/scalaris/user-dev-guide.pdf
+	make install-java DESTDIR=$(BUILD_DIR)
+	make install-java-doc DESTDIR=$(BUILD_DIR)
 	
 	# handle config files:
-	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \
-	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
+	cp $(BUILD_DIR)/etc/scalaris/scalaris.properties \
+	   $(BUILD_DIR)/etc/scalaris/scalaris.properties.example
 
-	# move files of the scalaris-doc package
-	mkdir -p $(BUILD_DIR)-doc/usr/share/doc/scalaris
+	# move files of the scalaris-java package
+	mkdir -p $(BUILD_DIR)-java/usr/bin
+	mv    -t $(BUILD_DIR)-java/usr/bin \
+	         $(BUILD_DIR)/usr/bin/scalaris
+	mkdir -p $(BUILD_DIR)-java/usr/share/
+	mv    -t $(BUILD_DIR)-java/usr/share \
+	         $(BUILD_DIR)/usr/share/java
+	mkdir -p $(BUILD_DIR)-java/etc/scalaris/
+	mv    -t $(BUILD_DIR)-java/etc/scalaris/ \
+	         $(BUILD_DIR)/etc/scalaris/scalaris-java.conf \
+	         $(BUILD_DIR)/etc/scalaris/scalaris-java.conf.sample \
+	         $(BUILD_DIR)/etc/scalaris/scalaris.properties \
+	         $(BUILD_DIR)/etc/scalaris/scalaris.properties.example
+	cp    -t $(BUILD_DIR)-java/usr/share/java/scalaris/lib \
+	         $(CURDIR)/java-api/lib/jakarta-commons-cli-1.2.jar
+	mkdir -p $(BUILD_DIR)-doc/usr/share/doc/scalaris/java-api
 	mv    -t $(BUILD_DIR)-doc/usr/share/doc/scalaris \
-	         $(BUILD_DIR)/usr/share/doc/scalaris/erlang
+	         $(BUILD_DIR)/usr/share/doc/scalaris/java-api
 
 # # 	for subpackage in `echo "client doc java"`
 # # 	do
