@@ -22,7 +22,7 @@ MAKE = make
 VERSION=0.0.1
 OTP_ERLANG_VERSION=1.5.4
 
-.PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python3 python3-compile python3-clean python3-test python3-bench interop-test clean docs svn dialyzer dialyzer-all rrd-init install install-erlang install-java install-docs install-ruby test-clean %_SUITE %_SUITE-dialyzer
+.PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python3 python3-compile python3-clean python3-test python3-bench interop-test clean docs svn dialyzer dialyzer-all rrd-init install install-all install-erlang install-java install-docs install-ruby install-python install-python3 test-clean %_SUITE %_SUITE-dialyzer
 
 YAWS_PATH= /usr/local/lib/yaws
 
@@ -52,6 +52,10 @@ JAVADIR=$(DESTDIR)@datarootdir@/java
 LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
 # /usr/lib/ruby/site_ruby/1.8
 RUBYSITELIBDIR=$(DESTDIR)@RUBYSITELIBDIR@
+# /usr/lib/python2.7/site-packages
+PYTHONSITELIBDIR=$(DESTDIR)@PYTHONSITELIBDIR@
+# /usr/lib/python3.1/site-packages
+PYTHON3SITELIBDIR=$(DESTDIR)@PYTHON3SITELIBDIR@
 
 # paths of source files for make doc
 SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
@@ -422,6 +426,7 @@ install-java: java
 	           java-api/scalaris.jar
 	install -m 644 -t $(JAVADIR)/scalaris/lib \
 	           java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar
+	install -d $(ETCDIR)
 	install -m 644 java-api/scalaris-java.conf \
 	           $(ETCDIR)/scalaris-java.conf
 	install -m 644 -t $(ETCDIR) \
@@ -490,6 +495,18 @@ install-erlang: compile
 install-ruby:
 	install -d $(RUBYSITELIBDIR)
 	install -m 644 -t $(RUBYSITELIBDIR) ruby-api/scalaris.rb
-	install -m 755  ruby-api/scalarisclient.rb $(BINDIR)/scalaris-ruby
+	install -m 755 ruby-api/scalarisclient.rb $(BINDIR)/scalaris-ruby
 
-install: install-erlang install-java install-docs @ENABLERUBYINSTALL@
+install-python:
+	install -d $(PYTHONSITELIBDIR)
+	install -m 644 -t $(PYTHONSITELIBDIR) python-api/Scalaris.py*
+	install -m 755 python-api/ScalarisClient.py $(BINDIR)/scalaris-python
+
+install-python3:
+	install -d $(PYTHON3SITELIBDIR)
+	install -m 644 -t $(PYTHON3SITELIBDIR) python3-api/Scalaris.py*
+	install -m 755 python3-api/ScalarisClient.py $(BINDIR)/scalaris-python3
+
+install: install-erlang
+
+install-all: install-erlang install-java install-docs @ENABLERUBYINSTALL@ @ENABLEPYTHONINSTALL@ @ENABLEPYTHON3INSTALL@
