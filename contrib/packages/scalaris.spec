@@ -73,12 +73,12 @@ Documentation for scalaris.
     --infodir=%{_infodir} \
     --docdir=%{_docdir}/scalaris
 make all
-make docs
+make doc
 
 %install
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
-make install-docs DESTDIR=$RPM_BUILD_ROOT
+make install-doc DESTDIR=$RPM_BUILD_ROOT
 cp user-dev-guide/main.pdf $RPM_BUILD_ROOT/%{_docdir}/scalaris/user-dev-guide.pdf
 
 %post
@@ -103,7 +103,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %files doc
 %defattr(-,root,root)
-%doc %{_docdir}/scalaris
+%dir %{_docdir}/scalaris
+%doc %{_docdir}/scalaris/erlang
 %doc %{_docdir}/scalaris/user-dev-guide.pdf
 
 %changelog
