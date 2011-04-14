@@ -56,8 +56,6 @@ BuildRequires:  erlang-stack >= R13B01
 %global python3_sitedir  %{python3_libdir}/site-packages
 %endif
 BuildRequires:  pkg-config
-BuildRequires:  rubygems_with_buildroot_patch
-%rubygems_requires
 %if 0%{?suse_version} >= 1130 
 BuildRequires:  ruby(abi) >= 1.8
 %else
@@ -96,7 +94,11 @@ Requires:   erlang
 %endif
 Requires:   jakarta-commons-cli
 Requires:   %{name} == %{version}-%{release}
+%if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
+# once noarch, always noarch on SLE <= 11
+%else
 BuildArch:  noarch
+%endif
 
 %description -n scalaris-java
 Java Bindings and Command line client for scalaris
@@ -115,7 +117,11 @@ Ruby bindings and ruby client
 Summary:    Python API for scalaris and python client
 Group:      Productivity/Databases/Clients
 Requires:   python >= 2.6
+%if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
+# once noarch, always noarch on SLE <= 11
+%else
 BuildArch:  noarch
+%endif
 
 %description -n python-scalaris
 Python bindings and python client
@@ -126,7 +132,11 @@ Python bindings and python client
 Summary:    Python3 API for scalaris and python3 client
 Group:      Productivity/Databases/Clients
 Requires:   python3
+%if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
+# once noarch, always noarch on SLE <= 11
+%else
 BuildArch:  noarch
+%endif
 
 %description -n python3-scalaris
 Python3 bindings and python3 client
