@@ -11,19 +11,15 @@ URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
-BuildRequires:  java-devel >= 1.6.0
 BuildRequires:  erlang >= R13B01
 Requires:       erlang >= R13B01
 BuildArch:      noarch
-
-%{!?ruby_sitelib: %global ruby_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  pkgconfig
-BuildRequires: ruby(abi) >= 1.8
 %endif
 
 ##########################################################################################
@@ -63,38 +59,6 @@ Requires:   %{name} == %{version}-%{release}
 %description doc
 Documentation for scalaris.
 
-%package java
-Summary:    Java API for scalaris
-Group:      Productivity/Databases/Clients
-Requires:   jre >= 1.6.0
-%if 0%{?suse_version} || 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
-Requires:   erlang-jinterface >= R13B01
-%else
-Requires:   erlang
-%endif
-Requires:   jakarta-commons-cli
-Requires:   %{name} == %{version}-%{release}
-
-%description java
-Java Bindings
-
-%package client
-Summary:    Cli client for scalaris
-Group:      Productivity/Databases/Clients
-Requires:   %{name}-java = %{version}-%{release}
-
-%description client
-Command line client for scalaris using the Java interface
-
-%package ruby
-Summary:    Ruby API for scalaris and ruby client
-Group:      Productivity/Databases/Clients
-Requires:   ruby(abi) >= 1.8
-Requires:   rubygem-json
-
-%description ruby
-Ruby bindings and ruby client
-
 %prep
 %setup -q -n %{name}-%{version}
 
@@ -112,10 +76,8 @@ Ruby bindings and ruby client
     --sharedstatedir=%{_sharedstatedir} \
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
-    --docdir=%{_docdir}/scalaris \
-    --with-ruby-sitelibdir=%{ruby_sitelib}
+    --docdir=%{_docdir}/scalaris
 make all
-make java
 make docs
 
 %install
@@ -148,22 +110,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %doc %{_docdir}/scalaris
 %doc user-dev-guide/main.pdf
-
-%files java
-%defattr(-,root,root)
-%{_javadir}/scalaris
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris-java.conf
-%config %{_sysconfdir}/scalaris/scalaris-java.conf.sample
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.properties
-
-%files client
-%defattr(-,root,root)
-%{_bindir}/scalaris
-
-%files ruby
-%defattr(-,root,root)
-%{_bindir}/scalaris-ruby
-%{ruby_sitelib}/scalaris.rb
 
 %changelog
 * Thu Mar 19 2009 Nico Kruber <nico.laus.2001@gmx.de>
