@@ -250,6 +250,7 @@ AS_IF([test ! -x "$BUILDCLASSPATH"],
 # check ruby
 #
 ###########################################################
+
 ENABLERUBYINSTALL=
 RUBYSITELIBDIR=
 AC_ARG_WITH([ruby-sitelibdir],
@@ -262,6 +263,39 @@ AC_ARG_WITH([ruby-sitelibdir],
             [])
 AC_SUBST(ENABLERUBYINSTALL)
 AC_SUBST(RUBYSITELIBDIR)
+
+###########################################################
+#
+# check python
+#
+###########################################################
+PYTHONSITELIBDIR=
+ENABLEPYTHONINSTALL=
+AM_PATH_PYTHON(,, [:])
+AS_IF([test "$PYTHON" != ":"],
+      [PYTHONSITELIBDIR=$am_cv_python_pythondir
+       ENABLEPYTHONINSTALL="install-python"])
+AC_SUBST(ENABLEPYTHONINSTALL)
+AC_SUBST(PYTHONSITELIBDIR)
+
+###########################################################
+#
+# check python3
+#
+###########################################################
+
+ENABLEPYTHON3INSTALL=
+PYTHON3SITELIBDIR=
+AC_ARG_WITH([python3-sitelibdir],
+            [AS_HELP_STRING([--with-python3-sitelibdir=SITELIBDIR],
+            [where to install python3 libraries])],
+            [if test -n "$withval"; then
+               PYTHON3SITELIBDIR="$withval"
+               ENABLEPYTHON3INSTALL="install-python3"
+             fi],
+            [])
+AC_SUBST(ENABLEPYTHON3INSTALL)
+AC_SUBST(PYTHON3SITELIBDIR)
 
 ###########################################################
 #
