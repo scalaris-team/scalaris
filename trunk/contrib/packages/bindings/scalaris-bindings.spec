@@ -165,6 +165,7 @@ Python3 bindings and python3 client
 %endif
     --with-ruby-sitelibdir=%{rb_sitelib}
 make java
+make java-doc
 %if 0%{?with_python}
 make python-compile
 %endif
@@ -177,6 +178,7 @@ make python3-compile
 export NO_BRP_CHECK_BYTECODE_VERSION=true
 rm -rf $RPM_BUILD_ROOT
 make install-java DESTDIR=$RPM_BUILD_ROOT
+make install-java-doc DESTDIR=$RPM_BUILD_ROOT
 make install-ruby DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_python}
 make install-python DESTDIR=$RPM_BUILD_ROOT
@@ -196,6 +198,8 @@ rm -rf $RPM_BUILD_ROOT
 %config %{_sysconfdir}/scalaris/scalaris-java.conf.sample
 %config(noreplace) %{_sysconfdir}/scalaris/scalaris.properties
 %{_bindir}/scalaris
+%dir %{_docdir}/scalaris/
+%doc %{_docdir}/scalaris/java-api
 
 %files -n ruby-scalaris
 %defattr(-,root,root)
