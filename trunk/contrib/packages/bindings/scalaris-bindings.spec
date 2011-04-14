@@ -25,10 +25,9 @@ BuildRequires:  ruby(abi) >= 1.8
 %if 0%{?fedora_version} >= 12 || 0%{?rhel_version} >= 600
 %define with_python 1
 %endif
-%if 0%{?fedora_version} >= 13 || 0%{?rhel_version} >= 600
+%if 0%{?fedora_version} >= 13
 %define with_python3 1
-BuildRequires:  /usr/bin/2to3
-BuildRequires:  python3-setuptools, python3-devel
+BuildRequires:  python3-setuptools
 %endif
 %endif
 
