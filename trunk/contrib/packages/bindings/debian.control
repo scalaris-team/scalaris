@@ -1,0 +1,17 @@
+Source: scalaris-bindings
+Section: unknown
+Priority: optional
+Maintainer: Nico Kruber <kruber@zib.de>
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, pkg-config
+Homepage: http://code.google.com/p/scalaris
+
+Package: scalaris-java
+Architecture: all
+Depends: ${shlibs:Depends}, java6-runtime, erlang-jinterface (>= 13.b.1)
+Description: Java API for scalaris
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
+
