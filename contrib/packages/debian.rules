@@ -60,9 +60,11 @@ install: build
 
 	# Add here commands to install the package into debian/gentoo.
 	make install DESTDIR=$(BUILD_DIR)
+	make install-docs DESTDIR=$(BUILD_DIR)
+	make install-java DESTDIR=$(BUILD_DIR)
 	# copy docs:
-	cp    -t $(BUILD_DIR)/usr/share/doc/scalaris/ AUTHORS README LICENSE
-	cp    -t $(BUILD_DIR)/usr/share/doc/scalaris/ user-dev-guide/main.pdf
+	cp -t $(BUILD_DIR)/usr/share/doc/scalaris/ AUTHORS README LICENSE
+	cp user-dev-guide/main.pdf $(BUILD_DIR)/usr/share/doc/scalaris/user-dev-guide.pdf
 	
 	# handle config files:
 	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \

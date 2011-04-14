@@ -84,7 +84,8 @@ make docs
 # see http://en.opensuse.org/Java/Packaging/Cookbook#bytecode_version_error
 export NO_BRP_CHECK_BYTECODE_VERSION=true
 rm -rf $RPM_BUILD_ROOT
-make install DESTDIR=$RPM_BUILD_ROOT
+make install-docs DESTDIR=$RPM_BUILD_ROOT
+cp user-dev-guide/main.pdf $RPM_BUILD_ROOT/%{_docdir}/scalaris/user-dev-guide.pdf
 
 %post
 if grep -e '^cookie=\w\+' %{_sysconfdir}/scalaris/scalarisctl.conf > /dev/null 2>&1; then
@@ -109,7 +110,7 @@ rm -rf $RPM_BUILD_ROOT
 %files doc
 %defattr(-,root,root)
 %doc %{_docdir}/scalaris
-%doc user-dev-guide/main.pdf
+%doc %{_docdir}/scalaris/user-dev-guide.pdf
 
 %changelog
 * Thu Mar 19 2009 Nico Kruber <nico.laus.2001@gmx.de>
