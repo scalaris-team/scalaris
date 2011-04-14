@@ -210,7 +210,7 @@ python3:
 	  mkdir -p python3-api ; \
 	fi
 	cp python-api/*.py python3-api/
-	cd python3-api && 2to3 -f all -f buffer -w -n --no-diffs .
+	cd python3-api && 2to3 -f all -f buffer -w -n . >/dev/null
 	sed -i -e "s|#!/usr/bin/python|#!/usr/bin/python3|g" python3-api/*.py
 
 python3-compile: python3
