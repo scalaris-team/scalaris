@@ -10,7 +10,6 @@ Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
-BuildRequires:  ant
 BuildRequires:  erlang >= R13B01
 Requires:       erlang >= R13B01
 BuildArch:      noarch
@@ -27,13 +26,9 @@ BuildRequires:  pkgconfig
 ##########################################################################################
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 BuildRequires:  pkgconfig
-%if 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
 BuildRequires:  erlang-stack >= R13B01
 Requires:       erlang-stack >= R13B01
 Suggests:       %{name}-client, %{name}-doc
-%else
-#BuildRequires:  classpathx-jaf
-%endif
 %endif
 
 ###########################################################################################
@@ -81,9 +76,8 @@ make all
 make docs
 
 %install
-# see http://en.opensuse.org/Java/Packaging/Cookbook#bytecode_version_error
-export NO_BRP_CHECK_BYTECODE_VERSION=true
 rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
 make install-docs DESTDIR=$RPM_BUILD_ROOT
 cp user-dev-guide/main.pdf $RPM_BUILD_ROOT/%{_docdir}/scalaris/user-dev-guide.pdf
 
