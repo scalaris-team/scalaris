@@ -60,8 +60,6 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/debian.changelog > ./debian.changelog && \
   sed -e "s/Source: scalaris/Source: scalaris-svn/g" \
       -e "s/Package: scalaris\$/Package: scalaris-svn\nConflicts: scalaris/g" \
-      -e "s/Package: scalaris-client\$/Package: scalaris-svn-client\nConflicts: scalaris-client/g" \
-      -e "s/Package: scalaris-java\$/Package: scalaris-svn-java\nConflicts: scalaris-java/g" \
       -e "s/Package: scalaris-doc\$/Package: scalaris-svn-doc\nConflicts: scalaris-doc/g" \
       -e 's/scalaris (= ${binary:Version})/scalaris-svn (= ${binary:Version})/g' \
       -e 's/scalaris-java (= ${binary:Version})/scalaris-svn-java (= ${binary:Version})/g' \
@@ -72,12 +70,7 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.scalaris.conffiles      ./debian.scalaris-svn.conffiles && \
   cp  ${sourcefolder}/debian.scalaris.postrm         ./debian.scalaris-svn.postrm && \
   cp  ${sourcefolder}/debian.scalaris.postinst       ./debian.scalaris-svn.postinst && \
-  cp  ${sourcefolder}/debian.scalaris-client.files   ./debian.scalaris-svn-client.files && \
-  cp  ${sourcefolder}/debian.scalaris-doc.files      ./debian.scalaris-svn-doc.files && \
-  cp  ${sourcefolder}/debian.scalaris-java.files     ./debian.scalaris-svn-java.files && \
-  cp  ${sourcefolder}/debian.scalaris-java.conffiles ./debian.scalaris-svn-java.conffiles && \
-  cp  ${sourcefolder}/debian.scalaris-java.postrm    ./debian.scalaris-svn-java.postrm && \
-  cp  ${sourcefolder}/debian.scalaris-java.postinst  ./debian.scalaris-svn-java.postinst
+  cp  ${sourcefolder}/debian.scalaris-doc.files      ./debian.scalaris-svn-doc.files
   result=$?
 fi
 
