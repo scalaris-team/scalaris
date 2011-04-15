@@ -499,16 +499,19 @@ install-erlang: compile
 install-ruby:
 	install -d $(RUBYSITELIBDIR)
 	install -m 644 -t $(RUBYSITELIBDIR) ruby-api/scalaris.rb
+	install -d $(BINDIR)
 	install -m 755 ruby-api/scalarisclient.rb $(BINDIR)/scalaris-ruby
 
 install-python:
 	install -d $(PYTHONSITELIBDIR)
 	install -m 644 -t $(PYTHONSITELIBDIR) python-api/Scalaris.py*
+	install -d $(BINDIR)
 	install -m 755 python-api/ScalarisClient.py $(BINDIR)/scalaris-python
 
 install-python3:
 	install -d $(PYTHON3SITELIBDIR)
 	install -m 644 -t $(PYTHON3SITELIBDIR) python3-api/Scalaris.py*
+	install -d $(BINDIR)
 	install -m 755 python3-api/ScalarisClient.py $(BINDIR)/scalaris-python3
 
 install: install-erlang
