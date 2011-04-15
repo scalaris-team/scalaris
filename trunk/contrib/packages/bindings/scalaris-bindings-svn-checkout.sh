@@ -69,7 +69,7 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/debian.changelog > ./debian.changelog && \
   sed -e "s/Source: scalaris-bindings/Source: scalaris-svn-bindings/g" \
       -e "s/Package: scalaris-java\$/Package: scalaris-svn-java\nConflicts: scalaris-java, scalaris-client/g" \
-      -e "s/Package: scalaris-ruby1.8\$/Package: scalaris-svn--ruby1.8/g" \
+      -e "s/Package: scalaris-ruby1.8\$/Package: scalaris-svn-ruby1.8/g" \
       -e "s/Package: python-scalaris\$/Package: python-scalaris-svn/g" \
       -e "s/Package: python3-scalaris\$/Package: python3-scalaris-svn/g" \
       < ${sourcefolder}/debian.control > ./debian.control && \
@@ -82,9 +82,9 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.scalaris-java.conffiles ./debian.scalaris-svn-java.conffiles && \
   cp  ${sourcefolder}/debian.scalaris-java.postrm    ./debian.scalaris-svn-java.postrm && \
   cp  ${sourcefolder}/debian.scalaris-java.postinst  ./debian.scalaris-svn-java.postinst && \
-  cp  ${sourcefolder}/debian.python-scalaris.files  ./debian.python-scalaris-svn.postinst && \
-  cp  ${sourcefolder}/debian.python3-scalaris.files  ./debian.python3-scalaris-svn.postinst && \
-  cp  ${sourcefolder}/debian.scalaris-ruby1.8.files  ./debian.scalaris-svn-ruby1.8.postinst
+  cp  ${sourcefolder}/debian.python-scalaris.files  ./debian.python-scalaris-svn.files && \
+  cp  ${sourcefolder}/debian.python3-scalaris.files  ./debian.python3-scalaris-svn.files && \
+  cp  ${sourcefolder}/debian.scalaris-ruby1.8.files  ./debian.scalaris-svn-ruby1.8.files
 
   result=$?
 fi
