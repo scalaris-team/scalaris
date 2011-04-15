@@ -7,7 +7,7 @@ Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris
 Architecture: all
-Depends: ${shlibs:Depends}, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
+Depends: adduser, addgroup, ${shlibs:Depends}, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
 Suggests: scalaris-client, scalaris-doc
 Description: Scalable Distributed key-value store
  Scalaris is a scalable, transactional, distributed key-value store. It
