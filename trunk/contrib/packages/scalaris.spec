@@ -1,6 +1,9 @@
 # norootforbuild
 
 %define pkg_version 0.0.1
+%define scalaris_user scalaris
+%define scalaris_group scalaris
+%define scalaris_home /var/lib/scalaris
 Name:           scalaris
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
@@ -19,6 +22,7 @@ BuildArch:      noarch
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  pkgconfig
+Requires(pre):  shadow-utils
 %endif
 
 ##########################################################################################
@@ -29,6 +33,7 @@ BuildRequires:  pkgconfig
 BuildRequires:  erlang-stack >= R13B01
 Requires:       erlang-stack >= R13B01
 Suggests:       %{name}-client, %{name}-doc
+Requires(pre):  shadow-utils
 %endif
 
 ###########################################################################################
@@ -37,6 +42,7 @@ Suggests:       %{name}-client, %{name}-doc
 %if 0%{?suse_version}
 BuildRequires:  pkg-config
 Suggests:       %{name}-client, %{name}-doc
+Requires(pre):  pwdutils
 %endif
 
 %description
@@ -81,6 +87,11 @@ make install DESTDIR=$RPM_BUILD_ROOT
 make install-doc DESTDIR=$RPM_BUILD_ROOT
 cp user-dev-guide/main.pdf $RPM_BUILD_ROOT/%{_docdir}/scalaris/user-dev-guide.pdf
 
+%pre
+getent group %{scalaris_group} >/dev/null || groupadd --system %{scalaris_group}
+getent passwd %{scalaris_user} >/dev/null || useradd --system -g %{scalaris_group} -d %{scalaris_home} -s /sbin/nologin -c "user for scalaris" %{scalaris_user}
+exit 0
+
 %post
 if grep -e '^cookie=\w\+' %{_sysconfdir}/scalaris/scalarisctl.conf > /dev/null 2>&1; then
   echo $RANDOM"-"$RANDOM"-"$RANDOM"-"$RANDOM >> %{_sysconfdir}/scalaris/scalarisctl.conf
@@ -95,11 +106,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/scalarisctl
 %{_prefix}/lib/scalaris
 %{_localstatedir}/log/scalaris
-%dir %{_sysconfdir}/scalaris
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
-%config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
-%config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
+%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
+%attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
 
 %files doc
 %defattr(-,root,root)

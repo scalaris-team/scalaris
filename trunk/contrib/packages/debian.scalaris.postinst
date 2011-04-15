@@ -2,6 +2,10 @@
 
 set -e
 
+scalaris_user=scalaris
+scalaris_group=scalaris
+scalaris_home=/var/lib/scalaris
+
 # use automatic handling for now...
 # # Copy config file if not existing yet
 # 
@@ -9,9 +13,20 @@ set -e
 #     cp /etc/scalaris/scalaris.cfg.example /etc/scalaris/scalaris.cfg
 #   fi
 
+create_scalaris_user() {
+  getent group $scalaris_group >/dev/null || addgroup --quiet --system $scalaris_group
+  getent passwd $scalaris_user >/dev/null || adduser --quiet --system -g $scalaris_group -d $scalaris_home -s /sbin/nologin -c "user for scalaris" $scalaris_user
+  chown $scalaris_user:$scalaris_group \
+    /etc/scalaris/scalaris.cfg \
+    /etc/scalaris/scalaris.local.cfg \
+    /etc/scalaris/scalarisctl.conf
+}
+
 if grep -e '^cookie=\w\+' /etc/scalaris/scalarisctl.conf > /dev/null 2>&1; then
   echo $RANDOM"-"$RANDOM"-"$RANDOM"-"$RANDOM >> /etc/scalaris/scalarisctl.conf
 fi
+
+create_scalaris_user
 
 #DEBHELPER#
 

@@ -44,7 +44,8 @@ if [ ${result} -eq 0 ]; then
       -e "s/%package java/%package java\nConflicts:  scalaris-java/g" \
       -e "s/%package doc/%package doc\nConflicts:  scalaris-doc/g" \
       -e "s/%package client/%package client\nConflicts:  scalaris-client/g" \
-      < ${sourcefolder}/scalaris.spec > ./scalaris-svn.spec
+      < ${sourcefolder}/scalaris.spec > ./scalaris-svn.spec && \
+  cp  ${sourcefolder}/scalaris-rpmlintrc ./scalaris-svn-rpmlintrc
   result=$?
 fi
 
