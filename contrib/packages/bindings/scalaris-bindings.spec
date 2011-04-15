@@ -44,23 +44,24 @@ BuildRequires:  erlang-stack >= R13B01
 # SuSE, openSUSE
 ###########################################################################################
 %if 0%{?suse_version}
-%if 0%{?suse_version} >= 1110
+%if 0%{?suse_version} >= 1110 || 0%{?sles_version} >= 11 
 %define with_python 1
+%if 0%{?suse_version} >= 1130 
+%else
+# py_requires is no longer needed since 11.3
+%py_requires
 %endif
 %if 0%{?suse_version} >= 1120
 %define with_python3 1
 # these macros are not integrated yet:
-%global python3_ver  %(python3 -c "import sys; v=sys.version_info[:2]; print('%%d.%%d'%%v)" 2>/dev/null || echo PYTHON-NOT-FOUND)
-%global python3_prefix  %(python3 -c "import sys; print(sys.prefix)" 2>/dev/null || echo PYTHON-NOT-FOUND)
+%global python3_ver      %(python3 -c "import sys; v=sys.version_info[:2]; print('%%d.%%d'%%v)" 2>/dev/null || echo PYTHON-NOT-FOUND)
+%global python3_prefix   %(python3 -c "import sys; print(sys.prefix)" 2>/dev/null || echo PYTHON-NOT-FOUND)
 %global python3_libdir   %{python3_prefix}/%{_lib}/python%{python3_ver}
 %global python3_sitedir  %{python3_libdir}/site-packages
 %endif
 BuildRequires:  pkg-config
 %if 0%{?suse_version} >= 1130 
 BuildRequires:  ruby(abi) >= 1.8
-%else
-# py_requires is no longer needed since 11.3
-%py_requires
 %endif
 %endif
 
@@ -87,7 +88,7 @@ implemented in Erlang.
 Summary:    Java-API and Java-Client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
-%if 0%{?suse_version} || 0%{?mandriva_version} >= 2009 || 0%{?mdkversion} >= 200900
+%if 0%{?suse_version} || 0%{?mdkversion} >= 200900
 Requires:   erlang-jinterface >= R13B01
 %else
 Requires:   erlang
@@ -101,20 +102,20 @@ BuildArch:  noarch
 %endif
 
 %description -n scalaris-java
-Java Bindings and Command line client for scalaris
+Java Bindings and command line client for scalaris
 
 %package -n ruby-scalaris
-Summary:    Ruby API for scalaris and ruby client
+Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   ruby(abi) >= 1.8
 Requires:   rubygem-json
 
 %description -n ruby-scalaris
-Ruby bindings and ruby client
+Ruby bindings and Ruby command line client for scalaris
 
 %if 0%{?with_python}
 %package -n python-scalaris
-Summary:    Python API for scalaris and python client
+Summary:    Python-API and Python-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python >= 2.6
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -124,12 +125,12 @@ BuildArch:  noarch
 %endif
 
 %description -n python-scalaris
-Python bindings and python client
+Python bindings and Python command line client for scalaris
 %endif
 
 %if 0%{?with_python3}
 %package -n python3-scalaris
-Summary:    Python3 API for scalaris and python3 client
+Summary:    Python3-API and Python3-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python3
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -139,7 +140,7 @@ BuildArch:  noarch
 %endif
 
 %description -n python3-scalaris
-Python3 bindings and python3 client
+Python3 bindings and Python3 command line client for scalaris
 %endif
 
 %prep
