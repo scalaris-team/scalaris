@@ -51,6 +51,7 @@ BuildRequires:  erlang-stack >= R13B01
 # py_requires is no longer needed since 11.3
 %py_requires
 %endif
+%endif
 %if 0%{?suse_version} >= 1120
 %define with_python3 1
 # these macros are not integrated yet:
@@ -94,7 +95,6 @@ Requires:   erlang-jinterface >= R13B01
 Requires:   erlang
 %endif
 Requires:   jakarta-commons-cli
-Requires:   %{name} == %{version}-%{release}
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
 %else

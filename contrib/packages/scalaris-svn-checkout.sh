@@ -41,9 +41,7 @@ if [ ${result} -eq 0 ]; then
   sourcefolder=${folder}/contrib/packages
   sed -e "s/%define pkg_version .*/%define pkg_version ${revision}/g" \
       -e "s/Name:           scalaris/Name:           scalaris-svn\nConflicts:      scalaris/g" \
-      -e "s/%package java/%package java\nConflicts:  scalaris-java/g" \
       -e "s/%package doc/%package doc\nConflicts:  scalaris-doc/g" \
-      -e "s/%package client/%package client\nConflicts:  scalaris-client/g" \
       < ${sourcefolder}/scalaris.spec > ./scalaris-svn.spec && \
   cp  ${sourcefolder}/scalaris-rpmlintrc ./scalaris-svn-rpmlintrc
   result=$?
@@ -63,7 +61,8 @@ if [ ${result} -eq 0 ]; then
       -e "s/Package: scalaris\$/Package: scalaris-svn\nConflicts: scalaris/g" \
       -e "s/Package: scalaris-doc\$/Package: scalaris-svn-doc\nConflicts: scalaris-doc/g" \
       -e 's/scalaris (= ${binary:Version})/scalaris-svn (= ${binary:Version})/g' \
-      -e 's/scalaris-java (= ${binary:Version})/scalaris-svn-java (= ${binary:Version})/g' \
+      -e 's/scalaris-java/scalaris-svn-java/g' \
+      -e 's/scalaris-doc/scalaris-svn-doc/g' \
       < ${sourcefolder}/debian.control > ./debian.control && \
   sed -e 's/BUILD_DIR:=$(CURDIR)\/debian\/scalaris/BUILD_DIR:=$(CURDIR)\/debian\/scalaris-svn/g' \
       < ${sourcefolder}/debian.rules > ./debian.rules && \
