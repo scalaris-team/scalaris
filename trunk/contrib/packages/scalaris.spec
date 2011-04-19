@@ -32,7 +32,7 @@ Requires(pre):  shadow-utils
 BuildRequires:  pkgconfig
 BuildRequires:  erlang-stack >= R13B01
 Requires:       erlang-stack >= R13B01
-Suggests:       %{name}-client, %{name}-doc
+Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  shadow-utils
 %endif
 
@@ -41,7 +41,7 @@ Requires(pre):  shadow-utils
 ###########################################################################################
 %if 0%{?suse_version}
 BuildRequires:  pkg-config
-Suggests:       %{name}-client, %{name}-doc
+Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 %endif
 

@@ -41,7 +41,7 @@ if [ ${result} -eq 0 ]; then
   sourcefolder=${folder}/contrib/packages/bindings
   sed -e "s/%define pkg_version .*/%define pkg_version ${revision}/g" \
       -e "s/Name:           scalaris-bindings/Name:           scalaris-svn-bindings/g" \
-      -e "s/%package -n scalaris-java/%package -n scalaris-svn-java\nConflicts:  scalaris-java\nConflicts:  scalaris-client/g" \
+      -e "s/%package -n scalaris-java/%package -n scalaris-svn-java\nConflicts:  scalaris-java scalaris-client/g" \
       -e "s/%package -n ruby-scalaris/%package -n ruby-scalaris-svn/g" \
       -e "s/%package -n python-scalaris/%package -n python-scalaris-svn/g" \
       -e "s/%package -n python3-scalaris/%package -n python3-scalaris-svn/g" \
