@@ -125,11 +125,8 @@ public class TransactionSingleOp {
      * 
      * @param conn
      *            connection to use for the transaction
-     * 
-     * @throws ConnectionException
-     *             if the connection fails
      */
-    public TransactionSingleOp(Connection conn) throws ConnectionException {
+    public TransactionSingleOp(Connection conn) {
         connection = conn;
     }
     

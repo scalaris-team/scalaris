@@ -36,7 +36,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * See {@link #ErlangValue(Object)} for a list of compatible types.
  * 
  * @author Nico Kruber, kruber@zib.de
- * @version 3.4
+ * @version 3.5
  * @since 3.0
  */
 public class ErlangValue {
@@ -283,121 +283,6 @@ public class ErlangValue {
     }
 
     /**
-     * Converts an {@link OtpErlangObject} to a {@link OtpErlangList} taking
-     * special care if the OTP library converted a list to an
-     * {@link OtpErlangString}.
-     * 
-     * @param value
-     *            the value to convert
-     * 
-     * @return the value as a OtpErlangList
-     * 
-     * @throws ClassCastException
-     *             if the conversion fails
-     */
-    static OtpErlangList otpObjectToOtpList(OtpErlangObject value)
-            throws ClassCastException {
-        // need special handling if OTP thought that the value is a string
-        if (value instanceof OtpErlangString) {
-            OtpErlangString value_string = (OtpErlangString) value;
-            return new OtpErlangList(value_string.stringValue());
-        } else {
-            return (OtpErlangList) value;
-        }
-    }
-
-    /**
-     * Returns a list of mixed Java values (wrapped in {@link ErlangValue}
-     * objects) of the wrapped erlang value.
-     * 
-     * @return the converted value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    public List<ErlangValue> listValue() throws ClassCastException {
-        OtpErlangList list = otpObjectToOtpList(value);
-        ArrayList<ErlangValue> result = new ArrayList<ErlangValue>(list.arity());
-        for (OtpErlangObject i : list) {
-            result.add(new ErlangValue(i));
-        }
-        return result;
-    }
-
-    /**
-     * Returns a list of {@link Long} values of the wrapped erlang value.
-     * 
-     * @return the converted value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    public List<Long> longListValue() throws ClassCastException {
-        OtpErlangList list = otpObjectToOtpList(value);
-        ArrayList<Long> result = new ArrayList<Long>(list.arity());
-        for (OtpErlangObject i : list) {
-            result.add(((OtpErlangLong) i).longValue());
-        }
-        return result;
-    }
-
-    /**
-     * Returns a list of {@link Double} values of the wrapped erlang value.
-     * 
-     * @return the converted value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    public List<Double> doubleListValue() throws ClassCastException {
-        OtpErlangList list = otpObjectToOtpList(value);
-        ArrayList<Double> result = new ArrayList<Double>(list.arity());
-        for (OtpErlangObject i : list) {
-            result.add(((OtpErlangDouble) i).doubleValue());
-        }
-        return result;
-    }
-
-    /**
-     * Returns a list of {@link String} values of the wrapped erlang value.
-     * 
-     * @return the converted value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    public List<String> stringListValue() throws ClassCastException {
-        OtpErlangList list = otpObjectToOtpList(value);
-        ArrayList<String> result = new ArrayList<String>(list.arity());
-        for (OtpErlangObject i : list) {
-            result.add(otpObjectToString(i));
-        }
-        return result;
-    }
-
-    /**
-     * Returns a list of <tt>byte[]</tt> values of the wrapped erlang value.
-     * 
-     * @return the converted value
-     * 
-     * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
-     */
-    public List<byte[]> binaryListValue() throws ClassCastException {
-        OtpErlangList list = otpObjectToOtpList(value);
-        ArrayList<byte[]> result = new ArrayList<byte[]>(list.arity());
-        for (OtpErlangObject i : list) {
-            result.add(((OtpErlangBinary) i).binaryValue());
-        }
-        return result;
-    }
-
-    /**
      * Returns a JSON object (as {@link Map}&lt;String, Object&gt;) of the wrapped
      * erlang value.
      * 
@@ -457,6 +342,189 @@ public class ErlangValue {
         } else {
             throw new ClassCastException("wrong tuple arity");
         }
+    }
+
+    /**
+     * Converts an {@link OtpErlangObject} to a {@link OtpErlangList} taking
+     * special care if the OTP library converted a list to an
+     * {@link OtpErlangString}.
+     * 
+     * @param value
+     *            the value to convert
+     * 
+     * @return the value as a OtpErlangList
+     * 
+     * @throws ClassCastException
+     *             if the conversion fails
+     */
+    static OtpErlangList otpObjectToOtpList(OtpErlangObject value)
+            throws ClassCastException {
+        // need special handling if OTP thought that the value is a string
+        if (value instanceof OtpErlangString) {
+            OtpErlangString value_string = (OtpErlangString) value;
+            return new OtpErlangList(value_string.stringValue());
+        } else {
+            return (OtpErlangList) value;
+        }
+    }
+    
+    /**
+     * Converts list elements to a desired type.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     * 
+     * @param <T>
+     *            the type to convert to
+     * 
+     * @since 3.5
+     */
+    public static interface ListElementConverter<T> {
+        /**
+         * Conversion function.
+         * 
+         * @param i
+         *            the index in the list
+         * @param v
+         *            the value to convert
+         * 
+         * @return the value to convert to
+         */
+        public abstract T convert(int i, ErlangValue v);
+    }
+
+    /**
+     * Returns a list of mixed Java values of the wrapped erlang value.
+     * 
+     * @param converter
+     *                object that converts the list value to the desired type
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     */
+    public <T> List<T> listValue(ListElementConverter<T> converter) throws ClassCastException {
+        OtpErlangList list = otpObjectToOtpList(value);
+        ArrayList<T> result = new ArrayList<T>(list.arity());
+        for (int i = 0; i < list.arity(); ++i) {
+            result.add(converter.convert(i, new ErlangValue(list.elementAt(i))));
+        }
+        return result;
+    }
+
+    /**
+     * Returns a list of mixed Java values (wrapped in {@link ErlangValue}
+     * objects) of the wrapped erlang value.
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     */
+    public List<ErlangValue> listValue() throws ClassCastException {
+        return listValue(new ListElementConverter<ErlangValue>() {
+            public ErlangValue convert(int i, ErlangValue v) { return v; }
+        });
+    }
+
+    /**
+     * Returns a list of {@link Long} values of the wrapped erlang value.
+     * Provided for convenience.
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     * 
+     * @see #listValue(ListElementConverter)
+     */
+    public List<Long> longListValue() throws ClassCastException {
+        return listValue(new ListElementConverter<Long>() {
+            public Long convert(int i, ErlangValue v) { return v.longValue(); }
+        });
+    }
+
+    /**
+     * Returns a list of {@link Double} values of the wrapped erlang value.
+     * Provided for convenience.
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     * 
+     * @see #listValue(ListElementConverter)
+     */
+    public List<Double> doubleListValue() throws ClassCastException {
+        return listValue(new ListElementConverter<Double>() {
+            public Double convert(int i, ErlangValue v) { return v.doubleValue(); }
+        });
+    }
+
+    /**
+     * Returns a list of {@link String} values of the wrapped erlang value.
+     * Provided for convenience.
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     * 
+     * @see #listValue(ListElementConverter)
+     */
+    public List<String> stringListValue() throws ClassCastException {
+        return listValue(new ListElementConverter<String>() {
+            public String convert(int i, ErlangValue v) { return v.stringValue(); }
+        });
+    }
+
+    /**
+     * Returns a list of <tt>byte[]</tt> values of the wrapped erlang value.
+     * Provided for convenience.
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *                if thrown if a conversion is not possible, i.e. the type
+     *                is not supported
+     * 
+     * @see #listValue(ListElementConverter)
+     */
+    public List<byte[]> binaryListValue() throws ClassCastException {
+        return listValue(new ListElementConverter<byte[]>() {
+            public byte[] convert(int i, ErlangValue v) { return v.binaryValue(); }
+        });
+    }
+
+    /**
+     * Returns a list of JSON objects (as an instance of the given class) of the
+     * wrapped erlang value.
+     * Provided for convenience.
+     * 
+     * @param <T>
+     *            the type of the object to create as a list element
+     * 
+     * @param c
+     *            the class of the created object
+     * 
+     * @return the converted value
+     * 
+     * @throws ClassCastException
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
+     * 
+     * @see #listValue(ListElementConverter)
+     * @since 3.5
+     */
+    public <T> List<T> jsonListValue(final Class<T> c) throws ClassCastException {
+        return listValue(new ListElementConverter<T>() {
+            public T convert(int i, ErlangValue v) { return v.jsonValue(c); }
+        });
     }
 
     /**

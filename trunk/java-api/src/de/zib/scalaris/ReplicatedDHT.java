@@ -91,11 +91,8 @@ public class ReplicatedDHT {
      * 
      * @param conn
      *            connection to use for the transaction
-     * 
-     * @throws ConnectionException
-     *             if the connection fails
      */
-    public ReplicatedDHT(Connection conn) throws ConnectionException {
+    public ReplicatedDHT(Connection conn) {
         connection = conn;
     }
     

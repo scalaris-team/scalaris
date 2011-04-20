@@ -134,11 +134,8 @@ public class PubSub {
      * 
      * @param conn
      *            connection to use for the transaction
-     * 
-     * @throws ConnectionException
-     *             if the connection fails
      */
-    public PubSub(Connection conn) throws ConnectionException {
+    public PubSub(Connection conn) {
         connection = conn;
     }
 

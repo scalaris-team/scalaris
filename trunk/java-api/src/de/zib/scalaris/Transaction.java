@@ -126,11 +126,8 @@ public class Transaction {
      * 
      * @param conn
      *            connection to use for the transaction
-     * 
-     * @throws ConnectionException
-     *             if the connection fails
      */
-    public Transaction(Connection conn) throws ConnectionException {
+    public Transaction(Connection conn) {
         connection = conn;
     }
     
