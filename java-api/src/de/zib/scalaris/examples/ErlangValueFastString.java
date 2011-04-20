@@ -26,7 +26,7 @@ import de.zib.scalaris.ErlangValue;
 /**
  * Implements a faster {@link String} storage mechanism if only Java access to
  * scalaris is used.
- * 
+ *
  * <p>
  * Uses {@link OtpErlangBinary} objects that store the array of bytes a
  * {@link String} consists of and writes this binary to scalaris wrapped into a
@@ -34,12 +34,12 @@ import de.zib.scalaris.ErlangValue;
  * {@link OtpErlangBinary} to a {@link String} or return the value of a
  * {@link OtpErlangString} result.
  * </p>
- * 
+ *
  * <p>
  * Run a benchmark of the different String implementations with
  * <code>java -cp scalaris-examples.jar de.zib.scalaris.examples.FastStringBenchmark</code>
  * </p>
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.9
  * @since 2.9
@@ -52,11 +52,11 @@ public class ErlangValueFastString extends ErlangValue {
 
     /**
      * Creates an object with the given (Java) value.
-     * 
+     *
      * @param value
      *            the value to use
      */
-    public ErlangValueFastString(String value) {
+    public ErlangValueFastString(final String value) {
         super(new OtpErlangTuple(new OtpErlangObject[] {
                 identifier,
                 new OtpErlangBinary(value.getBytes()) }));
@@ -64,37 +64,37 @@ public class ErlangValueFastString extends ErlangValue {
 
     /**
      * Creates an object with the given (erlang) value.
-     * 
+     *
      * @param otpValue
      *            the value to use
      */
-    public ErlangValueFastString(OtpErlangObject otpValue) {
+    public ErlangValueFastString(final OtpErlangObject otpValue) {
         super(otpValue);
     }
 
     /**
      * Creates an object with the given (erlang) value.
      * Provided for convenience.
-     * 
+     *
      * @param value
      *            the value to use
-     * 
+     *
      * @see ErlangValue
      */
-    public ErlangValueFastString(ErlangValue value) {
+    public ErlangValueFastString(final ErlangValue value) {
         super(value.value());
     }
 
     /**
      * Converts the stored erlang value created by this object to a Java
      * {@link String}.
-     * 
+     *
      * @throws ClassCastException
      *             if the conversion fails
      */
     @Override
     public String stringValue() {
-        OtpErlangTuple otpTuple = (OtpErlangTuple) value();
+        final OtpErlangTuple otpTuple = (OtpErlangTuple) value();
         if (otpTuple.elementAt(0).equals(identifier)) {
             return new String(
                     ((OtpErlangBinary) otpTuple.elementAt(0)).binaryValue());

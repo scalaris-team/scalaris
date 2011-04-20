@@ -30,14 +30,13 @@ import org.junit.Test;
 
 /**
  * Test cases for the {@link DefaultConnectionPolicy} class.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
- * 
+ *
  * @version 2.3
  * @since 2.3
  */
 public class DefaultConnectionPolicyTest {
-
     /**
      * Test method for {@link DefaultConnectionPolicy#DefaultConnectionPolicy(PeerNode)}.
      */
@@ -46,7 +45,7 @@ public class DefaultConnectionPolicyTest {
         PeerNode remote;
         DefaultConnectionPolicy p;
         List<PeerNode> goodNodes, badNodes;
-        
+
         remote = new PeerNode("test@localhost");
         p = new DefaultConnectionPolicy(remote);
         goodNodes = p.getGoodNodes();
@@ -54,7 +53,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(goodNodes.contains(remote));
         assertEquals(0, badNodes.size());
         assertEquals(1, goodNodes.size());
-        
+
         remote = new PeerNode("test@localhost");
         remote.setLastConnectSuccess();
         p = new DefaultConnectionPolicy(remote);
@@ -63,7 +62,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(goodNodes.contains(remote));
         assertEquals(0, badNodes.size());
         assertEquals(1, goodNodes.size());
-        
+
         remote = new PeerNode("test@localhost");
         remote.setLastFailedConnect();
         p = new DefaultConnectionPolicy(remote);
@@ -80,13 +79,13 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testDefaultConnectionPolicyListOfPeerNode() throws InterruptedException {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
         List<PeerNode> goodNodes, badNodes;
-        
+
         // single node list:
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         remotes.add(p1);
@@ -118,7 +117,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(badNodes.contains(p1));
         assertEquals(1, badNodes.size());
         assertEquals(0, goodNodes.size());
-        
+
         // more nodes:
 
         remotes.clear();
@@ -244,10 +243,10 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testAvailableNodeAdded() {
-        PeerNode remote = new PeerNode("test@localhost");
+        final PeerNode remote = new PeerNode("test@localhost");
         DefaultConnectionPolicy p;
         PeerNode p1, p2;
-        
+
         p = new DefaultConnectionPolicy(remote);
         p1 = new PeerNode("test1@localhost");
         p.availableNodeAdded(p1);
@@ -255,7 +254,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(p.getGoodNodes().contains(p1));
         assertEquals(0, p.getBadNodes().size());
         assertEquals(2, p.getGoodNodes().size());
-        
+
         p = new DefaultConnectionPolicy(remote);
         p1 = new PeerNode("test1@localhost");
         p1.setLastConnectSuccess();
@@ -264,7 +263,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(p.getGoodNodes().contains(p1));
         assertEquals(0, p.getBadNodes().size());
         assertEquals(2, p.getGoodNodes().size());
-        
+
         p = new DefaultConnectionPolicy(remote);
         p1 = new PeerNode("test1@localhost");
         p1.setLastFailedConnect();
@@ -273,7 +272,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(p.getBadNodes().contains(p1));
         assertEquals(1, p.getBadNodes().size());
         assertEquals(1, p.getGoodNodes().size());
-        
+
         p = new DefaultConnectionPolicy(remote);
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -291,11 +290,11 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testAvailableNodeRemoved() {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
         List<PeerNode> goodNodes, badNodes;
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -306,7 +305,7 @@ public class DefaultConnectionPolicyTest {
         remotes.add(p2);
         remotes.add(p3);
         p = new DefaultConnectionPolicy(remotes);
-        
+
         p.availableNodeRemoved(p1);
         goodNodes = p.getGoodNodes();
         badNodes = p.getBadNodes();
@@ -340,11 +339,11 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testAvailableNodesReset() {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
         List<PeerNode> goodNodes, badNodes;
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -355,7 +354,7 @@ public class DefaultConnectionPolicyTest {
         remotes.add(p2);
         remotes.add(p3);
         p = new DefaultConnectionPolicy(remotes);
-        
+
         p.availableNodesReset();
         goodNodes = p.getGoodNodes();
         badNodes = p.getBadNodes();
@@ -369,13 +368,13 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testNodeFailed() throws InterruptedException {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
         List<PeerNode> goodNodes, badNodes;
-        
+
         // without time:
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -397,7 +396,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(badNodes.contains(p3));
         assertEquals(2, badNodes.size());
         assertEquals(1, goodNodes.size());
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -419,7 +418,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(badNodes.contains(p3));
         assertEquals(2, badNodes.size());
         assertEquals(1, goodNodes.size());
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -467,7 +466,7 @@ public class DefaultConnectionPolicyTest {
         assertEquals(1, goodNodes.size());
         assertEquals(p3, badNodes.get(0));
         assertEquals(p1, badNodes.get(badNodes.size() - 1));
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -492,7 +491,7 @@ public class DefaultConnectionPolicyTest {
         assertEquals(1, goodNodes.size());
         assertEquals(p3, badNodes.get(0));
         assertEquals(p2, badNodes.get(badNodes.size() - 1));
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -523,11 +522,11 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testnodeFailReset() {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
         List<PeerNode> goodNodes, badNodes;
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -549,7 +548,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(badNodes.contains(p3));
         assertEquals(1, badNodes.size());
         assertEquals(2, goodNodes.size());
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -571,7 +570,7 @@ public class DefaultConnectionPolicyTest {
         assertTrue(badNodes.contains(p3));
         assertEquals(1, badNodes.size());
         assertEquals(2, goodNodes.size());
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -601,12 +600,12 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testNodeConnectSuccess() throws InterruptedException {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
         List<PeerNode> goodNodes, badNodes;
         Date d0, d2;
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -632,7 +631,7 @@ public class DefaultConnectionPolicyTest {
         assertEquals(2, goodNodes.size());
         assertNotNull(p1.getLastConnectSuccess());
         assertTrue(d0.getTime() < p1.getLastConnectSuccess().getTime());
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -661,7 +660,7 @@ public class DefaultConnectionPolicyTest {
         assertNotNull(p2.getLastConnectSuccess());
         assertTrue(d0.getTime() < p2.getLastConnectSuccess().getTime());
         assertTrue(d2.getTime() < p2.getLastConnectSuccess().getTime());
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -695,10 +694,10 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testSelectNode() throws InterruptedException {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
-        
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -719,7 +718,7 @@ public class DefaultConnectionPolicyTest {
         try {
             assertEquals(p1, p.selectNode());
             assertEquals(p1, p.selectNode());
-        } catch (Exception e) {
+        } catch (final Exception e) {
             fail();
         }
 
@@ -734,10 +733,10 @@ public class DefaultConnectionPolicyTest {
             p.nodeFailed(p3);
             TimeUnit.MILLISECONDS.sleep(10);
             assertEquals(p1, p.selectNode());
-        } catch (RuntimeException e) {
+        } catch (final RuntimeException e) {
             fail();
         }
-        
+
         // getting random good nodes:
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
@@ -759,7 +758,7 @@ public class DefaultConnectionPolicyTest {
         try {
             // get 100 random nodes:
             for (int i = 0; i < 100; ++i) {
-                PeerNode n = p.selectNode();
+                final PeerNode n = p.selectNode();
                 if (n == p1) {
                     ++p1Found;
                 }
@@ -775,12 +774,12 @@ public class DefaultConnectionPolicyTest {
             assertTrue(p3Found == 0);
             // this may fail but the uniform random number distribution should
             // at result in p1 and p2 to be found 40 times:
-            if (p1Found < 40 || p2Found < 40) {
+            if ((p1Found < 40) || (p2Found < 40)) {
                 System.err
                         .println("Warning: DefaultConnectionPolicyTest::testSelectNodeIntPeerNodeE(): 100 selects, p1="
                                 + p1Found + ", p2=" + p2Found);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             fail();
         }
     }
@@ -791,11 +790,11 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testSelectNodeIntPeerNodeE() throws InterruptedException {
-        List<PeerNode> remotes = new ArrayList<PeerNode>();
+        final List<PeerNode> remotes = new ArrayList<PeerNode>();
         DefaultConnectionPolicy p;
         PeerNode p1, p2, p3;
-        PeerNode failedNode = new PeerNode("failedNode@localhost");
-        
+        final PeerNode failedNode = new PeerNode("failedNode@localhost");
+
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
         p2 = new PeerNode("test2@localhost");
@@ -816,7 +815,7 @@ public class DefaultConnectionPolicyTest {
         try {
             assertEquals(p1, p.selectNode(0, failedNode, new Exception()));
             assertEquals(p1, p.selectNode(0, failedNode, new Exception()));
-        } catch (Exception e) {
+        } catch (final Exception e) {
             fail();
         }
 
@@ -831,10 +830,10 @@ public class DefaultConnectionPolicyTest {
             p.nodeFailed(p3);
             TimeUnit.MILLISECONDS.sleep(10);
             assertEquals(p1, p.selectNode(0, failedNode, new Exception()));
-        } catch (Exception e) {
+        } catch (final Exception e) {
             fail();
         }
-        
+
         // getting random good nodes:
         remotes.clear();
         p1 = new PeerNode("test1@localhost");
@@ -856,7 +855,7 @@ public class DefaultConnectionPolicyTest {
         try {
             // get 100 random nodes:
             for (int i = 0; i < 100; ++i) {
-                PeerNode n = p.selectNode(0, failedNode, new Exception());
+                final PeerNode n = p.selectNode(0, failedNode, new Exception());
                 if (n == p1) {
                     ++p1Found;
                 }
@@ -872,12 +871,12 @@ public class DefaultConnectionPolicyTest {
             assertTrue(p3Found == 0);
             // this may fail but the uniform random number distribution should
             // at result in p1 and p2 to be found 40 times:
-            if (p1Found < 40 || p2Found < 40) {
+            if ((p1Found < 40) || (p2Found < 40)) {
                 System.err
                         .println("Warning: DefaultConnectionPolicyTest::testSelectNodeIntPeerNodeE(): 100 selects, p1="
                                 + p1Found + ", p2=" + p2Found);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             fail();
         }
     }
@@ -887,7 +886,7 @@ public class DefaultConnectionPolicyTest {
      */
     @Test
     public final void testGetMaxRetries() {
-        DefaultConnectionPolicy p = new DefaultConnectionPolicy(new PeerNode("test@localhost"));
+        final DefaultConnectionPolicy p = new DefaultConnectionPolicy(new PeerNode("test@localhost"));
         assertEquals(3, p.getMaxRetries());
         p.setMaxRetries(5);
         assertEquals(5, p.getMaxRetries());
@@ -899,7 +898,7 @@ public class DefaultConnectionPolicyTest {
 
     /**
      * Test method for {@link DefaultConnectionPolicy#setMaxRetries(int)}.
-     * 
+     *
      * Tries to set 3, 5, 1 and 0 retries and checks whether
      * {@link DefaultConnectionPolicy#selectNode(int, PeerNode, Exception)}
      * performs this many retries.
@@ -907,85 +906,85 @@ public class DefaultConnectionPolicyTest {
     @Test
     public final void testSetMaxRetries() {
         PeerNode remote = new PeerNode("test@localhost");
-        DefaultConnectionPolicy p = new DefaultConnectionPolicy(remote);
+        final DefaultConnectionPolicy p = new DefaultConnectionPolicy(remote);
         boolean exceptionThrown = false;
 
         ///// 3 retries:
         do {
             p.setMaxRetries(3);
-    
+
             try {
                 remote = p.selectNode(0, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
-    
+
             try {
                 remote = p.selectNode(2, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
-    
+
             try {
                 remote = p.selectNode(3, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
-    
+
             exceptionThrown = false;
             try {
                 remote = p.selectNode(4, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
-    
+
             exceptionThrown = false;
             try {
                 remote = p.selectNode(5, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
-    
+
             int retry = 0;
             try {
                 for (retry = 0; retry < 10; ++retry) {
                     remote = p.selectNode(retry, remote, new Exception());
     //                p.nodeFailed(remote);
                 }
-            } catch (Exception e) {
+            } catch (final Exception e) {
             }
             assertEquals(4, retry); // the 4th retry has not been performed
                                     // though
         } while (false);
-        
+
         ///// 5 retries:
         do {
             p.setMaxRetries(5);
 
             try {
                 remote = p.selectNode(0, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
-    
+
             try {
                 remote = p.selectNode(2, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
-    
+
             try {
                 remote = p.selectNode(5, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
 
             exceptionThrown = false;
             try {
                 remote = p.selectNode(6, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
@@ -993,7 +992,7 @@ public class DefaultConnectionPolicyTest {
             exceptionThrown = false;
             try {
                 remote = p.selectNode(7, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
@@ -1004,32 +1003,32 @@ public class DefaultConnectionPolicyTest {
                     remote = p.selectNode(retry, remote, new Exception());
                     // p.nodeFailed(remote);
                 }
-            } catch (Exception e) {
+            } catch (final Exception e) {
             }
             assertEquals(6, retry); // the 6th retry has not been performed
                                     // though
         } while (false);
-        
+
         ///// 1 retry:
         do {
             p.setMaxRetries(1);
 
             try {
                 remote = p.selectNode(0, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
-    
+
             try {
                 remote = p.selectNode(1, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
 
             exceptionThrown = false;
             try {
                 remote = p.selectNode(2, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
@@ -1037,7 +1036,7 @@ public class DefaultConnectionPolicyTest {
             exceptionThrown = false;
             try {
                 remote = p.selectNode(3, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
@@ -1048,26 +1047,26 @@ public class DefaultConnectionPolicyTest {
                     remote = p.selectNode(retry, remote, new Exception());
                     // p.nodeFailed(remote);
                 }
-            } catch (Exception e) {
+            } catch (final Exception e) {
             }
             assertEquals(2, retry); // the 2nd retry has not been performed
                                     // though
         } while (false);
-        
+
         ///// 0 retries:
         do {
             p.setMaxRetries(0);
 
             try {
                 remote = p.selectNode(0, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 fail();
             }
 
             exceptionThrown = false;
             try {
                 remote = p.selectNode(1, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
@@ -1075,7 +1074,7 @@ public class DefaultConnectionPolicyTest {
             exceptionThrown = false;
             try {
                 remote = p.selectNode(2, remote, new Exception());
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 exceptionThrown = true;
             }
             assertTrue(exceptionThrown);
@@ -1086,7 +1085,7 @@ public class DefaultConnectionPolicyTest {
                     remote = p.selectNode(retry, remote, new Exception());
                     // p.nodeFailed(remote);
                 }
-            } catch (Exception e) {
+            } catch (final Exception e) {
             }
             assertEquals(1, retry); // the 1st retry has not been performed
                                     // though

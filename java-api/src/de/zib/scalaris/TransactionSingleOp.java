@@ -22,19 +22,19 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
  * Provides methods to read and write key/value pairs to/from a scalaris ring.
- * 
+ *
  * <p>
  * Each operation is a single transaction. If you are looking for more
  * transactions, use the {@link Transaction} class instead.
  * </p>
- * 
+ *
  * <p>
  * Instances of this class can be generated using a given connection to a
  * scalaris node ({@link #TransactionSingleOp(Connection)}) or without a
  * connection ({@link #TransactionSingleOp()}) in which case a new connection
  * is created using {@link ConnectionFactory#createConnection()}.
  * </p>
- * 
+ *
  * <p>
  * There are two paradigms for reading and writing values:
  * <ul>
@@ -55,24 +55,24 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *       inserting strings is provided by
  *       {@link de.zib.scalaris.examples.ErlangValueFastString} and can be
  *       tested by {@link de.zib.scalaris.examples.FastStringBenchmark}.</p>
- * </ul> 
+ * </ul>
  * </p>
- * 
+ *
  * <h3>Reading values</h3>
  * <pre>
  * <code style="white-space:pre;">
  *   String key;
  *   OtpErlangString otpKey;
- *   
+ *
  *   TransactionSingleOp sc = new TransactionSingleOp();
  *   String value             = sc.read(key).stringValue(); // {@link #read(String)}
  *   OtpErlangObject optValue = sc.read(otpKey).value();    // {@link #read(OtpErlangString)}
  * </code>
  * </pre>
- * 
+ *
  * <p>For the full example, see
  * {@link de.zib.scalaris.examples.TransactionSingleOpReadExample}</p>
- * 
+ *
  * <h3>Writing values</h3>
  * <pre>
  * <code style="white-space:pre;">
@@ -80,25 +80,25 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *   String value;
  *   OtpErlangString otpKey;
  *   OtpErlangString otpValue;
- *   
+ *
  *   TransactionSingleOp sc = new TransactionSingleOp();
  *   sc.write(key, value);             // {@link #write(String, Object)}
  *   sc.writeObject(otpKey, otpValue); // {@link #write(OtpErlangString, OtpErlangObject)}
  * </code>
  * </pre>
- * 
+ *
  * <p>For the full example, see
  * {@link de.zib.scalaris.examples.TransactionSingleOpWriteExample}</p>
- * 
+ *
  * <h3>Connection errors</h3>
- * 
+ *
  * Errors when setting up connections or trying to send/receive RPCs will be
  * handed to the {@link ConnectionPolicy} that has been set when the connection
  * was created. By default, {@link ConnectionFactory} uses
  * {@link DefaultConnectionPolicy} which implements automatic connection
  * retries by classifying nodes as good or bad depending on their previous
  * state. The number of automatic retries is adjustable (default: 3).
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.4
  * @since 2.0
@@ -107,12 +107,12 @@ public class TransactionSingleOp {
     /**
      * Connection to a TransactionSingleOp node.
      */
-    private Connection connection;
-    
+    private final Connection connection;
+
     /**
      * Constructor, uses the default connection returned by
      * {@link ConnectionFactory#createConnection()}.
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      */
@@ -122,26 +122,26 @@ public class TransactionSingleOp {
 
     /**
      * Constructor, uses the given connection to an erlang node.
-     * 
+     *
      * @param conn
      *            connection to use for the transaction
      */
-    public TransactionSingleOp(Connection conn) {
+    public TransactionSingleOp(final Connection conn) {
         connection = conn;
     }
-    
+
     // /////////////////////////////
     // read methods
     // /////////////////////////////
-    
+
     /**
      * Gets the value stored under the given <tt>key</tt>.
-     * 
+     *
      * @param key
      *            the key to look up
-     * 
+     *
      * @return the value stored under the given <tt>key</tt>
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -152,25 +152,25 @@ public class TransactionSingleOp {
      *             if the requested key does not exist
      * @throws UnknownException
      *             if any other error occurs
-     * 
+     *
      * @since 2.9
      */
-    public ErlangValue read(OtpErlangString key)
+    public ErlangValue read(final OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
-        OtpErlangObject received_raw = connection.doRPC("api_tx", "read",
+        final OtpErlangObject received_raw = connection.doRPC("api_tx", "read",
                 new OtpErlangList(key));
         return new ErlangValue(CommonErlangObjects.processResult_read(received_raw));
     }
 
     /**
      * Gets the value stored under the given <tt>key</tt>.
-     * 
+     *
      * @param key
      *            the key to look up
-     * 
+     *
      * @return the value stored under the given <tt>key</tt>
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -181,11 +181,11 @@ public class TransactionSingleOp {
      *             if the requested key does not exist
      * @throws UnknownException
      *             if any other error occurs
-     * 
+     *
      * @see #read(OtpErlangString)
      * @since 2.9
      */
-    public ErlangValue read(String key) throws ConnectionException,
+    public ErlangValue read(final String key) throws ConnectionException,
             TimeoutException, NotFoundException, UnknownException {
         return read(new OtpErlangString(key));
     }
@@ -196,12 +196,12 @@ public class TransactionSingleOp {
 
     /**
      * Stores the given <tt>key</tt>/<tt>value</tt> pair.
-     * 
+     *
      * @param key
      *            the key to store the value for
      * @param value
      *            the value to store
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -212,19 +212,19 @@ public class TransactionSingleOp {
      *             if the commit of the write failed
      * @throws UnknownException
      *             if any other error occurs
-     * 
+     *
      * @since 2.9
      */
-    public void write(OtpErlangString key, OtpErlangObject value)
+    public void write(final OtpErlangString key, final OtpErlangObject value)
             throws ConnectionException, TimeoutException, AbortException, UnknownException {
-        OtpErlangObject received_raw = connection.doRPC("api_tx", "write",
+        final OtpErlangObject received_raw = connection.doRPC("api_tx", "write",
                 new OtpErlangObject[] { key, value });
         CommonErlangObjects.processResult_commit(received_raw);
     }
 
     /**
      * Stores the given <tt>key</tt>/<tt>value</tt> pair.
-     * 
+     *
      * @param <T>
      *            the type of the value to store.
      *            See {@link ErlangValue} for a list of supported types.
@@ -247,7 +247,7 @@ public class TransactionSingleOp {
      * @see #write(OtpErlangString, OtpErlangObject)
      * @since 2.9
      */
-    public <T> void write(String key, T value) throws ConnectionException,
+    public <T> void write(final String key, final T value) throws ConnectionException,
             TimeoutException, AbortException, UnknownException {
         write(new OtpErlangString(key), ErlangValue.convertToErlang(value));
     }
@@ -259,14 +259,14 @@ public class TransactionSingleOp {
     /**
      * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
      * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
-     * 
+     *
      * @param key
      *            the key to store the value for
      * @param old_value
      *            the old value to check
      * @param new_value
      *            the value to store
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -281,25 +281,25 @@ public class TransactionSingleOp {
      *             if any other error occurs
      * @throws KeyChangedException
      *             if the key did not match <tt>old_value</tt>
-     * 
+     *
      * @since 2.9
      */
-    public void testAndSet(OtpErlangString key,
-            OtpErlangObject old_value, OtpErlangObject new_value)
+    public void testAndSet(final OtpErlangString key,
+            final OtpErlangObject old_value, final OtpErlangObject new_value)
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
-        OtpErlangObject received_raw = connection.doRPC("api_tx", "test_and_set",
+        final OtpErlangObject received_raw = connection.doRPC("api_tx", "test_and_set",
                 new OtpErlangObject[] { key, old_value, new_value });
         /*
          * possible return values:
          *  {ok} | {fail, timeout | abort | not_found | {key_changed, RealOldValue}
          */
         try {
-            OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
-            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
-                OtpErlangObject reason = received.elementAt(1);
+            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
+                final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
                     throw new TimeoutException(received_raw);
                 } else if (reason.equals(CommonErlangObjects.abortAtom)) {
@@ -307,16 +307,16 @@ public class TransactionSingleOp {
                 } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
                     throw new NotFoundException(received_raw);
                 } else {
-                    OtpErlangTuple reason_tpl = (OtpErlangTuple) reason;
+                    final OtpErlangTuple reason_tpl = (OtpErlangTuple) reason;
                     if (reason_tpl.elementAt(0).equals(
                             CommonErlangObjects.keyChangedAtom)
-                            && reason_tpl.arity() == 2) {
+                            && (reason_tpl.arity() == 2)) {
                         throw new KeyChangedException(reason_tpl.elementAt(1));
                     }
                 }
             }
             throw new UnknownException(received_raw);
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
         }
@@ -325,7 +325,7 @@ public class TransactionSingleOp {
     /**
      * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
      * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
-     * 
+     *
      * @param <OldT>
      *            the type of the stored (old) value.
      *            See {@link ErlangValue} for a list of supported types.
@@ -357,17 +357,17 @@ public class TransactionSingleOp {
      * @see #testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)
      * @since 2.9
      */
-    public <OldT, NewT> void testAndSet(String key, OldT old_value, NewT new_value)
+    public <OldT, NewT> void testAndSet(final String key, final OldT old_value, final NewT new_value)
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
         testAndSet(new OtpErlangString(key),
                 ErlangValue.convertToErlang(old_value),
                 ErlangValue.convertToErlang(new_value));
     }
-    
+
     /**
      * Closes the transaction's connection to a scalaris node.
-     * 
+     *
      * Note: Subsequent calls to the other methods will throw
      * {@link ConnectionException}s!
      */

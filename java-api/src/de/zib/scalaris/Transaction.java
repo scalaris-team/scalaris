@@ -25,14 +25,14 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
  * Provides means to realise a transaction with the scalaris ring using Java.
- * 
+ *
  * <p>
  * Instances of this class can be generated using a given connection to a
  * scalaris node using {@link #Transaction(Connection)} or without a
  * connection ({@link #Transaction()}) in which case a new connection is
  * created using {@link ConnectionFactory#createConnection()}.
  * </p>
- * 
+ *
  * <p>
  * There are two paradigms for reading and writing values:
  * <ul>
@@ -53,48 +53,48 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *       inserting strings is provided by
  *       {@link de.zib.scalaris.examples.ErlangValueFastString} and can be
  *       tested by {@link de.zib.scalaris.examples.FastStringBenchmark}.</p>
- * </ul> 
+ * </ul>
  * </p>
- * 
+ *
  * <h3>Example:</h3>
  * <pre>
  * <code style="white-space:pre;">
  *   OtpErlangString otpKey;
  *   OtpErlangString otpValue;
  *   OtpErlangObject otpResult;
- *   
+ *
  *   String key;
  *   String value;
  *   String result;
- *   
+ *
  *   Transaction t1 = new Transaction();  // {@link #Transaction()}
- *   
+ *
  *   t1.write(key, value);                // {@link #write(String, Object)}
  *   t1.write(otpKey, otpValue);          // {@link #write(OtpErlangString, OtpErlangObject)}
- *   
+ *
  *   result = t1.read(key).stringValue(); //{@link #read(String)}
  *   otpResult = t1.read(otpKey).value(); //{@link #read(OtpErlangString)}
- *   
+ *
  *   transaction.commit(); // {@link #commit()}
  * </code>
  * </pre>
- * 
+ *
  * <p>
  * For more examples, have a look at
  * {@link de.zib.scalaris.examples.TransactionReadExample},
  * {@link de.zib.scalaris.examples.TransactionWriteExample} and
  * {@link de.zib.scalaris.examples.TransactionReadWriteExample}.
  * </p>
- * 
+ *
  * <h3>Connection errors</h3>
- * 
+ *
  * Errors when setting up connections or trying to send/receive RPCs will be
  * handed to the {@link ConnectionPolicy} that has been set when the connection
  * was created. By default, {@link ConnectionFactory} uses
  * {@link DefaultConnectionPolicy} which implements automatic connection-retries
  * by classifying nodes as good or bad depending on their previous state. The
  * number of automatic retries is adjustable (default: 3).
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.4
  * @since 2.0
@@ -109,11 +109,11 @@ public class Transaction {
      * connection to a scalaris node
      */
     private Connection connection;
-    
+
     /**
      * Constructor, uses the default connection returned by
      * {@link ConnectionFactory#createConnection()}.
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      */
@@ -123,39 +123,44 @@ public class Transaction {
 
     /**
      * Constructor, uses the given connection to an erlang node.
-     * 
+     *
      * @param conn
      *            connection to use for the transaction
      */
     public Transaction(Connection conn) {
         connection = conn;
     }
-    
+
     /**
      * Encapsulates requests that can be used for transactions in
      * {@link Transaction#req_list(RequestList)}.
-     * 
+     *
      * @author Nico Kruber, kruber@zib.de
-     * 
+     *
      * @since 3.4
      */
     public static class RequestList {
         private List<OtpErlangObject> requests = new ArrayList<OtpErlangObject>(10);
         private boolean isCommit = false;
-        
+
         /**
          * Default constructor.
          */
         public RequestList() {
         }
-        
+
         /**
          * Adds a read operation to the list of requests.
-         * 
+         *
          * @param key  the key to read
-         * 
+         *
          * @return this {@link RequestList} object
-         */
+     
+import com.ericsson.otp.erlang.OtpErlangObject;
+import com.ericsson.otp.erlang.OtpErlangString;
+
+import de.zib.scalaris.Transaction.RequestList;
+    */
         public RequestList addRead(OtpErlangObject key) {
             if (isCommit) {
                 throw new UnsupportedOperationException("No further request supported after a commit!");
@@ -168,9 +173,9 @@ public class Transaction {
 
         /**
          * Adds a read operation to the list of requests.
-         * 
+         *
          * @param key  the key to read
-         * 
+         *
          * @return this {@link RequestList} object
          */
         public RequestList addRead(String key) {
@@ -179,10 +184,10 @@ public class Transaction {
 
         /**
          * Adds a write operation to the list of requests.
-         * 
+         *
          * @param key    the key to write the value to
          * @param value  the value to write
-         * 
+         *
          * @return this {@link RequestList} object
          */
         public RequestList addWrite(OtpErlangObject key, OtpErlangObject value) {
@@ -197,10 +202,10 @@ public class Transaction {
 
         /**
          * Adds a write operation to the list of requests.
-         * 
+         *
          * @param key    the key to write the value to
          * @param value  the value to write
-         * 
+         *
          * @return this {@link RequestList} object
          */
         public <T>  RequestList addWrite(String key, T value) {
@@ -209,7 +214,7 @@ public class Transaction {
 
         /**
          * Adds a commit operation to the list of requests.
-         * 
+         *
          * @return this {@link RequestList} object
          */
         public RequestList addCommit() {
@@ -225,16 +230,16 @@ public class Transaction {
         /**
          * Gets the whole request list as erlang terms as required by
          * <code>api_tx:req_list/2</code>
-         * 
+         *
          * @return an erlang list of requests
          */
         OtpErlangList getErlangReqList() {
             return new OtpErlangList(requests.toArray(new OtpErlangObject[0]));
         }
-        
+
         /**
          * Returns whether the transactions contains a commit or not.
-         * 
+         *
          * @return <tt>true</tt> if the operation contains a commit,
          *         <tt>false</tt> otherwise
          */
@@ -242,30 +247,30 @@ public class Transaction {
             return isCommit;
         }
     }
-    
+
     /**
      * Encapsulates a list of results as returned by
      * {@link Transaction#req_list(RequestList)}.
-     * 
+     *
      * @author Nico Kruber, kruber@zib.de
-     * 
+     *
      * @since 3.4
      */
     public final static class ResultList {
         private OtpErlangList results = new OtpErlangList();
-        
+
         /**
          * Default constructor.
-         * 
+         *
          * @param results  the raw results list as returned by scalaris.
          */
         ResultList(OtpErlangList results) {
             this.results = results;
         }
-        
+
         /**
          * Gets the number of results in the list.
-         * 
+         *
          * @return total number of results
          */
         public int size() {
@@ -275,12 +280,12 @@ public class Transaction {
         /**
          * Processes the result at the given position which originated from
          * a read request and returns the value that has been read.
-         * 
+         *
          * @param pos
          *            the position in the result list
-         * 
-         * @return the stored value 
-         * 
+         *
+         * @return the stored value
+         *
          * @throws TimeoutException
          *             if a timeout occurred while trying to fetch the value
          * @throws NotFoundException
@@ -297,7 +302,7 @@ public class Transaction {
         /**
          * Processes the result at the given position which originated from
          * a write request.
-         * 
+         *
          * @param pos
          *            the position in the result list
          *
@@ -314,7 +319,7 @@ public class Transaction {
         /**
          * Processes the result at the given position which originated from
          * a commit request.
-         * 
+         *
          * @param pos
          *            the position in the result list
          *
@@ -329,11 +334,11 @@ public class Transaction {
                 AbortException, UnknownException {
             CommonErlangObjects.processResult_commit(results.elementAt(pos));
         }
-        
+
         /**
          * Gets the raw results.
          * (for internal use)
-         * 
+         *
          * @return results as returned by erlang
          */
         OtpErlangList getResults() {
@@ -343,20 +348,20 @@ public class Transaction {
 
     /**
      * Executes all requests in <code>req</code>.
-     * 
+     *
      * <p>
      * The transaction's log is reset if a commit in the request list was
      * successful, otherwise it still retains in the transaction which must be
      * successfully committed, aborted or reset in order to be (re-)used for
      * another request.
      * </p>
-     * 
+     *
      * @param req
      *            the requests to issue
-     * 
+     *
      * @return results of all requests in the same order as they appear in
      *         <code>req</code>
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -407,13 +412,13 @@ public class Transaction {
 
     /**
      * Commits the current transaction.
-     * 
+     *
      * <p>
      * The transaction's log is reset if the commit was successful, otherwise it
      * still retains in the transaction which must be successfully committed,
      * aborted or reset in order to be (re-)used for another request.
      * </p>
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -427,7 +432,7 @@ public class Transaction {
      *             an unknown type/structure, this exception is thrown. Neither
      *             the transaction log nor the local operations buffer is
      *             emptied, so that the commit can be tried again.
-     * 
+     *
      * @see #abort()
      */
     public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
@@ -436,7 +441,7 @@ public class Transaction {
 
     /**
      * Cancels the current transaction.
-     * 
+     *
      * <p>
      * For a transaction to be cancelled, only the {@link #transLog} needs to be
      * reset. Nothing else needs to be done since the data was not modified
@@ -451,12 +456,12 @@ public class Transaction {
 
     /**
      * Gets the value stored under the given <code>key</code>.
-     * 
+     *
      * @param key
      *            the key to look up
      *
      * @return the value stored under the given <code>key</code>
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -467,7 +472,7 @@ public class Transaction {
      *             if the requested key does not exist
      * @throws UnknownException
      *             if any other error occurs
-     * 
+     *
      * @since 2.9
      */
     public ErlangValue read(OtpErlangString key)
@@ -486,12 +491,12 @@ public class Transaction {
 
     /**
      * Gets the value stored under the given <code>key</code>.
-     * 
+     *
      * @param key
      *            the key to look up
      *
      * @return the value stored under the given <code>key</code>
-     * 
+     *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
@@ -502,7 +507,7 @@ public class Transaction {
      *             if the requested key does not exist
      * @throws UnknownException
      *             if any other error occurs
-     * 
+     *
      * @see #read(OtpErlangString)
      * @since 2.9
      */
@@ -513,7 +518,7 @@ public class Transaction {
 
     /**
      * Stores the given <code>key</code>/<code>value</code> pair.
-     * 
+     *
      * @param key
      *            the key to store the value for
      * @param value
@@ -527,7 +532,7 @@ public class Transaction {
      *             if a timeout occurred while trying to write the value
      * @throws UnknownException
      *             if any other error occurs
-     * 
+     *
      * @since 2.9
      */
     public void write(OtpErlangString key, OtpErlangObject value)
@@ -546,7 +551,7 @@ public class Transaction {
 
     /**
      * Stores the given <code>key</code>/<code>value</code> pair.
-     * 
+     *
      * @param <T>
      *            the type of the <tt>value</tt>
      * @param key
@@ -570,10 +575,10 @@ public class Transaction {
             TimeoutException, UnknownException {
         write(new OtpErlangString(key), ErlangValue.convertToErlang(value));
     }
-    
+
     /**
      * Closes the transaction's connection to a scalaris node.
-     * 
+     *
      * Note: Subsequent calls to the other methods will throw
      * {@link ConnectionException}s!
      */

@@ -20,7 +20,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 /**
  * Generic exception that is thrown during operations on a scalaris ring, e.g.
  * if an unknown result has been returned.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.2
  * @since 2.0
@@ -39,49 +39,49 @@ public class UnknownException extends RuntimeException {
 
     /**
      * Creates the exception with the given message.
-     * 
+     *
      * @param msg
      *            message of the exception
      */
-    public UnknownException(String msg) {
+    public UnknownException(final String msg) {
         super(msg);
     }
 
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e
      *            the exception to "re-throw"
      */
-    public UnknownException(Throwable e) {
+    public UnknownException(final Throwable e) {
         super(e.getMessage());
         setStackTrace(e.getStackTrace());
     }
 
     /**
      * Creates an exception including the message of the given erlang object.
-     * 
+     *
      * @param erlValue
      *            the erlang message to include
-     * 
+     *
      * @since 2.2
      */
-    public UnknownException(OtpErlangObject erlValue) {
+    public UnknownException(final OtpErlangObject erlValue) {
         super("Erlang message: " + erlValue.toString());
     }
 
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e
      *            the exception to "re-throw"
      * @param erlValue
      *            the string representation of this erlang value is included
      *            into the message
-     * 
+     *
      * @since 2.2
      */
-    public UnknownException(Throwable e, OtpErlangObject erlValue) {
+    public UnknownException(final Throwable e, final OtpErlangObject erlValue) {
         super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
         setStackTrace(e.getStackTrace());
     }

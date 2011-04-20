@@ -21,9 +21,9 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 /**
  * Exception that is thrown if a test_and_set operation on a scalaris ring
  * fails because the old value did not match the expected value.
- * 
+ *
  * Contains the old value stored in scalaris.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.7
  * @since 2.7
@@ -37,15 +37,15 @@ public class KeyChangedException extends OtpErlangException {
     /**
      * The value stored in scalaris.
      */
-    private OtpErlangObject oldValue;
+    private final OtpErlangObject oldValue;
 
     /**
      * Creates the exception with the given old value.
-     * 
+     *
      * @param old_value
      *            the old value stored in scalaris
      */
-    public KeyChangedException(OtpErlangObject old_value) {
+    public KeyChangedException(final OtpErlangObject old_value) {
         super();
         this.oldValue = old_value;
     }
@@ -53,13 +53,13 @@ public class KeyChangedException extends OtpErlangException {
     /**
      * Creates the exception with the given old value taking the message of the
      * given throwable.
-     * 
+     *
      * @param e
      *            the exception to "re-throw"
      * @param old_value
      *            the old value stored in scalaris
      */
-    public KeyChangedException(Throwable e, OtpErlangObject old_value) {
+    public KeyChangedException(final Throwable e, final OtpErlangObject old_value) {
         super(e.getMessage());
         this.oldValue = old_value;
         setStackTrace(e.getStackTrace());
@@ -67,7 +67,7 @@ public class KeyChangedException extends OtpErlangException {
 
     /**
      * Returns the (old) value stored in scalaris.
-     * 
+     *
      * @return the value
      */
     public OtpErlangObject getOldValue() {

@@ -40,24 +40,23 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 /**
  * Unit tests for {@link ErlangValue}.
- * 
+ *
  * TODO: implement tests verifying that the expected exceptions are thrown for
  * unsupported conversions
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  */
 public class ErlangValueTest {
-    
     private static BigInteger getRandomBigInt(Random random) {
         return BigInteger.valueOf(random.nextLong()).multiply(BigInteger.valueOf(random.nextLong()));
     }
-    
+
     private static byte[] getRandomBytes(Random random, int size) {
         byte[] bytes = new byte[size];
         random.nextBytes(bytes);
         return bytes;
     }
-    
+
     private static String getRandomString(Random random, int length, boolean onlyChars) {
         if (onlyChars) {
             return getRandomCharString(random, length);
@@ -80,7 +79,7 @@ public class ErlangValueTest {
             symbols[i + 26] = (char) ('0' + i);
         }
     }
-    
+
     private static String getRandomCharString(Random random, int length) {
         if(length > 0) {
             char[] result = new char[length];
@@ -93,12 +92,12 @@ public class ErlangValueTest {
         }
         return "";
     }
-    
+
     private static List<Object> getRandomList(Random random, int capacity) {
         // note: we do not generate (recursive) maps -> so there won't be keys to worry about
         return getRandomListRecursive(random, capacity, 0, false);
     }
-    
+
     private static List<Object> getRandomListRecursive(Random random, int capacity, int maxDepth, boolean mapKeyOnlyChars) {
         List<Object> currentList = null;
         currentList = new ArrayList<Object>(capacity);
@@ -134,7 +133,7 @@ public class ErlangValueTest {
         }
         return currentList;
     }
-    
+
     private static Map<String, Object> getRandomMapRecursive(Random random, int capacity, int maxDepth, boolean keyOnlyChars) {
         Map<String, Object> currentMap = null;
         currentMap = new LinkedHashMap<String, Object>(capacity);
@@ -175,7 +174,7 @@ public class ErlangValueTest {
         }
         return currentMap;
     }
-    
+
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#boolValue()}.
      */
@@ -185,7 +184,7 @@ public class ErlangValueTest {
         ErlangValue trueValOtp = new ErlangValue(new OtpErlangBoolean(true));
         ErlangValue falseVal = new ErlangValue(false);
         ErlangValue falseValOtp = new ErlangValue(new OtpErlangBoolean(false));
-        
+
         assertEquals(true, trueVal.boolValue());
         assertEquals(true, trueValOtp.boolValue());
         assertEquals(false, falseVal.boolValue());
@@ -194,7 +193,7 @@ public class ErlangValueTest {
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#intValue()}.
-     * 
+     *
      * @throws Exception if a test with a random integer failed
      */
     @Test
@@ -210,18 +209,18 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testIntValue(int value) {
         ErlangValue eVal = new ErlangValue(value);
         ErlangValue eValOtp = new ErlangValue(new OtpErlangInt(value));
-        
+
         assertEquals(value, eVal.intValue());
         assertEquals(value, eValOtp.intValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#longValue()}.
-     * 
+     *
      * @throws Exception if a test with a random long failed
      */
     @Test
@@ -237,18 +236,18 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testLongValue(long value) {
         ErlangValue eVal = new ErlangValue(value);
         ErlangValue eValOtp = new ErlangValue(new OtpErlangLong(value));
-        
+
         assertEquals(value, eVal.longValue());
         assertEquals(value, eValOtp.longValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#bigIntValue()}.
-     * 
+     *
      * @throws Exception if a test with a random big integer failed
      */
     @Test
@@ -264,18 +263,18 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testBigIntValue(BigInteger value) {
         ErlangValue eVal = new ErlangValue(value);
         ErlangValue eValOtp = new ErlangValue(new OtpErlangLong(value));
-        
+
         assertEquals(value, eVal.bigIntValue());
         assertEquals(value, eValOtp.bigIntValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#doubleValue()}.
-     * 
+     *
      * @throws Exception if a test with a random double failed
      */
     @Test
@@ -291,18 +290,18 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testDoubleValue(double value) {
         ErlangValue eVal = new ErlangValue(value);
         ErlangValue eValOtp = new ErlangValue(new OtpErlangDouble(value));
-        
+
         assertEquals(value, eVal.doubleValue(), 0.0);
         assertEquals(value, eValOtp.doubleValue(), 0.0);
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#stringValue()}.
-     * 
+     *
      * @throws Exception if a test with a random double failed
      */
     @Test
@@ -318,18 +317,18 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testStringValue(String value) {
         ErlangValue eVal = new ErlangValue(value);
         ErlangValue eValOtp = new ErlangValue(new OtpErlangString(value));
-        
+
         assertEquals(value, eVal.stringValue());
         assertEquals(value, eValOtp.stringValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#binaryValue()}.
-     * 
+     *
      * @throws Exception if a test with a random byte array failed
      */
     @Test
@@ -344,18 +343,18 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testBinaryValue(byte[] value) {
         ErlangValue eVal = new ErlangValue(value);
         ErlangValue eValOtp = new ErlangValue(new OtpErlangBinary(value));
-        
+
         assertArrayEquals(value, eVal.binaryValue());
         assertArrayEquals(value, eValOtp.binaryValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#listValue()}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
@@ -374,7 +373,7 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testListValue(List<Object> value) {
         ErlangValue eVal = new ErlangValue(value);
         OtpErlangObject[] valueOtp = new OtpErlangObject[value.size()];
@@ -382,7 +381,7 @@ public class ErlangValueTest {
         for (Iterator<Object> iterator = value.iterator(); iterator.hasNext();) {
             Object value_i = iterator.next();
             OtpErlangObject valueOtp_i;
-            
+
             if (value_i instanceof Boolean) {
                 valueOtp_i = new OtpErlangBoolean((Boolean) value_i);
             } else if (value_i instanceof Integer) {
@@ -406,7 +405,7 @@ public class ErlangValueTest {
         compareList(value, eVal.listValue());
         compareList(value, eValOtp.listValue());
     }
-    
+
     private static void compareList(List<Object> expected, List<ErlangValue> actual) {
         assertEquals(expected.size(), actual.size());
         for (int j = 0; j < actual.size(); ++j) {
@@ -432,7 +431,7 @@ public class ErlangValueTest {
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#longListValue()}.
-     * 
+     *
      * @throws Exception if a test with a random list of longs failed
      */
     @Test
@@ -452,7 +451,7 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testLongListValue(List<Long> value) {
         ErlangValue eVal = new ErlangValue(value);
         OtpErlangLong[] valueOtp = new OtpErlangLong[value.size()];
@@ -462,14 +461,14 @@ public class ErlangValueTest {
             valueOtp[i++] = new OtpErlangLong(long1);
         }
         ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
-        
+
         assertEquals(value, eVal.longListValue());
         assertEquals(value, eValOtp.longListValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#doubleListValue()}.
-     * 
+     *
      * @throws Exception if a test with a random list of doubles failed
      */
     @Test
@@ -489,7 +488,7 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testDoubleListValue(List<Double> value) {
         ErlangValue eVal = new ErlangValue(value);
         OtpErlangDouble[] valueOtp = new OtpErlangDouble[value.size()];
@@ -499,14 +498,14 @@ public class ErlangValueTest {
             valueOtp[i++] = new OtpErlangDouble(double1);
         }
         ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
-        
+
         assertEquals(value, eVal.doubleListValue());
         assertEquals(value, eValOtp.doubleListValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#stringListValue()}.
-     * 
+     *
      * @throws Exception if a test with a random list of strings failed
      */
     @Test
@@ -526,7 +525,7 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testStringListValue(List<String> value) {
         ErlangValue eVal = new ErlangValue(value);
         OtpErlangString[] valueOtp = new OtpErlangString[value.size()];
@@ -536,14 +535,14 @@ public class ErlangValueTest {
             valueOtp[i++] = new OtpErlangString(string1);
         }
         ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
-        
+
         assertEquals(value, eVal.stringListValue());
         assertEquals(value, eValOtp.stringListValue());
     }
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#binaryListValue()}.
-     * 
+     *
      * @throws Exception if a test with a random list of binaries failed
      */
     @Test
@@ -563,7 +562,7 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testBinaryListValue(List<byte[]> value) {
         ErlangValue eVal = new ErlangValue(value);
         OtpErlangBinary[] valueOtp = new OtpErlangBinary[value.size()];
@@ -586,7 +585,7 @@ public class ErlangValueTest {
 
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue()}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
@@ -604,13 +603,13 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     private final void testJsonValue(Map<String, Object> value) {
         ErlangValue eVal = new ErlangValue(value);
         Map<String, Object> actual = eVal.jsonValue();
         compareMap(value, actual);
     }
-    
+
     private final void compareMap(Map<String, Object> expected, Map<String, Object> actual) {
         assertEquals(expected.size(), actual.size());
         for (Entry<String, Object> entry : expected.entrySet()) {
@@ -630,16 +629,16 @@ public class ErlangValueTest {
         private BigInteger d = new BigInteger("0");
         private double e = 0.0;
         private String f = "";
-        
+
         public JSONBeanTest1() {}
-        
+
         public boolean getA() { return a; }
         public int getB() { return b; }
         public long getC() { return c; }
         public BigInteger getD() { return d; }
         public double getE() { return e; }
         public String getF() { return f; }
-        
+
         public void setA(boolean a_) { this.a = a_; }
         public void setB(int b_) { this.b = b_; }
         public void setC(long c_) { this.c = c_; }
@@ -647,11 +646,11 @@ public class ErlangValueTest {
         public void setE(double e_) { this.e = e_; }
         public void setF(String f_) { this.f = f_; }
     }
-    
+
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
      * writing a {@link Map} and reading a {@link JSONBeanTest1}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
@@ -679,11 +678,11 @@ public class ErlangValueTest {
             assertEquals(map.get("f"), actual.getF());
         }
     }
-    
+
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
      * writing a {@link JSONBeanTest1} and reading a {@link JSONBeanTest1}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
@@ -722,9 +721,9 @@ public class ErlangValueTest {
         private List<Object> g2 = new ArrayList<Object>();
         private JSONBeanTest1 h2 = new JSONBeanTest1();
         private Map<String, Object> i2 = new LinkedHashMap<String, Object>();
-        
+
         public JSONBeanTest2() {}
-        
+
         public boolean getA2() { return a2; }
         public int getB2() { return b2; }
         public long getC2() { return c2; }
@@ -734,7 +733,7 @@ public class ErlangValueTest {
         public List<Object> getG2() { return g2; }
         public JSONBeanTest1 getH2() { return h2; }
         public Map<String, Object> getI2() { return i2; }
-        
+
         public void setA2(boolean a_) { this.a2 = a_; }
         public void setB2(int b_) { this.b2 = b_; }
         public void setC2(long c_) { this.c2 = c_; }
@@ -745,11 +744,11 @@ public class ErlangValueTest {
         public void setH2(JSONBeanTest1 h_) { this.h2 = h_; }
         public void setI2(Map<String, Object> i_) { this.i2 = i_; }
     }
-    
+
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
      * writing a {@link Map} and reading a {@link JSONBeanTest2}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
@@ -797,11 +796,11 @@ public class ErlangValueTest {
             compareMap(map2, actual.getI2());
         }
     }
-    
+
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
      * writing a {@link JSONBeanTest2} and reading a {@link JSONBeanTest2}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
@@ -854,20 +853,20 @@ public class ErlangValueTest {
     private static class JSONBeanTest3 {
         private List<JSONBeanTest1> a3 = new ArrayList<JSONBeanTest1>();
         private Map<String, JSONBeanTest1> b3 = new LinkedHashMap<String, JSONBeanTest1>();
-        
+
         public JSONBeanTest3() {}
-        
+
         public List<JSONBeanTest1> getA3() { return a3; }
         public Map<String, JSONBeanTest1> getB3() { return b3; }
-        
+
         public void setA3(List<JSONBeanTest1> a_) { this.a3 = a_; }
         public void setB3(Map<String, JSONBeanTest1> b_) { this.b3 = b_; }
     }
-    
+
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
      * writing a {@link Map} and reading a {@link JSONBeanTest3}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed
@@ -925,11 +924,11 @@ public class ErlangValueTest {
             }
         }
     }
-    
+
     /**
      * Test method for {@link de.zib.scalaris.ErlangValue#jsonValue(Class)}
      * writing a {@link JSONBeanTest2} and reading a {@link JSONBeanTest2}.
-     * 
+     *
      * @throws Exception
      *             if a test with a random list of mixed objects (bool, int,
      *             long, BigInteger, double, String) failed

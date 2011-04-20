@@ -23,13 +23,13 @@ import java.util.Properties;
 
 /**
  * Provides methods to load property files with default look up mechanisms.
- * 
+ *
  * <h3>Example:</h3>
  * <code style="white-space:pre;">
  *   Properties properties = new Properties();
  *   PropertyLoader.loadProperties(properties, "PropertiesFile.properties"); // {@link #loadProperties(java.util.Properties, String)}
  * </code>
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 1.0
  */
@@ -37,23 +37,22 @@ public class PropertyLoader {
     /**
      * Tries to locate the file given by {@code filename} and loads it into the
      * given properties parameter.
-     * 
+     *
      * @param properties
      *            the {@link Properties} object to load the file into
      * @param filename
      *            the filename of the file containing the properties
-     * 
+     *
      * @return indicates whether the properties have been successfully loaded
      */
-    public static boolean loadProperties(Properties properties, String filename) {
+    public static boolean loadProperties(final Properties properties, final String filename) {
         FileInputStream fis = null;
         try {
-            ClassLoader classLoader = PropertyLoader.class
-                    .getClassLoader();
+            final ClassLoader classLoader = PropertyLoader.class.getClassLoader();
             if (classLoader != null) {
-                URL url = classLoader.getResource(filename);
+                final URL url = classLoader.getResource(filename);
                 if (url != null) {
-                    String path = url.getFile();
+                    final String path = url.getFile();
                     fis = new FileInputStream(path);
                     properties.load(fis);
                     properties.setProperty("PropertyLoader.loadedfile", path);
@@ -67,17 +66,17 @@ public class PropertyLoader {
             properties.setProperty("PropertyLoader.loadedfile", filename);
             fis.close();
             return true;
-        } catch (FileNotFoundException e) {
+        } catch (final FileNotFoundException e) {
             // TODO add logging
             // e.printStackTrace();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             // TODO add logging
             // e.printStackTrace();
         } finally {
             if (fis != null) {
                 try {
                     fis.close();
-                } catch (IOException e) {
+                } catch (final IOException e) {
                 }
             }
         }

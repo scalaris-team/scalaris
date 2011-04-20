@@ -19,14 +19,14 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the <tt>read</tt> methods of the
  * {@link TransactionSingleOp} class.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
  * @since 2.0
@@ -36,12 +36,12 @@ public class TransactionSingleOpReadExample {
      * Reads a key given on the command line with the <tt>read</tt> methods of
      * {@link TransactionSingleOp}.<br />
      * If no key is given, the default key <tt>"key"</tt> is used.
-     * 
+     *
      * @param args
      *            command line arguments (first argument can be an optional key
      *            to look up)
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         String key;
         String value;
 
@@ -51,55 +51,55 @@ public class TransactionSingleOpReadExample {
             key = args[0];
         }
 
-        OtpErlangString otpKey = new OtpErlangString(key);
+        final OtpErlangString otpKey = new OtpErlangString(key);
         OtpErlangString otpValue;
 
         System.out.println("Reading values with the class `TransactionSingleOp`:");
 
         try {
             System.out.println("  creating object...");
-            TransactionSingleOp sc = new TransactionSingleOp();
+            final TransactionSingleOp sc = new TransactionSingleOp();
             System.out
                     .println("    `OtpErlangObject readObject(OtpErlangString)`...");
             otpValue = (OtpErlangString) sc.read(otpKey).value();
             System.out.println("      read(" + otpKey.stringValue() + ") == "
                     + otpValue.stringValue());
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed: " + e.getMessage());
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with timeout: " + e.getMessage());
-        } catch (NotFoundException e) {
+        } catch (final NotFoundException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with not found: " + e.getMessage());
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with unexpected return type: " + e.getMessage());
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with unknown: " + e.getMessage());
         }
 
         try {
             System.out.println("  creating object...");
-            TransactionSingleOp sc = new TransactionSingleOp();
+            final TransactionSingleOp sc = new TransactionSingleOp();
             System.out.println("    `String read(String)`...");
             value = sc.read(key).stringValue();
             System.out.println("      read(" + key + ") == " + value);
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      read(" + key + ") failed: "
                     + e.getMessage());
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      read(" + key + ") failed with timeout: "
                     + e.getMessage());
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             System.out.println("      read(" + key + ") failed with unexpected return type: "
                     + e.getMessage());
-        } catch (NotFoundException e) {
+        } catch (final NotFoundException e) {
             System.out.println("      read(" + key + ") failed with not found: "
                     + e.getMessage());
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      read(" + key + ") failed with unknown: "
                     + e.getMessage());
         }

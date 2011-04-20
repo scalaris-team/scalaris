@@ -21,7 +21,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 /**
  * Exception that is thrown if a delete operation on a scalaris ring fails
  * because no scalaris node was found.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.2
  * @since 2.2
@@ -40,46 +40,46 @@ public class NodeNotFoundException extends OtpErlangException {
 
     /**
      * Creates the exception with the given message.
-     * 
+     *
      * @param msg
      *            message of the exception
      */
-    public NodeNotFoundException(String msg) {
+    public NodeNotFoundException(final String msg) {
         super(msg);
     }
-    
+
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e the exception to "re-throw"
      */
-    public NodeNotFoundException(Throwable e) {
+    public NodeNotFoundException(final Throwable e) {
         super(e.getMessage());
         fillInStackTrace();
     }
 
     /**
      * Creates an exception including the message of the given erlang object.
-     * 
+     *
      * @param erlValue
      *            the erlang message to include
-     * 
+     *
      * @since 2.2
      */
-    public NodeNotFoundException(OtpErlangObject erlValue) {
+    public NodeNotFoundException(final OtpErlangObject erlValue) {
         super("Erlang message: " + erlValue.toString());
     }
 
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e
      *            the exception to "re-throw"
      * @param erlValue
      *            the string representation of this erlang value is included
      *            into the message
      */
-    public NodeNotFoundException(Throwable e, OtpErlangObject erlValue) {
+    public NodeNotFoundException(final Throwable e, final OtpErlangObject erlValue) {
         super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
         setStackTrace(e.getStackTrace());
     }

@@ -18,15 +18,15 @@ package de.zib.scalaris.examples;
 import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.AbortException;
-import de.zib.scalaris.PubSub;
 import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.PubSub;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the <tt>subscribe</tt> methods of the
  * {@link PubSub} class.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.5
  * @since 2.5
@@ -37,12 +37,12 @@ public class PubSubSubscribeExample {
      * line, with the <tt>subscribe</tt> methods of {@link PubSub}.<br />
      * If no URL or topic is given, the default URL <tt>"url"</tt> and the
      * default topic <tt>"topic"</tt> is used.
-     * 
+     *
      * @param args
      *            command line arguments (first argument can be an optional
      *            topic and the second an optional URL)
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         String topic;
         String URL;
 
@@ -57,33 +57,33 @@ public class PubSubSubscribeExample {
             URL = args[1];
         }
 
-        OtpErlangString otpTopic = new OtpErlangString(topic);
-        OtpErlangString otpURL = new OtpErlangString(URL);
+        final OtpErlangString otpTopic = new OtpErlangString(topic);
+        final OtpErlangString otpURL = new OtpErlangString(URL);
 
         System.out
                 .println("Subscribing a URL to a topic with the class `PubSub`:");
-        
+
         try {
             System.out.println("  creating object...");
-            PubSub sc = new PubSub();
+            final PubSub sc = new PubSub();
             System.out
                     .println("    `void subscribe(OtpErlangString, OtpErlangString)`...");
             sc.subscribe(otpTopic, otpURL);
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") succeeded");
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") failed: "
                     + e.getMessage());
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") failed with timeout: "
                     + e.getMessage());
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") failed with abort: "
                     + e.getMessage());
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") failed with unknown: "
                     + e.getMessage());
@@ -91,21 +91,21 @@ public class PubSubSubscribeExample {
 
         try {
             System.out.println("  creating object...");
-            PubSub sc = new PubSub();
+            final PubSub sc = new PubSub();
             System.out.println("    `void subscribe(String, String)`...");
             sc.subscribe(topic, URL);
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") succeeded");
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") failed: " + e.getMessage());
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") failed with timeout: " + e.getMessage());
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") failed with abort: " + e.getMessage());
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") failed with unknown: " + e.getMessage());
         }

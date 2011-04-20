@@ -34,7 +34,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 /**
  * Encapsulates a result from a read operation on scalaris.
  * See {@link #ErlangValue(Object)} for a list of compatible types.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.5
  * @since 3.0
@@ -44,16 +44,16 @@ public class ErlangValue {
      * The (internal representation of the) wrapped erlang value.
      */
     private OtpErlangObject value;
-    
+
     /**
      * Creates a new object wrapping the given erlang value.
-     * 
+     *
      * @param value  a value from erlang
      */
     public ErlangValue(OtpErlangObject value) {
         this.value = value;
     }
-    
+
     /**
      * Creates a new object from a given set of Java types.
      * The following types are supported:
@@ -77,10 +77,10 @@ public class ErlangValue {
      *  <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
      *  <li>{@link ErlangValue}</li>
      *  </ul>
-     * 
+     *
      * @param <T>    the type of the value
      * @param value  the value to convert to an erlang type
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -88,15 +88,15 @@ public class ErlangValue {
     public <T> ErlangValue(T value) throws ClassCastException {
         this.value = convertToErlang(value);
     }
-    
+
     /**
      * Converts a (supported) Java type to an {@link OtpErlangObject}.
-     * 
+     *
      * @param <T>    the type of the value
      * @param value  the value to convert to an erlang type
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -149,13 +149,13 @@ public class ErlangValue {
 
     /**
      * Returns the Java int value of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported or the value is too big
-     * 
+     *
      * @since 3.3
      */
     public boolean boolValue() throws ClassCastException {
@@ -170,9 +170,9 @@ public class ErlangValue {
 
     /**
      * Returns the Java int value of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported or the value is too big
@@ -187,9 +187,9 @@ public class ErlangValue {
 
     /**
      * Returns the Java long value of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported or the value is too big
@@ -205,9 +205,9 @@ public class ErlangValue {
 
     /**
      * Returns the Java BigInteger value of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -218,9 +218,9 @@ public class ErlangValue {
 
     /**
      * Returns the Java double value of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -233,12 +233,12 @@ public class ErlangValue {
      * Converts an {@link OtpErlangObject} to a {@link String} taking
      * special care of empty lists which can not be converted to strings using
      * the OTP library .
-     * 
+     *
      * @param value
      *            the value to convert
-     * 
+     *
      * @return the value as a String
-     * 
+     *
      * @throws ClassCastException
      *             if the conversion fails
      */
@@ -258,9 +258,9 @@ public class ErlangValue {
 
     /**
      * Returns the Java {@link String} value of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -271,9 +271,9 @@ public class ErlangValue {
 
     /**
      * Returns the Java byte[] value of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -285,9 +285,9 @@ public class ErlangValue {
     /**
      * Returns a JSON object (as {@link Map}&lt;String, Object&gt;) of the wrapped
      * erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -297,7 +297,7 @@ public class ErlangValue {
          * object(): {struct, [{key::string() | atom(), value()}]}
          * array():  {array, [value()]}
          * value():  number(), string(), object(), array(), 'true', 'false', 'null'
-         * 
+         *
          * first term must be an object!
          */
         OtpErlangTuple value_tpl = (OtpErlangTuple) value;
@@ -313,15 +313,15 @@ public class ErlangValue {
     /**
      * Returns a JSON object (as an instance of the given class) of the wrapped
      * erlang value.
-     * 
+     *
      * @param <T>
      *            the type of the object to create
-     * 
+     *
      * @param c
      *            the class of the created object
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *             if thrown if a conversion is not possible, i.e. the type is
      *             not supported
@@ -331,7 +331,7 @@ public class ErlangValue {
          * object(): {struct, [{key::string() | atom(), value()}]}
          * array():  {array, [value()]}
          * value():  number(), string(), object(), array(), 'true', 'false', 'null'
-         * 
+         *
          * first term must be an object!
          */
         OtpErlangTuple value_tpl = (OtpErlangTuple) value;
@@ -348,12 +348,12 @@ public class ErlangValue {
      * Converts an {@link OtpErlangObject} to a {@link OtpErlangList} taking
      * special care if the OTP library converted a list to an
      * {@link OtpErlangString}.
-     * 
+     *
      * @param value
      *            the value to convert
-     * 
+     *
      * @return the value as a OtpErlangList
-     * 
+     *
      * @throws ClassCastException
      *             if the conversion fails
      */
@@ -367,26 +367,26 @@ public class ErlangValue {
             return (OtpErlangList) value;
         }
     }
-    
+
     /**
      * Converts list elements to a desired type.
-     * 
+     *
      * @author Nico Kruber, kruber@zib.de
-     * 
+     *
      * @param <T>
      *            the type to convert to
-     * 
+     *
      * @since 3.5
      */
     public static interface ListElementConverter<T> {
         /**
          * Conversion function.
-         * 
+         *
          * @param i
          *            the index in the list
          * @param v
          *            the value to convert
-         * 
+         *
          * @return the value to convert to
          */
         public abstract T convert(int i, ErlangValue v);
@@ -394,12 +394,12 @@ public class ErlangValue {
 
     /**
      * Returns a list of mixed Java values of the wrapped erlang value.
-     * 
+     *
      * @param converter
      *                object that converts the list value to the desired type
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -416,9 +416,9 @@ public class ErlangValue {
     /**
      * Returns a list of mixed Java values (wrapped in {@link ErlangValue}
      * objects) of the wrapped erlang value.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
@@ -432,13 +432,13 @@ public class ErlangValue {
     /**
      * Returns a list of {@link Long} values of the wrapped erlang value.
      * Provided for convenience.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
-     * 
+     *
      * @see #listValue(ListElementConverter)
      */
     public List<Long> longListValue() throws ClassCastException {
@@ -450,13 +450,13 @@ public class ErlangValue {
     /**
      * Returns a list of {@link Double} values of the wrapped erlang value.
      * Provided for convenience.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
-     * 
+     *
      * @see #listValue(ListElementConverter)
      */
     public List<Double> doubleListValue() throws ClassCastException {
@@ -468,13 +468,13 @@ public class ErlangValue {
     /**
      * Returns a list of {@link String} values of the wrapped erlang value.
      * Provided for convenience.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
-     * 
+     *
      * @see #listValue(ListElementConverter)
      */
     public List<String> stringListValue() throws ClassCastException {
@@ -486,13 +486,13 @@ public class ErlangValue {
     /**
      * Returns a list of <tt>byte[]</tt> values of the wrapped erlang value.
      * Provided for convenience.
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported
-     * 
+     *
      * @see #listValue(ListElementConverter)
      */
     public List<byte[]> binaryListValue() throws ClassCastException {
@@ -505,19 +505,19 @@ public class ErlangValue {
      * Returns a list of JSON objects (as an instance of the given class) of the
      * wrapped erlang value.
      * Provided for convenience.
-     * 
+     *
      * @param <T>
      *            the type of the object to create as a list element
-     * 
+     *
      * @param c
      *            the class of the created object
-     * 
+     *
      * @return the converted value
-     * 
+     *
      * @throws ClassCastException
      *             if thrown if a conversion is not possible, i.e. the type is
      *             not supported
-     * 
+     *
      * @see #listValue(ListElementConverter)
      * @since 3.5
      */
@@ -529,7 +529,7 @@ public class ErlangValue {
 
     /**
      * Gets the original erlang value.
-     * 
+     *
      * @return the value as reported by erlang
      */
     public OtpErlangObject value() {

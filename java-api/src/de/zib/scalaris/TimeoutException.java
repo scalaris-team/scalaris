@@ -21,7 +21,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 /**
  * Exception that is thrown if a read or write operation on a scalaris ring
  * fails due to a timeout.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.2
  * @since 2.0
@@ -40,48 +40,48 @@ public class TimeoutException extends OtpErlangException {
 
     /**
      * Creates the exception with the given message.
-     * 
+     *
      * @param msg
      *            message of the exception
      */
-    public TimeoutException(String msg) {
+    public TimeoutException(final String msg) {
         super(msg);
     }
-    
+
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e the exception to "re-throw"
      */
-    public TimeoutException(Throwable e) {
+    public TimeoutException(final Throwable e) {
         super(e.getMessage());
         setStackTrace(e.getStackTrace());
     }
 
     /**
      * Creates an exception including the message of the given erlang object.
-     * 
+     *
      * @param erlValue
      *            the erlang message to include
-     * 
+     *
      * @since 2.2
      */
-    public TimeoutException(OtpErlangObject erlValue) {
+    public TimeoutException(final OtpErlangObject erlValue) {
         super("Erlang message: " + erlValue.toString());
     }
 
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e
      *            the exception to "re-throw"
      * @param erlValue
      *            the string representation of this erlang value is included
      *            into the message
-     * 
+     *
      * @since 2.2
      */
-    public TimeoutException(Throwable e, OtpErlangObject erlValue) {
+    public TimeoutException(final Throwable e, final OtpErlangObject erlValue) {
         super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
         setStackTrace(e.getStackTrace());
     }

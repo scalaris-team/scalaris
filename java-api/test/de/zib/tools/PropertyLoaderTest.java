@@ -28,7 +28,7 @@ import org.junit.Test;
 
 /**
  * Unit test for the {@link PropertyLoader} class.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  */
 public class PropertyLoaderTest {
@@ -67,7 +67,7 @@ public class PropertyLoaderTest {
      */
     @Test
     public final void testLoadProperties1() {
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         assertTrue(PropertyLoader.loadProperties(properties, "de/zib/tools/test.properties"));
         assertEquals("ahz2ieSh", properties.get("cs.node"));
         assertEquals("wooPhu8u", properties.get("cs.cookie"));
@@ -80,20 +80,20 @@ public class PropertyLoaderTest {
     @Test
     public final void testLoadProperties2() {
         System.out.println("Working Directory = " + System.getProperty("user.dir"));
-        
-        URL url = ClassLoader.getSystemResource("de/zib/tools/test.properties");
-        Properties properties = new Properties();
+
+        final URL url = ClassLoader.getSystemResource("de/zib/tools/test.properties");
+        final Properties properties = new Properties();
         assertTrue(PropertyLoader.loadProperties(properties, url.getPath()));
         assertEquals("ahz2ieSh", properties.get("cs.node"));
         assertEquals("wooPhu8u", properties.get("cs.cookie"));
     }
-    
+
     /**
      * Test method for {@link PropertyLoader#loadProperties(Properties, String)}.
      */
     @Test
     public final void testLoadProperties3() {
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         assertFalse(PropertyLoader.loadProperties(properties, "de/zib/tools/ahz2ieSh.wooPhu8u"));
     }
 

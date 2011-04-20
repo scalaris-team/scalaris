@@ -22,13 +22,13 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 /**
  * Contains some often used objects as static objects as static members in
  * order to avoid re-creating them each time they are needed.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
- * 
+ *
  * @version 3.4
  * @since 2.5
  */
-final class CommonErlangObjects { 
+final class CommonErlangObjects {
     static final OtpErlangAtom readAtom = new OtpErlangAtom("read");
     static final OtpErlangAtom writeAtom = new OtpErlangAtom("write");
     static final OtpErlangAtom okAtom = new OtpErlangAtom("ok");
@@ -40,23 +40,23 @@ final class CommonErlangObjects {
     static final OtpErlangAtom keyChangedAtom = new OtpErlangAtom("key_changed");
     static final OtpErlangTuple okTupleAtom = new OtpErlangTuple(okAtom);
     static final OtpErlangTuple commitTupleAtom = new OtpErlangTuple(new OtpErlangAtom("commit"));
-    
+
     // JSON
     static final OtpErlangAtom structAtom = new OtpErlangAtom("struct");
     static final OtpErlangAtom arrayAtom = new OtpErlangAtom("array");
     static final OtpErlangAtom trueAtom = new OtpErlangAtom("true");
     static final OtpErlangAtom falseAtom = new OtpErlangAtom("false");
     static final OtpErlangAtom nullAtom = new OtpErlangAtom("null");
-    
+
     /**
      * Processes the <tt>received_raw</tt> term from erlang interpreting it as
      * a result from a read operation.
-     * 
+     *
      * @param received_raw
      *             the object to process
-     * 
+     *
      * @return the contained value
-     * 
+     *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch the value
      * @throws NotFoundException
@@ -64,21 +64,21 @@ final class CommonErlangObjects {
      * @throws UnknownException
      *             if any other error occurs
      */
-    static final OtpErlangObject processResult_read(OtpErlangObject received_raw) throws TimeoutException, NotFoundException, UnknownException {
+    static final OtpErlangObject processResult_read(final OtpErlangObject received_raw) throws TimeoutException, NotFoundException, UnknownException {
         /*
          * possible return values:
          *  {ok, Value} | {fail, timeout | not_found}
          */
         try {
-            OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            OtpErlangObject state = received.elementAt(0);
+            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangObject state = received.elementAt(0);
             if (received.arity() != 2) {
                 throw new UnknownException(received_raw);
             }
             if (state.equals(CommonErlangObjects.okAtom)) {
                 return received.elementAt(1);
             } else if (state.equals(CommonErlangObjects.failAtom)) {
-                OtpErlangObject reason = received.elementAt(1);
+                final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
                     throw new TimeoutException(received_raw);
                 } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
@@ -86,7 +86,7 @@ final class CommonErlangObjects {
                 }
             }
             throw new UnknownException(received_raw);
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
         }
@@ -95,32 +95,32 @@ final class CommonErlangObjects {
     /**
      * Processes the <tt>received_raw</tt> term from erlang interpreting it as
      * a result from a write operation.
-     * 
+     *
      * @param received_raw
      *             the object to process
-     * 
+     *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch the value
      * @throws UnknownException
      *             if any other error occurs
      */
-    static final void processResult_write(OtpErlangObject received_raw) throws TimeoutException, UnknownException {
+    static final void processResult_write(final OtpErlangObject received_raw) throws TimeoutException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout}
          */
         try {
-            OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
-            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
-                OtpErlangObject reason = received.elementAt(1);
+            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
+                final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
                     throw new TimeoutException(received_raw);
                 }
             }
             throw new UnknownException(received_raw);
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
         }
@@ -129,10 +129,10 @@ final class CommonErlangObjects {
     /**
      * Processes the <tt>received_raw</tt> term from erlang interpreting it as
      * a result from a commit operation.
-     * 
+     *
      * @param received_raw
      *             the object to process
-     * 
+     *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch the value
      * @throws AbortException
@@ -140,17 +140,17 @@ final class CommonErlangObjects {
      * @throws UnknownException
      *             if any other error occurs
      */
-    static final void processResult_commit(OtpErlangObject received_raw) throws TimeoutException, AbortException, UnknownException {
+    static final void processResult_commit(final OtpErlangObject received_raw) throws TimeoutException, AbortException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout | abort}
          */
         try {
-            OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
-            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && received.arity() == 2) {
-                OtpErlangObject reason = received.elementAt(1);
+            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
+                final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
                     throw new TimeoutException(received_raw);
                 } else if (reason.equals(CommonErlangObjects.abortAtom)) {
@@ -158,7 +158,7 @@ final class CommonErlangObjects {
                 }
             }
             throw new UnknownException(received_raw);
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
         }
