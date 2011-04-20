@@ -21,7 +21,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 /**
  * Exception that is thrown if a the commit of a write operation on a
  * scalaris ring fails.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.5
  * @since 2.5
@@ -40,44 +40,44 @@ public class AbortException extends OtpErlangException {
 
     /**
      * Creates the exception with the given message.
-     * 
+     *
      * @param msg
      *            message of the exception
      */
-    public AbortException(String msg) {
+    public AbortException(final String msg) {
         super(msg);
     }
-    
+
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e the exception to "re-throw"
      */
-    public AbortException(Throwable e) {
+    public AbortException(final Throwable e) {
         super(e.getMessage());
         setStackTrace(e.getStackTrace());
     }
 
     /**
      * Creates an exception including the message of the given erlang object.
-     * 
+     *
      * @param erlValue
      *            the erlang message to include
      */
-    public AbortException(OtpErlangObject erlValue) {
+    public AbortException(final OtpErlangObject erlValue) {
         super("Erlang message: " + erlValue.toString());
     }
 
     /**
      * Creates an exception taking the message of the given throwable.
-     * 
+     *
      * @param e
      *            the exception to "re-throw"
      * @param erlValue
      *            the string representation of this erlang value is included
      *            into the message
      */
-    public AbortException(Throwable e, OtpErlangObject erlValue) {
+    public AbortException(final Throwable e, final OtpErlangObject erlValue) {
         super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
         setStackTrace(e.getStackTrace());
     }

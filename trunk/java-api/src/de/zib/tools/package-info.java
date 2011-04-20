@@ -15,19 +15,19 @@
  */
 /**
  * This package contains some generic tools useful for most implementations.
- * 
+ *
  * <h3>The PropertyLoader class</h3>
  * <p>
  * The {@link de.zib.tools.PropertyLoader} class provides methods to load
  * property files with look-up mechanisms to find a file given only by its name.
  * </p>
- * 
+ *
  * <h4>Example:</h4>
  * <code style="white-space:pre;">
  *   Properties properties = new Properties();
  *   PropertyLoader.loadProperties(properties, "PropertiesFile.properties");
  * </code>
- * 
+ *
  * <p>See the {@link de.zib.tools.PropertyLoader} class documentation for more
  * details.</p>
  */

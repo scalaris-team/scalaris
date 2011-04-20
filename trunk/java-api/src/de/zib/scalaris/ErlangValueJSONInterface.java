@@ -20,21 +20,20 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
  * Interface for Scalaris-JSON to Java and Java to Scalaris-JSON converters.
- * 
+ *
  * @param <T> the class to convert to/from
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  */
 interface ErlangValueJSONInterface<T> {
-
     /**
      * Converts a Java Map to a JSON object as expected by Scalaris.
-     * 
+     *
      * @param value
      *            a Java Map with String-keys and supported JSON types as values
-     * 
+     *
      * @return a JSON object representing the value
-     * 
+     *
      * @throws ClassCastException
      *             if thrown if a conversion is not possible, i.e. the type is
      *             not supported
@@ -44,13 +43,13 @@ interface ErlangValueJSONInterface<T> {
 
     /**
      * Converts a JSON object value (a list of key/value pairs) to a Java Map.
-     * 
+     *
      * @param value
      *            a list of key/value pairs with JSON values and string keys as
      *            stored by Scalaris' JSON API
-     * 
+     *
      * @return a Java object representing the value
-     * 
+     *
      * @throws ClassCastException
      *                if thrown if a conversion is not possible, i.e. the type
      *                is not supported

@@ -21,11 +21,11 @@ import java.util.List;
 /**
  * Defines a policy on how to select a node to connect with from a set of
  * possible nodes and whether to automatically re-connect.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
- * 
+ *
  * @see ConnectionFactory
- * 
+ *
  * @version 2.3
  * @since 2.3
  */
@@ -34,45 +34,45 @@ public abstract class ConnectionPolicy {
      * A reference to the list of available nodes
      */
     protected List<PeerNode> availableRemoteNodes;
-    
+
     /**
      * Creates a connection policy with one available node to connect to.
-     * 
+     *
      * Provided for convenience.
-     * 
+     *
      * @param remoteNode the node available for connections
      */
-    public ConnectionPolicy(PeerNode remoteNode) {
+    public ConnectionPolicy(final PeerNode remoteNode) {
         availableRemoteNodes = new ArrayList<PeerNode>(1);
         availableRemoteNodes.add(remoteNode);
     }
-    
+
     /**
      * Creates a connection policy with the given set of nodes available for
      * connections.
-     * 
+     *
      * @param availableRemoteNodes available nodes to connect to
      */
-    public ConnectionPolicy(List<PeerNode> availableRemoteNodes) {
+    public ConnectionPolicy(final List<PeerNode> availableRemoteNodes) {
         this.availableRemoteNodes = availableRemoteNodes;
     }
-    
+
     /**
      * Signals the connection policy that the given node has been added to the
      * list of available nodes.
-     * 
+     *
      * @param newNode the new node
      */
-    public void availableNodeAdded(PeerNode newNode) {
+    public void availableNodeAdded(final PeerNode newNode) {
     }
-    
+
     /**
      * Signals the connection policy that the given node has been removed from
      * the list of available nodes.
-     * 
+     *
      * @param removedNode the removed node
      */
-    public void availableNodeRemoved(PeerNode removedNode) {
+    public void availableNodeRemoved(final PeerNode removedNode) {
     }
 
     /**
@@ -81,42 +81,42 @@ public abstract class ConnectionPolicy {
      */
     public void availableNodesReset() {
     }
-    
+
     /**
      * Acts upon a failure of the given node.
-     * 
+     *
      * Sets the node's last failed connect time stamp.
-     * 
+     *
      * @param node the failed node
      */
-    public void nodeFailed(PeerNode node) {
+    public void nodeFailed(final PeerNode node) {
         synchronized (node) {
             node.setLastFailedConnect();
         }
     }
-    
+
     /**
      * Acts upon a failure reset of the given node.
-     * 
+     *
      * Resets the node's last failure state.
-     * 
+     *
      * @param node the node
      */
-    public void nodeFailReset(PeerNode node) {
+    public void nodeFailReset(final PeerNode node) {
         synchronized (node) {
             node.resetFailureCount();
         }
     }
-    
+
     /**
      * Acts upon a successful connect attempt of the given node.
-     * 
+     *
      * Sets the node's last successful connect time stamp and resets its failure
      * statistics.
-     * 
+     *
      * @param node the node
      */
-    public void nodeConnectSuccess(PeerNode node) {
+    public void nodeConnectSuccess(final PeerNode node) {
         synchronized (node) {
             node.resetFailureCount();
             node.setLastConnectSuccess();
@@ -126,23 +126,23 @@ public abstract class ConnectionPolicy {
     /**
      * Selects the node to connect with when establishing a connection (no
      * failed node, no exception that has already been thrown).
-     * 
+     *
      * Provided for convenience.
-     * 
+     *
      * @return the node to use for the connection
-     * 
+     *
      * @throws UnsupportedOperationException
      *             is thrown if the operation can not be performed, e.g. the
      *             list is empty
-     * 
+     *
      * @see ConnectionFactory
      */
     public PeerNode selectNode() throws UnsupportedOperationException {
         try {
             return selectNode(0, null, null);
-        } catch (UnsupportedOperationException e) {
+        } catch (final UnsupportedOperationException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // this should not happen - selectNode should be able to copy with
             // this situation without throwing another exception than
             // UnsupportedOperationException
@@ -152,13 +152,13 @@ public abstract class ConnectionPolicy {
 
     /**
      * Selects the node to (re-)connect with.
-     * 
+     *
      * If no re-connection is desired, throw an exception!
-     * 
+     *
      * @param <E>
      *            the type of the exception that came from the failed connection
      *            and may be re-thrown
-     * 
+     *
      * @param retry
      *            the n'th retry (initial connect = 0, 1st reconnect = 1,...)
      * @param failedNode
@@ -166,15 +166,15 @@ public abstract class ConnectionPolicy {
      * @param e
      *            the exception that came back from the previous connection
      *            attempt or {@code null}
-     * 
+     *
      * @return the new node to connect with
-     * 
+     *
      * @throws E
      *             if thrown, automatic re-connection attempts will stop
      * @throws UnsupportedOperationException
      *             is thrown if the operation can not be performed, e.g. the
      *             list is empty
-     * 
+     *
      * @see Connection#connect()
      * @see Connection#doRPC(String, String,
      *      com.ericsson.otp.erlang.OtpErlangList)

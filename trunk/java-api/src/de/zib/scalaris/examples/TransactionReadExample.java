@@ -28,7 +28,7 @@ import de.zib.scalaris.UnknownException;
 /**
  * Provides an example for using the <code>read</code> method of the
  * {@link Transaction} class.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
  * @since 2.0
@@ -41,11 +41,11 @@ public class TransactionReadExample {
      * transaction.<br />
      * If no keys are given, the default keys <code>"key1"</code>, <code>"key2"</code>,
      * <code>"key3"</code> are used.
-     * 
+     *
      * @param args
      *            command line arguments (optional keys to look up)
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         String[] keys;
         String value;
 
@@ -55,18 +55,18 @@ public class TransactionReadExample {
             keys = args;
         }
 
-        OtpErlangString[] otpKeys_temp = new OtpErlangString[keys.length];
+        final OtpErlangString[] otpKeys_temp = new OtpErlangString[keys.length];
         for (int i = 0; i < keys.length; ++i) {
             otpKeys_temp[i] = new OtpErlangString(keys[i]);
         }
-        OtpErlangList otpKeys = (new OtpErlangList(otpKeys_temp));
+        final OtpErlangList otpKeys = (new OtpErlangList(otpKeys_temp));
         OtpErlangString otpValue;
 
         System.out.println("Reading values with the class `Transaction`:");
 
         System.out.print("    Initialising Transaction object... ");
         try {
-            Transaction transaction = new Transaction();
+            final Transaction transaction = new Transaction();
             System.out.println("done");
 
             System.out.print("    Starting transaction... ");
@@ -75,24 +75,24 @@ public class TransactionReadExample {
             System.out
                     .println("    `OtpErlangObject readObject(OtpErlangString)`...");
             for (int i = 0; i < otpKeys.arity(); ++i) {
-                OtpErlangString otpKey = (OtpErlangString) otpKeys.elementAt(i);
+                final OtpErlangString otpKey = (OtpErlangString) otpKeys.elementAt(i);
                 try {
                     otpValue = (OtpErlangString) transaction.read(otpKey).value();
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") == " + otpValue.stringValue());
-                } catch (ConnectionException e) {
+                } catch (final ConnectionException e) {
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") failed: " + e.getMessage());
-                } catch (TimeoutException e) {
+                } catch (final TimeoutException e) {
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") failed with timeout: " + e.getMessage());
-                } catch (UnknownException e) {
+                } catch (final UnknownException e) {
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") failed with unknown: " + e.getMessage());
-                } catch (NotFoundException e) {
+                } catch (final NotFoundException e) {
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") failed with not found: " + e.getMessage());
-                } catch (ClassCastException e) {
+                } catch (final ClassCastException e) {
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") failed with unknown return type: " + e.getMessage());
                 }
@@ -100,20 +100,20 @@ public class TransactionReadExample {
 
             System.out.println("    `String read(String)`...");
             for (int i = 0; i < keys.length; ++i) {
-                String key = keys[i];
+                final String key = keys[i];
                 try {
                     value = transaction.read(key).stringValue();
                     System.out.println("      read(" + key + ") == " + value);
-                } catch (ConnectionException e) {
+                } catch (final ConnectionException e) {
                     System.out.println("      read(" + key + ") failed: "
                             + e.getMessage());
-                } catch (TimeoutException e) {
+                } catch (final TimeoutException e) {
                     System.out.println("      read(" + key
                             + ") failed with timeout: " + e.getMessage());
-                } catch (UnknownException e) {
+                } catch (final UnknownException e) {
                     System.out.println("      read(" + key
                             + ") failed with unknown: " + e.getMessage());
-                } catch (NotFoundException e) {
+                } catch (final NotFoundException e) {
                     System.out.println("      read(" + key
                             + ") failed with not found: " + e.getMessage());
                 }
@@ -122,16 +122,16 @@ public class TransactionReadExample {
             System.out.print("    Committing transaction... ");
             transaction.commit();
             System.out.println("done");
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("failed: " + e.getMessage());
             return;
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("failed: " + e.getMessage());
             return;
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             System.out.println("failed: " + e.getMessage());
             return;
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("failed: " + e.getMessage());
             return;
         }

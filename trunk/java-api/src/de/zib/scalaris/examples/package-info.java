@@ -16,10 +16,9 @@
 /**
  * This package contains examples how to use the classes of the
  * {@link de.zib.scalaris} package.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.9
  * @since 2.0
  */
 package de.zib.scalaris.examples;
-

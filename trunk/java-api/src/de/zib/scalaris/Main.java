@@ -28,9 +28,9 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 /**
- * Class to test basic functionality of the package and to use scalaris 
+ * Class to test basic functionality of the package and to use scalaris
  * from command line.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
  * @since 2.0
@@ -38,7 +38,7 @@ import org.apache.commons.cli.ParseException;
 public class Main {
     /**
      * Queries the command line options for an action to perform.
-     * 
+     *
      * <pre>
      * <code>
      * > java -jar scalaris.jar -help
@@ -64,23 +64,23 @@ public class Main {
      *  -u,--unsubscribe <topic> <url>   unsubscribe from a topic
      * </code>
      * </pre>
-     * 
+     *
      * In order to override node and cookie to use for a connection, specify
      * the <tt>SCALARIS_JAPI_NODE</tt> or <tt>SCALARIS_JAPI_COOKIE</tt>
      * environment variables. Their values will be used instead of the values
      * defined in the config file!
-     * 
+     *
      * @param args
      *            command line arguments
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         boolean verbose = false;
-        CommandLineParser parser = new GnuParser();
+        final CommandLineParser parser = new GnuParser();
         CommandLine line = null;
-        Options options = getOptions();
+        final Options options = getOptions();
         try {
             line = parser.parse(options, args);
-        } catch (ParseException e) {
+        } catch (final ParseException e) {
             printException("Parsing failed", e, false);
         }
 
@@ -88,16 +88,16 @@ public class Main {
             verbose = true;
             ConnectionFactory.getInstance().printProperties();
         }
-        
+
         if (line.hasOption("minibench")) {
-            String[] optionValues = line.getOptionValues("minibench");
+            final String[] optionValues = line.getOptionValues("minibench");
             int testruns = 100;
-            HashSet<Integer> benchmarks = new HashSet<Integer>(10);
+            final HashSet<Integer> benchmarks = new HashSet<Integer>(10);
             if (optionValues != null) {
                 checkArguments(optionValues, 2, options, "b");
                 testruns = Integer.parseInt(optionValues[0]);
                 for (int i = 1; i < Math.min(10, optionValues.length); ++i) {
-                    String benchmarks_str = optionValues[i];
+                    final String benchmarks_str = optionValues[i];
                     if (benchmarks_str.equals("all")) {
                         for (int j = 1; j <= 9; ++j) {
                             benchmarks.add(j);
@@ -113,117 +113,117 @@ public class Main {
             }
             Benchmark.minibench(testruns, benchmarks);
         } else if (line.hasOption("r")) { // read
-            String key = line.getOptionValue("read");
+            final String key = line.getOptionValue("read");
             checkArguments(key, options, "r");
             try {
-                TransactionSingleOp sc = new TransactionSingleOp();
-                String value = sc.read(key).value().toString();
+                final TransactionSingleOp sc = new TransactionSingleOp();
+                final String value = sc.read(key).value().toString();
                 System.out.println("read(" + key + ") == " + value);
-            } catch (ConnectionException e) {
+            } catch (final ConnectionException e) {
                 printException("read failed with connection error", e, verbose);
-            } catch (TimeoutException e) {
+            } catch (final TimeoutException e) {
                 printException("read failed with timeout", e, verbose);
-            } catch (NotFoundException e) {
+            } catch (final NotFoundException e) {
                 printException("read failed with not found", e, verbose);
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 printException("read failed with unknown", e, verbose);
             }
         } else if (line.hasOption("w")) { // write
-            String[] optionValues = line.getOptionValues("write");
+            final String[] optionValues = line.getOptionValues("write");
             checkArguments(optionValues, 2, options, "w");
-            String key = optionValues[0];
-            String value = optionValues[1];
+            final String key = optionValues[0];
+            final String value = optionValues[1];
             try {
-                TransactionSingleOp sc = new TransactionSingleOp();
+                final TransactionSingleOp sc = new TransactionSingleOp();
                 sc.write(key, value);
                 System.out.println("write(" + key + ", " + value + "): ok");
-            } catch (ConnectionException e) {
+            } catch (final ConnectionException e) {
                 printException("write failed with connection error", e, verbose);
-            } catch (TimeoutException e) {
+            } catch (final TimeoutException e) {
                 printException("write failed with timeout", e, verbose);
-            } catch (AbortException e) {
+            } catch (final AbortException e) {
                 printException("write failed with abort", e, verbose);
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 printException("write failed with unknown", e, verbose);
             }
         } else if (line.hasOption("p")) { // publish
-            String[] optionValues = line.getOptionValues("publish");
+            final String[] optionValues = line.getOptionValues("publish");
             checkArguments(optionValues, 2, options, "p");
-            String topic = optionValues[0];
-            String content = optionValues[1];
+            final String topic = optionValues[0];
+            final String content = optionValues[1];
             if (content == null) {
                 // parsing methods of commons.cli only checks the first argument :(
                 printException("Parsing failed", new ParseException("missing content for option p"), verbose);
             }
             try {
-                PubSub sc = new PubSub();
+                final PubSub sc = new PubSub();
                 sc.publish(topic, content);
                 System.out.println("publish(" + topic + ", " + content + "): ok");
-            } catch (ConnectionException e) {
+            } catch (final ConnectionException e) {
                 printException("publish failed with connection error", e, verbose);
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 printException("publish failed with unknown", e, verbose);
             }
         } else if (line.hasOption("s")) { // subscribe
-            String[] optionValues = line.getOptionValues("subscribe");
+            final String[] optionValues = line.getOptionValues("subscribe");
             checkArguments(optionValues, 2, options, "s");
-            String topic = optionValues[0];
-            String url = optionValues[1];
+            final String topic = optionValues[0];
+            final String url = optionValues[1];
             try {
-                PubSub sc = new PubSub();
+                final PubSub sc = new PubSub();
                 sc.subscribe(topic, url);
                 System.out.println("subscribe(" + topic + ", " + url + "): ok");
-            } catch (ConnectionException e) {
+            } catch (final ConnectionException e) {
                 printException("subscribe failed with connection error", e, verbose);
-            } catch (TimeoutException e) {
+            } catch (final TimeoutException e) {
                 printException("subscribe failed with timeout", e, verbose);
-            } catch (AbortException e) {
+            } catch (final AbortException e) {
                 printException("write failed with abort", e, verbose);
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 printException("subscribe failed with unknown", e, verbose);
             }
         } else if (line.hasOption("u")) { // unsubscribe
-            String[] optionValues = line.getOptionValues("unsubscribe");
+            final String[] optionValues = line.getOptionValues("unsubscribe");
             checkArguments(optionValues, 2, options, "u");
-            String topic = optionValues[0];
-            String url = optionValues[1];
+            final String topic = optionValues[0];
+            final String url = optionValues[1];
             try {
-                PubSub sc = new PubSub();
+                final PubSub sc = new PubSub();
                 sc.unsubscribe(topic, url);
                 System.out.println("unsubscribe(" + topic + ", " + url + "): ok");
-            } catch (ConnectionException e) {
+            } catch (final ConnectionException e) {
                 printException("unsubscribe failed with connection error", e, verbose);
-            } catch (TimeoutException e) {
+            } catch (final TimeoutException e) {
                 printException("unsubscribe failed with timeout", e, verbose);
-            } catch (NotFoundException e) {
+            } catch (final NotFoundException e) {
                 printException("unsubscribe failed with not found", e, verbose);
-            } catch (AbortException e) {
+            } catch (final AbortException e) {
                 printException("write failed with abort", e, verbose);
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 printException("unsubscribe failed with unknown", e, verbose);
             }
         } else if (line.hasOption("g")) { // getsubscribers
-            String topic = line.getOptionValue("getsubscribers");
+            final String topic = line.getOptionValue("getsubscribers");
             checkArguments(topic, options, "g");
             try {
-                PubSub sc = new PubSub();
-                List<String> subscribers = sc.getSubscribers(topic).stringListValue();
+                final PubSub sc = new PubSub();
+                final List<String> subscribers = sc.getSubscribers(topic).stringListValue();
                 System.out.println("getSubscribers(" + topic + ") == "
                         + subscribers);
-            } catch (ConnectionException e) {
+            } catch (final ConnectionException e) {
                 printException("getSubscribers failed with connection error", e, verbose);
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 printException("getSubscribers failed with unknown error", e, verbose);
             }
         } else if (line.hasOption("d")) { // delete
-            String[] optionValues = line.getOptionValues("delete");
+            final String[] optionValues = line.getOptionValues("delete");
             checkArguments(optionValues, 1, options, "d");
-            String key = optionValues[0];
+            final String key = optionValues[0];
             int timeout = 2000;
             if (optionValues.length >= 2) {
                 try {
                     timeout = Integer.parseInt(optionValues[1]);
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     printException("Parsing failed", new ParseException(
                             "wrong type for timeout parameter of option d"
                                     + " (parameters: <"
@@ -232,20 +232,20 @@ public class Main {
                 }
             }
             try {
-                ReplicatedDHT sc = new ReplicatedDHT();
+                final ReplicatedDHT sc = new ReplicatedDHT();
                 sc.delete(key, timeout);
-                DeleteResult deleteResult = sc.getLastDeleteResult();
+                final DeleteResult deleteResult = sc.getLastDeleteResult();
                 System.out.println("delete(" + key + ", " + timeout + "): "
                         + deleteResult.ok + " ok, "
                         + deleteResult.locks_set + " locks_set, "
                         + deleteResult.undef + " undef");
-            } catch (ConnectionException e) {
+            } catch (final ConnectionException e) {
                 printException("delete failed with connection error", e, verbose);
-            } catch (TimeoutException e) {
+            } catch (final TimeoutException e) {
                 printException("delete failed with timeout", e, verbose);
-            } catch (NodeNotFoundException e) {
+            } catch (final NodeNotFoundException e) {
                 printException("delete failed with node not found", e, verbose);
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 printException("delete failed with unknown error", e, verbose);
             }
         } else if (line.hasOption("lh")) { // get local host name
@@ -253,66 +253,66 @@ public class Main {
         } else {
             // print help if no other option was given
 //        if (line.hasOption("help")) {
-            HelpFormatter formatter = new HelpFormatter();
+            final HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("scalaris [Options]", getOptions());
         }
     }
 
     /**
      * Creates the options the command line should understand.
-     * 
+     *
      * @return the options the program understands
      */
     private static Options getOptions() {
-        Options options = new Options();
-        OptionGroup group = new OptionGroup();
+        final Options options = new Options();
+        final OptionGroup group = new OptionGroup();
 
         /* Note: arguments are set to be optional since we implement argument
          * checks on our own (commons.cli is not flexible enough and only
          * checks for the existence of a first argument)
          */
-        
+
         options.addOption(new Option("h", "help", false, "print this message"));
-        
+
         options.addOption(new Option("v", "verbose", false, "print verbose information, e.g. the properties read"));
 
-        Option read = new Option("r", "read", true, "read an item");
+        final Option read = new Option("r", "read", true, "read an item");
         read.setArgName("key");
         read.setArgs(1);
         read.setOptionalArg(true);
         group.addOption(read);
 
-        Option write = new Option("w", "write", true, "write an item");
+        final Option write = new Option("w", "write", true, "write an item");
         write.setArgName("key> <value");
         write.setArgs(2);
         write.setOptionalArg(true);
         group.addOption(write);
 
-        Option publish = new Option("p", "publish", true, "publish a new message for the given topic");
+        final Option publish = new Option("p", "publish", true, "publish a new message for the given topic");
         publish.setArgName("topic> <message");
         publish.setArgs(2);
         publish.setOptionalArg(true);
         group.addOption(publish);
 
-        Option subscribe = new Option("s", "subscribe", true, "subscribe to a topic");
+        final Option subscribe = new Option("s", "subscribe", true, "subscribe to a topic");
         subscribe.setArgName("topic> <url");
         subscribe.setArgs(2);
         subscribe.setOptionalArg(true);
         group.addOption(subscribe);
-        
-        Option unsubscribe = new Option("u", "unsubscribe", true, "unsubscribe from a topic");
+
+        final Option unsubscribe = new Option("u", "unsubscribe", true, "unsubscribe from a topic");
         unsubscribe.setArgName("topic> <url");
         unsubscribe.setArgs(2);
         unsubscribe.setOptionalArg(true);
         group.addOption(unsubscribe);
 
-        Option getSubscribers = new Option("g", "getsubscribers", true, "get subscribers of a topic");
+        final Option getSubscribers = new Option("g", "getsubscribers", true, "get subscribers of a topic");
         getSubscribers.setArgName("topic");
         getSubscribers.setArgs(1);
         getSubscribers.setOptionalArg(true);
         group.addOption(getSubscribers);
 
-        Option delete = new Option("d", "delete", true,
+        final Option delete = new Option("d", "delete", true,
                 "delete an item (default timeout: 2000ms)\n" +
                 "WARNING: This function can lead to inconsistent data (e.g. " +
                 "deleted items can re-appear). Also when re-creating an item " +
@@ -322,7 +322,7 @@ public class Main {
         delete.setOptionalArg(true);
         group.addOption(delete);
 
-        Option bench = new Option("b", "minibench", true, "run selected mini benchmark(s) [1|...|9|all] (default: all benchmarks, 100 test runs)");
+        final Option bench = new Option("b", "minibench", true, "run selected mini benchmark(s) [1|...|9|all] (default: all benchmarks, 100 test runs)");
         bench.setArgName("runs> <benchmarks");
         bench.setArgs(10);
         bench.setOptionalArg(true);
@@ -334,101 +334,101 @@ public class Main {
 
         return options;
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(String description, ParseException e, boolean verbose) {
+    final static void printException(final String description, final ParseException e, final boolean verbose) {
         printException(description, e, verbose, 1);
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(String description, ConnectionException e, boolean verbose) {
+    final static void printException(final String description, final ConnectionException e, final boolean verbose) {
         printException(description, e, verbose, 2);
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(String description, TimeoutException e, boolean verbose) {
+    final static void printException(final String description, final TimeoutException e, final boolean verbose) {
         printException(description, e, verbose, 3);
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(String description, NotFoundException e, boolean verbose) {
+    final static void printException(final String description, final NotFoundException e, final boolean verbose) {
         printException(description, e, verbose, 4);
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(String description, UnknownException e, boolean verbose) {
+    final static void printException(final String description, final UnknownException e, final boolean verbose) {
         printException(description, e, verbose, 5);
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(String description, NodeNotFoundException e, boolean verbose) {
+    final static void printException(final String description, final NodeNotFoundException e, final boolean verbose) {
         printException(description, e, verbose, 6);
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(String description, AbortException e, boolean verbose) {
+    final static void printException(final String description, final AbortException e, final boolean verbose) {
         printException(description, e, verbose, 7);
     }
-    
+
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
-     * 
+     *
      * @param description  will be prepended to the error message
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
-     * @param exitStatus   the status code the JVM exits with 
+     * @param exitStatus   the status code the JVM exits with
      */
-    final static void printException(String description, Exception e, boolean verbose, int exitStatus) {
+    final static void printException(final String description, final Exception e, final boolean verbose, final int exitStatus) {
         System.err.print(description + ": ");
         if (verbose) {
             System.err.println();
@@ -443,13 +443,13 @@ public class Main {
      * Checks that the given option value as returned from e.g.
      * {@link CommandLine#getOptionValue(String)} does exist and prints an error
      * message if not.
-     * 
+     *
      * @param optionValue    the value to check
      * @param options        the available command line options
      * @param currentOption  the short name of the current option being parsed
      */
-    final static void checkArguments(String optionValue,
-            Options options, String currentOption) {
+    final static void checkArguments(final String optionValue,
+            final Options options, final String currentOption) {
         if (optionValue == null) {
             printException("Parsing failed", new ParseException(
                     "missing parameter for option " + currentOption
@@ -463,15 +463,15 @@ public class Main {
      * Checks that the given option values as returned from e.g.
      * {@link CommandLine#getOptionValues(String)} do exist and contain
      * enough parameters. Prints an error message if not.
-     * 
+     *
      * @param optionValues   the values to check
      * @param required       the number of required parameters
      * @param options        the available command line options
      * @param currentOption  the short name of the current option being parsed
      */
-    final static void checkArguments(String[] optionValues,
-            int required, Options options, String currentOption) {
-        if (optionValues == null || optionValues.length < required) {
+    final static void checkArguments(final String[] optionValues,
+            final int required, final Options options, final String currentOption) {
+        if ((optionValues == null) || (optionValues.length < required)) {
             printException("Parsing failed", new ParseException(
                     "missing parameter for option " + currentOption
                             + " (required: <"

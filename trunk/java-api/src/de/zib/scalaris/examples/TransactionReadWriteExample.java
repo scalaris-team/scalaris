@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples;
 
+import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.AbortException;
@@ -27,7 +28,7 @@ import de.zib.scalaris.UnknownException;
 /**
  * Provides an example for using the <code>read</code> and <code>write</code> methods of
  * the {@link Transaction} class together in one transaction.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
  * @since 2.0
@@ -41,43 +42,43 @@ public class TransactionReadWriteExample {
      * <code>(key1, value1) = ("key1", "value1")</code>,
      * <code>(key2, value2) = ("key2", "value2")</code> and <code>key3 = "key3"</code> are
      * used.
-     * 
+     *
      * <h3>Transaction 1:</h3>
      * <code style="white-space:pre;">
      *   write(key1, value1);
      *   write(key2, value2);
-     *   
+     *
      *   result1 = read(key1);
      *   result2 = read(key2);
      *   result3 = read(key3);
-     *   
+     *
      *   write(key3, result1 + result2);
-     *   
+     *
      *   result3 = read(key3);
-     *   
+     *
      *   commit();
      * </code>
-     * 
+     *
      * <h3>Transaction 2:</h3>
      * <code style="white-space:pre;">
      *   write(key1, value1);
      *   commit();
-     *   
+     *
      *   write(key1, "WRONG value");
      *   read(key1);
      *   abort();
-     *   
+     *
      *   read(key1);
      *   commit();
      * </code>
-     * 
+     *
      * @param args
      *            command line arguments with the structure "key1 value1 key2
      *            value2 key3"
      * @see #Transaction1(String, String, String, String, String)
      * @see #Transaction2(String, String, String, String, String)
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         String key1, key2, key3;
         String value1, value2;
 
@@ -102,24 +103,24 @@ public class TransactionReadWriteExample {
     /**
      * Implements the following transaction with the Java type methods and the
      * erlang (OTP) type methods:
-     * 
+     *
      * <p>
      * <code style="white-space:pre;">
      *   write(key1, value1);
      *   write(key2, value2);
-     *   
+     *
      *   result1 = read(key1);
      *   result2 = read(key2);
      *   result3 = read(key3);
-     *   
+     *
      *   write(key3, result1 + result2);
-     *   
+     *
      *   result3 = read(key3);
-     *   
+     *
      *   commit();
      * </code>
      * </p>
-     * 
+     *
      * @param key1
      *            key1 used the way described above
      * @param value1
@@ -131,8 +132,8 @@ public class TransactionReadWriteExample {
      * @param key3
      *            key3 used the way described above
      */
-    private static void Transaction1(String key1, String value1, String key2,
-            String value2, String key3) {
+    private static void Transaction1(final String key1, final String value1, final String key2,
+            final String value2, final String key3) {
         String result1 = "";
         String result2 = "";
         @SuppressWarnings("unused")
@@ -141,13 +142,13 @@ public class TransactionReadWriteExample {
 
         System.out.print("    Initialising Transaction object... ");
         try {
-            Transaction transaction = new Transaction();
+            final Transaction transaction = new Transaction();
             System.out.println("done");
 
             try {
                 System.out.print("    Starting transaction... ");
                 System.out.println("done");
-                
+
                 otpWrite(transaction, key1, value1);
                 otpWrite(transaction, key2, value2);
 
@@ -155,7 +156,7 @@ public class TransactionReadWriteExample {
                 result2 = otpRead(transaction, key2);
                 try {
                     result3 = otpRead(transaction, key3);
-                } catch (NotFoundException e) {
+                } catch (final NotFoundException e) {
 //                    System.out.println("    caught not_found for " + key3);
                 }
 
@@ -181,7 +182,7 @@ public class TransactionReadWriteExample {
                 result2 = read(transaction, key2);
                 try {
                     result3 = read(transaction, key3);
-                } catch (NotFoundException e) {
+                } catch (final NotFoundException e) {
 //                  System.out.println("    caught not_found for " + key3);
                 }
 
@@ -192,26 +193,26 @@ public class TransactionReadWriteExample {
                 System.out.print("    Committing transaction... ");
                 transaction.commit();
                 System.out.println("done");
-            } catch (TimeoutException e) {
+            } catch (final TimeoutException e) {
                 // read/write operation
                 transaction.abort();
                 System.out.println("    Transaction aborted due to timeout: "
                         + e.getMessage());
-            } catch (NotFoundException e) {
+            } catch (final NotFoundException e) {
                 // read/write operation
                 transaction.abort();
                 System.out
                         .println("    Transaction aborted because elements were not found although they should exist: "
                                 + e.getMessage());
-            } catch (AbortException e) {
+            } catch (final AbortException e) {
                 System.out.println("    Transaction aborted during commit: "
                         + e.getMessage());
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 // any operation
                 System.out.println("failed: " + e.getMessage());
             }
 
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("failed: " + e.getMessage());
         }
         System.out.println("End Transaction 1");
@@ -220,21 +221,21 @@ public class TransactionReadWriteExample {
     /**
      * Implements the following transaction with the Java type methods and the
      * erlang (OTP) type methods:
-     * 
+     *
      * <p>
      * <code style="white-space:pre;">
      *   write(key1, value1);
      *   commit();
-     *   
+     *
      *   write(key1, "WRONG value");
      *   read(key1);
      *   abort();
-     *   
+     *
      *   read(key1);
      *   commit();
      * </code>
      * </p>
-     * 
+     *
      * @param key1
      *            key1 used the way described above
      * @param value1
@@ -246,19 +247,19 @@ public class TransactionReadWriteExample {
      * @param key3
      *            key3 used the way described above
      */
-    private static void Transaction2(String key1, String value1, String key2,
-            String value2, String key3) {
+    private static void Transaction2(final String key1, final String value1, final String key2,
+            final String value2, final String key3) {
         System.out.println("Transaction 2 using class `Transaction`:");
 
         System.out.print("    Initialising Transaction object... ");
         try {
-            Transaction transaction = new Transaction();
+            final Transaction transaction = new Transaction();
             System.out.println("done");
 
             try {
                 System.out.print("    Starting transaction... ");
                 System.out.println("done");
-                
+
                 otpWrite(transaction, key1, value1);
 
                 System.out.print("    Committing transaction... ");
@@ -316,26 +317,26 @@ public class TransactionReadWriteExample {
                 transaction.commit();
                 System.out.println("done");
 
-            } catch (TimeoutException e) {
+            } catch (final TimeoutException e) {
                 // read/write operation
                 transaction.abort();
                 System.out.println("    Transaction aborted due to timeout: "
                         + e.getMessage());
-            } catch (NotFoundException e) {
+            } catch (final NotFoundException e) {
                 // read/write operation
                 transaction.abort();
                 System.out
                         .println("    Transaction aborted because elements were not found although they should exist: "
                                 + e.getMessage());
-            } catch (AbortException e) {
+            } catch (final AbortException e) {
                 System.out.println("    Transaction aborted during commit: "
                         + e.getMessage());
-            } catch (UnknownException e) {
+            } catch (final UnknownException e) {
                 // any operation
                 System.out.println("failed: " + e.getMessage());
             }
 
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("failed: " + e.getMessage());
         }
         System.out.println("End Transaction 2");
@@ -346,7 +347,7 @@ public class TransactionReadWriteExample {
      * {@link Transaction#write(OtpErlangString, OtpErlangObject)} method on the
      * given <code>transaction</code> object and generates output according to the
      * result.
-     * 
+     *
      * @param transaction
      *            the transaction object to operate on
      * @param key
@@ -362,26 +363,26 @@ public class TransactionReadWriteExample {
      * @throws UnknownException
      *             if any other error occurs
      */
-    private static void otpWrite(Transaction transaction, String key,
-            String value) throws ConnectionException, TimeoutException,
+    private static void otpWrite(final Transaction transaction, final String key,
+            final String value) throws ConnectionException, TimeoutException,
             UnknownException {
         System.out.println("    `write(OtpErlangString, OtpErlangString)`...");
-        OtpErlangString otpKey = new OtpErlangString(key);
-        OtpErlangString otpValue = new OtpErlangString(value);
+        final OtpErlangString otpKey = new OtpErlangString(key);
+        final OtpErlangString otpValue = new OtpErlangString(value);
         try {
             transaction.write(otpKey, otpValue);
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") succeeded");
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed: " + e.getMessage());
             throw new ConnectionException(e);
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with timeout: "
                     + e.getMessage());
             throw new TimeoutException(e);
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with unknown: "
                     + e.getMessage());
@@ -393,7 +394,7 @@ public class TransactionReadWriteExample {
      * Writes the given <code>key</code> and <code>value</code> with the
      * {@link Transaction#write(String, Object)} method on the given
      * <code>transaction</code> object and generates output according to the result.
-     * 
+     *
      * @param transaction
      *            the transaction object to operate on
      * @param key
@@ -409,22 +410,22 @@ public class TransactionReadWriteExample {
      * @throws UnknownException
      *             if any other error occurs
      */
-    private static void write(Transaction transaction, String key, String value)
+    private static void write(final Transaction transaction, final String key, final String value)
             throws ConnectionException, TimeoutException, UnknownException {
         System.out.println("    `write(String, String)`...");
         try {
             transaction.write(key, value);
             System.out.println("      write(" + key + ", " + value
                     + ") succeeded");
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed: " + e.getMessage());
             throw new ConnectionException(e);
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed with timeout: " + e.getMessage());
             throw new TimeoutException(e);
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed with unknown: " + e.getMessage());
             throw new UnknownException(e);
@@ -435,7 +436,7 @@ public class TransactionReadWriteExample {
      * Reads the given <code>key</code> with the
      * {@link Transaction#read(OtpErlangString)} method on the given
      * <code>transaction</code> object and generates output according to the result.
-     * 
+     *
      * @param transaction
      *            the transaction object to operate on
      * @param key
@@ -452,34 +453,34 @@ public class TransactionReadWriteExample {
      * @throws UnknownException
      *             if any other error occurs
      */
-    private static String otpRead(Transaction transaction, String key)
+    private static String otpRead(final Transaction transaction, final String key)
             throws ConnectionException, TimeoutException, UnknownException,
             NotFoundException {
         System.out.println("    `OtpErlangString read(OtpErlangString)`...");
-        OtpErlangString otpKey = new OtpErlangString(key);
+        final OtpErlangString otpKey = new OtpErlangString(key);
         OtpErlangString otpValue;
         try {
             otpValue = (OtpErlangString) transaction.read(otpKey).value();
             System.out.println("      read(" + otpKey.stringValue() + ") == "
                     + otpValue.stringValue());
             return otpValue.stringValue();
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed: " + e.getMessage());
             throw new ConnectionException(e);
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with timeout: " + e.getMessage());
             throw new TimeoutException(e);
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with unknown: " + e.getMessage());
             throw new UnknownException(e);
-        } catch (NotFoundException e) {
+        } catch (final NotFoundException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with not found: " + e.getMessage());
             throw new NotFoundException(e);
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with unknown return type: " + e.getMessage());
             throw new UnknownException(e);
@@ -490,7 +491,7 @@ public class TransactionReadWriteExample {
      * Reads the given <code>key</code> with the {@link Transaction#read(String)}
      * method on the given <code>transaction</code> object and generates output
      * according to the result.
-     * 
+     *
      * @param transaction
      *            the transaction object to operate on
      * @param key
@@ -507,7 +508,7 @@ public class TransactionReadWriteExample {
      * @throws UnknownException
      *             if any other error occurs
      */
-    private static String read(Transaction transaction, String key)
+    private static String read(final Transaction transaction, final String key)
             throws ConnectionException, TimeoutException, UnknownException,
             NotFoundException {
         System.out.println("    `String read(String)`...");
@@ -516,19 +517,19 @@ public class TransactionReadWriteExample {
             value = transaction.read(key).stringValue();
             System.out.println("      read(" + key + ") == " + value);
             return value;
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      read(" + key + ") failed: "
                     + e.getMessage());
             throw new ConnectionException(e);
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      read(" + key + ") failed with timeout: "
                     + e.getMessage());
             throw new TimeoutException(e);
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      read(" + key + ") failed with unknown: "
                     + e.getMessage());
             throw new UnknownException(e);
-        } catch (NotFoundException e) {
+        } catch (final NotFoundException e) {
             System.out.println("      read(" + key
                     + ") failed with not found: " + e.getMessage());
             throw new NotFoundException(e);

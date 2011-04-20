@@ -15,7 +15,7 @@
  */
 /**
  * This package contains means to communicate with the erlang scalaris ring from Java.
- * 
+ *
  * <h3>The TransactionSingleOp class</h3>
  * <p>
  * The {@link de.zib.scalaris.TransactionSingleOp} class provides methods for
@@ -23,7 +23,7 @@
  * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and
  * Java objects like {@link java.lang.String}.
  * </p>
- * 
+ *
  * <h4>Example:</h4>
  * <pre>
  * <code style="white-space:pre;">
@@ -43,10 +43,10 @@
  *   }
  * </code>
  * </pre>
- * 
+ *
  * <p>See the {@link de.zib.scalaris.TransactionSingleOp} class documentation
  * for more details.</p>
- * 
+ *
  * <h3>The Transaction class</h3>
  * <p>
  * The {@link de.zib.scalaris.Transaction} class provides means to realise a
@@ -55,7 +55,7 @@
  * and Java objects like {@link java.lang.String}. The transaction can then be
  * committed or aborted.
  * </p>
- * 
+ *
  * <h4>Example:</h4>
  * <pre>
  * <code style="white-space:pre;">
@@ -75,10 +75,10 @@
  *   }
  * </code>
  * </pre>
- * 
+ *
  * <p>See the {@link de.zib.scalaris.Transaction} class documentation for more
  * details.</p>
- * 
+ *
  * <h3>The PubSub class</h3>
  * <p>
  * The {@link de.zib.scalaris.PubSub} class provides methods for publishing
@@ -86,7 +86,7 @@
  * erlang strings ({@link com.ericsson.otp.erlang.OtpErlangString}) and
  * Java strings ({@link java.lang.String}).
  * </p>
- * 
+ *
  * <h4>Example:</h4>
  * <pre>
  * <code style="white-space:pre;">
@@ -104,10 +104,10 @@
  *   }
  * </code>
  * </pre>
- * 
+ *
  * <p>See the {@link de.zib.scalaris.PubSub} class documentation for more
  * details.</p>
- * 
+ *
  * <h3>The ReplicatedDHT class</h3>
  * <p>
  * The {@link de.zib.scalaris.ReplicatedDHT} class provides methods for
@@ -116,7 +116,7 @@
  * ({@link com.ericsson.otp.erlang.OtpErlangString}) and Java strings
  * ({@link java.lang.String}).
  * </p>
- * 
+ *
  * <h4>Example:</h4>
  * <pre>
  * <code style="white-space:pre;">
@@ -135,10 +135,10 @@
  *   }
  * </code>
  * </pre>
- * 
+ *
  * <p>See the {@link de.zib.scalaris.ReplicatedDHT} class documentation for
  * more details.</p>
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.9
  * @since 2.0

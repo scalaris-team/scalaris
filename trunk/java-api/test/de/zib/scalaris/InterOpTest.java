@@ -32,17 +32,17 @@ import org.apache.commons.cli.ParseException;
 
 /**
  * Class to test interoperability between the different Scalaris APIs.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.1
  * @since 3.1
  */
 public class InterOpTest {
     private enum Mode { READ, WRITE };
-    
+
     /**
      * Queries the command line options for an action to perform.
-     * 
+     *
      * <pre>
      * <code>
      * > java -jar scalaris.jar -help
@@ -57,12 +57,12 @@ public class InterOpTest {
      *                                   given basekey
      * </code>
      * </pre>
-     * 
+     *
      * In order to override node and cookie to use for a connection, specify
      * the <tt>SCALARIS_JAPI_NODE</tt> or <tt>SCALARIS_JAPI_COOKIE</tt>
      * environment variables. Their values will be used instead of the values
      * defined in the config file!
-     * 
+     *
      * @param args
      *            command line arguments
      */
@@ -122,7 +122,7 @@ public class InterOpTest {
             failed += read_write_list(basekey, sc, mode);
             failed += read_write_map(basekey, sc, mode);
             System.out.println();
-            
+
             sc.closeConnection();
             if (failed > 0) {
                 if (mode == Mode.WRITE) {
@@ -139,7 +139,7 @@ public class InterOpTest {
             Main.printException("failed with unknown", e, verbose);
         }
     }
-    
+
     private static int read_or_write(TransactionSingleOp sc, String key, Object value, Mode mode) {
         try {
             switch (mode) {
@@ -200,7 +200,7 @@ public class InterOpTest {
         }
         return 1;
     }
-    
+
     private static boolean compare(byte[] actual, Object expected) {
         try {
             byte[] expected_bytes = (byte[]) expected;
@@ -217,7 +217,7 @@ public class InterOpTest {
             return false;
         }
     }
-    
+
     private static boolean compare(List<Object> actual, Object expected) {
         try {
             @SuppressWarnings("unchecked")
@@ -235,7 +235,7 @@ public class InterOpTest {
             return false;
         }
     }
-    
+
     private static boolean compare(Map<String, Object> actual, Object expected) {
         try {
             @SuppressWarnings("unchecked")
@@ -253,7 +253,7 @@ public class InterOpTest {
             return false;
         }
     }
-    
+
     private static boolean compare(Object actual, Object expected) {
         try {
             if (expected instanceof byte[]) {
@@ -261,7 +261,7 @@ public class InterOpTest {
                     return compare(((ErlangValue) actual).binaryValue(), expected);
                 } else {
                     return compare((byte[]) actual, expected);
-                } 
+                }
             } else if (expected instanceof List<?>) {
                 if (actual instanceof ErlangValue) {
                     return compare(((ErlangValue) actual).listValue(), expected);
@@ -269,7 +269,7 @@ public class InterOpTest {
                     @SuppressWarnings("unchecked")
                     List<Object> actual_list = (List<Object>) actual;
                     return compare(actual_list, expected);
-                }  
+                }
             } else if (expected instanceof Map<?, ?>) {
                 if (actual instanceof ErlangValue) {
                     return compare(((ErlangValue) actual).jsonValue(), expected);
@@ -321,7 +321,7 @@ public class InterOpTest {
             return false;
         }
     }
-    
+
     private static String valueToStr(Object value) {
         String value_str;
         if (value instanceof String) {
@@ -365,32 +365,32 @@ public class InterOpTest {
         }
         return value_str;
     }
-    
+
     private static int read_write_boolean(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_bool_false"; value = false;
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_bool_true"; value = true;
         failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
+
     private static int read_write_integer(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_int_0"; value = 0;
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_int_1"; value = 1;
         failed += read_or_write(sc, key, value, mode);
-        
+
 //        lastKey = basekey + "_int_min"; lastValue = Integer.MIN_VALUE;
         key = basekey + "_int_min"; value = -2147483648;
         failed += read_or_write(sc, key, value, mode);
@@ -402,18 +402,18 @@ public class InterOpTest {
 //        lastKey = basekey + "_int_max_div_2"; lastValue = Integer.MAX_VALUE / 2;
         key = basekey + "_int_max_div_2"; value = 2147483647 / 2;
         failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
+
     private static int read_write_long(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_long_0"; value = 0l;
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_long_1"; value = 1l;
         failed += read_or_write(sc, key, value, mode);
 
@@ -428,44 +428,44 @@ public class InterOpTest {
 //        lastKey = basekey + "_long_max_div_2"; lastValue = Long.MAX_VALUE / 2l;
         key = basekey + "_long_max_div_2"; value = 9223372036854775807l / 2l;
         failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
+
     private static int read_write_biginteger(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_bigint_0"; value = new BigInteger("0");
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_bigint_1"; value = new BigInteger("1");
         failed += read_or_write(sc, key, value, mode);
 
         key = basekey + "_bigint_min"; value = new BigInteger("-100000000000000000000");
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_bigint_max"; value = new BigInteger("100000000000000000000");
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_bigint_max_div_2"; value = new BigInteger("100000000000000000000").divide(new BigInteger("2"));
         failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
+
     private static int read_write_double(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_float_0.0"; value = 0.0;
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_float_1.5"; value = 1.5;
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_float_-1.5"; value = -1.5;
         failed += read_or_write(sc, key, value, mode);
 
@@ -480,7 +480,7 @@ public class InterOpTest {
 //        lastKey = basekey + "_float_max_div_2"; lastValue = Double.MAX_VALUE / 2.0;
         key = basekey + "_float_max_div_2"; value = 1.7976931348623157E308 / 2.0;
         failed += read_or_write(sc, key, value, mode);
-        
+
         // not supported by OTP:
 //        key = basekey + "_float_neg_inf"; value = Double.NEGATIVE_INFINITY;
 //        failed += read_or_write(sc, key, value, mode);
@@ -488,72 +488,72 @@ public class InterOpTest {
 //        failed += read_or_write(sc, key, value, mode);
 //        key = basekey + "_float_nan"; value = Double.NaN;
 //        failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
+
     private static int read_write_string(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_string_empty"; value = "";
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_string_foobar"; value = "foobar";
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_string_foo\\nbar"; value = "foo\nbar";
         failed += read_or_write(sc, key, value, mode);
-        
+
         // some (arbitrary) unicode characters
         // (please don't be offended if they actually mean something)
         key = basekey + "_string_unicode"; value = "foo\u0180\u01E3\u11E5";
         failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
+
     private static int read_write_binary(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_byte_empty"; value = new byte[0];
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_byte_0"; value = new byte[] {0};
         failed += read_or_write(sc, key, value, mode);
-        
+
         key = basekey + "_byte_0123"; value = new byte[] {0, 1, 2, 3};
         failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
+
     private static int read_write_list(String basekey, TransactionSingleOp sc, Mode mode) {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_list_empty"; value = new ArrayList<Object>();
         failed += read_or_write(sc, key, value, mode);
-        
+
         ArrayList<Integer> list1 = new ArrayList<Integer>();
         list1.add(0); list1.add(1); list1.add(2); list1.add(3);
         key = basekey + "_list_0_1_2_3"; value = list1;
         failed += read_or_write(sc, key, value, mode);
-        
+
         ArrayList<Integer> list2 = new ArrayList<Integer>();
         list2.add(0); list2.add(123); list2.add(456); list2.add(65000);
         key = basekey + "_list_0_123_456_65000"; value = list2;
         failed += read_or_write(sc, key, value, mode);
-        
+
         ArrayList<Integer> list3 = new ArrayList<Integer>();
         list3.add(0); list3.add(123); list3.add(456); list3.add(0x10ffff);
         key = basekey + "_list_0_123_456_0x10ffff"; value = list3;
         failed += read_or_write(sc, key, value, mode);
-        
+
         ArrayList<Object> list4 = new ArrayList<Object>();
         list4.add(0);
         list4.add("foo");
@@ -561,7 +561,7 @@ public class InterOpTest {
         list4.add(false);
         key = basekey + "_list_0_foo_1.5_false"; value = list4;
         failed += read_or_write(sc, key, value, mode);
-        
+
         // note: we do not support binaries in lists anymore because JSON would
         // need special handling for each list element which introduces too
         // much overhead
@@ -572,7 +572,7 @@ public class InterOpTest {
 //        list5.add(new byte[] {0, 1, 2, 3});
 //        key = basekey + "_list_0_foo_1.5_<<0123>>"; value = list5;
 //        failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
 
@@ -581,18 +581,18 @@ public class InterOpTest {
         int failed = 0;
         String key;
         Object value;
-        
+
         key = basekey + "_map_empty";
         value = new LinkedHashMap<String, Object>();
         failed += read_or_write(sc, key, value, mode);
-        
+
         LinkedHashMap<String, Integer> map1 = new LinkedHashMap<String, Integer>();
         map1.put("x", 0);
         map1.put("y", 1);
         key = basekey + "_map_x=0_y=1";
         value = map1;
         failed += read_or_write(sc, key, value, mode);
-        
+
         LinkedHashMap<String, Object> map2 = new LinkedHashMap<String, Object>();
         map2.put("a", 0);
         map2.put("b", "foo");
@@ -608,13 +608,13 @@ public class InterOpTest {
         key = basekey + "_map_a=0_b=foo_c=1.5_d=foo<nl>bar_e=list0123_f=mapx0y1";
         value = map2;
         failed += read_or_write(sc, key, value, mode);
-        
+
         LinkedHashMap<String, Integer> map3 = new LinkedHashMap<String, Integer>();
         map3.put("", 0);
         key = basekey + "_map_=0";
         value = map3;
         failed += read_or_write(sc, key, value, mode);
-        
+
         LinkedHashMap<String, Object> map4 = new LinkedHashMap<String, Object>();
         // some (arbitrary) unicode characters
         // (please don't be offended if they actually mean something)
@@ -623,7 +623,7 @@ public class InterOpTest {
         key = basekey + "_map_x=0_y=foo\u0180\u01E3\u11E5";
         value = map4;
         failed += read_or_write(sc, key, value, mode);
-        
+
         LinkedHashMap<String, Integer> map5 = new LinkedHashMap<String, Integer>();
         // some (arbitrary) unicode characters
         // (please don't be offended if they actually mean something)
@@ -632,15 +632,15 @@ public class InterOpTest {
         key = basekey + "_map_x=0_foo\u0180\u01E3\u11E5=1";
         value = map5;
         failed += read_or_write(sc, key, value, mode);
-        
+
         return failed;
     }
-    
-    
+
+
 
     /**
      * Creates the options the command line should understand.
-     * 
+     *
      * @return the options the program understands
      */
     private static Options getOptions() {
@@ -651,9 +651,9 @@ public class InterOpTest {
          * checks on our own (commons.cli is not flexible enough and only
          * checks for the existence of a first argument)
          */
-        
+
         options.addOption(new Option("h", "help", false, "print this message"));
-        
+
         options.addOption(new Option("v", "verbose", false, "print verbose information, e.g. the properties read"));
 
         Option read = new Option("r", "read", true, "read an item");

@@ -34,17 +34,16 @@ import com.ericsson.otp.erlang.OtpSelf;
 
 /**
  * Test cases for the {@link Connection} class.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
- * 
+ *
  * @version 2.3
  * @since 2.3
  */
 public class ConnectionTest {
-
     /**
      * Test method for {@link Connection#Connection(OtpSelf, PeerNode)}.
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      * @throws IOException
@@ -60,14 +59,14 @@ public class ConnectionTest {
     @Test
     public final void testConnectionOtpSelfPeerNode() throws ConnectionException,
             OtpErlangExit, OtpAuthException, IOException, InterruptedException {
-        OtpSelf self = new OtpSelf("testConnection", ConnectionFactory
+        final OtpSelf self = new OtpSelf("testConnection", ConnectionFactory
                 .getInstance().getCookie());
-        PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
+        final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
-        Date d0 = new Date();
+        final Date d0 = new Date();
         TimeUnit.MILLISECONDS.sleep(10);
-        Connection c = new Connection(self, remote);
-        
+        final Connection c = new Connection(self, remote);
+
         assertEquals(self, c.getSelf());
         assertEquals(remote, c.getRemote());
         assertTrue(c.getConnection().isConnected());
@@ -75,13 +74,13 @@ public class ConnectionTest {
         assertTrue(d0.getTime() < remote.getLastConnectSuccess().getTime());
         assertEquals(0, remote.getFailureCount());
         assertNull(remote.getLastFailedConnect());
-        
+
         c.close();
     }
 
     /**
      * Test method for {@link Connection#Connection(OtpSelf, ConnectionPolicy)}.
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      * @throws IOException
@@ -97,14 +96,14 @@ public class ConnectionTest {
     @Test
     public final void testConnectionOtpSelfConnectionPolicy() throws ConnectionException,
             OtpErlangExit, OtpAuthException, IOException, InterruptedException {
-        OtpSelf self = new OtpSelf("testConnection", ConnectionFactory
+        final OtpSelf self = new OtpSelf("testConnection", ConnectionFactory
                 .getInstance().getCookie());
-        PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
+        final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
-        Date d0 = new Date();
+        final Date d0 = new Date();
         TimeUnit.MILLISECONDS.sleep(10);
-        Connection c = new Connection(self, new DefaultConnectionPolicy(remote));
-        
+        final Connection c = new Connection(self, new DefaultConnectionPolicy(remote));
+
         assertEquals(self, c.getSelf());
         assertEquals(remote, c.getRemote());
         assertTrue(c.getConnection().isConnected());
@@ -112,17 +111,17 @@ public class ConnectionTest {
         assertTrue(d0.getTime() < remote.getLastConnectSuccess().getTime());
         assertEquals(0, remote.getFailureCount());
         assertNull(remote.getLastFailedConnect());
-        
+
         c.close();
     }
 
     /**
      * Test method for
      * {@link Connection#Connection(OtpSelf, PeerNode)}.
-     * 
+     *
      * Tries several kinds of connections that fail and evaluates the statistics
      * of the {@link PeerNode} object.
-     * 
+     *
      * @throws IOException
      *             if the connection is not active or a communication error
      *             occurs (should not happen)
@@ -134,7 +133,7 @@ public class ConnectionTest {
         PeerNode remote;
         Connection c;
         DefaultConnectionPolicy connectionPolicy;
-        Date d0 = new Date();
+        final Date d0 = new Date();
         Date d1, d2;
         TimeUnit.MILLISECONDS.sleep(10);
 
@@ -149,7 +148,7 @@ public class ConnectionTest {
             // this should have failed!
             fail();
             c.close();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(1, remote.getFailureCount());
         d1 = remote.getLastFailedConnect();
@@ -161,7 +160,7 @@ public class ConnectionTest {
             // this should have failed!
             fail();
             c.close();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(2, remote.getFailureCount());
         d2 = remote.getLastFailedConnect();
@@ -181,7 +180,7 @@ public class ConnectionTest {
             // this should have failed!
             fail();
             c.close();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(1, remote.getFailureCount());
         d1 = remote.getLastFailedConnect();
@@ -193,7 +192,7 @@ public class ConnectionTest {
             // this should have failed!
             fail();
             c.close();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(2, remote.getFailureCount());
         d2 = remote.getLastFailedConnect();
@@ -213,7 +212,7 @@ public class ConnectionTest {
             // this should have failed!
             fail();
             c.close();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(1, remote.getFailureCount());
         d1 = remote.getLastFailedConnect();
@@ -225,7 +224,7 @@ public class ConnectionTest {
             // this should have failed!
             fail();
             c.close();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(2, remote.getFailureCount());
         d2 = remote.getLastFailedConnect();
@@ -238,7 +237,7 @@ public class ConnectionTest {
     /**
      * Test method for
      * {@link Connection#doRPC(String, String, OtpErlangList)}.
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      * @throws IOException
@@ -256,32 +255,32 @@ public class ConnectionTest {
     public final void testDoRPCStringStringOtpErlangList()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException {
-        OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
                 ConnectionFactory.getInstance().getCookie());
-        PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
+        final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
-        Connection c = new Connection(self, remote);
+        final Connection c = new Connection(self, remote);
 
-        OtpErlangObject raw_result = c.doRPC("lists", "sum", new OtpErlangList(
+        final OtpErlangObject raw_result = c.doRPC("lists", "sum", new OtpErlangList(
                 new OtpErlangList(new OtpErlangObject[] { new OtpErlangInt(1),
                         new OtpErlangInt(2), new OtpErlangInt(3) })));
-        OtpErlangLong result = (OtpErlangLong) raw_result;
-        
+        final OtpErlangLong result = (OtpErlangLong) raw_result;
+
         assertEquals(6, result.intValue());
         assertNotNull(remote.getLastConnectSuccess());
         assertEquals(0, remote.getFailureCount());
         assertNull(remote.getLastFailedConnect());
-        
+
         c.close();
     }
 
     /**
      * Test method for
      * {@link Connection#doRPC(String, String, OtpErlangList)}.
-     * 
+     *
      * Closes the connection before doing the RPC which thus fails. Evaluates
      * the statistics of the {@link PeerNode} object.
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      * @throws IOException
@@ -294,22 +293,22 @@ public class ConnectionTest {
      *             cookie
      * @throws OtpErlangRangeException
      *             if the value is too large to be represented as an int
-     * @throws InterruptedException if the sleep is interrupted 
+     * @throws InterruptedException if the sleep is interrupted
      */
     @Test
     public final void testDoRPCStringStringOtpErlangList_fail()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException, InterruptedException {
-        OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
                 ConnectionFactory.getInstance().getCookie());
-        PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
+        final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
-        DefaultConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(remote);
+        final DefaultConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(remote);
         connectionPolicy.setMaxRetries(0);
-        Date d0 = new Date();
+        final Date d0 = new Date();
         Date d1;
         TimeUnit.MILLISECONDS.sleep(10);
-        Connection c = new Connection(self, connectionPolicy);
+        final Connection c = new Connection(self, connectionPolicy);
 
         c.close();
 
@@ -321,7 +320,7 @@ public class ConnectionTest {
             c.close();
             // this should have failed!
             fail();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(1, remote.getFailureCount());
         d1 = remote.getLastFailedConnect();
@@ -333,7 +332,7 @@ public class ConnectionTest {
      * Test method for
      * {@link Connection#doRPC(String, String, OtpErlangObject[])}
      * .
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      * @throws IOException
@@ -351,33 +350,33 @@ public class ConnectionTest {
     public final void testDoRPCStringStringOtpErlangObjectArray()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException {
-        OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangObjectArray",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangObjectArray",
                 ConnectionFactory.getInstance().getCookie());
-        PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
+        final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
-        Connection c = new Connection(self, remote);
+        final Connection c = new Connection(self, remote);
 
-        OtpErlangObject raw_result = c.doRPC("lists", "sum",
+        final OtpErlangObject raw_result = c.doRPC("lists", "sum",
                 new OtpErlangObject[] { new OtpErlangList(
                         new OtpErlangObject[] { new OtpErlangInt(1),
                                 new OtpErlangInt(2), new OtpErlangInt(3) }) });
-        OtpErlangLong result = (OtpErlangLong) raw_result;
-        
+        final OtpErlangLong result = (OtpErlangLong) raw_result;
+
         assertEquals(6, result.intValue());
         assertNotNull(remote.getLastConnectSuccess());
         assertEquals(0, remote.getFailureCount());
         assertNull(remote.getLastFailedConnect());
-        
+
         c.close();
     }
-    
+
     /**
      * Test method for
      * {@link Connection#doRPC(String, String, OtpErlangObject[])}.
-     * 
+     *
      * Closes the connection before doing the RPC which thus fails. Evaluates
      * the statistics of the {@link PeerNode} object.
-     * 
+     *
      * @throws ConnectionException
      *             if the connection fails
      * @throws IOException
@@ -390,22 +389,22 @@ public class ConnectionTest {
      *             cookie
      * @throws OtpErlangRangeException
      *             if the value is too large to be represented as an int
-     * @throws InterruptedException if the sleep is interrupted 
+     * @throws InterruptedException if the sleep is interrupted
      */
     @Test
     public final void testDoRPCStringStringOtpErlangObjectArray_fail()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException, InterruptedException {
-        OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
                 ConnectionFactory.getInstance().getCookie());
-        PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
+        final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
-        DefaultConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(remote);
+        final DefaultConnectionPolicy connectionPolicy = new DefaultConnectionPolicy(remote);
         connectionPolicy.setMaxRetries(0);
-        Date d0 = new Date();
+        final Date d0 = new Date();
         Date d1;
         TimeUnit.MILLISECONDS.sleep(10);
-        Connection c = new Connection(self, connectionPolicy);
+        final Connection c = new Connection(self, connectionPolicy);
 
         c.close();
 
@@ -417,7 +416,7 @@ public class ConnectionTest {
             c.close();
             // this should have failed!
             fail();
-        } catch (Exception e) {
+        } catch (final Exception e) {
         }
         assertEquals(1, remote.getFailureCount());
         d1 = remote.getLastFailedConnect();

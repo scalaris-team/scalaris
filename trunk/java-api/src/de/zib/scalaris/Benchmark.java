@@ -27,9 +27,9 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 /**
  * Provides methods to run benchmarks and print the results.
- * 
+ *
  * Also provides some default benchmarks.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.0
  * @since 2.0
@@ -41,7 +41,7 @@ public class Benchmark {
     protected static final int BENCH_DATA_SIZE = 1000;
     /**
      * The time when the (whole) benchmark suite was started.
-     * 
+     *
      * This is used to create different erlang keys for each run.
      */
     protected static final long benchTime = System.currentTimeMillis();
@@ -60,7 +60,7 @@ public class Benchmark {
 
     /**
      * Default minimal benchmark.
-     * 
+     *
      * Tests some strategies for writing key/value pairs to scalaris:
      * <ol>
      * <li>writing {@link OtpErlangBinary} objects (random data, size =
@@ -77,71 +77,71 @@ public class Benchmark {
      * <li>and finally re-using a single {@link Transaction} or
      * {@link TransactionSingleOp} object.</li>
      * </ul>
-     * 
+     *
      * @param testruns
      *            the number of test runs to execute
      * @param benchmarks
      *            the benchmarks to run
      */
-    public static void minibench(int testruns, Set<Integer> benchmarks) {
+    public static void minibench(final int testruns, final Set<Integer> benchmarks) {
         long[][] results = getResultArray(3, 2);
         String[] columns;
         String[] rows;
-        
+
         System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
 
         try {
             if (benchmarks.contains(1)) {
-                results[0][0] = 
+                results[0][0] =
                     transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_1");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(2)) {
-                results[1][0] = 
+                results[1][0] =
                     transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_2");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(3)) {
-                results[2][0] = 
+                results[2][0] =
                     transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_3");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(4)) {
-                results[0][1] = 
+                results[0][1] =
                     transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_1");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(5)) {
-                results[1][1] = 
+                results[1][1] =
                     transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_2");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(6)) {
-                results[2][1] = 
+                results[2][1] =
                     transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_3");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
 
@@ -153,64 +153,64 @@ public class Benchmark {
                 "re-use connection",
                 "re-use object" };
         printResults(columns, rows, results, testruns);
-        
-        
+
+
         results = getResultArray(3, 2);
         System.out.println("-----");
         System.out.println("Benchmark of de.zib.scalaris.Transaction:");
 
         try {
             if (benchmarks.contains(1)) {
-                results[0][0] = 
+                results[0][0] =
                     transBench1(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_1");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(2)) {
-                results[1][0] = 
+                results[1][0] =
                     transBench2(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_2");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(3)) {
-                results[2][0] = 
+                results[2][0] =
                     transBench3(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_3");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(4)) {
-                results[0][1] = 
+                results[0][1] =
                     transBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_1");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(5)) {
-                results[1][1] = 
+                results[1][1] =
                     transBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_2");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
         try {
             if (benchmarks.contains(6)) {
-                results[2][1] = 
+                results[2][1] =
                     transBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_3");
                 TimeUnit.SECONDS.sleep(1);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // e.printStackTrace();
         }
 
@@ -222,8 +222,8 @@ public class Benchmark {
                 "re-use connection",
                 "re-use object" };
         printResults(columns, rows, results, testruns);
-        
-        
+
+
         results = getResultArray(3, 1);
         System.out.println("-----");
         System.out.println("Benchmark incrementing an integer key (read+write):");
@@ -232,7 +232,7 @@ public class Benchmark {
             try {
                 results[0][0] = transIncrementBench1(testruns, "transbench_inc_1");
                 TimeUnit.SECONDS.sleep(1);
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 // e.printStackTrace();
             }
         }
@@ -240,14 +240,14 @@ public class Benchmark {
             try {
                 results[1][0] = transIncrementBench2(testruns, "transbench_inc_2");
                 TimeUnit.SECONDS.sleep(1);
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 // e.printStackTrace();
             }
         }
         if (benchmarks.contains(9)) {
             try {
                 results[2][0] = transIncrementBench3(testruns, "transbench_inc_3");
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 // e.printStackTrace();
             }
         }
@@ -263,17 +263,17 @@ public class Benchmark {
 
     /**
      * Prints a result table.
-     * 
+     *
      * @param columns
      *            names of the columns
      * @param rows
      *            names of the rows (max 25 chars to protect the layout)
-     * 
+     *
      * @param results
      *            the results to print (results[i][j]: i = row, j = column)
      */
-    protected static void printResults(String[] columns, String[] rows,
-            long[][] results, int testruns) {
+    protected static void printResults(final String[] columns, final String[] rows,
+            final long[][] results, final int testruns) {
         System.out.println("Test runs: " + testruns + ", each using " + transactionsPerTestRun + " transactions");
         System.out
                 .println("                         \tspeed (transactions / second)");
@@ -305,7 +305,7 @@ public class Benchmark {
 
     /**
      * Call this method when a benchmark is started.
-     * 
+     *
      * Sets the time the benchmark was started.
      */
     final protected static void testBegin() {
@@ -314,30 +314,30 @@ public class Benchmark {
 
     /**
      * Call this method when a benchmark is finished.
-     * 
+     *
      * Calculates the time the benchmark took and the number of transactions
      * performed during this time.
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    final protected static long testEnd(int testRuns) {
-        long timeTaken = System.currentTimeMillis() - timeAtStart;
-        long speed = (testRuns * 1000) / timeTaken;
+    final protected static long testEnd(final int testRuns) {
+        final long timeTaken = System.currentTimeMillis() - timeAtStart;
+        final long speed = (testRuns * 1000) / timeTaken;
         return speed;
     }
-    
+
     /**
      * Returns a pre-initialized results array with values <tt>-1</tt>.
-     * 
+     *
      * @param rows
      *            number of rows to create
      * @param columns
      *            number of columns to create
-     * 
+     *
      * @return the 2d results array
      */
-    protected static long[][] getResultArray(int rows, int columns) {
-        long[][] results = new long[rows][columns];
+    protected static long[][] getResultArray(final int rows, final int columns) {
+        final long[][] results = new long[rows][columns];
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < columns; ++j) {
                 results[i][j] = -1;
@@ -345,20 +345,20 @@ public class Benchmark {
         }
         return results;
     }
-    
+
     /**
      * Creates an object T from <tt>size</tt> random bytes. Uses either a
      * constructor that expects a <tt>byte[]</tt> or a {@link String} parameter.
-     * 
+     *
      * @param <T>
      *            the type of the object to create
      * @param size
      *            the number of (random) bytes to create
      * @param c
      *            the class of the object to create (needed due to type erasure)
-     * 
+     *
      * @return the created object
-     * 
+     *
      * @throws IllegalAccessException
      *             - if this Constructor object enforces Java language access
      *             control and the underlying constructor is inaccessible.
@@ -387,16 +387,16 @@ public class Benchmark {
      *             invocation of s.checkPackageAccess() denies access to the
      *             package of this class
      */
-    protected static <T> T getRandom(int size, Class<T> c)
+    protected static <T> T getRandom(final int size, final Class<T> c)
             throws IllegalArgumentException, SecurityException,
             InstantiationException, IllegalAccessException,
             InvocationTargetException, NoSuchMethodException {
-        byte[] data = new byte[size];
-        Random r = new Random();
+        final byte[] data = new byte[size];
+        final Random r = new Random();
         r.nextBytes(data);
         try {
             return c.getConstructor(byte[].class).newInstance(data);
-        } catch (NoSuchMethodException e) {
+        } catch (final NoSuchMethodException e) {
             return c.getConstructor(String.class).newInstance(new String(data));
         }
     }
@@ -405,28 +405,28 @@ public class Benchmark {
      * Calculates the average number of transactions per second from the results
      * of executing 10 transactions per test run. Will remove the top and bottom
      * {@link #percentToRemove} percent of the sorted results array.
-     * 
+     *
      * @param results
      *            the average number of transactions per second using 10
      *            transactions
-     * 
+     *
      * @return the average number of transactions per second
      */
-    protected static long getAvgSpeed(long[] results) {
+    protected static long getAvgSpeed(final long[] results) {
         Arrays.sort(results);
-        int toRemove = (results.length * percentToRemove) / 100;
+        final int toRemove = (results.length * percentToRemove) / 100;
         long avgSpeed = 0;
         for (int i = toRemove; i < (results.length - toRemove); ++i) {
             avgSpeed += results[i];
         }
-        avgSpeed /= results.length - 2 * toRemove;
+        avgSpeed /= results.length - (2 * toRemove);
         return avgSpeed;
     }
 
     /**
      * Performs a benchmark writing objects using a new
      * {@link TransactionSingleOp} object for each test.
-     * 
+     *
      * @param <T>
      *            type of the value to write
      * @param testRuns
@@ -436,19 +436,19 @@ public class Benchmark {
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static <T> long transSingleOpBench1(int testRuns, T value, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static <T> long transSingleOpBench1(final int testRuns, final T value, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
                     testBegin();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        TransactionSingleOp transaction = new TransactionSingleOp();
+                        final TransactionSingleOp transaction = new TransactionSingleOp();
                         if (value instanceof OtpErlangObject) {
                             transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
                         } else {
@@ -458,7 +458,7 @@ public class Benchmark {
                     }
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -474,7 +474,7 @@ public class Benchmark {
      * Performs a benchmark writing objects using a new
      * {@link TransactionSingleOp} but re-using a single {@link Connection} for
      * each test.
-     * 
+     *
      * @param <T>
      *            type of the value to write
      * @param testRuns
@@ -484,21 +484,21 @@ public class Benchmark {
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static <T> long transSingleOpBench2(int testRuns, T value, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static <T> long transSingleOpBench2(final int testRuns, final T value, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
                     testBegin();
-                    Connection connection = ConnectionFactory.getInstance()
+                    final Connection connection = ConnectionFactory.getInstance()
                     .createConnection();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        TransactionSingleOp transaction = new TransactionSingleOp(connection);
+                        final TransactionSingleOp transaction = new TransactionSingleOp(connection);
                         if (value instanceof OtpErlangObject) {
                             transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
                         } else {
@@ -508,7 +508,7 @@ public class Benchmark {
                     connection.close();
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -523,7 +523,7 @@ public class Benchmark {
     /**
      * Performs a benchmark writing objects using a single
      * {@link TransactionSingleOp} object for all tests.
-     * 
+     *
      * @param <T>
      *            type of the value to write
      * @param testRuns
@@ -533,18 +533,18 @@ public class Benchmark {
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static <T> long transSingleOpBench3(int testRuns, T value, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static <T> long transSingleOpBench3(final int testRuns, final T value, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
                     testBegin();
-                    TransactionSingleOp transaction = new TransactionSingleOp();
+                    final TransactionSingleOp transaction = new TransactionSingleOp();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
                         if (value instanceof OtpErlangObject) {
                             transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
@@ -555,7 +555,7 @@ public class Benchmark {
                     transaction.closeConnection();
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -570,7 +570,7 @@ public class Benchmark {
     /**
      * Performs a benchmark writing objects using a new {@link Transaction} for
      * each test.
-     * 
+     *
      * @param <T>
      *            type of the value to write
      * @param testRuns
@@ -580,19 +580,19 @@ public class Benchmark {
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static <T> long transBench1(int testRuns, T value, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static <T> long transBench1(final int testRuns, final T value, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
                     testBegin();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        Transaction transaction = new Transaction();
+                        final Transaction transaction = new Transaction();
                         if (value instanceof OtpErlangObject) {
                             transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
                         } else {
@@ -603,7 +603,7 @@ public class Benchmark {
                     }
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -618,7 +618,7 @@ public class Benchmark {
     /**
      * Performs a benchmark writing objects using a new {@link Transaction} but
      * re-using a single {@link Connection} for each test.
-     * 
+     *
      * @param <T>
      *            type of the value to write
      * @param testRuns
@@ -628,21 +628,21 @@ public class Benchmark {
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static <T> long transBench2(int testRuns, T value, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static <T> long transBench2(final int testRuns, final T value, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
                     testBegin();
-                    Connection connection = ConnectionFactory.getInstance()
+                    final Connection connection = ConnectionFactory.getInstance()
                     .createConnection();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        Transaction transaction = new Transaction(connection);
+                        final Transaction transaction = new Transaction(connection);
                         if (value instanceof OtpErlangObject) {
                             transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
                         } else {
@@ -653,7 +653,7 @@ public class Benchmark {
                     connection.close();
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -668,7 +668,7 @@ public class Benchmark {
     /**
      * Performs a benchmark writing objects using a single {@link Transaction}
      * object for all tests.
-     * 
+     *
      * @param <T>
      *            type of the value to write
      * @param testRuns
@@ -678,18 +678,18 @@ public class Benchmark {
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static <T> long transBench3(int testRuns, T value, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static <T> long transBench3(final int testRuns, final T value, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
                     testBegin();
-                    Transaction transaction = new Transaction();
+                    final Transaction transaction = new Transaction();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
                         if (value instanceof OtpErlangObject) {
                             transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
@@ -701,7 +701,7 @@ public class Benchmark {
                     transaction.closeConnection();
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -716,38 +716,38 @@ public class Benchmark {
     /**
      * Performs a benchmark writing {@link Integer} numbers on a single key and
      * increasing them using a new {@link Transaction} for each test.
-     * 
+     *
      * @param testRuns
      *            the number of times to write the value
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static long transIncrementBench1(int testRuns, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static long transIncrementBench1(final int testRuns, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
-                    String key_i = key + i;
-                    Transaction tx_init = new Transaction();
+                    final String key_i = key + i;
+                    final Transaction tx_init = new Transaction();
                     tx_init.write(key_i, 0);
                     tx_init.commit();
                     tx_init.closeConnection();
                     testBegin();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        Transaction transaction = new Transaction();
-                        int value_old = transaction.read(key_i).intValue();
+                        final Transaction transaction = new Transaction();
+                        final int value_old = transaction.read(key_i).intValue();
                         transaction.write(key_i, value_old + 1);
                         transaction.commit();
                         transaction.closeConnection();
                     }
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -763,40 +763,40 @@ public class Benchmark {
      * Performs a benchmark writing {@link Integer} numbers on a single key and
      * increasing them using a new {@link Transaction} but re-using a single
      * {@link Connection} for each test.
-     * 
+     *
      * @param testRuns
      *            the number of times to write the value
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static long transIncrementBench2(int testRuns, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static long transIncrementBench2(final int testRuns, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
-                    String key_i = key + i;
-                    Transaction tx_init = new Transaction();
+                    final String key_i = key + i;
+                    final Transaction tx_init = new Transaction();
                     tx_init.write(key_i, 0);
                     tx_init.commit();
                     tx_init.closeConnection();
                     testBegin();
-                    Connection connection = ConnectionFactory.getInstance()
+                    final Connection connection = ConnectionFactory.getInstance()
                     .createConnection();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        Transaction transaction = new Transaction(connection);
-                        int value_old = transaction.read(key_i).intValue();
+                        final Transaction transaction = new Transaction(connection);
+                        final int value_old = transaction.read(key_i).intValue();
                         transaction.write(key_i, value_old + 1);
                         transaction.commit();
                     }
                     connection.close();
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;
@@ -811,38 +811,38 @@ public class Benchmark {
     /**
      * Performs a benchmark writing objects using a single {@link Transaction}
      * object for all tests.
-     * 
+     *
      * @param testRuns
      *            the number of times to write the value
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
-     * 
+     *
      * @return the number of achieved transactions per second
      */
-    protected static long transIncrementBench3(int testRuns, String name) {
-        String key = benchTime + name;
-        long[] results = new long[testRuns];
+    protected static long transIncrementBench3(final int testRuns, final String name) {
+        final String key = benchTime + name;
+        final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
             for (int retry = 0; retry < 3; ++retry) {
                 try {
-                    String key_i = key + i;
-                    Transaction tx_init = new Transaction();
+                    final String key_i = key + i;
+                    final Transaction tx_init = new Transaction();
                     tx_init.write(key_i, 0);
                     tx_init.commit();
                     tx_init.closeConnection();
                     testBegin();
-                    Transaction transaction = new Transaction();
+                    final Transaction transaction = new Transaction();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        int value_old = transaction.read(key_i).intValue();
+                        final int value_old = transaction.read(key_i).intValue();
                         transaction.write(key_i, value_old + 1);
                         transaction.commit();
                     }
                     transaction.closeConnection();
                     results[i] = testEnd(transactionsPerTestRun);
                     break;
-                } catch (Exception e) {
+                } catch (final Exception e) {
                     // e.printStackTrace();
                     if (retry == 2) {
                         return -1;

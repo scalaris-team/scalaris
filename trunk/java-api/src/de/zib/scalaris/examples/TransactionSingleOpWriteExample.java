@@ -19,14 +19,14 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Provides an example for using the <tt>write</tt> methods of the
  * {@link TransactionSingleOp} class.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  * @version 2.0
  * @since 2.0
@@ -37,12 +37,12 @@ public class TransactionSingleOpWriteExample {
      * methods of {@link TransactionSingleOp}.<br />
      * If no value or key is given, the default key <tt>"key"</tt> and the
      * default value <tt>"value"</tt> is used.
-     * 
+     *
      * @param args
      *            command line arguments (first argument can be an optional key
      *            and the second an optional value)
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         String key;
         String value;
 
@@ -57,31 +57,31 @@ public class TransactionSingleOpWriteExample {
             value = args[1];
         }
 
-        OtpErlangString otpKey = new OtpErlangString(key);
-        OtpErlangString otpValue = new OtpErlangString(value);
+        final OtpErlangString otpKey = new OtpErlangString(key);
+        final OtpErlangString otpValue = new OtpErlangString(value);
 
         System.out.println("Writing values with the class `TransactionSingleOp`:");
 
         try {
             System.out.println("  creating object...");
-            TransactionSingleOp sc = new TransactionSingleOp();
+            final TransactionSingleOp sc = new TransactionSingleOp();
             System.out
                     .println("    `void writeObject(OtpErlangString, OtpErlangObject)`...");
             sc.write(otpKey, otpValue);
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") succeeded");
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed: " + e.getMessage());
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with timeout: "
                     + e.getMessage());
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with abort: "
                     + e.getMessage());
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with unknown: "
                     + e.getMessage());
@@ -89,22 +89,22 @@ public class TransactionSingleOpWriteExample {
 
         try {
             System.out.println("  creating object...");
-            TransactionSingleOp sc = new TransactionSingleOp();
+            final TransactionSingleOp sc = new TransactionSingleOp();
             System.out.println("    `void write(String, String)`...");
             sc.write(key, value);
             System.out.println("      write(" + key + ", " + value
                     + ") succeeded");
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed: " + e.getMessage());
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed with timeout: " + e.getMessage());
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with abort: "
                     + e.getMessage());
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed with unknown: " + e.getMessage());
         }
