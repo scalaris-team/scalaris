@@ -1,415 +1,388 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <project name="Scalaris Java Interface" default="jar" basedir=".">
 
-<!--
-	Setting the following environment variables influence the build:
-	SCALARIS_JAVADOC_JINTERFACE_URL - url of the javadoc of JInterface
-	SCALARIS_JAVADOC_JINTERFACE_OFFLINE ("true"|"false") - link offline using cached package-list file
-	SCALARIS_JAVADOC_JAVASE6_URL - url of the javadoc of JavaSE 6
-	SCALARIS_JAVADOC_JAVASE6_OFFLINE ("true"|"false") - link offline using cached package-list file
-	SCALARIS_JAVADOC_APACHECOMMONSCLI_URL - url of the javadoc of Apache commons cli
-	SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE ("true"|"false") - link offline using cached package-list file
-	SCALARIS_JAVADOC_OFFLINE ("true"|"false") - link offline using cached package-list files (sets all unset offline properties mentioned above)
-	
-	defaults:
-	SCALARIS_JAVADOC_JINTERFACE_URL = http://www.erlang.org/doc/apps/jinterface/java/
-	SCALARIS_JAVADOC_JAVASE6_URL = http://java.sun.com/javase/6/docs/api/
-	SCALARIS_JAVADOC_APACHECOMMONSCLI_URL = http://commons.apache.org/cli/api-release/
-	SCALARIS_JAVADOC_OFFLINE = true
+  <!--
+    Setting the following environment variables influence the build:
+    SCALARIS_JAVADOC_JINTERFACE_URL - url of the javadoc of JInterface
+    SCALARIS_JAVADOC_JINTERFACE_OFFLINE ("true"|"false") - link offline using cached package-list file
+    SCALARIS_JAVADOC_JAVASE6_URL - url of the javadoc of JavaSE 6
+    SCALARIS_JAVADOC_JAVASE6_OFFLINE ("true"|"false") - link offline using cached package-list file
+    SCALARIS_JAVADOC_APACHECOMMONSCLI_URL - url of the javadoc of Apache commons cli
+    SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE ("true"|"false") - link offline using cached package-list file
+    SCALARIS_JAVADOC_OFFLINE ("true"|"false") - link offline using cached package-list files (sets all unset offline properties mentioned above)
+    
+    defaults:
+    SCALARIS_JAVADOC_JINTERFACE_URL = http://www.erlang.org/doc/apps/jinterface/java/
+    SCALARIS_JAVADOC_JAVASE6_URL = http://java.sun.com/javase/6/docs/api/
+    SCALARIS_JAVADOC_APACHECOMMONSCLI_URL = http://commons.apache.org/cli/api-release/
+    SCALARIS_JAVADOC_OFFLINE = true
 -->
 
-	<!-- ########## Build configuration (begin) ########## -->
-	<!-- filename without file extension -->
-	<property name="scalaris.dist.filename" value="scalaris" />
-	<!-- directory where the classes are compiled to -->
-	<property name="scalaris.classes.dirname" value="classes" />
-	<!-- version of the OtpErlang jar file to bundle and compile against (OtpErlang-<version>.jar) -->
-	<property name="opterlang.version" value="1.5.4" />
-	<!-- version of the jakarta-commons-cli jar file to bundle and compile against (jakarta-commons-cli-<version>.jar) -->
-	<property name="jakarta.commons.cli.version" value="1.2" />
-	<!-- version of the jetty jar file to bundle and compile the tests against (jetty-<version>.jar, jetty-util-<version>.jar) -->
-	<property name="jetty.version" value="7.3.0.v20110203" />
-	<!-- version of the servlet api jar file to bundle and compile the tests against (servlet-api-<version>.jar) -->
-	<property name="jetty.servletapi.version" value="2.5" />
-	<!-- version of the junit jar file to bundle and compile the tests against (junit-<version>.jar) -->
-	<property name="junit.version" value="4.8.2" />
-	<!-- ########## Build configuration (end) ########## -->
+  <!-- ########## Build configuration (begin) ########## -->
+  <!-- filename without file extension -->
+  <property name="scalaris.dist.filename" value="scalaris" />
+  <!-- directory where the classes are compiled to -->
+  <property name="scalaris.classes.dirname" value="classes" />
+  <!-- version of the OtpErlang jar file to bundle and compile against (OtpErlang-<version>.jar) -->
+  <property name="opterlang.version" value="1.5.4" />
+  <!-- version of the jakarta-commons-cli jar file to bundle and compile against (jakarta-commons-cli-<version>.jar) -->
+  <property name="jakarta.commons.cli.version" value="1.2" />
+  <!-- version of the jetty jar file to bundle and compile the tests against (jetty-<version>.jar, jetty-util-<version>.jar) -->
+  <property name="jetty.version" value="7.3.0.v20110203" />
+  <!-- version of the servlet api jar file to bundle and compile the tests against (servlet-api-<version>.jar) -->
+  <property name="jetty.servletapi.version" value="2.5" />
+  <!-- version of the junit jar file to bundle and compile the tests against (junit-<version>.jar) -->
+  <property name="junit.version" value="4.8.2" />
+  <!-- ########## Build configuration (end) ########## -->
 
-    <!-- ########## Run configuration (begin) ########## -->
-	<condition property="scalaris.node" value="">
-    	<not> <isset property="scalaris.node" /> </not>
-    </condition>
-    <condition property="scalaris.cookie" value="">
-        <not> <isset property="scalaris.cookie" /> </not>
-    </condition>
-    <condition property="scalaris.client.name" value="">
-        <not> <isset property="scalaris.client.name" /> </not>
-    </condition>
-    <condition property="scalaris.client.appendUUID" value="">
-        <not> <isset property="scalaris.client.appendUUID" /> </not>
-    </condition>
-    <!-- ########## Run configuration (end) ########## -->
+  <!-- ########## Run configuration (begin) ########## -->
+  <condition property="scalaris.node" value="">
+    <not>
+      <isset property="scalaris.node" />
+    </not>
+  </condition>
+  <condition property="scalaris.cookie" value="">
+    <not>
+      <isset property="scalaris.cookie" />
+    </not>
+  </condition>
+  <condition property="scalaris.client.name" value="">
+    <not>
+      <isset property="scalaris.client.name" />
+    </not>
+  </condition>
+  <condition property="scalaris.client.appendUUID" value="">
+    <not>
+      <isset property="scalaris.client.appendUUID" />
+    </not>
+  </condition>
+  <!-- ########## Run configuration (end) ########## -->
 
-	<property environment="env"/>
-	<!-- set paths to documentations to link to -->
-	<condition property="javadoc.jinterface.url"
-		value="${env.SCALARIS_JAVADOC_JINTERFACE_URL}"
-		else="http://www.erlang.org/doc/apps/jinterface/java/">
-		<isset property="env.SCALARIS_JAVADOC_JINTERFACE_URL" />
-	</condition>
-	<condition property="javadoc.javase6.url"
-		value="${env.SCALARIS_JAVADOC_JAVASE6_URL}"
-		else="http://java.sun.com/javase/6/docs/api/">
-		<isset property="env.SCALARIS_JAVADOC_JAVASE6_URL" />
-	</condition>
-	<condition property="javadoc.commons-apache-cli.url"
-		value="${env.SCALARIS_JAVADOC_APACHECOMMONSCLI_URL}"
-		else="http://commons.apache.org/cli/api-release/">
-		<isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_URL" />
-	</condition>
-	
-	<!-- set whether those documentations should be linked offline with cached package-list files -->
-	<condition property="javadoc.offline" value="true" else="false">
-		<or>
-			<and>
-				<isset property="env.SCALARIS_JAVADOC_OFFLINE" />
-				<istrue value="${env.SCALARIS_JAVADOC_OFFLINE}" />
-			</and>
-			<not>
-				<isset property="env.SCALARIS_JAVADOC_OFFLINE" />
-			</not>
-		</or>
-	</condition>
-	<condition property="javadoc.jinterface.offline" value="true" else="false">
-		<or>
-			<and>
-				<isset property="env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE" />
-				<istrue value="${env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE}" />
-			</and>
-			<and>
-				<not>
-					<isset property="env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE" />
-				</not>
-				<istrue value="${javadoc.offline}" />
-			</and>
-		</or>
-	</condition>
-	<condition property="javadoc.javase6.offline" value="true" else="false">
-		<or>
-			<and>
-				<isset property="env.SCALARIS_JAVADOC_JAVASE6_OFFLINE" />
-				<istrue value="${env.SCALARIS_JAVADOC_JAVASE6_OFFLINE}" />
-			</and>
-			<and>
-				<not>
-					<isset property="env.SCALARIS_JAVADOC_JAVASE6_OFFLINE" />
-				</not>
-				<istrue value="${javadoc.offline}" />
-			</and>
-		</or>
-	</condition>
-	<condition property="javadoc.commons-apache-cli.offline" value="true" else="false">
-		<or>
-			<and>
-				<isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE" />
-				<istrue value="${env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE}" />
-			</and>
-			<and>
-				<not>
-					<isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE" />
-				</not>
-				<istrue value="${javadoc.offline}" />
-			</and>
-		</or>
-	</condition>
-	
-	<!-- set paths to package-list files of linked documentation -->
-	<condition property="javadoc.jinterface.pkglist" value="${javadoc.jinterface.url}" else="doc-contrib/jinterface">
-		<isfalse value="${javadoc.jinterface.offline}" />
-	</condition>
-	<condition property="javadoc.javase6.pkglist" value="${javadoc.javase6.url}" else="doc-contrib/javase6">
-		<isfalse value="${javadoc.javase6.offline}" />
-	</condition>
-	<condition property="javadoc.commons-apache-cli.pkglist" value="${javadoc.commons-apache-cli.url}" else="doc-contrib/apache_commons_cli">
-		<isfalse value="${javadoc.commons-apache-cli.offline}" />
-	</condition>
-	
-<!--
-	<echo message="javadoc.offline is set to = ${javadoc.offline}"/>
-	<echo message="javadoc.jinterface.url is set to = ${javadoc.jinterface.url}"/>
-	<echo message="javadoc.jinterface.offline is set to = ${javadoc.jinterface.offline}"/>
-	<echo message="javadoc.jinterface.pkglist is set to = ${javadoc.jinterface.pkglist}"/>
-	<echo message="javadoc.javase6.url is set to = ${javadoc.javase6.url}"/>
-	<echo message="javadoc.javase6.offline is set to = ${javadoc.javase6.offline}"/>
-	<echo message="javadoc.javase6.pkglist is set to = ${javadoc.javase6.pkglist}"/>
-	<echo message="javadoc.commons-apache-cli.url is set to = ${javadoc.commons-apache-cli.url}"/>
-	<echo message="javadoc.commons-apache-cli.offline is set to = ${javadoc.commons-apache-cli.offline}"/>
-	<echo message="javadoc.commons-apache-cli.pkglist is set to = ${javadoc.commons-apache-cli.pkglist}"/>
+  <property environment="env" />
+  <!-- set paths to documentations to link to -->
+  <condition property="javadoc.jinterface.url" value="${env.SCALARIS_JAVADOC_JINTERFACE_URL}" else="http://www.erlang.org/doc/apps/jinterface/java/">
+    <isset property="env.SCALARIS_JAVADOC_JINTERFACE_URL" />
+  </condition>
+  <condition property="javadoc.javase6.url" value="${env.SCALARIS_JAVADOC_JAVASE6_URL}" else="http://java.sun.com/javase/6/docs/api/">
+    <isset property="env.SCALARIS_JAVADOC_JAVASE6_URL" />
+  </condition>
+  <condition property="javadoc.commons-apache-cli.url" value="${env.SCALARIS_JAVADOC_APACHECOMMONSCLI_URL}" else="http://commons.apache.org/cli/api-release/">
+    <isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_URL" />
+  </condition>
+
+  <!-- set whether those documentations should be linked offline with cached package-list files -->
+  <condition property="javadoc.offline" value="true" else="false">
+    <or>
+      <and>
+        <isset property="env.SCALARIS_JAVADOC_OFFLINE" />
+        <istrue value="${env.SCALARIS_JAVADOC_OFFLINE}" />
+      </and>
+      <not>
+        <isset property="env.SCALARIS_JAVADOC_OFFLINE" />
+      </not>
+    </or>
+  </condition>
+  <condition property="javadoc.jinterface.offline" value="true" else="false">
+    <or>
+      <and>
+        <isset property="env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE" />
+        <istrue value="${env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE}" />
+      </and>
+      <and>
+        <not>
+          <isset property="env.SCALARIS_JAVADOC_JINTERFACE_OFFLINE" />
+        </not>
+        <istrue value="${javadoc.offline}" />
+      </and>
+    </or>
+  </condition>
+  <condition property="javadoc.javase6.offline" value="true" else="false">
+    <or>
+      <and>
+        <isset property="env.SCALARIS_JAVADOC_JAVASE6_OFFLINE" />
+        <istrue value="${env.SCALARIS_JAVADOC_JAVASE6_OFFLINE}" />
+      </and>
+      <and>
+        <not>
+          <isset property="env.SCALARIS_JAVADOC_JAVASE6_OFFLINE" />
+        </not>
+        <istrue value="${javadoc.offline}" />
+      </and>
+    </or>
+  </condition>
+  <condition property="javadoc.commons-apache-cli.offline" value="true" else="false">
+    <or>
+      <and>
+        <isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE" />
+        <istrue value="${env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE}" />
+      </and>
+      <and>
+        <not>
+          <isset property="env.SCALARIS_JAVADOC_APACHECOMMONSCLI_OFFLINE" />
+        </not>
+        <istrue value="${javadoc.offline}" />
+      </and>
+    </or>
+  </condition>
+
+  <!-- set paths to package-list files of linked documentation -->
+  <condition property="javadoc.jinterface.pkglist" value="${javadoc.jinterface.url}" else="doc-contrib/jinterface">
+    <isfalse value="${javadoc.jinterface.offline}" />
+  </condition>
+  <condition property="javadoc.javase6.pkglist" value="${javadoc.javase6.url}" else="doc-contrib/javase6">
+    <isfalse value="${javadoc.javase6.offline}" />
+  </condition>
+  <condition property="javadoc.commons-apache-cli.pkglist" value="${javadoc.commons-apache-cli.url}" else="doc-contrib/apache_commons_cli">
+    <isfalse value="${javadoc.commons-apache-cli.offline}" />
+  </condition>
+
+  <!--
+    <echo message="javadoc.offline is set to = ${javadoc.offline}"/>
+    <echo message="javadoc.jinterface.url is set to = ${javadoc.jinterface.url}"/>
+    <echo message="javadoc.jinterface.offline is set to = ${javadoc.jinterface.offline}"/>
+    <echo message="javadoc.jinterface.pkglist is set to = ${javadoc.jinterface.pkglist}"/>
+    <echo message="javadoc.javase6.url is set to = ${javadoc.javase6.url}"/>
+    <echo message="javadoc.javase6.offline is set to = ${javadoc.javase6.offline}"/>
+    <echo message="javadoc.javase6.pkglist is set to = ${javadoc.javase6.pkglist}"/>
+    <echo message="javadoc.commons-apache-cli.url is set to = ${javadoc.commons-apache-cli.url}"/>
+    <echo message="javadoc.commons-apache-cli.offline is set to = ${javadoc.commons-apache-cli.offline}"/>
+    <echo message="javadoc.commons-apache-cli.pkglist is set to = ${javadoc.commons-apache-cli.pkglist}"/>
 -->
 
-	<path id="scalaris.classpath">
-		<pathelement path='lib/OtpErlang-${opterlang.version}.jar' />
-		<pathelement path='lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar' />
-	</path>
-	<path id="scalaris.test.classpath">
-		<path refid="scalaris.classpath" />
-		<pathelement path="${scalaris.classes.dirname}" />
-		<pathelement path="test-lib/junit-${junit.version}.jar" />
-		<pathelement path="test-lib/jetty-continuation-${jetty.version}.jar" />
-		<pathelement path="test-lib/jetty-http-${jetty.version}.jar" />
-		<pathelement path="test-lib/jetty-io-${jetty.version}.jar" />
-		<pathelement path="test-lib/jetty-server-${jetty.version}.jar" />
-		<pathelement path="test-lib/jetty-util-${jetty.version}.jar" />
-		<pathelement path="test-lib/servlet-api-${jetty.servletapi.version}.jar" />
-	</path>
+  <path id="scalaris.classpath">
+    <pathelement path='lib/OtpErlang-${opterlang.version}.jar' />
+    <pathelement path='lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar' />
+  </path>
+  <path id="scalaris.test.classpath">
+    <path refid="scalaris.classpath" />
+    <pathelement path="${scalaris.classes.dirname}" />
+    <pathelement path="test-lib/junit-${junit.version}.jar" />
+    <pathelement path="test-lib/jetty-continuation-${jetty.version}.jar" />
+    <pathelement path="test-lib/jetty-http-${jetty.version}.jar" />
+    <pathelement path="test-lib/jetty-io-${jetty.version}.jar" />
+    <pathelement path="test-lib/jetty-server-${jetty.version}.jar" />
+    <pathelement path="test-lib/jetty-util-${jetty.version}.jar" />
+    <pathelement path="test-lib/servlet-api-${jetty.servletapi.version}.jar" />
+  </path>
 
-	<!-- ########## Public targets (begin) ########## -->
-	<target name='compile' depends="scalaris.compile"
-		description="Compiles all source files for the library and the default Main class." />
+  <!-- ########## Public targets (begin) ########## -->
+  <target name='compile' depends="scalaris.compile" description="Compiles all source files for the library and the default Main class." />
 
-	<target name="jar" depends="scalaris.jar"
-		description="Creates jar files for use on command line or in other projects." />
+  <target name="jar" depends="scalaris.jar" description="Creates jar files for use on command line or in other projects." />
 
-	<target name='clean'
-		depends="dist.clean, jar.clean, test.clean, compile.clean, doc.clean, devel-doc.clean"
-		description="Deletes all generated files.">
-		<delete dir="${scalaris.classes.dirname}" />
-	</target>
+  <target name='clean' depends="dist.clean, jar.clean, test.clean, compile.clean, doc.clean, devel-doc.clean" description="Deletes all generated files.">
+    <delete dir="${scalaris.classes.dirname}" />
+  </target>
 
-	<target name="dist" depends="scalaris.dist"
-		description="Creates archives with source, docs and jar files." />
+  <target name="dist" depends="scalaris.dist" description="Creates archives with source, docs and jar files." />
 
-	<target name="test" depends="tools.test, scalaris.test"
-		description="Runs all unit tests in non-graphical mode." />
+  <target name="test" depends="tools.test, scalaris.test" description="Runs all unit tests in non-graphical mode." />
 
-	<target name="examples"
-		depends="jar, scalaris.examples.jar" />
-	<!-- ########## Public targets (end) ########## -->
+  <target name="examples" depends="jar, scalaris.examples.jar" />
+  <!-- ########## Public targets (end) ########## -->
 
-	<!-- ########## Common targets (begin) ########## -->
-	<target name="compile.clean">
-		<delete includeemptydirs="true" failonerror="false">
-			<fileset dir='${scalaris.classes.dirname}' includes='**/*.class' />
-		</delete>
-	</target>
-	<target name="jar.clean" depends="scalaris.jar.clean" />
-	<target name="dist.clean" depends="scalaris.dist.clean" />
-	<target name="test.clean">
-		<delete includeemptydirs="true" failonerror="false">
-			<fileset dir='${scalaris.classes.dirname}' includes='**/*Test.class, **/*.properties' />
-		</delete>
-	</target>
+  <!-- ########## Common targets (begin) ########## -->
+  <target name="compile.clean">
+    <delete includeemptydirs="true" failonerror="false">
+      <fileset dir='${scalaris.classes.dirname}' includes='**/*.class' />
+    </delete>
+  </target>
+  <target name="jar.clean" depends="scalaris.jar.clean" />
+  <target name="dist.clean" depends="scalaris.dist.clean" />
+  <target name="test.clean">
+    <delete includeemptydirs="true" failonerror="false">
+      <fileset dir='${scalaris.classes.dirname}' includes='**/*Test.class, **/*.properties' />
+    </delete>
+  </target>
 
-	<target name='doc'>
-		<mkdir dir='doc' />
-		<javadoc encoding="UTF-8" docencoding="UTF-8" charset="UTF-8"
-			sourcepath="src" destdir="doc" classpathref="scalaris.classpath"
-			access="public" author="true" doctitle="Scalaris Java API"
-			nodeprecated="false" nodeprecatedlist="false" noindex="false"
-			nonavbar="false" notree="false" packagenames="de.zib.scalaris.*"
-			source="1.6" splitindex="true" use="true" version="true">
-			
-			<link href="${javadoc.jinterface.url}" offline="${javadoc.jinterface.offline}" packagelistLoc="${javadoc.jinterface.pkglist}" />
-			<link href="${javadoc.javase6.url}" offline="${javadoc.javase6.offline}" packagelistLoc="${javadoc.javase6.pkglist}" />
-			<link href="${javadoc.commons-apache-cli.url}" offline="${javadoc.commons-apache-cli.offline}" packagelistLoc="${javadoc.commons-apache-cli.pkglist}" />
-		</javadoc>
-	</target>
+  <target name='doc'>
+    <mkdir dir='doc' />
+    <javadoc encoding="UTF-8" docencoding="UTF-8" charset="UTF-8" sourcepath="src" destdir="doc" classpathref="scalaris.classpath" access="public" author="true" doctitle="Scalaris Java API" nodeprecated="false" nodeprecatedlist="false" noindex="false" nonavbar="false" notree="false" packagenames="de.zib.scalaris.*" source="1.6" splitindex="true" use="true" version="true">
 
-	<target name='doc-doxygen'>
-		<mkdir dir='doc-doxygen' />
-		<doxygen>
-			<property name="INPUT" value="src" />
-			<property name="RECURSIVE" value="src" />
-			<property name="GENERATE_LAXTEX" value="true" />
-			<property name="PROJECT_NAME" value="Scalaris Java API" />
-		</doxygen>
-	</target>
+      <link href="${javadoc.jinterface.url}" offline="${javadoc.jinterface.offline}" packagelistLoc="${javadoc.jinterface.pkglist}" />
+      <link href="${javadoc.javase6.url}" offline="${javadoc.javase6.offline}" packagelistLoc="${javadoc.javase6.pkglist}" />
+      <link href="${javadoc.commons-apache-cli.url}" offline="${javadoc.commons-apache-cli.offline}" packagelistLoc="${javadoc.commons-apache-cli.pkglist}" />
+    </javadoc>
+  </target>
 
-	<target name="doc.clean">
-		<delete dir="doc" />
-	</target>
+  <target name='doc-doxygen'>
+    <mkdir dir='doc-doxygen' />
+    <doxygen>
+      <property name="INPUT" value="src" />
+      <property name="RECURSIVE" value="src" />
+      <property name="GENERATE_LAXTEX" value="true" />
+      <property name="PROJECT_NAME" value="Scalaris Java API" />
+    </doxygen>
+  </target>
 
-	<target name='devel-doc'>
-		<mkdir dir='doc-devel' />
-		<javadoc encoding="UTF-8" docencoding="UTF-8" charset="UTF-8"
-			sourcepath="src" destdir="doc-devel" classpathref="scalaris.classpath"
-			access="private" author="true" doctitle="Scalaris Java API"
-			nodeprecated="false" nodeprecatedlist="false" noindex="false"
-			nonavbar="false" notree="false" packagenames="de.zib.*" source="1.6"
-			splitindex="true" use="true" version="true">
-			<link href="${javadoc.jinterface.url}" offline="${javadoc.jinterface.offline}" packagelistLoc="${javadoc.jinterface.pkglist}" />
-			<link href="${javadoc.javase6.url}" offline="${javadoc.javase6.offline}" packagelistLoc="${javadoc.javase6.pkglist}" />
-			<link href="${javadoc.commons-apache-cli.url}" offline="${javadoc.commons-apache-cli.offline}" packagelistLoc="${javadoc.commons-apache-cli.pkglist}" />
-		</javadoc>
-	</target>
+  <target name="doc.clean">
+    <delete dir="doc" />
+  </target>
 
-	<target name="devel-doc.clean">
-		<delete dir="doc-devel" />
-	</target>
-	<!-- ########## Common targets (end) ########## -->
+  <target name='devel-doc'>
+    <mkdir dir='doc-devel' />
+    <javadoc encoding="UTF-8" docencoding="UTF-8" charset="UTF-8" sourcepath="src" destdir="doc-devel" classpathref="scalaris.classpath" access="private" author="true" doctitle="Scalaris Java API" nodeprecated="false" nodeprecatedlist="false" noindex="false" nonavbar="false" notree="false" packagenames="de.zib.*" source="1.6" splitindex="true" use="true" version="true">
+      <link href="${javadoc.jinterface.url}" offline="${javadoc.jinterface.offline}" packagelistLoc="${javadoc.jinterface.pkglist}" />
+      <link href="${javadoc.javase6.url}" offline="${javadoc.javase6.offline}" packagelistLoc="${javadoc.javase6.pkglist}" />
+      <link href="${javadoc.commons-apache-cli.url}" offline="${javadoc.commons-apache-cli.offline}" packagelistLoc="${javadoc.commons-apache-cli.pkglist}" />
+    </javadoc>
+  </target>
 
-	<!-- ########## Tools targets (begin) ########## -->
-	<target name='tools.compile'>
-		<mkdir dir='${scalaris.classes.dirname}' />
-		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			includes="de/zib/tools/*.java" debug="true" />
-	</target>
+  <target name="devel-doc.clean">
+    <delete dir="doc-devel" />
+  </target>
+  <!-- ########## Common targets (end) ########## -->
 
-	<target name="tools.test.compile" depends="tools.compile">
-		<mkdir dir="${scalaris.classes.dirname}" />
-		<javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" debug="true" />
-		<copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
-			<fileset dir="test" includes="de/zib/tools/*.properties" />
-		</copy>
-	</target>
+  <!-- ########## Tools targets (begin) ########## -->
+  <target name='tools.compile'>
+    <mkdir dir='${scalaris.classes.dirname}' />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' includes="de/zib/tools/*.java" debug="true" />
+  </target>
 
-	<target name="tools.test" depends="tools.test.compile"
-		description="Run Chord# unit tests in non-graphical mode">
-		<junit dir="${scalaris.classes.dirname}" printsummary="true"
-			haltonfailure="true" fork="yes">
-			<formatter type="brief" usefile="false" />
-			<classpath refid="scalaris.test.classpath" />
-			<batchtest>
-				<fileset dir="${scalaris.classes.dirname}" includes="de/zib/tools**/*Test.class" />
-			</batchtest>
-		</junit>
-	</target>
-	<!-- ########## Tools targets (end) ########## -->
+  <target name="tools.test.compile" depends="tools.compile">
+    <mkdir dir="${scalaris.classes.dirname}" />
+    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" debug="true" />
+    <copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
+      <fileset dir="test" includes="de/zib/tools/*.properties" />
+    </copy>
+  </target>
 
-	<!-- ########## Scalaris targets (begin) ########## -->
-	<target name='scalaris.compile' depends="tools.compile">
-		<mkdir dir='${scalaris.classes.dirname}' />
-		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" />
-	</target>
-	<target name='scalaris.examples.compile' depends="scalaris.compile">
-		<javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" />
-	</target>
+  <target name="tools.test" depends="tools.test.compile" description="Run Chord# unit tests in non-graphical mode">
+    <junit dir="${scalaris.classes.dirname}" printsummary="true" haltonfailure="true" fork="yes">
+      <formatter type="brief" usefile="false" />
+      <classpath refid="scalaris.test.classpath" />
+      <batchtest>
+        <fileset dir="${scalaris.classes.dirname}" includes="de/zib/tools**/*Test.class" />
+      </batchtest>
+    </junit>
+  </target>
+  <!-- ########## Tools targets (end) ########## -->
 
-	<!-- package library and examples separately -->
-	<target name='scalaris.jar' depends="scalaris.compile">
-		<!--
-			copy the connection settings file to the folder where the jar files
-			resist so that the main program can access it
-		-->
-		<copy file="src/scalaris.properties" todir="." />
-		<jar destfile="${scalaris.dist.filename}.jar" basedir="${scalaris.classes.dirname}"
-			includes="de/zib/scalaris/*.class de/zib/tools/*.class" excludes="**/examples** **/*Test.class **/*Test$*.class">
-			<manifest>
-				<attribute name="Built-By" value="${user.name}" />
-				<attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />
-				<attribute name="Bundle-Name" value="Scalaris Java Interface" />
-				<attribute name="Bundle-Version" value="2.0.0" />
-				<attribute name="Export-Package" value="de.zib.scalaris.*" />
-				<attribute name="Main-Class" value="de.zib.scalaris.Main" />
-				<!--
-					<attribute name="Class-Path" value=".
-					lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar lib/OtpErlang-${opterlang.version}.jar" />
-				-->
-			</manifest>
-		</jar>
-	</target>
-	<target name='scalaris.examples.jar' depends="scalaris.examples.compile">
-		<jar destfile="${scalaris.dist.filename}-examples.jar" basedir="${scalaris.classes.dirname}"
-			includes="de/zib/scalaris/examples/*.class" excludes="**/*Test.class **/*Test$*.class">
-			<manifest>
-				<attribute name="Built-By" value="${user.name}" />
-				<attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />
-				<attribute name="Bundle-Name" value="Scalaris Java Interface" />
-				<attribute name="Bundle-Version" value="2.0.0" />
-				<attribute name="Export-Package" value="de.zib.scalaris.*" />
-				<attribute name="Class-Path"
-					value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar lib/OtpErlang-${opterlang.version}.jar" />
-			</manifest>
-		</jar>
-	</target>
+  <!-- ########## Scalaris targets (begin) ########## -->
+  <target name='scalaris.compile' depends="tools.compile">
+    <mkdir dir='${scalaris.classes.dirname}' />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" />
+  </target>
+  <target name='scalaris.examples.compile' depends="scalaris.compile">
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" />
+  </target>
 
-	<target name="scalaris.jar.clean">
-		<delete file="scalaris.properties" />
-		<delete file="${scalaris.dist.filename}.jar" />
-		<delete file="${scalaris.dist.filename}-examples.jar" />
-	</target>
+  <!-- package library and examples separately -->
+  <target name='scalaris.jar' depends="scalaris.compile">
+    <!--
+            copy the connection settings file to the folder where the jar files
+            resist so that the main program can access it
+        -->
+    <copy file="src/scalaris.properties" todir="." />
+    <jar destfile="${scalaris.dist.filename}.jar" basedir="${scalaris.classes.dirname}" includes="de/zib/scalaris/*.class de/zib/tools/*.class" excludes="**/examples** **/*Test.class **/*Test$*.class">
+      <manifest>
+        <attribute name="Built-By" value="${user.name}" />
+        <attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />
+        <attribute name="Bundle-Name" value="Scalaris Java Interface" />
+        <attribute name="Bundle-Version" value="2.0.0" />
+        <attribute name="Export-Package" value="de.zib.scalaris.*" />
+        <attribute name="Main-Class" value="de.zib.scalaris.Main" />
+        <!--
+                    <attribute name="Class-Path" value=".
+                    lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar lib/OtpErlang-${opterlang.version}.jar" />
+                -->
+      </manifest>
+    </jar>
+  </target>
+  <target name='scalaris.examples.jar' depends="scalaris.examples.compile">
+    <jar destfile="${scalaris.dist.filename}-examples.jar" basedir="${scalaris.classes.dirname}" includes="de/zib/scalaris/examples/*.class" excludes="**/*Test.class **/*Test$*.class">
+      <manifest>
+        <attribute name="Built-By" value="${user.name}" />
+        <attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />
+        <attribute name="Bundle-Name" value="Scalaris Java Interface" />
+        <attribute name="Bundle-Version" value="2.0.0" />
+        <attribute name="Export-Package" value="de.zib.scalaris.*" />
+        <attribute name="Class-Path" value=". ${scalaris.dist.filename}.jar lib/jakarta-commons-cli-${jakarta.commons.cli.version}.jar lib/OtpErlang-${opterlang.version}.jar" />
+      </manifest>
+    </jar>
+  </target>
 
-	<target name="scalaris.dist" depends="scalaris.jar, scalaris.examples.jar, doc">
-		<fileset dir="src" id="src">
-			<include name="**/*" />
-		</fileset>
-		<fileset dir="test" id="src-test">
-			<include name="**/*" />
-		</fileset>
-		<fileset dir="lib" id="lib">
-			<include name="**/*.jar" />
-		</fileset>
-		<fileset dir="test-lib" id="test-lib">
-			<include name="**/*.jar" />
-		</fileset>
-		<fileset dir="doc" id="doc">
-			<include name="**/*" />
-		</fileset>
-		<fileset dir="." id="files">
-			<include name="build.xml" />
-			<include name="scalaris.properties" />
-			<include name="${scalaris.dist.filename}.jar" />
-			<include name="${scalaris.dist.filename}-examples.jar" />
-			<include name="LICENSE" />
-			<include name="README" />
-		</fileset>
+  <target name="scalaris.jar.clean">
+    <delete file="scalaris.properties" />
+    <delete file="${scalaris.dist.filename}.jar" />
+    <delete file="${scalaris.dist.filename}-examples.jar" />
+  </target>
 
-		<zip destfile="${scalaris.dist.filename}.zip">
-			<zipfileset refid="src" prefix="${scalaris.dist.filename}/src" />
-			<zipfileset refid="src-test" prefix="${scalaris.dist.filename}/test" />
-			<zipfileset refid="lib" prefix="${scalaris.dist.filename}/lib" />
-			<zipfileset refid="test-lib" prefix="${scalaris.dist.filename}/test-lib" />
-			<zipfileset refid="doc" prefix="${scalaris.dist.filename}/doc" />
-			<zipfileset refid="files" prefix="${scalaris.dist.filename}/" />
-		</zip>
+  <target name="scalaris.dist" depends="scalaris.jar, scalaris.examples.jar, doc">
+    <fileset dir="src" id="src">
+      <include name="**/*" />
+    </fileset>
+    <fileset dir="test" id="src-test">
+      <include name="**/*" />
+    </fileset>
+    <fileset dir="lib" id="lib">
+      <include name="**/*.jar" />
+    </fileset>
+    <fileset dir="test-lib" id="test-lib">
+      <include name="**/*.jar" />
+    </fileset>
+    <fileset dir="doc" id="doc">
+      <include name="**/*" />
+    </fileset>
+    <fileset dir="." id="files">
+      <include name="build.xml" />
+      <include name="scalaris.properties" />
+      <include name="${scalaris.dist.filename}.jar" />
+      <include name="${scalaris.dist.filename}-examples.jar" />
+      <include name="LICENSE" />
+      <include name="README" />
+    </fileset>
 
-		<tar destfile="${scalaris.dist.filename}.tar">
-			<tarfileset refid="src" prefix="${scalaris.dist.filename}/src" />
-			<tarfileset refid="src-test" prefix="${scalaris.dist.filename}/test" />
-			<tarfileset refid="doc" prefix="${scalaris.dist.filename}/doc" />
-			<tarfileset refid="lib" prefix="${scalaris.dist.filename}/lib" />
-			<tarfileset refid="test-lib" prefix="${scalaris.dist.filename}/test-lib" />
-			<tarfileset refid="files" prefix="${scalaris.dist.filename}/" />
-		</tar>
+    <zip destfile="${scalaris.dist.filename}.zip">
+      <zipfileset refid="src" prefix="${scalaris.dist.filename}/src" />
+      <zipfileset refid="src-test" prefix="${scalaris.dist.filename}/test" />
+      <zipfileset refid="lib" prefix="${scalaris.dist.filename}/lib" />
+      <zipfileset refid="test-lib" prefix="${scalaris.dist.filename}/test-lib" />
+      <zipfileset refid="doc" prefix="${scalaris.dist.filename}/doc" />
+      <zipfileset refid="files" prefix="${scalaris.dist.filename}/" />
+    </zip>
 
-		<gzip src="${scalaris.dist.filename}.tar" destfile="${scalaris.dist.filename}.tar.gz" />
-		<bzip2 src="${scalaris.dist.filename}.tar" destfile="${scalaris.dist.filename}.tar.bz2" />
+    <tar destfile="${scalaris.dist.filename}.tar">
+      <tarfileset refid="src" prefix="${scalaris.dist.filename}/src" />
+      <tarfileset refid="src-test" prefix="${scalaris.dist.filename}/test" />
+      <tarfileset refid="doc" prefix="${scalaris.dist.filename}/doc" />
+      <tarfileset refid="lib" prefix="${scalaris.dist.filename}/lib" />
+      <tarfileset refid="test-lib" prefix="${scalaris.dist.filename}/test-lib" />
+      <tarfileset refid="files" prefix="${scalaris.dist.filename}/" />
+    </tar>
 
-		<delete file="${scalaris.dist.filename}.tar" />
-	</target>
+    <gzip src="${scalaris.dist.filename}.tar" destfile="${scalaris.dist.filename}.tar.gz" />
+    <bzip2 src="${scalaris.dist.filename}.tar" destfile="${scalaris.dist.filename}.tar.bz2" />
 
-	<target name="scalaris.dist.clean">
-		<delete file="${scalaris.dist.filename}.zip" />
-		<delete file="${scalaris.dist.filename}.tar.gz" />
-		<delete file="${scalaris.dist.filename}.tar.bz2" />
-	</target>
+    <delete file="${scalaris.dist.filename}.tar" />
+  </target>
 
-	<target name="scalaris.test.compile" depends="scalaris.compile">
-		<mkdir dir="${scalaris.classes.dirname}" />
-		<javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}'
-			classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" debug="true" />
-		<copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
-			<fileset dir="test" includes="**/*.properties" />
-		</copy>
-	</target>
+  <target name="scalaris.dist.clean">
+    <delete file="${scalaris.dist.filename}.zip" />
+    <delete file="${scalaris.dist.filename}.tar.gz" />
+    <delete file="${scalaris.dist.filename}.tar.bz2" />
+  </target>
 
-	<target name="scalaris.test" depends="scalaris.test.compile"
-		description="Run Scalaris unit tests in non-graphical mode">
-		<junit dir="${scalaris.classes.dirname}" printsummary="true"
-			haltonfailure="true" fork="yes">
-            <sysproperty key="scalaris.node" value="${scalaris.node}"/>
-            <sysproperty key="scalaris.cookie" value="${scalaris.cookie}"/>
-            <sysproperty key="scalaris.client.name" value="${scalaris.client.name}"/>
-            <sysproperty key="scalaris.client.appendUUID" value="${scalaris.client.appendUUID}"/>
-			<formatter type="brief" usefile="false" />
-			<classpath refid="scalaris.test.classpath" />
-			<batchtest>
-				<fileset dir="${scalaris.classes.dirname}" includes="de/zib/scalaris**/*Test.class" excludes="de/zib/scalaris**/InterOpTest.class" />
-			</batchtest>
-		</junit>
-	</target>
-	<!-- ########## Scalaris targets (end) ########## -->
+  <target name="scalaris.test.compile" depends="scalaris.compile">
+    <mkdir dir="${scalaris.classes.dirname}" />
+    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" debug="true" />
+    <copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
+      <fileset dir="test" includes="**/*.properties" />
+    </copy>
+  </target>
+
+  <target name="scalaris.test" depends="scalaris.test.compile" description="Run Scalaris unit tests in non-graphical mode">
+    <junit dir="${scalaris.classes.dirname}" printsummary="true" haltonfailure="true" fork="yes">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <sysproperty key="scalaris.client.name" value="${scalaris.client.name}" />
+      <sysproperty key="scalaris.client.appendUUID" value="${scalaris.client.appendUUID}" />
+      <formatter type="brief" usefile="false" />
+      <classpath refid="scalaris.test.classpath" />
+      <batchtest>
+        <fileset dir="${scalaris.classes.dirname}" includes="de/zib/scalaris**/*Test.class" excludes="de/zib/scalaris**/InterOpTest.class" />
+      </batchtest>
+    </junit>
+  </target>
+  <!-- ########## Scalaris targets (end) ########## -->
 </project>
