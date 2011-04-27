@@ -253,6 +253,8 @@ scalarisstart(){
         tmp="$tmp -scalaris start_dht_node $start_dht_node"
     fi
     SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS $tmp"
+    export YAWSHOME="$HOME/.scalaris/$NODE_NAME"
+    mkdir -p "$YAWSHOME"
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
