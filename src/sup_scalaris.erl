@@ -119,14 +119,7 @@ my_process_list(ServiceGroup, Options) ->
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link,
                              [ServiceGroup]),
     YAWS =
-        util:sup_worker_desc(yaws, yaws_wrapper, start_link,
-                             [ config:read(docroot),
-                               [{port, config:read(yaws_port)},
-                                {listen, {0,0,0,0}}],
-                               [{max_open_conns, 800},
-                                {access_log, false},
-                                {logdir, config:read(log_path)}]
-                              ]),
+        util:sup_supervisor_desc(yaws, sup_yaws, start_link, []),
 
     %% order in the following list is the start order
     BasicServers = [Config,
