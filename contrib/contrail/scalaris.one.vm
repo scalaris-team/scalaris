@@ -34,5 +34,5 @@ CONTEXT = [
   dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
   ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",
   user_cert  = "special user certificate",
-  TARGET     = sr1
+  TARGET     = hdb
 ]
