@@ -15,7 +15,8 @@ OS = [
 # --- 3 disks ---
 
 DISK = [
-  image     = "Scalaris4Contrail" 
+  image     = "Scalaris4Contrail",
+  target    = "hdc"
 ]
 
 # --- 1 NIC ---
@@ -34,5 +35,13 @@ CONTEXT = [
   dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
   ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",
   user_cert  = "special user certificate",
-  TARGET     = hdb
+  TARGET     = sdb
+]
+
+# --- Debugging ---
+
+GRAPHICS = [ 
+  TYPE    = "vnc",              
+  LISTEN  = "127.0.0.1",
+  PORT    = "-1"
 ]
