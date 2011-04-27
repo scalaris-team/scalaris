@@ -41,6 +41,9 @@ import de.zib.tools.PropertyLoader;
  * scalaris.java.config</tt> system property - otherwise the class tries to load
  * <tt>scalaris.properties</tt>.
  *
+ * A specific property can also be overridden specifying a (non-empty) system
+ * property with its name.
+ *
  * A user-defined {@link Properties} object can also be used by creating objects
  * with {@link #ConnectionFactory(Properties)} or setting the new values with
  * {@link #setProperties(Properties)} but must provide the following values
@@ -152,10 +155,8 @@ public class ConnectionFactory {
      * <li><tt>scalaris.client.appendUUID = "true"</tt></li>
      * </ul>
      *
-     * Node and cookie to use for a connection can be overridden with the
-     * <tt>SCALARIS_JAPI_NODE</tt> and <tt>SCALARIS_JAPI_COOKIE</tt>
-     * environment variables. Their values will be used instead of the values
-     * defined in the config file!
+     * These properties can be overridden by specifying (non-empty) system
+     * properties with their names.
      */
     public ConnectionFactory() {
         final Properties properties = new Properties();
@@ -166,14 +167,11 @@ public class ConnectionFactory {
 //        System.out.println("loading config file: " + configFile);
         PropertyLoader.loadProperties(properties, configFile);
 
-        final String node = System.getenv("SCALARIS_JAPI_NODE");
-        if ((node != null) && !node.isEmpty()) {
-            properties.setProperty("scalaris.node", node);
-        }
-
-        final String cookie = System.getenv("SCALARIS_JAPI_COOKIE");
-        if ((cookie != null) && !cookie.isEmpty()) {
-            properties.setProperty("scalaris.cookie", cookie);
+        for (final String propName: new String[] {"scalaris.node", "scalaris.cookie", "scalaris.client.name", "scalaris.client.appendUUID"}) {
+            final String prop = System.getProperty(propName);
+            if ((prop != null) && !prop.isEmpty()) {
+                properties.setProperty(propName, prop);
+            }
         }
 
         setProperties(properties);
