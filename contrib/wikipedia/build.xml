@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="." default="build" name="WikiOnScalaris">
+  <!-- version of the OtpErlang jar file to bundle and compile against (OtpErlang-<version>.jar) -->
+  <property name="opterlang.version" value="1.5.4" />
+
+  <!-- All libraries needed to run the import task -->
+  <path id="import.classpath">
+    <pathelement location="contrib/scalaris.jar"/>
+    <pathelement location="contrib/OtpErlang-${opterlang.version}.jar"/>
+    <pathelement location="contrib/bliki-core-3.0.16.jar"/>
+    <pathelement location="contrib/commons-lang-2.6.jar"/>
+    <pathelement location="contrib/commons-compress-1.1.jar"/>
+  </path>
+
+  <!-- All libraries needed to build the sources -->
+  <path id="build.classpath">
+    <path refid="import.classpath"/>
+    <pathelement location="contrib/jetty-libs/servlet-api-2.5.jar"/>
+  </path>
+
+  <!-- jetty server and jetty ant plugin classes (to launch jetty from ant) -->
+  <taskdef resource="tasks.properties" loaderref="jetty.loader">
+    <classpath>
+      <path>
+        <fileset dir="contrib/jetty-libs" includes="*.jar"/>
+        <fileset dir="contrib/jetty-libs/jsp" includes="*.jar"/>
+      </path>
+    </classpath>
+  </taskdef>
+
+  <!-- Create build directory and copy static files -->
+  <!-- If  -->
+  <target name="scalaris.check.jars">
+    <condition property="scalaris.jars.available.contrib">
+      <and>
+        <available file="contrib/scalaris.jar" />
+        <available file="contrib/OtpErlang-${opterlang.version}.jar" />
+      </and>
+    </condition>
+    <condition property="scalaris.src.available">
+        <available file="../../java-api/build.xml" />
+    </condition>
+    <condition property="scalaris.src.jars.available">
+      <and>
+        <available file="../../java-api/scalaris.jar" />
+        <available file="../../java-api/lib/OtpErlang-${opterlang.version}.jar" />
+      </and>
+    </condition>
+  </target>
+  <target name="scalaris.build.jars" depends="scalaris.check.jars" if="scalaris.src.available">
+    <ant dir="../../java-api/"/>
+    <antcall target="scalaris.check.jars" />
+  </target>
+  <target name="scalaris.get.jars" depends="scalaris.check.jars,scalaris.build.jars" if="scalaris.src.available">
+    <fail unless="scalaris.src.jars.available" message="missing ../../java-api/scalaris.jar and ../../java-api/lib/OtpErlang-${opterlang.version}.jar" />
+    <copy todir="contrib" flatten="true" preservelastmodified="true">
+      <fileset dir=".">
+        <include name="../../java-api/scalaris.jar" />
+        <include name="../../java-api/lib/OtpErlang-${opterlang.version}.jar" />
+      </fileset>
+    </copy>
+    <antcall target="scalaris.check.jars" />
+  </target>
+  <target name="scalaris.update.jars" depends="scalaris.check.jars,scalaris.get.jars">
+    <fail unless="scalaris.jars.available.contrib" message="missing scalaris.jar and OtpErlang-${opterlang.version}.jar and no sources found in ../../java-api/" />
+  </target>
+
+  <target name="init" depends="scalaris.update.jars">
+    <mkdir dir="simplewiki/WEB-INF/classes"/>
+    <mkdir dir="simplewiki/WEB-INF/lib"/>
+    <copy todir="simplewiki/WEB-INF/lib" flatten="true" preservelastmodified="true">
+      <fileset dir="contrib" includes="*.jar"/>
+    </copy>
+  </target>
+
+  <!-- Compile Servlets, Beans and other java files -->
+  <target name="build" depends="init">
+    <echo message="Download Wiktionary dump:                'ant download'"/>
+    <echo message="Import dump into Scalaris (interactive): 'ant import'"/>
+    <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
+    <echo message="Run jetty web server:                    'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
+    <javac debug="true" debuglevel="${debuglevel}" destdir="simplewiki/WEB-INF/classes">
+      <src path="src"/>
+      <classpath refid="build.classpath"/>
+    </javac>
+  </target>
+
+  <!-- Deletes the generated class files and the temporary files created by jetty (compiled jsps, logs,...) -->
+  <target name="clean">
+    <delete dir="simplewiki/WEB-INF/classes"/>
+    <delete dir="simplewiki/WEB-INF/lib"/>
+    <delete dir="bin/jetty-temp"/>
+  </target>
+
+  <!-- starts a jetty server which provides the wiki website -->
+  <target name="run" depends="build,scalaris.properties">
+    <jetty tempDirectory="bin/jetty-temp">
+      <systemProperties>
+        <systemProperty name="scalaris.node" value="${scalaris.node}"/>
+        <systemProperty name="scalaris.cookie" value="${scalaris.cookie}"/>
+      </systemProperties>
+      <!-- scan every 5 seconds for changes in class files, then re-deploy -->
+      <webApp name="${ant.project.name} - simplewiki" warfile="simplewiki" contextpath="/simplewiki" scanIntervalSeconds="5"/>
+      <!--<webApp name="JAMWiki" warfile="contrib/jamwiki-1.0.2.war" contextpath="/" scanIntervalSeconds="5"/>-->
+      <!--<webApp name="JAMWiki" warfile="JAMWiki" contextpath="/jamwiki" scanIntervalSeconds="5"/>-->
+    </jetty>
+  </target>
+
+  <target name="import.get.data" unless="data">
+    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2)"/>
+  </target>
+
+  <target name="import.get.max_revisions" unless="max_revisions">
+    <input addproperty="max_revisions" defaultvalue="2" message="Maximum number of revisions per page starting with the most recent one (-1 for all revisions)"/>
+  </target>
+
+  <target name="download">
+    <get usetimestamp="true" dest="simplewiktionary-latest-pages-meta-history.xml.bz2" src="http://dumps.wikimedia.org/simplewiktionary/latest/simplewiktionary-latest-pages-meta-history.xml.bz2"/>
+  </target>
+
+  <target name="scalaris.properties.get.node" unless="scalaris.node">
+    <input addproperty="scalaris.node" defaultvalue="node1@localhost" message="URL to a scalaris node"/>
+  </target>
+  <target name="scalaris.properties.get.cookie" unless="scalaris.cookie">
+    <input addproperty="scalaris.cookie" defaultvalue="chocolate chip cookie" message="Cookie the scalaris node uses for connections"/>
+  </target>
+
+  <target name="scalaris.properties" depends="scalaris.properties.get.node,scalaris.properties.get.cookie" />
+
+  <target name="import" depends="build,import.get.data,import.get.max_revisions,scalaris.properties">
+    <fail unless="data">You must specify the data property when you run 'ant import'.</fail>
+    <fail unless="max_revisions">You must specify the data property when you run 'ant import'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="${max_revisions}"/>
+      <classpath>
+        <pathelement location="simplewiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="dist">
+    <jar jarfile="scalaris-wiki.war" basedir="simplewiki"/>
+  </target>
+</project>
