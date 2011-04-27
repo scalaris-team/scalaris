@@ -89,7 +89,7 @@ cp user-dev-guide/main.pdf $RPM_BUILD_ROOT/%{_docdir}/scalaris/user-dev-guide.pd
 
 %pre
 getent group %{scalaris_group} >/dev/null || groupadd --system %{scalaris_group}
-getent passwd %{scalaris_user} >/dev/null || useradd --system -g %{scalaris_group} -d %{scalaris_home} -s /sbin/nologin -c "user for scalaris" %{scalaris_user}
+getent passwd %{scalaris_user} >/dev/null || useradd --system -g %{scalaris_group} -d %{scalaris_home} -m -s /sbin/nologin -c "user for scalaris" %{scalaris_user}
 exit 0
 
 %post
