@@ -35,6 +35,21 @@
 	<property name="junit.version" value="4.8.2" />
 	<!-- ########## Build configuration (end) ########## -->
 
+    <!-- ########## Run configuration (begin) ########## -->
+	<condition property="scalaris.node" value="">
+    	<not> <isset property="scalaris.node" /> </not>
+    </condition>
+    <condition property="scalaris.cookie" value="">
+        <not> <isset property="scalaris.cookie" /> </not>
+    </condition>
+    <condition property="scalaris.client.name" value="">
+        <not> <isset property="scalaris.client.name" /> </not>
+    </condition>
+    <condition property="scalaris.client.appendUUID" value="">
+        <not> <isset property="scalaris.client.appendUUID" /> </not>
+    </condition>
+    <!-- ########## Run configuration (end) ########## -->
+
 	<property environment="env"/>
 	<!-- set paths to documentations to link to -->
 	<condition property="javadoc.jinterface.url"
@@ -385,6 +400,10 @@
 		description="Run Scalaris unit tests in non-graphical mode">
 		<junit dir="${scalaris.classes.dirname}" printsummary="true"
 			haltonfailure="true" fork="yes">
+            <sysproperty key="scalaris.node" value="${scalaris.node}"/>
+            <sysproperty key="scalaris.cookie" value="${scalaris.cookie}"/>
+            <sysproperty key="scalaris.client.name" value="${scalaris.client.name}"/>
+            <sysproperty key="scalaris.client.appendUUID" value="${scalaris.client.appendUUID}"/>
 			<formatter type="brief" usefile="false" />
 			<classpath refid="scalaris.test.classpath" />
 			<batchtest>

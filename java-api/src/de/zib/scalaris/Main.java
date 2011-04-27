@@ -66,9 +66,9 @@ public class Main {
      * </pre>
      *
      * In order to override node and cookie to use for a connection, specify
-     * the <tt>SCALARIS_JAPI_NODE</tt> or <tt>SCALARIS_JAPI_COOKIE</tt>
-     * environment variables. Their values will be used instead of the values
-     * defined in the config file!
+     * the <tt>scalaris.node</tt> or <tt>scalaris.cookie</tt> system properties.
+     * Their values will be used instead of the values defined in the config
+     * file!
      *
      * @param args
      *            command line arguments

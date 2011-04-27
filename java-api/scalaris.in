@@ -53,15 +53,24 @@ if [ "$DIRNAME" != "@bindir@" ]; then
 fi
 
 get_cookie() {
-    # system config
-    . @sysconfdir@/scalaris/scalarisctl.conf
+  if [ -z "$SCALARIS_JAPI_COOKIE" ]; then
+    echo -n "$SCALARIS_JAPI_COOKIE"
+    return
+  else
+    if $no_config ; then
+      echo -n ""
+    else
+      # system config
+      . @sysconfdir@/scalaris/scalarisctl.conf
 
-    # load user scalaris configuration (overrides system config)
-    if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
-      . $HOME/.scalaris/scalarisctl.conf
+      # load user scalaris configuration (overrides system config)
+      if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
+        . $HOME/.scalaris/scalarisctl.conf
+      fi
+
+      echo -n "${cookie:-"chocolate chip cookie"}"
     fi
-
-    echo -n ${cookie:-"chocolate chip cookie"}
+  fi
 }
 
 # Source default scalaris configuration?
@@ -75,8 +84,6 @@ else
           . @sysconfdir@/scalaris/scalaris-java.conf
       fi
   fi
-
-  SCALARIS_JAPI_COOKIE="`get_cookie`"
 
   # load user scalaris configuration
   if [ -f "$HOME/.scalaris/scalaris-java.conf" ] ; then
@@ -309,7 +316,13 @@ fi
 
 # Execute scalaris using eval/exec to preserve spaces in paths,
 # java options, and scalaris args
-scalaris_exec_command="exec \"$JAVACMD\" $SCALARIS_OPTS -classpath \"$LOCALCLASSPATH\" -Dscalaris.java.home=\"$SCALARIS_JAVA_HOME\" -Dscalaris.erlang.nodename=\"$ERLANG_NODE_NAME\" $scalaris_java_config de.zib.scalaris.Main $SCALARIS_ARGS $scalaris_exec_args"
+scalaris_exec_command="exec \"$JAVACMD\" $SCALARIS_OPTS\
+  -classpath \"$LOCALCLASSPATH\"\
+  -Dscalaris.java.home=\"$SCALARIS_JAVA_HOME\"\
+  -Dscalaris.erlang.nodename=\"$ERLANG_NODE_NAME\"\
+  -Dscalaris.cookie=\"`get_cookie`\"\
+  -Dscalaris.node=\"$SCALARIS_JAPI_NODE\"
+  $scalaris_java_config de.zib.scalaris.Main $SCALARIS_ARGS $scalaris_exec_args"
 if $scalaris_exec_debug ; then
     echo $scalaris_exec_command
 fi
