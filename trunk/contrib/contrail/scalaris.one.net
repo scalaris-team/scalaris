@@ -3,11 +3,11 @@ TYPE = RANGED
 
 PUBLIC = YES
 
-BRIDGE = br0
+BRIDGE = virbr0
 
 NETWORK_SIZE    = C
 NETWORK_ADDRESS = 192.168.1.0
 
 #Custom Attributes to be used in Context
-GATEWAY = 192.168.1.1
-DNS     = 192.168.1.1
+GATEWAY = 192.168.122.1
+DNS     = 192.168.122.1
