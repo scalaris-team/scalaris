@@ -1,0 +1,6 @@
+QUICKSTART:
+
+1) run 'ant download' to get a wikipedia dump of the simple wiktionary (or download a dump yourself)
+2) start at least one Scalaris node, e.g. by running '../../bin/scalarisctl -f -s -d start' (for a deamonized first node)
+3) run 'ant import' and follow the instructions to import data into Scalaris
+4) run 'ant run' and follow the instructions to get a webserver up and running
