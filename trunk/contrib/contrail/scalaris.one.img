@@ -1,6 +1,6 @@
 NAME	      = "Scalaris4Contrail"
 TYPE          = CDROM
-PATH          = /home/schuett/Scalaris-LiveCD.iso
+PATH          = /home/bzcschut/Scalaris-LiveCD.iso
 PUBLIC        = YES
-DEV_PREFIX    = hd
+DEV_PREFIX    = sd
 DESCRIPTION   = "Scalaris (Contrail Edition)"
