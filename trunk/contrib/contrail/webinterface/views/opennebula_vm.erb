@@ -1,0 +1,43 @@
+<html>
+<head>
+<title>Opennebula VM</title>
+</head>
+<body>
+
+<h2>Opennebula VM</h2>
+
+<table>
+<tr>
+<th></th>
+<th></th>
+</tr>
+<tr>
+  <td>Id:</td>
+  <td><%= @vm['ID'] %></td>
+</tr>
+<tr>
+  <td>User</td>
+  <td><%= @vm['USERNAME'] %></td>
+</tr>
+<tr>
+  <td>Name</td>
+  <td><%= @vm['NAME'] %></td>
+</tr>
+<tr>
+  <td>State</td>
+  <td><%= @vm.state_str %></td>
+</tr>
+<tr>
+  <td>Start Time</td>
+  <td><%= Time.at(@vm['STIME'].to_i) %></td>
+</tr>
+<tr>
+  <td>IP</td>
+  <td><%= Nokogiri::XML(@vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text %></td>
+</tr>
+</table>
+
+<%= @vm.to_json %>
+
+</body>
+</html>

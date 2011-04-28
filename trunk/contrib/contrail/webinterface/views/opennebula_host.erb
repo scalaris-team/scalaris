@@ -1,0 +1,50 @@
+<html>
+<head>
+<title>Opennebula Host</title>
+</head>
+<body>
+
+<h2>Opennebula Host</h2>
+
+<%= @host.to_xml %>
+<table>
+<tr>
+<th></th>
+<th></th>
+</tr>
+<tr>
+  <td>Id:</td>
+  <td><%= @host['ID'] %></td>
+</tr>
+<tr>
+  <td>Name</td>
+  <td><%= @host['NAME'] %></td>
+</tr>
+<tr>
+  <td>State</td>
+  <td><%= @host.state_str %></td>
+</tr>
+<tr>
+  <td>IM MAD</td>
+  <td><%= @host['IM_MAD'] %></td>
+</tr>
+<tr>
+  <td>VM MAD</td>
+  <td><%= @host['VM_MAD'] %></td>
+</tr>
+<tr>
+  <td>TM MAD</td>
+  <td><%= @host['TM_MAD'] %></td>
+</tr>
+<tr>
+  <td>Cluster</td>
+  <td><%= @host['CLUSTER'] %></td>
+</tr>
+<tr>
+  <td>Host</td>
+  <td><%= @host['HOST'] %></td>
+</tr>
+</table>
+
+</body>
+</html>
