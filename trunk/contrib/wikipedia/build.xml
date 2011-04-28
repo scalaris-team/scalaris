@@ -29,39 +29,44 @@
   </taskdef>
 
   <!-- Create build directory and copy static files -->
-  <!-- If  -->
+  <macrodef name="scalaris.check.jars">
+    <sequential>
+      <condition property="scalaris.jars.available.contrib">
+        <and>
+          <available file="contrib/scalaris.jar" type="file" />
+          <available file="contrib/OtpErlang-${opterlang.version}.jar" type="file" />
+        </and>
+      </condition>
+      <condition property="scalaris.src.available">
+        <available file="../../java-api/build.xml" type="file" />
+      </condition>
+      <condition property="scalaris.src.jars.available">
+        <and>
+          <available file="../../java-api/scalaris.jar" type="file" />
+          <available file="../../java-api/lib/OtpErlang-${opterlang.version}.jar" type="file" />
+        </and>
+      </condition>
+    </sequential>
+  </macrodef>
   <target name="scalaris.check.jars">
-    <condition property="scalaris.jars.available.contrib">
-      <and>
-        <available file="contrib/scalaris.jar" />
-        <available file="contrib/OtpErlang-${opterlang.version}.jar" />
-      </and>
-    </condition>
-    <condition property="scalaris.src.available">
-        <available file="../../java-api/build.xml" />
-    </condition>
-    <condition property="scalaris.src.jars.available">
-      <and>
-        <available file="../../java-api/scalaris.jar" />
-        <available file="../../java-api/lib/OtpErlang-${opterlang.version}.jar" />
-      </and>
-    </condition>
+    <scalaris.check.jars />
   </target>
   <target name="scalaris.build.jars" depends="scalaris.check.jars" if="scalaris.src.available">
     <ant dir="../../java-api/"/>
-    <antcall target="scalaris.check.jars" />
+    <scalaris.check.jars />
   </target>
   <target name="scalaris.get.jars" depends="scalaris.check.jars,scalaris.build.jars" if="scalaris.src.available">
     <fail unless="scalaris.src.jars.available" message="missing ../../java-api/scalaris.jar and ../../java-api/lib/OtpErlang-${opterlang.version}.jar" />
     <copy todir="contrib" flatten="true" preservelastmodified="true">
-      <fileset dir=".">
-        <include name="../../java-api/scalaris.jar" />
-        <include name="../../java-api/lib/OtpErlang-${opterlang.version}.jar" />
+      <fileset dir="../../java-api/">
+        <include name="scalaris.jar" />
+        <include name="lib/OtpErlang-${opterlang.version}.jar" />
       </fileset>
     </copy>
-    <antcall target="scalaris.check.jars" />
+    <scalaris.check.jars />
   </target>
-  <target name="scalaris.update.jars" depends="scalaris.check.jars,scalaris.get.jars">
+  <target name="scalaris.update.jars" depends="scalaris.get.jars">
+    <scalaris.check.jars />
     <fail unless="scalaris.jars.available.contrib" message="missing scalaris.jar and OtpErlang-${opterlang.version}.jar and no sources found in ../../java-api/" />
   </target>
 
