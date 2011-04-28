@@ -1,1 +1,0 @@
-SCALARIS_FIRST=true
