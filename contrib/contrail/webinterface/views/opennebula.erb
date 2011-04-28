@@ -1,0 +1,40 @@
+<html>
+<head>
+<title>Opennebula</title>
+</head>
+<body>
+
+<%= @image_pool.info %>
+<%= @vm_pool.info %>
+<%= @host_pool.info %>
+
+<h2>Opennebula Images</h>
+<ul>
+<% @image_pool.each do |image| %>
+  <li><a href="/one/image/<%= image.id %>"><%= image.id %></a> </li>
+<% end %>
+</ul>
+
+<h2>Opennebula VMs</h>
+<ul>
+<% @vm_pool.each do |vm| %>
+  <li><a href="/one/vm/<%= vm.id %>"><%= vm.name %></a> <%= vm['USERNAME'] %></li>
+<% end %>
+</ul>
+
+<h2>Opennebula Hosts</h>
+<ul>
+<% @host_pool.each do |host| %>
+  <li><a href="/one/host/<%= host.id %>"><%= host.name %></a> </li>
+<% end %>
+</ul>
+
+<h2>Opennebula VNets</h>
+<ul>
+<% @vnet_pool.each do |vnet| %>
+  <li><a href="/one/vnet/<%= vnet.id %>"><%= vnet.name %></a> </li>
+<% end %>
+</ul>
+
+</body>
+</html>

@@ -1,0 +1,29 @@
+<html>
+<head>
+<title>Scalaris Instances</title>
+</head>
+<body>
+
+<h2>Scalaris Instances</h>
+<ul>
+<% @instances.each do |instance| %>
+  <li><a href="/scalaris/<%= instance.id %>"><%= instance.id %></a> <%= instance.user %></li>
+<% end %>
+</ul>
+
+<h2>Create new Instance</h>
+
+<fieldset style="border: 1px black solid">
+<form action="/scalaris" method="post">
+  <div style="margin:0;padding:0;display:inline">
+    <input name="_method" type="hidden" value="post" />
+  </div>
+  <label for="user">User</label>:
+  <input id="user" name="user" size="30" type="text" value="John" /><br />
+
+  <input id="submit" name="commit" type="submit" value="Create New Instance" />
+</form>
+</fieldset>
+
+</body>
+</html>

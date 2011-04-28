@@ -1,0 +1,18 @@
+<html>
+<head>
+<title>Scalaris Instance</title>
+</head>
+<body>
+
+<h2>Scalaris Instance</h2>
+Id: <%= @id %><br>
+
+Created at: <%= @instance.created_at %><br>
+
+<h3>VMs</h3>
+<% @instance.vms_dataset.each do |vm| %>
+  <li><a href="/one/vm/<%= vm.one_vm_id %>"><%= vm.one_vm_id %></a></li>
+<% end %>
+
+</body>
+</html>
