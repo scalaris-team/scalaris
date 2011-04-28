@@ -27,6 +27,7 @@ import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
+import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.Transaction.RequestList;
@@ -48,10 +49,11 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
     private Connection connection;
     private TransactionSingleOp scalaris_single;
     private Transaction scalaris_tx;
-    private List<String> pages = new LinkedList<String>();
+    private List<String> newPages = new LinkedList<String>();
+    private int pageCount = 0;
     private int maxRevisions = -1; // all revisions by default
-    private HashMap<String, List<String>> categories = new HashMap<String, List<String>>(100);
-    private HashMap<String, List<String>> templates = new HashMap<String, List<String>>(100);
+    private HashMap<String, List<String>> newCategories = new HashMap<String, List<String>>(100);
+    private HashMap<String, List<String>> newTemplates = new HashMap<String, List<String>>(100);
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -182,21 +184,21 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
             if (!revisions.isEmpty() && wikiModel != null) {
                 for (String cat_raw: revisions.get(0).parseCategories(wikiModel)) {
                     String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
-                    List<String> catPages = categories.get(category);
+                    List<String> catPages = newCategories.get(category);
                     if (catPages == null) {
                         catPages = new ArrayList<String>(100);
                     }
                     catPages.add(page.getTitle());
-                    categories.put(category, catPages);
+                    newCategories.put(category, catPages);
                 }
                 for (String tpl_raw: revisions.get(0).parseTemplates(wikiModel)) {
                     String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
-                    List<String> templatePages = templates.get(template);
+                    List<String> templatePages = newTemplates.get(template);
                     if (templatePages == null) {
                         templatePages = new ArrayList<String>(100);
                     }
                     templatePages.add(page.getTitle());
-                    templates.put(template, templatePages);
+                    newTemplates.put(template, templatePages);
                 }
             }
             
@@ -212,12 +214,12 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
                     addCommit());
             result.processWriteAt(0);
             result.processWriteAt(1);
-//            result.processCommitAt(2);
-            pages.add(page.getTitle());
-            // only export page list every 100 pages:
-            if ((pages.size() % 100) == 0) {
-                System.out.println("imported pages: " + pages.size());
-                scalaris_single.write(ScalarisDataHandler.getPageListKey(), pages);
+            newPages.add(page.getTitle());
+            ++pageCount;
+            // only export page list every 200 pages:
+            if ((newPages.size() % 200) == 0) {
+                System.out.println("imported pages: " + pageCount);
+                updatePageLists();
             }
         } catch (ConnectionException e) {
             System.err.println("write of page \"" + page.getTitle() + "\" failed with connection error");
@@ -235,45 +237,84 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      */
     @Override
     public void tearDown() {
-        try {
-            scalaris_single.write(ScalarisDataHandler.getPageListKey(), pages);
-        } catch (ConnectionException e) {
-            System.err.println("write of pages list failed with connection error");
-        } catch (TimeoutException e) {
-            System.err.println("write of pages list failed with timeout");
-        } catch (AbortException e) {
-            System.err.println("write of pages list failed with abort");
-        } catch (UnknownException e) {
-            System.err.println("write of pages list failed with unknown: " + e.getMessage());
+        updatePageLists();
+    }
+    
+    private void updatePageLists() {
+        String scalaris_key = ScalarisDataHandler.getPageListKey();
+        
+        // list of pages:
+        if (writePageList(scalaris_key, newPages)) {
+            newPages.clear();
         }
-        String scalaris_key;
-        for (Entry<String, List<String>> category: categories.entrySet()) {
+        
+        boolean success = true;
+        // list of pages in each category:
+        for (Entry<String, List<String>> category: newCategories.entrySet()) {
             scalaris_key = ScalarisDataHandler.getCatPageListKey(category.getKey());
-            try {
-                scalaris_single.write(scalaris_key, category.getValue());
-            } catch (ConnectionException e) {
-                System.err.println("write of category page list \"" + scalaris_key + "\" failed with connection error");
-            } catch (TimeoutException e) {
-                System.err.println("write of category page list \"" + scalaris_key + "\" failed with timeout");
-            } catch (AbortException e) {
-                System.err.println("write of category page list \"" + scalaris_key + "\" failed with abort");
-            } catch (UnknownException e) {
-                System.err.println("write of category page list \"" + scalaris_key + "\" failed with unknown: " + e.getMessage());
+            if (writePageList(scalaris_key, category.getValue())) {
+                category.getValue().clear();
+            } else {
+                success = false;
             }
         }
-        for (Entry<String, List<String>> template: templates.entrySet()) {
+        if (success) {
+            newCategories.clear();
+        }
+
+        success = true;
+        // list of pages a templates is used in:
+        for (Entry<String, List<String>> template: newTemplates.entrySet()) {
             scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey());
-            try {
-                scalaris_single.write(scalaris_key, template.getValue());
-            } catch (ConnectionException e) {
-                System.err.println("write of template page list \"" + scalaris_key + "\" failed with connection error");
-            } catch (TimeoutException e) {
-                System.err.println("write of template page list \"" + scalaris_key + "\" failed with timeout");
-            } catch (AbortException e) {
-                System.err.println("write of template page list \"" + scalaris_key + "\" failed with abort");
-            } catch (UnknownException e) {
-                System.err.println("write of template page list \"" + scalaris_key + "\" failed with unknown: " + e.getMessage());
+            if (writePageList(scalaris_key, template.getValue())) {
+                template.getValue().clear();
+            } else {
+                success = false;
             }
         }
+        if (success) {
+            newTemplates.clear();
+        }
+    }
+    
+    private boolean writePageList(String scalaris_key, List<String> newEntries) {
+        List<String> entries; 
+        try {
+            entries = scalaris_single.read(scalaris_key).stringListValue();
+        } catch (NotFoundException e) {
+            entries = new LinkedList<String>();
+        } catch (ConnectionException e) {
+            System.err.println("write of page list \"" + scalaris_key + "\" failed with connection error");
+            return false;
+        } catch (TimeoutException e) {
+            System.err.println("read of page list \"" + scalaris_key + "\" failed with timeout");
+            return false;
+        } catch (UnknownException e) {
+            System.err.println("read of page list \"" + scalaris_key + "\" failed with unknown: " + e.getMessage());
+            return false;
+        } catch (ClassCastException e) {
+            System.err.println("read of page list \"" + scalaris_key + "\" failed with unexpected type: " + e.getMessage());
+            return false;
+        }
+        
+        entries.addAll(newEntries);
+        
+        try {
+            scalaris_single.write(scalaris_key, entries);
+        } catch (ConnectionException e) {
+            System.err.println("write of page list \"" + scalaris_key + "\" failed with connection error");
+            return false;
+        } catch (TimeoutException e) {
+            System.err.println("write of page list \"" + scalaris_key + "\" failed with timeout");
+            return false;
+        } catch (AbortException e) {
+            System.err.println("write of page list \"" + scalaris_key + "\" failed with abort");
+            return false;
+        } catch (UnknownException e) {
+            System.err.println("write of page list \"" + scalaris_key + "\" failed with unknown: " + e.getMessage());
+            return false;
+        }
+        
+        return true;
     }
 }
