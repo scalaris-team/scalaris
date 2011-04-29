@@ -120,12 +120,12 @@ if (req_render == null || !req_render.equals("0")) {
 	    if (rev.getContributor().getIp().isEmpty() || !rev.getContributor().getUser().isEmpty()) {
 	        String username = rev.getContributor().getUser();
 	        usertools = "<a href=\"wiki?title=User:" + username + "\" title=\"User:" + username + "\" class=\"mw-userlink\">" + username + "</a> " +
-	                "<span class=\"mw-usertoollinks\">(<a href=\"wiki?User_talk:" + username + "\" title=\"User talk:" + username + "\">talk</a> | " +
-	                "<a href=\"wiki?Special:Contributions/" + username + "\" title=\"Special:Contributions/" + username + "\">changes</a>)</span>";
+	                "<span class=\"mw-usertoollinks\">(<a href=\"wiki?title=" + pageBean.getWikiNamespace().getUser_talk() + ":" + username + "\" title=\"User talk:" + username + "\">talk</a> | " +
+	                "<a href=\"wiki?title=Special:Contributions/" + username + "\" title=\"Special:Contributions/" + username + "\">changes</a>)</span>";
 	    } else {
 	        String ip = rev.getContributor().getIp();
 	        usertools = "<a href=\"wiki?title=Special:Contributions/" + ip + "\" title=\"Special:Contributions/" + ip + "\" class=\"mw-userlink\">" + ip + "</a> " +
-	                "<span class=\"mw-usertoollinks\">(<a href=\"wiki?title=User_talk:" + ip + "\" title=\"User talk:" + ip + "\" class=\"mw-usertoollinks\">talk</a>)</span>";
+	                "<span class=\"mw-usertoollinks\">(<a href=\"wiki?title=" + pageBean.getWikiNamespace().getUser_talk() + ":" + ip + "\" title=\"User talk:" + ip + "\" class=\"mw-usertoollinks\">talk</a>)</span>";
 	    }
 	    
 	    out.print("<li><span class=\"mw-history-histlinks\">(cur | prev) </span> ");
@@ -193,7 +193,7 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
     <h5>Namespaces</h5>
     <ul>
                     <li id="ca-nstab-main" class="selected"><span><a href="wiki?title=${ pageBean.title }" title="View the content page [c]" accesskey="c">Page</a></span></li>
-                    <li id="ca-talk"><span><a href="wiki?title=Diskussion:${ pageBean.title }" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
+                    <li id="ca-talk"><span><a href="wiki?title=<%= pageBean.getWikiNamespace().getTalk() %>:${ pageBean.title }" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
     </ul>
 </div>
 

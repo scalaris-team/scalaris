@@ -21,7 +21,9 @@ package de.zib.scalaris.examples.wikipedia.bliki;
  * @author Nico Kruber, kruber@zib.de
  */
 public class WikiPageEditBean extends WikiPageBean {
-
+    /**
+     * the page did not exist before
+     */
     private boolean isNewPage = false;
     
     /**
@@ -33,8 +35,6 @@ public class WikiPageEditBean extends WikiPageBean {
      * the summary field of the site
      */
     private String summary = "";
-    
-    private boolean isEditRestricted = false;
 
     /**
      * @return the preview
@@ -76,19 +76,5 @@ public class WikiPageEditBean extends WikiPageBean {
      */
     public void setNewPage(boolean isNewPage) {
         this.isNewPage = isNewPage;
-    }
-
-    /**
-     * @return the isEditRestricted
-     */
-    public boolean isEditRestricted() {
-        return isEditRestricted;
-    }
-
-    /**
-     * @param isEditRestricted the isEditRestricted to set
-     */
-    public void setEditRestricted(boolean isEditRestricted) {
-        this.isEditRestricted = isEditRestricted;
     }
 }
