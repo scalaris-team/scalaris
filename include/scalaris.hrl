@@ -83,5 +83,9 @@
 %-define(LOG_CS_API(Timer, Time), monitor_timing:log(Timer, Time)).
 -define(LOG_CS_API(Timer, Time), ok).
 
+% Replica Repair - bloom filter implemenation selection
+-define(REP_BLOOM, bloom).
+% Replica Repair - HashFunctionSet selection for usage by bloom filter 
+-define(REP_HFS, hfs_lhsp_md5).
 
 -include("types.hrl").

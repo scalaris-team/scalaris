@@ -243,6 +243,11 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
     comm:send(Source_PID, Msg),
     State;
 
+on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
+    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), Interval, MaxChunkSize),
+    comm:send_local(Source_PID, {get_chunk_response, Chunk}),
+    State;
+
 %% for unit testing only: allow direct DB manipulation
 on({get_key_entry, Source_PID, HashedKey}, State) ->
     Entry = ?DB:get_entry(dht_node_state:get(State, db), HashedKey),
