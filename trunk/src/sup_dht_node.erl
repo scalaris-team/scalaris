@@ -75,18 +75,24 @@ init(Options) ->
         util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Monitor =
         util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
+    RepUpdate = case config:read(rep_update_activate) of
+                    true -> util:sup_worker_desc(rep_upd, rep_upd,
+                                                 start_link, [DHTNodeGroup]);
+                    _ -> []
+                end,
     %% order in the following list is the start order
     {ok, {{one_for_one, 10, 1},
-          [
-           Monitor,
-           Delayer,
-           Reregister,
-           DeadNodeCache,
-           RoutingTable,
-           Cyclon,
-           Vivaldi,
-           DC_Clustering,
-           Gossip,
-           SupDHTNodeCore_AND
-          ]}}.
+          lists:flatten([
+                Monitor,
+                Delayer,
+                Reregister,
+                DeadNodeCache,
+                RoutingTable,
+                Cyclon,
+                Vivaldi,
+                DC_Clustering,
+                Gossip,
+                SupDHTNodeCore_AND,
+                RepUpdate
+          ])}}.
 %% userdevguide-end sup_dht_node:init
