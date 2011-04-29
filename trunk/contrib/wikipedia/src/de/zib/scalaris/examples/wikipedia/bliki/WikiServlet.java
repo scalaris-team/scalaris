@@ -21,6 +21,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.TimeZone;
@@ -158,6 +159,13 @@ public class WikiServlet extends HttpServlet implements Servlet {
 
         if (req_title.equals("Special:Random")) {
             handleViewRandomPage(request, response);
+        } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
+            String prefix = "";
+            int slashIndex = req_title.indexOf('/');
+            if (slashIndex != (-1)) {
+                prefix = req_title.substring(slashIndex + 1);
+            } 
+            handleViewSpecialPageList(request, response, prefix);
         } else if (req_action == null || req_action.equals("view")) {
             handleViewPage(request, response, req_title);
         } else if (req_action.equals("history")) {
@@ -464,6 +472,60 @@ public class WikiServlet extends HttpServlet implements Servlet {
             dispatcher.forward(request, response);
         } else {
             addToParam_notice(request, "error: unknown error getting revision list for page " + title + ": <pre>" + result.message + "</pre>");
+            showEmptyPage(request, response);
+        }
+    }
+
+    /**
+     * Shows the page containing the list of pages.
+     * 
+     * @param request
+     *            the request of the current operation
+     * @param response
+     *            the response of the current operation
+     * 
+     * @throws IOException 
+     * @throws ServletException 
+     */
+    private void handleViewSpecialPageList(HttpServletRequest request,
+            HttpServletResponse response, String prefix) throws ServletException, IOException {
+        PageListResult result = ScalarisDataHandler.getPageList(connection);
+        
+        if (result.success) {
+            WikiPageListBean value = new WikiPageListBean();
+            value.setNotice(WikiServlet.getParam_notice(request));
+            Collections.sort(result.pages);
+            String last = prefix;
+            if (!prefix.equals("")) {
+                // only show pages with this prefix:
+                for (Iterator<String> it = result.pages.iterator(); it.hasNext(); ) {
+                    String cur = it.next();
+                    if (!cur.startsWith(prefix)) {
+                        it.remove();
+                    } else {
+                        last = cur;
+                    }
+                }
+            }
+            String first = prefix;
+            if (!result.pages.isEmpty()) {
+                first = result.pages.get(0);
+            }
+            value.setPages(result.pages);
+            value.setFromPage(first);
+            value.setToPage(last);
+            
+            value.setTitle("Special:AllPages");
+            value.setWikiTitle(siteinfo.getSitename());
+            value.setWikiNamespace(namespace);
+            
+            // forward the request and the bean to the jsp:
+            request.setAttribute("pageBean", value);
+            RequestDispatcher dispatcher = request
+                    .getRequestDispatcher("pageSpecial_pagelist.jsp");
+            dispatcher.forward(request, response);
+        } else {
+            addToParam_notice(request, "error: unknown error getting page list: <pre>" + result.message + "</pre>");
             showEmptyPage(request, response);
         }
     }

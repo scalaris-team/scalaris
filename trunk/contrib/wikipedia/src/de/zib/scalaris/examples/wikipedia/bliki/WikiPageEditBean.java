@@ -20,7 +20,7 @@ package de.zib.scalaris.examples.wikipedia.bliki;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class WikiPageEditBean extends WikiPageBean {
+public class WikiPageEditBean extends WikiPageBeanBase {
     /**
      * the page did not exist before
      */

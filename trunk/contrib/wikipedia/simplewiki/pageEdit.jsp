@@ -335,7 +335,7 @@ ${ pageBean.preview }
                 </ul>
                 <ul id="footer-icons" class="noprint">
                 </ul>
-                        <div style="clear:both"></div>
+                <div style="clear:both"></div>
         </div>
         <!-- /footer -->
 </body>
