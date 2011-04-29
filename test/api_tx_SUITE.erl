@@ -90,7 +90,7 @@ req_list_2(_Config) ->
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{read, "non-existing"}, {commit}]),
                     {_TLog, [_ReadRes = {fail, not_found},
-                             _CommitRes = {ok}]}), %% or {fail, abort}?
+                             _CommitRes = {fail, abort}]}),
     %% read non-existing item and write to that item afterwards
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{read, "non-existing1"},
@@ -98,7 +98,7 @@ req_list_2(_Config) ->
                                      {commit}]),
                     {_TLog, [_ReadRes = {fail, not_found},
                              _WriteRes = {ok},
-                             _CommitRes = {ok}]}), %% or {fail, abort}?
+                             _CommitRes = {ok}]}),
     %% exec more complex transaction with repeated requests
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{read, "B"}, {read, "B"},
@@ -143,7 +143,7 @@ req_list_2(_Config) ->
     ?equals_pattern(api_tx:req_list(NonExistReadTLog2,
                                     [{read, "non-existing"}, {commit}]),
                     {_TLog, [_ReadRes = {fail, not_found},
-                             _CommitRes = {ok}]}), %% or {fail, abort}?
+                             _CommitRes = {fail, abort}]}),
     ok.
 
 read_2(_Config) ->
@@ -154,6 +154,7 @@ read_2(_Config) ->
     %% read non existing key
     ?equals_pattern(api_tx:read(api_tx:new_tlog(), "non-existing"),
                     {_, {fail, not_found}}),
+
     ok.
 
 write_3(_Config) ->
@@ -178,8 +179,27 @@ commit_1(_Config) ->
     ?equals(api_tx:commit(EmptyTLog), {ok}),
 
     %% commit a tlog
-    {TLog, _} = api_tx:write(api_tx:new_tlog(), "commit_1_A", 7),
-    ?equals(api_tx:commit(TLog), {ok}),
+    {WriteTLog, _} = api_tx:write(api_tx:new_tlog(), "commit_1_A", 7),
+    ?equals(api_tx:commit(WriteTLog), {ok}),
+
+    _ = api_tx:write("commit_1_B", 7),
+    {ReadTLog, _} = api_tx:read(api_tx:new_tlog(), "commit_1_B"),
+    ?equals(api_tx:commit(ReadTLog), {ok}),
+
+    %% commit a timedout TLog
+    TimeoutReadTLog =
+        [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- ReadTLog ],
+    ?equals(api_tx:commit(TimeoutReadTLog), {fail, abort}),
+
+    {WriteTLog2, _} = api_tx:write(api_tx:new_tlog(), "commit_1_C", 7),
+    TimeoutWriteTLog =
+        [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- WriteTLog2 ],
+    ?equals(api_tx:commit(TimeoutWriteTLog), {fail, abort}),
+
+    %% commit a non-existing tlog
+    {NonExistReadTLog, _} = api_tx:read(EmptyTLog, "non-existing"),
+    ?equals(api_tx:commit(NonExistReadTLog), {fail, abort}),
+
     ok.
 
 read_1(_Config) ->
@@ -258,7 +278,7 @@ conflicting_tx2(_Config) ->
                                     [{write, "conflicting_tx2_non-existing", "NewValue"},
                                      {commit}]),
                     {_TLog, [_WriteRes = {ok},
-                             _CommitRes = {fail, abort}]}), %% or {fail, abort}?
+                             _CommitRes = {fail, abort}]}),
     ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
     ok.
 
