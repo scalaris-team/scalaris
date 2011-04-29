@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator"%>
 <% String req_render = request.getParameter("render"); %>
-<jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageBean" scope="request" />
+<jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
@@ -52,9 +52,6 @@
                 <!-- /tagline -->
                 <!-- subtitle -->
                 <div id="contentSub">
-<% if (!pageBean.getRedirectedTo().isEmpty()) { %>
-                (Redirected to <a href="wiki?title=<%=pageBean.getRedirectedTo()%>" title="<%=pageBean.getRedirectedTo()%>"><%=pageBean.getRedirectedTo()%></a> - showing contents of redirected page)
-<% } %>
                 </div>
                 <!-- /subtitle -->
                 <!-- jumpto -->
@@ -67,118 +64,92 @@
 
 ${ pageBean.page }
 
-<% if (!pageBean.getSubCategories().isEmpty()) {
-    int rest = pageBean.getSubCategories().size();
-%>
-
-<div id="mw-subcategories">
-<h2>Subcategories</h2>
-<p>This category has the following <%= rest %> subcategories.</p>
-<%
-int[] columnCount = new int[3];
-if (rest > 15) {
-    columnCount[0] = rest / 3;
-    rest -= columnCount[0];
-} else {
-    columnCount[0] = rest;
-    rest = 0;
-}
-columnCount[1] = rest / 2;
-columnCount[2] = rest - columnCount[1];
-
-Iterator<String> iter = pageBean.getSubCategories().iterator();
-%>
-
-<table width="100%"><tbody><tr valign="top">
-<% for (int i = 0; i < 3; ++i) { %>
-<td>
-
-<h3> </h3>
-<ul>
-<% for (int j = 0; j < columnCount[i]; ++j) {
-    String subCat = iter.next();
-%>
-<li>
-  <div class="CategoryTreeSection">
-	<div class="CategoryTreeItem">
-<% /*
-	  <span class="CategoryTreeEmptyBullet">[<b>×</b>] </span>
+                <table class="mw-allpages-table-form">
+                  <tr>
+                    <td>
+                      <div class="namespaceoptions">
+                        <form method="get" action="/wiktionary/simple/w/index.php">
+                          <input type="hidden" value="Special:AllPages" name="title" />
+                          <fieldset>
+                            <legend>All pages</legend>
+                            <table id="nsselect" class="allpages">
+                              <tr>
+                                <td class='mw-label'><label for="nsfrom">Display pages starting at:</label> </td>
+                                <td class='mw-input'><input disabled="disabled" name="from" size="30" value="${ pageBean.fromPage }" id="nsfrom" />  </td>
+                              </tr>
+                              <tr>
+                                <td class='mw-label'><label for="nsto">Display pages ending at:</label> </td>
+                                <td class='mw-input'><input disabled="disabled" name="to" size="30" value="${ pageBean.toPage }" id="nsto" />      </td>
+                              </tr>
+                              <tr>
+                                <td class='mw-label'><label for="namespace">Namespace:</label>  </td>
+                                <td class='mw-input'>
+                                  <select disabled="disabled" id="namespace" name="namespace" class="namespaceselector">
+                                    <option value="0" selected="selected">(Main)</option>
+<% /* TODO: parse options from namespace
+                                    <option value="1">Talk</option>
+                                    <option value="2">User</option>
+                                    <option value="3">User talk</option>
+                                    <option value="4">Wiktionary</option>
+                                    <option value="5">Wiktionary talk</option>
+                                    <option value="6">File</option>
+                                    <option value="7">File talk</option>
+                                    <option value="8">MediaWiki</option>
+                                    <option value="9">MediaWiki talk</option>
+                                    <option value="10">Template</option>
+                                    <option value="11">Template talk</option>
+                                    <option value="12">Help</option>
+                                    <option value="13">Help talk</option>
+                                    <option value="14">Category</option>
+                                    <option value="15">Category talk</option>
 */ %>
-	  <a class="CategoryTreeLabel  CategoryTreeLabelNs14 CategoryTreeLabelCategory" href="wiki?title=Category:<%=subCat%>"><%=subCat%></a>
-<% /* 
-	  <span title="contains 0 subcategories, 1745 pages, and 0 files">(0)</span>
-*/ %>
-	</div>
-    <div class="CategoryTreeChildren" style="display: none;"></div>
-  </div>
-</li>
-<% } %>
-</ul></td>
-<% } %>
-</tr>
-</table>
-</div>
-<% } %>
-
-<% if (!pageBean.getCategoryPages().isEmpty()) {
-    int rest = pageBean.getCategoryPages().size(); %>
-
-<div id="mw-pages">
-<h2>Pages in category "${ pageBean.title }"</h2>
-<p>The following <%= rest %> pages are in this category.</p>
+                                  </select>
+                                  <input disabled="disabled" type="submit" value="Go" />    </td>
+                              </tr>
+                            </table>
+                          </fieldset>
+                        </form>
+                      </div>
+                    </td>
+                    <td class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></td>
+                  </tr>
+                </table>
+                <table class="mw-allpages-table-chunk">
+<% if (!pageBean.getPages().isEmpty()) {
+    Iterator<String> iter = pageBean.getPages().iterator();
+    while (iter.hasNext()) {
+        String value = iter.next();
+%>
+                  <tr>
+                    <td style="width:33%"><a href="wiki?title=<%= value %>"><%= value %></a></td>
+                    <td style="width:33%">
+<%      if (iter.hasNext()) {
+            value = iter.next();
+%>
+                    <a href="wiki?title=<%= value %>"><%= value %></a>
+<%      } %>
+                    </td>
+                    <td style="width:33%">
+<%      if (iter.hasNext()) {
+            value = iter.next();
+%>
+                    <a href="wiki?title=<%= value %>"><%= value %></a>
+<%      } %>
+                    </td>
+                  </tr>
 <%
-int[] columnCount = new int[3];
-if (rest > 15) {
-    columnCount[0] = rest / 3;
-    rest -= columnCount[0];
-} else {
-    columnCount[0] = rest;
-    rest = 0;
-}
-columnCount[1] = rest / 2;
-columnCount[2] = rest - columnCount[1];
-
-Iterator<String> iter = pageBean.getCategoryPages().iterator();
+    }
+  }
 %>
-
-<table width="100%"><tbody><tr valign="top">
-<% for (int i = 0; i < 3; ++i) { %>
-<td>
-
-<h3> </h3>
-<ul>
-<% for (int j = 0; j < columnCount[i]; ++j) {
-    String catPage = iter.next();
-%>
-<li><a href="wiki?title=<%=catPage%>" title="<%=catPage%>"><%=catPage%></a></li>
-<% } %>
-</ul></td>
-<% } %>
-</tr>
-</table>
-</div>
-<% } %>
-
+                </table>
+                <hr />
+                <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></p>
+                <div class="printfooter">
+                Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
 <% if (req_render == null || !req_render.equals("0")) { %>
                 <!-- catlinks -->
-<% if (!pageBean.getCategories().isEmpty()) { %>
-                <div id="catlinks" class="catlinks">
-                <div id="mw-normal-catlinks">
-                <a href="wiki?title=Special:Categories" title="Special:Categories">Categories</a>:
-<%
-	for (Iterator<String> iterator = pageBean.getCategories().iterator(); iterator.hasNext();) {
-	    String category = iterator.next();
-	    out.print("<span dir=\"" + pageBean.getWikiLangDir() + "\"><a href=\"wiki?title=Category:" + category + "\" title=\"Category:" + category + "\">" + category + "</a></span>");
-	    
-	    if (iterator.hasNext()) {
-	        out.print(" | ");
-	    }
-	}
-%>
-                </div>
-                </div>
-<% } // if (!pageBean.getCategories().isEmpty()) %>
+                <div id="catlinks" class="catlinks catlinks-allhidden"></div>
                 <!-- /catlinks -->
 <% } %>
                 <div class="visualClear"></div>
@@ -204,8 +175,7 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
 <div id="p-namespaces" class="vectorTabs">
     <h5>Namespaces</h5>
     <ul>
-                    <li id="ca-nstab-main" class="selected"><span><a href="wiki?title=${ pageBean.title }" title="View the content page [c]" accesskey="c">Page</a></span></li>
-                    <li id="ca-talk"><span><a href="wiki?title=<%= pageBean.getWikiNamespace().getTalk() %>:${ pageBean.title }" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
+                    <li id="ca-special" class="selected"><span><a href="wiki?title=${ pageBean.title }" >Special page</a></span></li>
     </ul>
 </div>
 
@@ -225,20 +195,9 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
             <div id="right-navigation">
                 
 <!-- 0 -->
-<div id="p-views" class="vectorTabs">
+<div id="p-views" class="vectorTabs emptyPortlet">
     <h5>Views</h5>
     <ul>
-          <% if (!pageBean.isNotAvailable()) { %>
-                    <li id="ca-view" class="selected"><span><a href="wiki?title=${ pageBean.title }">Read</a></span></li>
-          <% if (!pageBean.isEditRestricted()) { %>
-                    <li id="ca-edit"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Change</a></span></li>
-          <% } else {%>
-                    <li id="ca-viewsource"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="This page is protected. You can view its source [e]" accesskey="e">View source</a></span></li>
-          <% } %>
-                    <li id="ca-history" class="collapsible "><span><a href="wiki?title=${ pageBean.title }&amp;action=history" title="Past revisions of this page [h]" accesskey="h">View history</a></span></li>
-          <% } else {%>
-                    <li id="ca-edit"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Start</a></span></li>
-          <% } %>
     </ul>
 </div>
 
@@ -308,21 +267,6 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
     <h5 tabindex="2">Toolbox</h5>
     <div style="display: block;" class="body">
         <ul>
-                    <li id="t-whatlinkshere"><a href="wiki?title=Special:WhatLinksHere/${ pageBean.title }" title="List of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
-          <% if (!pageBean.isNotAvailable()) { %>
-                    <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked/${ pageBean.title }" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>
-          <% } %>
-                    <li id="t-specialpages"><a href="wiki?title=Special:SpecialPages" title="List of all special pages [q]" accesskey="q">Special pages</a></li>
-<% /*
-                    <li id="t-print"><a href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;printable=yes" rel="alternate" title="Printable version of this page [p]" accesskey="p">Page for printing</a></li>
-*/ %>
-          <% if (!pageBean.isNotAvailable()) { %>
-                    <li id="t-permalink"><a href="wiki?title=${ pageBean.title }&amp;oldid=${ pageBean.version }" title="Permanent link to this revision of the page">Permanent link</a></li>
-          <% } %>
-<% /*
-                    <li><span><a href="javascript:adddefinition()">Add definition</a></span></li>
-                    <li id="newimagebutton"><span><a href="javascript:addimage()">Add image</a></span></li>
-*/ %>
         </ul>
     </div>
 </div>
@@ -330,45 +274,6 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
 <!-- /TOOLBOX -->
 
 <!-- LANGUAGES -->
-        <% if (!pageBean.isNotAvailable()) { %>
-<div class="portal expanded" id="p-lang">
-    <h5 tabindex="3">In other languages</h5>
-    <div style="display: block;" class="body">
-        <ul>
-<% /*
-                    <li class="interwiki-cs"><a href="http://cs.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Česky</a></li>
-                    <li class="interwiki-de"><a href="http://de.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Deutsch</a></li>
-                    <li class="interwiki-et"><a href="http://et.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Eesti</a></li>
-                    <li class="interwiki-el"><a href="http://el.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Ελληνικά</a></li>
-                    <li class="interwiki-en"><a href="http://en.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">English</a></li>
-                    <li class="interwiki-es"><a href="http://es.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Español</a></li>
-                    <li class="interwiki-fa"><a href="http://fa.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">فارسی</a></li>
-                    <li class="interwiki-fr"><a href="http://fr.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Français</a></li>
-                    <li class="interwiki-ko"><a href="http://ko.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">한국어</a></li>
-                    <li class="interwiki-io"><a href="http://io.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Ido</a></li>
-                    <li class="interwiki-it"><a href="http://it.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Italiano</a></li>
-                    <li class="interwiki-kn"><a href="http://kn.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">ಕನ್ನಡ</a></li>
-                    <li class="interwiki-sw"><a href="http://sw.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Kiswahili</a></li>
-                    <li class="interwiki-ku"><a href="http://ku.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Kurdî</a></li>
-                    <li class="interwiki-hu"><a href="http://hu.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Magyar</a></li>
-                    <li class="interwiki-ml"><a href="http://ml.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">മലയാളം</a></li>
-                    <li class="interwiki-pl"><a href="http://pl.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Polski</a></li>
-                    <li class="interwiki-pt"><a href="http://pt.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Português</a></li>
-                    <li class="interwiki-ro"><a href="http://ro.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Română</a></li>
-                    <li class="interwiki-ru"><a href="http://ru.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Русский</a></li>
-                    <li class="interwiki-sl"><a href="http://sl.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Slovenščina</a></li>
-                    <li class="interwiki-fi"><a href="http://fi.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Suomi</a></li>
-                    <li class="interwiki-sv"><a href="http://sv.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Svenska</a></li>
-                    <li class="interwiki-ta"><a href="http://ta.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">தமிழ்</a></li>
-                    <li class="interwiki-tr"><a href="http://tr.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Türkçe</a></li>
-                    <li class="interwiki-vi"><a href="http://vi.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Tiếng Việt</a></li>
-                    <li class="interwiki-zh"><a href="http://zh.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">中文</a></li>
-*/ %>
-                </ul>
-    </div>
-</div>
-        <% } %>
-
 <!-- /LANGUAGES -->
 <!-- RENDERER -->
 <div class="portal expanded" id="p-renderer">
@@ -398,18 +303,6 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
         <!-- /panel -->
         <!-- footer -->
         <div id="footer">
-                <ul id="footer-info">
-        <% if (!pageBean.isNotAvailable()) {
-          DateFormat dfm = new SimpleDateFormat("d MMMMM yyyy', at 'HH:mm");
-          dfm.setTimeZone(TimeZone.getTimeZone("GMT")); // time presented by Wikipedia is UTC/GMT, not the local time of the user viewing the page
-          %>
-                    <li id="footer-info-lastmod"> This page was last modified on <%= dfm.format(pageBean.getDate().getTime()) %>.</li>
-                    <li id="footer-info-copyright">
-                        Text is available under the <a href="http://creativecommons.org/licenses/by-sa/3.0/">Creative Commons Attribution/Share-Alike License</a>;
-                        additional terms may apply.
-                        See <a href="wiki?title=Terms of Use">Terms of Use</a> for details.</li>
-        <% } %>
-                </ul>
                 <ul id="footer-places">
                     <li id="footer-places-privacy"><a href="wiki?title=Wiktionary:Privacy policy" title="Privacy policy">Privacy policy</a></li>
                     <li id="footer-places-about"><a href="wiki?title=Wiktionary:About" title="Wiktionary:About">About Wiktionary</a></li>
