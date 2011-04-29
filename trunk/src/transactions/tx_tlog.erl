@@ -27,14 +27,14 @@
 -export([add_entry/2]).
 -export([filter_by_key/2]).
 -export([filter_by_status/2]).
+-export([is_sane_for_commit/1]).
 %%-export([update_entry/4]).
 
 %% Operations on entries of TransLogs
 -export([new_entry/5]).
 -export([get_entry_operation/1]).
--export([get_entry_key/1]).
--export([set_entry_key/2]).
--export([get_entry_status/1]).
+-export([get_entry_key/1,    set_entry_key/2]).
+-export([get_entry_status/1, set_entry_status/2]).
 -export([get_entry_value/1]).
 -export([get_entry_version/1]).
 
@@ -75,6 +75,19 @@ filter_by_key(TransLog, Key) ->
 filter_by_status(TransLog, Status) ->
     [ X || X <- TransLog, Status =:= get_entry_status(X) ].
 
+-spec is_sane_for_commit(tlog()) -> boolean().
+is_sane_for_commit(TLog) ->
+    EntrySane =
+        fun(Entry, Acc) ->
+                Acc andalso
+                    {fail, timeout} =/= get_entry_status(Entry) andalso
+                    case get_entry_operation(Entry) of
+                        rdht_tx_read -> not_found =/= get_entry_status(Entry);
+                        _ -> true
+                    end
+        end,
+    lists:foldl(EntrySane, true, TLog).
+
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
 new_entry(Op, Key, Status, Val, Vers) ->
@@ -91,6 +104,9 @@ set_entry_key(Entry, Val)    -> setelement(2, Entry, Val).
 
 -spec get_entry_status(tlog_entry()) -> tx_status().
 get_entry_status(Element)    -> element(3, Element).
+
+-spec set_entry_status(tlog_entry(), tx_status) -> tlog_entry().
+set_entry_status(Element, Val)    -> setelement(3, Element, Val).
 
 -spec get_entry_value(tlog_entry()) -> any().
 get_entry_value(Element)     -> element(4, Element).

@@ -125,6 +125,7 @@ get_and_init_key() ->
     case get_and_init_key(Key, _Retries = 10) of
         fail ->
             io:format("geT_and_init_key choosing new key and retrying~n"),
+            timer:sleep(1000 * randoms:rand_uniform(1, 10)),
             get_and_init_key();
         Key -> Key
     end.
@@ -139,5 +140,6 @@ get_and_init_key(Key, Count) ->
             get_and_init_key(Key, Count - 1);
         {fail, timeout} ->
             io:format("geT_and_init_key 2 timeout, retrying~n", []),
+            timer:sleep(1000 * randoms:rand_uniform(1, 10-Count)),
             get_and_init_key(Key, Count - 1)
     end.

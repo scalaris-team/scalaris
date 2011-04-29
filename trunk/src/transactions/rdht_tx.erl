@@ -248,28 +248,32 @@ commit(TLog) ->
     %% number of retries, etc?
     %% some parameters are checked via the individual operations
     %% rdht_tx_read, rdht_tx_write which implement the behaviour tx_op_beh.
-    Client = comm:this(),
-    ClientsId = {commit_client_id, util:get_global_uid()},
-    ?TRACE("rdht_tx:commit(Client ~p, ~p, TLog ~p)~n", [Client, ClientsId, TLog]),
-    case pid_groups:find_a(tx_tm) of
-        failed ->
-            Msg = io_lib:format("No tx_tm found.~n", []),
-            tx_tm_rtm:msg_commit_reply(Client, ClientsId, {fail, Msg});
-        TM ->
-            tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
-    end,
-    msg_delay:send_local_as_client(config:read(tx_timeout) div 1000,
-                         self(), {tx_timeout, ClientsId}),
-    _Result =
-        receive
-            {tx_tm_rtm_commit_reply, ClientsId, commit} ->
-                {ok}; %% commit / abort;
-            {tx_tm_rtm_commit_reply, ClientsId, abort} ->
-                {fail, abort}; %% commit / abort;
-            {tx_timeout, ClientsId} ->
-                log:log(error, "No result for commit received!"),
-                {fail, timeout}
-        end.
+    case tx_tlog:is_sane_for_commit(TLog) of
+        false -> {fail, abort};
+        true ->
+            Client = comm:this(),
+            ClientsId = {commit_client_id, util:get_global_uid()},
+            ?TRACE("rdht_tx:commit(Client ~p, ~p, TLog ~p)~n", [Client, ClientsId, TLog]),
+            case pid_groups:find_a(tx_tm) of
+                failed ->
+                    Msg = io_lib:format("No tx_tm found.~n", []),
+                    tx_tm_rtm:msg_commit_reply(Client, ClientsId, {fail, Msg});
+                TM ->
+                    tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
+            end,
+            msg_delay:send_local_as_client(config:read(tx_timeout) div 1000,
+                                           self(), {tx_timeout, ClientsId}),
+            _Result =
+                receive
+                    {tx_tm_rtm_commit_reply, ClientsId, commit} ->
+                        {ok}; %% commit / abort;
+                    {tx_tm_rtm_commit_reply, ClientsId, abort} ->
+                        {fail, abort}; %% commit / abort;
+                    {tx_timeout, ClientsId} ->
+                        log:log(error, "No result for commit received!"),
+                        {fail, timeout}
+                end
+    end.
 
 -spec receive_answer() -> {tx_tlog:tx_op(), req_id(),
                            tx_tlog:tlog_entry(), result_entry()}.

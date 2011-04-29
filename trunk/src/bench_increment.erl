@@ -49,9 +49,17 @@ process_iter(Parent, Key, Count, AbortCount) ->
     Result = inc(Key),
     case Result of
         {ok}              -> process_iter(Parent, Key, Count - 1, AbortCount);
-        {fail, abort}     -> process_iter(Parent, Key, Count, AbortCount + 1);
-        {fail, timeout}   -> process_iter(Parent, Key, Count, AbortCount + 1);
-        {fail, not_found} -> process_iter(Parent, Key, Count, AbortCount + 1);
+        {fail, abort}     ->
+            timer:sleep(10 * randoms:rand_uniform(1, AbortCount + 1)),
+            process_iter(Parent, Key, Count, AbortCount + 1);
+        {fail, timeout}   ->
+            %% overloaded system?
+            timer:sleep(100 * randoms:rand_uniform(1, (AbortCount + 1)
+                                                   * (AbortCount +1))),
+            process_iter(Parent, Key, Count, AbortCount + 1);
+        {fail, not_found} ->
+            timer:sleep(10 * randoms:rand_uniform(1, AbortCount + 1)),
+            process_iter(Parent, Key, Count, AbortCount + 1);
         X -> log:log(warn, "~p", [X])
     end.
 
