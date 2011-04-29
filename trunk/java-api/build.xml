@@ -27,10 +27,6 @@
   <property name="opterlang.version" value="1.5.4" />
   <!-- version of the jakarta-commons-cli jar file to bundle and compile against (jakarta-commons-cli-<version>.jar) -->
   <property name="jakarta.commons.cli.version" value="1.2" />
-  <!-- version of the jetty jar file to bundle and compile the tests against (jetty-<version>.jar, jetty-util-<version>.jar) -->
-  <property name="jetty.version" value="7.3.0.v20110203" />
-  <!-- version of the servlet api jar file to bundle and compile the tests against (servlet-api-<version>.jar) -->
-  <property name="jetty.servletapi.version" value="2.5" />
   <!-- version of the junit jar file to bundle and compile the tests against (junit-<version>.jar) -->
   <property name="junit.version" value="4.8.2" />
   <!-- ########## Build configuration (end) ########## -->
@@ -157,12 +153,10 @@
     <path refid="scalaris.classpath" />
     <pathelement path="${scalaris.classes.dirname}" />
     <pathelement path="test-lib/junit-${junit.version}.jar" />
-    <pathelement path="test-lib/jetty-continuation-${jetty.version}.jar" />
-    <pathelement path="test-lib/jetty-http-${jetty.version}.jar" />
-    <pathelement path="test-lib/jetty-io-${jetty.version}.jar" />
-    <pathelement path="test-lib/jetty-server-${jetty.version}.jar" />
-    <pathelement path="test-lib/jetty-util-${jetty.version}.jar" />
-    <pathelement path="test-lib/servlet-api-${jetty.servletapi.version}.jar" />
+    <path>
+      <fileset dir="test-lib" includes="jetty-*.jar"/>
+      <fileset dir="test-lib" includes="servlet-api-*.jar"/>
+    </path>
   </path>
 
   <!-- ########## Public targets (begin) ########## -->
