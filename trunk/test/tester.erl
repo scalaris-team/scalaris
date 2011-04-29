@@ -68,7 +68,7 @@ test_with_scheduler(Modules, F, Options) ->
     test_with_scheduler(Modules, F, Options, 1).
 
 -spec test_with_scheduler(list(module()), fun(), list(), number()) -> any().
-test_with_scheduler(Modules, F, Options, Repititions) ->
+test_with_scheduler(Modules, F, Options, Repetitions) ->
     _InstrumentRes = [tester_scheduler:instrument_module(Module) || Module <- Modules],
     Processes = unittest_helper:get_processes(),
     Res = repeat(fun () ->
@@ -79,15 +79,15 @@ test_with_scheduler(Modules, F, Options, Repititions) ->
                          (catch exit(Pid)),
                          (catch unregister(usscheduler)),
                          Res
-                 end, Repititions),
+                 end, Repetitions),
     _DeleteRes = [code:delete(Module) || Module <- Modules],
     Res.
 
 repeat(F, 1) ->
     F();
-repeat(F, Repititions) ->
+repeat(F, Repetitions) ->
     _Res = F(),
-    repeat(F, Repititions - 1).
+    repeat(F, Repetitions - 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
