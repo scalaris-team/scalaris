@@ -106,8 +106,6 @@
       </systemProperties>
       <!-- scan every 5 seconds for changes in class files, then re-deploy -->
       <webApp name="${ant.project.name} - simplewiki" warfile="simplewiki" contextpath="/simplewiki" scanIntervalSeconds="5"/>
-      <!--<webApp name="JAMWiki" warfile="contrib/jamwiki-1.0.2.war" contextpath="/" scanIntervalSeconds="5"/>-->
-      <!--<webApp name="JAMWiki" warfile="JAMWiki" contextpath="/jamwiki" scanIntervalSeconds="5"/>-->
     </jetty>
   </target>
 

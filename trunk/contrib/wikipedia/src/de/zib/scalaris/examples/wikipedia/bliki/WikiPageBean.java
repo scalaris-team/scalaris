@@ -15,6 +15,8 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import info.bliki.wiki.namespaces.Namespace;
+
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashSet;
@@ -62,6 +64,7 @@ public class WikiPageBean {
     private String wikiTitle = "Wikipedia";
     private String wikiLang = "en";
     private String wikiLangDir = "ltr";
+    private Namespace wikiNamespace = new Namespace();
     
     private List<ShortRevision> revisions = new LinkedList<ShortRevision>();
     
@@ -309,5 +312,19 @@ public class WikiPageBean {
      */
     public void setEditRestricted(boolean isEditRestricted) {
         this.isEditRestricted = isEditRestricted;
+    }
+
+    /**
+     * @return the wikiTalkNamespace
+     */
+    public Namespace getWikiNamespace() {
+        return wikiNamespace;
+    }
+
+    /**
+     * @param wikiNamespace the wikiTalkNamespace to set
+     */
+    public void setWikiNamespace(Namespace wikiNamespace) {
+        this.wikiNamespace = wikiNamespace;
     }
 }

@@ -204,7 +204,7 @@ ${ pageBean.preview }
     <h5>Namespaces</h5>
     <ul>
                     <li id="ca-nstab-main" class="selected"><span><a href="wiki?title=${ pageBean.title }" title="View the content page [c]" accesskey="c">Page</a></span></li>
-                    <li id="ca-talk"><span><a href="wiki?title=Diskussion:${ pageBean.title }" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
+                    <li id="ca-talk"><span><a href="wiki?title=<%= pageBean.getWikiNamespace().getTalk() %>:${ pageBean.title }" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
     </ul>
 </div>
 

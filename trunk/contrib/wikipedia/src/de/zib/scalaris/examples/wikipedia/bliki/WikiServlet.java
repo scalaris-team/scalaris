@@ -314,9 +314,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         // need special handling the wiki renderer is used)
         WikiPageBean value = new WikiPageBean();
         value.setNotice(notice);
-        MyWikiModel wikiModel = new MyWikiModel(
-                WikiServlet.imageBaseURL,
-                WikiServlet.linkBaseURL, connection, namespace);
+        MyWikiModel wikiModel = getWikiModel();
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
             wikiModel.setLinkBaseFullURL(fullUrl);
@@ -370,6 +368,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         value.setTitle(title);
         value.setVersion(revision.getId());
         value.setWikiTitle(siteinfo.getSitename());
+        value.setWikiNamespace(namespace);
 
         // extract the date:
         value.setDate(Revision.stringToCalendar(revision.getTimestamp()));
@@ -411,6 +410,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
         value.setVersion(-1);
         value.setNotAvailable(true);
         value.setNotice(WikiServlet.getParam_notice(request));
+        value.setWikiTitle(siteinfo.getSitename());
+        value.setWikiNamespace(namespace);
 
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", value);
@@ -453,6 +454,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
             if (!result.revisions.isEmpty()) { 
                 value.setVersion(result.revisions.get(0).getId());
             }
+            value.setWikiTitle(siteinfo.getSitename());
+            value.setWikiNamespace(namespace);
             
             // forward the request and the bean to the jsp:
             request.setAttribute("pageBean", value);
@@ -530,6 +533,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
         // set the textarea's contents:
         value.setNotice(WikiServlet.getParam_notice(request));
         value.setTitle(title);
+        value.setWikiTitle(siteinfo.getSitename());
+        value.setWikiNamespace(namespace);
 
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", value);
@@ -589,9 +594,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         // set the textarea's contents:
         value.setPage(StringEscapeUtils.escapeHtml(content));
 
-        MyWikiModel wikiModel = new MyWikiModel(
-                WikiServlet.imageBaseURL,
-                WikiServlet.linkBaseURL, connection, namespace);
+        MyWikiModel wikiModel = getWikiModel();
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
             wikiModel.setLinkBaseFullURL(fullUrl);
@@ -601,12 +604,19 @@ public class WikiServlet extends HttpServlet implements Servlet {
         value.setVersion(oldVersion);
         value.setTitle(title);
         value.setSummary(request.getParameter("wpSummary"));
+        value.setWikiTitle(siteinfo.getSitename());
+        value.setWikiNamespace(namespace);
 
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", value);
         RequestDispatcher dispatcher = request
                 .getRequestDispatcher("pageEdit.jsp");
         dispatcher.forward(request, response);
+    }
+    
+    private MyWikiModel getWikiModel() {
+        return new MyWikiModel(WikiServlet.imageBaseURL,
+                WikiServlet.linkBaseURL, connection, namespace);
     }
 
     /**
