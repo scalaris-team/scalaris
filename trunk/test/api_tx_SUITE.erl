@@ -90,7 +90,8 @@ req_list_2(_Config) ->
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{read, "non-existing"}, {commit}]),
                     {_TLog, [_ReadRes = {fail, not_found},
-                             _CommitRes = {fail, abort}]}),
+                             %% allow test for existance of a key to be ok
+                             _CommitRes = {ok}]}),
     %% read non-existing item and write to that item afterwards
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{read, "non-existing1"},
@@ -143,7 +144,8 @@ req_list_2(_Config) ->
     ?equals_pattern(api_tx:req_list(NonExistReadTLog2,
                                     [{read, "non-existing"}, {commit}]),
                     {_TLog, [_ReadRes = {fail, not_found},
-                             _CommitRes = {fail, abort}]}),
+                             %% allow test for existance of a key to be ok
+                             _CommitRes = {ok}]}),
     ok.
 
 read_2(_Config) ->
@@ -198,7 +200,8 @@ commit_1(_Config) ->
 
     %% commit a non-existing tlog
     {NonExistReadTLog, _} = api_tx:read(EmptyTLog, "non-existing"),
-    ?equals(api_tx:commit(NonExistReadTLog), {fail, abort}),
+    %% allow test for existance of a key to be ok
+    ?equals(api_tx:commit(NonExistReadTLog), {ok}),
 
     ok.
 
@@ -271,8 +274,11 @@ conflicting_tx2(_Config) ->
     {TLog1a, [ReadRes1a]} =
         api_tx:req_list([{read, "conflicting_tx2_non-existing"}]),
     ?equals(ReadRes1a, {fail, not_found}),
+    ?equals(api_tx:commit(TLog1a), {ok}),
 
     _ = api_tx:write("conflicting_tx2_non-existing", "Value"),
+    %% verify not_found of tlog in commit phase? key now exists!
+    ?equals(api_tx:commit(TLog1a), {fail, abort}),
 
     ?equals_pattern(api_tx:req_list(TLog1a,
                                     [{write, "conflicting_tx2_non-existing", "NewValue"},
@@ -280,6 +286,8 @@ conflicting_tx2(_Config) ->
                     {_TLog, [_WriteRes = {ok},
                              _CommitRes = {fail, abort}]}),
     ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
+
+
     ok.
 
 write2_read2(_Config) ->

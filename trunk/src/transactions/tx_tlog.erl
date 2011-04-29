@@ -80,11 +80,7 @@ is_sane_for_commit(TLog) ->
     EntrySane =
         fun(Entry, Acc) ->
                 Acc andalso
-                    {fail, timeout} =/= get_entry_status(Entry) andalso
-                    case get_entry_operation(Entry) of
-                        rdht_tx_read -> not_found =/= get_entry_status(Entry);
-                        _ -> true
-                    end
+                    {fail, timeout} =/= get_entry_status(Entry)
         end,
     lists:foldl(EntrySane, true, TLog).
 
