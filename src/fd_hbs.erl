@@ -65,7 +65,7 @@ init([RemotePid]) ->
     end,
     Now = erlang:now(),
     state_new(_RemoteHBS = RemoteFDPid, _RemotePids = [{RemotePid, 1}],
-              _LastPong = {0,0,0},
+              _LastPong = Now,
               _CrashedAfter = util:time_plus_ms(Now, 3 * failureDetectorInterval()),
               TableName).
 
@@ -116,11 +116,13 @@ on({pong, _Subscriber}, State) ->
     ?TRACEPONG("Pinger pong for ~p~n", [_Subscriber]),
     Now = erlang:now(),
     LastPong = state_get_last_pong(State),
-%    CrashedAfter = state_get_crashed_after(State),
+    CrashedAfter = state_get_crashed_after(State),
     Delay = abs(timer:now_diff(Now, LastPong)),
     S1 = state_set_last_pong(State, Now),
-    NewCrashedAfter = util:time_plus_us(Now, 3 * Delay),
-%    state_set_crashed_after(S1, erlang:max(NewCrashedAfter, CrashedAfter));
+    NewCrashedAfter = erlang:max(util:time_plus_us(Now, 3 * Delay),
+                                 CrashedAfter)
+    % io:format("Time for next pong: ~p s~n",
+    % [timer:now_diff(NewCrashedAfter, Now)/1000000]),
     state_set_crashed_after(S1, NewCrashedAfter);
 
 on({periodic_alive_check}, State) ->
