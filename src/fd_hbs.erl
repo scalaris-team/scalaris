@@ -120,7 +120,7 @@ on({pong, _Subscriber}, State) ->
     Delay = abs(timer:now_diff(Now, LastPong)),
     S1 = state_set_last_pong(State, Now),
     NewCrashedAfter = erlang:max(util:time_plus_us(Now, 3 * Delay),
-                                 CrashedAfter)
+                                 CrashedAfter),
     % io:format("Time for next pong: ~p s~n",
     % [timer:now_diff(NewCrashedAfter, Now)/1000000]),
     state_set_crashed_after(S1, NewCrashedAfter);
