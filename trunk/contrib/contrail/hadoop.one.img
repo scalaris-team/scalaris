@@ -1,0 +1,6 @@
+NAME	      = "Hadoop4Contrail"
+TYPE          = CDROM
+PATH          = /home/bzcmaier/HadoopLive.iso
+PUBLIC        = YES
+DEV_PREFIX    = hd
+DESCRIPTION   = "Hadoop (Contrail Edition)"
