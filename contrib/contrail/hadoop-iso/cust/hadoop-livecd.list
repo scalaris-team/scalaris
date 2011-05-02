@@ -1,0 +1,15 @@
+hadoop-0.20-conf-pseudo 
+hadoop-0.20 
+hadoop-0.20-namenode 
+hadoop-0.20-datanode 
+hadoop-0.20-secondarynamenode 
+hadoop-0.20-jobtracker 
+hadoop-0.20-tasktracker 
+sun-java6-jre 
+sun-java6-bin 
+hue-common 
+hue-filebrowser 
+hue-jobbrowser 
+hue-jobsub 
+hue-plugins 
+openssh-server 
