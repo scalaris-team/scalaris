@@ -14,19 +14,18 @@
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Less hashing, same performance hash function set container
+%%
+%%         Implementation of a hash function set proposed in 
+%%         2006 by A. Kirsch, M. Mitzenmacher - 
+%%         "Less Hashing, Same Perofrmance: Building a Better Bloom Filter 
+%%         Build k Hash functions of the form g_i(x) = h_1(X) + i * h_2(X)
+%%  
+%%         Used MD5 Hash-Function like in 
+%%         2000 - L.Fan, P. Cao., JA, ZB : "Summary Cache: A Scalable Wide-Area Web Cache Sharing Protocol" (Counting Bloom Filters Paper)
 %% @end
 %% @version $Id$
 
 -module(hfs_lhsp_md5).
-
-% @doc Implementation of a hash function set proposed in 
-%		2006 by A. Kirsch, M. Mitzenmacher - 
-%		"Less Hashing, Same Perofrmance: Building a Better Bloom Filter 
-%		Build k Hash functions of the form g_i(x) = h_1(X) + i * h_2(X)
-%
-%		Used MD5 Hash-Function like in 
-%		2000 - L.Fan, P. Cao., JA, ZB : "Summary Cache: A Scalable Wide-Area Web Cache Sharing Protocol" (Counting Bloom Filters Paper)
-%
 
 % types
 -behaviour(hfs_beh).
