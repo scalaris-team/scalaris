@@ -17,7 +17,7 @@
 %%
 %%         Implementation of a hash function set proposed in 
 %%         2006 by A. Kirsch, M. Mitzenmacher - 
-%%         "Less Hashing, Same Perofrmance: Building a Better Bloom Filter 
+%%         "Less Hashing, Same Performance: Building a Better Bloom Filter 
 %%         Build k Hash functions of the form g_i(x) = h_1(X) + i * h_2(X)
 %%  
 %%         Used MD5 Hash-Function like in 
