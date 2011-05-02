@@ -1,6 +1,7 @@
 <html>
 <head>
 <title>Opennebula</title>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
 </head>
 <body>
 
@@ -9,30 +10,69 @@
 <%= @host_pool.info %>
 
 <h2>Opennebula Images</h>
-<ul>
+<table>
+<tr>
+  <th>Id</th>
+  <th>Name</th>
+  <th>State</th>
+</tr>
 <% @image_pool.each do |image| %>
-  <li><a href="/one/image/<%= image.id %>"><%= image.id %></a> </li>
+<tr>
+  <td><a href="/one/image/<%= image.id %>"><%= image.id %></a> </td>
+  <td><%= image.name %></a> </td>
+  <td><%= image.state_str %></td>
+</tr>
 <% end %>
-</ul>
+</table>
 
 <h2>Opennebula VMs</h>
-<ul>
+<table>
+<tr>
+  <th>Id</th>
+  <th>Name</th>
+  <th>Owner</th>
+  <th>State</th>
+</tr>
 <% @vm_pool.each do |vm| %>
-  <li><a href="/one/vm/<%= vm.id %>"><%= vm.name %></a> <%= vm['USERNAME'] %></li>
+<tr>
+  <td><a href="/one/vm/<%= vm.id %>"><%= vm.id %></a></td>
+  <td><%= vm.name %></td>
+  <td><%= vm['USERNAME'] %></td>
+  <td><%= vm.state_str %></td>
+</tr>
 <% end %>
-</ul>
+</table>
 
 <h2>Opennebula Hosts</h>
-<ul>
+<table>
+<tr>
+  <th>Id</th>
+  <th>Name</th>
+  <th>Cluster</th>
+</tr>
 <% @host_pool.each do |host| %>
-  <li><a href="/one/host/<%= host.id %>"><%= host.name %></a> </li>
+<tr>
+  <td><a href="/one/host/<%= host.id %>"><%= host.id %></a></td>
+  <td><%= host.name %></td>
+  <td><%= host['CLUSTER'] %></td>
+</tr>
 <% end %>
+</table>
+
+<ul>
 </ul>
 
 <h2>Opennebula VNets</h>
-<ul>
+<table>
+<tr>
+  <th>Id</th>
+  <th>Name</th>
+</tr>
 <% @vnet_pool.each do |vnet| %>
-  <li><a href="/one/vnet/<%= vnet.id %>"><%= vnet.name %></a> </li>
+<tr>
+  <td><a href="/one/vnet/<%= vnet.id %>"><%= vnet.id %></a> </td>
+  <td><%= vnet.name %></td>
+</tr>
 <% end %>
 </ul>
 

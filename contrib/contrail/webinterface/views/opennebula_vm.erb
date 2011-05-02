@@ -1,12 +1,13 @@
 <html>
 <head>
 <title>Opennebula VM</title>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
 </head>
 <body>
 
 <h2>Opennebula VM</h2>
 
-<table>
+<table class="zebra">
 <tr>
 <th></th>
 <th></th>
@@ -37,7 +38,7 @@
 </tr>
 </table>
 
-<%= @vm.to_json %>
+<%= @vm.to_xml %>
 
 </body>
 </html>

@@ -1,8 +1,10 @@
+require 'erb'
+
 require 'one.rb'
 
 class ScalarisHelper
   def self.create
-    description = File.read("scalaris.one.vm")
+    description = get_description(SCALARISIMAGE, "true")
     puts description
 
     client = Client.new(CREDENTIALS, ENDPOINT)
@@ -12,5 +14,12 @@ class ScalarisHelper
     rescue Exception => e
       [false, e.message]
     end
+  end
+
+  def self.get_description(image=SCALARISIMAGE, scalarisfirst="true")
+    @image = image
+    @scalarisfirst = scalarisfirst
+    erb = ERB.new(File.read("scalaris.one.vm.erb"))
+    erb.result binding
   end
 end

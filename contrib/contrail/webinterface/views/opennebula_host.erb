@@ -1,12 +1,12 @@
 <html>
 <head>
 <title>Opennebula Host</title>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
 </head>
 <body>
 
 <h2>Opennebula Host</h2>
 
-<%= @host.to_xml %>
 <table>
 <tr>
 <th></th>
@@ -45,6 +45,8 @@
   <td><%= @host['HOST'] %></td>
 </tr>
 </table>
+
+<%= @host.to_xml %>
 
 </body>
 </html>
