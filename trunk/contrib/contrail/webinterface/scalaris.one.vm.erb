@@ -15,7 +15,7 @@ OS = [
 # --- 3 disks ---
 
 DISK = [
-  image     = "Scalaris4Contrail",
+  image     = "<%= @image %>",
   target    = "hdc"
 ]
 
@@ -31,7 +31,7 @@ NIC = [ network = "Private LAN" ]
 # --- Contextualization ---
 
 CONTEXT = [
-  SCALARIS_FIRST="true",
+  SCALARIS_FIRST="<%= @scalarisfirst %>",
   ip_private = "$NIC[IP]",
   dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
   ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",
