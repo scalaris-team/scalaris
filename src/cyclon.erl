@@ -62,7 +62,6 @@
 -type(message() ::
     {cy_shuffle} |
     {rm_changed, NewNode::node:node_type()} |
-    {check_state} |
     {cy_subset, SourcePid::comm:mypid(), PSubset::cyclon_cache:cache()} |
     {cy_subset_response, QSubset::cyclon_cache:cache(), PSubset::cyclon_cache:cache()} |
     {get_node_details_response, node_details:node_details()} |
@@ -165,7 +164,6 @@ on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState, MonitorT
     rm_loop:subscribe(self(), cyclon, fun erlang:'=/='/2,
                       fun cyclon:rm_send_changes/4, inf),
     request_node_details([node, pred, succ]),
-    comm:send_local_after(100, self(), {check_state}),
     TriggerState2 = trigger:now(TriggerState),
     msg_queue:send(QueuedMessages),
     comm:send_local_after(monitor:proc_get_report_interval() * 1000, self(),
@@ -215,10 +213,6 @@ on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState, MonitorTable} = Stat
 
 on_active({rm_changed, NewNode}, {Cache, _OldNode, Cycles, TriggerState, MonitorTable}) ->
     {Cache, NewNode, Cycles, TriggerState, MonitorTable};
-
-on_active({check_state}, State) ->
-    check_state(State),
-    State;
 
 on_active({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState, MonitorTable}) ->
     %io:format("subset~n", []),
@@ -327,7 +321,6 @@ check_state({Cache, Node, _Cycles, _TriggerState, _MonitorTable} = _State) ->
     if 
         length(NeedsInfo) > 0 ->
             request_node_details(NeedsInfo),
-            comm:send_local_after(1000, self(), {check_state}),
             fail;
         true ->
             ok
