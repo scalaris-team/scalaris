@@ -23,12 +23,11 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageListResult;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RevisionResult;
 
 /**
  * Wiki model using Scalaris to fetch (new) data, e.g. templates.
@@ -117,12 +116,7 @@ public class MyWikiModel extends WikiModel {
                     } else {
 //                        System.err.println(getRevResult.message);
 //                        return "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
-                        StringBuffer parStr = new StringBuffer();
-                        for (Entry<String, String> par : templateParameters.entrySet()) {
-                            parStr.append(" | " + par.getKey() + " = " + par.getValue());
-                        }
-                        // {{payoff matrix | UL = 5 | UR = 7 | DL = 2 | DR = 9 | Name = Example usage }}
-                        return "{{" + articleName + parStr.toString() + " }}";
+                        return null;
                     }
                 }
             }
