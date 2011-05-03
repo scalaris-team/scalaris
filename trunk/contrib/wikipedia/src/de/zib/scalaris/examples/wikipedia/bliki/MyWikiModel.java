@@ -21,7 +21,9 @@ import info.bliki.wiki.namespaces.INamespace;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.text.NumberFormat;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import de.zib.scalaris.Connection;
@@ -67,6 +69,17 @@ public class MyWikiModel extends WikiModel {
         this.connection = connection;
         this.fExternalWikiBaseFullURL = linkBaseURL;
     }
+    
+    private String formatStatisticNumber(String magicWord, int number) {
+        if (magicWord.endsWith(":R") || magicWord.endsWith("|R")) {
+            return String.valueOf(number);
+        } else {
+            // TODO: use locale from Wiki
+            NumberFormat nf = NumberFormat.getIntegerInstance(Locale.ENGLISH);
+            nf.setGroupingUsed(true);
+            return nf.format(number);
+        }
+    }
 
     /* (non-Javadoc)
      * @see info.bliki.wiki.model.AbstractWikiModel#getRawWikiContent(java.lang.String, java.lang.String, java.util.Map)
@@ -77,19 +90,105 @@ public class MyWikiModel extends WikiModel {
         String result = super.getRawWikiContent(namespace, articleName, templateParameters);
         if (result != null) {
             // found magic word template
+            // http://www.mediawiki.org/wiki/Help:Magic_words
             if (magicWordCache.containsKey(result)) {
                 return magicWordCache.get(result);
             }
-            if (result.equals("NUMBEROFARTICLES")) {
+            // TODO: distinguish articles and pages correctly - see http://www.mediawiki.org/wiki/Manual:Using_custom_namespaces#Content_namespaces
+            if (result.startsWith("NUMBEROFARTICLES") || result.startsWith("NUMBEROFPAGES")) {
                 PageListResult pageCountResult = ScalarisDataHandler.getPageList(connection);
                 if (pageCountResult.success) {
-                    String pageCount = String.valueOf(pageCountResult.pages.size());
+                    String pageCount = formatStatisticNumber(result, pageCountResult.pages.size());
                     magicWordCache.put(result, pageCount);
                     return pageCount;
                 } else {
                     return result;
                 }
+            } else if (result.startsWith("NUMBEROFFILES")) {
+                // we currently do not store files:
+                String fileCount = formatStatisticNumber(result, 0);
+                magicWordCache.put(result, fileCount);
+                return fileCount;
+            } else if (result.startsWith("NUMBEROFUSERS") ||
+                    result.startsWith("NUMBEROFADMINS")) {
+                // we currently do not support users:
+                String userCount = formatStatisticNumber(result, 0);
+                magicWordCache.put(result, userCount);
+                return userCount;
+            // namespaces:
+            } else if (result.equals("NAMESPACE")) {
+                String pageNamespace = WikiServlet.getNamespace(getPageName());
+                magicWordCache.put(result, pageNamespace);
+                return pageNamespace;
+            } else if (result.equals("TALKSPACE") || result.equals("TALKSPACEE")) {
+                String talkNamespace = getNamespace().getTalkspace(WikiServlet.getNamespace(getPageName()));
+                magicWordCache.put(result, talkNamespace);
+                return talkNamespace;
+//            } else if (result.equals("SUBJECTSPACE") || result.equals("SUBJECTSPACEE")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("ARTICLESPACE") || result.equals("ARTICLESPACEE")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("CURRENTVERSION")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("PAGESINNAMESPACE")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("SUBPAGENAME") || result.equals("SUBPAGENAMEE")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("BASEPAGENAME") || result.equals("BASEPAGENAMEE")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("SUBJECTPAGENAME") || result.equals("SUBJECTPAGENAMEE")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("ARTICLEPAGENAME") || result.equals("ARTICLEPAGENAMEE")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("REVISIONID")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("REVISIONDAY")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("REVISIONDAY2")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("REVISIONMONTH")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("REVISIONYEAR")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("REVISIONTIMESTAMP")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("SITENAME")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("SERVER")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("SCRIPTPATH")) {
+//                // TODO: implement
+//                return null;
+//            } else if (result.equals("SERVERNAME")) {
+//                // TODO: implement
+//                return null;
+            // some MediaWiki-encoded URLs:
+            } else if (result.equals("PAGENAMEE")) {
+                return "{{PAGENAME}}";
+            } else if (result.equals("NAMESPACEE")) {
+                return "{{NAMESPACE}}";
+            } else if (result.equals("FULLPAGENAMEE")) {
+                return "{{FULLPAGENAME}}";
+            } else if (result.equals("TALKPAGENAMEE")) {
+                return "{{TALKPAGENAME}}";
             }
+            
             return result;
         }
         if (getRedirectLink() != null) {

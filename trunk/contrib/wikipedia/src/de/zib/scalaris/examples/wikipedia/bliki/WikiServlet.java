@@ -657,6 +657,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         value.setPage(StringEscapeUtils.escapeHtml(content));
 
         MyWikiModel wikiModel = getWikiModel();
+        wikiModel.setPageName(title);
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
             wikiModel.setLinkBaseFullURL(fullUrl);
@@ -688,6 +689,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
      *            a (raw) page title including namespace (if present)
      * 
      * @return the title part of the page title
+     * 
+     * @see WikiServlet#getNamespace(String)
      */
     public static String getTitleName(String title) {
         int colonIndex = title.indexOf(':');
@@ -705,6 +708,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
      * 
      * @return the namespace part of the title or an empty string if no
      *         namespace
+     * 
+     * @see #getTitleName(String)
      */
     public static String getNamespace(String title) {
         int colonIndex = title.indexOf(':');
