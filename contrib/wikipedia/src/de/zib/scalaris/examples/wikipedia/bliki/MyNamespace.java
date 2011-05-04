@@ -19,6 +19,7 @@ import info.bliki.Messages;
 import info.bliki.wiki.namespaces.Namespace;
 
 import java.util.ListResourceBundle;
+import java.util.Map.Entry;
 
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 
@@ -28,6 +29,8 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * @author Nico Kruber, kruber@zib.de
  */
 public class MyNamespace extends Namespace {
+    private SiteInfo siteinfo;
+    
     /**
      * Resource bundle derived from a given {@link SiteInfo} object.
      * 
@@ -116,6 +119,7 @@ public class MyNamespace extends Namespace {
      */
     public MyNamespace(SiteInfo siteinfo) {
         super(new MyResourceBundle(siteinfo));
+        this.siteinfo = siteinfo;
         initializeTalkNamespaces();
     }
 
@@ -142,5 +146,30 @@ public class MyNamespace extends Namespace {
         TALKSPACE_MAP.put(fNamespacesLowercase[15], getHelp_talk()); // help_talk
         TALKSPACE_MAP.put(fNamespacesLowercase[16], getCategory_talk()); // category
         TALKSPACE_MAP.put(fNamespacesLowercase[17], getCategory_talk()); // category_talk
+    }
+
+    /**
+     * Gets the subject/content namespace for a given namespace.
+     * 
+     * @param talkNamespace the namespace, potentially a talkspace
+     * 
+     * @return the subject/content namespace or <tt>null</tt>
+     */
+    public String getSubjectspace(String talkNamespace) {
+        for (Entry<String, String> entry: TALKSPACE_MAP.entrySet() ) {
+            if (entry.getValue().equals(talkNamespace)) {
+                return NAMESPACE_MAP.get(entry.getKey());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Gets the siteinfo object used for this namespace.
+     * 
+     * @return the siteinfo
+     */
+    public SiteInfo getSiteinfo() {
+        return siteinfo;
     }
 }

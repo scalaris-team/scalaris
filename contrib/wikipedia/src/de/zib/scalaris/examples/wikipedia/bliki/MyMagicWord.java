@@ -19,6 +19,7 @@ import info.bliki.wiki.filter.MagicWord;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 
@@ -43,6 +44,8 @@ public class MyMagicWord extends MagicWord {
     private static final String MAGIC_NUMBER_USERS = "NUMBEROFUSERS";
 
     private static final String MAGIC_NUMBER_ADMINS = "NUMBEROFADMINS";
+
+    private static final String MAGIC_PAGES_IN_NS = "PAGESINNS";
 
     private static final String MAGIC_PAGES_IN_NAMESPACE = "PAGESINNAMESPACE";
 
@@ -123,6 +126,7 @@ public class MyMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_FILES);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_USERS);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_ADMINS);
+        MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_NS);
         MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_NAMESPACE);
         // page values
         MY_MAGIC_WORDS.add(MAGIC_PAGE_NAME_E);
@@ -139,6 +143,7 @@ public class MyMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_SUBJECT_SPACE_E);
         MY_MAGIC_WORDS.add(MAGIC_ARTICLE_SPACE);
         MY_MAGIC_WORDS.add(MAGIC_ARTICLE_SPACE_E);
+        MY_MAGIC_WORDS.add(MAGIC_TALK_PAGE_NAME);
         MY_MAGIC_WORDS.add(MAGIC_TALK_PAGE_NAME_E);
         MY_MAGIC_WORDS.add(MAGIC_SUBJECT_PAGE_NAME);
         MY_MAGIC_WORDS.add(MAGIC_SUBJECT_PAGE_NAME_E);
@@ -201,37 +206,32 @@ public class MyMagicWord extends MagicWord {
             parameter = parameter.substring(0, parameter.length() - 2);
             rawNumber = true;
         }
-
-        // TODO: distinguish articles and pages correctly - see http://www.mediawiki.org/wiki/Manual:Using_custom_namespaces#Content_namespaces
-        if (name.equals(MAGIC_NUMBER_ARTICLES) || name.equals(MAGIC_NUMBER_PAGES)) {
-            PageListResult pageCountResult = ScalarisDataHandler.getPageList(model.connection);
-            if (pageCountResult.success) {
-                return formatStatisticNumber(rawNumber, pageCountResult.pages.size());
-            }
-        } else if (name.equals(MAGIC_NUMBER_FILES)) {
-            // we currently do not store files:
-            return formatStatisticNumber(rawNumber, 0);
-        } else if (name.equals(MAGIC_NUMBER_USERS) || name.equals(MAGIC_NUMBER_ADMINS)) {
-            // we currently do not support users:
-            return formatStatisticNumber(rawNumber, 0);
+        
+        /*
+         * Technical metadata / site
+         */
+        if (name.equals(MAGIC_SITE_NAME)) {
+            return model.getNamespace().getSiteinfo().getSitename();
+//        } else if (name.equals(MAGIC_SERVER)) {
+//            // TODO: implement
+//            return null;
+//        } else if (name.equals(MAGIC_SERVER_NAME)) {
+//            // TODO: implement
+//            return null;
+//            {{DIRMARK}}
+//            {{DIRECTIONMARK}}
+//        } else if (name.equals(MAGIC_SCRIPT_PATH)) {
+//            // TODO: implement
+//            return null;
+//            {{STYLEPATH}}
 //        } else if (name.equals(MAGIC_CURRENT_VERSION)) {
 //            // TODO: implement
 //            return null;
-//        } else if (name.equals(MAGIC_PAGES_IN_NAMESPACE)) {
-//            // TODO: implement
-//            return null;
-//        } else if (name.equals(MAGIC_SUB_PAGE_NAME) || name.equals(MAGIC_SUB_PAGE_NAME_E)) {
-//            // TODO: implement
-//            return null;
-//        } else if (name.equals(MAGIC_BASE_PAGE_NAME) || name.equals(MAGIC_BASE_PAGE_NAME_E)) {
-//            // TODO: implement
-//            return null;
-//        } else if (name.equals(MAGIC_SUBJECT_PAGE_NAME) || name.equals(MAGIC_SUBJECT_PAGE_NAME_E)) {
-//            // TODO: implement
-//            return null;
-//        } else if (name.equals(MAGIC_ARTICLE_PAGE_NAME) || name.equals(MAGIC_ARTICLE_PAGE_NAME_E)) {
-//            // TODO: implement
-//            return null;
+//            {{CONTENTLANGUAGE}}
+//            {{CONTENTLANG}}
+        /*
+         * Technical metadata / Latest revision to current page
+         */
 //        } else if (name.equals(MAGIC_REVISION_ID)) {
 //            // TODO: implement
 //            return null;
@@ -250,48 +250,132 @@ public class MyMagicWord extends MagicWord {
 //        } else if (name.equals(MAGIC_REVISION_TIMESTAMP)) {
 //            // TODO: implement
 //            return null;
-//        } else if (name.equals(MAGIC_SITE_NAME)) {
+//            {{REVISIONUSER}}
+//            {{PAGESIZE:page name}}
+//            {{PROTECTIONLEVEL:action}}
+        /*
+         * Technical metadata / Affects page content
+         */
+//            {{DISPLAYTITLE:title}}
+//            {{DEFAULTSORT:sortkey}}
+//            {{DEFAULTSORTKEY:sortkey}}
+//            {{DEFAULTCATEGORYSORT:sortkey}}
+
+        /*
+         * Statistics / Entire wiki
+         */
+            
+        } else if (name.equals(MAGIC_NUMBER_PAGES)) {
+            PageListResult pageCountResult = ScalarisDataHandler.getPageList(model.connection);
+            if (pageCountResult.success) {
+                return formatStatisticNumber(rawNumber, pageCountResult.pages.size());
+            }
+        } else if (name.equals(MAGIC_NUMBER_ARTICLES)) {
+            // simple content filter: only show pages in main namespace:
+            PageListResult pageCountResult = ScalarisDataHandler.getPageList(model.connection);
+            if (pageCountResult.success) {
+                for (Iterator<String> it = pageCountResult.pages.iterator(); it
+                        .hasNext();) {
+                    String title = it.next();
+                    if (!MyWikiModel.getNamespace(title).isEmpty()) {
+                        it.remove();
+                    }
+                }
+                return formatStatisticNumber(rawNumber, pageCountResult.pages.size());
+            }
+        } else if (name.equals(MAGIC_NUMBER_FILES)) {
+            // we currently do not store files:
+            return formatStatisticNumber(rawNumber, 0);
+//            {{NUMBEROFEDITS}}
+//            {{NUMBEROFVIEWS}}
+        } else if (name.equals(MAGIC_NUMBER_USERS) || name.equals(MAGIC_NUMBER_ADMINS)) {
+            // we currently do not support users/admins:
+            return formatStatisticNumber(rawNumber, 0);
+//            {{NUMBEROFACTIVEUSERS}}
+//            {{PAGESINCATEGORY:categoryname}}
+//            {{PAGESINCAT:categoryname}}
+//            {{NUMBERINGROUP:groupname}}
+//            {{NUMINGROUP:groupname}}
+//        } else if (name.equals(MAGIC_PAGES_IN_NAMESPACE) || name.equals(MAGIC_PAGES_IN_NS)) {
 //            // TODO: implement
 //            return null;
-//        } else if (name.equals(MAGIC_SERVER)) {
-//            // TODO: implement
-//            return null;
-//        } else if (name.equals(MAGIC_SCRIPT_PATH)) {
-//            // TODO: implement
-//            return null;
-//        } else if (name.equals(MAGIC_SERVER_NAME)) {
-//            // TODO: implement
-//            return null;
-        // some MediaWiki-encoded URLs:
+
+        /*
+         * Page names
+         */
+            
+        } else if (name.equals(MAGIC_BASE_PAGE_NAME) || name.equals(MAGIC_BASE_PAGE_NAME_E)) {
+            String pagename = getPageName(parameter, model);
+            String[] split = MyWikiModel.splitNsBaseSubPage(pagename);
+            return split[1];
+        } else if (name.equals(MAGIC_SUB_PAGE_NAME) || name.equals(MAGIC_SUB_PAGE_NAME_E)) {
+            String pagename = getPageName(parameter, model);
+            String[] split = MyWikiModel.splitNsBaseSubPage(pagename);
+            if (split[2].isEmpty()) {
+                return split[1];
+            } else {
+                return split[2];
+            }
+        } else if (name.equals(MAGIC_SUBJECT_PAGE_NAME) || name.equals(MAGIC_SUBJECT_PAGE_NAME_E) ||
+                name.equals(MAGIC_ARTICLE_PAGE_NAME) || name.equals(MAGIC_ARTICLE_PAGE_NAME_E)) {
+            String pagename = getPageName(parameter, model);
+            String[] split = MyWikiModel.splitNsTitle(pagename);
+            String subjectSpace = model.getNamespace().getSubjectspace(split[0]);
+            if (subjectSpace == null || subjectSpace.isEmpty()) {
+                subjectSpace = "";
+            } else {
+                subjectSpace += ':';
+            }
+            return subjectSpace + split[1];
+        } else if (name.equals(MAGIC_TALK_PAGE_NAME) || name.equals(MAGIC_TALK_PAGE_NAME_E)) {
+            String pagename = getPageName(parameter, model);
+            String[] split = MyWikiModel.splitNsTitle(pagename);
+            if (split[0].equals(model.getNamespace().getTalk())) {
+                return pagename;
+            } else {
+                String talkSpace = model.getNamespace().getTalkspace(split[0]);
+                if (talkSpace == null) {
+                    talkSpace = "";
+                } else {
+                    talkSpace += ':';
+                }
+                return talkSpace + split[1];
+            }
+
+        /*
+         * Namespaces
+         */
+
+        } else if (name.equals(MAGIC_NAMESPACE) || name.equals(MAGIC_NAMESPACE_E)) {
+            String pagename = getPageName(parameter, model);
+            return MyWikiModel.getNamespace(pagename);
+        } else if (name.equals(MAGIC_TALK_SPACE) || name.equals(MAGIC_TALK_SPACE_E)) {
+            String pagename = getPageName(parameter, model);
+            String pageNamespace = MyWikiModel.getNamespace(pagename);
+            String talkspace = model.getNamespace().getTalkspace(pageNamespace);
+            if (talkspace == null) {
+                return "";
+            } else {
+                return talkspace;
+            }
+        } else if (name.equals(MAGIC_SUBJECT_SPACE) || name.equals(MAGIC_SUBJECT_SPACE_E) ||
+                name.equals(MAGIC_ARTICLE_SPACE) || name.equals(MAGIC_ARTICLE_SPACE_E)) {
+            String pagename = getPageName(parameter, model);
+            String talkNamespace = MyWikiModel.getNamespace(pagename);
+            String subjectspace = model.getNamespace().getSubjectspace(talkNamespace);
+            if (subjectspace == null) {
+                return "";
+            } else {
+                return subjectspace;
+            }
+
+        // some MediaWiki-encoded URLs -> forward to MagicWord class:
         } else if (name.equals(MAGIC_PAGE_NAME_E)) {
             return MagicWord.processMagicWord(MAGIC_PAGE_NAME, parameter, model);
         } else if (name.equals(MAGIC_FULL_PAGE_NAME_E)) {
             return MagicWord.processMagicWord(MAGIC_FULL_PAGE_NAME, parameter, model);
         } else if (name.equals(MAGIC_TALK_PAGE_NAME_E)) {
             return MagicWord.processMagicWord(MAGIC_TALK_PAGE_NAME, parameter, model);
-
-            // NAMESPACES:
-
-        } else if (name.equals(MAGIC_NAMESPACE) || name.equals(MAGIC_NAMESPACE_E)) {
-            // parse page name to operate on:
-            String pagename = parameter;
-            if (pagename.isEmpty()) {
-                pagename = model.getPageName();
-            }
-            return WikiServlet.getNamespace(pagename);
-        } else if (name.equals(MAGIC_TALK_SPACE) || name.equals(MAGIC_TALK_SPACE_E)) {
-            String pagename = parameter;
-            if (pagename.isEmpty()) {
-                pagename = model.getPageName();
-            }
-            String pageNamespace = WikiServlet.getNamespace(pagename);
-            return model.getNamespace().getTalkspace(pageNamespace);
-//            } else if (name.equals(MAGIC_SUBJECT_SPACE) || name.equals(MAGIC_SUBJECT_SPACE_E)) {
-//                // TODO: implement
-//                return null;
-//            } else if (name.equals(MAGIC_ARTICLE_SPACE) || name.equals(MAGIC_ARTICLE_SPACE_E)) {
-//                // TODO: implement
-//                return null;
         }
         
         return name;
@@ -306,5 +390,14 @@ public class MyMagicWord extends MagicWord {
             nf.setGroupingUsed(true);
             return nf.format(number);
         }
+    }
+    
+    private static String getPageName(String parameter, MyWikiModel model) {
+        // parse page name to operate on:
+        String pagename = parameter;
+        if (pagename.isEmpty()) {
+            pagename = model.getPageName();
+        }
+        return pagename;
     }
 }

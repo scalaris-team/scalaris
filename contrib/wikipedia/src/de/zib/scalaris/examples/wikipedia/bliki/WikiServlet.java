@@ -331,15 +331,15 @@ public class WikiServlet extends HttpServlet implements Servlet {
         wikiModel.setPageName(title);
         if (renderer > 0) {
             String mainText = wikiModel.render(revision.getText());
-            if (wikiModel.isCategoryNamespace(WikiServlet.getNamespace(title))) {
+            if (wikiModel.isCategoryNamespace(MyWikiModel.getNamespace(title))) {
                 PageListResult catPagesResult = ScalarisDataHandler.getPagesInCategory(connection, title);
                 if (catPagesResult.success) {
                     LinkedList<String> subCategories = new LinkedList<String>();
                     LinkedList<String> categoryPages = new LinkedList<String>();
                     for (String page: catPagesResult.pages) {
-                        String pageNamespace = WikiServlet.getNamespace(page);
+                        String pageNamespace = MyWikiModel.getNamespace(page);
                         if (wikiModel.isCategoryNamespace(pageNamespace)) {
-                            subCategories.add(WikiServlet.getTitleName(page));
+                            subCategories.add(MyWikiModel.getTitleName(page));
                         } else if (wikiModel.isTemplateNamespace(pageNamespace)) {
                             // all pages using a template are in the category, too
                             PageListResult tplResult = ScalarisDataHandler.getPagesInTemplate(connection, page);
@@ -681,43 +681,6 @@ public class WikiServlet extends HttpServlet implements Servlet {
     private MyWikiModel getWikiModel() {
         return new MyWikiModel(WikiServlet.imageBaseURL,
                 WikiServlet.linkBaseURL, connection, namespace);
-    }
-
-    /**
-     * Returns the name of a given page title without its namespace.
-     * 
-     * @param title
-     *            a (raw) page title including namespace (if present)
-     * 
-     * @return the title part of the page title
-     * 
-     * @see WikiServlet#getNamespace(String)
-     */
-    public static String getTitleName(String title) {
-        int colonIndex = title.indexOf(':');
-        if (colonIndex != (-1)) {
-            return title.substring(colonIndex + 1);
-        }
-        return title;
-    }
-
-    /**
-     * Returns the namespace of a given page title.
-     * 
-     * @param title
-     *            a (raw) page title including namespace (if present)
-     * 
-     * @return the namespace part of the title or an empty string if no
-     *         namespace
-     * 
-     * @see #getTitleName(String)
-     */
-    public static String getNamespace(String title) {
-        int colonIndex = title.indexOf(':');
-        if (colonIndex != (-1)) {
-            return title.substring(0, colonIndex);
-        }
-        return "";
     }
 
     /**
