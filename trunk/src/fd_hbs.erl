@@ -32,7 +32,7 @@
 -behavior(gen_component).
 -include("scalaris.hrl").
 
--export([init/1, on/2, start_link/1, check_config/0]).
+-export([init/1, on/2, start_link/2, check_config/0]).
 -type(state() :: {
        comm:mypid(),   %% remote hbs
        [{comm:mypid(), pos_integer()}], %% subscribed rem. pids + ref counting
@@ -46,9 +46,13 @@
 %% Akronyms: HBS =:= (local) heartbeat server instance
 
 %% @doc spawns a fd_hbs instance
--spec start_link(comm:mypid()) -> {ok, pid()}.
-start_link(RemotePid) ->
-   gen_component:start_link(?MODULE, [RemotePid], [wait_for_init]).
+-spec start_link(pid_groups:groupname(), comm:mypid()) -> {ok, pid()}.
+start_link(ServiceGroup, RemotePid) ->
+    RemoteFDPid = comm:get(fd, RemotePid),
+    Name = list_to_atom(lists:flatten(io_lib:format("fd <-> ~p", [RemoteFDPid]))),
+    gen_component:start_link(?MODULE, [RemotePid],
+                             [wait_for_init,
+                              {pid_groups_join_as, ServiceGroup, Name}]).
 
 -spec init([pid() | comm:mypid()]) -> state().
 init([RemotePid]) ->
@@ -66,7 +70,7 @@ init([RemotePid]) ->
     Now = erlang:now(),
     state_new(_RemoteHBS = RemoteFDPid, _RemotePids = [{RemotePid, 1}],
               _LastPong = Now,
-              _CrashedAfter = util:time_plus_ms(Now, 3 * failureDetectorInterval()),
+              _CrashedAfter = util:time_plus_ms(Now, delayfactor() * failureDetectorInterval()),
               TableName).
 
 -spec on(comm:message(), state()) -> state() | kill.
@@ -106,13 +110,13 @@ on({stop}, _State) ->
     ?TRACE("fd_hbs stop~n", []),
     kill;
 
-on({pong_via_fd, RemHBSSubscriber}, State) ->
+on({pong_via_fd, RemHBSSubscriber, RemoteDelay}, State) ->
     ?TRACEPONG("fd_hbs pong via fd~n", []),
     comm:send(RemHBSSubscriber, {update_remote_hbs_to, comm:this()}),
     NewState = state_set_rem_hbs(State, RemHBSSubscriber),
-    on({pong, RemHBSSubscriber}, NewState);
+    on({pong, RemHBSSubscriber, RemoteDelay}, NewState);
 
-on({pong, _Subscriber}, State) ->
+on({pong, _Subscriber, RemoteDelay}, State) ->
     ?TRACEPONG("Pinger pong for ~p~n", [_Subscriber]),
     Now = erlang:now(),
     LastPong = state_get_last_pong(State),
@@ -120,17 +124,27 @@ on({pong, _Subscriber}, State) ->
     PongDelay = abs(timer:now_diff(Now, LastPong)),
     Delay = erlang:max(PongDelay, failureDetectorInterval()),
     S1 = state_set_last_pong(State, Now),
-    NewCrashedAfter = erlang:max(util:time_plus_us(Now, 4 * Delay),
-                                 CrashedAfter),
-    % io:format("Time for next pong: ~p s~n",
-    % [timer:now_diff(NewCrashedAfter, Now)/1000000]),
+    NewCrashedAfter = lists:max(
+                        [util:time_plus_us(Now, delayfactor() * Delay),
+                         util:time_plus_ms(CrashedAfter, 1000),
+                         util:time_plus_us(Now, RemoteDelay)]),
+    %% io:format("Time for next pong: ~p s~n",
+    %%           [timer:now_diff(NewCrashedAfter, Now)/1000000]),
     state_set_crashed_after(S1, NewCrashedAfter);
 
 on({periodic_alive_check}, State) ->
     ?TRACEPONG("Pinger periodic_alive_check~n", []),
-    comm:send(state_get_rem_hbs(State), {pong, comm:this()}),
     Now = erlang:now(),
     CrashedAfter = state_get_crashed_after(State),
+    comm:send(state_get_rem_hbs(State),
+              {pong, comm:this(),
+               timer:now_diff(
+                 CrashedAfter,
+                 util:time_plus_ms(state_get_last_pong(State),
+                                   failureDetectorInterval()
+                                   %% the following is the reduction rate
+                                   %% when increased earlier
+                                   + failureDetectorInterval() div 3))}),
     NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
                    true -> report_crash(State);
                    false -> State
@@ -197,6 +211,9 @@ report_crash(State) ->
 %% @doc The interval between two failure detection runs.
 -spec failureDetectorInterval() -> pos_integer().
 failureDetectorInterval() -> config:read(failure_detector_interval).
+
+-spec delayfactor() -> pos_integer().
+delayfactor() -> 4.
 
 -spec state_new(comm:mypid(), [{comm:mypid(), pos_integer()}],
                 util:time(), util:time(), atom()) -> state().
