@@ -47,7 +47,7 @@ addRange(Bloom, Items) -> addRange_(Bloom, Items).
 -spec is_element(bloomFilter(), key()) -> boolean().
 is_element(Bloom, Item) -> is_element_(Bloom, Item).
 
--spec print(bloomFilter()) -> string().
+-spec print(bloomFilter()) -> ok.
 print(Bloom) -> print_(Bloom). 
 
 
@@ -92,4 +92,4 @@ calc_FPR(M, N, K) ->
 -spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloomFilter_t().					 
 -spec addRange_(bloomFilter_t(), [key()]) -> bloomFilter_t().
 -spec is_element_(bloomFilter_t(), key()) -> boolean().
--spec print_(bloomFilter_t()) -> string().
+-spec print_(bloomFilter_t()) -> ok.
