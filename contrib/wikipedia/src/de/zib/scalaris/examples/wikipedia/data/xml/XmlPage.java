@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.TreeMap;
 
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.DefaultHandler;
@@ -56,7 +57,7 @@ public class XmlPage extends DefaultHandler {
     /**
      * All revisions of the page.
      */
-    protected List<Revision> revisions = new LinkedList<Revision>();
+    protected TreeMap<Integer, Revision> revisions = new TreeMap<Integer, Revision>();
     
     protected boolean inPage_title = false;
     protected boolean inPage_id = false;
@@ -67,12 +68,23 @@ public class XmlPage extends DefaultHandler {
     
     protected Page final_page = null;
     protected List<ShortRevision> revisions_short = new LinkedList<ShortRevision>();
+    
+    /**
+     * Maximum number of revisions per page (starting with the most recent) -
+     * <tt>-1/tt> imports all revisions.
+     */
+    protected int maxRevisions;
 
     /**
      * Creates a new page with an empty title, id and no revision.
+     * 
+     * @param maxRevisions
+     *            maximum number of revisions per page (starting with the most
+     *            recent) - <tt>-1/tt> imports all revisions
      */
-    public XmlPage() {
+    public XmlPage(int maxRevisions) {
         super();
+        this.maxRevisions = maxRevisions;
     }
 
     /**
@@ -202,12 +214,7 @@ public class XmlPage extends DefaultHandler {
             }
         }
         // get current revision (the largest one):
-        Revision curRev = revisions.get(0);
-        for (Revision rev : revisions) {
-            if (rev.getId() > curRev.getId()) {
-                curRev = rev;
-            }
-        }
+        Revision curRev = revisions.lastEntry().getValue();
         final_page = new Page(title,
                 Integer.parseInt(id), redirect, restrictions_map, curRev);
     }
@@ -232,7 +239,10 @@ public class XmlPage extends DefaultHandler {
             if (localName.equals("revision")) {
                 inRevision = false;
                 currentRevision.endRevision(uri, localName, qName);
-                revisions.add(currentRevision.getRevision());
+                revisions.put(currentRevision.getRevision().getId(), currentRevision.getRevision());
+                if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
+                    revisions.remove(revisions.firstKey());
+                }
                 revisions_short.add(new ShortRevision(currentRevision.getRevision()));
                 currentRevision = null;
             } else {
@@ -267,7 +277,7 @@ public class XmlPage extends DefaultHandler {
      * @return the revisions
      */
     public List<Revision> getRevisions() {
-        return revisions;
+        return new LinkedList<Revision>(revisions.values());
     }
 
     /**

@@ -38,9 +38,13 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
      * 
      * @param blacklist
      *            a number of page titles to ignore
+     * @param maxRevisions
+     *            maximum number of revisions per page (starting with the most
+     *            recent) - <tt>-1/tt> imports all revisions
+     *            (useful to speed up the import / reduce the DB size)
      */
-    public WikiDumpToStdoutHandler(Set<String> blacklist) {
-        super(blacklist);
+    public WikiDumpToStdoutHandler(Set<String> blacklist, int maxRevisions) {
+        super(blacklist, maxRevisions);
     }
 
     /**
