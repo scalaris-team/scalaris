@@ -120,9 +120,9 @@ on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
     comm:send(Subscriber, {update_remote_hbs_to, comm:make_global(HBPid)}),
     State;
 
-on({pong, RemHBSSubscriber}, State) ->
+on({pong, RemHBSSubscriber, RemoteDelay}, State) ->
     ?TRACE("FD: pong, ~p~n", [RemHBSSubscriber]),
-    forward_to_hbs(RemHBSSubscriber, {pong_via_fd, RemHBSSubscriber}),
+    forward_to_hbs(RemHBSSubscriber, {pong_via_fd, RemHBSSubscriber, RemoteDelay}),
     State;
 
 on({add_watching_of_via_fd, Subscriber, Pid}, State) ->
@@ -196,8 +196,8 @@ start_and_register_hbs(Pid) ->
     FDPid = comm:get(fd, Pid),
     case ets:lookup(fd_hbs, FDPid) of
         [] ->
-            NewHBS = element(2, fd_hbs:start_link(Pid)),
-            ets:insert(fd_hbs, {comm:get(fd, Pid), NewHBS}),
+            NewHBS = element(2, fd_hbs:start_link(pid_groups:my_groupname(), Pid)),
+            ets:insert(fd_hbs, {FDPid, NewHBS}),
             NewHBS;
         [Res] -> element(2, Res)
     end.
