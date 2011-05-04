@@ -74,7 +74,8 @@ on({tcp, Socket, Data}, State) ->
             ?TRACE("Received message ~.0p", [Message]),
             lists:foldr(fun({DestPid, Msg}, _) -> DestPid ! Msg, ok end,
                         ok, Message),
-            ok = inet:setopts(Socket, [{active, once}]),
+            %% may fail, when tcp just closed
+            inet:setopts(Socket, [{active, once}]),
             inc_r_msg_count(State);
         {deliver, Process, Message} ->
             ?TRACE("Received message ~.0p", [Message]),
@@ -89,7 +90,8 @@ on({tcp, Socket, Data}, State) ->
                                 " process ~p: ~.0p~n", [Process, Message]);
                 _ -> PID ! Message
             end,
-            ok = inet:setopts(Socket, [{active, once}]),
+            %% may fail, when tcp just closed
+            inet:setopts(Socket, [{active, once}]),
             inc_r_msg_count(State);
         {user_close} ->
             log:log(warn,"[ CC ] tcp user_close request", []),
@@ -97,13 +99,15 @@ on({tcp, Socket, Data}, State) ->
             set_socket(State, notconnected);
         Unknown ->
             log:log(warn,"[ CC ] unknown message ~.0p", [Unknown]),
-            ok = inet:setopts(Socket, [{active, once}]),
+            %% may fail, when tcp just closed
+            inet:setopts(Socket, [{active, once}]),
             State
     end;
 
 on({tcp_closed, Socket}, State) ->
-    log:log(warn,"[ CC ] tcp closed info", []),
     gen_tcp:close(Socket),
+    %% receiving processes do not need to survive
+    gen_component:kill(self()),
     set_socket(State, notconnected);
 
 on({web_debug_info, Requestor}, State) ->
