@@ -50,15 +50,15 @@ process_iter(Parent, Key, Count, AbortCount) ->
     case Result of
         {ok}              -> process_iter(Parent, Key, Count - 1, AbortCount);
         {fail, abort}     ->
-            timer:sleep(10 * randoms:rand_uniform(1, AbortCount + 1)),
+            timer:sleep(randoms:rand_uniform(1, 10 * AbortCount + 1)),
             process_iter(Parent, Key, Count, AbortCount + 1);
         {fail, timeout}   ->
             %% overloaded system?
-            timer:sleep(100 * randoms:rand_uniform(1, (AbortCount + 1)
+            timer:sleep(randoms:rand_uniform(1, 100 * (AbortCount + 1)
                                                    * (AbortCount +1))),
             process_iter(Parent, Key, Count, AbortCount + 1);
         {fail, not_found} ->
-            timer:sleep(10 * randoms:rand_uniform(1, AbortCount + 1)),
+            timer:sleep(randoms:rand_uniform(1, 10 * AbortCount + 1)),
             process_iter(Parent, Key, Count, AbortCount + 1);
         X -> log:log(warn, "~p", [X])
     end.
