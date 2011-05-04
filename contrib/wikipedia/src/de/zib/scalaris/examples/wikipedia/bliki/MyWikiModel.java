@@ -21,14 +21,11 @@ import info.bliki.wiki.namespaces.INamespace;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.text.NumberFormat;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageListResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RevisionResult;
 
 /**
@@ -69,17 +66,6 @@ public class MyWikiModel extends WikiModel {
         this.connection = connection;
         this.fExternalWikiBaseFullURL = linkBaseURL;
     }
-    
-    private String formatStatisticNumber(String magicWord, int number) {
-        if (magicWord.endsWith(":R") || magicWord.endsWith("|R")) {
-            return String.valueOf(number);
-        } else {
-            // TODO: use locale from Wiki
-            NumberFormat nf = NumberFormat.getIntegerInstance(Locale.ENGLISH);
-            nf.setGroupingUsed(true);
-            return nf.format(number);
-        }
-    }
 
     /* (non-Javadoc)
      * @see info.bliki.wiki.model.AbstractWikiModel#getRawWikiContent(java.lang.String, java.lang.String, java.util.Map)
@@ -87,126 +73,25 @@ public class MyWikiModel extends WikiModel {
     @Override
     public String getRawWikiContent(String namespace, String articleName,
             Map<String, String> templateParameters) {
-        String result = super.getRawWikiContent(namespace, articleName, templateParameters);
-        if (result != null) {
-            // found magic word template
-            // http://www.mediawiki.org/wiki/Help:Magic_words
-            if (magicWordCache.containsKey(result)) {
-                return magicWordCache.get(result);
+        if (isTemplateNamespace(namespace)) {
+            String magicWord = articleName;
+            String parameter = "";
+            int index = magicWord.indexOf(':');
+            if (index > 0) {
+                parameter = magicWord.substring(index + 1).trim();
+                magicWord = magicWord.substring(0, index);
             }
-            // TODO: distinguish articles and pages correctly - see http://www.mediawiki.org/wiki/Manual:Using_custom_namespaces#Content_namespaces
-            if (result.startsWith("NUMBEROFARTICLES") || result.startsWith("NUMBEROFPAGES")) {
-                PageListResult pageCountResult = ScalarisDataHandler.getPageList(connection);
-                if (pageCountResult.success) {
-                    String pageCount = formatStatisticNumber(result, pageCountResult.pages.size());
-                    magicWordCache.put(result, pageCount);
-                    return pageCount;
+            if (MyMagicWord.isMagicWord(magicWord)) {
+                // cache values for magic words:
+                if (magicWordCache.containsKey(articleName)) {
+                    return magicWordCache.get(articleName);
                 } else {
-                    return result;
+                    String value = MyMagicWord.processMagicWord(magicWord, parameter, this);
+                    magicWordCache.put(articleName, value);
+                    return value;
                 }
-            } else if (result.startsWith("NUMBEROFFILES")) {
-                // we currently do not store files:
-                String fileCount = formatStatisticNumber(result, 0);
-                magicWordCache.put(result, fileCount);
-                return fileCount;
-            } else if (result.startsWith("NUMBEROFUSERS") ||
-                    result.startsWith("NUMBEROFADMINS")) {
-                // we currently do not support users:
-                String userCount = formatStatisticNumber(result, 0);
-                magicWordCache.put(result, userCount);
-                return userCount;
-            // NAMESPACES:
-            } else if (result.equals("NAMESPACE")) {
-                String pageNamespace = WikiServlet.getNamespace(getPageName());
-                magicWordCache.put(result, pageNamespace);
-                return pageNamespace;
-            } else if (result.equals("TALKSPACE") || result.equals("TALKSPACEE")) {
-                String pageNamespace = WikiServlet.getNamespace(getPageName());
-                String talkNamespace = getNamespace().getTalkspace(pageNamespace);
-                magicWordCache.put(result, talkNamespace);
-                return talkNamespace;
-//            } else if (result.equals("SUBJECTSPACE") || result.equals("SUBJECTSPACEE")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("ARTICLESPACE") || result.equals("ARTICLESPACEE")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("CURRENTVERSION")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("PAGESINNAMESPACE")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("SUBPAGENAME") || result.equals("SUBPAGENAMEE")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("BASEPAGENAME") || result.equals("BASEPAGENAMEE")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("SUBJECTPAGENAME") || result.equals("SUBJECTPAGENAMEE")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("ARTICLEPAGENAME") || result.equals("ARTICLEPAGENAMEE")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("REVISIONID")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("REVISIONDAY")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("REVISIONDAY2")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("REVISIONMONTH")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("REVISIONYEAR")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("REVISIONTIMESTAMP")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("SITENAME")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("SERVER")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("SCRIPTPATH")) {
-//                // TODO: implement
-//                return null;
-//            } else if (result.equals("SERVERNAME")) {
-//                // TODO: implement
-//                return null;
-            // some MediaWiki-encoded URLs:
-            } else if (result.equals("PAGENAMEE")) {
-                return "{{PAGENAME}}";
-            } else if (result.equals("NAMESPACEE")) {
-                return "{{NAMESPACE}}";
-            } else if (result.equals("FULLPAGENAMEE")) {
-                return "{{FULLPAGENAME}}";
-            } else if (result.equals("TALKPAGENAMEE")) {
-                return "{{TALKPAGENAME}}";
-            }
-            
-            return result;
-        }
-        if (getRedirectLink() != null) {
-            // requesting a page from a redirect?
-            String pageName = getRedirectLink();
-            RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
-            if (getRevResult.success) {
-                // make PAGENAME in the redirected content work as expected
-                setPageName(pageName);
-                return getRevResult.revision.getText();
             } else {
-//                System.err.println(getRevResult.message);
-//                return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
-                return "#redirect [[" + pageName + "]]";
-            }
-        } else {
-            if (isTemplateNamespace(namespace)) {
+                // retrieve template from Scalaris:
                 // note: templates are already cached, no need to cache them here
                 if (connection != null) {
                     String pageName = getTemplateNamespace() + ":" + articleName;
@@ -219,6 +104,21 @@ public class MyWikiModel extends WikiModel {
                         return null;
                     }
                 }
+            }
+        }
+        
+        if (getRedirectLink() != null) {
+            // requesting a page from a redirect?
+            String pageName = getRedirectLink();
+            RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
+            if (getRevResult.success) {
+                // make PAGENAME in the redirected content work as expected
+                setPageName(pageName);
+                return getRevResult.revision.getText();
+            } else {
+//                System.err.println(getRevResult.message);
+//                return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
+                return "#redirect [[" + pageName + "]]";
             }
         }
 //        System.out.println("getRawWikiContent(" + namespace + ", " + articleName + ", " +
