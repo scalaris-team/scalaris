@@ -40,7 +40,8 @@
          smerge2/2, smerge2/3, smerge2/4,
          is_unittest/0, make_filename/1,
          app_get_env/2,
-         time_plus_s/2, time_plus_ms/2, time_plus_us/2]).
+         time_plus_s/2, time_plus_ms/2, time_plus_us/2,
+         for_to/3]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 
@@ -603,3 +604,10 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     MegaSecs1 = MegaSecs + (Secs1 div 1000000),
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, MicroSecs}.
+
+%% for(i; I<=n; i++) { fun(i) }
+-spec for_to(integer(), integer(), fun()) -> ok.
+for_to(I, N, Fun) ->
+    if I =< N -> Fun(I), for_to(I+1, N, Fun);
+       true -> ok
+    end.

@@ -75,8 +75,8 @@ manage_run(ThreadsPerVM, Iterations, Options, Message) ->
                   fun((Parent::comm:erl_local_pid()) -> any())) -> ok.
 run_threads(Threads, Bench) ->
     Self = self(),
-    _ = [ spawn(fun () -> Bench(Self) end) || _ <- lists:seq(1, Threads) ],
-    _ = [ receive {done, _} -> ok end || _ <- lists:seq(1, Threads) ],
+    util:for_to(1, Threads, fun(_X) -> spawn(fun()->Bench(Self) end) end),
+    util:for_to(1, Threads, fun(_X) -> receive {done, _} -> ok end end),
     ok.
 
 %% read benchmark
@@ -119,27 +119,32 @@ start_link() ->
     gen_component:start_link(?MODULE, [], [{erlang_register, bench_server}]).
 
 %% helper functions
+-spec retries() -> pos_integer().
+retries() -> 10.
+
 -spec get_and_init_key() -> string().
 get_and_init_key() ->
     Key = randoms:getRandomId(),
-    case get_and_init_key(Key, _Retries = 10) of
-        fail ->
-            io:format("geT_and_init_key choosing new key and retrying~n"),
-            timer:sleep(1000 * randoms:rand_uniform(1, 10)),
-            get_and_init_key();
-        Key -> Key
-    end.
+    get_and_init_key(Key, retries(), _TriedKeys = 1).
 
-get_and_init_key(_Key, 0)    -> fail;
-get_and_init_key(Key, Count) ->
+get_and_init_key(_Key, 0, TriedKeys) ->
+    NewKey = randoms:getRandomId(),
+    io:format("geT_and_init_key choosing new key and retrying~n"),
+    timer:sleep(randoms:rand_uniform(1, 10000 * TriedKeys)),
+    get_and_init_key(NewKey, retries(), TriedKeys + 1);
+
+get_and_init_key(Key, Count, TriedKeys) ->
     case api_tx:write(Key, 0) of
         {ok} ->
             Key;
         {fail, abort} ->
-            io:format("geT_and_init_key 1 failed, retrying~n", []),
-            get_and_init_key(Key, Count - 1);
+            SleepTime = randoms:rand_uniform(1, TriedKeys * 2000 * 11-Count),
+            io:format("geT_and_init_key 1 failed, retrying in ~p ms~n",
+                      [SleepTime]),
+            timer:sleep(SleepTime),
+            get_and_init_key(Key, Count - 1, TriedKeys);
         {fail, timeout} ->
             io:format("geT_and_init_key 2 timeout, retrying~n", []),
-            timer:sleep(1000 * randoms:rand_uniform(1, 10-Count)),
-            get_and_init_key(Key, Count - 1)
+            timer:sleep(TriedKeys * randoms:rand_uniform(1, 2000 * 11-Count)),
+            get_and_init_key(Key, Count - 1, TriedKeys)
     end.
