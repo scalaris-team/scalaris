@@ -44,6 +44,7 @@
 -ifdef(with_export_type_support).
 -export_type([tlog/0, tlog_entry/0]).
 -export_type([tx_status/0]).
+-export_type([tx_op/0]).
 -endif.
 
 -type tx_status()    :: {fail, atom()} | value | not_found.

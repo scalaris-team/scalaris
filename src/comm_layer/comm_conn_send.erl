@@ -139,7 +139,7 @@ on({tcp, Socket, Data}, State) ->
             Unknown ->
                 log:log(warn,"[ CC ] unknown message ~.0p", [Unknown]),
                 %% may fail, when tcp just closed
-                inet:setopts(Socket, [{active, once}]),
+                _ = inet:setopts(Socket, [{active, once}]),
                 State
     end,
     send_bundle_if_ready(NewState);

@@ -75,7 +75,7 @@ on({tcp, Socket, Data}, State) ->
             lists:foldr(fun({DestPid, Msg}, _) -> DestPid ! Msg, ok end,
                         ok, Message),
             %% may fail, when tcp just closed
-            inet:setopts(Socket, [{active, once}]),
+            _ = inet:setopts(Socket, [{active, once}]),
             inc_r_msg_count(State);
         {deliver, Process, Message} ->
             ?TRACE("Received message ~.0p", [Message]),
@@ -91,7 +91,7 @@ on({tcp, Socket, Data}, State) ->
                 _ -> PID ! Message
             end,
             %% may fail, when tcp just closed
-            inet:setopts(Socket, [{active, once}]),
+            _ = inet:setopts(Socket, [{active, once}]),
             inc_r_msg_count(State);
         {user_close} ->
             log:log(warn,"[ CC ] tcp user_close request", []),
@@ -100,7 +100,7 @@ on({tcp, Socket, Data}, State) ->
         Unknown ->
             log:log(warn,"[ CC ] unknown message ~.0p", [Unknown]),
             %% may fail, when tcp just closed
-            inet:setopts(Socket, [{active, once}]),
+            _ = inet:setopts(Socket, [{active, once}]),
             State
     end;
 
