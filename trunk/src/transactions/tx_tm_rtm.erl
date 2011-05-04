@@ -346,7 +346,9 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, InRole} = _Msg,
                        %%io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
                        HoldBackQ = tx_state:get_hold_back(LocalTxEntry),
                        tx_state:set_hold_back(TxState, HoldBackQ);
-                   ok -> log:log(error, "Duplicate init_RTM", [])
+                   ok ->
+                       log:log(error, "Duplicate init_RTM", []),
+                       LocalTxEntry
                end,
     NewEntry = tx_state:set_status(TmpEntry, ok),
     _ = my_set_entry(NewEntry, State),
@@ -362,7 +364,9 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, InRole} = _Msg,
                                 %% take over hold back from existing entry
                                 IHoldBQ = tx_item_state:get_hold_back(LocalItem),
                                 tx_item_state:set_hold_back(Entry, IHoldBQ);
-                            ok -> log:log(error, "Duplicate init_RTM for an item", [])
+                            ok ->
+                                log:log(error, "Duplicate init_RTM for an item", []),
+                                LocalItem
                         end,
               NewItem = tx_item_state:set_status(TmpItem, ok),
               _ = my_set_entry(NewItem, State),
