@@ -116,5 +116,31 @@ public class MyNamespace extends Namespace {
      */
     public MyNamespace(SiteInfo siteinfo) {
         super(new MyResourceBundle(siteinfo));
+        initializeTalkNamespaces();
+    }
+
+    /**
+     * Fixes {@link Namespace} not initialising the talk namespaces depending on
+     * the resource bundle.
+     */
+    private void initializeTalkNamespaces() {
+        TALKSPACE_MAP.put(fNamespacesLowercase[0], null); // media
+        TALKSPACE_MAP.put(fNamespacesLowercase[1], null); // special
+        TALKSPACE_MAP.put(fNamespacesLowercase[2], getTalk()); // ""
+        TALKSPACE_MAP.put(fNamespacesLowercase[3], null); // talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[4], getUser_talk()); // user
+        TALKSPACE_MAP.put(fNamespacesLowercase[5], getUser_talk()); // user_talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[6], getMeta_talk()); // project
+        TALKSPACE_MAP.put(fNamespacesLowercase[7], getMeta_talk()); // project_talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[8], getImage_talk()); // image
+        TALKSPACE_MAP.put(fNamespacesLowercase[9], getImage_talk()); // image_talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[10], getMediaWiki_talk()); // mediawiki
+        TALKSPACE_MAP.put(fNamespacesLowercase[11], getMediaWiki_talk()); // mediawiki_talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[12], getTemplate_talk()); // template
+        TALKSPACE_MAP.put(fNamespacesLowercase[13], getTemplate_talk()); // template_talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[14], getHelp_talk()); // help
+        TALKSPACE_MAP.put(fNamespacesLowercase[15], getHelp_talk()); // help_talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[16], getCategory_talk()); // category
+        TALKSPACE_MAP.put(fNamespacesLowercase[17], getCategory_talk()); // category_talk
     }
 }
