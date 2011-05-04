@@ -51,7 +51,6 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
     private Transaction scalaris_tx;
     private List<String> newPages = new LinkedList<String>();
     private int pageCount = 0;
-    private int maxRevisions = -1; // all revisions by default
     private HashMap<String, List<String>> newCategories = new HashMap<String, List<String>>(100);
     private HashMap<String, List<String>> newTemplates = new HashMap<String, List<String>>(100);
 
@@ -70,8 +69,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      *             if the connection to Scalaris fails
      */
     public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions) throws RuntimeException {
-        super(blacklist);
-        this.maxRevisions = maxRevisions;
+        super(blacklist, maxRevisions);
         try {
             connection = ConnectionFactory.getInstance().createConnection(
                     "wiki_import", true);
@@ -174,11 +172,6 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         List<ShortRevision> revisions_short = page_xml.getRevisions_short();
         Collections.sort(revisions, Collections.reverseOrder(new byRevId()));
         Collections.sort(revisions_short, Collections.reverseOrder(new byShortRevId()));
-        if (maxRevisions > 0) {
-            // cut off some revisions - only keep the newest ones:
-            revisions = revisions.subList(0, Math.min(revisions.size(), maxRevisions));
-            revisions_short = revisions_short.subList(0, Math.min(revisions_short.size(), maxRevisions));            
-        }
         
         try {
             if (!revisions.isEmpty() && wikiModel != null) {
@@ -244,7 +237,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         String scalaris_key = ScalarisDataHandler.getPageListKey();
         
         // list of pages:
-        if (writePageList(scalaris_key, newPages)) {
+        if (addToPageList(scalaris_key, newPages)) {
             newPages.clear();
         }
         
@@ -252,7 +245,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         // list of pages in each category:
         for (Entry<String, List<String>> category: newCategories.entrySet()) {
             scalaris_key = ScalarisDataHandler.getCatPageListKey(category.getKey());
-            if (writePageList(scalaris_key, category.getValue())) {
+            if (addToPageList(scalaris_key, category.getValue())) {
                 category.getValue().clear();
             } else {
                 success = false;
@@ -266,7 +259,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         // list of pages a templates is used in:
         for (Entry<String, List<String>> template: newTemplates.entrySet()) {
             scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey());
-            if (writePageList(scalaris_key, template.getValue())) {
+            if (addToPageList(scalaris_key, template.getValue())) {
                 template.getValue().clear();
             } else {
                 success = false;
@@ -277,7 +270,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         }
     }
     
-    private boolean writePageList(String scalaris_key, List<String> newEntries) {
+    private boolean addToPageList(String scalaris_key, List<String> newEntries) {
         List<String> entries; 
         try {
             entries = scalaris_single.read(scalaris_key).stringListValue();

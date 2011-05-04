@@ -42,6 +42,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     private Set<String> blacklist = null;
     
     protected WikiModel wikiModel;
+    
+    private int maxRevisions = -1; // all revisions by default
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -49,9 +51,14 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      * 
      * @param blacklist
      *            a number of page titles to ignore
+     * @param maxRevisions
+     *            maximum number of revisions per page (starting with the most
+     *            recent) - <tt>-1/tt> imports all revisions
+     *            (useful to speed up the import / reduce the DB size)
      */
-    public WikiDumpHandler(Set<String> blacklist) {
+    public WikiDumpHandler(Set<String> blacklist, int maxRevisions) {
         this.blacklist = blacklist;
+        this.maxRevisions = maxRevisions;
     }
 
     /**
@@ -89,7 +96,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
             currentSiteInfo.startSiteInfo(uri, localName, qName, attributes);
         } else if (localName.equals("page")) {
             inPage = true;
-            currentPage = new XmlPage();
+            currentPage = new XmlPage(maxRevisions);
             currentPage.startPage(uri, localName, qName, attributes);
         } else if (inSiteInfo) {
             currentSiteInfo.startElement(uri, localName, qName, attributes);
