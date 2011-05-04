@@ -17,7 +17,6 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
-import info.bliki.wiki.namespaces.INamespace;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -61,7 +60,7 @@ public class MyWikiModel extends WikiModel {
      * @param namespace
      *            namespace of the wiki
      */
-    public MyWikiModel(String imageBaseURL, String linkBaseURL, Connection connection, INamespace namespace) {
+    public MyWikiModel(String imageBaseURL, String linkBaseURL, Connection connection, MyNamespace namespace) {
         super(configuration, null, namespace, imageBaseURL, linkBaseURL);
         this.connection = connection;
         this.fExternalWikiBaseFullURL = linkBaseURL;
@@ -178,5 +177,84 @@ public class MyWikiModel extends WikiModel {
      */
     public void setLinkBaseFullURL(String linkBaseFullURL) {
         this.fExternalWikiBaseFullURL = linkBaseFullURL;
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.WikiModel#getNamespace()
+     */
+    @Override
+    public MyNamespace getNamespace() {
+        return (MyNamespace) super.getNamespace();
+    }
+    
+    /**
+     * Splits the given full title into its namespace and page title components.
+     * 
+     * @param fullTitle
+     *            the (full) title including a namespace (if present)
+     * 
+     * @return a 2-element array with the namespace (index 0) and the page title
+     *         (index 1)
+     */
+    public static String[] splitNsTitle(String fullTitle) {
+        int colonIndex = fullTitle.indexOf(':');
+        if (colonIndex != (-1)) {
+            return new String[] { fullTitle.substring(0, colonIndex),
+                    fullTitle.substring(colonIndex + 1) };
+        }
+        return new String[] {"", fullTitle};
+    }
+
+    /**
+     * Returns the namespace of a given page title.
+     * 
+     * @param title
+     *            the (full) title including a namespace (if present)
+     * 
+     * @return the namespace part of the title or an empty string if no
+     *         namespace
+     * 
+     * @see #getTitleName(String)
+     * @see #splitNsTitle(String)
+     */
+    public static String getNamespace(String title) {
+        return splitNsTitle(title)[0];
+    }
+
+    /**
+     * Returns the name of a given page title without its namespace.
+     * 
+     * @param title
+     *            the (full) title including a namespace (if present)
+     * 
+     * @return the title part of the page title
+     * 
+     * @see #getNamespace(String)
+     * @see #splitNsTitle(String)
+     */
+    public static String getTitleName(String title) {
+        return splitNsTitle(title)[1];
+    }
+    
+    /**
+     * Splits the given full title into its namespace, base and sub page
+     * components.
+     * 
+     * @param fullTitle
+     *            the (full) title including a namespace (if present)
+     * 
+     * @return a 3-element array with the namespace (index 0), the base page
+     *         (index 1) and the sub page (index 2)
+     */
+    public static String[] splitNsBaseSubPage(String fullTitle) {
+        String[] split1 = splitNsTitle(fullTitle);
+        String namespace = split1[0];
+        String title = split1[1];
+        int colonIndex = title.lastIndexOf('/');
+        if (colonIndex != (-1)) {
+            return new String[] { namespace, title.substring(0, colonIndex),
+                    title.substring(colonIndex + 1) };
+        }
+        return new String[] {namespace, title, ""};
     }
 }
