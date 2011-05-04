@@ -115,13 +115,14 @@ public class MyWikiModel extends WikiModel {
                 String userCount = formatStatisticNumber(result, 0);
                 magicWordCache.put(result, userCount);
                 return userCount;
-            // namespaces:
+            // NAMESPACES:
             } else if (result.equals("NAMESPACE")) {
                 String pageNamespace = WikiServlet.getNamespace(getPageName());
                 magicWordCache.put(result, pageNamespace);
                 return pageNamespace;
             } else if (result.equals("TALKSPACE") || result.equals("TALKSPACEE")) {
-                String talkNamespace = getNamespace().getTalkspace(WikiServlet.getNamespace(getPageName()));
+                String pageNamespace = WikiServlet.getNamespace(getPageName());
+                String talkNamespace = getNamespace().getTalkspace(pageNamespace);
                 magicWordCache.put(result, talkNamespace);
                 return talkNamespace;
 //            } else if (result.equals("SUBJECTSPACE") || result.equals("SUBJECTSPACEE")) {
