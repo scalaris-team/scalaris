@@ -110,7 +110,8 @@ print_(Bloom) ->
 			   HCount,
 			   NumItems,
 			   calc_FPR(Size, NumItems, HCount)]
-			 ). 
+			 ),
+    ok. 
 
 
 %% bit operations

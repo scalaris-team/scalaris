@@ -44,12 +44,23 @@
          for_to/3]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
+-export([s_repeat/3, s_repeatAndCollect/3, s_repeatAndAccumulate/5,
+         p_repeat/3, p_repeatAndCollect/3, p_repeatAndAccumulate/5,
+         parallel_run/4]).
 
 -opaque global_uid() :: {pos_integer(), comm:mypid()}.
 
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
                  MicroSecs::non_neg_integer()}.
+
+-type args() :: [term()].
+-type accumulatorFun(T, U) :: fun((T, U) -> U).
+%-type anyFun(T) :: fun((...) -> T). %will not work with R14B02 dialyzer
+-type anyFun(T) :: 
+    fun((any()) -> T) | 
+    fun((any(), any()) -> T).
+
 
 %% @doc Creates a worker description for a supervisor.
 -spec sup_worker_desc(Name::atom() | string(), Module::module(), Function::atom())
@@ -611,3 +622,77 @@ for_to(I, N, Fun) ->
     if I =< N -> Fun(I), for_to(I+1, N, Fun);
        true -> ok
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% sequential repeat
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Simple sequential function repetition
+-spec s_repeat(fun(), args(), pos_integer()) -> ok.
+s_repeat(Fun, Args, 1) ->    
+    apply(Fun, Args),
+    ok;
+s_repeat(Fun, Args, Times) ->
+    apply(Fun, Args),
+    s_repeat(Fun, Args, Times - 1).
+
+%% @doc Simple sequential function repetiton with collection of their results
+%%      returns a list of results of "times" function calls
+%% @end
+-spec s_repeatAndCollect(fun(), args(), pos_integer()) -> [any()].
+s_repeatAndCollect(Fun, Args, Times) ->    
+    s_repeatAndAccumulate(Fun, Args, Times, fun(R, Y) -> [R | Y] end, []).
+  
+%% @doc Sequential repetion of function FUN with Arguments ARGS TIMES-fold.
+%%      Results will be accumulated with an accumulator function ACCUFUN 
+%%      in register ACCUMULATOR.
+%% @end
+-spec s_repeatAndAccumulate(anyFun(T), args(), pos_integer(), accumulatorFun(T, U), U) -> U.
+s_repeatAndAccumulate(Fun, Args, 1, AccuFun, Accumulator) ->
+    R1 = apply(Fun, Args),
+    AccuFun(R1, Accumulator);
+s_repeatAndAccumulate(Fun, Args, Times, AccuFun, Accumulator) ->
+    R1 = apply(Fun, Args),
+    s_repeatAndAccumulate(Fun, Args, Times - 1, AccuFun, AccuFun(R1, Accumulator)).
+    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% parallel repeat
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec p_repeat(fun(), args(), pos_integer()) -> ok.
+p_repeat(Fun, Args, Times) ->
+    p_repeat(Fun, Args, Times, false).
+
+-spec p_repeatAndCollect(fun(), args(), pos_integer()) -> [any()].
+p_repeatAndCollect(Fun, Args, Times) ->
+    p_repeatAndAccumulate(Fun, Args, Times, fun(X,Y) -> [X|Y] end, []).
+
+-spec p_repeatAndAccumulate(anyFun(T), args(), pos_integer(), accumulatorFun(T, U), U) -> U.
+p_repeatAndAccumulate(Fun, Args, Times, AccuFun, Accumulator) ->
+    p_repeat(Fun, Args, Times, true),
+    parallel_collect(Times, AccuFun, Accumulator).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% parallel repeat helper functions 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec p_repeat(fun(), args(), pos_integer(), boolean()) -> ok.
+p_repeat(Fun, Args, Times, DoAnswer) ->
+    s_repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, DoAnswer]], Times).
+
+-spec parallel_run(pid(), fun(), args(), boolean()) -> none().
+parallel_run(SourcePid, Fun, Args, DoAnswer) ->
+    Res = (catch apply(Fun, Args)),
+    case DoAnswer of
+        true -> SourcePid ! {parallel_result, Res};
+        _ -> []
+    end.
+
+-spec parallel_collect(non_neg_integer(), accumulatorFun(any(), U), U) -> U.
+parallel_collect(0, _, Accumulator) ->
+    Accumulator;
+parallel_collect(ExpectedResults, AccuFun, Accumulator) -> 
+    Result = receive
+                {parallel_result, R} -> R
+             end,
+    parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).

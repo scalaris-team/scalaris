@@ -37,6 +37,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-type db_chunk() :: {intervals:interval(), ?DB:db_as_list()}.
 -type sync_struct() :: %TODO add merkleTree + art
     {   
         Interval    :: intervals:interval(), 
@@ -59,28 +60,38 @@
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Message handler when trigger triggers (START SYNC)
+%% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
 on({?TRIGGER_NAME}, {SyncMethod, TriggerState}) ->
 	%STEPS
 	%1) SELECT DEST
 	%2) CREATE SYNC STRUCT
-	_SyncStruct = case SyncMethod of
-					 bloom -> build_bloom();
-					 merkleTree -> build_merkleTree();
-					 art -> build_art()
-				 end,	
+    %retrieve node db-intervall
+    DhtNodePid = pid_groups:find_a(dht_node),
+    comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
 	%3) SEND SyncStruct 2 DEST
 	%4) DONE - NEW TRIGGER
 	NewTriggerState = trigger:next(TriggerState),
     ?TRACE("~nDEBUG Trigger NEXT~n", []),
 	{SyncMethod, NewTriggerState};
 
-on({recv_sync, bloom, {_Interval, _Bloom}}, _) ->
+%% @doc retrieve node responsibility interval
+on({get_state_response, NodeDBInterval}, State) ->
+    ?TRACE("~nDEBUG DB-Intervall ~p~n", [NodeDBInterval]),
+    DhtNodePid = pid_groups:find_a(dht_node),
+    comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, 10000}), %TODO remove 10k constant
+    State;
+%% @doc retriebe local node db
+on({get_chunk_response, DB}, {SyncMethod, _TriggerState} = State) ->
+    ?TRACE("~nDEBUG Node-DB ~p~n", [DB]),
+    spawn(fun build_SyncStruct/3, [self(), SyncMethod, DB]),
+    State;
+
+on({recv_sync, bloom, {_Interval, _Bloom}}, State) ->
 	%1) FIND ALL DB-ENTRIES NOT IN KEY VERS BLOOM (KV_BF)
     %a) CHECK IF ENTRY ALSO NOT IN K_BF -> MISSING REP -> DO REGEN
     %b) IF NOT IN KV_BF AND IN K_BF -> outdated found -> DO UDPATE
-	ok;
+	State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MerkleTree Sync Message handling
@@ -104,26 +115,30 @@ on({web_debug_info, Requestor},
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SyncStruct building
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec build_SyncStruct(comm:erl_local_pid(), sync_method(), db_chunk()) -> sync_struct().
+build_SyncStruct(SourcePid, SyncMethod, DB) ->
+    SyncStruct = case SyncMethod of
+                     bloom ->
+                         build_bloom(DB);
+                     merkleTree ->
+                         ok; %TODO
+                     art ->
+                         ok %TODO
+                 end,
+    comm:send_local(SourcePid, {get_sync_struct_response, SyncStruct}),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % BloomFilter building
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Build two bloom filter, one over all keys (BF1), 
 %%      one over all keys concatenated with their version (BF2)
--spec build_bloom() -> sync_struct().
-build_bloom() ->
-    DhtNodePid = pid_groups:find_a(dht_node),
-    %retrieve node db-intervall
-    comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
-    Interval =  receive 
-                    {get_state_response, I} -> I
-                end,
-    ?TRACE("~nDEBUG DB-Intervall ~p~n", [Interval]),
-    %retrieve node data (possibly outdated)
-	comm:send_local(DhtNodePid, {get_chunk, self(), Interval, 10000}), %TODO remove 10k constant
-    _DB = receive 
-            {get_chunk_response, R} -> R
-         end,
-    ?TRACE("~nDEBUG DB ~p~n", [_DB]),
+-spec build_bloom(db_chunk()) -> sync_struct().
+build_bloom({Interval, _DB}) ->
     %create bloom filter
     Fpr = 0.001,           %TODO move to config?
     ElementNum = 10000,    %TODO set to node db item cout + 5%?
@@ -132,22 +147,9 @@ build_bloom() ->
     BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
     BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
     %fill bloom filter
+    %TODO
 	%lists:min(?RT:get_replica_keys(Key)) %map keys to their smallest associated key
 	{Interval, comm:this(), BF1, BF2}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MerkleTree building
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-build_merkleTree() ->
-	ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ART building
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-build_art() ->
-	ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup

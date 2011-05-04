@@ -33,12 +33,11 @@
 
 -define(Fpr_Test_NumTests, 30).
 -define(Fpr_Test_DestFPR, 0.001).
--define(Fpr_Test_ElementNum, 10000).
+-define(Fpr_Test_ElementNum, 1000).
 
 all() -> [
 		  bloom_addSimple,
 		  bloom_addRange,
-		  %fpr_test_seq, %slow
           fpr_test_parallel
 		 ].
 
@@ -47,9 +46,9 @@ bloom_addSimple(_) ->
 	B1 = ?BLOOM:add(BF, "10"),
 	B2 = ?BLOOM:add(B1, 10),
 	B3 = ?BLOOM:add(B2, 10.3),
-	?BLOOM:is_element(B3, "10") 
-	and not ?BLOOM:is_element(B3, "100")
-	and ?BLOOM:is_element(B3, 10.3).
+    ?equals(?BLOOM:is_element(B3, "10"), true),
+    ?equals(?BLOOM:is_element(B3, "100"), false),
+    ?equals(?BLOOM:is_element(B3, 10.3), true).
 
 bloom_addRange(_) ->	
 	BF = newBloom(10, 0.1),
@@ -58,27 +57,23 @@ bloom_addRange(_) ->
 	Results = [ ?BLOOM:is_element(BF1, Item) || Item <- Elements],
 	io:format("Elements: ~p~n", [Elements]),
 	io:format("Results: ~p~n", [Results]),
-	not lists:member(false, Results)
-	and not ?BLOOM:is_element(BF1, "Not").
+	?equals(lists:member(false, Results), false),
+    ?equals(?BLOOM:is_element(BF1, "Not"), false),
+    ?equals(?BLOOM:is_element(BF1, 2), true).
 
-%% @doc run "?Fpr_Test_NumTests"-times measure_fp in parallel
+%% @doc ?Fpr_Test_NumTests-fold parallel run of measure_fp
 fpr_test_parallel(_) ->
-    FalsePositives = parallel_test(?MODULE, 
-                                   measure_fp, 
-                                   [?Fpr_Test_DestFPR, ?Fpr_Test_ElementNum], 
-                                   ?Fpr_Test_NumTests, 
-                                   fun(X,Y) -> X+Y end),
-    print_fpr_test_result(FalsePositives).
-
-%% @doc run "?Fpr_Test_NumTests"-times measure_fp sequential
-fpr_test_seq(_) ->
-    FalsePositives = lists:sum([measure_fp(?Fpr_Test_DestFPR, ?Fpr_Test_ElementNum) || _ <- lists:seq(1, ?Fpr_Test_NumTests, 1)]),
-    print_fpr_test_result(FalsePositives).
-    
-print_fpr_test_result(FalsePositives) ->
+    FalsePositives = util:p_repeatAndAccumulate(
+                       fun measure_fp/2, 
+                       [?Fpr_Test_DestFPR, ?Fpr_Test_ElementNum], 
+                       ?Fpr_Test_NumTests, 
+                       fun(X, Y) -> X + Y end, 
+                       0),
     AvgFpr = FalsePositives / ?Fpr_Test_NumTests,
     ?BLOOM:print(newBloom(?Fpr_Test_ElementNum, ?Fpr_Test_DestFPR)),
-    io:format("DestFpr: ~f~nMeasured Fpr: ~f~n", [?Fpr_Test_DestFPR, AvgFpr]).    
+    io:format("~nDestFpr: ~f~nMeasured Fpr: ~f~n", [?Fpr_Test_DestFPR, AvgFpr]),
+    ?assert(?Fpr_Test_DestFPR >= AvgFpr orelse ?Fpr_Test_DestFPR*1.3 >= AvgFpr),
+    ok.   
 
 %% @doc adds numbers from 1 to "Elements" to bloom filter "BF"
 addIntSeq(BF, 1) ->
@@ -113,44 +108,3 @@ newBloom(ElementNum, Fpr) ->
 	HFCount = ?BLOOM:calc_HF_numEx(ElementNum, Fpr),
 	Hfs = ?HFS:new(HFCount),
 	?BLOOM:new(ElementNum, Fpr, Hfs).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% helper functions
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec parallel_test(module(), atom(), [term()], number(), function()) -> any().
-parallel_test(Module, F, Args, Repetitions, ResAggregationF) ->
-    %start workers
-    parallel_run_start(Module, F, Args, Repetitions),
-    %collect results   
-    parallel_collect(Repetitions, ResAggregationF).
-
-parallel_collect(0, Result, _AggF) ->
-    Result;
-parallel_collect(ResNum, Result, ResAggregationF) -> 
-    receive
-        {parallel_result, R} -> 
-            parallel_collect(ResNum - 1, ResAggregationF(Result, R), ResAggregationF)
-    end.
-
-parallel_collect(ResNum, ResAggregationF) -> 
-    receive
-        {parallel_result, R} -> 
-            parallel_collect(ResNum - 1, R, ResAggregationF)
-    end.
-
-parallel_run(SourcePid, Module, Function, Args) ->
-    Res = (catch apply(Module, Function, Args)),
-    SourcePid ! {parallel_result, Res}.
-
-parallel_run_start(Module, Function, Args, 1) ->
-    spawn_opt(?MODULE, parallel_run, [self(), Module, Function, Args], [{priority, low}]);
-parallel_run_start(Module, Function, Args, Repetitions) ->    
-    spawn_opt(?MODULE, parallel_run, [self(), Module, Function, Args], [{priority, low}]),
-    parallel_run_start(Module, Function, Args, Repetitions - 1).
-
-
-
-
