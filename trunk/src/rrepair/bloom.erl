@@ -82,6 +82,40 @@ is_element_(Bloom, Item) ->
 	Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
 	check_Bits(Filter, Positions).
 
+%% @doc joins two bloom filter, returned bloom filter represents their union
+join_(#bloom{size = Size1, expItems = ExpItem1, addedItems = Items1, targetFPR = Fpr1,
+             filter = F1, hfs = Hfs}, 
+      #bloom{size = Size2, expItems = ExpItem2, addedItems = Items2, targetFPR = Fpr2,
+             filter = F2}) ->
+    NewSize = max(Size1, Size2),
+    <<F1Val : Size1>> = F1,
+    <<F2Val : Size2>> = F2,
+    NewFVal = F1Val bor F2Val,
+    #bloom{
+           size = NewSize,
+           filter = <<NewFVal:NewSize>>,                            
+           expItems = max(ExpItem1, ExpItem2), 
+           targetFPR = min(Fpr1, Fpr2),
+           hfs = Hfs,                              
+           addedItems = Items1 + Items2 %approximation            
+           }.
+
+%% @doc checks equality of two bloom filters
+equals_(Bloom1, Bloom2) ->
+    #bloom{
+           size = Size1, 
+           addedItems = Items1,
+           filter = Filter1
+          } = Bloom1,
+    #bloom{
+           size = Size2, 
+           addedItems = Items2,
+           filter = Filter2
+          } = Bloom2,
+    Size1 =:= Size2 andalso
+        Items1 =:= Items2 andalso
+        Filter1 =:= Filter2.
+
 % @doc bloom filter debug information
 print_(Bloom) -> 
 	#bloom{
@@ -139,13 +173,9 @@ check_Bits(Filter, [Pos | Positions]) ->
 	end.
 
 %% helper functions
--spec log(float(), integer()) -> float().
-log(Val, Base) -> 
-	math:log(Val) / math:log(Base).
-
--spec ln(float()) -> float().
-ln(Val) -> 
-	log(Val, math:exp(1)).
+-spec ln(X::number()) -> float().
+ln(X) -> 
+	util:log(X, math:exp(1)).
 
 % @doc Increases Val until Val rem Div == 0.
 -spec resize(integer(), integer()) -> integer().

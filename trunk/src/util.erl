@@ -680,13 +680,14 @@ p_repeatAndAccumulate(Fun, Args, Times, AccuFun, Accumulator) ->
 p_repeat(Fun, Args, Times, DoAnswer) ->
     s_repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, DoAnswer]], Times).
 
--spec parallel_run(pid(), fun(), args(), boolean()) -> none().
-parallel_run(SourcePid, Fun, Args, DoAnswer) ->
+-spec parallel_run(pid(), fun(), args(), boolean()) -> ok.
+parallel_run(SrcPid, Fun, Args, DoAnswer) ->
     Res = (catch apply(Fun, Args)),
     case DoAnswer of
-        true -> SourcePid ! {parallel_result, Res};
-        _ -> []
-    end.
+        true -> comm:send_local(SrcPid, {parallel_result, Res});
+        _ -> ok 
+    end,
+    ok.
 
 -spec parallel_collect(non_neg_integer(), accumulatorFun(any(), U), U) -> U.
 parallel_collect(0, _, Accumulator) ->

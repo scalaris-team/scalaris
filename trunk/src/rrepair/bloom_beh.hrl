@@ -18,7 +18,7 @@
 %% @version $Id$
 
 -export([new/3, add/2, addRange/2, is_element/2]).
--export([print/1]).
+-export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/2,
          calc_HF_numEx/2,
@@ -26,7 +26,8 @@
          calc_FPR/3]).
 
 %% types
--opaque bloomFilter() :: bloomFilter_t().
+%-opaque bloomFilter() :: bloomFilter_t().
+-type bloomFilter() :: bloomFilter_t(). %make opaque causes lots of dialyzer warnings
 -type key() :: any().
 
 -ifdef(with_export_type_support).
@@ -47,10 +48,14 @@ addRange(Bloom, Items) -> addRange_(Bloom, Items).
 -spec is_element(bloomFilter(), key()) -> boolean().
 is_element(Bloom, Item) -> is_element_(Bloom, Item).
 
+-spec equals(bloomFilter(), bloomFilter()) -> boolean().
+equals(Bloom1, Bloom2) -> equals_(Bloom1, Bloom2).
+
 -spec print(bloomFilter()) -> ok.
 print(Bloom) -> print_(Bloom). 
 
-
+-spec join(bloomFilter(), bloomFilter()) -> bloomFilter().
+join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Common bloom filter calculations
@@ -77,7 +82,7 @@ calc_HF_numEx(N, FPR) ->
 %       with a bounded false-positive rate up to MaxElements.
 -spec calc_least_size(integer(), float()) -> integer().
 calc_least_size(N, FPR) -> 
-	trunc(N * log(math:exp(1), 2) * log(1 / FPR, 2)). 
+	trunc(N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2)). 
 
 % @doc  Calculates FPR for an M-bit large BloomFilter with K Hashfuntions 
 %       and a maximum of N elements.
@@ -92,4 +97,6 @@ calc_FPR(M, N, K) ->
 -spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloomFilter_t().					 
 -spec addRange_(bloomFilter_t(), [key()]) -> bloomFilter_t().
 -spec is_element_(bloomFilter_t(), key()) -> boolean().
+-spec equals_(bloomFilter(), bloomFilter()) -> boolean().
+-spec join_(bloomFilter(), bloomFilter()) -> bloomFilter().
 -spec print_(bloomFilter_t()) -> ok.

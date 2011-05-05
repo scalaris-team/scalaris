@@ -41,7 +41,7 @@
 -type sync_struct() :: %TODO add merkleTree + art
     {   
         Interval    :: intervals:interval(), 
-        SrcNode     :: pid(),
+        SrcNode     :: comm:mypid(),
         KeyBF       :: ?REP_BLOOM:bloomFilter(),
         KeyVersBF   :: ?REP_BLOOM:bloomFilter()
     }. 
@@ -84,7 +84,7 @@ on({get_state_response, NodeDBInterval}, State) ->
 %% @doc retriebe local node db
 on({get_chunk_response, DB}, {SyncMethod, _TriggerState} = State) ->
     ?TRACE("~nDEBUG Node-DB ~p~n", [DB]),
-    spawn(fun build_SyncStruct/3, [self(), SyncMethod, DB]),
+    spawn(fun() -> build_SyncStruct(self(), SyncMethod, DB) end),
     State;
 
 on({recv_sync, bloom, {_Interval, _Bloom}}, State) ->
@@ -118,7 +118,7 @@ on({web_debug_info, Requestor},
 % SyncStruct building
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_SyncStruct(comm:erl_local_pid(), sync_method(), db_chunk()) -> sync_struct().
+-spec build_SyncStruct(comm:erl_local_pid(), sync_method(), db_chunk()) -> ok.
 build_SyncStruct(SourcePid, SyncMethod, DB) ->
     SyncStruct = case SyncMethod of
                      bloom ->
