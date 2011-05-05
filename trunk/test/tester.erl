@@ -277,14 +277,6 @@ parse_type({type, _Line, 'function', []}, _Module, ParseState) ->
     {{'function'}, ParseState};
 parse_type({type, _Line, 'fun', []}, _Module, ParseState) ->
     {{'function'}, ParseState};
-parse_type({type, _Line, TypeName, []}, Module, ParseState) ->
-    %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
-    case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
-        true ->
-            {{typedef, Module, TypeName}, ParseState};
-        false ->
-            {{typedef, Module, TypeName}, tester_parse_state:add_unknown_type(Module, TypeName, ParseState)}
-    end;
 parse_type({type, _Line, record, [{atom, _Line2, TypeName}]}, Module, ParseState) ->
     {{record, Module, TypeName}, ParseState};
 parse_type({type, _Line, record, [{atom, _Line2, TypeName} | Fields]}, Module, ParseState) ->
@@ -330,6 +322,14 @@ parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState
             end,
     {Constraints, ParseState3} = lists:foldl(Foldl, {[], ParseState2}, ConstraintList),
     {{bounded_fun, InternalFunType, Constraints}, ParseState3};
+parse_type({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
+    %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
+    case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
+        true ->
+            {{typedef, Module, TypeName}, ParseState};
+        false ->
+            {{typedef, Module, TypeName}, tester_parse_state:add_unknown_type(Module, TypeName, ParseState)}
+    end;
 parse_type(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
     {unkown, ParseState}.
