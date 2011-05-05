@@ -36,12 +36,14 @@
 -define(Fpr_Test_ElementNum, 1000).
 
 all() -> [
-		  bloom_addSimple,
-		  bloom_addRange,
+		  add,
+		  addRange,
+          join,
+          equals,
           fpr_test_parallel
 		 ].
 
-bloom_addSimple(_) -> 
+add(_) -> 
 	BF = newBloom(10, 0.1),
 	B1 = ?BLOOM:add(BF, "10"),
 	B2 = ?BLOOM:add(B1, 10),
@@ -50,7 +52,7 @@ bloom_addSimple(_) ->
     ?equals(?BLOOM:is_element(B3, "100"), false),
     ?equals(?BLOOM:is_element(B3, 10.3), true).
 
-bloom_addRange(_) ->	
+addRange(_) ->	
 	BF = newBloom(10, 0.1),
 	Elements = lists:seq(1,10,1),
 	BF1 = ?BLOOM:addRange(BF, Elements),
@@ -60,6 +62,27 @@ bloom_addRange(_) ->
 	?equals(lists:member(false, Results), false),
     ?equals(?BLOOM:is_element(BF1, "Not"), false),
     ?equals(?BLOOM:is_element(BF1, 2), true).
+
+join(_) ->
+    BF1 = for_to_ex(1, 10, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),
+    BF2 = for_to_ex(11, 20, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),
+    BF3 = ?BLOOM:join(BF1, BF2),
+    NumFound = for_to_ex(1, 20, 
+                         fun(I) -> case ?BLOOM:is_element(BF3, I) of
+                                       true -> 1;
+                                       false -> 0
+                                   end
+                         end,
+                         fun(X,Y) -> X+Y end, 0),
+    io:format("join NumFound=~B~n", [NumFound]),
+    ?assert(NumFound > 10 andalso NumFound =< 20),
+    ok.
+
+equals(_) ->
+    BF1 = for_to_ex(1, 10, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),
+    BF2 = for_to_ex(1, 10, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),    
+    ?equals(?BLOOM:equals(BF1, BF2), true),
+    ok.
 
 %% @doc ?Fpr_Test_NumTests-fold parallel run of measure_fp
 fpr_test_parallel(_) ->
@@ -75,36 +98,40 @@ fpr_test_parallel(_) ->
     ?assert(?Fpr_Test_DestFPR >= AvgFpr orelse ?Fpr_Test_DestFPR*1.3 >= AvgFpr),
     ok.   
 
-%% @doc adds numbers from 1 to "Elements" to bloom filter "BF"
-addIntSeq(BF, 1) ->
-    ?BLOOM:add(BF, 1);
-addIntSeq(BF, Elements) ->
-    BF2 = addIntSeq(BF, Elements - 1),
-    ?BLOOM:add(BF2, Elements).
-
-%% @doc checks how mutch integers from "From" to "To" are element of bloom filter "BF"
-checkIntSeq(BF, To, To) ->
-    case ?BLOOM:is_element(BF, To) of
-        true -> 1;
-        false -> 0
-    end;
-checkIntSeq(BF, From, To) ->
-    Res = case ?BLOOM:is_element(BF, From) of
-              true -> 1;
-              false -> 0
-          end,
-    Res + checkIntSeq(BF, From + 1, To).
-
 %% @doc measures false positives by adding 1..MaxElements into a new BF
 %%      and checking number of found items which are not in the BF
 measure_fp(DestFpr, MaxElements) ->
 	BF = newBloom(MaxElements, DestFpr),
-    BF1 = addIntSeq(BF, MaxElements),
+    BF1 = for_to_ex(1, MaxElements, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, BF),
 	NumNotIn = trunc(10 / DestFpr),
-    NumFound = checkIntSeq(BF1, MaxElements + 1, MaxElements + 1 + NumNotIn),
+    NumFound = for_to_ex(MaxElements + 1, 
+                         MaxElements + 1 + NumNotIn, 
+                         fun(I) -> case ?BLOOM:is_element(BF1, I) of
+                                       true -> 1;
+                                       false -> 0
+                                   end
+                         end,
+                         fun(X,Y) -> X+Y end,
+                         0),       
 	NumFound / NumNotIn.
 
 newBloom(ElementNum, Fpr) ->
 	HFCount = ?BLOOM:calc_HF_numEx(ElementNum, Fpr),
 	Hfs = ?HFS:new(HFCount),
 	?BLOOM:new(ElementNum, Fpr, Hfs).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% UTILS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for_to_ex(I, N, Fun, AccuFun, Accu) ->
+    NewAccu = AccuFun(Fun(I), Accu),
+    if 
+        I < N ->
+            for_to_ex(I + 1, N, Fun, AccuFun, NewAccu);
+        I =:= N ->
+            NewAccu;
+        I > N ->
+            failed
+    end.
