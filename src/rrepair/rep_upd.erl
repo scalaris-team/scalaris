@@ -25,8 +25,8 @@
 
 -export([start_link/1, init/1, on/2, check_config/0]).
 
-%-define(TRACE(X,Y), io:format(X,Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -40,10 +40,10 @@
 -type db_chunk() :: {intervals:interval(), ?DB:db_as_list()}.
 -type sync_struct() :: %TODO add merkleTree + art
     {   
-        Interval    :: intervals:interval(), 
-        SrcNode     :: comm:mypid(),
-        KeyBF       :: ?REP_BLOOM:bloomFilter(),
-        KeyVersBF   :: ?REP_BLOOM:bloomFilter()
+        Interval :: intervals:interval(), 
+        SrcNode  :: comm:mypid(),
+        KeyBF    :: ?REP_BLOOM:bloomFilter(),
+        VersBF   :: ?REP_BLOOM:bloomFilter()
     }. 
 -type sync_method() :: bloom | merkleTree | art.
 -type state() :: 
@@ -63,28 +63,31 @@
 %% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
 on({?TRIGGER_NAME}, {SyncMethod, TriggerState}) ->
-	%STEPS
-	%1) SELECT DEST
-	%2) CREATE SYNC STRUCT
-    %retrieve node db-intervall
     DhtNodePid = pid_groups:find_a(dht_node),
     comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
-	%3) SEND SyncStruct 2 DEST
-	%4) DONE - NEW TRIGGER
+    
 	NewTriggerState = trigger:next(TriggerState),
-    ?TRACE("~nDEBUG Trigger NEXT~n", []),
+    ?TRACE("Trigger NEXT", []),
 	{SyncMethod, NewTriggerState};
 
 %% @doc retrieve node responsibility interval
 on({get_state_response, NodeDBInterval}, State) ->
-    ?TRACE("~nDEBUG DB-Intervall ~p~n", [NodeDBInterval]),
+    %?TRACE("DB-Intervall ~p", [NodeDBInterval]),
     DhtNodePid = pid_groups:find_a(dht_node),
     comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, 10000}), %TODO remove 10k constant
     State;
 %% @doc retriebe local node db
 on({get_chunk_response, DB}, {SyncMethod, _TriggerState} = State) ->
-    ?TRACE("~nDEBUG Node-DB ~p~n", [DB]),
-    spawn(fun() -> build_SyncStruct(self(), SyncMethod, DB) end),
+    %?TRACE("Node-DB ~p", [DB]),
+    MyPid = self(),
+    Pid = spawn(fun() -> build_SyncStruct(MyPid, SyncMethod, DB) end),    
+    ?TRACE("get_chunk: let [~p] build SyncStruct", [Pid]),
+    State;
+%% @doc SyncStruct is build and can be send to a node for synchronization
+on({get_sync_struct_response, _SyncStruct}, State) ->
+    %?TRACE("SyncStruct ~p", [SyncStruct]),
+    %1) SELECT DEST    
+    %3) SEND SyncStruct 2 DEST    
     State;
 
 on({recv_sync, bloom, {_Interval, _Bloom}}, State) ->
@@ -104,7 +107,6 @@ on({recv_sync, merkleTree, _}, _) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 on({web_debug_info, Requestor}, 
    {SyncMethod, _TriggerState} = State) ->
     KeyValueList =
@@ -129,27 +131,39 @@ build_SyncStruct(SourcePid, SyncMethod, DB) ->
                          ok %TODO
                  end,
     comm:send_local(SourcePid, {get_sync_struct_response, SyncStruct}),
+    ?TRACE("build_SyncStruct - finished send response to [~p]", [SourcePid]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % BloomFilter building
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Build two bloom filter, one over all keys (BF1), 
-%%      one over all keys concatenated with their version (BF2)
+%% @doc Create two bloom filter of a given database chunk.
+%%      One over all keys and one over all keys concatenated with their version.
+-spec fill_bloom(?DB:db_as_list(), 
+                 KeyBF::?REP_BLOOM:bloomFilter(), 
+                 VerBF::?REP_BLOOM:bloomFilter()) -> 
+          {?REP_BLOOM:bloomFilter(), ?REP_BLOOM:bloomFilter()}.
+fill_bloom([], KeyBF, VerBF) ->
+    {KeyBF, VerBF};
+fill_bloom([H | T], KeyBF, VerBF) ->
+    {Key, _, _, _, Ver} = H,
+    AddKey = lists:min(?RT:get_replica_keys(Key)), %map keys to their smallest associated key
+    NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
+    NewVerBF = ?REP_BLOOM:add(VerBF, integer_to_list(AddKey) ++ "#" ++ integer_to_list(Ver)),
+    fill_bloom(T, NewKeyBF, NewVerBF).
+
+%% @doc Build bloom filter sync struct.
 -spec build_bloom(db_chunk()) -> sync_struct().
-build_bloom({Interval, _DB}) ->
-    %create bloom filter
+build_bloom({Interval, DB}) ->
     Fpr = 0.001,           %TODO move to config?
-    ElementNum = 10000,    %TODO set to node db item cout + 5%?
+    ElementNum = 10,    %TODO set to node db item cout + 5%?
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     Hfs = ?REP_HFS:new(HFCount),
     BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
     BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
-    %fill bloom filter
-    %TODO
-	%lists:min(?RT:get_replica_keys(Key)) %map keys to their smallest associated key
-	{Interval, comm:this(), BF1, BF2}.
+    {KeyBF, VerBF} = fill_bloom(DB, BF1, BF2),
+	{Interval, comm:this(), KeyBF, VerBF}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
