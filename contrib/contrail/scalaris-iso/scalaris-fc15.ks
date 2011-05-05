@@ -8,7 +8,7 @@ part / --size 1024
 firstboot --disable
 bootloader --timeout=1
 
-repo --name=fedora-14 --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-14&arch=$basearch
+repo --name=fedora-14 --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-15&arch=$basearch
 repo --name=scalaris --baseurl=http://download.opensuse.org/repositories/home:/scalaris/Fedora_14/
 
 %packages
@@ -27,7 +27,7 @@ scalaris-svn
 ruby-scalaris-svn
 ruby
 screen
-# virt-what starting with FC15
+virt-what
 
 # for debugging
 strace
