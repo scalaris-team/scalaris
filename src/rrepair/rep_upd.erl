@@ -37,15 +37,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -type db_chunk() :: {intervals:interval(), ?DB:db_as_list()}.
--type sync_struct() :: %TODO add merkleTree + art
-    {   
-        Interval :: intervals:interval(), 
-        SrcNode  :: comm:mypid(),
-        KeyBF    :: ?REP_BLOOM:bloomFilter(),
-        VersBF   :: ?REP_BLOOM:bloomFilter()
-    }. 
 -type sync_method() :: bloom | merkleTree | art.
+
+-type sync_struct() :: %TODO add merkleTree + art
+    bloom_sync:bloom_sync_struct(). 
+
 -type state() :: 
     {
         Sync_method     :: sync_method(),  
@@ -53,7 +51,10 @@
     }.
 -type message() ::
 	{?TRIGGER_NAME} |
-    {recv_sync, sync_method(), sync_struct()} |
+    {get_state_response, any()} |
+    {get_chunk_response, db_chunk()} |
+    {get_sync_struct_response, intervals:interval(), sync_struct()} |
+    {request_sync, sync_method(), sync_struct()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -63,7 +64,7 @@
 %% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
 on({?TRIGGER_NAME}, {SyncMethod, TriggerState}) ->
-    DhtNodePid = pid_groups:find_a(dht_node),
+    DhtNodePid = pid_groups:get_my(dht_node),
     comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
     
 	NewTriggerState = trigger:next(TriggerState),
@@ -72,37 +73,39 @@ on({?TRIGGER_NAME}, {SyncMethod, TriggerState}) ->
 
 %% @doc retrieve node responsibility interval
 on({get_state_response, NodeDBInterval}, State) ->
-    %?TRACE("DB-Intervall ~p", [NodeDBInterval]),
-    DhtNodePid = pid_groups:find_a(dht_node),
+    DhtNodePid = pid_groups:get_my(dht_node),
     comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, 10000}), %TODO remove 10k constant
     State;
 %% @doc retriebe local node db
 on({get_chunk_response, DB}, {SyncMethod, _TriggerState} = State) ->
-    %?TRACE("Node-DB ~p", [DB]),
     MyPid = self(),
     Pid = spawn(fun() -> build_SyncStruct(MyPid, SyncMethod, DB) end),    
     ?TRACE("get_chunk: let [~p] build SyncStruct", [Pid]),
     State;
 %% @doc SyncStruct is build and can be send to a node for synchronization
-on({get_sync_struct_response, _SyncStruct}, State) ->
-    %?TRACE("SyncStruct ~p", [SyncStruct]),
-    %1) SELECT DEST    
-    %3) SEND SyncStruct 2 DEST    
+on({get_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _} = State) ->
+    ?TRACE("~p", [SyncStruct]),
+    DhtNodePid = pid_groups:get_my(dht_node),
+    {_, _, RKey, RBr} = intervals:get_bounds(Interval),
+    Key = case RBr of
+              ')' -> RKey - 1;
+              ']' -> RKey
+          end,
+    Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
+    DestKey = lists:nth(random:uniform(erlang:length(Keys)), Keys),
+    comm:send_local(DhtNodePid, 
+                    {lookup_aux, DestKey, 0, 
+                        {send_to_group_member, ?PROCESS_NAME, 
+                            {request_sync, SyncMethod, SyncStruct}}}),
     State;
-
-on({recv_sync, bloom, {_Interval, _Bloom}}, State) ->
-	%1) FIND ALL DB-ENTRIES NOT IN KEY VERS BLOOM (KV_BF)
-    %a) CHECK IF ENTRY ALSO NOT IN K_BF -> MISSING REP -> DO REGEN
-    %b) IF NOT IN KV_BF AND IN K_BF -> outdated found -> DO UDPATE
+%% @doc receive sync request and spawn a new process which executes a sync protocol
+on({request_sync, Sync_method, SyncStruct}, State) ->
+    _ = case Sync_method of
+            bloom       -> bloom_sync:start_bloom_sync(SyncStruct);
+            merkleTree  -> ok;
+            art         -> ok
+        end,
 	State;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MerkleTree Sync Message handling
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%TODO
-on({recv_sync, merkleTree, _}, _) ->
-	ok;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling
@@ -120,8 +123,9 @@ on({web_debug_info, Requestor},
 % SyncStruct building
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc builds desired synchronization structure and replies it to SourcePid
 -spec build_SyncStruct(comm:erl_local_pid(), sync_method(), db_chunk()) -> ok.
-build_SyncStruct(SourcePid, SyncMethod, DB) ->
+build_SyncStruct(SourcePid, SyncMethod, {ChunkInterval, _} = DB) ->
     SyncStruct = case SyncMethod of
                      bloom ->
                          build_bloom(DB);
@@ -130,7 +134,7 @@ build_SyncStruct(SourcePid, SyncMethod, DB) ->
                      art ->
                          ok %TODO
                  end,
-    comm:send_local(SourcePid, {get_sync_struct_response, SyncStruct}),
+    comm:send_local(SourcePid, {get_sync_struct_response, ChunkInterval, SyncStruct}),
     ?TRACE("build_SyncStruct - finished send response to [~p]", [SourcePid]),
     ok.
 
@@ -148,10 +152,15 @@ fill_bloom([], KeyBF, VerBF) ->
     {KeyBF, VerBF};
 fill_bloom([H | T], KeyBF, VerBF) ->
     {Key, _, _, _, Ver} = H,
-    AddKey = lists:min(?RT:get_replica_keys(Key)), %map keys to their smallest associated key
-    NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
-    NewVerBF = ?REP_BLOOM:add(VerBF, integer_to_list(AddKey) ++ "#" ++ integer_to_list(Ver)),
-    fill_bloom(T, NewKeyBF, NewVerBF).
+    case Ver of
+        -1 ->
+            fill_bloom(T, KeyBF, VerBF);
+        _ ->
+            AddKey = lists:min(?RT:get_replica_keys(Key)), %map keys to their smallest associated key
+            NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
+            NewVerBF = ?REP_BLOOM:add(VerBF, erlang:list_to_binary([term_to_binary(AddKey), "#", Ver])),
+            fill_bloom(T, NewKeyBF, NewVerBF)            
+    end.
 
 %% @doc Build bloom filter sync struct.
 -spec build_bloom(db_chunk()) -> sync_struct().
