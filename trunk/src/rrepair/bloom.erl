@@ -87,15 +87,15 @@ join_(#bloom{size = Size1, expItems = ExpItem1, addedItems = Items1, targetFPR =
              filter = F1, hfs = Hfs}, 
       #bloom{size = Size2, expItems = ExpItem2, addedItems = Items2, targetFPR = Fpr2,
              filter = F2}) ->
-    NewSize = max(Size1, Size2),
+    NewSize = erlang:max(Size1, Size2),
     <<F1Val : Size1>> = F1,
     <<F2Val : Size2>> = F2,
     NewFVal = F1Val bor F2Val,
     #bloom{
            size = NewSize,
            filter = <<NewFVal:NewSize>>,                            
-           expItems = max(ExpItem1, ExpItem2), 
-           targetFPR = min(Fpr1, Fpr2),
+           expItems = erlang:max(ExpItem1, ExpItem2), 
+           targetFPR = erlang:min(Fpr1, Fpr2),
            hfs = Hfs,                              
            addedItems = Items1 + Items2 %approximation            
            }.
