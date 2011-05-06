@@ -20,7 +20,7 @@
 
 -behaviour(supervisor).
 
--export([start_link/0, init/1]).
+-export([start_link/0, init/1, check_config/0]).
 
 -spec start_link() -> {ok, Pid::pid()} | ignore |
                       {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
@@ -35,6 +35,7 @@ start_link() ->
                  {port, config:read(yaws_port)},
                  {listen, {0,0,0,0}},
                  {allowed_scripts, [yaws]},
+                 {partial_post_size, config:read(yaws_max_post_data)},
                  {flags, [{access_log, false}]} % {deflate, true}
                 ],
     
@@ -64,3 +65,17 @@ start_link() ->
                          ChildSpecs}}.
 init(ChildSpecs) ->
     {ok, {{one_for_all, 10, 1}, ChildSpecs}}.
+
+%% @doc Checks whether config parameters of the cyclon process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_string(docroot) and
+    config:is_string(log_path) and
+    config:is_port(yaws_port) and
+        
+    case config:read(yaws_max_post_data) of
+        nolimit -> true;
+        _ -> config:is_integer(yaws_max_post_data) and
+             config:is_greater_than(yaws_max_post_data, 0)
+    end.
