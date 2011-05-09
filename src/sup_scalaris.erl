@@ -57,7 +57,7 @@ start_link(Options) ->
 init(Options) ->
     randoms:start(),
     _ = config:start_link2(Options),
-    ServiceGroup = pid_groups:new("basic_services_"),
+    ServiceGroup = "basic_services",
     ErrorLoggerFile = filename:join(config:read(log_path),
                                     config:read(log_file_name_errorlogger)),
     case error_logger:logfile({open, ErrorLoggerFile}) of
@@ -121,6 +121,9 @@ my_process_list(ServiceGroup, Options) ->
     YAWS =
         util:sup_supervisor_desc(yaws, sup_yaws, start_link, []),
 
+    ServicePaxosGroup = util:sup_supervisor_desc(
+                          sup_service_paxos_group, sup_paxos, start_link,
+                          [ServiceGroup, []]),
     %% order in the following list is the start order
     BasicServers = [Config,
                     Logger,
@@ -129,7 +132,8 @@ my_process_list(ServiceGroup, Options) ->
                     CommLayer,
                     FailureDetector,
                     AdminServer,
-                    ClientsDelayer],
+                    ClientsDelayer,
+                    ServicePaxosGroup],
     Servers = [YAWS, BenchServer, Ganglia],
     MgmtServers =
         case StartMgmtServer orelse util:is_unittest() of

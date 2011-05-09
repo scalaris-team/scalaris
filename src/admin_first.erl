@@ -29,4 +29,41 @@
 is_first_vm() ->
     util:is_unittest()
         orelse
-    util:app_get_env(first, false) =:= true.
+    util:app_get_env(first, false) =:= true
+        orelse
+    (util:app_get_env(first_quorum, false) =:= true andalso has_first_quorum()).
+
+has_first_quorum() ->
+    % determine own IP
+    dht_node:trigger_known_nodes(),
+    KnownHosts = config:read(known_hosts),
+    MyServicePerVM = comm:get(service_per_vm, comm:this()),
+    case lists:member(MyServicePerVM, KnownHosts) of
+        false ->
+            false;
+        true ->
+            PaxosId = leader_election_for_first_quorum,
+            MyProposer = comm:get('basic_services-paxos_proposer', comm:this()),
+            MyAcceptor = comm:get('basic_services-paxos_acceptor', comm:this()),
+            MyLearner = comm:get('basic_services-paxos_learner', comm:this()),
+            Acceptors = [comm:get('basic_services-paxos_acceptor', Host) || Host <- KnownHosts],
+            Learners = [comm:get('basic_services-paxos_learner', Host) || Host <- KnownHosts],
+            Proposal = {leader, MyServicePerVM},
+            MaxProposers = length(KnownHosts),
+            Majority = quorum:majority_for_accept(MaxProposers),
+            Rank = index_of(MyServicePerVM, KnownHosts),
+
+            acceptor:start_paxosid(MyAcceptor, PaxosId, Learners),
+            learner:start_paxosid(MyLearner, PaxosId, Majority, comm:this(), client_cookie),
+            proposer:start_paxosid(MyProposer, PaxosId,
+                                   Acceptors, Proposal, Majority, MaxProposers, Rank),
+            receive
+                {learner_decide, client_cookie, PaxosId, {leader, TheLeader}} ->
+                    TheLeader =:= MyServicePerVM
+            end
+    end.
+
+index_of(P, [P|_Rest]) ->
+    1;
+index_of(P, [_|Rest]) ->
+    1 + index_of(P, Rest).

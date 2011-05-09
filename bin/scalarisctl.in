@@ -55,7 +55,8 @@ usage(){
     echo " options:"
     echo "    -h        - print this help message"
     echo "    -d        - daemonize"
-    echo "    -f        - first node (to start a new Scalaris instead of joining one)"
+    echo "    -f        - first node (to start a new Scalaris instead of joining one) (not with -q)"
+    echo "    -q        - elect first node from known hosts (not with -f)"
     echo "    -n <name> - Erlang process name (default 'node')"
     echo "    -p <port> - TCP port for the Scalaris node"
     echo "    -y <port> - TCP port for the built-in webserver"
@@ -237,6 +238,9 @@ scalarisstart(){
     if [ $first -eq 1 ]; then
         tmp="$tmp -scalaris first true"
     fi
+    if [ $first_quorum -eq 1 ]; then
+        tmp="$tmp -scalaris first_quorum true"
+    fi
     if [ "$port" != "" ]; then
         tmp="$tmp -scalaris port $port"
     fi
@@ -300,10 +304,11 @@ debug(){
 fix_paths
 SCALARIS_COOKIE="`get_cookie`"
 
-while getopts "dhifmsgn:p:y:k:" optionName; do
+while getopts "dhifqmsgn:p:y:k:" optionName; do
     case "$optionName" in
         d) daemonize=1;;
         f) first=1;;
+        q) first_quorum=1;;
         h) usage 0;;
         i) echo "WARN: interactive is now default";;
         k) join_at=$OPTARG;;
