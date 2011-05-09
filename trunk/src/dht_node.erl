@@ -420,8 +420,7 @@ trigger_known_nodes() ->
 %%      this is the first node in this VM.
 -spec is_first([tuple()]) -> boolean().
 is_first(Options) ->
-    lists:member({first}, Options) andalso
-        (util:is_unittest() orelse util:app_get_env(first, false) =:= true).
+    lists:member({first}, Options) andalso admin_first:is_first_vm().
 
 -spec is_alive(Pid::pid()) -> boolean().
 is_alive(Pid) ->
