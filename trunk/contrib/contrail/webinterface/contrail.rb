@@ -71,6 +71,7 @@ end
 get '/scalaris/:id' do
   @id = params[:id].to_i
   @instance = Scalaris[@id]
+  @ips = ScalarisHelper.get_ips(@id)
   erb :scalaris_instance
 end
 
@@ -82,8 +83,8 @@ end
 post '/scalaris' do
   if params["user"] != nil and params["user"] != ""
     @valid = true
-    instance = Scalaris.create(:user => params["user"])
     @vm_id = ScalarisHelper.create[1]
+    instance = Scalaris.create(:user => params["user"], :head_node => @vm_id)
     instance.add_vm(:one_vm_id => @vm_id)
     @id = instance.id
   else
@@ -93,6 +94,15 @@ post '/scalaris' do
   end
   @params = params.to_json
   erb :scalaris_create
+end
+
+post '/scalaris/:id/add' do
+  @id = params[:id].to_i
+  @instance = Scalaris[@id]
+  @new_vm_id = ScalarisHelper.add(@id)[1]
+  @instance.add_vm(:one_vm_id => @new_vm_id)
+  @params = params.to_json
+  erb :scalaris_add
 end
 
 #DB.loggers << Logger.new($stdout)

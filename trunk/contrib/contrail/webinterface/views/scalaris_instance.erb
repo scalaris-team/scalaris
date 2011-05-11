@@ -9,10 +9,23 @@ Id: <%= @id %><br>
 
 Created at: <%= @instance.created_at %><br>
 
+Head node: #<%= @instance.head_node %><br>
+
 <h3>VMs</h3>
 <% @instance.vms_dataset.each do |vm| %>
-  <li><a href="/one/vm/<%= vm.one_vm_id %>"><%= vm.one_vm_id %></a></li>
+  <li><a href="/one/vm/<%= vm.one_vm_id %>">#<%= vm.one_vm_id %></a></li>
 <% end %>
 
+<fieldset style="border: 1px black solid">
+<form action="/scalaris/<%= @id %>/add" method="post">
+  <div style="margin:0;padding:0;display:inline">
+    <input name="_method" type="hidden" value="post" />
+  </div>
+  <input id="submit" name="commit" type="submit" value="Add New Instance" />
+</form>
+</fieldset>
+
+<br/>
+<a href="/">Main</a> <a href="/scalaris">Scalaris</a> <a href="/one">OpenNebula</a>
 </body>
 </html>
