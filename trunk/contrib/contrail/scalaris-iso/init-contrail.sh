@@ -12,13 +12,23 @@ if [ "x$SCALARIS_FIRST" = xtrue ]; then
   ADDR=`ifconfig eth0 | grep "inet addr:" | cut -d ':' -f 2 | cut -d ' ' -f 1`
   ERLANG_ADDR=`echo $ADDR | tr . ,`
 
-  echo "{known_host, [{{$ERLANG_ADDR}, 14195, cyclon_thread}]}." >> /etc/scalaris/scalaris.local.cfg
+  echo "{known_hosts, [{{$ERLANG_ADDR}, 14195, service_per_vm}]}." >> /etc/scalaris/scalaris.local.cfg
+  echo "{mgmt_server, {{$ERLANG_ADDR}, 14195, mgmt_server}}." >> /etc/scalaris/scalaris.local.cfg
   SCALARIS_PARAMS="-f -m"
 fi
 
 if [ "x$SCALARIS_FIRST" = xfalse ]; then
   SCALARIS_PARAMS=""
+
+  if [ "x$SCALARIS_KNOWN_HOSTS" != "x" ]; then
+    echo "$SCALARIS_KNOWN_HOSTS" >> /etc/scalaris/scalaris.local.cfg
+  fi
+
+  if [ "x$SCALARIS_MGMT_SERVER" != "x" ]; then
+    echo "$SCALARIS_MGMT_SERVER" >> /etc/scalaris/scalaris.local.cfg
+  fi
 fi
+
 
 # temporary fix, we are waiting for a real scalaris user
 export HOME=/root
