@@ -44,6 +44,8 @@ anaconda
 cp scalaris-contrail.init.d $INSTALL_ROOT/etc/init.d/scalaris-contrail
 cp vmcontext $INSTALL_ROOT/etc/init.d/vmcontext
 cp init-contrail.sh $INSTALL_ROOT/etc/scalaris/init-contrail.sh
+chmod ugo+x $INSTALL_ROOT/etc/init.d/vmcontext
+chmod ugo+x $INSTALL_ROOT/etc/scalaris/init-contrail.sh
 
 %post
 
