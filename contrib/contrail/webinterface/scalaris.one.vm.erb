@@ -32,6 +32,8 @@ NIC = [ network = "Private LAN" ]
 
 CONTEXT = [
   SCALARIS_FIRST="<%= @scalarisfirst %>",
+  SCALARIS_KNOWN_HOSTS="<%= @known_hosts %>",
+  SCALARIS_MGMT_SERVER="<%= @mgmt_server %>",
   ip_private = "$NIC[IP]",
   dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
   ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",

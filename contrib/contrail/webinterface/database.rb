@@ -13,6 +13,7 @@ migration "create scalaris table" do
     String      :known_nodes
     DataTime    :created_at
     DataTime    :updated_at
+    String      :head_node
   end
 end
 
