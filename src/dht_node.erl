@@ -40,7 +40,9 @@
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, util:global_uid()}, Key::?RT:key()} |
-      {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
+      {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()} |
+      {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer()} |
+      {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()}).
 
 -type(lookup_message() ::
       {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
@@ -247,6 +249,23 @@ on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
     Chunk = ?DB:get_chunk(dht_node_state:get(State, db), Interval, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
+
+on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
+    {Exists, Entry} = ?DB:get_entry2(dht_node_state:get(State, db), HashedKey),
+    EntryVersion = db_entry:get_version(Entry),
+    IsNewer = EntryVersion =/= -1 andalso EntryVersion < NewVersion,
+    IsNotLocked = not db_entry:get_writelock(Entry),
+    Updateable = IsNewer andalso IsNotLocked,
+    NewState = case Exists of
+                   true when Updateable ->
+                       UpdateEntry = db_entry:set_version(db_entry:set_value(Entry, NewValue), NewVersion),
+                       NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdateEntry), 
+                       dht_node_state:set_db(State, NewDB);
+                   _ ->
+                       State
+               end,
+    comm:send(Source_PID, {update_key_entry_ack, Exists andalso Updateable}),
+    NewState;
 
 %% for unit testing only: allow direct DB manipulation
 on({get_key_entry, Source_PID, HashedKey}, State) ->
