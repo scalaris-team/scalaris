@@ -158,11 +158,11 @@ encode_object({struct, _Props} = Obj) ->
 	end,
 	V = encode(Value),
 	case Acc of
-	    [] -> [S, $:, V];
-	    _ -> [Acc, $,, S, $:, V]
+	    [] -> S ++ ":" ++ V;
+	    _ -> Acc ++ "," ++ S ++ ":" ++ V
 	end
     end, [], Obj),
-    [${, M, $}].
+    "{" ++ M ++ "}".
 
 %% Encode an Erlang tuple as a JSON array.
 %% Order *is* significant in a JSON array!
@@ -172,10 +172,10 @@ encode_array(T) ->
 	V = encode(E),
 	case Acc of
 	    [] -> V;
-	    _ -> [Acc, $,, V]
+	    _ -> Acc ++ "," ++ V
 	end
     end, [], T),
-    [$[, M, $]].
+    "[" ++ M ++ "]".
 
 %%% SCANNING
 %%%
@@ -580,8 +580,8 @@ obj_fold(Fun, Acc, {struct, Props}) ->
 is_string([]) -> yes;
 is_string(List) -> is_string(List, non_unicode).
 
-is_string([C|Rest], non_unicode) when C >= 0, C =< 255 -> is_string(Rest, non_unicode);
-is_string([C|Rest], _) when C =< 65000 -> is_string(Rest, unicode);
+is_string([C|Rest], non_unicode) when is_integer(C), C >= 0, C =< 255 -> is_string(Rest, non_unicode);
+is_string([C|Rest], _) when is_integer(C), C>= 0, C =< 65000 -> is_string(Rest, unicode);
 is_string([], non_unicode) -> yes;
 is_string([], unicode) -> unicode;
 is_string(_, _) -> no.

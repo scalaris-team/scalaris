@@ -1,0 +1,32 @@
+Index: contrib/yaws/src/json.erl
+===================================================================
+--- contrib/yaws/src/json.erl	(revision 1738)
++++ contrib/yaws/src/json.erl	(working copy)
+@@ -158,11 +158,11 @@
+ 	end,
+ 	V = encode(Value),
+ 	case Acc of
+-	    [] -> [S, $:, V];
+-	    _ -> [Acc, $,, S, $:, V]
++	    [] -> S ++ ":" ++ V;
++	    _ -> Acc ++ "," ++ S ++ ":" ++ V
+ 	end
+     end, [], Obj),
+-    [${, M, $}].
++    "{" ++ M ++ "}".
+ 
+ %% Encode an Erlang tuple as a JSON array.
+ %% Order *is* significant in a JSON array!
+@@ -172,10 +172,10 @@
+ 	V = encode(E),
+ 	case Acc of
+ 	    [] -> V;
+-	    _ -> [Acc, $,, V]
++	    _ -> Acc ++ "," ++ V
+ 	end
+     end, [], T),
+-    [$[, M, $]].
++    "[" ++ M ++ "]".
+ 
+ %%% SCANNING
+ %%%
