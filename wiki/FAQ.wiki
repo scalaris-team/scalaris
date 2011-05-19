@@ -244,4 +244,11 @@ It is not so much an error but a message created by the Erlang runtime that this
 
 == Publishing topics with Erlang !R13B01 may fail ==
 
-The httpc_handler module of the !R13B01 distribution sporadically crashes when a message is published to a web server. This can be seen using our integrated java tests. There have been some changes to that module in !R13B02 which seem to have fixed this bug. We haven't observed this behavior in Erlang !R13B02 - !R14A.
+The httpc_handler module of the !R13B01 distribution sporadically crashes when a message is published to a web server. This can be seen using our integrated java tests. There have been some changes to that module in !R13B02 which seem to have fixed this bug. We haven't observed this behavior in Erlang !R13B02 - R14A.
+
+== Configure claims that the Java client script may not work ==
+
+Our client script wrapper in `java-api/scalaris` uses `java-functions` and `build-classpath` to cope with distribution-specific paths. If either of them is not present, the client script _may_ not work. The following explains a bit more what they do and how they are used:
+
+  * `java-functions` (if present) will be used to setup the java environment before starting the client
+  * `build-classpath` is a script that eases classpath creation especially when a script is being used on different platforms. If `build-classpath` is not present, our wrapper script will try to locate dependent jar files in `$SCALARIS_JAVA_HOME/lib` - these jars include `OtpErlang-1.5.4.jar` and `jakarta-commons-cli-1.2.jar` which can be copied from `./java-api/lib/`. If unset, SCALARIS_JAVA_HOME will be set to the client wrapper script's location which enables the script to be called from a checkout of the scalaris sources.
