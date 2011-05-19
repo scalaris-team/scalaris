@@ -229,7 +229,7 @@ AC_ARG_WITH([java-functions],
 
 AC_CHECK_FILE($with_java_functions, [JAVAFUNCTIONS=$with_java_functions],
               [JAVAFUNCTIONS=$with_java_functions
-               AC_MSG_WARN(["$with_java_functions" was not found (java-api/scalaris will likely fail)])])
+               AC_MSG_WARN([java-functions was not found in "$with_java_functions" (java-api/scalaris may fail)])])
 AC_SUBST(JAVAFUNCTIONS)
 
 BUILDCLASSPATH=
@@ -243,7 +243,7 @@ AC_ARG_WITH([build-classpath],
 AC_SUBST(BUILDCLASSPATH)
 
 AS_IF([test ! -x "$BUILDCLASSPATH"],
-      [AC_MSG_WARN(["$BUILDCLASSPATH" was not found or is not executable (java-api/scalaris will likely fail)])])
+      [AC_MSG_WARN([build-classpath was not found in "$BUILDCLASSPATH" or is not executable (java-api/scalaris may fail)])])
 
 ###########################################################
 #
