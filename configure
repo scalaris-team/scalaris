@@ -3141,8 +3141,8 @@ if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
   JAVAFUNCTIONS=$with_java_functions
 else
   JAVAFUNCTIONS=$with_java_functions
-               { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: \"$with_java_functions\" was not found (java-api/scalaris will likely fail)" >&5
-$as_echo "$as_me: WARNING: \"$with_java_functions\" was not found (java-api/scalaris will likely fail)" >&2;}
+               { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: java-functions was not found in \"$with_java_functions\" (java-api/scalaris may fail)" >&5
+$as_echo "$as_me: WARNING: java-functions was not found in \"$with_java_functions\" (java-api/scalaris may fail)" >&2;}
 fi
 
 
@@ -3200,8 +3200,8 @@ fi
 
 
 if test ! -x "$BUILDCLASSPATH"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: \"$BUILDCLASSPATH\" was not found or is not executable (java-api/scalaris will likely fail)" >&5
-$as_echo "$as_me: WARNING: \"$BUILDCLASSPATH\" was not found or is not executable (java-api/scalaris will likely fail)" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: build-classpath was not found in \"$BUILDCLASSPATH\" or is not executable (java-api/scalaris may fail)" >&5
+$as_echo "$as_me: WARNING: build-classpath was not found in \"$BUILDCLASSPATH\" or is not executable (java-api/scalaris may fail)" >&2;}
 fi
 
 ###########################################################
