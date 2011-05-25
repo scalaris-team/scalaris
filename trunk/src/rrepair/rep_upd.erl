@@ -25,8 +25,12 @@
 
 -export([start_link/1, init/1, on/2, check_config/0]).
 
--define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+-ifdef(with_export_type_support).
+-export_type([db_chunk/0]).
+-endif.
+
+%-define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -47,15 +51,19 @@
 -type state() :: 
     {
         Sync_method     :: sync_method(),  
-        TriggerState    :: trigger:state()
+        TriggerState    :: trigger:state(),
+        SyncRound       :: non_neg_integer(),
+        MonitorTable    :: pdb:tableid()
     }.
+
 -type message() ::
-	{?TRIGGER_NAME} |
+    {?TRIGGER_NAME} |
     {get_state_response, any()} |
     {get_chunk_response, db_chunk()} |
     {get_sync_struct_response, intervals:interval(), sync_struct()} |
     {request_sync, sync_method(), sync_struct()} |
-    {web_debug_info, Requestor::comm:erl_local_pid()}.
+    {web_debug_info, Requestor::comm:erl_local_pid()} |
+    {sync_progress_report, Sender::comm:erl_local_pid(), Text::string()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -63,27 +71,29 @@
 
 %% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
-on({?TRIGGER_NAME}, {SyncMethod, TriggerState}) ->
+on({?TRIGGER_NAME}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
     DhtNodePid = pid_groups:get_my(dht_node),
     comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
     
-	NewTriggerState = trigger:next(TriggerState),
+    NewTriggerState = trigger:next(TriggerState),
     ?TRACE("Trigger NEXT", []),
-	{SyncMethod, NewTriggerState};
+    {SyncMethod, NewTriggerState, Round, MonitorTable};
 
 %% @doc retrieve node responsibility interval
 on({get_state_response, NodeDBInterval}, State) ->
     DhtNodePid = pid_groups:get_my(dht_node),
     comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, 10000}), %TODO remove 10k constant
     State;
+
 %% @doc retriebe local node db
-on({get_chunk_response, DB}, {SyncMethod, _TriggerState} = State) ->
+on({get_chunk_response, DB}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
     MyPid = self(),
-    Pid = spawn(fun() -> build_SyncStruct(MyPid, SyncMethod, DB) end),    
-    ?TRACE("get_chunk: let [~p] build SyncStruct", [Pid]),
-    State;
+    _Pid = spawn(fun() -> build_SyncStruct(MyPid, SyncMethod, DB, Round) end),    
+    ?TRACE("get_chunk: let [~p] build SyncStruct", [_Pid]),
+    {SyncMethod, TriggerState, Round + 1, MonitorTable};
+
 %% @doc SyncStruct is build and can be send to a node for synchronization
-on({get_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _} = State) ->
+on({get_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _TriggerState, Round, MonitorTable} = State) ->
     ?TRACE("~p", [SyncStruct]),
     DhtNodePid = pid_groups:get_my(dht_node),
     {_, _, RKey, RBr} = intervals:get_bounds(Interval),
@@ -97,26 +107,45 @@ on({get_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _} = State) ->
                     {lookup_aux, DestKey, 0, 
                         {send_to_group_member, ?PROCESS_NAME, 
                             {request_sync, SyncMethod, SyncStruct}}}),
+    monitor:proc_set_value(MonitorTable, 
+                           io_lib:format("~p", [erlang:localtime()]), 
+                           io_lib:format("SEND SyncReq Round=[~B] to Key [~p]", [Round, DestKey])),
     State;
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_sync, Sync_method, SyncStruct}, State) ->
+on({request_sync, Sync_method, SyncStruct}, {_SM, _TriggerState, _Round, MonitorTable} = State) ->
     _ = case Sync_method of
-            bloom       -> bloom_sync:start_bloom_sync(SyncStruct);
+            bloom ->
+                monitor:proc_inc_value(MonitorTable, "Recv-Sync-Req-Count"),
+                bloom_sync:start_bloom_sync(SyncStruct);
             merkleTree  -> ok;
             art         -> ok
         end,
-	State;
+    State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({web_debug_info, Requestor}, 
-   {SyncMethod, _TriggerState} = State) ->
+   {SyncMethod, _TriggerState, Round, _MonitorTable} = State) ->
     KeyValueList =
         [{"Sync Method:", SyncMethod},
-         {"Bloom Module:", ?REP_BLOOM}
+         {"Bloom Module:", ?REP_BLOOM},
+         {"Sync Round:", Round}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Monitor Reporting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({sync_progress_report, _Sender, Msg}, {_SyncMethod, _TriggerState, _Round, MonitorTable} = State) ->
+    monitor:proc_set_value(MonitorTable, io_lib:format("~p", [erlang:localtime()]), Msg),
+    State;
+on({report_to_monitor}, {_SyncMethod, _TriggerState, _Round, MonitorTable} = State) ->
+    monitor:proc_report_to_my_monitor(MonitorTable),
+    comm:send_local_after(monitor:proc_get_report_interval() * 1000, 
+                          self(),
+                          {report_to_monitor}),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -124,11 +153,11 @@ on({web_debug_info, Requestor},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc builds desired synchronization structure and replies it to SourcePid
--spec build_SyncStruct(comm:erl_local_pid(), sync_method(), db_chunk()) -> ok.
-build_SyncStruct(SourcePid, SyncMethod, {ChunkInterval, _} = DB) ->
+-spec build_SyncStruct(comm:erl_local_pid(), sync_method(), db_chunk(), Round::non_neg_integer()) -> ok.
+build_SyncStruct(SourcePid, SyncMethod, {ChunkInterval, _} = DB, Round) ->
     SyncStruct = case SyncMethod of
                      bloom ->
-                         build_bloom(DB);
+                         build_bloom(DB, Round);
                      merkleTree ->
                          ok; %TODO
                      art ->
@@ -163,8 +192,8 @@ fill_bloom([H | T], KeyBF, VerBF) ->
     end.
 
 %% @doc Build bloom filter sync struct.
--spec build_bloom(db_chunk()) -> sync_struct().
-build_bloom({Interval, DB}) ->
+-spec build_bloom(db_chunk(), non_neg_integer()) -> sync_struct().
+build_bloom({Interval, DB}, Round) ->
     Fpr = 0.001,           %TODO move to config?
     ElementNum = 10,    %TODO set to node db item cout + 5%?
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
@@ -172,7 +201,7 @@ build_bloom({Interval, DB}) ->
     BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
     BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
     {KeyBF, VerBF} = fill_bloom(DB, BF1, BF2),
-	{Interval, comm:this(), KeyBF, VerBF}.
+    {bloom_sync_struct, Interval, comm:this(), KeyBF, VerBF, Round}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -183,7 +212,7 @@ build_bloom({Interval, DB}) ->
 %%      and returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-	Trigger = get_update_trigger(),
+    Trigger = get_update_trigger(),
     gen_component:start_link(?MODULE, Trigger,
                              [{pid_groups_join_as, DHTNodeGroup, ?PROCESS_NAME}]).
 
@@ -191,7 +220,10 @@ start_link(DHTNodeGroup) ->
 -spec init(module()) -> state().
 init(Trigger) ->	
     TriggerState = trigger:init(Trigger, fun get_update_interval/0, ?TRIGGER_NAME),
-    {get_sync_method(), trigger:next(TriggerState)}.
+    comm:send_local_after(monitor:proc_get_report_interval() * 1000, 
+                          self(),
+                          {report_to_monitor}),
+    {get_sync_method(), trigger:next(TriggerState), 0, monitor:proc_init(?MODULE)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
