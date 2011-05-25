@@ -30,7 +30,7 @@ have
 three choices:
   # drop the persistent storage and start as new node (crash-stop model)
   # get some inconsistencies as another node already took over. For a short timeframe there might be more replicas in the system than allowed, which destroys the proper functioning of our majority based algorithms.
-  # friendly join the system and update the stored peristent state with the current state in the system (one way to implement that would be (1)).
+  # friendly join the system and update the stored persistent state with the current state in the system (one way to implement that would be (1)).
 
 So, persistent storage does not help in improving the availability or
 robustness of the system.
@@ -152,35 +152,6 @@ Note: we do not support Scalaris on Windows at the moment.
 
 For changing the yaws port of the boot server or a normal node change the `YAWSPORT` variable in its start script, e.g. `bin/boot.sh` or `bin/cs_local?.sh`.
 
-== The Java-client cannot connect to Scalaris. What is wrong? ==
-
-If you do not use our client script (java-api/scalaris) your hostname configuration probably needs some adjustments. Erlang and Java use different mechanisms to determine the full qualified domain name (FQDN), but both have to come to the same result in order to be able to connect.
-
-You may check your installation using:
-
-{{{
-scalarisctl checkinstallation
-}}}
-
-which will guide you further.
-
-  * For getting the node name Erlang uses, call:
-    {{{
-    erl -noinput -name boot -eval 'io:format("~s~n", [node()]), halt().'
-    }}}
-    If this gives you a strange erlang error, replace "boot" in the line above with some arbitrary name.
-  * For getting the hostname the Java-API uses, call:
-    * installed with an RPM:
-      {{{
-      scalaris --noerl -lh
-      }}}
-    * inside the source directory:
-      {{{
-      ./java-api/scalaris --noconfig --noerl -lh
-      }}}
-
-The domain name from Erlang should be the same as the name printed by the Java client. If not, you may need to change your `/etc/hosts` or `/etc/hostname` for it to work.
-
 = Usage =
 
 == What is the difference between a boot server and an ordinary node? ==
@@ -239,6 +210,49 @@ If you stop a Scalaris node and immediately restart it, you can get messages lik
 [error] Discarding message {ping,{{127,0,0,1},14195,<9148.128.0>}} from <0.108.0> to <0.102.0> in an old incarnation (3) of this node (1)
 }}}
 It is not so much an error but a message created by the Erlang runtime that this particular message was sent to the last "incarnation" of this Scalaris node. Here it is the failure detector sending a ping message. After a couple of seconds, the failure detector will notice the change and the messages will stop to appear.
+
+== Java-API ==
+
+=== The Java-client cannot connect to Scalaris. What is wrong? ===
+
+If you do not use our client script (java-api/scalaris) your hostname configuration probably needs some adjustments. Erlang and Java use different mechanisms to determine the full qualified domain name (FQDN), but both have to come to the same result in order to be able to connect.
+
+You may check your installation using:
+
+{{{
+scalarisctl checkinstallation
+}}}
+
+which will guide you further.
+
+  * For getting the node name Erlang uses, call:
+    {{{
+    erl -noinput -name boot -eval 'io:format("~s~n", [node()]), halt().'
+    }}}
+    If this gives you a strange erlang error, replace "boot" in the line above with some arbitrary name.
+  * For getting the hostname the Java-API uses, call:
+    * installed with an RPM:
+      {{{
+      scalaris --noerl -lh
+      }}}
+    * inside the source directory:
+      {{{
+      ./java-api/scalaris --noconfig --noerl -lh
+      }}}
+
+The domain name from Erlang should be the same as the name printed by the Java client. If not, you may need to change your `/etc/hosts` or `/etc/hostname` for it to work.
+
+== Python-API ==
+
+=== Reading a list of (small) integers results in a unicode object instead of a list. ===
+
+Unfortunately, Erlang can not distinguish between list of (small) integers and strings (which are lists of small integers, internally). Therefore, we can not guess the resulting type neither in the Java API, nor in the Python API.
+The Java API contains several ???Value() methods for the values read back from 
+Scalaris.
+Since python is dynamically typed, most of these are not needed except for the 
+conversion from (falsely interpreted) strings to lists of integers. Use our `str_to_list()` utility method form the `Scalaris` module for this task.
+
+Note: You can safely use `Scalaris.str_to_list()` for any integer list (even those with large integers which are already returned as valid lists). It will return the original value if it is not a string or unicode object.
 
 = Known Issues =
 
