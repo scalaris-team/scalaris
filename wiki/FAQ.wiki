@@ -130,8 +130,8 @@ No. Well, maybe.
   # run `build.bat` in the cmd window
   # check that there were no errors during the compilation; warnings are fine
   # go to the `bin` sub-directory
-  # adapt the path to your Erlang installation in `boot.bat`, `cs_local.bat`, `cs_local2.bat` and `cs_local3.bat`
-  # run `boot.bat` in the cmd window
+  # adapt the path to your Erlang installation in `firstnode.bat`, and `joining_node.bat`
+  # run `firstnode.bat` in the cmd window
 
 If you have Erlang < !R13B04, you will need to adapt the `Emakefile` that `build.bat` generates if it doesn't exist.
 Replace every occurrence of
@@ -154,37 +154,39 @@ For changing the yaws port of the boot server or a normal node change the `YAWSP
 
 = Usage =
 
-== What is the difference between a boot server and an ordinary node? ==
+== What is the difference between a management-server and an ordinary node? ==
 
-Scalaris has two types of nodes:
-  * a boot server and
+Scalaris nodes can take two roles:
+  * a management-server and
   * a Scalaris node.
 
-Formerly the boot-server was required to add new nodes to the system, hence its name. Today the boot-server only maintains a list of all Scalaris nodes in the system and provides a web-interface for debugging including different plots of the ring. It has no administrative tasks. A ring could be created without one.
+As a management-server a Scalaris node maintains a list of all Scalaris nodes in the system and provides a web-interface for debugging - including different plots of the ring. It has no administrative tasks. A ring could be created without one.
 
-Note that for historical reasons `./bin/boot.sh` starts an Erlang VM with both, a boot server and a Scalaris node which is marked as the _first_ node.
+Note that `./bin/firstnode.sh` starts an Erlang VM with both, a management-server and a Scalaris node which is marked as the _first_ node.
 
 == Why is one Scalaris node marked as _first_? ==
 
 When starting a Scalaris ring we have to mark exactly one node as the first node. This node will not try contacting any other node and simply wait for connections. It thus creates a new ring.
 
-We are currently using a command line parameter `-boot_cs first true` (non-empty boot server) / `-scalaris first true` (ordinary Scalaris nodes) to mark the first Scalaris node inside an Erlang VM as being the first (see `bin/scalarisctl` and `dht_node:init/1`).
+We are currently using a command line parameter `-scalaris first true` to mark the first Scalaris node inside an Erlang VM as being the first (see `bin/scalarisctl` and `dht_node:init/1`).
+
+For a fault-tolerant setup, Scalaris is able to select the first node by itself from the list of known_hosts. Scalaris will then start, if a majority of the known hosts becomes available (See -q in `bin/scalariscrl`). In this setup no node has to be marked first explicitly.
 
 == How do I start a ring? ==
 
 {{{
-./bin/boot.sh`
+./bin/firstnode.sh`
 }}}
 
 starts both a boot server and a Scalaris node - a ring of size 1.
 Further clients can be started using
 {{{
-./bin/cs_local.sh
-./bin/cs_local2.sh
-./bin/cs_local3.sh
+./bin/joining_node.sh
+./bin/joining_node.sh 2
+./bin/joining_node.sh 3
 }}}
 
-Alternatively, `scalarisctl boot start` starts a boot server and `scalarisctl node start` starts a client similar to `cs_local.sh`. A boot server without a Scalaris node can be started by providing it with the option `-e` (empty) and a first node can be started with `-f`. To start Scalaris in the background, use `-d`. Refer to the help `scalarisctl -h` for further options.
+Alternatively, `scalarisctl -m start` starts a management-server and `scalarisctl -s start` starts a node similar to `joining_node.sh`. A Scalaris node can be marked as first using the parameter `-f`. To start Scalaris in the background, use `-d`. Refer to the help `scalarisctl -h` for further options.
 
 == How do I delete a key? ==
 
