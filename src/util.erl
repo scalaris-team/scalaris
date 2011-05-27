@@ -41,7 +41,7 @@
          is_unittest/0, make_filename/1,
          app_get_env/2,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
-         for_to/3]).
+         for_to/3, for_to_ex/3]).
 -export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 -export([s_repeat/3, s_repeatAndCollect/3, s_repeatAndAccumulate/5,
@@ -623,6 +623,17 @@ for_to(I, N, Fun) ->
        true -> ok
     end.
 
+%% for(i; I<=n; i++) { fun(i) }
+for_to_ex(N, N, Fun, Acc) ->
+    [Fun(N)|Acc];
+for_to_ex(I, N, Fun, Acc) ->
+    R = Fun(I),
+    for_to_ex(I+1, N, Fun, [R|Acc]).
+
+-spec for_to_ex(integer(), integer(), anyFun(T)) -> [T].
+for_to_ex(I, N, Fun) ->
+    for_to_ex(I, N, Fun, []).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sequential repeat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -643,7 +654,7 @@ s_repeat(Fun, Args, Times) ->
 s_repeatAndCollect(Fun, Args, Times) ->    
     s_repeatAndAccumulate(Fun, Args, Times, fun(R, Y) -> [R | Y] end, []).
   
-%% @doc Sequential repetion of function FUN with Arguments ARGS TIMES-fold.
+%% @doc Sequential repetion of function FUN with arguments ARGS TIMES-fold.
 %%      Results will be accumulated with an accumulator function ACCUFUN 
 %%      in register ACCUMULATOR.
 %% @end
