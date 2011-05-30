@@ -8,43 +8,43 @@
 <h2>Opennebula Image</h2>
 
 <table>
-<tr>
+<tr class="zebra">
 <th></th>
 <th></th>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Id:</td>
   <td><%= @image['ID'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>User</td>
   <td><%= @image['USERNAME'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Name</td>
   <td><%= @image['NAME'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Public</td>
   <td><%= @image['PUBLIC'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Persistent</td>
   <td><%= @image['PERSISTENT'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Source</td>
   <td><%= @image['SOURCE'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>State</td>
   <td><%= @image.state_str %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Running VMs</td>
   <td><%= @image['RUNNING_VMS'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Register Time</td>
   <td><%= Time.at(@image['REGTIME'].to_i) %></td>
 </tr>

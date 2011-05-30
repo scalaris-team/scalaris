@@ -1,0 +1,15 @@
+Requirements
+============
+
+- ruby
+- gems ()
+
+
+The user has to provide a file named "one.rb":
+CREDENTIALS   = "username:password"
+ENDPOINT      = "http://localhost:2633/RPC2"
+SCALARISIMAGE = "Scalaris4Contrail"
+HADOOPIMAGE   = "Hadoop4Contrail"
+
+It contains the url to the opennebula xmlrpc interface, the
+usercredentials and the names of the scalaris/hadoop images.
