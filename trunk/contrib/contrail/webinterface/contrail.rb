@@ -7,12 +7,15 @@ require 'erb'
 require 'cgi'
 require 'json'
 require 'oca'
+require 'nokogiri'
 
 include OpenNebula
 
 require 'database.rb'
 require 'one.rb'
 require 'scalarishelper.rb'
+require 'opennebulahelper.rb'
+require 'jsonrpc.rb'
 
 get '/' do
   @ps = CGI.escapeHTML(%x[ps aux | grep beam.smp]).gsub(/\n/, '<br>')
@@ -59,6 +62,12 @@ get '/one/vm/:id' do
   erb :opennebula_vm
 end
 
+post '/one/vm/:id/delete' do
+  @id = params[:id]
+  OpenNebulaHelper.delete_vm(@id)
+  redirect '/one'
+end
+
 get '/one/vnet/:id' do
   @id = params[:id]
   client = Client.new(CREDENTIALS, ENDPOINT)
@@ -83,10 +92,7 @@ end
 post '/scalaris' do
   if params["user"] != nil and params["user"] != ""
     @valid = true
-    @vm_id = ScalarisHelper.create[1]
-    instance = Scalaris.create(:user => params["user"], :head_node => @vm_id)
-    instance.add_vm(:one_vm_id => @vm_id)
-    @id = instance.id
+    @id = ScalarisHelper.create(params["user"])[1]
   else
     @valid = false
     @id = ""
@@ -98,11 +104,28 @@ end
 
 post '/scalaris/:id/add' do
   @id = params[:id].to_i
-  @instance = Scalaris[@id]
   @new_vm_id = ScalarisHelper.add(@id)[1]
-  @instance.add_vm(:one_vm_id => @new_vm_id)
   @params = params.to_json
+  @instance = Scalaris[@id]
   erb :scalaris_add
+end
+
+post '/scalaris/:id/destroy' do
+  @id = params[:id].to_i
+  ScalarisHelper.destroy(@id)
+  redirect '/scalaris'
+end
+
+get '/hadoop' do
+  @instances = Hadoop.all
+  erb :hadoop
+end
+
+post '/jsonrpc' do
+  req = JSON.parse(request.body.read)
+  res = JSONRPC.call(req)
+  puts res
+  res
 end
 
 #DB.loggers << Logger.new($stdout)

@@ -1,2 +1,3 @@
-tr:nth-child(even) {background: #CCC}
-tr:nth-child(odd) {background: #FFF}
+tr.zebra:nth-child(even) {background: #CCC}
+tr.zebra:nth-child(odd) {background: #FFF}
+a:link { text-decoration:none; }

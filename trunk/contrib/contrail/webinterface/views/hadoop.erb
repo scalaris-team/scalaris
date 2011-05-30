@@ -1,21 +1,21 @@
 <html>
 <head>
 <link rel="stylesheet" text="text/css" href="/contrail.css">
-<title>Scalaris Instances</title>
+<title>Hadoop Control Panel</title>
 </head>
 <body>
 
-<h2>Scalaris Instances</h>
+<h2>Hadoop Instances</h>
 <ul>
 <% @instances.each do |instance| %>
-  <li><a href="/scalaris/<%= instance.id %>"><%= instance.id %></a> <%= instance.user %></li>
+  <li><a href="/hadoop/<%= instance.id %>"><%= instance.id %></a> <%= instance.user %></li>
 <% end %>
 </ul>
 
 <h2>Create new Instance</h>
 
 <fieldset style="border: 1px black solid">
-<form action="/scalaris" method="post">
+<form action="/hadoop" method="post">
   <div style="margin:0;padding:0;display:inline">
     <input name="_method" type="hidden" value="post" />
   </div>
@@ -26,6 +26,6 @@
 </form>
 </fieldset>
 
-<a href="/">Main</a> <a href="/scalaris">Scalaris</a> <a href="/one">OpenNebula</a>
+<a href="/">Main</a> <a href="/scalaris">Scalaris</a> <a href="/hadoop">Hadoop</a> <a href="/one">OpenNebula</a>
 </body>
 </html>

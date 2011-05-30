@@ -11,13 +11,13 @@
 
 <h2>Opennebula Images</h>
 <table>
-<tr>
+<tr class="zebra">
   <th>Id</th>
   <th>Name</th>
   <th>State</th>
 </tr>
 <% @image_pool.each do |image| %>
-<tr>
+<tr class="zebra">
   <td><a href="/one/image/<%= image.id %>"><%= image.id %></a> </td>
   <td><%= image.name %></a> </td>
   <td><%= image.state_str %></td>
@@ -27,14 +27,14 @@
 
 <h2>Opennebula VMs</h>
 <table>
-<tr>
+<tr class="zebra">
   <th>Id</th>
   <th>Name</th>
   <th>Owner</th>
   <th>State</th>
 </tr>
 <% @vm_pool.each do |vm| %>
-<tr>
+<tr class="zebra">
   <td><a href="/one/vm/<%= vm.id %>"><%= vm.id %></a></td>
   <td><%= vm.name %></td>
   <td><%= vm['USERNAME'] %></td>
@@ -45,13 +45,13 @@
 
 <h2>Opennebula Hosts</h>
 <table>
-<tr>
+<tr class="zebra">
   <th>Id</th>
   <th>Name</th>
   <th>Cluster</th>
 </tr>
 <% @host_pool.each do |host| %>
-<tr>
+<tr class="zebra">
   <td><a href="/one/host/<%= host.id %>"><%= host.id %></a></td>
   <td><%= host.name %></td>
   <td><%= host['CLUSTER'] %></td>
@@ -59,17 +59,14 @@
 <% end %>
 </table>
 
-<ul>
-</ul>
-
 <h2>Opennebula VNets</h>
 <table>
-<tr>
+<tr class="zebra">
   <th>Id</th>
   <th>Name</th>
 </tr>
 <% @vnet_pool.each do |vnet| %>
-<tr>
+<tr class="zebra">
   <td><a href="/one/vnet/<%= vnet.id %>"><%= vnet.id %></a> </td>
   <td><%= vnet.name %></td>
 </tr>

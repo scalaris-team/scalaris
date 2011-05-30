@@ -1,5 +1,6 @@
 <html>
 <head>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
 <title>Scalaris Added Instance</title>
 </head>
 <body>
@@ -8,7 +9,7 @@
 Added <a href="/one/vm/<%= @new_vm_id %>"><%= @new_vm_id %></a>
 
 <h3>VMs</h3>
-<% @instance.vms_dataset.each do |vm| %>
+<% @instance.scalarisvms_dataset.each do |vm| %>
   <li><a href="/one/vm/<%= vm.one_vm_id %>"><%= vm.one_vm_id %></a></li>
 <% end %>
 

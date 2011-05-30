@@ -12,33 +12,40 @@
 <th></th>
 <th></th>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Id:</td>
   <td><%= @vm['ID'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>User</td>
   <td><%= @vm['USERNAME'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Name</td>
   <td><%= @vm['NAME'] %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>State</td>
   <td><%= @vm.state_str %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>Start Time</td>
   <td><%= Time.at(@vm['STIME'].to_i) %></td>
 </tr>
-<tr>
+<tr class="zebra">
   <td>IP</td>
   <td><%= Nokogiri::XML(@vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text %></td>
 </tr>
 </table>
 
 <%= @vm.to_xml %>
+
+<form action="/one/vm/<%= @vm['ID']%>/delete" method="post">
+  <div style="margin:0;padding:0;display:inline">
+    <input name="_method" type="hidden" value="post" />
+  </div>
+  <input id="submit" name="commit" type="submit" value="Delete" />
+</form>
 
 </body>
 </html>

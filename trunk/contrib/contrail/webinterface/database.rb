@@ -17,11 +17,30 @@ migration "create scalaris table" do
   end
 end
 
-migration "create vms table" do
-  database.create_table :vms do
+migration "create scalarisvms table" do
+  database.create_table :scalarisvms do
     primary_key :id
     String      :one_vm_id
     foreign_key :scalaris_id, :scalaris
+  end
+end
+
+migration "create hadoop table" do
+  database.create_table :hadoops do
+    primary_key :id
+    String      :user
+    String      :known_nodes
+    DataTime    :created_at
+    DataTime    :updated_at
+    String      :head_node
+  end
+end
+
+migration "create hadoopvms table" do
+  database.create_table :hadoopvms do
+    primary_key :id
+    String      :one_vm_id
+    foreign_key :hadoop_id, :hadoops
   end
 end
 # you can also alter tables
@@ -34,7 +53,7 @@ end
 
 # models just work ...
 class Scalaris < Sequel::Model
-  one_to_many :vms
+  one_to_many :scalarisvms
 
   def before_create
     return false if super == false
@@ -47,6 +66,24 @@ class Scalaris < Sequel::Model
   end
 end
 
-class Vm < Sequel::Model
+class Scalarisvm < Sequel::Model
   many_to_one :scalaris
+end
+
+class Hadoop < Sequel::Model
+  one_to_many :hadoopvms
+
+  def before_create
+    return false if super == false
+    self.created_at = Time.now.utc
+  end
+
+  def before_update
+    return false if super == false
+    self.updated_at = Time.now.utc
+  end
+end
+
+class Hadoopvm < Sequel::Model
+  many_to_one :hadoops
 end
